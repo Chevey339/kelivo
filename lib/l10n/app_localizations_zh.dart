@@ -12563,6 +12563,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25050,6 +25056,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37616,4 +37628,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get markdownDangerLabel => '危險';
+
+  @override
+  String get markdownCopyRichTextAction => '複製富文字';
+
+  @override
+  String get markdownCopySelectionFailed => '複製所選內容失敗。';
 }

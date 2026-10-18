@@ -141,3 +141,35 @@ reparsing, persistent selection/layout, streaming truncation and virtual code
 offsets. Final gates: root 7,976 passed / one existing skip, package 275 passed,
 golden suite 389 passed, clean analyzers. Extra images are visual review evidence,
 not native-device proof.
+
+## C46 rich clipboard
+
+Twenty-three focused menu checks cover HTML/plain representations on five
+simulated platforms, partial HTML styling/link selection, signed/large ordered
+list starts, failure feedback, existing Markdown copy and iOS Translate. A
+rendered macOS right-click menu and a narrow Android long-press menu expose both
+copy formats; the latter uses the standard More overflow control.
+
+A standalone macOS profile integration entry point creates its own MaterialApp,
+selection area and synthetic Markdown view. It writes through the real
+SystemClipboard, then reads HTML and plain text only after that write completes.
+Both formats preserve Chinese/emoji, emphasis, link destinations, indented code,
+table TSV and an HTML list beginning at -3. The response records HTML 371 UTF-16
+code units and plain text 97. Driver and test completion both report success.
+The integration_test plugin-not-detected warning also appears, as in earlier
+native runs; the driver-delivered report and content assertions were verified.
+
+This test uses programmatic SelectAll and invokes the app menu action. It proves
+the macOS native clipboard round trip, not manual Cmd+A/Cmd+C handling or another
+platform's clipboard. It does not start the production application entry point
+or open the business database. The physical Android and original-conversation
+validation gaps remain deferred.
+
+Final C46 gates: root 7,986 passed / one existing skip, package 276 passed,
+golden suite 389 passed, all analyzers clean, and 384 default captures remain
+byte-identical to C43. Localization regeneration is reproducible. A preceding
+full run received HTTP 403 in an existing localhost LongCat-host fixture;
+its complete 30-test file and the unchanged full rerun both passed. The test
+uses a local server and synthetic credentials; no provider-code change was
+made to address that failure. Final performance acceptance remains open as
+recorded in `markstream_baseline.md`.

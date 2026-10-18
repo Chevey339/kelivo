@@ -82,13 +82,11 @@ String _attributes(String tag, Map<String, String> attributes) {
     if (tag == 'a' && key == 'href' && isSafeHtmlUrl(value)) safe[key] = value;
     if (tag == 'img' && key == 'src' && isSafeHtmlUrl(value, image: true))
       safe[key] = value;
-    if (const {
-          'colspan',
-          'rowspan',
-          'width',
-          'height',
-          'start',
-        }.contains(key) &&
+    if (tag == 'ol' && key == 'start') {
+      final start = int.tryParse(value);
+      if (start != null) safe[key] = '$start';
+    }
+    if (const {'colspan', 'rowspan', 'width', 'height'}.contains(key) &&
         RegExp(r'^[0-9]{1,5}$').hasMatch(value))
       safe[key] = value;
     if (key == 'align' && const {'left', 'center', 'right'}.contains(value))

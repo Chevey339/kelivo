@@ -333,3 +333,39 @@ five independent rounds and the unmet limits are not waived.
 ```text
 MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":325,"firstPumpP95Us":566,"contentPumpMedianUs":2101,"contentPumpP95Us":3190,"coldFirstFrameUs":497743}
 ```
+
+## C46 final application configuration
+
+Measured after rich-copy integration and the ordered-list serialization repair,
+on the same M4 Pro host, Flutter 3.47.6 and test-VM mode. Five fresh processes
+each start the 100k document before any Markdown rendering in that isolate;
+app adapters and the message selection controller are enabled. No other Flutter
+test/build ran concurrently. The 30k append fixture and sample protocol are
+unchanged. These final-state rounds supersede the preceding diagnostic batch.
+
+| Round | Scheduling median / p95 (ms) | Actual content median / p95 (ms) | 100k cold (ms) |
+| --- | --- | --- | --- |
+| 1 | 0.463 / 0.812 | 2.334 / 3.741 | 570.870 |
+| 2 | 0.380 / 0.816 | 2.164 / 2.991 | 547.442 |
+| 3 | 0.361 / 0.481 | 1.971 / 3.430 | 527.100 |
+| 4 | 0.386 / 0.862 | 2.361 / 3.599 | 516.395 |
+| 5 | 0.513 / 0.969 | 2.872 / 4.726 | 538.990 |
+| Median of rounds | 0.386 / 0.816 | 2.334 / 3.599 | 538.990 |
+
+The scheduling frame does not yet paint the appended token because the 50ms
+coalescing timer is pending. It must not be substituted for the actual content
+frame. C04 recorded actual 2.003/3.147ms and 814.392ms cold. In these final
+rounds the actual median and p95 are higher than C04 and cold is lower. No
+noise tolerance was agreed, so this is not proof of a non-regression. Both the
+actual-content <=2ms goal and the <=100ms cold goal remain unmet. Implementation
+completion does not waive those performance acceptance items. Android physical
+device performance and real-chat corpus validation are deferred by the user;
+these desktop results do not establish either.
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":463,"firstPumpP95Us":812,"contentPumpMedianUs":2334,"contentPumpP95Us":3741,"coldFirstFrameUs":570870}
+MARKSTREAM_RENDER {"run":2,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":380,"firstPumpP95Us":816,"contentPumpMedianUs":2164,"contentPumpP95Us":2991,"coldFirstFrameUs":547442}
+MARKSTREAM_RENDER {"run":3,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":361,"firstPumpP95Us":481,"contentPumpMedianUs":1971,"contentPumpP95Us":3430,"coldFirstFrameUs":527100}
+MARKSTREAM_RENDER {"run":4,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":386,"firstPumpP95Us":862,"contentPumpMedianUs":2361,"contentPumpP95Us":3599,"coldFirstFrameUs":516395}
+MARKSTREAM_RENDER {"run":5,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":513,"firstPumpP95Us":969,"contentPumpMedianUs":2872,"contentPumpP95Us":4726,"coldFirstFrameUs":538990}
+```

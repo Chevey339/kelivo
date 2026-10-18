@@ -1,5 +1,8 @@
 import 'dart:ui' as ui;
+import 'package:super_clipboard/super_clipboard.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import '../../support/markdown_render_helpers.dart';
 import 'package:markstream/markstream.dart';
 import 'package:flutter/services.dart';
@@ -12,16 +15,17 @@ Widget _harness(String source) => _widgetHarness(Text(source));
 Widget _widgetHarness(
   Widget child, {
   MarkstreamSelectionController? controller,
+  ClipboardWriter? writer,
 }) => MaterialApp(
   locale: const Locale('en'),
   supportedLocales: AppLocalizations.supportedLocales,
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   home: Scaffold(
     body: controller == null
-        ? AppSelectionArea(child: child)
+        ? AppSelectionArea(clipboardWriter: writer, child: child)
         : MarkstreamSelectionScope(
             controller: controller,
-            child: AppSelectionArea(child: child),
+            child: AppSelectionArea(clipboardWriter: writer, child: child),
           ),
   ),
 );
@@ -33,6 +37,47 @@ AdaptiveTextSelectionToolbar _menu(WidgetTester tester) {
         tester.state<SelectableRegionState>(find.byType(SelectableRegion)),
       )
       as AdaptiveTextSelectionToolbar;
+}
+
+class _ClipboardWriter implements ClipboardWriter {
+  _ClipboardWriter({this.fail = false});
+  final bool fail;
+  List<DataWriterItem> items = [];
+  @override
+  Future<void> write(Iterable<DataWriterItem> items) async {
+    this.items = items.toList();
+    if (fail) {
+      throw StateError('clipboard unavailable');
+    }
+  }
+
+  Future<String?> decode(ValueFormat<String> format) async {
+    final values = <String, Object?>{};
+    for (final item in items) {
+      for (final data in item.data) {
+        for (final representation in (await data).representations) {
+          final serialized = representation.serialize() as Map;
+          values[representation.format] = serialized['data'];
+        }
+      }
+    }
+    final provider = _ClipboardProvider(values);
+    for (final name in format.codec.decodingFormats) {
+      if (values.containsKey(name)) {
+        return format.codec.decode(provider, name);
+      }
+    }
+    return null;
+  }
+}
+
+class _ClipboardProvider implements PlatformDataProvider {
+  _ClipboardProvider(this.values);
+  final Map<String, Object?> values;
+  @override
+  Future<Object?> getData(String format) async => values[format];
+  @override
+  List<String> getAllFormats() => values.keys.toList();
 }
 
 void main() {
@@ -51,6 +96,198 @@ void main() {
         .selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
   }
+
+  for (final platform in [TargetPlatform.macOS, TargetPlatform.android]) {
+    testWidgets(
+      'rendered selection menu exposes both copy formats on $platform',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final writer = _ClipboardWriter();
+        await tester.pumpWidget(
+          _widgetHarness(
+            const MarkstreamView(source: '**Selected** prose'),
+            writer: writer,
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (platform == TargetPlatform.macOS) {
+          await selectAll(tester);
+          await tester.tapAt(
+            markdownGlyphCenter(tester, 'Selected'),
+            kind: ui.PointerDeviceKind.mouse,
+            buttons: kSecondaryMouseButton,
+          );
+        } else {
+          await tester.longPressAt(markdownGlyphCenter(tester, 'Selected'));
+        }
+        await tester.pumpAndSettle();
+        if (find.byTooltip('More').evaluate().isNotEmpty) {
+          await tester.tap(find.byTooltip('More'));
+          await tester.pumpAndSettle();
+        }
+        expect(find.text('Copy Markdown'), findsOneWidget);
+        expect(find.text('Copy rich text'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Copy rich text'));
+        await tester.pumpAndSettle();
+        expect(writer.items, hasLength(1));
+        expect(
+          await writer.decode(Formats.htmlText),
+          contains('<strong>Selected</strong>'),
+        );
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
+  }
+
+  testWidgets(
+    'rich copy writes HTML and plain text as one clipboard item',
+    (tester) async {
+      final writer = _ClipboardWriter();
+      const source =
+          '**Bold** [Link](https://example.com) &amp; 中文😀\n\n```dart\n  code();\n```\n\n| A | B |\n| - | - |\n|  | value |';
+      await tester.pumpWidget(
+        _widgetHarness(
+          const MarkstreamView(source: source, cullToViewport: false),
+          writer: writer,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectAll(tester);
+      _menu(tester).buttonItems!
+          .singleWhere((item) => item.label == 'Copy rich text')
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(writer.items, hasLength(1));
+      expect(writer.items.single.data, hasLength(2));
+      final html = await writer.decode(Formats.htmlText);
+      final plain = await writer.decode(Formats.plainText);
+      expect(html, contains('<strong>Bold</strong>'));
+      expect(html, contains('<a href="https://example.com">Link</a>'));
+      expect(html, contains('&amp; 中文😀'));
+      expect(html, contains('<pre><code class="language-dart">  code();'));
+      expect(html, contains('<td></td>'));
+      expect(plain, contains('Bold Link & 中文😀'));
+      expect(plain, contains('A\tB\n\tvalue'));
+      expect(plain, isNot(contains('<strong>')));
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
+  testWidgets('rich copy preserves signed and large HTML list starts', (
+    tester,
+  ) async {
+    for (final start in [-3, 100000]) {
+      final writer = _ClipboardWriter();
+      await tester.pumpWidget(
+        _widgetHarness(
+          MarkstreamView(
+            source: '<ol start="$start"><li>First</li><li>Second</li></ol>',
+          ),
+          writer: writer,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectAll(tester);
+      _menu(tester).buttonItems!
+          .singleWhere((item) => item.label == 'Copy rich text')
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(
+        await writer.decode(Formats.htmlText),
+        contains('<ol start="$start">'),
+      );
+      expect(
+        await writer.decode(Formats.plainText),
+        '$start. First\n${start + 1}. Second',
+      );
+    }
+  });
+
+  testWidgets('rich copy clips HTML selection before clearing the toolbar', (
+    tester,
+  ) async {
+    final writer = _ClipboardWriter();
+    await tester.pumpWidget(
+      _widgetHarness(
+        const MarkstreamView(
+          source:
+              '<p><b>Bold</b> <a href="https://example.com" onclick="bad()">Link</a><script>SECRET</script> Tail</p>',
+        ),
+        writer: writer,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final paragraph = markdownParagraph(tester, 'Bold Link');
+    Offset edge(int index, {bool end = false}) {
+      final box = paragraph
+          .getBoxesForSelection(
+            TextSelection(baseOffset: index, extentOffset: index + 1),
+          )
+          .first
+          .toRect();
+      return paragraph.localToGlobal(
+        Offset(end ? box.right - .1 : box.left + .1, box.center.dy),
+      );
+    }
+
+    final drag = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await drag.addPointer();
+    await drag.down(edge(1));
+    await drag.moveTo(edge(6, end: true));
+    await drag.up();
+    await tester.pumpAndSettle();
+    _menu(tester).buttonItems!
+        .singleWhere((item) => item.label == 'Copy rich text')
+        .onPressed!();
+    await tester.pumpAndSettle();
+    final html = await writer.decode(Formats.htmlText);
+    expect(html, contains('<b>old</b>'));
+    expect(html, contains('<a href="https://example.com">Li</a>'));
+    expect(html, isNot(contains('onclick')));
+    expect(html, isNot(contains('SECRET')));
+    expect(await writer.decode(Formats.plainText), 'old Li');
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets(
+    'rich clipboard failure reports an error without breaking selection',
+    (tester) async {
+      await tester.pumpWidget(
+        _widgetHarness(
+          const MarkstreamView(source: '**Copy me**'),
+          writer: _ClipboardWriter(fail: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectAll(tester);
+      _menu(tester).buttonItems!
+          .singleWhere((item) => item.label == 'Copy rich text')
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(
+        AppSnackBarManager().activeToasts.last.notification.message,
+        'Could not copy the selected text.',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await selectAll(tester);
+      expect(
+        _menu(
+          tester,
+        ).buttonItems!.any((item) => item.type == ContextMenuButtonType.copy),
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('Markdown menu copies structured selection and keeps native Copy', (
     tester,

@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:super_clipboard/super_clipboard.dart' show ClipboardWriter;
+import '../markdown/rich_clipboard.dart';
+import 'snackbar.dart';
 
 import 'package:markstream/markstream.dart'
     show
@@ -13,9 +16,14 @@ import '../../l10n/app_localizations.dart';
 
 /// App-owned selection actions shared by messages and Markdown previews.
 class AppSelectionArea extends StatefulWidget {
-  const AppSelectionArea({super.key, required this.child});
+  const AppSelectionArea({
+    super.key,
+    required this.child,
+    this.clipboardWriter,
+  });
 
   final Widget child;
+  final ClipboardWriter? clipboardWriter;
 
   @override
   State<AppSelectionArea> createState() => _AppSelectionAreaState();
@@ -64,6 +72,24 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     }
   }
 
+  Future<void> _copyRichText(SelectableRegionState region) async {
+    final pending = copyRichMarkdownSelection(
+      _markdownSelection,
+      writer: widget.clipboardWriter,
+    );
+    region.hideToolbar();
+    try {
+      await pending;
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.markdownCopySelectionFailed,
+        type: NotificationType.error,
+      );
+    }
+  }
+
   Widget _buildMenu(BuildContext context, SelectableRegionState region) {
     final text = _selectedText;
     final anchors = region.contextMenuAnchors;
@@ -81,6 +107,11 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
                 unawaited(Clipboard.setData(ClipboardData(text: markdown)));
               }
             },
+          ),
+        if (_markdownSelection.hasSelection)
+          ContextMenuButtonItem(
+            label: AppLocalizations.of(context)!.markdownCopyRichTextAction,
+            onPressed: () => unawaited(_copyRichText(region)),
           ),
         if (_translationAvailable && text.trim().isNotEmpty)
           ContextMenuButtonItem(

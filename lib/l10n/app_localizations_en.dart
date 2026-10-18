@@ -13158,4 +13158,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get markdownDangerLabel => 'Danger';
+
+  @override
+  String get markdownCopyRichTextAction => 'Copy rich text';
+
+  @override
+  String get markdownCopySelectionFailed => 'Could not copy the selected text.';
 }

@@ -23495,6 +23495,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Danger'**
   String get markdownDangerLabel;
+
+  /// No description provided for @markdownCopyRichTextAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy rich text'**
+  String get markdownCopyRichTextAction;
+
+  /// No description provided for @markdownCopySelectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the selected text.'**
+  String get markdownCopySelectionFailed;
 }
 
 class _AppLocalizationsDelegate

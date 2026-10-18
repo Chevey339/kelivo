@@ -5795,5 +5795,7 @@
   "markdownImportantLabel": "Important",
   "markdownWarningLabel": "Warning",
   "markdownCautionLabel": "Caution",
-  "markdownDangerLabel": "Danger"
+  "markdownDangerLabel": "Danger",
+  "markdownCopyRichTextAction": "Copy rich text",
+  "markdownCopySelectionFailed": "Could not copy the selected text."
 }

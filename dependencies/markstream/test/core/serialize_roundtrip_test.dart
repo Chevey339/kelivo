@@ -3,6 +3,17 @@ import 'package:markstream/markstream_core.dart';
 
 void main() {
   const parser = MarkdownParser();
+  test('HTML ordered-list starts retain signed and large integer values', () {
+    for (final start in [-3, 0, 100000]) {
+      final doc = parser.parse('<ol start="$start"><li>Item</li></ol>');
+      expect(toHtml(doc), contains('<ol start="$start">'));
+      expect(toHtml(parser.parse(toMarkdown(doc))), toHtml(doc));
+    }
+    expect(
+      toHtml(parser.parse('<ol start="invalid"><li>Item</li></ol>')),
+      isNot(contains('start=')),
+    );
+  });
   test('plain clipboard text includes structure and TSV quoting', () {
     final doc = parser.parse(
       '# Title\n\n- [x] Done\n- Next\n\n| A | B |\n| --- | --- |\n| "quote" | `x` |\n\n```\n  first\n\tsecond\n```\n\n\$x+y\$',

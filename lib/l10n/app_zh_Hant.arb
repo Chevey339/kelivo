@@ -4601,5 +4601,7 @@
   "markdownImportantLabel": "重要",
   "markdownWarningLabel": "警告",
   "markdownCautionLabel": "注意",
-  "markdownDangerLabel": "危險"
+  "markdownDangerLabel": "危險",
+  "markdownCopyRichTextAction": "複製富文字",
+  "markdownCopySelectionFailed": "複製所選內容失敗。"
 }
