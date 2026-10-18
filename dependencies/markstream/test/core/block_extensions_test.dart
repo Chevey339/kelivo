@@ -20,6 +20,22 @@ void main() {
     expect(math.span.slice(source), '\$\$\na + b\n\nc + d\n\$\$');
     expect(_text(doc.children.last), '后续文字');
   });
+  test('empty escaped brackets remain visible punctuation', () {
+    const source = r'Before \[ \] \# after';
+    final doc = const MarkdownParser().parse(source);
+    expect(doc.children.single, isA<ParagraphNode>());
+    expect(toPlainText(doc), 'Before [ ] # after');
+    for (final streaming in [false, true]) {
+      final incremental = IncrementalDocument();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        expect(
+          incremental.update(prefix, streaming: streaming).toJson(),
+          const MarkdownParser().parse(prefix, streaming: streaming).toJson(),
+        );
+      }
+    }
+  });
   test('bracket math preserves original body positions under a quote', () {
     const source = '> \\[\r\n> x + y\r\n> \\]';
     final quote = parser.parse(source).children.single as BlockQuoteNode;

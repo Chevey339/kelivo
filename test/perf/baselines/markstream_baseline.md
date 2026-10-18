@@ -236,3 +236,48 @@ The binding emitted a missing native integration-test-plugin warning on macOS;
 the Dart driver response still contained the complete reported measurements.
 The largest case contains 27,038 characters, so it does not establish the exact
 30k target. Desktop content p95 and 100k cold-render targets remain open for C41.
+
+
+## M3 application checkpoint — C41
+
+Measurement tree: `1dcb110a` plus the C41 scaling/empty-bracket repairs. Same
+host, Flutter 3.47.6, fixed 30k/100k corpus, fonts, viewport and five fresh
+process protocol as C04. The app's actual Markdown wrapper and adapters are
+installed. The host uses SelectionArea, without a MarkstreamSelectionController
+(the message-menu controller is introduced by C44). No other Flutter tests or
+native QA app were running during this batch.
+
+| Metric | C04 median of rounds (ms) | C41 median of rounds (ms) | C41 range (ms) |
+| --- | ---: | ---: | ---: |
+| Scheduling frame median | 1.270 | 0.365 | 0.327–0.453 |
+| Scheduling frame p95 | 2.413 | 0.695 | 0.576–0.785 |
+| Actual content frame median | 2.003 | 2.064 | 1.896–2.220 |
+| Actual content frame p95 | 3.147 | 3.355 | 3.281–3.604 |
+| 100k cold first frame | 814.392 | 520.010 | 498.538–552.710 |
+
+The cheap scheduling frame is below 2ms, but it does not paint the new token.
+The actual content frame median/p95 and cold frame **do not meet** the desktop
+acceptance targets. This batch's content median/p95 also exceed C04 slightly;
+no noise tolerance was agreed, so no non-regression claim is made. Cold render
+is materially faster than C04 but remains well above 100ms. Physical Android
+profile timing is deferred; its 4ms target has no measurement.
+
+A preliminary five-process batch before these visual repairs measured content
+median/p95 1.714/2.849ms and cold 462.551ms. It is not the final code state and
+must not replace the final results above. A diagnostic CPU profile (280 samples)
+at that earlier state still found native widget mounting/rebuild work dominant
+(149–157 inclusive samples; not additive). The existing viewport culling avoids
+offscreen paint/semantics; it does not avoid all initial layout and mounting.
+This report leaves the unmet performance criteria explicit.
+
+Raw final output:
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":327,"firstPumpP95Us":785,"contentPumpMedianUs":1896,"contentPumpP95Us":3604,"coldFirstFrameUs":498538}
+MARKSTREAM_RENDER {"run":2,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":348,"firstPumpP95Us":695,"contentPumpMedianUs":2040,"contentPumpP95Us":3281,"coldFirstFrameUs":504894}
+MARKSTREAM_RENDER {"run":3,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":365,"firstPumpP95Us":576,"contentPumpMedianUs":2064,"contentPumpP95Us":3355,"coldFirstFrameUs":520010}
+MARKSTREAM_RENDER {"run":4,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":367,"firstPumpP95Us":670,"contentPumpMedianUs":2084,"contentPumpP95Us":3327,"coldFirstFrameUs":526017}
+MARKSTREAM_RENDER {"run":5,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":453,"firstPumpP95Us":750,"contentPumpMedianUs":2220,"contentPumpP95Us":3421,"coldFirstFrameUs":552710}
+```
+
+The complete visual/interaction review is in `markstream_visual_review.md`.

@@ -26,6 +26,10 @@ const _fonts = {
     defaultValue: '/System/Library/Fonts/Hiragino Sans GB.ttc',
   ),
   'golden-code': 'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
+  'golden-emoji': String.fromEnvironment(
+    'MARKSTREAM_EMOJI_FONT',
+    defaultValue: '/System/Library/Fonts/Apple Color Emoji.ttc',
+  ),
 };
 
 void main() {
@@ -157,7 +161,10 @@ void main() {
                                     streaming: id.contains('_open_'),
                                     baseStyle: const TextStyle(
                                       fontFamily: 'golden-latin',
-                                      fontFamilyFallback: ['golden-cjk'],
+                                      fontFamilyFallback: [
+                                        'golden-cjk',
+                                        'golden-emoji',
+                                      ],
                                       fontSize: 15.5,
                                       height: 1.55,
                                     ),

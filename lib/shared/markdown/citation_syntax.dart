@@ -112,8 +112,10 @@ RenderedInline buildCitation(
       child: SelectableSpanAdapter(
         selectedText: source,
         mouseCursor: SystemMouseCursors.click,
-        child: _CitationChips(
-          refs: parseCitationRefs(citation.attributes['refs']!),
+        child: MediaQuery.withNoTextScaling(
+          child: _CitationChips(
+            refs: parseCitationRefs(citation.attributes['refs']!),
+          ),
         ),
       ),
     ),

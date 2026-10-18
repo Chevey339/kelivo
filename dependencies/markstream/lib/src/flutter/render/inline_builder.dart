@@ -84,6 +84,11 @@ class InlineSpanBuilder {
           ),
       ],
     );
+    // RichText scales WidgetSpans; their text must not scale a second time.
+    Widget unscaled(Widget child) =>
+        MediaQuery.textScalerOf(context) == TextScaler.noScaling
+        ? child
+        : MediaQuery.withNoTextScaling(child: child);
     WidgetSpan atom(Widget child, String selectedText) {
       Widget selected = SelectableSpanAdapter(
         selectedText: selectedText,
@@ -104,7 +109,7 @@ class InlineSpanBuilder {
       return WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
         baseline: TextBaseline.alphabetic,
-        child: selected,
+        child: unscaled(selected),
       );
     }
 
@@ -167,7 +172,7 @@ class InlineSpanBuilder {
       return WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
         baseline: TextBaseline.alphabetic,
-        child: capsule,
+        child: unscaled(capsule),
       );
     }
     if (node is MathInlineNode) {

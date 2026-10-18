@@ -76,7 +76,16 @@ MathBlockStart? findMathBlockStart(
     } else {
       continue;
     }
-    final after = source.substring(i + opener.length, end);
+    final bodyStart = i + opener.length;
+    final sameLineClose = findMathBlockClose(source, bodyStart, end, closer);
+    // Empty escaped brackets are punctuation, not a display formula.
+    if (opener == r'\[' &&
+        sameLineClose >= 0 &&
+        source.substring(bodyStart, sameLineClose).trim().isEmpty) {
+      i = sameLineClose + closer.length - 1;
+      continue;
+    }
+    final after = source.substring(bodyStart, end);
     if (after.trim().isEmpty ||
         findMathBlockClose(source, i + opener.length, end, closer) >= 0 ||
         streaming ||

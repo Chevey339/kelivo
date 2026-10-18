@@ -19,9 +19,10 @@ pixel ratio 1, locale zh_CN and deterministic citation indices. Fixtures with
 existing behavior, including existing rendering defects.
 
 The default Latin font is macOS Arial; CJK uses Hiragino Sans GB; code uses the
-vendored JetBrains Mono. Package fonts (including KaTeX and icons) are loaded
+vendored JetBrains Mono. Current captures also load Apple Color Emoji so decoded
+entities have a real emoji face. Package fonts (including KaTeX and icons) are loaded
 from Flutter's font manifest. On another machine pass `MARKSTREAM_LATIN_FONT` and
-`MARKSTREAM_CJK_FONT` with `--dart-define` to specify local font files. Missing
+`MARKSTREAM_CJK_FONT` and `MARKSTREAM_EMOJI_FONT` with `--dart-define` to specify local font files. Missing
 fonts fail explicitly. The capture manifest records the font file paths and
 sizes; use the same files for comparisons. System fonts are never copied into
 the repository.

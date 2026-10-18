@@ -104,6 +104,30 @@ class _ProbeState extends State<_Probe> {
 }
 
 void main() {
+  testWidgets('inline atoms apply inherited text scaling exactly once', (
+    tester,
+  ) async {
+    final widths = <double>[];
+    for (final scale in [1.0, 1.3]) {
+      await tester.pumpWidget(
+        host(
+          const MarkstreamView(source: r'Before `code` $x$ after'),
+          scale: scale,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final code = paragraph('code');
+      expect(code.textScaler, TextScaler.noScaling);
+      final bounds = MatrixUtils.transformRect(
+        code.getTransformTo(null),
+        Offset.zero & code.size,
+      );
+      widths.add(bounds.width);
+      expect(paragraph('x').textScaler, TextScaler.noScaling);
+    }
+    expect(widths.last / widths.first, closeTo(1.3, .001));
+  });
+
   testWidgets('basic AST blocks render with tasks and inherited font scaling', (
     tester,
   ) async {
