@@ -45,14 +45,16 @@ import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
 import 'markdown_block_list.dart';
 import 'streaming_rich_text.dart';
-import 'markdown_selection/selectable_span_adapter.dart';
-import 'markdown_selection/table_selection.dart';
-import 'markdown_selection/code_selection.dart';
+import 'package:markstream/markstream.dart'
+    show
+        SelectableSpanAdapter,
+        TableSelectionDelegate,
+        TableCellSelection,
+        CodeSelectionDelegate,
+        buildSelectableText;
 import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
-
-import 'markdown_selection/selectable_rich_text.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.

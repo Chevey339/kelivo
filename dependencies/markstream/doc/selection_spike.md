@@ -28,3 +28,9 @@ Run `flutter test test/flutter/inline_code_capsule_test.dart test/flutter/select
 These are Flutter 3.47.6 widget tests with synthesized pointer input. Physical
 Android handle behavior and native clipboard integration remain manual QA.
 The library creates no SelectionArea; the application owns the selection menu.
+
+`mixed_selection_test.dart` also exercises one document containing a paragraph,
+inline code, a formula, a table with empty edge cells and split code chunks.
+Desktop dragging in both directions and Android end-handle expansion retain
+TSV cell separators, code indentation and line breaks. The application imports
+these same code/table/paragraph delegates from the package.

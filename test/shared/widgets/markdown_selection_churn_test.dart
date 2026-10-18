@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
-import 'package:Kelivo/shared/widgets/markdown_selection/stable_selection_container.dart';
+import 'package:markstream/markstream.dart' show StableSelectionContainer;
 import '../../support/business_test_harness.dart';
 
 void main() {

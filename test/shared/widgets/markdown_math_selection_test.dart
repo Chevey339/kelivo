@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
-import 'package:Kelivo/shared/widgets/markdown_selection/selectable_span_adapter.dart';
+import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

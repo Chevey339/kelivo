@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import 'markdown_selection/selectable_rich_text.dart';
+import 'package:markstream/markstream.dart' show buildSelectableText;
 import 'incremental_markdown_document.dart';
 import 'markdown_block_list.dart';
 

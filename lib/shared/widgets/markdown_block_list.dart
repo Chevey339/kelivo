@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
-import 'markdown_selection/stable_selection_container.dart';
+import 'package:markstream/markstream.dart' show StableSelectionDelegate;
 import 'incremental_markdown_document.dart';
 import 'export_capture_scope.dart';
 
