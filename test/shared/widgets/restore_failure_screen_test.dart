@@ -66,7 +66,7 @@ void main() {
   setUpAll(() async {
     final font =
         Platform.environment['KELIVO_RECOVERY_FONT'] ??
-        'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf';
+        'test/fixtures/fonts/JetBrainsMono-Regular.ttf';
     final bytes = await File(font).readAsBytes();
     await (FontLoader(
       'RecoveryPreview',

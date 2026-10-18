@@ -25,8 +25,7 @@ const _fonts = {
     'MARKSTREAM_CJK_FONT',
     defaultValue: '/System/Library/Fonts/Hiragino Sans GB.ttc',
   ),
-  'golden-code':
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+  'golden-code': 'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
 };
 
 void main() {

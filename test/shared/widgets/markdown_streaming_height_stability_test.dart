@@ -23,7 +23,7 @@ void main() {
     // hides the per-line rounding a real font goes through. Lay these cases out
     // with a real font so a separator that only matches on paper still fails.
     final bytes = File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytesSync();
     await (FontLoader(
       'markdown-metrics',

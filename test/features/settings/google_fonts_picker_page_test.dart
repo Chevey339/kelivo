@@ -124,7 +124,7 @@ void main() {
   late Uint8List bytes;
   setUpAll(() async {
     bytes = await File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytes();
     final loader = FontLoader('GoogleFontsTestUi')
       ..addFont(Future.value(bytes.buffer.asByteData()));

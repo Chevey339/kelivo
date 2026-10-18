@@ -18,7 +18,7 @@ import '../support/business_test_harness.dart';
 void main() {
   setUpAll(() async {
     final bytes = File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytesSync();
     await (FontLoader(
       'markstream-bench',
