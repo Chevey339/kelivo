@@ -2,14 +2,14 @@ import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_render_helpers.dart';
 
 Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
     ChangeNotifierProvider(
@@ -30,12 +30,8 @@ Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
 SelectableRegionState _region(WidgetTester tester) =>
     tester.state<SelectableRegionState>(find.byType(SelectableRegion));
 
-RenderParagraph _paragraph(String text) => find
-    .byType(RichText)
-    .evaluate()
-    .map((e) => e.renderObject)
-    .whereType<RenderParagraph>()
-    .firstWhere((p) => p.text.toPlainText().contains(text));
+RenderParagraph _paragraph(WidgetTester tester, String text) =>
+    markdownParagraph(tester, text);
 
 Offset _edge(RenderParagraph paragraph, int offset, {required bool trailing}) {
   final box = paragraph
@@ -72,8 +68,6 @@ void main() {
     testWidgets('table cells join surrounding selection at width $width', (
       tester,
     ) async {
-      markdownTableTargetPlatformOverride = defaultTargetPlatform;
-      addTearDown(() => markdownTableTargetPlatformOverride = null);
       const source =
           'Before\n\n| A | | C |\n| --- | --- | --- |\n| | B | |\n| D | | E |\n\nAfter';
       const expected = 'Before\n\nA\t\tC\n\tB\t\nD\t\tE\n\nAfter';
@@ -96,7 +90,8 @@ void main() {
       _region(tester).selectAll(SelectionChangedCause.keyboard);
       await tester.pumpAndSettle();
       expect(selected, expected);
-      final first = _paragraph('Before'), last = _paragraph('After');
+      final first = _paragraph(tester, 'Before'),
+          last = _paragraph(tester, 'After');
       final start = _edge(first, 0, trailing: false),
           end = _edge(last, 4, trailing: true);
       for (final reverse in [false, true]) {
@@ -111,8 +106,6 @@ void main() {
   testWidgets('mobile selection includes table cells without toolbar text', (
     tester,
   ) async {
-    markdownTableTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => markdownTableTargetPlatformOverride = null);
     String? selected;
     await tester.pumpWidget(
       _harness(
@@ -130,8 +123,8 @@ void main() {
     await tester.pumpAndSettle();
     await _drag(
       tester,
-      _edge(_paragraph('Before'), 0, trailing: false),
-      _edge(_paragraph('After'), 4, trailing: true),
+      _edge(_paragraph(tester, 'Before'), 0, trailing: false),
+      _edge(_paragraph(tester, 'After'), 4, trailing: true),
       touch: true,
     );
     expect(selected, 'Before\n\nName\tValue\nAlpha\t42\n\nAfter');
@@ -175,8 +168,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final start = _edge(_paragraph('AlphaBeta'), 5, trailing: false);
-    final end = _edge(_paragraph('GammaDelta'), 4, trailing: true);
+    final start = _edge(_paragraph(tester, 'AlphaBeta'), 5, trailing: false);
+    final end = _edge(_paragraph(tester, 'GammaDelta'), 4, trailing: true);
     for (final reverse in [false, true]) {
       _region(tester).clearSelection();
       await tester.pump();
@@ -186,8 +179,6 @@ void main() {
   }, variant: TargetPlatformVariant.desktop());
 
   testWidgets('mobile wide table retains horizontal scrolling', (tester) async {
-    markdownTableTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => markdownTableTargetPlatformOverride = null);
     String? selected;
     await tester.pumpWidget(
       _harness(
@@ -202,7 +193,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final body = find.byKey(const ValueKey('markdown-table-body'));
+    final body = find.byKey(const ValueKey('markstream-table-scroll'));
     final state = tester.state<ScrollableState>(
       find.descendant(of: body, matching: find.byType(Scrollable)).first,
     );
@@ -275,7 +266,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final before = _paragraph('Before'), after = _paragraph('After');
+        final before = _paragraph(tester, 'Before'),
+            after = _paragraph(tester, 'After');
         final start = _edge(
           before,
           before.text.toPlainText().indexOf('Before'),

@@ -17,7 +17,8 @@ MarkstreamTheme mapMarkdownTheme(
             fontFamily: family == null || family.isEmpty
                 ? baseStyle?.fontFamily
                 : family,
-            fontFamilyFallback: getPlatformFontFallback(),
+            fontFamilyFallback:
+                baseStyle?.fontFamilyFallback ?? getPlatformFontFallback(),
             fontSize: baseStyle?.fontSize ?? 15.5,
             height: baseStyle?.height ?? 1.55,
             letterSpacing:

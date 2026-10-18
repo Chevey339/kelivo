@@ -45,3 +45,22 @@ List<RenderParagraph> renderedParagraphsWith(
   final text = paragraph.text.toPlainText();
   return exact ? text == pattern : text.contains(pattern);
 }).toList();
+
+List<Offset> markdownGlyphCenters(WidgetTester tester, String label) => [
+  for (final paragraph in markdownParagraphs(tester))
+    for (final match in RegExp(
+      RegExp.escape(label),
+    ).allMatches(paragraph.text.toPlainText()))
+      paragraph.localToGlobal(
+        paragraph
+            .getBoxesForSelection(
+              TextSelection(
+                baseOffset: match.start,
+                extentOffset: match.start + 1,
+              ),
+            )
+            .first
+            .toRect()
+            .center,
+      ),
+];

@@ -217,6 +217,15 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
           borderRadius: BorderRadius.circular(radius),
           child: ColoredBox(color: body, child: table),
         );
+        clipped = DecoratedBox(
+          key: const ValueKey('markstream-table-surface'),
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.borderColor, width: .8),
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          child: clipped,
+        );
         if (_capturing) clipped = ColoredBox(color: body, child: clipped);
         final surface = RepaintBoundary(key: _boundary, child: clipped);
         return Padding(

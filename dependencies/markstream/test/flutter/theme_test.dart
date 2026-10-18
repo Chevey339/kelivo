@@ -38,6 +38,7 @@ void main() {
       bodyStyle: const TextStyle(
         inherit: false,
         fontFamily: 'AppFont',
+        fontFamilyFallback: ['AppCjk'],
         fontSize: 20,
         color: Colors.purple,
       ),
@@ -59,6 +60,8 @@ void main() {
     expect(theme.table.heading.fontFamily, 'AppFont');
     expect(theme.table.heading.fontWeight, FontWeight.w500);
     expect(theme.code.text.fontFamily, 'AppMono');
+    expect(theme.code.text.fontFamilyFallback, ['AppCjk']);
+    expect(theme.inlineCode.text.fontFamilyFallback, ['AppCjk']);
     expect(theme.inlineCode.text.fontFamily, 'AppMono');
     expect(theme.inlineCode.text.color, Colors.purple);
     expect(theme.code.text.color, light.onSurface);

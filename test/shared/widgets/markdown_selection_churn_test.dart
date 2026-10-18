@@ -2,12 +2,12 @@ import 'dart:ui' as ui;
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:markstream/markstream.dart' show StableSelectionContainer;
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_render_helpers.dart';
 
 void main() {
   for (final blocks in [false, true]) {
@@ -52,12 +52,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         Offset edge(String word, bool end) {
-          final p = find
-              .byType(RichText)
-              .evaluate()
-              .map((e) => e.renderObject)
-              .whereType<RenderParagraph>()
-              .firstWhere((p) => p.text.toPlainText().contains(word));
+          final p = markdownParagraph(tester, word);
           final index =
               p.text.toPlainText().indexOf(word) + (end ? word.length - 1 : 0);
           final b = p

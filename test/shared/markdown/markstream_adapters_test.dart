@@ -245,7 +245,11 @@ void main() {
       host(
         const MarkdownWithCodeHighlight(
           text: r'$x$ \(y\)',
-          baseStyle: TextStyle(fontSize: 21),
+          baseStyle: TextStyle(
+            fontSize: 21,
+            fontFamily: 'CallerFace',
+            fontFamilyFallback: ['CallerCjk'],
+          ),
         ),
         settings: settings,
       ),
@@ -255,6 +259,14 @@ void main() {
     expect(view.options.inlineMath, isTrue);
     expect(view.options.dollarInlineMath, isFalse);
     expect(view.theme!.body.fontSize, 21);
+    for (final style in [
+      view.theme!.body,
+      ...view.theme!.headings,
+      view.theme!.inlineCode.text,
+      view.theme!.code.text,
+    ]) {
+      expect(style.fontFamilyFallback, ['CallerCjk']);
+    }
     expect(view.theme!.strongWeight, AppFontWeights.strong);
     expect(view.codeOptions.autoCollapse, isTrue);
     expect(view.codeOptions.mobileWrap, isTrue);

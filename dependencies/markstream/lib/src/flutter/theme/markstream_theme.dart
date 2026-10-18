@@ -484,6 +484,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       height: 1.5,
       color: colors.onSurface,
       fontFamily: codeFontFamily,
+      fontFamilyFallback: body.fontFamilyFallback,
     );
     final extremeOutline =
         colors.outlineVariant == Colors.black ||

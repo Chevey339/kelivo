@@ -2,13 +2,15 @@ import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_render_helpers.dart';
 
 Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
     ChangeNotifierProvider(
@@ -29,12 +31,8 @@ Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
 SelectableRegionState _region(WidgetTester tester) =>
     tester.state<SelectableRegionState>(find.byType(SelectableRegion));
 
-RenderParagraph _paragraph(String text) => find
-    .byType(RichText)
-    .evaluate()
-    .map((e) => e.renderObject)
-    .whereType<RenderParagraph>()
-    .firstWhere((p) => p.text.toPlainText().contains(text));
+RenderParagraph _paragraph(WidgetTester tester, String text) =>
+    markdownParagraph(tester, text);
 
 Offset _edge(RenderParagraph paragraph, int offset, {required bool trailing}) {
   final box = paragraph
@@ -91,8 +89,8 @@ void main() {
     _region(tester).selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
     expect(selected, expected);
-    final start = _edge(_paragraph('Before'), 0, trailing: false);
-    final end = _edge(_paragraph('After'), 4, trailing: true);
+    final start = _edge(_paragraph(tester, 'Before'), 0, trailing: false);
+    final end = _edge(_paragraph(tester, 'After'), 4, trailing: true);
     for (final reverse in [false, true]) {
       _region(tester).clearSelection();
       await tester.pump();
@@ -119,8 +117,8 @@ void main() {
     await tester.pumpAndSettle();
     await _drag(
       tester,
-      _edge(_paragraph('Before'), 0, trailing: false),
-      _edge(_paragraph('After'), 4, trailing: true),
+      _edge(_paragraph(tester, 'Before'), 0, trailing: false),
+      _edge(_paragraph(tester, 'After'), 4, trailing: true),
       touch: true,
     );
     expect(selected, 'Before\n\n  alpha\n    beta\n\nAfter');
@@ -140,7 +138,18 @@ void main() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Before'),
-                SelectableHighlightView(code, enableHighlight: false),
+                MarkstreamCodeContent(
+                  node: CodeBlockNode(
+                    span: SourceSpan(0, code.length),
+                    children: [
+                      TextNode(span: SourceSpan(0, code.length), text: code),
+                    ],
+                  ),
+                  theme: MarkstreamTheme.fromColorScheme(
+                    ThemeData.light().colorScheme,
+                  ),
+                  highlight: false,
+                ),
                 const Text('After'),
               ],
             ),

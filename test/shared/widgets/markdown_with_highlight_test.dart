@@ -1071,6 +1071,11 @@ Inline ***strong emphasis*** text.
       final table = tester.widget<Table>(find.byType(Table));
       expect(table.border?.horizontalInside.width, greaterThan(0));
       expect(table.border?.verticalInside.width, greaterThan(0));
+      final surface = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('markstream-table-surface')),
+      );
+      expect(surface.position, DecorationPosition.foreground);
+      expect((surface.decoration as BoxDecoration).border!.top.width, .8);
       expect(
         find.descendant(
           of: tableBlock,
@@ -3394,7 +3399,7 @@ final price = "$12";
     },
   );
 
-  testWidgets('SelectableHighlightView 为已注册语言生成高亮 span', (tester) async {
+  testWidgets('MarkstreamCodeContent 为已注册语言生成高亮 span', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -3415,7 +3420,7 @@ final price = "$12";
     expect(children.length, greaterThan(1));
   });
 
-  testWidgets('SelectableHighlightView 同内容父级重建时复用高亮 span', (tester) async {
+  testWidgets('MarkstreamCodeContent 同内容父级重建时复用高亮 span', (tester) async {
     late StateSetter rebuild;
 
     await tester.pumpWidget(
@@ -4665,7 +4670,7 @@ void main() {
   );
 
   testWidgets(
-    'SelectableHighlightView reuses parsed highlight nodes across remounts',
+    'MarkstreamCodeContent reuses parsed highlight nodes across remounts',
     (tester) async {
       debugResetHighlightNodeCache();
       addTearDown(debugResetHighlightNodeCache);
