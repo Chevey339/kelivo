@@ -1,0 +1,332 @@
+import 'package:flutter/material.dart';
+
+import '../../core/ast/nodes.dart';
+import '../../core/serialize/to_plain_text.dart';
+import '../extensions/registry.dart';
+import '../interfaces/renderers.dart';
+import '../theme/markstream_theme.dart';
+import 'inline_builder.dart';
+import 'streaming_text.dart';
+
+/// One view owns this session. Cached prefix widgets do not retain historical
+/// whole-document snapshots; recursive callbacks read the current session.
+class MarkstreamRenderer {
+  MarkstreamRenderer(this.recognizerFor);
+  final LinkRecognizerBuilder recognizerFor;
+  late DocumentNode document;
+  late MarkstreamTheme theme;
+  late MarkstreamExtensions extensions;
+  CodeHighlighter? codeHighlighter;
+  MathRenderer? mathRenderer;
+  ImageBuilder? imageBuilder;
+  LinkHandler? linkHandler;
+  late InlineSpanBuilder _inline;
+
+  void update({
+    required DocumentNode document,
+    required MarkstreamTheme theme,
+    required MarkstreamExtensions extensions,
+    CodeHighlighter? codeHighlighter,
+    MathRenderer? mathRenderer,
+    ImageBuilder? imageBuilder,
+    LinkHandler? linkHandler,
+  }) {
+    this.document = document;
+    this.theme = theme;
+    this.extensions = extensions;
+    this.codeHighlighter = codeHighlighter;
+    this.mathRenderer = mathRenderer;
+    this.imageBuilder = imageBuilder;
+    this.linkHandler = linkHandler;
+    _inline = InlineSpanBuilder(
+      theme: theme,
+      extensions: extensions,
+      renderingContext: contextFor,
+      recognizerFor: recognizerFor,
+      mathRenderer: mathRenderer,
+      imageBuilder: imageBuilder,
+      linkHandler: linkHandler,
+    );
+  }
+
+  MarkstreamRenderContext contextFor(BuildContext context, bool streaming) =>
+      MarkstreamRenderContext(
+        document: document,
+        theme: theme,
+        streaming: streaming,
+        buildBlock: (node) => build(context, node, streaming: streaming),
+        buildInline: (node, style) =>
+            _inline.build(context, node, style, streaming: streaming),
+      );
+
+  Widget inlineText(
+    BuildContext context,
+    List<InlineNode> nodes,
+    TextStyle style, {
+    required bool streaming,
+  }) => StreamingText(
+    streaming: streaming,
+    text: Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          for (final node in nodes)
+            _inline.build(context, node, style, streaming: streaming),
+        ],
+      ),
+      style: style,
+    ),
+  );
+
+  Widget children(
+    BuildContext context,
+    List<BlockNode> nodes, {
+    required bool streaming,
+    double? spacing,
+    TextStyle? firstStyle,
+  }) {
+    final visible = nodes
+        .where((node) => node is! ReferenceDefinitionNode)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < visible.length; i++)
+          Padding(
+            key: ValueKey(visible[i].span.start),
+            padding: EdgeInsets.only(
+              top: i == 0 ? 0 : spacing ?? theme.blockSpacing,
+            ),
+            child: build(
+              context,
+              visible[i],
+              streaming: streaming && identical(visible[i], nodes.last),
+              style: i == 0 ? firstStyle : null,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget build(
+    BuildContext context,
+    BlockNode node, {
+    required bool streaming,
+    TextStyle? style,
+  }) {
+    final custom = extensions.blockBuilderFor(node);
+    if (custom != null)
+      return custom(context, node, contextFor(context, streaming));
+    final body = style ?? theme.body;
+    if (node is ParagraphNode)
+      return inlineText(context, node.children, body, streaming: streaming);
+    if (node is HeadingNode)
+      return Padding(
+        padding: theme.headingPadding,
+        child: Semantics(
+          header: true,
+          child: inlineText(
+            context,
+            node.children,
+            theme.headings[node.level - 1],
+            streaming: streaming,
+          ),
+        ),
+      );
+    if (node is ThematicBreakNode)
+      return Padding(
+        padding: theme.rulePadding,
+        child: ColoredBox(
+          color: theme.ruleColor,
+          child: SizedBox(height: theme.ruleThickness, width: double.infinity),
+        ),
+      );
+    if (node is BlockQuoteNode)
+      return Padding(
+        padding: theme.quote.margin,
+        child: CustomPaint(
+          painter: _QuoteBar(theme.quote, Directionality.of(context)),
+          child: Padding(
+            padding: theme.quote.padding,
+            child: children(context, node.children, streaming: streaming),
+          ),
+        ),
+      );
+    if (node is ListNode)
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < node.children.length; i++)
+            Padding(
+              key: ValueKey(node.children[i].span.start),
+              padding: EdgeInsets.only(
+                top: i == 0 || node.tight ? 0 : theme.blockSpacing,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Padding(
+                    padding: theme.listMarkerPadding,
+                    child: SelectionContainer.disabled(
+                      child: node.children[i].checked == null
+                          ? Text(
+                              node.ordered ? '${node.start + i}.' : '•',
+                              style: body,
+                            )
+                          : _TaskIndicator(
+                              checked: node.children[i].checked!,
+                              radio: node.children[i].radio,
+                              theme: theme.task,
+                            ),
+                    ),
+                  ),
+                  Expanded(
+                    child: children(
+                      context,
+                      node.children[i].children,
+                      streaming: streaming && i == node.children.length - 1,
+                      spacing: node.tight ? 0 : theme.blockSpacing,
+                      firstStyle: node.children[i].checked == true
+                          ? theme.task.checkedText
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    if (node is TaskItemNode)
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Padding(
+            padding: theme.listMarkerPadding,
+            child: SelectionContainer.disabled(
+              child: _TaskIndicator(
+                checked: node.checked,
+                radio: node.radio,
+                theme: theme.task,
+              ),
+            ),
+          ),
+          Expanded(
+            child: inlineText(
+              context,
+              node.children,
+              node.checked ? theme.task.checkedText : body,
+              streaming: streaming,
+            ),
+          ),
+        ],
+      );
+    if (node is ListItemNode)
+      return children(context, node.children, streaming: streaming);
+    if (node is ReferenceDefinitionNode) return const SizedBox.shrink();
+    // Unregistered block types remain readable through the core text projection.
+    return StreamingText(
+      streaming: streaming,
+      text: Text(toPlainText(node), style: body),
+    );
+  }
+}
+
+class _QuoteBar extends CustomPainter {
+  const _QuoteBar(this.theme, this.direction);
+  final QuoteTheme theme;
+  final TextDirection direction;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final left = direction == TextDirection.ltr
+        ? 0.0
+        : size.width - theme.barWidth;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(left, 0, theme.barWidth, size.height),
+        Radius.circular(theme.barRadius),
+      ),
+      Paint()..color = theme.barColor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_QuoteBar oldDelegate) =>
+      oldDelegate.theme != theme || oldDelegate.direction != direction;
+}
+
+class _TaskIndicator extends StatelessWidget {
+  const _TaskIndicator({
+    required this.checked,
+    required this.radio,
+    required this.theme,
+  });
+  final bool checked;
+  final bool radio;
+  final TaskTheme theme;
+  @override
+  Widget build(BuildContext context) => Semantics(
+    checked: checked,
+    inMutuallyExclusiveGroup: radio,
+    child: SizedBox.square(
+      dimension: theme.size,
+      child: CustomPaint(painter: _TaskPaint(checked, radio, theme)),
+    ),
+  );
+}
+
+class _TaskPaint extends CustomPainter {
+  const _TaskPaint(this.checked, this.radio, this.theme);
+  final bool checked;
+  final bool radio;
+  final TaskTheme theme;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(.5);
+    final outline = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(radio ? size.width / 2 : theme.radius),
+    );
+    if (checked)
+      canvas.drawRRect(outline, Paint()..color = theme.selectedColor);
+    canvas.drawRRect(
+      outline,
+      Paint()
+        ..color = theme.borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    if (!checked) return;
+    if (radio) {
+      canvas.drawCircle(
+        size.center(Offset.zero),
+        theme.checkSize / 3,
+        Paint()..color = theme.checkColor,
+      );
+    } else {
+      final offset = (size.width - theme.checkSize) / 2;
+      final path = Path()
+        ..moveTo(offset + theme.checkSize * .15, offset + theme.checkSize * .5)
+        ..lineTo(offset + theme.checkSize * .4, offset + theme.checkSize * .75)
+        ..lineTo(offset + theme.checkSize * .9, offset + theme.checkSize * .2);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = theme.checkColor
+          ..strokeWidth = 1.6
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TaskPaint oldDelegate) =>
+      oldDelegate.checked != checked ||
+      oldDelegate.radio != radio ||
+      oldDelegate.theme != theme;
+}

@@ -13,3 +13,4 @@ export 'src/flutter/interfaces/renderers.dart';
 export 'src/flutter/extensions/registry.dart';
 export 'src/flutter/render/block_list.dart';
 export 'src/flutter/render/streaming_text.dart';
+export 'src/flutter/markstream_view.dart';
