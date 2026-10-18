@@ -7964,6 +7964,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditManageMemoryTitle => '本助手可见的记忆';
 
   @override
+  String get assistantMemoryManageTitle => '助手记忆管理';
+
+  @override
+  String assistantMemoryManageSubtitle(int count) {
+    return '本助手可见 $count 条记忆';
+  }
+
+  @override
   String get assistantEditWriteScopeTitle => '记忆写入范围';
 
   @override
@@ -20364,6 +20372,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditManageMemoryTitle => '本助手可见的记忆';
+
+  @override
+  String get assistantMemoryManageTitle => '助手记忆管理';
+
+  @override
+  String assistantMemoryManageSubtitle(int count) {
+    return '本助手可见 $count 条记忆';
+  }
 
   @override
   String get assistantEditWriteScopeTitle => '记忆写入范围';
@@ -32841,6 +32857,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditManageMemoryTitle => '本助手可見的記憶';
+
+  @override
+  String get assistantMemoryManageTitle => '助手記憶管理';
+
+  @override
+  String assistantMemoryManageSubtitle(int count) {
+    return '本助手可見 $count 條記憶';
+  }
 
   @override
   String get assistantEditWriteScopeTitle => '記憶寫入範圍';

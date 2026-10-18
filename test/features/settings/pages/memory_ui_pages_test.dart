@@ -137,6 +137,100 @@ void main() {
     expect(find.text('Alpha'), findsOneWidget);
   });
 
+  testWidgets('assistant memory list only shows memories visible to it', (
+    tester,
+  ) async {
+    final h = await _createHarness(
+      assistantList: const [
+        Assistant(id: 'a1', name: 'Alpha', temperature: 0.6),
+        Assistant(id: 'a2', name: 'Beta', temperature: 0.6),
+      ],
+    );
+    await h.memoryV2.create(
+      scope: MemoryScope.global,
+      type: MemoryType.identity,
+      content: 'Global fact',
+      source: MemorySource.manual,
+    );
+    await h.memoryV2.create(
+      scope: MemoryScope.assistant,
+      assistantId: 'a1',
+      type: MemoryType.workflow,
+      content: 'Alpha fact',
+      source: MemorySource.manual,
+    );
+    await h.memoryV2.create(
+      scope: MemoryScope.assistant,
+      assistantId: 'a2',
+      type: MemoryType.workflow,
+      content: 'Beta fact',
+      source: MemorySource.manual,
+    );
+    await h.memoryV2.refreshAll();
+
+    await tester.pumpWidget(
+      _wrap(h, const MemoryEntriesContent(assistantId: 'a1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Global fact'), findsOneWidget);
+    expect(find.text('Alpha fact'), findsOneWidget);
+    expect(find.text('Beta fact'), findsNothing);
+    expect(find.text('This assistant'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'fact');
+    await tester.pumpAndSettle();
+    expect(find.text('Global fact'), findsOneWidget);
+    expect(find.text('Alpha fact'), findsOneWidget);
+    expect(find.text('Beta fact'), findsNothing);
+  });
+
+  testWidgets('assistant memory list adds with the assistant write scope', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final h = await _createHarness(
+      assistantList: const [
+        Assistant(
+          id: 'a1',
+          name: 'Alpha',
+          temperature: 0.6,
+          memoryWriteScope: MemoryWriteScope.alwaysAssistant,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(h, const MemoryEntriesContent(assistantId: 'a1')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add memory'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(MemoryEntryEditForm),
+        matching: find.byType(TextField),
+      ),
+      'Prefers short answers',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final added = h.memoryV2.entries.singleWhere(
+      (e) => e.content == 'Prefers short answers',
+    );
+    expect(added.scope, MemoryScope.assistant);
+    expect(added.assistantId, 'a1');
+    expect(find.text('Prefers short answers'), findsOneWidget);
+  });
+
   testWidgets('archive restore and hard delete reach provider with confirm', (
     tester,
   ) async {

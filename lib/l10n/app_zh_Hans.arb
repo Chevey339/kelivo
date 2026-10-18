@@ -2953,6 +2953,13 @@
   "assistantEditGenerateSummaryTitle": "生成会话摘要",
   "assistantEditGenerateSummarySubtitle": "摘要仅供对话搜索使用",
   "assistantEditManageMemoryTitle": "本助手可见的记忆",
+  "assistantMemoryManageTitle": "助手记忆管理",
+  "assistantMemoryManageSubtitle": "本助手可见 {count} 条记忆",
+  "@assistantMemoryManageSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "assistantEditWriteScopeTitle": "记忆写入范围",
   "assistantEditWriteScopeSubtitle": "新记忆默认写入的位置",
   "assistantEditWriteScopeAlwaysGlobal": "一律全局",

@@ -3534,6 +3534,13 @@
   "assistantEditGenerateSummaryTitle": "Generate conversation summaries",
   "assistantEditGenerateSummarySubtitle": "Summaries are only used by chat search",
   "assistantEditManageMemoryTitle": "Memories visible to this assistant",
+  "assistantMemoryManageTitle": "Manage assistant memory",
+  "assistantMemoryManageSubtitle": "{count, plural, =1{1 memory visible to this assistant} other{{count} memories visible to this assistant}}",
+  "@assistantMemoryManageSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "assistantEditWriteScopeTitle": "Memory write scope",
   "assistantEditWriteScopeSubtitle": "Where new memories are stored by default",
   "assistantEditWriteScopeAlwaysGlobal": "Always global",

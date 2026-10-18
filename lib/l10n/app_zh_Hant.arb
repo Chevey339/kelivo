@@ -2977,6 +2977,13 @@
   "assistantEditGenerateSummaryTitle": "產生會話摘要",
   "assistantEditGenerateSummarySubtitle": "摘要僅供對話搜尋使用",
   "assistantEditManageMemoryTitle": "本助手可見的記憶",
+  "assistantMemoryManageTitle": "助手記憶管理",
+  "assistantMemoryManageSubtitle": "本助手可見 {count} 條記憶",
+  "@assistantMemoryManageSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "assistantEditWriteScopeTitle": "記憶寫入範圍",
   "assistantEditWriteScopeSubtitle": "新記憶預設寫入的位置",
   "assistantEditWriteScopeAlwaysGlobal": "一律全域",
