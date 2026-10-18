@@ -185,6 +185,25 @@ void main() {
     expect(find.text('Beta fact'), findsNothing);
   });
 
+  testWidgets('add memory stays reachable on a phone-width toolbar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final h = await _createHarness();
+    await tester.pumpWidget(_wrap(h, const MemoryEntriesContent()));
+    await tester.pumpAndSettle();
+
+    // The filter chips overflow and scroll; add must not scroll with them.
+    expect(find.text('Add memory').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Add memory').hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.byType(MemoryEntryEditForm), findsOneWidget);
+  });
+
   testWidgets('assistant memory list adds with the assistant write scope', (
     tester,
   ) async {

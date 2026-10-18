@@ -305,8 +305,8 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
   }
 
   Widget _mobileToolbar(AppLocalizations l10n, AssistantProvider ap) {
-    return MemoryFadingHorizontalScroll(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+    final filters = MemoryFadingHorizontalScroll(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
       child: Row(
         children: [
           _FilterChip(
@@ -416,14 +416,23 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
             emphasized: _selecting,
             onTap: _toggleBatchDelete,
           ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: l10n.memoryEntryActionAdd,
-            emphasized: true,
-            onTap: () => _showEditSheet(),
-          ),
         ],
       ),
+    );
+    // Add stays pinned outside the scroller so it is never cut off.
+    return Row(
+      children: [
+        Expanded(child: filters),
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: MemorySelectChip(
+            label: l10n.memoryEntryActionAdd,
+            emphasized: true,
+            icon: Lucide.Plus,
+            onTap: () => _showEditSheet(),
+          ),
+        ),
+      ],
     );
   }
 
