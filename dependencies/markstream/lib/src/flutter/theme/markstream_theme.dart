@@ -504,7 +504,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       blockSpacing: body.fontSize! * 1.15,
       link: TextStyle(color: colors.primary, decoration: TextDecoration.none),
       inlineCode: InlineCodeTheme(
-        text: mono.copyWith(height: 1.4),
+        text: mono.copyWith(height: 1.4, color: body.color),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         radius: 6,
         backgroundColor: dark
@@ -563,11 +563,12 @@ final class MarkstreamTheme extends _ThemeTokens {
           fontSize: 13,
           height: 1.42,
           fontWeight: semibold,
+          color: colors.onSurface,
         ),
         body: body.copyWith(
           fontSize: 13.5,
           height: 1.42,
-          color: ink.withValues(alpha: .90),
+          color: colors.onSurface.withValues(alpha: .90),
         ),
         cellPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         borderColor: colors.outlineVariant.withValues(alpha: dark ? .22 : .30),

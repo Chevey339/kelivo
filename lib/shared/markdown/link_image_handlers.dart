@@ -146,9 +146,21 @@ class LocalImagePathSyntax extends InlineSyntax {
 
 class KelivoImageBuilder implements ImageBuilder {
   const KelivoImageBuilder();
+  static final _dimensions = RegExp(r'^(?:(\d+)(?:x(\d+))?|x(\d+))$');
   @override
-  Widget build(BuildContext context, ImageNode image, MarkstreamTheme theme) =>
-      _MarkdownImage(url: image.destination);
+  Widget build(BuildContext context, ImageNode image, MarkstreamTheme theme) {
+    final dimensions = _dimensions.firstMatch(toPlainText(image).trim());
+    double? size(String? value) {
+      final number = double.tryParse(value ?? '');
+      return number != null && number.isFinite && number > 0 ? number : null;
+    }
+
+    return _MarkdownImage(
+      url: image.destination,
+      width: size(dimensions?[1]),
+      height: size(dimensions?[2] ?? dimensions?[3]),
+    );
+  }
 }
 
 ImageProvider? markdownImageProvider(String source) {
@@ -171,8 +183,9 @@ ImageProvider? markdownImageProvider(String source) {
 }
 
 class _MarkdownImage extends StatefulWidget {
-  const _MarkdownImage({required this.url});
+  const _MarkdownImage({required this.url, this.width, this.height});
   final String url;
+  final double? width, height;
   @override
   State<_MarkdownImage> createState() => _MarkdownImageState();
 }
@@ -246,9 +259,17 @@ class _MarkdownImageState extends State<_MarkdownImage> {
         onTap: () => _open(url),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final width = constraints.maxWidth.isFinite
+            final available = constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : null;
+            final requestedWidth = widget.width ?? available;
+            final width = requestedWidth == null || available == null
+                ? requestedWidth
+                : math.min(requestedWidth, available);
+            final height =
+                widget.height != null && widget.width != null && width != null
+                ? widget.height! * width / widget.width!
+                : widget.height;
             final cacheWidth = width == null
                 ? null
                 : math.max(
@@ -258,6 +279,7 @@ class _MarkdownImageState extends State<_MarkdownImage> {
             return Image(
               image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
               width: width,
+              height: height,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stack) => _broken(),
             );

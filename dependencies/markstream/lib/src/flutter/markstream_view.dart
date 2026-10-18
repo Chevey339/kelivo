@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/ast/nodes.dart';
+import '../core/html/html_fragment.dart' show htmlBlockTags;
 import '../core/parser/dialect.dart';
 import '../core/parser/incremental_document.dart';
 import '../core/parser/markdown_parser.dart';
@@ -234,12 +235,17 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       return _cachedView!;
     _cachedDocument = _document;
     _cachedSignature = visualSignature;
+    bool batchable(BlockNode node) =>
+        node is ParagraphNode &&
+        widget.extensions.blockBuilderFor(node) == null &&
+        !node.children.any(
+          (child) =>
+              child is HtmlElementNode && htmlBlockTags.contains(child.tag),
+        );
     final groups = <List<BlockNode>>[];
     for (var i = 0; i < nodes.length;) {
       final node = nodes[i];
-      if (!batching ||
-          node is! ParagraphNode ||
-          widget.extensions.blockBuilderFor(node) != null) {
+      if (!batching || !batchable(node)) {
         groups.add([node]);
         i++;
         continue;
@@ -247,8 +253,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       final run = <BlockNode>[];
       var characters = 0;
       while (i < nodes.length &&
-          nodes[i] is ParagraphNode &&
-          widget.extensions.blockBuilderFor(nodes[i]) == null &&
+          batchable(nodes[i]) &&
           (run.isEmpty ||
               characters + nodes[i].span.length <=
                   PerformanceLimits.paragraphRunCharacters)) {
@@ -304,11 +309,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
           itemBuilder: (context, index) => Padding(
             key: ValueKey(entries[index].node.span.start),
             padding: EdgeInsets.only(top: index == 0 ? 0 : theme.blockSpacing),
-            child:
-                batching &&
-                    entries[index].node is ParagraphNode &&
-                    widget.extensions.blockBuilderFor(entries[index].node) ==
-                        null
+            child: batching && batchable(entries[index].node)
                 ? ParagraphRun(
                     nodes: entries[index].nodes.cast<ParagraphNode>(),
                     renderer: _renderer,

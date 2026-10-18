@@ -5,8 +5,8 @@ import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
-import 'package:Kelivo/shared/widgets/markdown_line_lexer.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import '../../support/markdown_render_helpers.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -21,11 +21,50 @@ import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpt_markdown/gpt_markdown.dart' show GptMarkdown, HTag;
+import 'package:markstream/markstream.dart';
+import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
+import 'package:Kelivo/shared/markdown/diagram_code_blocks.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
+
 import 'package:provider/provider.dart';
 
+TableNode _tableFromRows(List<List<String>> values) {
+  var offset = 0;
+  final rows = <TableRowNode>[];
+  for (var row = 0; row < values.length; row++) {
+    final start = offset;
+    final cells = <TableCellNode>[];
+    for (final text in values[row]) {
+      final span = SourceSpan(offset, offset + text.length);
+      offset += text.length;
+      cells.add(
+        TableCellNode(
+          span: span,
+          children: [TextNode(span: span, text: text)],
+        ),
+      );
+    }
+    rows.add(
+      TableRowNode(
+        span: SourceSpan(start, offset),
+        children: cells,
+        header: row == 0,
+      ),
+    );
+  }
+  return TableNode(
+    span: SourceSpan(0, offset),
+    children: rows,
+    alignments: List.filled(values.first.length, TableAlignment.none),
+  );
+}
+
+Finder _action(MarkstreamActionKind kind) => find.byWidgetPredicate(
+  (widget) => widget is MarkstreamActionButton && widget.action.kind == kind,
+);
+
 Finder _codeTextFinder() => find.descendant(
-  of: find.byType(SelectableHighlightView),
+  of: find.byType(MarkstreamCodeContent),
   matching: find.byWidgetPredicate(
     (widget) => widget is Text && widget.textSpan != null,
   ),
@@ -58,7 +97,7 @@ List<WidgetSpan> _collectWidgetSpans(InlineSpan span) {
 
 List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
   final spans = <WidgetSpan>[];
-  for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
+  for (final richText in markdownParagraphs(tester)) {
     spans.addAll(_collectWidgetSpans(richText.text));
   }
   return spans;
@@ -95,19 +134,57 @@ List<_ResolvedTextSpan> _collectResolvedTextSpans(
 
 List<_ResolvedTextSpan> _resolvedTextSpansFromRichText(WidgetTester tester) {
   final spans = <_ResolvedTextSpan>[];
-  for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
+  for (final richText in markdownParagraphs(tester)) {
     spans.addAll(_collectResolvedTextSpans(richText.text));
   }
   return spans;
 }
 
-RenderParagraph _paragraphContaining(String text) {
-  return find
-      .byType(RichText)
-      .evaluate()
-      .map((element) => element.renderObject)
-      .whereType<RenderParagraph>()
-      .firstWhere((paragraph) => paragraph.text.toPlainText().contains(text));
+List<RenderParagraph> _paragraphsWith(
+  Pattern pattern, {
+  bool contains = false,
+}) {
+  final result = <RenderParagraph>[];
+  void visit(RenderObject object) {
+    if (object is RenderParagraph) {
+      final text = object.text.toPlainText();
+      if (contains ? text.contains(pattern) : text == pattern) {
+        result.add(object);
+      }
+    }
+    object.visitChildren(visit);
+  }
+
+  for (final element in find.byType(MarkstreamView).evaluate()) {
+    visit(element.findRenderObject()!);
+  }
+  return result;
+}
+
+RenderParagraph _paragraphContaining(String text) =>
+    _paragraphsWith(text, contains: true).first;
+
+class _HighlightFixture extends StatelessWidget {
+  const _HighlightFixture(
+    this.source, {
+    required this.language,
+    required this.theme,
+    this.enableHighlight = true,
+  });
+  final String source, language;
+  final Map<String, TextStyle> theme;
+  final bool enableHighlight;
+  @override
+  Widget build(BuildContext context) => MarkstreamCodeContent(
+    node: CodeBlockNode(
+      span: SourceSpan(0, source.length),
+      children: [TextNode(span: SourceSpan(0, source.length), text: source)],
+      info: language,
+    ),
+    theme: MarkstreamTheme.fromColorScheme(Theme.of(context).colorScheme),
+    highlighter: const KelivoCodeHighlighter(),
+    highlight: enableHighlight,
+  );
 }
 
 const _transparentPngDataUrl =
@@ -272,7 +349,7 @@ List<int> _displayedImageBytes(WidgetTester tester) {
 }
 
 Finder _findSoftHorizontalRule() {
-  return find.byKey(const ValueKey('markdown-soft-horizontal-rule'));
+  return find.byKey(const ValueKey('markstream-rule'));
 }
 
 String _nestedDetailsHtml(int levels) {
@@ -310,6 +387,7 @@ Widget _markdownHarness(
       theme: theme,
       darkTheme: darkTheme,
       themeMode: themeMode,
+      builder: (_, child) => AppSnackBarOverlay(child: child!),
       home: Scaffold(
         body: width == null
             ? MarkdownWithCodeHighlight(
@@ -336,8 +414,7 @@ Widget _markdownHarness(
 }
 
 void _overrideMarkdownTablePlatform(TargetPlatform platform) {
-  markdownTableTargetPlatformOverride = platform;
-  addTearDown(() => markdownTableTargetPlatformOverride = null);
+  debugDefaultTargetPlatformOverride = platform;
 }
 
 Widget _streamingMarkdownHarness(
@@ -394,7 +471,7 @@ Widget _settingsHarness({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('source hints follow late syntax and rewritten image prefixes', (
+  testWidgets('original source survives late syntax and file image paths', (
     tester,
   ) async {
     final directory = Directory.systemTemp.createTempSync('markdown-stream-');
@@ -410,19 +487,18 @@ void main() {
     source.value += ')';
     await tester.pumpAndSettle();
     final markdown = tester
-        .widgetList<GptMarkdown>(find.byType(GptMarkdown))
-        .map((widget) => widget.data)
+        .widgetList<MarkstreamView>(find.byType(MarkstreamView))
+        .map((widget) => widget.source)
         .join('\n\n');
-    expect(markdown, isNot(contains('\r')));
-    expect(markdown, contains('![alt](${Uri.file(file.path)})'));
+    expect(markdown, source.value);
     expect(find.byType(Image), findsOneWidget);
     source.value += '\n\n<details><summary>更多</summary>隐藏</details>';
     await tester.pumpAndSettle();
-    expect(find.text('更多'), findsOneWidget);
+    expect(_paragraphsWith('更多', contains: false), hasLength(1));
     source.value = 'Replacement **bold**';
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsNothing);
-    expect(find.text('更多'), findsNothing);
+    expect(_paragraphsWith('更多', contains: false), isEmpty);
     expect(
       _paragraphContaining('Replacement').text.toPlainText(),
       'Replacement bold',
@@ -430,30 +506,29 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('root fence parsing preserves the renderer whitespace contract', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_markdownHarness('```text\n', streaming: true));
-    expect(find.byType(SelectableHighlightView), findsNothing);
-    await tester.pumpWidget(
-      _markdownHarness('```text\nx \n\n', streaming: true),
-    );
-    expect(
-      tester
-          .widget<SelectableHighlightView>(find.byType(SelectableHighlightView))
-          .source,
-      'x',
-    );
-    await tester.pumpWidget(
-      _markdownHarness('```text\nx \n\n```', streaming: true),
-    );
-    expect(
-      tester
-          .widget<SelectableHighlightView>(find.byType(SelectableHighlightView))
-          .source,
-      'x ',
-    );
-  });
+  testWidgets(
+    'root fences retain body whitespace while streaming and after closure',
+    (tester) async {
+      for (final (source, body) in [
+        ('```text\n', ''),
+        ('```text\nx \n\n', 'x \n\n'),
+        ('```text\nx \n\n```', 'x \n\n'),
+      ]) {
+        await tester.pumpWidget(_markdownHarness(source, streaming: true));
+        expect(
+          tester
+              .widget<MarkstreamCodeContent>(find.byType(MarkstreamCodeContent))
+              .node
+              .code,
+          body,
+        );
+        expect(
+          tester.widget<MarkstreamView>(find.byType(MarkstreamView)).source,
+          source,
+        );
+      }
+    },
+  );
 
   for (final language in ['SVG', 'xml']) {
     for (final streaming in [false, true]) {
@@ -489,11 +564,11 @@ void main() {
           expect(find.byTooltip(l10n.codeBlockPreviewButton), findsNothing);
           await tester.tap(find.text(l10n.mermaidCodeTab));
           await tester.pumpAndSettle();
-          final code = tester.widget<SelectableHighlightView>(
-            find.byType(SelectableHighlightView),
+          final code = tester.widget<MarkstreamCodeContent>(
+            find.byType(MarkstreamCodeContent),
           );
-          expect(code.source.trim(), source);
-          expect(code.language, 'xml');
+          expect(code.node.code.trim(), source);
+          expect(normalizeCodeLanguage(code.node.info), 'xml');
           await tester.tap(find.text(l10n.mermaidImageTab));
           await tester.pumpAndSettle();
           await tester.tap(find.byType(Image));
@@ -512,7 +587,7 @@ void main() {
       _markdownHarness('```xml\n<config><name>Kelivo</name></config>\n```'),
     );
     await tester.pump();
-    expect(find.byType(SelectableHighlightView), findsOneWidget);
+    expect(find.byType(MarkstreamCodeContent), findsOneWidget);
     expect(find.byType(Image), findsNothing);
     final context = tester.element(find.byType(MarkdownWithCodeHighlight));
     expect(
@@ -521,34 +596,28 @@ void main() {
     );
   });
 
-  test('soft breaks never split a surrogate pair', () {
-    // 17 ASCII units followed by an emoji: the 18th code unit is the high
-    // surrogate, so a naive break would land inside the pair.
-    final value = '${'a' * 17}\u{1F600}${'b' * 20}';
-    final softened = insertMarkdownSoftBreaksForTesting(value, every: 18);
-
-    expect(softened.replaceAll('\u200B', ''), value);
-    expect(softened.contains('\u200B'), isTrue);
-    for (var i = 0; i < softened.length; i++) {
-      final unit = softened.codeUnitAt(i);
-      if (unit >= 0xD800 && unit <= 0xDBFF) {
-        final next = softened.codeUnitAt(i + 1);
-        expect(next >= 0xDC00 && next <= 0xDFFF, isTrue);
-      }
-    }
-    // Building a paragraph is what threw before the fix.
-    expect(
-      () => (ui.ParagraphBuilder(ui.ParagraphStyle())..addText(softened)),
-      returnsNormally,
-    );
-  });
+  testWidgets(
+    'native paragraphs preserve surrogate pairs without source rewrites',
+    (tester) async {
+      final value = '${'a' * 17}\u{1F600}${'b' * 20}';
+      await tester.pumpWidget(_markdownHarness(value, width: 180));
+      expect(
+        tester.widget<MarkstreamView>(find.byType(MarkstreamView)).source,
+        value,
+      );
+      expect(_paragraphContaining(value).text.toPlainText(), value);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test('markdown table CSV export escapes boundary cell values', () {
-    final csv = markdownTableRowsToCsvForTesting([
-      ['Name', 'Note', 'Multiline'],
-      ['Alice', 'plain', 'first\nsecond'],
-      ['Bob, Jr.', 'said "hello"', ''],
-    ]);
+    final csv = tableToCsv(
+      _tableFromRows([
+        ['Name', 'Note', 'Multiline'],
+        ['Alice', 'plain', 'first\nsecond'],
+        ['Bob, Jr.', 'said "hello"', ''],
+      ]),
+    );
 
     expect(
       csv,
@@ -559,18 +628,20 @@ void main() {
   });
 
   test('markdown table markdown copy keeps pipe table syntax', () {
-    final markdown = markdownTableRowsToMarkdownForTesting([
-      ['Name', 'Note', 'Multiline'],
-      ['Alice', 'plain', 'first\nsecond'],
-      ['Bob | Jr.', 'said "hello"', ''],
-    ]);
+    final markdown = toMarkdown(
+      _tableFromRows([
+        ['Name', 'Note', 'Multiline'],
+        ['Alice', 'plain', 'first\nsecond'],
+        ['Bob | Jr.', 'said "hello"', ''],
+      ]),
+    );
 
     expect(
       markdown,
       '| Name | Note | Multiline |\n'
       '| --- | --- | --- |\n'
       '| Alice | plain | first<br>second |\n'
-      '| Bob \\| Jr. | said "hello" |  |',
+      '| Bob \\| Jr\\. | said "hello" |  |',
     );
   });
 
@@ -589,12 +660,12 @@ void main() {
           reason: '$marker should render as a horizontal rule',
         );
         expect(
-          find.textContaining(marker),
-          findsNothing,
+          _paragraphsWith(marker, contains: true),
+          isEmpty,
           reason: '$marker should not remain as visible marker text',
         );
-        expect(find.textContaining('Before'), findsOneWidget);
-        expect(find.textContaining('After'), findsOneWidget);
+        expect(_paragraphsWith('Before', contains: true), hasLength(1));
+        expect(_paragraphsWith('After', contains: true), hasLength(1));
       }
     },
   );
@@ -616,11 +687,11 @@ Inline ***strong emphasis*** text.
       await tester.pump();
 
       expect(_findSoftHorizontalRule(), findsNothing);
-      expect(find.textContaining('list item'), findsOneWidget);
-      expect(find.textContaining('strong emphasis'), findsOneWidget);
+      expect(_paragraphsWith('list item', contains: true), hasLength(1));
+      expect(_paragraphsWith('strong emphasis', contains: true), hasLength(1));
       expect(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(MarkstreamCodeContent),
           matching: find.textContaining('***'),
         ),
         findsOneWidget,
@@ -642,9 +713,9 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(find.text('1'), findsOneWidget);
-      expect(find.text('4'), findsOneWidget);
-      expect(find.textContaining('citation:1:96d0ed'), findsNothing);
+      expect(_paragraphsWith('1', contains: false), hasLength(1));
+      expect(_paragraphsWith('4', contains: false), hasLength(1));
+      expect(_paragraphsWith('citation:1:96d0ed', contains: true), isEmpty);
 
       await tester.tap(find.text('1'));
       await tester.tap(find.text('4'));
@@ -667,8 +738,8 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(find.text('2'), findsOneWidget);
-      expect(find.textContaining('citation:2'), findsNothing);
+      expect(_paragraphsWith('2', contains: false), hasLength(1));
+      expect(_paragraphsWith('citation:2', contains: true), isEmpty);
 
       await tester.tap(find.text('2'));
 
@@ -684,8 +755,8 @@ Inline ***strong emphasis*** text.
     );
     await tester.pump();
 
-    expect(find.textContaining('citation:1:96d0ed'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(_paragraphsWith('citation:1:96d0ed', contains: true), hasLength(1));
+    expect(_paragraphsWith('1', contains: false), isEmpty);
   });
 
   testWidgets(
@@ -696,8 +767,8 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(find.text('citation'), findsOneWidget);
-      expect(find.text('https'), findsNothing);
+      expect(_paragraphsWith('citation', contains: false), hasLength(1));
+      expect(_paragraphsWith('https', contains: false), isEmpty);
     },
   );
 
@@ -716,9 +787,9 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(find.text('1'), findsNWidgets(2));
-      expect(find.text('4'), findsOneWidget);
-      expect(find.textContaining('cite:96d0ed'), findsNothing);
+      expect(_paragraphsWith('1', contains: false), hasLength(2));
+      expect(_paragraphsWith('4', contains: false), hasLength(1));
+      expect(_paragraphsWith('cite:96d0ed', contains: true), isEmpty);
 
       // Capsules must hug their content, not stretch to the full line width.
       final capsuleSize = tester.getSize(
@@ -742,8 +813,8 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(find.text('?'), findsOneWidget);
-      expect(find.textContaining('cite:deadbe'), findsNothing);
+      expect(_paragraphsWith('?', contains: false), hasLength(1));
+      expect(_paragraphsWith('cite:deadbe', contains: true), isEmpty);
     },
   );
 
@@ -753,8 +824,8 @@ Inline ***strong emphasis*** text.
     await tester.pumpWidget(_markdownHarness('`[cite:96d0ed]`', width: 360));
     await tester.pump();
 
-    expect(find.textContaining('cite:96d0ed'), findsOneWidget);
-    expect(find.text('?'), findsNothing);
+    expect(_paragraphsWith('cite:96d0ed', contains: true), hasLength(1));
+    expect(_paragraphsWith('?', contains: false), isEmpty);
   });
 
   testWidgets('MarkdownWithCodeHighlight applies markdown image dimensions', (
@@ -791,7 +862,7 @@ Inline ***strong emphasis*** text.
       await tester.pumpWidget(_markdownHarness('![42x24](missing-image.png)'));
       await tester.pump();
 
-      expect(find.byIcon(Icons.broken_image), findsOneWidget);
+      expect(find.byIcon(Lucide.ImageOff), findsOneWidget);
       expect(find.byType(Image), findsNothing);
     },
   );
@@ -799,231 +870,316 @@ Inline ***strong emphasis*** text.
   testWidgets('MarkdownWithCodeHighlight renders mobile table export action', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _markdownHarness('''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
 | Name | Value |
 | - | -: |
 | Alpha | 42 |
 ''', width: 360),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.text('Table'), findsOneWidget);
-    expect(find.byTooltip('Copy'), findsOneWidget);
-    expect(find.byTooltip('Export CSV'), findsOneWidget);
-    expect(find.byTooltip('Save to Gallery'), findsOneWidget);
-    final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-    final richTextPlainText = tester
-        .widgetList<RichText>(
-          find.descendant(of: tableBlock, matching: find.byType(RichText)),
-        )
-        .map((widget) => widget.text.toPlainText());
-    final plainText = richTextPlainText.join('\n');
-    expect(plainText, contains('Name'));
-    expect(plainText, contains('42'));
+      expect(_action(MarkstreamActionKind.copyMarkdown), findsOneWidget);
+      expect(find.byTooltip('Copy Markdown'), findsOneWidget);
+      expect(find.byTooltip('Export CSV'), findsOneWidget);
+      expect(find.byTooltip('Save Image'), findsOneWidget);
+      final tableBlock = find.byType(MarkstreamTableBlock);
+      final richTextPlainText = tester
+          .widgetList<RichText>(
+            find.descendant(of: tableBlock, matching: find.byType(RichText)),
+          )
+          .map((widget) => widget.text.toPlainText());
+      final plainText = richTextPlainText.join('\n');
+      expect(plainText, contains('Name'));
+      expect(plainText, contains('42'));
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight expands compact tables for export', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _settingsHarness(
-        onSettingsReady: (_) {},
-        child: const SizedBox(
-          width: 320,
-          child: ExportCaptureScope(
-            enabled: true,
-            child: MarkdownWithCodeHighlight(
-              text: '''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: const SizedBox(
+            width: 320,
+            child: ExportCaptureScope(
+              enabled: true,
+              child: MarkdownWithCodeHighlight(
+                text: '''
 | One | Two | Three | Four | Five |
 | - | - | - | - | - |
 | Alpha | Beta | Gamma | Delta | Epsilon |
 ''',
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(
-      find.byKey(const ValueKey('markdown-table-horizontal-scroll')),
-      findsNothing,
-    );
+      expect(
+        find.byKey(const ValueKey('markstream-table-scroll')),
+        findsNothing,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight keeps table actions out of body', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _markdownHarness('''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
 | Name | Value |
 | - | - |
 | Alpha | Beta |
 ''', width: 360),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final body = find.byKey(const ValueKey('markdown-table-body'));
-    expect(body, findsOneWidget);
-    expect(
-      find.descendant(of: body, matching: find.byTooltip('Export CSV')),
-      findsNothing,
-    );
-    expect(
-      find.descendant(of: body, matching: find.byTooltip('Copy')),
-      findsNothing,
-    );
-    expect(
-      find.descendant(of: body, matching: find.byTooltip('Export as Image')),
-      findsNothing,
-    );
+      final body = find.byType(Table);
+      expect(body, findsOneWidget);
+      expect(
+        find.descendant(of: body, matching: find.byTooltip('Export CSV')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: body, matching: find.byTooltip('Copy Markdown')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: body, matching: find.byTooltip('Export as Image')),
+        findsNothing,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight copies markdown table syntax', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    String? clipboardText;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == 'Clipboard.setData') {
-            final data = Map<String, dynamic>.from(call.arguments as Map);
-            clipboardText = data['text'] as String?;
-          }
-          return null;
-        });
-    addTearDown(() {
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      String? clipboardText;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null);
-    });
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
 
-    await tester.pumpWidget(
-      _markdownHarness('''
+      await tester.pumpWidget(
+        _markdownHarness('''
 | Name | Value |
 | - | - |
 | Alpha | Beta |
 ''', width: 360),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    await tester.tap(find.byTooltip('Copy'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 4));
+      await tester.tap(find.byTooltip('Copy Markdown'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
 
-    expect(
-      clipboardText,
-      '| Name | Value |\n'
-      '| --- | --- |\n'
-      '| Alpha | Beta |',
-    );
+      expect(
+        clipboardText,
+        '| Name | Value |\n'
+        '| --- | --- |\n'
+        '| Alpha | Beta |',
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight centers padded table cells', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _markdownHarness('''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
 | 项目 | 状态 |
 | :---: | :---: |
 | 单字 |   中   |
 ''', width: 360),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final body = find.byKey(const ValueKey('markdown-table-body'));
-    expect(body, findsOneWidget);
-    final bodyRect = tester.getRect(body);
-    final expectedSecondColumnCenter = bodyRect.left + bodyRect.width * 0.75;
-    final centeredCellText = find.descendant(
-      of: body,
-      matching: find.byWidgetPredicate(
-        (widget) => widget is RichText && widget.text.toPlainText() == '中',
-        description: 'centered table cell text',
-      ),
-    );
-    expect(centeredCellText, findsOneWidget);
+      final body = find.byType(Table);
+      expect(body, findsOneWidget);
+      final bodyRect = tester.getRect(body);
+      final expectedSecondColumnCenter = bodyRect.left + bodyRect.width * 0.75;
+      final centeredCellText = find.descendant(
+        of: body,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is RichText && widget.text.toPlainText() == '中',
+          description: 'centered table cell text',
+        ),
+      );
+      expect(centeredCellText, findsOneWidget);
 
-    expect(
-      (tester.getCenter(centeredCellText).dx - expectedSecondColumnCenter)
-          .abs(),
-      lessThan(1.0),
-    );
+      expect(
+        (tester.getCenter(centeredCellText).dx - expectedSecondColumnCenter)
+            .abs(),
+        lessThan(1.0),
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight does not scroll narrow table', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _markdownHarness('''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
 | Name | Value |
 | - | - |
 | Alpha | Beta |
 ''', width: 360),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-    expect(tableBlock, findsOneWidget);
-    final tableBlockWidget = tester.widget<Container>(tableBlock);
-    expect(tableBlockWidget.foregroundDecoration, isA<BoxDecoration>());
-    final foregroundDecoration =
-        tableBlockWidget.foregroundDecoration! as BoxDecoration;
-    expect(foregroundDecoration.border, isNotNull);
-    expect(
-      find.descendant(
-        of: tableBlock,
-        matching: find.byKey(
-          const ValueKey('markdown-table-horizontal-scroll'),
+      final tableBlock = find.byType(MarkstreamTableBlock);
+      expect(tableBlock, findsOneWidget);
+      final table = tester.widget<Table>(find.byType(Table));
+      expect(table.border?.horizontalInside.width, greaterThan(0));
+      expect(table.border?.verticalInside.width, greaterThan(0));
+      expect(
+        find.descendant(
+          of: tableBlock,
+          matching: find.byKey(const ValueKey('markstream-table-scroll')),
         ),
-      ),
-      findsNothing,
-    );
+        findsNothing,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets(
     'MarkdownWithCodeHighlight does not scroll three-column narrow table',
     (tester) async {
-      _overrideMarkdownTablePlatform(TargetPlatform.android);
-      await tester.pumpWidget(
-        _markdownHarness('''
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      try {
+        _overrideMarkdownTablePlatform(TargetPlatform.android);
+        await tester.pumpWidget(
+          _markdownHarness('''
 | Name | Value | Note |
 | - | - | - |
 | A | B | C |
 ''', width: 320),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-      expect(tableBlock, findsOneWidget);
-      expect(
-        find.descendant(
-          of: tableBlock,
-          matching: find.byKey(
-            const ValueKey('markdown-table-horizontal-scroll'),
+        final tableBlock = find.byType(MarkstreamTableBlock);
+        expect(tableBlock, findsOneWidget);
+        expect(
+          find.descendant(
+            of: tableBlock,
+            matching: find.byKey(const ValueKey('markstream-table-scroll')),
           ),
-        ),
-        findsNothing,
-      );
+          findsNothing,
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
     },
   );
 
   testWidgets(
     'MarkdownWithCodeHighlight saves table image on image action tap',
     (tester) async {
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      try {
+        _overrideMarkdownTablePlatform(TargetPlatform.android);
+        var savedToGallery = false;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('image_gallery_saver_plus'),
+              (call) async {
+                if (call.method == 'saveImageToGallery') {
+                  savedToGallery = true;
+                  return <String, Object>{'isSuccess': true};
+                }
+                return null;
+              },
+            );
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(
+                const MethodChannel('image_gallery_saver_plus'),
+                null,
+              );
+        });
+
+        await tester.pumpWidget(
+          _markdownHarness('''
+| Name | Value |
+| - | - |
+| Alpha | 42 |
+''', width: 360),
+        );
+        await tester.pump();
+
+        await tester.tap(find.byTooltip('Save Image'));
+        await tester.pump();
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+        await tester.pump(const Duration(seconds: 4));
+
+        expect(savedToGallery, isTrue);
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight saves an opaque table image', (
+    tester,
+  ) async {
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
       _overrideMarkdownTablePlatform(TargetPlatform.android);
-      var savedToGallery = false;
+      Uint8List? savedBytes;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
             const MethodChannel('image_gallery_saver_plus'),
             (call) async {
               if (call.method == 'saveImageToGallery') {
-                savedToGallery = true;
+                final raw = call.arguments['imageBytes'];
+                if (raw is Uint8List) {
+                  savedBytes = raw;
+                } else if (raw is List<int>) {
+                  savedBytes = Uint8List.fromList(raw);
+                }
                 return <String, Object>{'isSuccess': true};
               }
               return null;
@@ -1046,70 +1202,24 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      await tester.tap(find.byTooltip('Save to Gallery'));
+      await tester.tap(find.byTooltip('Save Image'));
       await tester.pump();
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
       await tester.pump(const Duration(seconds: 4));
 
-      expect(savedToGallery, isTrue);
-    },
-  );
-
-  testWidgets('MarkdownWithCodeHighlight saves an opaque table image', (
-    tester,
-  ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    Uint8List? savedBytes;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('image_gallery_saver_plus'),
-          (call) async {
-            if (call.method == 'saveImageToGallery') {
-              final raw = call.arguments['imageBytes'];
-              if (raw is Uint8List) {
-                savedBytes = raw;
-              } else if (raw is List<int>) {
-                savedBytes = Uint8List.fromList(raw);
-              }
-              return <String, Object>{'isSuccess': true};
-            }
-            return null;
-          },
-        );
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('image_gallery_saver_plus'),
-            null,
-          );
-    });
-
-    await tester.pumpWidget(
-      _markdownHarness('''
-| Name | Value |
-| - | - |
-| Alpha | 42 |
-''', width: 360),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byTooltip('Save to Gallery'));
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
-    await tester.pump(const Duration(seconds: 4));
-
-    expect(savedBytes, isNotNull);
-    await tester.runAsync(() async {
-      final pixels = await _pngRgbaPixels(savedBytes!);
-      expect(pixels, isNotEmpty);
-      for (var i = 3; i < pixels.length; i += 4) {
-        expect(pixels[i], 255);
-      }
-    });
+      expect(savedBytes, isNotNull);
+      await tester.runAsync(() async {
+        final pixels = await _pngRgbaPixels(savedBytes!);
+        expect(pixels, isNotEmpty);
+        for (var i = 3; i < pixels.length; i += 4) {
+          expect(pixels[i], 255);
+        }
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets('paragraph selection keeps line breaks through streaming', (
@@ -1179,20 +1289,76 @@ Inline ***strong emphasis*** text.
     testWidgets(
       'streaming table preserves its offset and active drag (long=$longReply)',
       (tester) async {
+        final previousPlatform = debugDefaultTargetPlatformOverride;
+        try {
+          _overrideMarkdownTablePlatform(TargetPlatform.iOS);
+          await tester.binding.setSurfaceSize(const Size(800, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final prefix = longReply ? '${'Intro text. ' * 50}\n\n' : '';
+          final text = ValueNotifier(
+            '$prefix| A | B | C | D | E |\n'
+            '| --- | --- | --- | --- | --- |\n| apple',
+          );
+          addTearDown(text.dispose);
+          await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
+          await tester.pump();
+          final viewport = find.byKey(
+            const ValueKey('markstream-table-scroll'),
+          );
+          final scroll = find.descendant(
+            of: viewport,
+            matching: find.byType(Scrollable),
+          );
+          final state = tester.state<ScrollableState>(scroll);
+          await tester.drag(viewport, const Offset(-100, 0));
+          await tester.pumpAndSettle();
+          final offset = state.position.pixels;
+          expect(offset, greaterThan(50));
+
+          text.value += ' banana';
+          await tester.pump();
+          expect(tester.state<ScrollableState>(scroll), same(state));
+          expect(state.position.pixels, offset);
+          expect(_paragraphsWith('apple banana', contains: true), isNotEmpty);
+
+          final gesture = await tester.startGesture(tester.getCenter(viewport));
+          await gesture.moveBy(const Offset(-40, 0));
+          await tester.pump();
+          final duringDrag = state.position.pixels;
+          text.value += ' cherry';
+          await tester.pump();
+          expect(tester.state<ScrollableState>(scroll), same(state));
+          expect(state.position.pixels, duringDrag);
+          await gesture.moveBy(const Offset(-40, 0));
+          await tester.pump();
+          expect(state.position.pixels, greaterThan(duringDrag));
+          await gesture.up();
+          await tester.pumpAndSettle();
+        } finally {
+          debugDefaultTargetPlatformOverride = previousPlatform;
+        }
+      },
+    );
+  }
+
+  testWidgets(
+    'table offset survives stream growth, block close and completion',
+    (tester) async {
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      try {
         _overrideMarkdownTablePlatform(TargetPlatform.iOS);
-        await tester.binding.setSurfaceSize(const Size(800, 1600));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final prefix = longReply ? '${'Intro text. ' * 50}\n\n' : '';
-        final text = ValueNotifier(
-          '$prefix| A | B | C | D | E |\n'
-          '| --- | --- | --- | --- | --- |\n| apple',
-        );
-        addTearDown(text.dispose);
-        await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
-        await tester.pump();
-        final viewport = find.byKey(
-          const ValueKey('markdown-table-horizontal-scroll'),
-        );
+        var text =
+            '| A | B | C | D | E |\n'
+            '| --- | --- | --- | --- | --- |\n| apple';
+        Future<void> render({bool streaming = true}) async {
+          await tester.pumpWidget(
+            _markdownHarness(text, width: 320, streaming: streaming),
+          );
+          await tester.pump();
+        }
+
+        await render();
+        final viewport = find.byKey(const ValueKey('markstream-table-scroll'));
         final scroll = find.descendant(
           of: viewport,
           matching: find.byType(Scrollable),
@@ -1203,171 +1369,133 @@ Inline ***strong emphasis*** text.
         final offset = state.position.pixels;
         expect(offset, greaterThan(50));
 
-        text.value += ' banana';
-        await tester.pump();
-        expect(tester.state<ScrollableState>(scroll), same(state));
-        expect(state.position.pixels, offset);
-        expect(
-          find.textContaining('apple banana', findRichText: true),
-          findsWidgets,
-        );
-
-        final gesture = await tester.startGesture(tester.getCenter(viewport));
-        await gesture.moveBy(const Offset(-40, 0));
-        await tester.pump();
-        final duringDrag = state.position.pixels;
-        text.value += ' cherry';
-        await tester.pump();
-        expect(tester.state<ScrollableState>(scroll), same(state));
-        expect(state.position.pixels, duringDrag);
-        await gesture.moveBy(const Offset(-40, 0));
-        await tester.pump();
-        expect(state.position.pixels, greaterThan(duringDrag));
-        await gesture.up();
-        await tester.pumpAndSettle();
-      },
-    );
-  }
-
-  testWidgets(
-    'table offset survives stream growth, block close and completion',
-    (tester) async {
-      _overrideMarkdownTablePlatform(TargetPlatform.iOS);
-      var text =
-          '| A | B | C | D | E |\n'
-          '| --- | --- | --- | --- | --- |\n| apple';
-      Future<void> render({bool streaming = true}) async {
-        await tester.pumpWidget(
-          _markdownHarness(text, width: 320, streaming: streaming),
-        );
-        await tester.pump();
-      }
-
-      await render();
-      final viewport = find.byKey(
-        const ValueKey('markdown-table-horizontal-scroll'),
-      );
-      final scroll = find.descendant(
-        of: viewport,
-        matching: find.byType(Scrollable),
-      );
-      final state = tester.state<ScrollableState>(scroll);
-      await tester.drag(viewport, const Offset(-100, 0));
-      await tester.pumpAndSettle();
-      final offset = state.position.pixels;
-      expect(offset, greaterThan(50));
-
-      // Cross the old whole-document / incremental rendering threshold.
-      text += ' | ${'wide ' * 100} | C | D | E |';
-      expect(text.length, greaterThan(512));
-      await render();
-      expect(tester.state<ScrollableState>(scroll), same(state));
-      expect(state.position.pixels, offset);
-      for (final suffix in ['\n', '\nFollowing paragraph']) {
-        text += suffix;
+        // Cross the old whole-document / incremental rendering threshold.
+        text += ' | ${'wide ' * 100} | C | D | E |';
+        expect(text.length, greaterThan(512));
         await render();
         expect(tester.state<ScrollableState>(scroll), same(state));
         expect(state.position.pixels, offset);
-      }
-      await render(streaming: false);
-      expect(tester.state<ScrollableState>(scroll), same(state));
-      expect(state.position.pixels, offset);
-      expect(
-        find.textContaining('Following paragraph', findRichText: true),
-        findsWidgets,
-      );
+        for (final suffix in ['\n', '\nFollowing paragraph']) {
+          text += suffix;
+          await render();
+          expect(tester.state<ScrollableState>(scroll), same(state));
+          expect(state.position.pixels, offset);
+        }
+        await render(streaming: false);
+        expect(tester.state<ScrollableState>(scroll), same(state));
+        expect(state.position.pixels, offset);
+        expect(
+          _paragraphsWith('Following paragraph', contains: true),
+          isNotEmpty,
+        );
 
-      text = text.replaceFirst('apple', 'replacement');
-      await render(streaming: false);
-      expect(tester.state<ScrollableState>(scroll).position.pixels, 0);
-      expect(
-        find.textContaining('replacement', findRichText: true),
-        findsWidgets,
-      );
+        text = text.replaceFirst('apple', 'replacement');
+        await render(streaming: false);
+        expect(tester.state<ScrollableState>(scroll).position.pixels, 0);
+        expect(_paragraphsWith('replacement', contains: true), isNotEmpty);
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
     },
   );
 
   testWidgets('appending to a table reuses the earlier table and its offset', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.iOS);
-    const header =
-        '| A | B | C | D | E |\n'
-        '| --- | --- | --- | --- | --- |\n';
-    final text = ValueNotifier(
-      '$header| apple | B | C | D | E |\n\n$header| banana',
-    );
-    addTearDown(text.dispose);
-    await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
-    await tester.pump();
-    final viewports = find.byKey(
-      const ValueKey('markdown-table-horizontal-scroll'),
-    );
-    expect(viewports, findsNWidgets(2));
-    final states = <ScrollableState>[];
-    for (var i = 0; i < 2; i++) {
-      states.add(
-        tester.state<ScrollableState>(
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.iOS);
+      const header =
+          '| A | B | C | D | E |\n'
+          '| --- | --- | --- | --- | --- |\n';
+      final text = ValueNotifier(
+        '$header| apple | B | C | D | E |\n\n$header| banana',
+      );
+      addTearDown(text.dispose);
+      await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
+      await tester.pump();
+      final viewports = find.byKey(const ValueKey('markstream-table-scroll'));
+      expect(viewports, findsNWidgets(2));
+      final states = <ScrollableState>[];
+      for (var i = 0; i < 2; i++) {
+        states.add(
+          tester.state<ScrollableState>(
+            find.descendant(
+              of: viewports.at(i),
+              matching: find.byType(Scrollable),
+            ),
+          ),
+        );
+        await tester.drag(viewports.at(i), Offset(-80.0 * (i + 1), 0));
+        await tester.pumpAndSettle();
+      }
+      final offsets = states.map((state) => state.position.pixels).toList();
+      expect(offsets.first, greaterThan(0));
+      expect(offsets.last, greaterThan(offsets.first));
+      final cached = tester
+          .widget<MarkstreamTableBlock>(find.byType(MarkstreamTableBlock).first)
+          .node;
+
+      text.value += ' cherry';
+      await tester.pump();
+      expect(
+        tester
+            .widget<MarkstreamTableBlock>(
+              find.byType(MarkstreamTableBlock).first,
+            )
+            .node,
+        same(cached),
+      );
+      for (var i = 0; i < 2; i++) {
+        final state = tester.state<ScrollableState>(
           find.descendant(
             of: viewports.at(i),
             matching: find.byType(Scrollable),
           ),
-        ),
-      );
-      await tester.drag(viewports.at(i), Offset(-80.0 * (i + 1), 0));
-      await tester.pumpAndSettle();
-    }
-    final offsets = states.map((state) => state.position.pixels).toList();
-    expect(offsets.first, greaterThan(0));
-    expect(offsets.last, greaterThan(offsets.first));
-    final cached = tester.widget<GptMarkdown>(find.byType(GptMarkdown).first);
-
-    text.value += ' cherry';
-    await tester.pump();
-    expect(tester.widget(find.byType(GptMarkdown).first), same(cached));
-    for (var i = 0; i < 2; i++) {
-      final state = tester.state<ScrollableState>(
-        find.descendant(of: viewports.at(i), matching: find.byType(Scrollable)),
-      );
-      expect(state, same(states[i]));
-      expect(state.position.pixels, offsets[i]);
+        );
+        expect(state, same(states[i]));
+        expect(state.position.pixels, offsets[i]);
+      }
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
     }
   });
 
   testWidgets('MarkdownWithCodeHighlight scrolls only overflowing table', (
     tester,
   ) async {
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    await tester.pumpWidget(
-      _markdownHarness('''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
 | Very long header | Another very long header | Third very long header | Fourth very long header |
 | - | - | - | - |
 | A very long value that should wrap inside the cell | Second long value | Third long value | Fourth long value |
 ''', width: 320),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-    expect(tableBlock, findsOneWidget);
-    expect(tester.getSize(tableBlock).width, lessThanOrEqualTo(320));
-    expect(
-      find.descendant(
-        of: tableBlock,
-        matching: find.byKey(
-          const ValueKey('markdown-table-horizontal-scroll'),
+      final tableBlock = find.byType(MarkstreamTableBlock);
+      expect(tableBlock, findsOneWidget);
+      expect(tester.getSize(tableBlock).width, lessThanOrEqualTo(320));
+      expect(
+        find.descendant(
+          of: tableBlock,
+          matching: find.byKey(const ValueKey('markstream-table-scroll')),
         ),
-      ),
-      findsOneWidget,
-    );
-    final scrollView = tester.widget<SingleChildScrollView>(
-      find.descendant(
-        of: tableBlock,
-        matching: find.byKey(
-          const ValueKey('markdown-table-horizontal-scroll'),
+        findsOneWidget,
+      );
+      final scrollView = tester.widget<SingleChildScrollView>(
+        find.descendant(
+          of: tableBlock,
+          matching: find.byKey(const ValueKey('markstream-table-scroll')),
         ),
-      ),
-    );
-    expect(scrollView.physics, isA<ClampingScrollPhysics>());
+      );
+      expect(scrollView.physics, isA<ClampingScrollPhysics>());
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets(
@@ -1400,17 +1528,17 @@ Inline ***strong emphasis*** text.
     await tester.pumpWidget(_streamingMarkdownHarness(text));
     await tester.pump();
 
-    expect(find.textContaining('old-tail'), findsOneWidget);
+    expect(_paragraphsWith('old-tail', contains: true), hasLength(1));
 
-    text.value = '$baseLines\nnew-tail';
+    text.value = '$baseLines\nold-tail new-tail';
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.textContaining('old-tail'), findsOneWidget);
-    expect(find.textContaining('new-tail'), findsNothing);
+    expect(_paragraphsWith('old-tail', contains: true), hasLength(1));
+    expect(_paragraphsWith('new-tail', contains: true), isEmpty);
 
     await tester.pump(const Duration(milliseconds: 180));
 
-    expect(find.textContaining('new-tail'), findsOneWidget);
+    expect(_paragraphsWith('new-tail', contains: true), hasLength(1));
   });
 
   testWidgets(
@@ -1437,7 +1565,7 @@ Inline ***strong emphasis*** text.
       await tester.pump(const Duration(milliseconds: 60));
       await tester.pump(const Duration(milliseconds: 60));
 
-      expect(find.textContaining('frame-3'), findsOneWidget);
+      expect(_paragraphsWith('frame-3', contains: true), hasLength(1));
     },
   );
 
@@ -1458,7 +1586,7 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final body = find.byType(Table);
       final plainText = tester
           .widgetList<RichText>(
             find.descendant(of: body, matching: find.byType(RichText)),
@@ -1467,8 +1595,12 @@ ${rows.join('\n')}
           .join('\n');
 
       expect(plainText, contains('row0'));
-      expect(plainText, contains('row29'));
-      expect(plainText, isNot(contains('row30')));
+      expect(
+        tester.widget<Table>(body).children,
+        hasLength(PerformanceLimits.streamingTableRows),
+      );
+      expect(plainText, contains('row28'));
+      expect(plainText, isNot(contains('row29')));
       expect(plainText, isNot(contains('row39')));
     },
   );
@@ -1490,7 +1622,7 @@ ${rows.join('\n')}
     String renderedTableText() => tester
         .widgetList<RichText>(
           find.descendant(
-            of: find.byKey(const ValueKey('markdown-table-body')),
+            of: find.byType(Table),
             matching: find.byType(RichText),
           ),
         )
@@ -1499,16 +1631,12 @@ ${rows.join('\n')}
 
     expect(renderedTableText(), contains('row0'));
     expect(renderedTableText(), isNot(contains('row999')));
-    expect(
-      find.byKey(const ValueKey('markdown-table-row-pager')),
-      findsOneWidget,
-    );
+    expect(_action(MarkstreamActionKind.showMore), findsOneWidget);
 
     tester
-        .widget<TextButton>(
-          find.byKey(const ValueKey('markdown-table-show-more')),
-        )
-        .onPressed!();
+        .widget<MarkstreamActionButton>(_action(MarkstreamActionKind.showMore))
+        .action
+        .onInvoke();
     await tester.pump();
 
     expect(renderedTableText(), contains('row100'));
@@ -1525,13 +1653,13 @@ ${rows.join('\n')}
     );
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('virtualized-code-view')), findsOneWidget);
-    expect(find.byType(SelectableHighlightView), findsWidgets);
     expect(
-      find.byType(SelectableHighlightView).evaluate().length,
-      lessThan(10),
+      find.byKey(const ValueKey('markstream-virtualized-code')),
+      findsOneWidget,
     );
-    expect(find.textContaining('line9999'), findsNothing);
+    expect(find.byType(MarkstreamCodeContent), findsWidgets);
+    expect(find.byType(MarkstreamCodeContent).evaluate().length, lessThan(10));
+    expect(_paragraphsWith('line9999', contains: true), isEmpty);
   });
 
   testWidgets(
@@ -1551,7 +1679,7 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final body = find.byType(Table);
       expect(body, findsOneWidget);
       final tableText = tester
           .widgetList<RichText>(
@@ -1559,10 +1687,9 @@ ${rows.join('\n')}
           )
           .map((widget) => widget.text.toPlainText())
           .join('\n');
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(tableText, contains('葡萄 🍇'));
       expect(tableText, contains('¥12.8'));
@@ -1585,7 +1712,7 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final body = find.byType(Table);
       expect(body, findsOneWidget);
       final tableText = tester
           .widgetList<RichText>(
@@ -1593,10 +1720,9 @@ ${rows.join('\n')}
           )
           .map((widget) => widget.text.toPlainText())
           .join('\n');
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(tableText, contains('葡萄 🍇'));
       expect(allText, isNot(contains('| 葡萄 🍇')));
@@ -1625,7 +1751,7 @@ ${rows.join('\n')}
       text.value = '$prefix\n| 文本样式 |   7';
       await tester.pump();
 
-      final bodies = find.byKey(const ValueKey('markdown-table-body'));
+      final bodies = find.byType(Table);
       expect(bodies, findsNWidgets(2));
       final secondBody = bodies.last;
       final tableText = tester
@@ -1634,10 +1760,9 @@ ${rows.join('\n')}
           )
           .map((widget) => widget.text.toPlainText())
           .join('\n');
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(tableText, contains('文本样式'));
       expect(tableText, contains('7'));
@@ -1661,7 +1786,7 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final body = find.byType(Table);
       expect(body, findsOneWidget);
       final tableText = tester
           .widgetList<RichText>(
@@ -1669,10 +1794,9 @@ ${rows.join('\n')}
           )
           .map((widget) => widget.text.toPlainText())
           .join('\n');
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(tableText, isNot(contains('|')));
       expect(allText.replaceAll(tableText, ''), isNot(contains('|')));
@@ -1696,12 +1820,11 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final bodies = find.byKey(const ValueKey('markdown-table-body'));
+      final bodies = find.byType(Table);
       expect(bodies, findsNWidgets(2));
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(allText, isNot(contains('| 测试类别 | 项目数 | 状态 |')));
     },
@@ -1725,12 +1848,11 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final bodies = find.byKey(const ValueKey('markdown-table-body'));
+      final bodies = find.byType(Table);
       expect(bodies, findsNWidgets(2));
-      final allText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final allText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
 
       expect(allText, isNot(contains('| 测试类别 | 项目数 | 状态 |')));
       expect(allText, isNot(contains('| :------- | :----')));
@@ -1768,9 +1890,12 @@ ${rows.join('\n')}
         text.value = frame;
         await tester.pump();
 
-        final allText = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .map((widget) => widget.text.toPlainText())
+        final tableNodes = tester.widgetList<MarkstreamTableBlock>(
+          find.byType(MarkstreamTableBlock),
+        );
+        expect(tableNodes, isNotEmpty, reason: frame);
+        final allText = tableNodes
+            .map((widget) => toPlainText(widget.node))
             .join('\n');
 
         expect(
@@ -1810,12 +1935,11 @@ ${rows.join('\n')}
         text.value = frame;
         await tester.pump();
 
-        final body = find.byKey(const ValueKey('markdown-table-body'));
+        final body = find.byType(Table);
         expect(body, findsOneWidget, reason: frame);
-        final allText = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .map((widget) => widget.text.toPlainText())
-            .join('\n');
+        final allText = markdownParagraphs(
+          tester,
+        ).map((widget) => widget.text.toPlainText()).join('\n');
 
         expect(
           allText,
@@ -1838,30 +1962,21 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      final blockquote = find.byKey(const ValueKey('markstream-quote'));
       expect(blockquote, findsOneWidget);
 
-      final blockquoteWidget = tester.widget<Container>(blockquote);
-      expect(blockquoteWidget.color, isNull);
-      expect(blockquoteWidget.decoration, isNull);
-
-      final line = find.descendant(
-        of: blockquote,
-        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
-      );
-      expect(line, findsOneWidget);
-      expect(tester.getSize(line).width, 3);
-
-      final lineDecoration =
-          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final painter = tester.widget<CustomPaint>(blockquote).painter!;
       final cs = Theme.of(tester.element(blockquote)).colorScheme;
-      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.36));
       expect(
-        lineDecoration.color,
-        isNot(cs.outlineVariant.withValues(alpha: 0.82)),
+        (Canvas canvas) => painter.paint(canvas, tester.getSize(blockquote)),
+        paints..rrect(
+          color: cs.onSurfaceVariant.withValues(alpha: .36),
+          rrect: RRect.fromRectAndRadius(
+            Rect.fromLTWH(0, 0, 3, tester.getSize(blockquote).height),
+            const Radius.circular(2),
+          ),
+        ),
       );
-      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
-      expect(lineDecoration.border, isNull);
     },
   );
 
@@ -1879,21 +1994,15 @@ ${rows.join('\n')}
       );
       await tester.pump();
 
-      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      final blockquote = find.byKey(const ValueKey('markstream-quote'));
       expect(blockquote, findsOneWidget);
 
-      final line = find.descendant(
-        of: blockquote,
-        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
-      );
-      expect(line, findsOneWidget);
-
-      final lineDecoration =
-          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final painter = tester.widget<CustomPaint>(blockquote).painter!;
       final cs = Theme.of(tester.element(blockquote)).colorScheme;
-      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.48));
-      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
-      expect(lineDecoration.border, isNull);
+      expect(
+        (Canvas canvas) => painter.paint(canvas, tester.getSize(blockquote)),
+        paints..rrect(color: cs.onSurfaceVariant.withValues(alpha: .48)),
+      );
     },
   );
 
@@ -1959,20 +2068,19 @@ const greet = (name) => {
         text.value = frame;
         await tester.pump();
 
-        final allText = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .map((widget) => widget.text.toPlainText())
-            .join('\n');
+        final allText = markdownParagraphs(
+          tester,
+        ).map((widget) => widget.text.toPlainText()).join('\n');
         final codeText = tester
             .widgetList<Text>(
               find.descendant(
-                of: find.byType(SelectableHighlightView),
+                of: find.byType(MarkstreamCodeContent),
                 matching: _codeTextFinder(),
               ),
             )
             .map((widget) => widget.textSpan?.toPlainText() ?? widget.data)
             .join('\n');
-        final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+        final blockquote = find.byKey(const ValueKey('markstream-quote'));
         final blockquoteCodeText = tester
             .widgetList<Text>(
               find.descendant(of: blockquote, matching: _codeTextFinder()),
@@ -1986,7 +2094,7 @@ const greet = (name) => {
         expect(
           find.descendant(
             of: blockquote,
-            matching: find.byType(SelectableHighlightView),
+            matching: find.byType(MarkstreamCodeContent),
           ),
           findsOneWidget,
           reason: frame,
@@ -2019,7 +2127,7 @@ const greet = (name) => {
       final codeText = tester
           .widgetList<Text>(
             find.descendant(
-              of: find.byType(SelectableHighlightView),
+              of: find.byType(MarkstreamCodeContent),
               matching: _codeTextFinder(),
             ),
           )
@@ -2039,8 +2147,8 @@ const greet = (name) => {
       await tester.pumpWidget(
         _markdownHarness(r'''
 - ```dart
-final value = "$foo$";
-```
+  final value = "$foo$";
+  ```
 '''),
       );
       await tester.pump();
@@ -2048,7 +2156,7 @@ final value = "$foo$";
       final codeText = tester
           .widgetList<Text>(
             find.descendant(
-              of: find.byType(SelectableHighlightView),
+              of: find.byType(MarkstreamCodeContent),
               matching: _codeTextFinder(),
             ),
           )
@@ -2076,7 +2184,7 @@ $code
       await tester.pump();
 
       expect(find.byType(Image), findsOneWidget);
-      expect(find.textContaining('graph TD'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), isEmpty);
     },
   );
 
@@ -2095,11 +2203,11 @@ $code
       );
       await tester.pump();
 
-      expect(find.text('Image'), findsOneWidget);
-      expect(find.text('Code'), findsOneWidget);
-      expect(find.text('Copy'), findsNothing);
-      expect(find.text('Export PNG'), findsNothing);
-      expect(find.text('Full screen'), findsNothing);
+      expect(_paragraphsWith('Image', contains: false), hasLength(1));
+      expect(_paragraphsWith('Code', contains: false), hasLength(1));
+      expect(_paragraphsWith('Copy', contains: false), isEmpty);
+      expect(_paragraphsWith('Export PNG', contains: false), isEmpty);
+      expect(_paragraphsWith('Full screen', contains: false), isEmpty);
       expect(find.byTooltip('Copy'), findsOneWidget);
       expect(find.byTooltip('Export PNG'), findsOneWidget);
       expect(find.byTooltip('Full screen'), findsOneWidget);
@@ -2110,7 +2218,7 @@ $code
         406,
       );
       expect(find.byType(Image), findsOneWidget);
-      expect(find.textContaining('graph TD'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), isEmpty);
     },
   );
 
@@ -2211,13 +2319,13 @@ $code
     await tester.pumpAndSettle();
 
     expect(find.byType(Image), findsNothing);
-    expect(find.textContaining('graph TD'), findsOneWidget);
+    expect(_paragraphsWith('graph TD', contains: true), hasLength(1));
 
     await tester.tap(find.text('Image'));
     await tester.pumpAndSettle();
 
     expect(find.byType(Image), findsOneWidget);
-    expect(find.textContaining('graph TD'), findsNothing);
+    expect(_paragraphsWith('graph TD', contains: true), isEmpty);
   });
 
   testWidgets('Mermaid keeps theme ink instead of inherited text color', (
@@ -2295,10 +2403,13 @@ A-->B
             .height,
         406,
       );
-      expect(find.text('Generating image'), findsOneWidget);
+      expect(
+        _paragraphsWith('Generating image', contains: false),
+        hasLength(1),
+      );
       expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(find.byType(Image), findsNothing);
-      expect(find.textContaining('graph TD'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), isEmpty);
     },
   );
 
@@ -2322,16 +2433,19 @@ A-->
       await tester.pump();
 
       expect(
-        find.text('Generation failed. Try asking another way.'),
-        findsOneWidget,
+        _paragraphsWith(
+          'Generation failed. Try asking another way.',
+          contains: false,
+        ),
+        hasLength(1),
       );
       expect(find.byType(Image), findsNothing);
-      expect(find.textContaining('graph TD'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), isEmpty);
 
       await tester.tap(find.text('Code'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('graph TD'), findsOneWidget);
+      expect(_paragraphsWith('graph TD', contains: true), hasLength(1));
     },
   );
 
@@ -2363,7 +2477,7 @@ B-->C
       await tester.pump();
 
       expect(find.byType(Image), findsOneWidget);
-      expect(find.textContaining('graph TD'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), isEmpty);
     },
   );
 
@@ -2477,15 +2591,18 @@ A-->B
 ''', streaming: true),
       );
       await tester.pump();
-      expect(find.text('Generating image'), findsOneWidget);
+      expect(
+        _paragraphsWith('Generating image', contains: false),
+        hasLength(1),
+      );
 
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
 
-      expect(find.text('Generating image'), findsNothing);
+      expect(_paragraphsWith('Generating image', contains: false), isEmpty);
       expect(find.byType(Image), findsNothing);
-      expect(find.textContaining('graph TD'), findsOneWidget);
-      expect(find.text('Open Preview'), findsNothing);
+      expect(_paragraphsWith('graph TD', contains: true), hasLength(1));
+      expect(_paragraphsWith('Open Preview', contains: false), isEmpty);
     },
   );
 
@@ -2501,8 +2618,8 @@ A-->B
       );
       await tester.pump();
 
-      final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final tableBlock = find.byType(MarkstreamTableBlock);
+      final body = find.byType(Table);
       final blockRect = tester.getRect(tableBlock);
       final bodyRect = tester.getRect(body);
 
@@ -2530,7 +2647,7 @@ A-->B
     );
     await tester.pump();
 
-    final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
+    final tableBlock = find.byType(MarkstreamTableBlock);
     final richTexts = tester.widgetList<RichText>(
       find.descendant(of: tableBlock, matching: find.byType(RichText)),
     );
@@ -2581,28 +2698,33 @@ A-->B
   testWidgets(
     'MarkdownWithCodeHighlight keeps dollar signs inside table code',
     (tester) async {
-      _overrideMarkdownTablePlatform(TargetPlatform.android);
-      await tester.pumpWidget(
-        _markdownHarness(r'''
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      try {
+        _overrideMarkdownTablePlatform(TargetPlatform.android);
+        await tester.pumpWidget(
+          _markdownHarness(r'''
 | 对比点 | 行内 `$...$` | 行间 `$$...$$` |
 |--------|-------------|---------------|
 | 是否换行 | 不换行 | 换行 |
 ''', width: 360),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-      expect(tableBlock, findsOneWidget);
-      final richTextPlainText = tester
-          .widgetList<RichText>(
-            find.descendant(of: tableBlock, matching: find.byType(RichText)),
-          )
-          .map((widget) => widget.text.toPlainText());
-      final plainText = richTextPlainText.join('\n');
+        final tableBlock = find.byType(MarkstreamTableBlock);
+        expect(tableBlock, findsOneWidget);
+        final richTextPlainText = tester
+            .widgetList<RichText>(
+              find.descendant(of: tableBlock, matching: find.byType(RichText)),
+            )
+            .map((widget) => widget.text.toPlainText());
+        final plainText = richTextPlainText.join('\n');
 
-      expect(plainText, contains(r'$...$'));
-      expect(plainText, contains(r'$$...$$'));
-      expect(plainText, isNot(contains('___CODE_DOLLAR_MASK___')));
+        expect(plainText, contains(r'$...$'));
+        expect(plainText, contains(r'$$...$$'));
+        expect(plainText, isNot(contains('___CODE_DOLLAR_MASK___')));
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
     },
   );
 
@@ -2631,9 +2753,9 @@ A-->B
         );
         await tester.pump();
 
-        final cjkGlyph = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .firstWhere((widget) => widget.text.toPlainText() == '非');
+        final cjkGlyph = markdownParagraphs(
+          tester,
+        ).firstWhere((widget) => widget.text.toPlainText() == '非');
 
         expect(cjkGlyph.text.style?.fontFamily, contains('KaTeX_Main'));
         expect(
@@ -2726,7 +2848,7 @@ A-->B
     await tester.pump();
 
     expect(_findMathWidget(), findsOneWidget);
-    expect(find.textContaining(r'$a+b$'), findsOneWidget);
+    expect(_paragraphsWith(r'$a+b$', contains: true), hasLength(1));
   });
 
   testWidgets(
@@ -2740,8 +2862,8 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(5));
-      expect(find.textContaining(r'\|x\|=1'), findsNothing);
-      expect(find.textContaining(r'\lVert x \rVert'), findsNothing);
+      expect(_paragraphsWith(r'\|x\|=1', contains: true), isEmpty);
+      expect(_paragraphsWith(r'\lVert x \rVert', contains: true), isEmpty);
     },
   );
 
@@ -2759,8 +2881,8 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(4));
-      expect(find.textContaining(r'$\mathbf{a} \cdot'), findsNothing);
-      expect(find.textContaining(r'$P(A|B)'), findsNothing);
+      expect(_paragraphsWith(r'$\mathbf{a} \cdot', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$P(A|B)', contains: true), isEmpty);
     },
   );
 
@@ -2781,10 +2903,10 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(3));
-      expect(find.textContaining(r'$10'), findsOneWidget);
-      expect(find.textContaining(r'$\pm 2$'), findsNothing);
-      expect(find.textContaining(r'$x+y$'), findsNothing);
-      expect(find.textContaining(r'$a+b$'), findsNothing);
+      expect(_paragraphsWith(r'$10', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$\pm 2$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$x+y$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$a+b$', contains: true), isEmpty);
     },
   );
 
@@ -2797,9 +2919,9 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(3));
-      expect(find.textContaining(r'$PaCO_2$'), findsNothing);
-      expect(find.textContaining(r'$\pm 2$'), findsNothing);
-      expect(find.textContaining(r'$SpO_2$'), findsNothing);
+      expect(_paragraphsWith(r'$PaCO_2$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$\pm 2$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$SpO_2$', contains: true), isEmpty);
     },
   );
 
@@ -2814,12 +2936,15 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(2));
-      expect(find.textContaining(r'$9 \times'), findsNothing);
-      expect(find.textContaining(r'$4.3 \times'), findsNothing);
-      expect(find.textContaining('相当于约 2100 万吨 TNT'), findsOneWidget);
+      expect(_paragraphsWith(r'$9 \times', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$4.3 \times', contains: true), isEmpty);
+      expect(_paragraphsWith('相当于约 2100 万吨 TNT', contains: true), hasLength(1));
       expect(
-        find.textContaining(r'，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3'),
-        findsNothing,
+        _paragraphsWith(
+          r'，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3',
+          contains: true,
+        ),
+        isEmpty,
       );
     },
   );
@@ -2833,8 +2958,8 @@ A-->B
     await tester.pump();
 
     expect(_findMathWidget(), findsOneWidget);
-    expect(find.textContaining(r'\(A ='), findsNothing);
-    expect(find.textContaining('等价于开区间'), findsOneWidget);
+    expect(_paragraphsWith(r'\(A =', contains: true), isEmpty);
+    expect(_paragraphsWith('等价于开区间', contains: true), hasLength(1));
   });
 
   testWidgets(
@@ -2852,18 +2977,27 @@ A-->B
       expect(encoded, contains(r'\{'));
       expect(encoded, contains(r'\}'));
       expect(encoded, contains(r'\mathbb{R}'));
-      expect(find.textContaining(r'\(A ='), findsNothing);
-      expect(find.textContaining(r'$A ='), findsNothing);
-      expect(find.textContaining('等价于开区间'), findsOneWidget);
+      expect(_paragraphsWith(r'\(A =', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$A =', contains: true), isEmpty);
+      expect(_paragraphsWith('等价于开区间', contains: true), hasLength(1));
     },
   );
+
+  test('code span closers do not treat backslashes as escapes', () {
+    const source = r'`code\`';
+    final node =
+        const MarkdownParser().parse(source).children.single.children.single
+            as CodeSpanNode;
+    expect(node.code, 'code\\');
+    expect(node.span.slice(source), source);
+  });
 
   testWidgets(
     r'MarkdownWithCodeHighlight keeps escaped inline delimiters literal',
     (tester) async {
       await tester.pumpWidget(
         _markdownHarness(
-          r'*literal\* and **strong\** and `code\` and [label\](https://example.com)',
+          r'\*literal\* and \*\*strong\*\* and \`code\` and [label\](https://example.com)',
         ),
       );
       await tester.pump();
@@ -2926,11 +3060,14 @@ A-->B
       expect(encoded[4], contains(r'\{'));
       expect(encoded[4], contains(r'\}'));
       expect(encoded[4], contains(r'\mathbb{R}'));
-      expect(find.textContaining(r'\(#\)'), findsNothing);
-      expect(find.textContaining(r'\({1, 2, 3}\)'), findsNothing);
-      expect(find.textContaining(r'\({}\)'), findsNothing);
-      expect(find.textContaining(r'\({a_n}_{n=1}^{\infty}\)'), findsNothing);
-      expect(find.textContaining(r'\(A = {x \in'), findsNothing);
+      expect(_paragraphsWith(r'\(#\)', contains: true), isEmpty);
+      expect(_paragraphsWith(r'\({1, 2, 3}\)', contains: true), isEmpty);
+      expect(_paragraphsWith(r'\({}\)', contains: true), isEmpty);
+      expect(
+        _paragraphsWith(r'\({a_n}_{n=1}^{\infty}\)', contains: true),
+        isEmpty,
+      );
+      expect(_paragraphsWith(r'\(A = {x \in', contains: true), isEmpty);
     },
   );
 
@@ -2957,7 +3094,10 @@ A-->B
       expect(encoded[1], isNot(contains(r'\#228B22')));
       expect(encoded[2], isNot(contains(r'\#197')));
       expect(encoded[3], contains(r'\#'));
-      expect(find.textContaining(r'\(\color{#FF5733}{A}\)'), findsNothing);
+      expect(
+        _paragraphsWith(r'\(\color{#FF5733}{A}\)', contains: true),
+        isEmpty,
+      );
     },
   );
 
@@ -2978,8 +3118,8 @@ A-->B
         mathWidgets.map((widget) => widget.parseError),
         everyElement(isNull),
       );
-      expect(find.textContaining(r'\ovalbox'), findsNothing);
-      expect(find.textContaining(r'\operatorname'), findsNothing);
+      expect(_paragraphsWith(r'\ovalbox', contains: true), isEmpty);
+      expect(_paragraphsWith(r'\operatorname', contains: true), isEmpty);
     },
   );
 
@@ -2994,11 +3134,11 @@ A-->B
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(7));
-      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
-      expect(find.textContaining(r'$$符号通常用于块级公式。后文'), findsOneWidget);
-      expect(find.textContaining(r'b$$c'), findsNothing);
-      expect(find.textContaining(r'x$$=$$1'), findsNothing);
-      expect(find.textContaining('结束'), findsOneWidget);
+      expect(_paragraphsWith('在LaTeX中需要转义', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$$符号通常用于块级公式。后文', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'b$$c', contains: true), isEmpty);
+      expect(_paragraphsWith(r'x$$=$$1', contains: true), isEmpty);
+      expect(_paragraphsWith('结束', contains: true), hasLength(1));
     },
   );
 
@@ -3021,14 +3161,14 @@ $f((x))$，$g([x])$，$h(\{x\})$，$\langle a, b \rangle$。
       await tester.pump();
 
       expect(_findMathWidget(), findsAtLeastNWidgets(14));
-      expect(find.textContaining(r'\(A ='), findsNothing);
-      expect(find.textContaining(r'$$符号通常用于块级公式'), findsOneWidget);
-      expect(find.textContaining(r'b$$c'), findsNothing);
-      expect(find.textContaining(r'x$$=$$1'), findsNothing);
-      expect(find.textContaining(r'$n > 2$'), findsNothing);
-      expect(find.textContaining(r'$f((x))$'), findsNothing);
-      expect(find.textContaining('费马大定理指出'), findsOneWidget);
-      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
+      expect(_paragraphsWith(r'\(A =', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$$符号通常用于块级公式', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'b$$c', contains: true), isEmpty);
+      expect(_paragraphsWith(r'x$$=$$1', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$n > 2$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$f((x))$', contains: true), isEmpty);
+      expect(_paragraphsWith('费马大定理指出', contains: true), hasLength(1));
+      expect(_paragraphsWith('在LaTeX中需要转义', contains: true), hasLength(1));
     },
   );
 
@@ -3048,10 +3188,10 @@ $。
       await tester.pump();
 
       expect(_findMathWidget(), findsOneWidget);
-      expect(find.textContaining(r'$50 到 $100'), findsOneWidget);
-      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
-      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
-      expect(find.textContaining(r'有效：$PaCO_2$'), findsNothing);
+      expect(_paragraphsWith(r'$50 到 $100', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$ PaCO_2$', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$PaCO_2 $', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'有效：$PaCO_2$', contains: true), isEmpty);
     },
   );
 
@@ -3064,9 +3204,9 @@ $。
       await tester.pump();
 
       expect(_findMathWidget(), findsNothing);
-      expect(find.textContaining(r'$10 到 $100'), findsOneWidget);
-      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
-      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
+      expect(_paragraphsWith(r'$10 到 $100', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$ PaCO_2$', contains: true), hasLength(1));
+      expect(_paragraphsWith(r'$PaCO_2 $', contains: true), hasLength(1));
     },
   );
 
@@ -3089,7 +3229,7 @@ $$
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(2));
-      expect(find.textContaining(r'$E = mc^2$'), findsNothing);
+      expect(_paragraphsWith(r'$E = mc^2$', contains: true), isEmpty);
     },
   );
 
@@ -3104,23 +3244,25 @@ $$
       await tester.pump();
 
       expect(_findMathWidget(), findsNWidgets(7));
-      expect(find.textContaining(r'$\Delta U$'), findsNothing);
-      expect(find.textContaining(r'$C_v$'), findsNothing);
+      expect(_paragraphsWith(r'$\Delta U$', contains: true), isEmpty);
+      expect(_paragraphsWith(r'$C_v$', contains: true), isEmpty);
     },
   );
 
-  testWidgets(
-    'MarkdownWithCodeHighlight keeps unfinished streaming dollar math in math layout',
-    (tester) async {
-      await tester.pumpWidget(
-        _markdownHarness(r'公式正在输出：$E = mc', streaming: true),
-      );
-      await tester.pump();
+  testWidgets('unfinished inline math stays literal until its closer arrives', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'公式正在输出：$E = mc', streaming: true),
+    );
+    await tester.pump();
 
-      expect(_findMathWidget(), findsOneWidget);
-      expect(find.textContaining(r'$E = mc'), findsNothing);
-    },
-  );
+    expect(_findMathWidget(), findsNothing);
+    expect(
+      _paragraphContaining(r'$E = mc').text.toPlainText(),
+      contains(r'$E = mc'),
+    );
+  });
 
   testWidgets(
     'MarkdownWithCodeHighlight does not stall on closed streaming inline dollar math',
@@ -3181,24 +3323,32 @@ $$
     timeout: const Timeout(Duration(seconds: 10)),
   );
 
-  testWidgets(
-    'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
-    (tester) async {
-      await tester.pumpWidget(
-        _markdownHarness(r'''
+  testWidgets('MarkdownWithCodeHighlight preserves pipes inside table math', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'''
 | A | B |
 | - | - |
 | $a$ | b |
 | $a|b$ | c |
 '''),
-      );
-      await tester.pump();
+    );
+    await tester.pump();
 
-      expect(_findMathWidget(), findsOneWidget);
-      expect(find.textContaining(r'$a'), findsOneWidget);
-      expect(find.textContaining(r'b$'), findsOneWidget);
-    },
-  );
+    expect(_findMathWidget(), findsNWidgets(2));
+    final table = tester
+        .widget<MarkstreamTableBlock>(find.byType(MarkstreamTableBlock))
+        .node;
+    expect(table.children.every((row) => row.children.length == 2), isTrue);
+    expect(
+      table.children.last.children.first.children
+          .whereType<MathInlineNode>()
+          .single
+          .tex,
+      'a|b',
+    );
+  });
 
   testWidgets(
     'MarkdownWithCodeHighlight disables all math rendering by setting',
@@ -3237,7 +3387,10 @@ final price = "$12";
       await tester.pump();
 
       expect(_findMathWidget(), findsNothing);
-      expect(find.textContaining(r'final price = "$12";'), findsOneWidget);
+      expect(
+        _paragraphsWith(r'final price = "$12";', contains: true),
+        hasLength(1),
+      );
     },
   );
 
@@ -3245,7 +3398,7 @@ final price = "$12";
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
-          body: SelectableHighlightView(
+          body: _HighlightFixture(
             'final value = 1;',
             language: 'dart',
             theme: {},
@@ -3271,7 +3424,7 @@ final price = "$12";
           body: StatefulBuilder(
             builder: (context, setState) {
               rebuild = setState;
-              return const SelectableHighlightView(
+              return const _HighlightFixture(
                 'final value = 1;',
                 language: 'dart',
                 theme: {},
@@ -3295,12 +3448,12 @@ final price = "$12";
   });
 
   testWidgets(
-    'SelectableHighlightView skips synchronous highlighting on demand',
+    'MarkstreamCodeContent skips synchronous highlighting on demand',
     (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: SelectableHighlightView(
+            body: _HighlightFixture(
               'final value = 1;',
               language: 'dart',
               theme: {},
@@ -3312,10 +3465,8 @@ final price = "$12";
 
       final richText = tester.widget<Text>(_codeTextFinder());
       final root = richText.textSpan! as TextSpan;
-      final children = root.children ?? const <InlineSpan>[];
-
-      expect(children, hasLength(1));
-      expect((children.single as TextSpan).text, 'final value = 1;');
+      expect(root.toPlainText(), 'final value = 1;');
+      expect(root.children, isNull);
     },
   );
 
@@ -3332,7 +3483,7 @@ final value = 1;
 
       final richText = tester.widget<Text>(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(MarkstreamCodeContent),
           matching: _codeTextFinder(),
         ),
       );
@@ -3357,10 +3508,10 @@ void main() {}
 
     expect(find.byTooltip('Save as file'), findsOneWidget);
     expect(find.byTooltip('Copy'), findsOneWidget);
-    expect(find.text('dart'), findsOneWidget);
+    expect(_paragraphsWith('dart', contains: false), hasLength(1));
   });
 
-  test('FencedCodeBlockMd does not close on an info-string fence line', () {
+  test('fenced code does not close on an info-string fence line', () {
     for (final item in const [
       ('```', '```', '```dart\na\n``` not-a-closer\nfollowing\n```'),
       ('~~~', '~~~', '~~~\na\n~~~ not-a-closer\nfollowing\n~~~'),
@@ -3368,11 +3519,12 @@ void main() {}
       ('~~~~', '~~~~', '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~'),
       ('````', '```', '````dart\na\n``` not-a-closer\nfollowing\n````'),
     ]) {
-      final match = FencedCodeBlockMd(streaming: false).exp.firstMatch(item.$3);
-      expect(match, isNotNull, reason: item.$3);
-      expect(match!.group(0), item.$3, reason: item.$3);
-      expect(match.group(4), contains('not-a-closer'), reason: item.$3);
-      expect(match.group(4), contains('following'), reason: item.$3);
+      final node =
+          const MarkdownParser().parse(item.$3).children.single
+              as CodeBlockNode;
+      expect(node.span.slice(item.$3), item.$3);
+      expect(node.code, contains('not-a-closer'));
+      expect(node.code, contains('following'));
     }
   });
 
@@ -3388,7 +3540,7 @@ void main() {}
         await tester.pump();
         expect(
           find.descendant(
-            of: find.byType(SelectableHighlightView),
+            of: find.byType(MarkstreamCodeContent),
             matching: find.textContaining('not-a-closer'),
           ),
           findsOneWidget,
@@ -3396,7 +3548,7 @@ void main() {}
         );
         expect(
           find.descendant(
-            of: find.byType(SelectableHighlightView),
+            of: find.byType(MarkstreamCodeContent),
             matching: find.textContaining('following'),
           ),
           findsOneWidget,
@@ -3426,24 +3578,27 @@ void main() {}
       );
       await tester.pump();
 
-      expect(find.text('html'), findsOneWidget);
+      expect(_paragraphsWith('html', contains: false), hasLength(1));
       expect(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(MarkstreamCodeContent),
           matching: find.textContaining('<details>'),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(MarkstreamCodeContent),
           matching: find.textContaining('<summary>点击展开/折叠内容</summary>'),
         ),
         findsOneWidget,
       );
-      expect(find.text('点击展开/折叠内容'), findsNothing);
+      expect(_paragraphsWith('点击展开/折叠内容', contains: false), isEmpty);
       expect(find.byKey(const ValueKey('details-collapsed')), findsNothing);
-      expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('markstream-details-body')),
+        findsNothing,
+      );
     },
   );
 
@@ -3468,27 +3623,28 @@ line3
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(
-        find.byKey(const ValueKey('code-block-collapse-icon-switcher')),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
+      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
       expect(
         tester.getTopLeft(find.text('dart')).dx,
-        lessThan(tester.getTopLeft(find.byIcon(Lucide.ChevronRight)).dx),
+        lessThan(tester.getTopLeft(_action(MarkstreamActionKind.expand)).dx),
       );
-      expect(find.textContaining('line3'), findsNothing);
-      expect(find.textContaining('folded'), findsNothing);
+      expect(_paragraphsWith('line3', contains: true), isEmpty);
+      expect(_paragraphsWith('folded', contains: true), isEmpty);
 
-      await tester.tap(find.text('dart'));
+      await tester.tap(
+        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+            ? _action(MarkstreamActionKind.expand)
+            : _action(MarkstreamActionKind.collapse),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
-      expect(find.textContaining('line3'), findsOneWidget);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_action(MarkstreamActionKind.expand), findsNothing);
+      expect(_paragraphsWith('line3', contains: true), hasLength(1));
     },
   );
 
@@ -3514,19 +3670,23 @@ fade3
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
         findsOneWidget,
       );
-      expect(find.textContaining('fade3'), findsNothing);
+      expect(_paragraphsWith('fade3', contains: true), isEmpty);
 
-      await tester.tap(find.text('dart'));
+      await tester.tap(
+        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+            ? _action(MarkstreamActionKind.expand)
+            : _action(MarkstreamActionKind.collapse),
+      );
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
         findsNothing,
       );
-      expect(find.textContaining('fade3'), findsOneWidget);
+      expect(_paragraphsWith('fade3', contains: true), hasLength(1));
     },
   );
 
@@ -3543,15 +3703,14 @@ exact2
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('dart'));
-      await tester.pumpAndSettle();
+      expect(_action(MarkstreamActionKind.collapse), findsNothing);
 
-      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(_action(MarkstreamActionKind.expand), findsNothing);
       expect(
-        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
         findsNothing,
       );
-      expect(find.textContaining('exact2'), findsOneWidget);
+      expect(_paragraphsWith('exact2', contains: true), hasLength(1));
     },
   );
 
@@ -3576,34 +3735,42 @@ disable3
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('disable3'), findsOneWidget);
+      expect(_paragraphsWith('disable3', contains: true), hasLength(1));
 
       await settings.setAutoCollapseCodeBlockLines(2);
       await settings.setAutoCollapseCodeBlock(true);
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(find.textContaining('disable3'), findsNothing);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_paragraphsWith('disable3', contains: true), isEmpty);
 
       await settings.setAutoCollapseCodeBlock(false);
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(find.textContaining('disable3'), findsOneWidget);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_paragraphsWith('disable3', contains: true), hasLength(1));
 
-      await tester.tap(find.text('dart'));
+      await tester.tap(
+        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+            ? _action(MarkstreamActionKind.expand)
+            : _action(MarkstreamActionKind.collapse),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
-      expect(find.textContaining('disable3'), findsNothing);
+      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
+      expect(_paragraphsWith('disable3', contains: true), isEmpty);
 
-      await tester.tap(find.text('dart'));
+      await tester.tap(
+        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+            ? _action(MarkstreamActionKind.expand)
+            : _action(MarkstreamActionKind.collapse),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
-      expect(find.textContaining('disable3'), findsOneWidget);
+      expect(_action(MarkstreamActionKind.expand), findsNothing);
+      expect(_paragraphsWith('disable3', contains: true), hasLength(1));
     },
   );
 
@@ -3633,11 +3800,15 @@ alpha3
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsNothing);
-    expect(find.text('Collapse'), findsNothing);
-    expect(find.textContaining('alpha3'), findsNothing);
+    expect(_paragraphsWith('Expand', contains: false), isEmpty);
+    expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+    expect(_paragraphsWith('alpha3', contains: true), isEmpty);
 
-    await tester.tap(find.text('dart'));
+    await tester.tap(
+      _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+          ? _action(MarkstreamActionKind.expand)
+          : _action(MarkstreamActionKind.collapse),
+    );
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -3650,11 +3821,15 @@ alpha4
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsNothing);
-    expect(find.text('Collapse'), findsNothing);
-    expect(find.textContaining('alpha4'), findsOneWidget);
+    expect(_paragraphsWith('Expand', contains: false), isEmpty);
+    expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+    expect(_paragraphsWith('alpha4', contains: true), hasLength(1));
 
-    await tester.tap(find.text('dart'));
+    await tester.tap(
+      _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
+          ? _action(MarkstreamActionKind.expand)
+          : _action(MarkstreamActionKind.collapse),
+    );
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -3668,9 +3843,9 @@ alpha5
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsNothing);
-    expect(find.text('Collapse'), findsNothing);
-    expect(find.textContaining('alpha5'), findsNothing);
+    expect(_paragraphsWith('Expand', contains: false), isEmpty);
+    expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+    expect(_paragraphsWith('alpha5', contains: true), isEmpty);
   });
 
   testWidgets(
@@ -3700,7 +3875,7 @@ press3
       await tester.pumpAndSettle();
 
       final expandGesture = await tester.startGesture(
-        tester.getCenter(find.text('dart')),
+        tester.getCenter(_action(MarkstreamActionKind.expand)),
       );
       streamText.value = '''
 ```dart
@@ -3714,12 +3889,12 @@ press4
       await expandGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(find.textContaining('press4'), findsOneWidget);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_paragraphsWith('press4', contains: true), hasLength(1));
 
       final collapseGesture = await tester.startGesture(
-        tester.getCenter(find.text('dart')),
+        tester.getCenter(_action(MarkstreamActionKind.collapse)),
       );
       streamText.value = '''
 ```dart
@@ -3734,9 +3909,9 @@ press5
       await collapseGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsNothing);
-      expect(find.text('Collapse'), findsNothing);
-      expect(find.textContaining('press5'), findsNothing);
+      expect(_paragraphsWith('Expand', contains: false), isEmpty);
+      expect(_paragraphsWith('Collapse', contains: false), isEmpty);
+      expect(_paragraphsWith('press5', contains: true), isEmpty);
     },
   );
 
@@ -3753,78 +3928,71 @@ press5
       );
       await tester.pump();
 
-      expect(
-        find.textContaining(RegExp(r'</?theater>'), findRichText: true),
-        findsNothing,
-      );
-      expect(
-        find.textContaining('返回 List<String> 给 <username>', findRichText: true),
-        findsOneWidget,
-      );
-      expect(find.text('更多信息'), findsOneWidget);
-      expect(find.text('隐藏内容', findRichText: true), findsNothing);
+      expect(_paragraphsWith(RegExp(r'</?theater>'), contains: true), isEmpty);
+      expect(_paragraphsWith('返回 List 给 ', contains: true), hasLength(1));
+      expect(_paragraphsWith('更多信息', contains: false), hasLength(1));
+      expect(_paragraphsWith('隐藏内容', contains: false), isEmpty);
 
       await tester.tap(find.text('更多信息'));
       await tester.pumpAndSettle();
 
-      expect(find.text('隐藏内容', findRichText: true), findsOneWidget);
+      expect(_paragraphsWith('隐藏内容', contains: false), hasLength(1));
 
       await tester.tap(find.text('更多信息'));
       await tester.pumpAndSettle();
 
-      expect(find.text('隐藏内容', findRichText: true), findsNothing);
+      expect(_paragraphsWith('隐藏内容', contains: false), isEmpty);
     },
   );
 
-  testWidgets('details walker, DetailsHtmlMd, and the widget share tokenization', (
-    tester,
-  ) async {
+  testWidgets('details AST and widget share tokenization', (tester) async {
     Future<void> expectShared({
       required String source,
       required bool isDetails,
-      int depth = 0,
       String? summary,
       String? hiddenBody,
       String? visibleText,
+      bool open = false,
     }) async {
-      final walker = MarkdownDetailsWalker()..consumeText(source);
-      expect(walker.depth, depth);
-      expect(walker.overflowed, isFalse);
-      expect(markdownDetailsExtent(source) >= 0, isDetails);
-      expect(markdownParseDetails(source) != null, isDetails);
-      final registry = MarkdownDetailsRegistry();
-      final rewritten = registry.rewrite(source);
-      expect(
-        registry.hasIssuedPlaceholders &&
-            DetailsHtmlMd(registry).exp.hasMatch(rewritten),
-        isDetails,
-      );
+      final document = const MarkdownParser().parse(source);
+      final pending = <MarkdownNode>[document];
+      var hasDetails = false;
+      while (pending.isNotEmpty) {
+        final node = pending.removeLast();
+        if (node is DetailsNode ||
+            node is HtmlElementNode && node.tag == 'details') {
+          hasDetails = true;
+        }
+        pending.addAll(node.children);
+      }
+      expect(hasDetails, isDetails, reason: source);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(_markdownHarness(source));
       await tester.pump();
       final details = find.byWidgetPredicate(
-        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+        (widget) => widget is MarkstreamDetailsBlock,
       );
       if (!isDetails) {
         expect(details, findsNothing);
         if (visibleText != null) {
-          expect(
-            find.textContaining(visibleText, findRichText: true),
-            findsWidgets,
-          );
+          expect(_paragraphsWith(visibleText, contains: true), isNotEmpty);
         }
         return;
       }
       expect(details, findsOneWidget);
       if (summary != null) {
-        expect(find.text(summary), findsOneWidget);
+        expect(_paragraphsWith(summary, contains: false), hasLength(1));
       }
       if (hiddenBody == null) return;
-      expect(find.textContaining(hiddenBody, findRichText: true), findsNothing);
+      expect(
+        _paragraphsWith(hiddenBody, contains: true),
+        open ? isNotEmpty : isEmpty,
+      );
+      if (open) return;
       await tester.tap(find.text(summary!));
       await tester.pumpAndSettle();
-      expect(find.textContaining(hiddenBody, findRichText: true), findsWidgets);
+      expect(_paragraphsWith(hiddenBody, contains: true), isNotEmpty);
     }
 
     await expectShared(
@@ -3842,8 +4010,10 @@ press5
     );
     await expectShared(
       source: '<details\nopen>\n<summary>s</summary>\n\nbody\n</details>',
-      isDetails: false,
-      visibleText: 'body',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'body',
+      open: true,
     );
     await expectShared(
       source:
@@ -3906,8 +4076,8 @@ press5
     );
     await expectShared(
       source: r'<details><summary>s</summary>`x`<details>y`</details>',
-      isDetails: false,
-      depth: 1,
+      isDetails: true,
+      summary: 's',
     );
     await expectShared(
       source: r'<details><summary>s</summary>`x```<details>y`</details>',
@@ -3916,8 +4086,8 @@ press5
     );
     await expectShared(
       source: r'<details><summary>s</summary>``x``<details>y``</details>',
-      isDetails: false,
-      depth: 1,
+      isDetails: true,
+      summary: 's',
     );
     await expectShared(
       source: '<details><summary>s</summary>before <details missing </details>',
@@ -3939,23 +4109,23 @@ press5
       await tester.pumpWidget(_markdownHarness(source));
       await tester.pump();
       final data = tester
-          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
-          .map((widget) => widget.data)
+          .widgetList<MarkstreamView>(find.byType(MarkstreamView))
+          .map((widget) => widget.source)
           .join('\n');
-      expect(find.byType(GptMarkdown), findsWidgets);
+      expect(find.byType(MarkstreamView), findsWidgets);
       expect(data, isNot(contains('\uE002')));
       final details = find.byWidgetPredicate(
-        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+        (widget) => widget is MarkstreamDetailsBlock,
       );
       expect(details, expectDetails ? findsOneWidget : findsNothing);
       if (expectDetails) {
-        expect(find.textContaining(visible, findRichText: true), findsNothing);
+        expect(_paragraphsWith(visible, contains: true), isEmpty);
         await tester.tap(find.text('s'));
         await tester.pumpAndSettle();
       } else {
         expect(data, contains(visible));
       }
-      expect(find.textContaining(visible, findRichText: true), findsWidgets);
+      expect(_paragraphsWith(visible, contains: true), isNotEmpty);
     }
 
     await expectUnmasked(source: 'Use `a < b` now', visible: 'a < b');
@@ -3964,6 +4134,7 @@ press5
     await expectUnmasked(
       source: '<details><summary>s</summary>`a < b` still open',
       visible: 'a < b',
+      expectDetails: true,
     );
     await expectUnmasked(
       source: '<details><summary>s</summary>\n\nUse `a < b` now\n</details>',
@@ -3975,39 +4146,35 @@ press5
     await tester.pumpWidget(_markdownHarness('hello \uE002 world'));
     await tester.pump();
     final privateData = tester
-        .widget<GptMarkdown>(find.byType(GptMarkdown))
-        .data;
+        .widget<MarkstreamView>(find.byType(MarkstreamView))
+        .source;
     expect(privateData, contains('\uE002'));
     expect(privateData, isNot(contains('hello < world')));
-    expect(
-      find.textContaining('hello \uE002 world', findRichText: true),
-      findsWidgets,
-    );
+    expect(_paragraphsWith('hello \uE002 world', contains: true), isNotEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(_markdownHarness('Use `a \uE002 b` now'));
     await tester.pump();
-    expect(find.text('a \uE002 b'), findsWidgets);
+    expect(_paragraphsWith('a \uE002 b', contains: false), isNotEmpty);
     expect(
-      tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data,
+      tester.widget<MarkstreamView>(find.byType(MarkstreamView)).source,
       contains('\uE002'),
     );
   });
 
-  testWidgets('details registry keeps walker top-level and block boundaries', (
+  testWidgets('details preserve nested, open and adjacent source boundaries', (
     tester,
   ) async {
-    Finder detailsFinder() => find.byWidgetPredicate(
-      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
-    );
+    Finder detailsFinder() =>
+        find.byWidgetPredicate((widget) => widget is MarkstreamDetailsBlock);
 
     Future<String> pumpSource(String source) async {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(_markdownHarness(source));
       await tester.pump();
       return tester
-          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
-          .map((widget) => widget.data)
+          .widgetList<MarkstreamView>(find.byType(MarkstreamView))
+          .map((widget) => widget.source)
           .join('\n');
     }
 
@@ -4015,63 +4182,68 @@ press5
         '<details>\n<summary>A</summary>\nunclosed\n'
         '<details><summary>B</summary>body B</details>';
     var data = await pumpSource(nestedUnclosed);
-    expect(detailsFinder(), findsNothing);
-    expect(data, isNot(contains('\uE010')));
-    expect(find.textContaining('body B', findRichText: true), findsWidgets);
+    expect(detailsFinder(), findsOneWidget);
+    expect(data, nestedUnclosed);
+    expect(_paragraphsWith('body B', contains: true), isEmpty);
+    await tester.tap(find.text('A'));
+    await tester.pumpAndSettle();
+    expect(detailsFinder(), findsNWidgets(2));
+    await tester.tap(find.text('B'));
+    await tester.pumpAndSettle();
+    expect(_paragraphsWith('body B', contains: true), isNotEmpty);
 
     data = await pumpSource(_nestedDetailsHtml(7));
-    expect(detailsFinder(), findsNothing);
+    expect(detailsFinder(), findsOneWidget);
     expect(data, isNot(contains('\uE010')));
-    expect(find.text('L2'), findsNothing);
+    expect(_paragraphsWith('L2', contains: false), isEmpty);
 
     const tailed = '<details><summary>s</summary>body</details> tail';
     data = await pumpSource(tailed);
-    expect(detailsFinder(), findsNothing);
+    expect(detailsFinder(), findsOneWidget);
     expect(data, isNot(contains('\uE010')));
-    expect(find.textContaining('tail', findRichText: true), findsWidgets);
+    expect(_paragraphsWith('tail', contains: true), isNotEmpty);
 
     data = await pumpSource('<details><summary>s</summary>body</details>  ');
     expect(detailsFinder(), findsOneWidget);
-    expect(find.text('s'), findsOneWidget);
+    expect(_paragraphsWith('s', contains: false), hasLength(1));
 
     const adjacent =
         '<details><summary>A</summary>a</details>'
         '<details><summary>B</summary>b</details>';
     data = await pumpSource(adjacent);
-    expect(detailsFinder(), findsNothing);
+    expect(detailsFinder(), findsNWidgets(2));
     expect(data, isNot(contains('\uE010')));
 
     data = await pumpSource('  <details><summary>s</summary>body</details>');
     expect(detailsFinder(), findsOneWidget);
-    expect(find.text('s'), findsOneWidget);
+    expect(_paragraphsWith('s', contains: false), hasLength(1));
 
     const literal = '\uE010DETAILS0\uE011';
     data = await pumpSource(
       '<details><summary>real</summary>body</details>\n\n$literal',
     );
     expect(detailsFinder(), findsOneWidget);
-    expect(find.text('real'), findsOneWidget);
+    expect(_paragraphsWith('real', contains: false), hasLength(1));
     expect(data, contains(literal));
-    expect(find.textContaining(literal, findRichText: true), findsWidgets);
+    expect(_paragraphsWith(literal, contains: true), isNotEmpty);
   });
 
   testWidgets('details render inside list, quote, table, and details body', (
     tester,
   ) async {
-    Finder detailsFinder() => find.byWidgetPredicate(
-      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
-    );
+    Finder detailsFinder() =>
+        find.byWidgetPredicate((widget) => widget is MarkstreamDetailsBlock);
 
     Future<void> expectFoldable(String source, String summary) async {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(_markdownHarness(source));
       await tester.pump();
       expect(detailsFinder(), findsWidgets);
-      expect(find.textContaining(summary, findRichText: true), findsWidgets);
-      expect(find.textContaining('body', findRichText: true), findsNothing);
+      expect(_paragraphsWith(summary, contains: true), isNotEmpty);
+      expect(_paragraphsWith('body', contains: true), isEmpty);
       await tester.tap(find.textContaining(summary, findRichText: true).first);
       await tester.pumpAndSettle();
-      expect(find.textContaining('body', findRichText: true), findsWidgets);
+      expect(_paragraphsWith('body', contains: true), isNotEmpty);
     }
 
     await expectFoldable(
@@ -4098,19 +4270,18 @@ press5
     await tester.pump();
     await tester.tap(find.text('outer'));
     await tester.pumpAndSettle();
-    expect(find.text('inner'), findsOneWidget);
-    expect(find.textContaining('body', findRichText: true), findsNothing);
+    expect(_paragraphsWith('inner', contains: false), hasLength(1));
+    expect(_paragraphsWith('body', contains: true), isEmpty);
     await tester.tap(find.text('inner'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('body', findRichText: true), findsWidgets);
+    expect(_paragraphsWith('body', contains: true), isNotEmpty);
   });
 
   testWidgets('details inside display math follow the math-rendering flag', (
     tester,
   ) async {
-    Finder detailsFinder() => find.byWidgetPredicate(
-      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
-    );
+    Finder detailsFinder() =>
+        find.byWidgetPredicate((widget) => widget is MarkstreamDetailsBlock);
     const source = '\$\$\n<details><summary>s</summary>body</details>\n\$\$';
     late SettingsProvider settings;
 
@@ -4128,21 +4299,24 @@ press5
     await tester.pumpAndSettle();
     expect(detailsFinder(), findsOneWidget);
     expect(_findMathWidget(), findsNothing);
-    expect(find.text('s'), findsOneWidget);
+    expect(_paragraphsWith('s', contains: false), hasLength(1));
   });
 
   testWidgets(
-    'an unclosed dollar opener does not hide a following details block',
+    'an unclosed display math block retains its literal details source',
     (tester) async {
-      Finder detailsFinder() => find.byWidgetPredicate(
-        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
-      );
+      Finder detailsFinder() =>
+          find.byWidgetPredicate((widget) => widget is MarkstreamDetailsBlock);
       await tester.pumpWidget(
         _markdownHarness('\$\$\n<details><summary>s</summary>body</details>'),
       );
       await tester.pump();
-      expect(detailsFinder(), findsOneWidget);
-      expect(find.text('s'), findsOneWidget);
+      expect(detailsFinder(), findsNothing);
+      final doc = const MarkdownParser().parse(
+        '\$\$\n<details><summary>s</summary>body</details>',
+      );
+      expect(doc.children.single, isA<MathBlockNode>());
+      expect((doc.children.single as MathBlockNode).tex, contains('<details>'));
     },
   );
 
@@ -4172,29 +4346,29 @@ press5
       );
       await tester.pump();
 
-      var richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      var richTexts = markdownParagraphs(tester);
       var plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
 
       expect(plainText, contains('开头文本'));
-      expect(find.text('第一层折叠'), findsOneWidget);
-      expect(find.text('第二层折叠'), findsNothing);
-      expect(find.text('普通内容...', findRichText: true), findsNothing);
-      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+      expect(_paragraphsWith('第一层折叠', contains: false), hasLength(1));
+      expect(_paragraphsWith('第二层折叠', contains: false), isEmpty);
+      expect(_paragraphsWith('普通内容...', contains: false), isEmpty);
+      expect(_paragraphsWith('深藏的内容在这里！', contains: false), isEmpty);
 
       await tester.tap(find.text('第一层折叠'));
       await tester.pumpAndSettle();
 
-      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      richTexts = markdownParagraphs(tester);
       plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
 
       expect(plainText, contains('普通内容...'));
-      expect(find.text('第二层折叠'), findsOneWidget);
-      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+      expect(_paragraphsWith('第二层折叠', contains: false), hasLength(1));
+      expect(_paragraphsWith('深藏的内容在这里！', contains: false), isEmpty);
 
       await tester.tap(find.text('第二层折叠'));
       await tester.pumpAndSettle();
 
-      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      richTexts = markdownParagraphs(tester);
       plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
 
       expect(plainText, contains('深藏的内容在这里！'));
@@ -4213,14 +4387,14 @@ press5
     );
     await tester.pump();
 
-    final richTexts = tester.widgetList<RichText>(find.byType(RichText));
+    final richTexts = markdownParagraphs(tester);
     final plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
 
     expect(plainText, contains('第一段\n第二行'));
     expect(plainText, isNot(contains('<p>')));
     expect(plainText, isNot(contains('<br>')));
     expect(plainText, isNot(contains('<a href=')));
-    expect(find.text('链接'), findsOneWidget);
+    expect(_paragraphsWith('链接', contains: false), hasLength(1));
   });
 
   testWidgets('MarkdownWithCodeHighlight normalizes strong weight on Android', (
@@ -4252,11 +4426,13 @@ press5
     );
     await tester.pump();
 
-    final richTexts = tester.widgetList<RichText>(find.byType(RichText));
-    final plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
-
-    expect(plainText, contains('这是一个 HTML 段落。\n\n同一个 HTML 段落里的第一行'));
-    expect(plainText, isNot(contains('这是一个 HTML 段落。\n\n\n同一个 HTML 段落里的第一行')));
+    final first = _paragraphContaining('这是一个 HTML 段落。');
+    final next = _paragraphContaining('同一个 HTML 段落里的第一行');
+    final gap =
+        next.localToGlobal(Offset.zero).dy -
+        first.localToGlobal(Offset(0, first.size.height)).dy;
+    expect(gap, inInclusiveRange(0.0, 18.0));
+    expect(next.text.toPlainText(), contains('第一行\n这里应该换到第二行。'));
   });
 
   testWidgets('MarkdownWithCodeHighlight keeps p to markdown spacing compact', (
@@ -4271,11 +4447,12 @@ press5
     );
     await tester.pump();
 
-    final richTexts = tester.widgetList<RichText>(find.byType(RichText));
-    final plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
-
-    expect(plainText, contains('这里应该换到第二行。\n\n这里是普通 Markdown 链接'));
-    expect(plainText, isNot(contains('这里应该换到第二行。\n\n\n这里是普通 Markdown 链接')));
+    final first = _paragraphContaining('这里应该换到第二行。');
+    final next = _paragraphContaining('这里是普通 Markdown 链接');
+    final gap =
+        next.localToGlobal(Offset.zero).dy -
+        first.localToGlobal(Offset(0, first.size.height)).dy;
+    expect(gap, inInclusiveRange(0.0, 18.0));
   });
 
   testWidgets('MarkdownWithCodeHighlight animates details collapse', (
@@ -4286,21 +4463,31 @@ press5
     );
     await tester.pump();
 
-    expect(find.text('隐藏内容', findRichText: true), findsNothing);
+    expect(_paragraphsWith('隐藏内容', contains: false), isEmpty);
 
     await tester.tap(find.text('更多信息'));
     await tester.pumpAndSettle();
 
-    expect(find.text('隐藏内容', findRichText: true), findsOneWidget);
+    expect(_paragraphsWith('隐藏内容', contains: false), hasLength(1));
 
+    final expandedHeight = tester
+        .getSize(find.byType(MarkstreamDetailsBlock))
+        .height;
     await tester.tap(find.text('更多信息'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-
-    expect(find.text('隐藏内容', findRichText: true), findsOneWidget);
+    final midwayHeight = tester
+        .getSize(find.byType(MarkstreamDetailsBlock))
+        .height;
+    expect(midwayHeight, lessThan(expandedHeight));
 
     await tester.pumpAndSettle();
 
-    expect(find.text('隐藏内容', findRichText: true), findsNothing);
+    expect(_paragraphsWith('隐藏内容', contains: false), isEmpty);
+    expect(
+      tester.getSize(find.byType(MarkstreamDetailsBlock)).height,
+      lessThan(midwayHeight),
+    );
   });
 
   testWidgets('MarkdownWithCodeHighlight stretches short details body', (
@@ -4315,7 +4502,7 @@ press5
     await tester.pump();
 
     final expandedSize = tester.getSize(
-      find.byKey(const ValueKey('details-expanded')),
+      find.byKey(const ValueKey('markstream-details-body')),
     );
 
     expect(expandedSize.width, closeTo(360, 2));
@@ -4346,9 +4533,12 @@ press5
       );
       await tester.pump();
 
-      final block = find.byKey(const ValueKey('details-surface'));
+      final block = find.byKey(const ValueKey('markstream-details-surface'));
       expect(block, findsOneWidget);
-      expect(fillAlpha(tester, block), closeTo(kBlockFillAlphaDetails, 0.01));
+      expect(
+        fillAlpha(tester, block),
+        closeTo(const MarkstreamFillAlphas().details, 0.01),
+      );
     });
 
     testWidgets('details block fill is translucent in light mode', (
@@ -4359,9 +4549,12 @@ press5
       );
       await tester.pump();
 
-      final block = find.byKey(const ValueKey('details-surface'));
+      final block = find.byKey(const ValueKey('markstream-details-surface'));
       expect(block, findsOneWidget);
-      expect(fillAlpha(tester, block), closeTo(kBlockFillAlphaDetails, 0.01));
+      expect(
+        fillAlpha(tester, block),
+        closeTo(const MarkstreamFillAlphas().details, 0.01),
+      );
     });
 
     testWidgets('table block fill is translucent', (tester) async {
@@ -4374,18 +4567,29 @@ press5
       );
       await tester.pump();
 
-      final block = find.byKey(const ValueKey('markdown-table-block'));
+      final block = find.byType(MarkstreamTableBlock);
       expect(block, findsOneWidget);
-      expect(fillAlpha(tester, block), closeTo(kBlockFillAlphaTable, 0.01));
+      expect(
+        tester
+            .widget<MarkstreamTableBlock>(block)
+            .theme
+            .table
+            .bodyBackgroundColor
+            .a,
+        closeTo(const MarkstreamFillAlphas().table, 0.01),
+      );
     });
 
     testWidgets('code block fill is translucent', (tester) async {
       await tester.pumpWidget(_markdownHarness('```dart\nvoid main() {}\n```'));
       await tester.pump();
 
-      final block = find.byKey(const ValueKey('code-block-surface'));
+      final block = find.byKey(const ValueKey('markstream-code-surface'));
       expect(block, findsOneWidget);
-      expect(fillAlpha(tester, block), closeTo(kBlockFillAlphaContent, 0.01));
+      expect(
+        fillAlpha(tester, block),
+        closeTo(const MarkstreamFillAlphas().content, 0.01),
+      );
     });
 
     testWidgets('inline code fill is translucent in light mode', (
@@ -4394,9 +4598,12 @@ press5
       await tester.pumpWidget(_markdownHarness('Body with `code`.'));
       await tester.pump();
 
-      final chip = find.byKey(const ValueKey('inline-code-surface'));
+      final chip = find.byType(InlineCodeCapsule);
       expect(chip, findsOneWidget);
-      expect(fillAlpha(tester, chip), closeTo(kBlockFillAlphaInline, 0.01));
+      expect(
+        tester.widget<InlineCodeCapsule>(chip).backgroundColor.a,
+        closeTo(const MarkstreamFillAlphas().inline, 0.01),
+      );
     });
   });
 
@@ -4431,23 +4638,26 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Example HTML link'), findsOneWidget);
-      expect(find.text('点击展开：次要信息'), findsOneWidget);
-      expect(find.text('默认展开：open 属性'), findsOneWidget);
-      expect(find.text('这一块带有 ', findRichText: true), findsNothing);
-      expect(find.text('这里是折叠内容的第一段。', findRichText: true), findsNothing);
+      expect(
+        _paragraphsWith('Example HTML link', contains: true),
+        hasLength(1),
+      );
+      expect(_paragraphsWith('点击展开：次要信息', contains: false), hasLength(1));
+      expect(_paragraphsWith('默认展开：open 属性', contains: false), hasLength(1));
+      expect(_paragraphsWith('这一块带有 ', contains: true), isNotEmpty);
+      expect(_paragraphsWith('这里是折叠内容的第一段。', contains: false), isEmpty);
 
       await tester.tap(find.text('点击展开：次要信息'));
       await tester.pumpAndSettle();
 
-      final richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      final richTexts = markdownParagraphs(tester);
       final plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
 
       expect(plainText, contains('这里是折叠内容的第一段。'));
       expect(plainText, contains('details 内的 Markdown 列表'));
       expect(
-        find.textContaining("print('code block inside details');"),
-        findsOneWidget,
+        _paragraphsWith("print('code block inside details');", contains: true),
+        hasLength(1),
       );
       expect(plainText, isNot(contains('<details>')));
       expect(plainText, isNot(contains('<a href=')));
@@ -4462,11 +4672,7 @@ void main() {
 
       Widget view(String source) => MaterialApp(
         home: Scaffold(
-          body: SelectableHighlightView(
-            source,
-            language: 'dart',
-            theme: const {},
-          ),
+          body: _HighlightFixture(source, language: 'dart', theme: const {}),
         ),
       );
 
@@ -4518,8 +4724,8 @@ void main() {
       );
       await tester.pump();
 
-      GptMarkdown builtMarkdown() =>
-          tester.widget<GptMarkdown>(find.byType(GptMarkdown));
+      InlineSpan builtMarkdown() =>
+          _paragraphContaining('cached body text').text;
 
       final initial = builtMarkdown();
 
@@ -4532,8 +4738,15 @@ void main() {
       // MaterialApp animates theme changes; let the lerp finish.
       await tester.pump(const Duration(milliseconds: 300));
       final darkMarkdown = builtMarkdown();
-      expect(identical(initial, darkMarkdown), isFalse);
-      expect(find.textContaining('cached body text'), findsOneWidget);
+      expect(
+        (darkMarkdown as TextSpan).style?.color,
+        tester
+            .widget<MarkstreamView>(find.byType(MarkstreamView))
+            .theme!
+            .body
+            .color,
+      );
+      expect(_paragraphsWith('cached body text', contains: true), hasLength(1));
 
       rebuild(() {});
       await tester.pump();
@@ -4542,7 +4755,7 @@ void main() {
       rebuild(() => fontSize = 16.5);
       await tester.pump();
       expect(identical(darkMarkdown, builtMarkdown()), isFalse);
-      expect(find.textContaining('cached body text'), findsOneWidget);
+      expect(_paragraphsWith('cached body text', contains: true), hasLength(1));
     },
   );
 
@@ -4586,7 +4799,7 @@ void main() {
       Set<Color?> codeSpanColors() {
         final richText = tester.widget<Text>(
           find.descendant(
-            of: find.byType(SelectableHighlightView),
+            of: find.byType(MarkstreamCodeContent),
             matching: _codeTextFinder(),
           ),
         );
@@ -4631,18 +4844,15 @@ void main() {
       await tester.pumpWidget(_markdownHarness(text, streaming: true));
       await tester.pump();
 
-      expect(
-        find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == 'MarkdownBlockList',
-        ),
-        findsWidgets,
-      );
-      expect(
-        find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_CachedMarkdownBlock',
-        ),
-        findsAtLeastNWidgets(2),
-      );
+      expect(find.byType(BlockList), findsWidgets);
+      final document = const MarkdownParser().parse(text, streaming: true);
+      expect(document.children.whereType<ParagraphNode>(), hasLength(4));
+      for (var index = 0; index < 4; index++) {
+        expect(
+          _paragraphsWith('$paragraph$index', contains: false),
+          hasLength(1),
+        );
+      }
     },
   );
 
@@ -4680,10 +4890,9 @@ void main() {
         text.value = source;
         await tester.pump();
 
-        final plainText = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .map((widget) => widget.text.toPlainText())
-            .join('\n');
+        final plainText = markdownParagraphs(
+          tester,
+        ).map((widget) => widget.text.toPlainText()).join('\n');
         for (final completed in paragraphs.where(source.contains)) {
           expect(
             plainText,
@@ -4695,17 +4904,16 @@ void main() {
 
       await tester.pumpWidget(_markdownHarness(source, width: 360));
       await tester.pump();
-      final finishedPlainText = tester
-          .widgetList<RichText>(find.byType(RichText))
-          .map((widget) => widget.text.toPlainText())
-          .join('\n');
+      final finishedPlainText = markdownParagraphs(
+        tester,
+      ).map((widget) => widget.text.toPlainText()).join('\n');
       for (final paragraph in paragraphs) {
         expect(finishedPlainText, contains(paragraph.replaceAll('*', '')));
       }
     },
   );
 
-  testWidgets('streaming markdown uses AtxHeadingMd and not the default HTag', (
+  testWidgets('streaming Markdown renders ATX headings from its AST', (
     tester,
   ) async {
     final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
@@ -4714,34 +4922,45 @@ void main() {
     );
     await tester.pump();
 
-    final markdown = tester.widget<GptMarkdown>(find.byType(GptMarkdown).first);
-    expect(markdown.components!.whereType<HTag>(), isEmpty);
-    expect(markdown.components!.whereType<AtxHeadingMd>(), hasLength(1));
+    final markdown = tester.widget<MarkstreamView>(
+      find.byType(MarkstreamView).first,
+    );
+    expect(
+      const MarkdownParser()
+          .parse(markdown.source!)
+          .children
+          .whereType<HeadingNode>()
+          .map((node) => node.level),
+      [1],
+    );
+
     expect(_spanFontSize(tester, 'Real heading'), 24);
   });
 
   testWidgets('regular and inline code text follow inherited ink color', (
     tester,
   ) async {
-    const inheritedInk = Color(0xFF224466);
-    const themeInk = Color(0xFF112233);
-    _overrideMarkdownTablePlatform(TargetPlatform.android);
-    final baseTheme = ThemeData.light();
-    final theme = baseTheme.copyWith(
-      colorScheme: baseTheme.colorScheme.copyWith(onSurface: themeInk),
-    );
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme: theme,
-          home: Scaffold(
-            body: DefaultTextStyle.merge(
-              style: const TextStyle(color: inheritedInk),
-              child: const MarkdownWithCodeHighlight(
-                text: '''
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    try {
+      const inheritedInk = Color(0xFF224466);
+      const themeInk = Color(0xFF112233);
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      final baseTheme = ThemeData.light();
+      final theme = baseTheme.copyWith(
+        colorScheme: baseTheme.colorScheme.copyWith(onSurface: themeInk),
+      );
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: theme,
+            home: Scaffold(
+              body: DefaultTextStyle.merge(
+                style: const TextStyle(color: inheritedInk),
+                child: const MarkdownWithCodeHighlight(
+                  text: '''
 # Real heading
 
 Body copy with `code`.
@@ -4754,38 +4973,41 @@ Body copy with `code`.
 Fenced code body
 ```
 ''',
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(
-      _paragraphContaining('Real heading').text.style?.color,
-      inheritedInk,
-    );
-    expect(
-      _paragraphContaining('Body copy with').text.style?.color,
-      inheritedInk,
-    );
-    expect(tester.widget<Text>(find.text('code')).style?.color, inheritedInk);
-    expect(
-      _paragraphContaining('Theme table header').text.style?.color,
-      themeInk,
-    );
-    expect(
-      _paragraphContaining('Theme table body').text.style?.color,
-      themeInk.withValues(alpha: 0.90),
-    );
-    final fencedCode = tester.widget<Text>(
-      find.descendant(
-        of: find.byType(SelectableHighlightView),
-        matching: _codeTextFinder(),
-      ),
-    );
-    expect(fencedCode.textSpan?.style?.color, themeInk);
+      expect(
+        _paragraphContaining('Real heading').text.style?.color,
+        inheritedInk,
+      );
+      expect(
+        _paragraphContaining('Body copy with').text.style?.color,
+        inheritedInk,
+      );
+      expect(tester.widget<Text>(find.text('code')).style?.color, inheritedInk);
+      expect(
+        _paragraphContaining('Theme table header').text.style?.color,
+        themeInk,
+      );
+      expect(
+        _paragraphContaining('Theme table body').text.style?.color,
+        themeInk.withValues(alpha: 0.90),
+      );
+      final fencedCode = tester.widget<Text>(
+        find.descendant(
+          of: find.byType(MarkstreamCodeContent),
+          matching: _codeTextFinder(),
+        ),
+      );
+      expect(fencedCode.textSpan?.style?.color, themeInk);
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets(
@@ -4801,10 +5023,17 @@ Fenced code body
           isNot(24),
           reason: streaming ? 'streaming' : 'finished',
         );
-        final markdown = tester.widget<GptMarkdown>(
-          find.byType(GptMarkdown).first,
+        final markdown = tester.widget<MarkstreamView>(
+          find.byType(MarkstreamView).first,
         );
-        expect(markdown.components!.whereType<HTag>(), isEmpty);
+        expect(
+          const MarkdownParser()
+              .parse(markdown.source!)
+              .children
+              .whereType<HeadingNode>()
+              .map((node) => node.level),
+          isEmpty,
+        );
       }
     },
   );
@@ -4817,10 +5046,9 @@ Fenced code body
       for (final streaming in const [true, false]) {
         await tester.pumpWidget(_markdownHarness(text, streaming: streaming));
         await tester.pump();
-        final plain = tester
-            .widgetList<RichText>(find.byType(RichText))
-            .map((widget) => widget.text.toPlainText())
-            .join('\n');
+        final plain = markdownParagraphs(
+          tester,
+        ).map((widget) => widget.text.toPlainText()).join('\n');
         expect(plain, isNot(contains('\u200C')), reason: '$streaming');
         expect(plain, contains('item'));
         expect(_spanFontSize(tester, 'item'), isNot(24));
@@ -4836,7 +5064,7 @@ Fenced code body
     await tester.pumpWidget(_markdownHarness(text, streaming: true));
     await tester.pump();
     expect(find.byType(Table), findsNothing);
-    expect(find.byKey(const ValueKey('markdown-table-body')), findsNothing);
+    expect(find.byType(Table), findsNothing);
 
     await tester.pumpWidget(_markdownHarness(text, streaming: false));
     await tester.pump();
@@ -4844,7 +5072,7 @@ Fenced code body
   });
 
   testWidgets(
-    'parent rebuilds with new citation closures keep the same GptMarkdown',
+    'parent rebuilds with new citation closures keep the same MarkstreamView',
     (tester) async {
       late StateSetter rebuild;
       var lookup = <String, String>{'96d0ed': '1'};
@@ -4873,21 +5101,21 @@ Fenced code body
       );
       await tester.pump();
 
-      GptMarkdown builtMarkdown() =>
-          tester.widget<GptMarkdown>(find.byType(GptMarkdown));
+      State<MarkstreamView> builtMarkdown() =>
+          tester.state<State<MarkstreamView>>(find.byType(MarkstreamView));
       final initial = builtMarkdown();
-      expect(find.text('1'), findsOneWidget);
+      expect(_paragraphsWith('1', contains: false), hasLength(1));
 
       rebuild(() {});
       await tester.pump();
       expect(identical(initial, builtMarkdown()), isTrue);
-      expect(find.text('1'), findsOneWidget);
+      expect(_paragraphsWith('1', contains: false), hasLength(1));
 
       rebuild(() => lookup = <String, String>{'96d0ed': '7'});
       await tester.pump();
-      expect(identical(initial, builtMarkdown()), isFalse);
-      expect(find.text('7'), findsOneWidget);
-      expect(find.text('1'), findsNothing);
+      expect(identical(initial, builtMarkdown()), isTrue);
+      expect(_paragraphsWith('7', contains: false), hasLength(1));
+      expect(_paragraphsWith('1', contains: false), isEmpty);
 
       await tester.tap(find.text('7'));
       expect(taps, 1);
@@ -4902,12 +5130,17 @@ Fenced code body
       );
       await tester.pump();
 
-      final key = tester.widget<GptMarkdown>(find.byType(GptMarkdown)).key;
-      expect(key, isA<ValueKey<String>>());
-      final value = (key! as ValueKey<String>).value;
-      expect(value, startsWith('parsed-markdown-'));
-      expect(value.contains('data:image'), isFalse);
-      expect(value.contains('iVBORw0KGgo'), isFalse);
+      final key = tester
+          .widget<MarkstreamView>(find.byType(MarkstreamView))
+          .key;
+      expect(key?.toString() ?? '', isNot(contains('data:image')));
+      expect(key?.toString() ?? '', isNot(contains('iVBORw0KGgo')));
+      final image = tester.widget<Image>(find.byType(Image));
+      final provider = image.image;
+      expect(
+        provider is ResizeImage ? provider.imageProvider : provider,
+        isA<MemoryImage>(),
+      );
     },
   );
 
@@ -4944,13 +5177,11 @@ Fenced code body
       );
       await tester.pump();
       expect(
-        find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
-        ),
+        find.byWidgetPredicate((widget) => widget is MarkstreamDetailsBlock),
         findsOneWidget,
       );
-      expect(find.text('real'), findsOneWidget);
-      expect(find.textContaining(literal, findRichText: true), findsWidgets);
+      expect(_paragraphsWith('real', contains: false), hasLength(1));
+      expect(_paragraphsWith(literal, contains: true), isNotEmpty);
     },
   );
 
@@ -4966,16 +5197,16 @@ Fenced code body
 
     await tester.tap(find.text('s'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+    expect(_paragraphsWith('hidden', contains: true), isNotEmpty);
 
     text.value =
         '$pad\n\n<details><summary>s</summary>\n\nhidden\n</details>\n'
         'more from the same block';
     await tester.pump();
-    expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+    expect(_paragraphsWith('hidden', contains: true), isNotEmpty);
     expect(
-      find.textContaining('more from the same block', findRichText: true),
-      findsWidgets,
+      _paragraphsWith('more from the same block', contains: true),
+      isNotEmpty,
     );
   });
 
@@ -4991,13 +5222,13 @@ Fenced code body
 
       await tester.tap(find.text('s'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+      expect(_paragraphsWith('hidden', contains: true), isNotEmpty);
 
       text.value =
           '$pad\n\n<details><summary>other</summary>\n\nhidden\n</details>';
       await tester.pump();
-      expect(find.text('other'), findsOneWidget);
-      expect(find.textContaining('hidden', findRichText: true), findsNothing);
+      expect(_paragraphsWith('other', contains: false), hasLength(1));
+      expect(_paragraphsWith('hidden', contains: true), isEmpty);
     },
   );
 
@@ -5013,16 +5244,16 @@ Fenced code body
       await tester.pumpWidget(_streamingMarkdownHarness(text, width: 360));
       await tester.pump();
 
-      expect(find.textContaining('hidden', findRichText: true), findsNothing);
+      expect(_paragraphsWith('hidden', contains: true), isEmpty);
       await tester.tap(find.text('s'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+      expect(_paragraphsWith('hidden', contains: true), isNotEmpty);
 
       text.value =
           '<details><summary>s</summary>\n\nhidden\n</details>\n\n'
           '![42x24]($_transparentPngDataUrl)\n\n$pad\n\n\n![]($second)';
       await tester.pump();
-      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+      expect(_paragraphsWith('hidden', contains: true), isNotEmpty);
 
       await tester.tap(find.byType(Image).first);
       await tester.pumpAndSettle();

@@ -6,6 +6,7 @@ import 'package:markstream/markstream_core.dart';
 void main() {
   test('every source prefix agrees with a complete parse', () {
     const fixtures = [
+      '<details>\n<summary>outer</summary>\nprefix <details>\n<summary>inner</summary>\n\nbody\n</details>\n\nafter\n</details>',
       'one\n\ntwo\n\n```dart\nvalue\n```\n\nend',
       '> - first\n> - second\n>   continuation\n\nOutside',
       '<details><summary>Title</summary>\n\n- one\n- two\n</details>After',

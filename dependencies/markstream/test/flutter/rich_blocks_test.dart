@@ -518,8 +518,7 @@ void main() {
     String? selected;
     Widget view(String body) => host(
       MarkstreamView(
-        source:
-            '<details>\n<summary>Summary **strong**</summary>\n\n$body\n\n</details>',
+        source: '<details>\n<summary>Summary **strong**</summary>\n\n$body',
       ),
       selectable: true,
       onSelection: (value) => selected = value?.plainText,

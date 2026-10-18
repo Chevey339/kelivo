@@ -65,7 +65,13 @@ HtmlTag? readHtmlTag(String source, int start, int end) {
 
 bool _whitespace(int c) => c == 32 || c == 9 || c == 10 || c == 13 || c == 12;
 
-HtmlTag? findClosingHtmlTag(String source, int start, int end, String name) {
+HtmlTag? findHtmlTag(
+  String source,
+  int start,
+  int end,
+  String name, {
+  bool? closing,
+}) {
   for (var i = start; i < end; i++) {
     final char = source.codeUnitAt(i);
     if (char == 92) {
@@ -93,7 +99,10 @@ HtmlTag? findClosingHtmlTag(String source, int start, int end, String name) {
     }
     if (char != 60) continue;
     final tag = readHtmlTag(source, i, end);
-    if (tag != null && tag.closing && tag.name == name) return tag;
+    if (tag != null &&
+        (closing == null || tag.closing == closing) &&
+        tag.name == name)
+      return tag;
   }
   return null;
 }

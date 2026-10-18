@@ -62,7 +62,12 @@ String toMarkdown(MarkdownNode root, {String? source}) {
   }
   return serializeNodes(root, (node, output) {
     final body = joinChildren(node, output);
-    if (node is TextNode) return _escape(node.text);
+    if (node is TextNode) {
+      final escaped = _escape(node.text);
+      return tableDescendants.contains(node)
+          ? escaped.replaceAll(RegExp(r'\r\n|\r|\n'), '<br>')
+          : escaped;
+    }
     if (node is LineBreakNode)
       return tableDescendants.contains(node)
           ? '<br>'

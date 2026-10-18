@@ -7,11 +7,15 @@ class MarkstreamDetailsBlock extends StatefulWidget {
   const MarkstreamDetailsBlock({
     super.key,
     required this.node,
+    required this.source,
+    required this.open,
     required this.theme,
     required this.summary,
     required this.body,
   });
-  final DetailsNode node;
+  final MarkdownNode node;
+  final bool open;
+  final String source;
   final MarkstreamTheme theme;
   final Widget summary;
   final WidgetBuilder body;
@@ -22,10 +26,20 @@ class MarkstreamDetailsBlock extends StatefulWidget {
 class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
   bool? _manual;
   @override
+  void didUpdateWidget(MarkstreamDetailsBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.node.span.start != oldWidget.node.span.start ||
+        !widget.source.startsWith(oldWidget.source)) {
+      _manual = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final expanded = _manual ?? widget.node.open;
+    final expanded = _manual ?? widget.open;
     final theme = widget.theme.details;
     return Container(
+      key: const ValueKey('markstream-details-surface'),
       margin: theme.margin,
       decoration: BoxDecoration(
         color: theme.backgroundColor,
@@ -33,48 +47,54 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
         border: Border.all(color: theme.borderColor, width: .8),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            expanded: expanded,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _manual = !expanded),
-              child: Padding(
-                padding: theme.summaryPadding,
-                child: Row(
-                  children: [
-                    SelectionContainer.disabled(
-                      child: AnimatedRotation(
-                        turns: expanded ? .25 : 0,
-                        duration: theme.chevronDuration,
-                        child: SizedBox.square(
-                          dimension: theme.chevronSize,
-                          child: CustomPaint(
-                            painter: _Chevron(
-                              theme.summary.color ??
-                                  widget.theme.body.color ??
-                                  Colors.black,
+      child: AnimatedSize(
+        alignment: Alignment.topCenter,
+        duration: theme.chevronDuration,
+        curve: Curves.easeOutCubic,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              expanded: expanded,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _manual = !expanded),
+                child: Padding(
+                  padding: theme.summaryPadding,
+                  child: Row(
+                    children: [
+                      SelectionContainer.disabled(
+                        child: AnimatedRotation(
+                          turns: expanded ? .25 : 0,
+                          duration: theme.chevronDuration,
+                          child: SizedBox.square(
+                            dimension: theme.chevronSize,
+                            child: CustomPaint(
+                              painter: _Chevron(
+                                theme.summary.color ??
+                                    widget.theme.body.color ??
+                                    Colors.black,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(child: widget.summary),
-                  ],
+                      const SizedBox(width: 7),
+                      Expanded(child: widget.summary),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (expanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: widget.body(context),
-            ),
-        ],
+            if (expanded)
+              Padding(
+                key: const ValueKey('markstream-details-body'),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: widget.body(context),
+              ),
+          ],
+        ),
       ),
     );
   }

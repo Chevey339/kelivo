@@ -20,6 +20,7 @@ class MarkstreamTableBlock extends StatefulWidget {
   const MarkstreamTableBlock({
     super.key,
     required this.node,
+    required this.source,
     required this.theme,
     required this.extensions,
     required this.labels,
@@ -28,6 +29,7 @@ class MarkstreamTableBlock extends StatefulWidget {
     this.exporting = false,
   });
   final TableNode node;
+  final String source;
   final MarkstreamTheme theme;
   final MarkstreamExtensions extensions;
   final MarkstreamLabels labels;
@@ -40,10 +42,22 @@ class MarkstreamTableBlock extends StatefulWidget {
 class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   final _selection = TableSelectionDelegate();
   final _boundary = GlobalKey();
+  final _scroll = ScrollController();
   int _visibleRows = PerformanceLimits.initialTableRows;
   bool _capturing = false;
   @override
+  void didUpdateWidget(MarkstreamTableBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.node.span.start != oldWidget.node.span.start ||
+        !widget.source.startsWith(oldWidget.source)) {
+      _visibleRows = PerformanceLimits.initialTableRows;
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    }
+  }
+
+  @override
   void dispose() {
+    _scroll.dispose();
     _selection.dispose();
     super.dispose();
   }
@@ -199,13 +213,12 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             itemBuilder: (_, index) => completeTable,
           );
         }
-        final surface = RepaintBoundary(
-          key: _boundary,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(radius),
-            child: ColoredBox(color: body, child: table),
-          ),
+        Widget clipped = ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: ColoredBox(color: body, child: table),
         );
+        if (_capturing) clipped = ColoredBox(color: body, child: clipped);
+        final surface = RepaintBoundary(key: _boundary, child: clipped);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
@@ -254,6 +267,9 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                 ),
               if (scroll)
                 SingleChildScrollView(
+                  key: const ValueKey('markstream-table-scroll'),
+                  controller: _scroll,
+                  physics: const ClampingScrollPhysics(),
                   primary: false,
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(width: columnWidth * columns, child: surface),

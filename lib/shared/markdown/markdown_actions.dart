@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:file_picker/file_picker.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:markstream/markstream.dart';
@@ -105,7 +106,10 @@ List<Widget> markdownTableActions(
   TableActionContext action,
 ) {
   final l10n = AppLocalizations.of(context)!;
-  final desktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final desktop =
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux ||
+      defaultTargetPlatform == TargetPlatform.macOS;
   return [
     markdownIconAction(
       context,

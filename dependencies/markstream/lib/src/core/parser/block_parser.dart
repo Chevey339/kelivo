@@ -289,23 +289,21 @@ final class _BlockSession {
 
   void _paragraph(LineCursor cursor) {
     if (stack.any((node) => node.kind == _Kind.details)) {
-      final close = findClosingHtmlTag(
+      final tag = findHtmlTag(
         source,
         cursor.offset,
         cursor.line.end,
         'details',
       );
-      if (close != null) {
+      if (tag != null) {
         _remaining.add(
           LineCursor(
-            SourceLine(source, close.start, cursor.line.end, cursor.line.next),
+            SourceLine(source, tag.start, cursor.line.end, cursor.line.next),
           ),
         );
-        if (source.substring(cursor.offset, close.start).trim().isNotEmpty)
+        if (source.substring(cursor.offset, tag.start).trim().isNotEmpty)
           _paragraphContent(
-            LineCursor(
-              SourceLine(source, cursor.offset, close.start, close.start),
-            ),
+            LineCursor(SourceLine(source, cursor.offset, tag.start, tag.start)),
           );
         return;
       }
@@ -484,11 +482,12 @@ final class _BlockSession {
 
   void _summary(LineCursor cursor) {
     final block = leaf!;
-    final close = findClosingHtmlTag(
+    final close = findHtmlTag(
       source,
       cursor.offset,
       cursor.line.end,
       'summary',
+      closing: true,
     );
     final end = close?.start ?? cursor.line.end;
     if (block.lastLine case final previous?)

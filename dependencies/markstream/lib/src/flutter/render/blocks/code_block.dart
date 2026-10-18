@@ -101,6 +101,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
         ),
         if (!expanded)
           Positioned(
+            key: const ValueKey('markstream-code-collapse-fade'),
             left: 0,
             right: 0,
             bottom: 0,
@@ -123,6 +124,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
       ],
     );
     return Container(
+      key: const ValueKey('markstream-code-surface'),
       margin: theme.margin,
       decoration: BoxDecoration(
         color: theme.backgroundColor,

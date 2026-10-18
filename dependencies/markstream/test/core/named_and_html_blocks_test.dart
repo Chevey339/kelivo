@@ -6,6 +6,30 @@ String textOf(MarkdownNode node) =>
 
 void main() {
   const parser = BlockParser();
+  test('inline nested details close their own container before the outer body', () {
+    const source =
+        '<details><summary>outer</summary>prefix <details><summary>inner</summary>body</details>after</details>';
+    final doc = const MarkdownParser().parse(source);
+    final outer = doc.children.single as DetailsNode;
+    expect(outer.closed, isTrue);
+    final inner = outer.children.whereType<DetailsNode>().single;
+    expect(inner.closed, isTrue);
+    expect(
+      inner.span.slice(source),
+      '<details><summary>inner</summary>body</details>',
+    );
+    expect(toPlainText(outer.children.last), 'after');
+    expect(
+      outer.children
+          .whereType<ParagraphNode>()
+          .first
+          .children
+          .single
+          .span
+          .slice(source),
+      'prefix ',
+    );
+  });
   test('GitHub alerts use the same named nodes as directives', () {
     final doc = parser.parse(
       '> [!WARNING]\n> Be **careful**.\n>\n> - next\n\nAfter',

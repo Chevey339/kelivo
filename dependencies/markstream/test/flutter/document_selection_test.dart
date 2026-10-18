@@ -24,6 +24,36 @@ Future<void> drag(
 }
 
 void main() {
+  testWidgets(
+    'HTML folds in containers and cells expose only visible selection',
+    (tester) async {
+      for (final source in [
+        '<div><p>Before</p><details><summary>Summary</summary>SECRET</details><p>After</p></div>',
+        '| H |\n| --- |\n| <details><summary>Summary</summary>SECRET</details> |',
+      ]) {
+        final controller = MarkstreamSelectionController();
+        await tester.pumpWidget(
+          host(
+            MarkstreamView(source: source, selectionController: controller),
+            selectable: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        selectAll(tester);
+        await tester.pumpAndSettle();
+        expect(controller.selectedPlainText, contains('Summary'));
+        expect(controller.selectedMarkdown, isNot(contains('SECRET')));
+        await tester.tap(find.text('Summary'));
+        await tester.pumpAndSettle();
+        selectAll(tester);
+        await tester.pumpAndSettle();
+        expect(controller.selectedPlainText, contains('SECRET'));
+        expect(controller.selectedMarkdown, contains('SECRET'));
+        await tester.pumpWidget(const SizedBox());
+        controller.dispose();
+      }
+    },
+  );
   testWidgets('document copy includes paragraphs and list markers', (
     tester,
   ) async {

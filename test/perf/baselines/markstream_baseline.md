@@ -174,3 +174,22 @@ between that exploratory run and this final state to the code change.
 | Incremental append | 0.182 / 0.194 | 0.029 / 0.036 |
 
 Command: `cd dependencies/markstream && dart run test/perf/parse_bench.dart`.
+
+
+## C38 renderer regression diagnostic
+
+After the native test migration and fixes for nested details, fold/table state,
+image dimensions and table capture, one isolated application benchmark batch
+reported the following values on the same SDK, host and fixed fonts as above.
+No other Flutter test was running during this measurement. This is a diagnostic
+sample, not the final five-process C41 performance acceptance run.
+
+```text
+MARKSTREAM_RENDER {"run":1,"appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":385,"firstPumpP95Us":701,"contentPumpMedianUs":2055,"contentPumpP95Us":3145,"coldFirstFrameUs":503841}
+```
+
+The real content frame remains near the C04 median/p95 (2.003/3.147 ms), but
+both the 2 ms content target and 100 ms cold target remain open. The parser
+harness, five rounds in one process, reports median-of-rounds median/p95:
+30k full parse 2.209/2.710 ms, 100k 6.942/7.726 ms, incremental append
+0.029/0.035 ms. These parse timings do not establish rendering performance.
