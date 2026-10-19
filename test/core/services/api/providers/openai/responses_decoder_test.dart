@@ -85,6 +85,69 @@ void main() {
     expect(decoder.onClosed(), isEmpty);
   });
 
+  test('preserves Responses reasoning summary type', () {
+    final decoder = ResponsesStreamDecoder();
+    final result = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_text.delta',
+        'output_index': 2,
+        'delta': '**Plan**',
+      }),
+    );
+
+    final chunk = result.chunks.whereType<ReasoningDelta>().single;
+    expect(chunk.reasoningType, ReasoningType.summaryText);
+    expect(chunk.id, 'stream:reasoning-summary-1');
+  });
+
+  test('keeps Responses reasoning summary parts as separate series', () {
+    final decoder = ResponsesStreamDecoder();
+    final firstStart = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_part.added',
+        'item_id': 'rs_1',
+        'output_index': 1,
+        'summary_index': 0,
+      }),
+    );
+    final firstDelta = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_text.delta',
+        'item_id': 'rs_1',
+        'output_index': 1,
+        'summary_index': 0,
+        'delta': '**First** explanation',
+      }),
+    );
+    final secondDelta = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_text.delta',
+        'item_id': 'rs_1',
+        'output_index': 1,
+        'summary_index': 1,
+        'delta': '**Second**',
+      }),
+    );
+    final secondDone = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_part.done',
+        'item_id': 'rs_1',
+        'output_index': 1,
+        'summary_index': 1,
+      }),
+    );
+
+    final firstId = firstDelta.chunks.whereType<ReasoningDelta>().single.id;
+    final secondId = secondDelta.chunks.whereType<ReasoningDelta>().single.id;
+    expect(firstStart.chunks.whereType<ReasoningStart>().single.id, firstId);
+    expect(firstId, isNot(secondId));
+    expect(
+      firstDelta.chunks.whereType<ReasoningDelta>().single.reasoningType,
+      ReasoningType.summaryText,
+    );
+    expect(secondDone.chunks.whereType<ReasoningEnd>().single.id, secondId);
+  });
+
   test('assembles indexed function calls and citations', () {
     final decoder = ResponsesStreamDecoder();
     decoder.accept(

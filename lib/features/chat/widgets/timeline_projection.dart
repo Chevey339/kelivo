@@ -66,7 +66,9 @@ class TimelineToolRef {
 /// Reasoning overlay used when structured parts or legacy segments are present.
 class TimelineReasoningRef {
   const TimelineReasoningRef({
-    required this.text,
+    required this._text,
+    this.textParts,
+    this.summaryText,
     this.expanded = true,
     this.loading = false,
     this.startAt,
@@ -74,12 +76,30 @@ class TimelineReasoningRef {
     this.toolStartIndex = 0,
   });
 
-  final String text;
+  final String _text;
+  final List<String>? textParts;
+  final String? summaryText;
   final bool expanded;
   final bool loading;
   final DateTime? startAt;
   final DateTime? finishedAt;
   final int toolStartIndex;
+
+  /// Merged reasoning is materialized by the projection pass. Keeping this
+  /// getter allocation-free avoids rebuilding a long reasoning body during
+  /// first-frame height estimation and widget comparison.
+  String get text => _text;
+
+  bool get hasText =>
+      textParts?.any((part) => part.isNotEmpty) ?? _text.isNotEmpty;
+
+  Iterable<String> get rawTextParts => textParts ?? <String>[_text];
+
+  String get latestSummary {
+    if (summaryText != null) return summaryText!.trim();
+    if (textParts == null || textParts!.isEmpty) return _text.trim();
+    return textParts!.last.trim();
+  }
 }
 
 class TimelineProjectedStep {
@@ -353,6 +373,8 @@ TimelineProjection projectAssistantTimeline({
   String Function(String text)? transformText,
   bool? renderFromParts,
   bool partsArrivalOrdered = false,
+  bool isStreaming = false,
+  DateTime? reasoningFinishedAt,
   // True when reasoningSegments carries the synthesized inline-think overlay.
   // Provider reasoning keeps tag-like text literal.
   bool? parseInlineThinking,
@@ -413,6 +435,8 @@ TimelineProjection projectAssistantTimeline({
         ),
       ),
       liveTools,
+      isStreaming: isStreaming,
+      reasoningFinishedAt: reasoningFinishedAt,
     );
   }
 
@@ -435,6 +459,8 @@ TimelineProjection projectAssistantTimeline({
               ],
       ),
       liveTools,
+      isStreaming: isStreaming,
+      reasoningFinishedAt: reasoningFinishedAt,
     );
   }
   final offsets = contentSplitOffsets;
@@ -464,6 +490,8 @@ TimelineProjection projectAssistantTimeline({
         ],
       ),
       liveTools,
+      isStreaming: isStreaming,
+      reasoningFinishedAt: reasoningFinishedAt,
     );
   }
 
@@ -504,6 +532,8 @@ TimelineProjection projectAssistantTimeline({
       blocks: blocks,
     ),
     liveTools,
+    isStreaming: isStreaming,
+    reasoningFinishedAt: reasoningFinishedAt,
   );
 }
 
@@ -514,8 +544,14 @@ TimelineProjection projectAssistantTimeline({
 /// to empty-id projected steps. Never synthesizes string ids.
 TimelineProjection mergeLiveToolsIntoProjection(
   TimelineProjection projection,
-  List<TimelineToolRef> liveTools,
-) {
+  List<TimelineToolRef> liveTools, {
+  bool isStreaming = false,
+  DateTime? reasoningFinishedAt,
+}) {
+  TimelineProjectedBlock? lastThinkingBlock;
+  for (final block in projection.blocks) {
+    if (block.isThinking) lastThinkingBlock = block;
+  }
   final liveById = <String, TimelineToolRef>{};
   final emptyIdLive = <TimelineToolRef>[];
   for (final tool in liveTools) {
@@ -548,22 +584,98 @@ TimelineProjection mergeLiveToolsIntoProjection(
     blocks: [
       for (final block in projection.blocks)
         if (block.isThinking)
-          TimelineProjectedBlock.thinking([
-            for (final step in block.steps)
-              if (step.isTool)
-                TimelineProjectedStep.tool(
-                  sourceOrdinal: step.sourceOrdinal,
-                  tool: resolve(step.tool!),
-                  reasoningCountAfter: step.reasoningCountAfter,
-                  toolCountAfter: step.toolCountAfter,
-                )
-              else
-                step,
-          ])
+          TimelineProjectedBlock.thinking(
+            _mergeConsecutiveReasoning(
+              [
+                for (final step in block.steps)
+                  if (step.isTool)
+                    TimelineProjectedStep.tool(
+                      sourceOrdinal: step.sourceOrdinal,
+                      tool: resolve(step.tool!),
+                      reasoningCountAfter: step.reasoningCountAfter,
+                      toolCountAfter: step.toolCountAfter,
+                    )
+                  else
+                    step,
+              ],
+              continueReasoning:
+                  isStreaming && identical(block, projection.blocks.last),
+              reasoningFinishedAt: identical(block, lastThinkingBlock)
+                  ? reasoningFinishedAt
+                  : null,
+            ),
+          )
         else
           block,
     ],
   );
+}
+
+/// Merge adjacent reasoning while preserving tool and text boundaries.
+List<TimelineProjectedStep> _mergeConsecutiveReasoning(
+  List<TimelineProjectedStep> steps, {
+  bool continueReasoning = false,
+  DateTime? reasoningFinishedAt,
+}) {
+  final merged = <TimelineProjectedStep>[];
+  for (var i = 0; i < steps.length;) {
+    final first = steps[i++];
+    if (!first.isReasoning) {
+      merged.add(first);
+      continue;
+    }
+    final group = <TimelineProjectedStep>[first];
+    while (i < steps.length && steps[i].isReasoning) {
+      group.add(steps[i++]);
+    }
+    final timed = group
+        .map((step) => step.reasoning!)
+        .where((reasoning) => reasoning.startAt != null)
+        .toList();
+    final completed = timed
+        .where((reasoning) => reasoning.finishedAt != null)
+        .toList();
+    // A completed summary is not the end of the model's reasoning phase.
+    final loading =
+        group.any((step) => step.reasoning!.loading) ||
+        (continueReasoning && i == steps.length && timed.isNotEmpty);
+    var finishedAt = completed.isEmpty ? null : completed.last.finishedAt;
+    if (i == steps.length &&
+        timed.isNotEmpty &&
+        reasoningFinishedAt != null &&
+        (finishedAt == null || reasoningFinishedAt.isAfter(finishedAt))) {
+      finishedAt = reasoningFinishedAt;
+    }
+    if (group.length == 1 &&
+        !loading &&
+        finishedAt == first.reasoning!.finishedAt) {
+      merged.add(first);
+      continue;
+    }
+    final last = group.last;
+    final mergedTextParts = <String>[
+      for (final step in group) ...step.reasoning!.rawTextParts,
+    ];
+    merged.add(
+      TimelineProjectedStep.reasoning(
+        sourceOrdinal: first.sourceOrdinal,
+        reasoning: TimelineReasoningRef(
+          text: mergedTextParts.join('\n\n'),
+          textParts: mergedTextParts,
+          summaryText: last.reasoning!.latestSummary,
+          expanded: first.reasoning!.expanded,
+          loading: loading,
+          startAt: timed.isEmpty ? null : timed.first.startAt,
+          finishedAt: loading ? null : finishedAt,
+          toolStartIndex: first.reasoning!.toolStartIndex,
+        ),
+        reasoningCountAfter: last.reasoningCountAfter,
+        toolCountAfter: last.toolCountAfter,
+        reasoningOverlayIndex: first.reasoningOverlayIndex,
+      ),
+    );
+  }
+  return merged;
 }
 
 bool _shouldProjectFromParts({
