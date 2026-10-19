@@ -162,6 +162,23 @@ Future<List<Map<String, dynamic>>> _googleFunctionResponsePartsFromToolMessage(
   );
 }
 
+/// Gemini requires every call of a parallel batch to be answered in one user
+/// turn, so a tool message following another joins its turn.
+void _addGoogleFunctionResponseParts(
+  List<Map<String, dynamic>> contents,
+  List<Map<String, dynamic>> parts,
+) {
+  final last = contents.lastOrNull;
+  final lastParts = last?['parts'];
+  if (last?['role'] == 'user' &&
+      lastParts is List<Map<String, dynamic>> &&
+      lastParts.firstOrNull?['functionResponse'] != null) {
+    lastParts.addAll(parts);
+    return;
+  }
+  contents.add({'role': 'user', 'parts': parts});
+}
+
 /// The `functionResponse` part answering call [id], then the result's images.
 Future<List<Map<String, dynamic>>> _googleFunctionResponseParts(
   String name,
@@ -370,13 +387,13 @@ Stream<StreamChunk> sendGoogleStream(
       }
       final role = roleRaw == 'assistant' ? 'model' : 'user';
       if (roleRaw == 'tool') {
-        contents.add({
-          'role': 'user',
-          'parts': await _googleFunctionResponsePartsFromToolMessage(
+        _addGoogleFunctionResponseParts(
+          contents,
+          await _googleFunctionResponsePartsFromToolMessage(
             msg,
             canImageInput: effective.input.contains(Modality.image),
           ),
-        });
+        );
         continue;
       }
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
@@ -855,13 +872,13 @@ Stream<StreamChunk> sendGoogleStream(
     }
     final role = roleRaw == 'assistant' ? 'model' : 'user';
     if (roleRaw == 'tool') {
-      contents.add({
-        'role': 'user',
-        'parts': await _googleFunctionResponsePartsFromToolMessage(
+      _addGoogleFunctionResponseParts(
+        contents,
+        await _googleFunctionResponsePartsFromToolMessage(
           msg,
           canImageInput: effective.input.contains(Modality.image),
         ),
-      });
+      );
       continue;
     }
     if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
