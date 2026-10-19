@@ -15,6 +15,7 @@ class _Selectable extends ChangeNotifier with Selectable {
   _Selectable(this.rect);
   Rect rect;
   int transforms = 0;
+  final events = <SelectionEventType>[];
   @override
   Matrix4 getTransformTo(RenderObject? ancestor) {
     transforms++;
@@ -35,13 +36,52 @@ class _Selectable extends ChangeNotifier with Selectable {
   @override
   SelectedContentRange? getSelection() => null;
   @override
-  SelectionResult dispatchSelectionEvent(SelectionEvent event) =>
-      SelectionResult.none;
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) {
+    events.add(event.type);
+    return SelectionResult.none;
+  }
+
   @override
   void pushHandleLayers(LayerLink? startHandle, LayerLink? endHandle) {}
 }
 
 void main() {
+  testWidgets('an empty container remembers edges when new text registers', (
+    tester,
+  ) async {
+    final delegate = StableSelectionDelegate();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SelectionContainer(
+          delegate: delegate,
+          child: const SizedBox(width: 200, height: 100),
+        ),
+      ),
+    );
+    delegate.dispatchSelectionEvent(
+      const SelectionEdgeUpdateEvent.forStart(globalPosition: Offset.zero),
+    );
+    delegate.dispatchSelectionEvent(
+      const SelectionEdgeUpdateEvent.forEnd(globalPosition: Offset(200, 100)),
+    );
+    final child = _Selectable(const Rect.fromLTWH(0, 0, 200, 100));
+    delegate.add(child);
+    await tester.pump();
+    expect(
+      child.events,
+      containsAll([
+        SelectionEventType.startEdgeUpdate,
+        SelectionEventType.endEdgeUpdate,
+      ]),
+    );
+    delegate.remove(child);
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    child.dispose();
+    delegate.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('registration ordering matches Flutter and releases geometry', (
     tester,
   ) async {

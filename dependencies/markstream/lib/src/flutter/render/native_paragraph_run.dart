@@ -22,6 +22,7 @@ class NativeParagraphRun extends LeafRenderObjectWidget {
       1.0;
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderParagraphRun(
+    context,
     paragraphs,
     spacing,
     _devicePixelRatio(context),
@@ -32,6 +33,7 @@ class NativeParagraphRun extends LeafRenderObjectWidget {
     BuildContext context,
     covariant _RenderParagraphRun renderObject,
   ) => renderObject.update(
+    context,
     paragraphs,
     spacing,
     _devicePixelRatio(context),
@@ -47,12 +49,13 @@ class _RenderParagraphRun extends RenderBox
         RenderBoxContainerDefaultsMixin<RenderParagraph, _ParagraphParentData>
     implements ViewportClipParticipant {
   _RenderParagraphRun(
+    BuildContext context,
     List<RichText> paragraphs,
     double spacing,
     double ratio,
     bool cull,
   ) {
-    update(paragraphs, spacing, ratio, cull);
+    update(context, paragraphs, spacing, ratio, cull);
   }
   List<RichText> _paragraphs = const [];
   double _spacing = 0, _ratio = 1;
@@ -91,6 +94,7 @@ class _RenderParagraphRun extends RenderBox
   void visitChildrenForSemantics(RenderObjectVisitor visitor) =>
       (_semanticChildren ??= _near(_clips.semantics)).forEach(visitor);
   void update(
+    BuildContext context,
     List<RichText> paragraphs,
     double spacing,
     double ratio,
@@ -106,41 +110,14 @@ class _RenderParagraphRun extends RenderBox
       final text = paragraphs[i];
       if (child == null) {
         _semanticChildren = null;
-        child = RenderParagraph(
-          text.text,
-          textDirection: text.textDirection!,
-          textAlign: text.textAlign,
-          softWrap: text.softWrap,
-          overflow: text.overflow,
-          textScaler: text.textScaler,
-          maxLines: text.maxLines,
-          locale: text.locale,
-          strutStyle: text.strutStyle,
-          textWidthBasis: text.textWidthBasis,
-          textHeightBehavior: text.textHeightBehavior,
-          registrar: text.selectionRegistrar,
-          selectionColor: text.selectionColor,
-          devicePixelRatio: ratio,
-        );
+        // Let the host Flutter version supply all paragraph properties,
+        // including device-pixel-ratio support where its renderer provides it.
+        child = text.createRenderObject(context);
         add(child);
       } else if (i >= _paragraphs.length ||
           !identical(_paragraphs[i], text) ||
           _ratio != ratio) {
-        child
-          ..text = text.text
-          ..textDirection = text.textDirection!
-          ..textAlign = text.textAlign
-          ..softWrap = text.softWrap
-          ..overflow = text.overflow
-          ..textScaler = text.textScaler
-          ..maxLines = text.maxLines
-          ..locale = text.locale
-          ..strutStyle = text.strutStyle
-          ..textWidthBasis = text.textWidthBasis
-          ..textHeightBehavior = text.textHeightBehavior
-          ..registrar = text.selectionRegistrar
-          ..selectionColor = text.selectionColor
-          ..devicePixelRatio = ratio;
+        text.updateRenderObject(context, child);
       }
       child = childAfter(child);
     }

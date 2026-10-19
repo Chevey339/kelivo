@@ -4,6 +4,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'selection_edge_initialization.dart';
+
 /// Preserves inline widget identity while the paragraph's selectable fragments
 /// change. Plain text keeps Flutter's ordinary Text rendering path.
 Widget buildSelectableText(Text text) {
@@ -173,7 +175,8 @@ TextSpan _withSpacing(TextSpan span, TextStyle spacing) => TextSpan(
 );
 
 class _ParagraphSelectionDelegate
-    extends MultiSelectableSelectionContainerDelegate {
+    extends MultiSelectableSelectionContainerDelegate
+    with SelectionEdgeInitialization {
   _ParagraphSelectionDelegate(this._paragraph) {
     addListener(WidgetsBinding.instance.ensureVisualUpdate);
   }
@@ -203,8 +206,9 @@ class _ParagraphSelectionDelegate
     if (offset <= start || offset >= end) {
       final forward = offset >= end;
       final text = paragraph.text.toPlainText(includeSemanticsLabels: false);
-      final boundary = CharacterBoundary(text)
-          .getTextBoundaryAt(forward ? end - 1 : start);
+      final boundary = CharacterBoundary(
+        text,
+      ).getTextBoundaryAt(forward ? end - 1 : start);
       final boxes = paragraph.getBoxesForSelection(
         TextSelection(baseOffset: boundary.start, extentOffset: boundary.end),
       );
@@ -448,8 +452,9 @@ class _ParagraphSelectionDelegate
     final position = paragraph.getPositionForOffset(
       paragraph.globalToLocal(globalPosition),
     );
-    return ParagraphBoundary(text)
-        .getTextBoundaryAt(position.offset.clamp(0, text.length - 1));
+    return ParagraphBoundary(
+      text,
+    ).getTextBoundaryAt(position.offset.clamp(0, text.length - 1));
   }
 
   Offset _caretPosition(int offset) {
