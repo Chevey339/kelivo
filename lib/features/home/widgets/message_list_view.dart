@@ -150,6 +150,7 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreAfter,
     this.onUserScrollIntent,
     this.chatFontScale = 1,
+    this.chatLineHeight = 1.5,
     this.collapseThinking = true,
     this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
@@ -251,6 +252,7 @@ class MessageListView extends StatefulWidget {
   final Future<bool> Function()? onLoadMoreAfter;
   final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
+  final double chatLineHeight;
 
   /// Whether finished thinking blocks render collapsed (display setting).
   final bool collapseThinking;
@@ -569,6 +571,7 @@ class _MessageListViewState extends State<MessageListView> {
     hideToolResultImages: false,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
+    lineHeight: 1.5,
     visualRegexSignature: 0,
     pendingApprovals: <PendingApprovalKey>[],
   );
@@ -731,7 +734,7 @@ class _MessageListViewState extends State<MessageListView> {
     }
 
     final fontSize = 15.6 * fontScale;
-    final lineHeight = fontSize * 1.5;
+    final lineHeight = fontSize * settings.lineHeight;
     // User bubbles are inset and never span the full width.
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
@@ -898,7 +901,7 @@ class _MessageListViewState extends State<MessageListView> {
     }
 
     final fontSize = 15.6 * fontScale;
-    final lineHeight = fontSize * 1.5;
+    final lineHeight = fontSize * settings.lineHeight;
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
     for (final block in visibleAssistantTimeline(
@@ -1239,6 +1242,7 @@ class _MessageListViewState extends State<MessageListView> {
     }
     final metricInputsChanged =
         oldWidget.chatFontScale != widget.chatFontScale ||
+        oldWidget.chatLineHeight != widget.chatLineHeight ||
         oldWidget.selecting != widget.selecting ||
         oldWidget.showModelIcon != widget.showModelIcon ||
         oldWidget.showUserAvatar != widget.showUserAvatar ||
@@ -1695,6 +1699,7 @@ class _MessageListViewState extends State<MessageListView> {
       hideToolResultImages: widget.hideToolResultImages,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
+      lineHeight: widget.chatLineHeight,
       visualRegexSignature: _visualRegexEstimateSignature(widget.assistant),
       pendingApprovals: pendingApprovals,
     );
@@ -2543,6 +2548,7 @@ final class _EstimateSettings {
     required this.hideToolResultImages,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
+    required this.lineHeight,
     required this.visualRegexSignature,
     required this.pendingApprovals,
   });
@@ -2571,6 +2577,9 @@ final class _EstimateSettings {
   /// Whether code blocks wrap instead of scrolling horizontally.
   final bool wrapCodeBlocks;
 
+  /// Line height multiplier of chat message text.
+  final double lineHeight;
+
   /// Identity of assistant visual-regex rules used by the estimate transform.
   final int visualRegexSignature;
 
@@ -2591,6 +2600,7 @@ final class _EstimateSettings {
       other.hideToolResultImages == hideToolResultImages &&
       other.collapsedCodeLines == collapsedCodeLines &&
       other.wrapCodeBlocks == wrapCodeBlocks &&
+      other.lineHeight == lineHeight &&
       other.visualRegexSignature == visualRegexSignature &&
       listEquals(other.pendingApprovals, pendingApprovals);
 
@@ -2604,6 +2614,7 @@ final class _EstimateSettings {
     hideToolResultImages,
     collapsedCodeLines,
     wrapCodeBlocks,
+    lineHeight,
     visualRegexSignature,
     Object.hashAll(pendingApprovals),
   );

@@ -9973,6 +9973,12 @@ abstract class AppLocalizations {
   /// **'Chat Font Size'**
   String get displaySettingsPageChatFontSizeTitle;
 
+  /// No description provided for @displaySettingsPageChatLineHeightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Line Height'**
+  String get displaySettingsPageChatLineHeightTitle;
+
   /// No description provided for @displaySettingsPageAutoScrollEnableTitle.
   ///
   /// In en, this message translates to:

@@ -5263,6 +5263,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
+  String get displaySettingsPageChatLineHeightTitle => '聊天行高';
+
+  @override
   String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
 
   @override
@@ -17830,6 +17833,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
+  String get displaySettingsPageChatLineHeightTitle => '聊天行高';
+
+  @override
   String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
 
   @override
@@ -30320,6 +30326,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字體大小';
+
+  @override
+  String get displaySettingsPageChatLineHeightTitle => '聊天行高';
 
   @override
   String get displaySettingsPageAutoScrollEnableTitle => '自動回到底部';

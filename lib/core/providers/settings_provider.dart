@@ -274,6 +274,7 @@ class SettingsProvider extends ChangeNotifier {
       'display_long_paste_as_file_threshold_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
+  static const String _displayChatLineHeightKey = 'display_chat_line_height_v1';
   static const String _displayAutoScrollEnabledKey =
       'display_auto_scroll_enabled_v1';
   static const String _displayAutoScrollIdleSecondsKey =
@@ -1105,6 +1106,8 @@ class SettingsProvider extends ChangeNotifier {
     }
     _chatFontScale =
         localPreferences.getDouble(_displayChatFontScaleKey) ?? 1.0;
+    _chatLineHeight =
+        localPreferences.getDouble(_displayChatLineHeightKey) ?? 1.5;
     _autoScrollEnabled = prefs.getBool(_displayAutoScrollEnabledKey) ?? true;
     _autoScrollIdleSeconds =
         prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
@@ -5038,6 +5041,18 @@ Requirements:
     await prefs.setDouble(_displayChatFontScaleKey, _chatFontScale);
   }
 
+  // Display: chat message line height (1.2 - 2.0, default 1.5)
+  double _chatLineHeight = 1.5;
+  double get chatLineHeight => _chatLineHeight;
+  Future<void> setChatLineHeight(double height) async {
+    final h = height.clamp(1.2, 2.0);
+    if (_chatLineHeight == h) return;
+    _chatLineHeight = h;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_displayChatLineHeightKey, _chatLineHeight);
+  }
+
   // Display: auto-scroll back to bottom toggle
   bool _autoScrollEnabled = true;
   bool get autoScrollEnabled => _autoScrollEnabled;
@@ -5853,6 +5868,7 @@ Requirements:
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
+    copy._chatLineHeight = _chatLineHeight;
     copy._autoScrollEnabled = _autoScrollEnabled;
     copy._autoScrollIdleSeconds = _autoScrollIdleSeconds;
     copy._enableDollarLatex = _enableDollarLatex;

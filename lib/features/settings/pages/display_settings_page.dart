@@ -274,6 +274,23 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               _iosDivider(context),
               _iosNavRow(
                 context,
+                icon: Lucide.ListChevronsUpDown,
+                label: l10n.displaySettingsPageChatLineHeightTitle,
+                detailBuilder: (ctx) {
+                  final height = ctx.watch<SettingsProvider>().chatLineHeight;
+                  return Text(
+                    height.toStringAsFixed(2),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  );
+                },
+                onTap: () => _showChatLineHeightSheet(context),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
                 icon: Lucide.ArrowDown,
                 label: l10n.displaySettingsPageAutoScrollIdleTitle,
                 detailBuilder: (ctx) {
@@ -498,115 +515,77 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
             child: Builder(
               builder: (context) {
-                final theme = Theme.of(context);
-                final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
                 final scale = context.watch<SettingsProvider>().chatFontScale;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          '50%',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SfSliderTheme(
-                            data: SfSliderThemeData(
-                              activeTrackHeight: 8,
-                              inactiveTrackHeight: 8,
-                              overlayRadius: 14,
-                              activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.25 : 0.20,
-                              ),
-                              tooltipBackgroundColor: cs.primary,
-                              tooltipTextStyle: TextStyle(
-                                color: cs.onPrimary,
-                                fontWeight: AppFontWeights.semibold,
-                              ),
-                              activeTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.45 : 0.35,
-                              ),
-                              inactiveTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.30 : 0.25,
-                              ),
-                              activeMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.34 : 0.28,
-                              ),
-                              inactiveMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.24 : 0.20,
-                              ),
-                            ),
-                            child: SfSlider(
-                              value: scale,
-                              min: 0.5,
-                              max: 1.50001,
-                              stepSize: 0.05,
-                              showTicks: true,
-                              showLabels: true,
-                              interval: 0.1,
-                              minorTicksPerInterval: 1,
-                              enableTooltip: true,
-                              shouldAlwaysShowTooltip: false,
-                              tooltipShape: const SfPaddleTooltipShape(),
-                              labelFormatterCallback: (value, text) =>
-                                  (value as double).toStringAsFixed(1),
-                              thumbIcon: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: cs.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: isDark
-                                      ? []
-                                      : [
-                                          BoxShadow(
-                                            color: cs.shadow.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                ),
-                              ),
-                              onChanged: (v) => context
-                                  .read<SettingsProvider>()
-                                  .setChatFontScale(
-                                    (v as double).clamp(0.5, 1.5),
-                                  ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${(scale * 100).round()}%',
-                          style: TextStyle(color: cs.onSurface, fontSize: 12),
-                        ),
-                      ],
+                    _ChatSliderRow(
+                      value: scale,
+                      min: 0.5,
+                      max: 1.5,
+                      interval: 0.1,
+                      minLabel: '50%',
+                      valueLabel: '${(scale * 100).round()}%',
+                      onChanged: (v) =>
+                          context.read<SettingsProvider>().setChatFontScale(v),
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: context.appColors.surfaceFill,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
+                    _ChatSampleText(
+                      text: l10n.displaySettingsPageChatFontSampleText,
+                      style: TextStyle(fontSize: 16 * scale),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showChatLineHeightSheet(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: context.overlaySurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      isScrollControlled: false,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Builder(
+              builder: (context) {
+                final sp = context.watch<SettingsProvider>();
+                final height = sp.chatLineHeight;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ChatSliderRow(
+                      value: height,
+                      min: 1.2,
+                      max: 2.0,
+                      interval: 0.2,
+                      minLabel: '1.2',
+                      valueLabel: height.toStringAsFixed(2),
+                      onChanged: (v) =>
+                          context.read<SettingsProvider>().setChatLineHeight(v),
+                    ),
+                    const SizedBox(height: 8),
+                    // Repeated so the sample wraps and the spacing shows.
+                    _ChatSampleText(
+                      text: List.filled(
+                        3,
                         l10n.displaySettingsPageChatFontSampleText,
-                        style: TextStyle(
-                          fontSize:
-                              16 *
-                              context.watch<SettingsProvider>().chatFontScale,
-                        ),
+                      ).join(' '),
+                      style: TextStyle(
+                        fontSize: 16 * sp.chatFontScale,
+                        height: height,
                       ),
                     ),
                   ],
@@ -2357,6 +2336,133 @@ class HapticsSettingsPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A 0.05-step chat display slider with a minimum label and a live value.
+class _ChatSliderRow extends StatelessWidget {
+  const _ChatSliderRow({
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.interval,
+    required this.minLabel,
+    required this.valueLabel,
+    required this.onChanged,
+  });
+
+  final double value;
+  final double min;
+  final double max;
+  final double interval;
+  final String minLabel;
+  final String valueLabel;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    return Row(
+      children: [
+        Text(
+          minLabel,
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.7),
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SfSliderTheme(
+            data: SfSliderThemeData(
+              activeTrackHeight: 8,
+              inactiveTrackHeight: 8,
+              overlayRadius: 14,
+              activeTrackColor: cs.primary,
+              inactiveTrackColor: cs.onSurface.withValues(
+                alpha: isDark ? 0.25 : 0.20,
+              ),
+              tooltipBackgroundColor: cs.primary,
+              tooltipTextStyle: TextStyle(
+                color: cs.onPrimary,
+                fontWeight: AppFontWeights.semibold,
+              ),
+              activeTickColor: cs.onSurface.withValues(
+                alpha: isDark ? 0.45 : 0.35,
+              ),
+              inactiveTickColor: cs.onSurface.withValues(
+                alpha: isDark ? 0.30 : 0.25,
+              ),
+              activeMinorTickColor: cs.onSurface.withValues(
+                alpha: isDark ? 0.34 : 0.28,
+              ),
+              inactiveMinorTickColor: cs.onSurface.withValues(
+                alpha: isDark ? 0.24 : 0.20,
+              ),
+            ),
+            child: SfSlider(
+              value: value,
+              min: min,
+              // Nudged past [max] so the last tick and label still render.
+              max: max + 0.00001,
+              stepSize: 0.05,
+              showTicks: true,
+              showLabels: true,
+              interval: interval,
+              minorTicksPerInterval: (interval / 0.05).round() - 1,
+              enableTooltip: true,
+              shouldAlwaysShowTooltip: false,
+              tooltipShape: const SfPaddleTooltipShape(),
+              labelFormatterCallback: (value, text) =>
+                  (value as double).toStringAsFixed(1),
+              thumbIcon: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: cs.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: cs.shadow.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                ),
+              ),
+              onChanged: (v) => onChanged((v as double).clamp(min, max)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(valueLabel, style: TextStyle(color: cs.onSurface, fontSize: 12)),
+      ],
+    );
+  }
+}
+
+/// Preview of chat text inside a display settings sheet.
+class _ChatSampleText extends StatelessWidget {
+  const _ChatSampleText({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.appColors.surfaceFill,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(text, style: style),
     );
   }
 }

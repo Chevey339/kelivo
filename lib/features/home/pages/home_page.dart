@@ -1453,6 +1453,7 @@ class _HomePageState extends State<HomePage>
       onLoadMoreAfter: _controller.loadMoreAfter,
       onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
       chatFontScale: settings.chatFontScale,
+      chatLineHeight: settings.chatLineHeight,
       collapseThinking: settings.autoCollapseThinking,
       collapseThinkingSteps: settings.collapseThinkingSteps,
       showThinkingCards: settings.showThinkingCards,
