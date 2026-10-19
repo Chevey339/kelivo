@@ -26,11 +26,12 @@ class DocumentSelectionDelegate extends StableSelectionDelegate {
     }
     if (pieces.isEmpty) return null;
     final text = pieces.join(separator);
+    if (prefix.isEmpty) return SelectedContent(plainText: text);
     final range = getSelection();
     final startsAtBeginning =
         range != null && math.min(range.startOffset, range.endOffset) == 0;
     return SelectedContent(
-      plainText: startsAtBeginning && prefix.isNotEmpty
+      plainText: startsAtBeginning
           ? '$prefix${text.replaceAll('\n', '\n$continuation')}'
           : text,
     );

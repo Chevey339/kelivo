@@ -139,13 +139,19 @@ class _ParagraphRunState extends State<ParagraphRun> {
       }
       final native = <RichText>[];
       final start = i;
-      while (i < children.length && children[i] is RichText)
+      // Fixed boundaries keep paragraph render objects in place as the tail
+      // grows, while completed chunks retain their paint independently.
+      while (i < children.length &&
+          children[i] is RichText &&
+          native.length < PerformanceLimits.nativeParagraphPaintCount)
         native.add(children[i++] as RichText);
       compressed.add(
-        NativeParagraphRun(
+        RepaintBoundary(
           key: ValueKey(widget.nodes[start].span.start),
-          paragraphs: native,
-          spacing: renderer.theme.blockSpacing,
+          child: NativeParagraphRun(
+            paragraphs: native,
+            spacing: renderer.theme.blockSpacing,
+          ),
         ),
       );
     }

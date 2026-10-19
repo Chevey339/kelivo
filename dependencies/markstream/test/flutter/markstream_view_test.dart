@@ -454,6 +454,28 @@ void main() {
       expect(find.text('first'), findsNothing);
     },
   );
+  testWidgets('provided snapshots regroup when paragraph builders change', (
+    tester,
+  ) async {
+    final document = const MarkdownParser().parse(
+      'first\n\nsecond\n\n# boundary\n\nlast',
+    );
+    final extensions = MarkstreamExtensions(
+      nodeBuilders: NodeBuilderRegistry(
+        blocks: {ParagraphNode: (_, node, _) => Text(toPlainText(node))},
+      ),
+    );
+    await tester.pumpWidget(host(MarkstreamView(document: document)));
+    await tester.pumpWidget(
+      host(MarkstreamView(document: document, extensions: extensions)),
+    );
+    expect(find.text('first'), findsOneWidget);
+    expect(find.text('second'), findsOneWidget);
+    expect(find.text('last'), findsOneWidget);
+    await tester.pumpWidget(host(MarkstreamView(document: document)));
+    expect(paragraph('second').text.toPlainText(), 'second');
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'reference definitions create no extra visible block or active tail',
     (tester) async {

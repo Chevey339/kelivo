@@ -366,7 +366,36 @@ class _StreamingTextState extends State<StreamingText> {
         ),
       );
     }
-    return TextSpan(style: style, children: spans);
+    return _ChunkTextSpan(style: style, children: spans);
+  }
+}
+
+// Chunking only accepts text/style runs: links, widgets, explicit semantic
+// labels, locales and spelling overrides keep Flutter's original paragraph.
+// All characters here inherit the same speech attributes. Emit one equivalent
+// range instead of repeating it for every bold/italic run in the chunk.
+class _ChunkTextSpan extends TextSpan {
+  _ChunkTextSpan({required super.style, required super.children});
+
+  @override
+  void computeSemanticsInformation(
+    List<InlineSpanSemanticsInformation> collector, {
+    ui.Locale? inheritedLocale,
+    bool inheritedSpellOut = false,
+  }) {
+    final value = toPlainText();
+    final range = TextRange(start: 0, end: value.length);
+    collector.add(
+      InlineSpanSemanticsInformation(
+        value,
+        stringAttributes: [
+          if (value.isNotEmpty && inheritedSpellOut)
+            ui.SpellOutStringAttribute(range: range),
+          if (value.isNotEmpty && inheritedLocale != null)
+            ui.LocaleStringAttribute(range: range, locale: inheritedLocale),
+        ],
+      ),
+    );
   }
 }
 

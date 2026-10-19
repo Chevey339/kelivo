@@ -1197,13 +1197,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
     if (!mounted) return;
-    final newExtracted = _legacyInlineThinkingFor(
-      widget,
-    ).thinkingTexts.join('\n\n');
-    final usingInlineThinkNew =
-        (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
-        newExtracted.isNotEmpty;
-
     bool usingInlineThinkOld = false;
     if (oldWidget != null) {
       final oldExtracted = _legacyInlineThinkingFor(
@@ -1214,6 +1207,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               oldWidget.reasoningText!.isEmpty) &&
           oldExtracted.isNotEmpty;
     }
+
+    // Read the old memo before parsing the new source so the build can reuse
+    // the new result instead of alternating the single-slot cache.
+    final newExtracted = _legacyInlineThinkingFor(
+      widget,
+    ).thinkingTexts.join('\n\n');
+    final usingInlineThinkNew =
+        (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
+        newExtracted.isNotEmpty;
 
     final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
 

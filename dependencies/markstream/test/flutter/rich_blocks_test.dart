@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -47,6 +48,95 @@ void selectAll(WidgetTester tester) => tester
     .state<SelectableRegionState>(find.byType(SelectableRegion))
     .selectAll(SelectionChangedCause.keyboard);
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets('collapsed code preserves translucent $brightness backdrop', (
+      tester,
+    ) async {
+      final base = MarkstreamTheme.fromColorScheme(
+        ColorScheme.fromSeed(seedColor: Colors.blue, brightness: brightness),
+      );
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        host(
+          RepaintBoundary(
+            key: key,
+            child: ColoredBox(
+              color: brightness == Brightness.light
+                  ? Colors.orange
+                  : Colors.indigo,
+              child: MarkstreamView(
+                source: '```text\nMMMM\nMMMM\nMMMM\nMMMM\n```',
+                theme: base.copyWith(
+                  code: base.code.copyWith(
+                    backgroundColor: base.code.backgroundColor.withValues(
+                      alpha: .3,
+                    ),
+                  ),
+                ),
+                codeOptions: const CodeBlockOptions(
+                  autoCollapse: true,
+                  collapsedLines: 3,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final bounds = tester.getRect(find.byType(MarkstreamCodeContent));
+      final origin = tester.getTopLeft(find.byKey(key));
+      final local = bounds.shift(-origin);
+      Future<(ByteData, int)> pixels() async {
+        final boundary =
+            key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        final image = boundary.toImageSync();
+        try {
+          final bytes = await tester.runAsync(
+            () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+          );
+          return (bytes!, image.width);
+        } finally {
+          image.dispose();
+        }
+      }
+
+      final (collapsed, width) = await pixels();
+      await tester.tap(find.byKey(const ValueKey('markstream-code-toggle')));
+      await tester.pumpAndSettle();
+      final (expanded, expandedWidth) = await pixels();
+      expect(expandedWidth, width);
+      var fadedTextDifference = 0;
+      for (
+        var y = (local.bottom - base.code.fadeHeight).ceil();
+        y < local.bottom.floor();
+        y++
+      ) {
+        final blank = (y * width + local.right.floor() - 4) * 4;
+        for (var channel = 0; channel < 4; channel++) {
+          expect(
+            collapsed.getUint8(blank + channel),
+            expanded.getUint8(blank + channel),
+          );
+        }
+        for (var x = local.left.ceil(); x < local.left + 50; x++) {
+          final pixel = (y * width + x) * 4;
+          for (var channel = 0; channel < 3; channel++) {
+            fadedTextDifference +=
+                (collapsed.getUint8(pixel + channel) -
+                        expanded.getUint8(pixel + channel))
+                    .abs();
+          }
+        }
+      }
+      expect(fadedTextDifference, greaterThan(100));
+      expect(
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('desktop code wraps even when mobile wrapping is disabled', (
     tester,
   ) async {
@@ -155,7 +245,14 @@ void main() {
     );
     await tester.pumpWidget(view(''));
     expect(paragraph('first').text.toPlainText(), 'first line\nsecond line');
-    await tester.tap(find.text('Expand'));
+    await tester.tap(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Semantics &&
+            w.key == const ValueKey('markstream-code-toggle') &&
+            w.properties.expanded == false,
+      ),
+    );
     await tester.pumpAndSettle();
     expect(paragraph('first').text.toPlainText(), contains('third line'));
     await tester.pumpWidget(view(' appended'));
@@ -166,12 +263,35 @@ void main() {
     );
     await tester.pumpWidget(view(' appended\n```', streaming: false));
     await tester.pumpAndSettle();
-    expect(find.text('Collapse'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Semantics &&
+            w.key == const ValueKey('markstream-code-toggle') &&
+            w.properties.expanded == true,
+      ),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(view(' appended\n```', streaming: false));
     await tester.pumpAndSettle();
-    expect(find.text('Collapse'), findsOneWidget);
-    await tester.tap(find.text('Collapse'));
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Semantics &&
+            w.key == const ValueKey('markstream-code-toggle') &&
+            w.properties.expanded == true,
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Semantics &&
+            w.key == const ValueKey('markstream-code-toggle') &&
+            w.properties.expanded == true,
+      ),
+    );
     await tester.pumpAndSettle();
     expect(paragraph('first').text.toPlainText(), 'first line\nsecond line');
     final bounded = CodeExpansionState(capacity: 1)
@@ -200,7 +320,14 @@ void main() {
         ),
       );
       await tester.pumpWidget(view('```text\na\nb'));
-      await tester.tap(find.text('Expand'));
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Semantics &&
+              w.key == const ValueKey('markstream-code-toggle') &&
+              w.properties.expanded == false,
+        ),
+      );
       await tester.pumpAndSettle();
       const completed = '```text\na\nb\nthis completes the prefix\n```';
       await tester.pumpWidget(view(completed, streaming: false));
@@ -208,7 +335,15 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pumpWidget(view(completed, streaming: false));
       await tester.pumpAndSettle();
-      expect(find.text('Collapse'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Semantics &&
+              w.key == const ValueKey('markstream-code-toggle') &&
+              w.properties.expanded == true,
+        ),
+        findsOneWidget,
+      );
       expect(
         paragraph('a').text.toPlainText(),
         contains('this completes the prefix'),
@@ -263,10 +398,7 @@ void main() {
     await tester.tap(find.text('Copy code'));
     await tester.pumpAndSettle();
     expect(clipboard, '  alpha\n\n beta\n');
-    expect(
-      kinds,
-      containsAll([MarkstreamActionKind.copyCode, MarkstreamActionKind.expand]),
-    );
+    expect(kinds, contains(MarkstreamActionKind.copyCode));
     expect(find.byType(SelectableRegion), findsOneWidget);
   });
   testWidgets(

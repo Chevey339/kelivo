@@ -25,6 +25,55 @@ Future<void> drag(
 
 void main() {
   testWidgets(
+    'selection availability follows clear, disable and text replacement',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        controller.dispose();
+      });
+      Future<void> pump(bool enabled, String source) async {
+        final view = MarkstreamView(
+          source: source,
+          selectionController: controller,
+        );
+        await tester.pumpWidget(
+          host(
+            enabled ? view : SelectionContainer.disabled(child: view),
+            selectable: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await pump(true, 'First **bold** 😀');
+      expect(controller.hasSelection, isFalse);
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(controller.hasSelection, isTrue);
+      expect(controller.selectedPlainText, 'First bold 😀');
+      tester
+          .state<SelectableRegionState>(find.byType(SelectableRegion))
+          .clearSelection();
+      await tester.pumpAndSettle();
+      expect(controller.hasSelection, isFalse);
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      await pump(false, 'First **bold** 😀');
+      expect(controller.hasSelection, isFalse);
+      await pump(true, 'Replacement');
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(controller.hasSelection, isTrue);
+      expect(controller.selectedMarkdown, 'Replacement');
+      await pump(true, '');
+      expect(controller.hasSelection, isFalse);
+      expect(controller.selectedMarkdown, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'HTML folds in containers and cells expose only visible selection',
     (tester) async {
       for (final source in [

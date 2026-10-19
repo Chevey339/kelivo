@@ -17,6 +17,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/selection_scroll_container.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/timeline_projection.dart';
 import '../../chat/widgets/timeline_visibility.dart';
@@ -1753,10 +1754,17 @@ class _MessageListViewState extends State<MessageListView> {
               },
             );
 
-            final historyList = NotificationListener<ScrollNotification>(
-              onNotification: _handleScrollNotification,
-              child: list,
-            );
+            final historyList =
+                NotificationListener<SelectionAutoScrollNotification>(
+                  onNotification: (_) {
+                    _handleUserScrollActivity();
+                    return false;
+                  },
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: list,
+                  ),
+                );
 
             final userScrollAwareList = Listener(
               onPointerDown: (event) {

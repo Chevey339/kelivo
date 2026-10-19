@@ -8,6 +8,106 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'long styled chunks preserve speech locale without repeating its range',
+    (tester) async {
+      final spans = List.generate(
+        320,
+        (i) => TextSpan(
+          text: 'fragment $i 中文 ',
+          style: TextStyle(
+            fontWeight: i.isEven ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SizedBox(
+                width: 320,
+                child: StreamingText(
+                  cullToViewport: false,
+                  text: Text.rich(
+                    TextSpan(children: spans),
+                    locale: const Locale('zh', 'CN'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final paragraphs = tester
+          .renderObjectList<RenderParagraph>(find.byType(RichText))
+          .toList();
+      expect(paragraphs.length, greaterThan(1));
+      for (final paragraph in paragraphs) {
+        final information = paragraph.text.getSemanticsInformation();
+        expect(information, hasLength(1));
+        final info = information.single;
+        expect(info.text, paragraph.text.toPlainText());
+        final attributes = info.stringAttributes
+            .whereType<ui.LocaleStringAttribute>();
+        expect(attributes, hasLength(1));
+        expect(attributes.single.locale, const Locale('zh', 'CN'));
+        expect(
+          attributes.single.range,
+          TextRange(start: 0, end: info.text.length),
+        );
+        final spelled = <InlineSpanSemanticsInformation>[];
+        (paragraph.text as TextSpan).computeSemanticsInformation(
+          spelled,
+          inheritedSpellOut: true,
+        );
+        final spelling = spelled.single.stringAttributes
+            .whereType<ui.SpellOutStringAttribute>();
+        expect(spelling, hasLength(1));
+        expect(
+          spelling.single.range,
+          TextRange(start: 0, end: info.text.length),
+        );
+      }
+      expect(
+        paragraphs.map((p) => p.text.toPlainText()).join(),
+        spans.map((s) => s.text).join(),
+      );
+    },
+  );
+
+  testWidgets(
+    'explicit inline speech languages keep their original attributes',
+    (tester) async {
+      final text = Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: 'English ' * 100, locale: const Locale('en')),
+            TextSpan(text: '日本語 ' * 100, locale: const Locale('ja')),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: StreamingText(text: text)),
+          ),
+        ),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText).first,
+      );
+      final languages = paragraph.text
+          .getSemanticsInformation()
+          .expand((info) => info.stringAttributes)
+          .whereType<ui.LocaleStringAttribute>()
+          .map((attribute) => attribute.locale)
+          .toList();
+      expect(languages, [const Locale('en'), const Locale('ja')]);
+      expect(paragraph.text.toPlainText(), text.textSpan!.toPlainText());
+    },
+  );
+
   testWidgets('completed medium paragraphs keep native text geometry', (
     tester,
   ) async {

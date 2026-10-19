@@ -85,7 +85,7 @@ void main() {
         () => content = '<think>new reasoning</think>updated think answer',
       );
       await tester.pump();
-      expect(ThinkingTagParser.debugParseCount, greaterThan(0));
+      expect(ThinkingTagParser.debugParseCount, 1);
       expect(
         renderedParagraphsWith('updated think answer', exact: false),
         hasLength(1),

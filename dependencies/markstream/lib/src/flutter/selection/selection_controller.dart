@@ -41,8 +41,9 @@ class MarkstreamSelectionController extends ChangeNotifier {
         final vertical = first.dy.compareTo(second.dy);
         return vertical != 0 ? vertical : first.dx.compareTo(second.dx);
       });
-  bool get hasSelection =>
-      _documents.any((binding) => binding.selectedSegments.isNotEmpty);
+  bool get hasSelection => _documents.any(
+    (binding) => binding.fragments.any((fragment) => fragment.hasSelection),
+  );
   String get selectedPlainText => _orderedDocuments
       .map((binding) => binding.plainText)
       .whereType<String>()
@@ -207,14 +208,15 @@ class MarkstreamSelectionFragment extends StatefulWidget {
 
 class _MarkstreamSelectionFragmentState
     extends State<MarkstreamSelectionFragment> {
-  final _notifier = SelectionListenerNotifier();
+  final _delegate = StableSelectionDelegate();
+  bool _registered = false;
   DocumentSelectionBinding? _binding;
   late TextIndex _index;
   @override
   void initState() {
     super.initState();
     _index = TextIndex.fromSegments(widget.segments);
-    _notifier.addListener(_changed);
+    _delegate.addListener(_changed);
   }
 
   void _changed() => _binding?.changed();
@@ -239,10 +241,10 @@ class _MarkstreamSelectionFragmentState
     _changed();
   }
 
-  List<TextSegment> get selectedSegments {
-    if (!_notifier.registered) return const [];
-    final range = _notifier.selection.range;
-    if (range == null) return const [];
+  TextRange? get _selectedRange {
+    if (!_registered) return null;
+    final range = _delegate.getSelection();
+    if (range == null) return null;
     // Native edge indices can briefly refer to the previous tail during a
     // streaming merge. The settled frame supplies the current exact range.
     final start = math
@@ -251,22 +253,35 @@ class _MarkstreamSelectionFragmentState
     final end = math
         .max(range.startOffset, range.endOffset)
         .clamp(start, _index.length);
-    return _index.segmentsForRange(start, end);
+    return TextRange(start: start, end: end);
+  }
+
+  bool get hasSelection => _selectedRange?.isCollapsed == false;
+
+  List<TextSegment> get selectedSegments {
+    final range = _selectedRange;
+    return range == null
+        ? const []
+        : _index.segmentsForRange(range.start, range.end);
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _binding == null || SelectionContainer.maybeOf(context) == null
-      ? widget.child
-      : SelectionListener(
-          selectionNotifier: _notifier,
-          child: StableSelectionContainer(child: widget.child),
-        );
+  Widget build(BuildContext context) {
+    _registered =
+        _binding != null && SelectionContainer.maybeOf(context) != null;
+    // This delegate already owns the exact range and emits selection changes.
+    // A second SelectionListener container would rebuild all selected line
+    // geometry and walk the same ranges again on every handle movement.
+    return _registered
+        ? SelectionContainer(delegate: _delegate, child: widget.child)
+        : widget.child;
+  }
+
   @override
   void dispose() {
     _binding?.fragments.remove(this);
     _changed();
-    _notifier.dispose();
+    _delegate.dispose();
     super.dispose();
   }
 }

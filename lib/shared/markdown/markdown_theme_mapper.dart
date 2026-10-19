@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -28,7 +29,7 @@ MarkstreamTheme mapMarkdownTheme(
                     : .05),
             color: DefaultTextStyle.of(context).style.color ?? scheme.onSurface,
           );
-  return MarkstreamTheme.fromColorScheme(
+  final theme = MarkstreamTheme.fromColorScheme(
     scheme,
     bodyStyle: body,
     codeFontFamily: (settings.codeFontFamily?.isNotEmpty ?? false)
@@ -38,4 +39,19 @@ MarkstreamTheme mapMarkdownTheme(
     semibold: AppFontWeights.semibold,
     strong: AppFontWeights.strong,
   );
+  final mobile =
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+  return mobile
+      ? theme.copyWith(
+          table: theme.table.copyWith(
+            bodyBackgroundColor: Color.alphaBlend(
+              scheme.primary.withValues(
+                alpha: theme.brightness == Brightness.dark ? .045 : .018,
+              ),
+              scheme.surface,
+            ).withValues(alpha: theme.fillAlphas.table),
+          ),
+        )
+      : theme;
 }

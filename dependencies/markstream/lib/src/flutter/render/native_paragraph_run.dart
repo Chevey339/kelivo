@@ -101,11 +101,11 @@ class _RenderParagraphRun extends RenderBox
       markNeedsPaint();
       markNeedsSemanticsUpdate();
     }
-    _semanticChildren = null;
     var child = firstChild;
     for (var i = 0; i < paragraphs.length; i++) {
       final text = paragraphs[i];
       if (child == null) {
+        _semanticChildren = null;
         child = RenderParagraph(
           text.text,
           textDirection: text.textDirection!,
@@ -145,6 +145,7 @@ class _RenderParagraphRun extends RenderBox
       child = childAfter(child);
     }
     while (child != null) {
+      _semanticChildren = null;
       final next = childAfter(child);
       remove(child);
       child.dispose();

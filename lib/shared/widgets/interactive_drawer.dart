@@ -294,7 +294,15 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            widget.child,
+            // Move the transcript as one retained paint/semantics subtree.
+            // Its descendants keep local coordinates during drawer gestures.
+            RepaintBoundary(
+              child: Semantics(
+                container: true,
+                explicitChildNodes: true,
+                child: widget.child,
+              ),
+            ),
             if (_anim.value > 0.0)
               IgnorePointer(
                 ignoring: !widget.barrierDismissible,
@@ -323,7 +331,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
         child: Semantics(
           label: widget.semanticLabel,
           container: true,
-          child: widget.drawer,
+          child: RepaintBoundary(child: widget.drawer),
         ),
       );
       return Align(
@@ -356,7 +364,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
       child: Semantics(
         label: widget.semanticLabel,
         container: true,
-        child: widget.drawer,
+        child: RepaintBoundary(child: widget.drawer),
       ),
     );
 

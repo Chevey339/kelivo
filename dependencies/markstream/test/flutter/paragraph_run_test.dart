@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
+import 'package:markstream/src/flutter/render/native_paragraph_run.dart';
 
 import 'markstream_view_test.dart' show host, paragraph, edge;
 
@@ -157,6 +158,35 @@ Future<Uint8List> movingScene(WidgetTester tester, bool batch) async {
 }
 
 void main() {
+  testWidgets('completed paragraph paint survives tail growth and new chunks', (
+    tester,
+  ) async {
+    var source = List.generate(
+      17,
+      (i) => 'Paragraph $i with stable words.',
+    ).join('\n\n');
+    Future<void> show() => tester.pumpWidget(
+      host(
+        MarkstreamView(source: source, streaming: true, cullToViewport: false),
+      ),
+    );
+    await show();
+    final first = tester.renderObject(find.byType(NativeParagraphRun).first);
+    final boundary = first.parent! as RenderRepaintBoundary;
+    final picture = boundary.debugLayer!.firstChild;
+    final tail = paragraph('Paragraph 16');
+    source += ' appended';
+    await show();
+    expect(boundary.debugLayer!.firstChild, same(picture));
+    expect(paragraph('Paragraph 16'), same(tail));
+    source += List.generate(9, (i) => '\n\nParagraph ${i + 17} next.').join();
+    await show();
+    expect(boundary.debugLayer!.firstChild, same(picture));
+    expect(paragraph('Paragraph 16'), same(tail));
+    expect(paragraph('Paragraph 25').text.toPlainText(), 'Paragraph 25 next.');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('native paragraphs support hosts without MediaQuery', (
     tester,
   ) async {
@@ -217,6 +247,45 @@ void main() {
   );
 
   testWidgets(
+    'active selection survives appending across a native paint chunk',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      addTearDown(controller.dispose);
+      var source = List.generate(8, (i) => 'Line $i stable.').join('\n\n');
+      Future<void> show() => tester.pumpWidget(
+        host(
+          MarkstreamView(
+            source: source,
+            streaming: true,
+            selectionController: controller,
+          ),
+          selectable: true,
+        ),
+      );
+      await show();
+      await tester.pumpAndSettle();
+      final existingTail = paragraph('Line 7');
+      final gesture = await tester.createGesture(
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer();
+      await gesture.down(edge(paragraph('Line 0'), 0));
+      await gesture.moveTo(edge(existingTail, 5, end: true));
+      source += '\n\nLine 8 newly appended.';
+      await show();
+      await tester.pumpAndSettle();
+      expect(paragraph('Line 7'), same(existingTail));
+      await gesture.moveTo(edge(paragraph('Line 8'), 21, end: true));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(controller.selectedPlainText, startsWith('Line 0'));
+      expect(controller.selectedPlainText, endsWith('Line 8 newly appended.'));
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
     'cached native paragraphs repaint when an ancestor reveals new glyphs',
     (tester) async {
       final reference = await movingScene(tester, false);
@@ -242,6 +311,10 @@ void main() {
           '中文段落 **加粗**，间距保持一致。跨行内容再加上更多的中文和 English.',
         ).join('\n\n'),
         'אבג one\n\nדהו two\n\nEnglish paragraph\n\nאבג three',
+        List.generate(
+          40,
+          (i) => '跨分组 $i **粗体** and wrapped English words.',
+        ).join('\n\n'),
       ]) {
         for (final scale in [1.0, 1.3]) {
           final normal = await pixels(

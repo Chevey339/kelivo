@@ -79,6 +79,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
   late final MarkstreamRenderer _renderer = MarkstreamRenderer(_recognizerFor);
   final _recognizers = <(int, int, String), TapGestureRecognizer>{};
   List<_BlockEntry> _entries = const [];
+  bool? _entriesBatched;
   DocumentSelectionBinding? _binding;
   Timer? _pendingUpdate;
   Widget? _cachedView;
@@ -93,6 +94,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
   }
 
   void _resetParser() {
+    _entries = const [];
     _incremental = IncrementalDocument(
       parser: MarkdownParser(
         options: widget.options,
@@ -125,7 +127,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
         source != null &&
         previous != null &&
         source.length >= PerformanceLimits.coalescingCharacters &&
-        source.startsWith(previous) &&
+        (source == previous || source.startsWith(previous)) &&
         oldWidget.streaming) {
       if (source == _document.source && _pendingUpdate == null) return;
       _pendingUpdate ??= Timer(PerformanceLimits.coalescingInterval, () {
@@ -206,23 +208,6 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       widget.highlightColor ??
           Theme.of(context).colorScheme.primary.withValues(alpha: .22),
     );
-    _renderer.update(
-      document: _document,
-      theme: theme,
-      extensions: widget.extensions,
-      codeHighlighter: widget.codeHighlighter,
-      mathRenderer: widget.mathRenderer,
-      imageBuilder: widget.imageBuilder,
-      linkHandler: widget.linkHandler,
-      codeOptions: widget.codeOptions,
-      labels: widget.labels,
-      exporting: widget.exporting,
-      trackSelection: _binding != null,
-      highlights: highlights,
-    );
-    final nodes = _document.children
-        .where((node) => node is! ReferenceDefinitionNode)
-        .toList();
     final defaults = DefaultTextStyle.of(context);
     final batching =
         MediaQuery.textScalerOf(context) == TextScaler.noScaling &&
@@ -256,6 +241,23 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       return _cachedView!;
     _cachedDocument = _document;
     _cachedSignature = visualSignature;
+    _renderer.update(
+      document: _document,
+      theme: theme,
+      extensions: widget.extensions,
+      codeHighlighter: widget.codeHighlighter,
+      mathRenderer: widget.mathRenderer,
+      imageBuilder: widget.imageBuilder,
+      linkHandler: widget.linkHandler,
+      codeOptions: widget.codeOptions,
+      labels: widget.labels,
+      exporting: widget.exporting,
+      trackSelection: _binding != null,
+      highlights: highlights,
+    );
+    final nodes = _document.children
+        .where((node) => node is! ReferenceDefinitionNode)
+        .toList();
     bool batchable(BlockNode node) =>
         node is ParagraphNode &&
         widget.extensions.blockBuilderFor(node) == null &&
@@ -263,47 +265,58 @@ class _MarkstreamViewState extends State<MarkstreamView> {
           (child) =>
               child is HtmlElementNode && htmlBlockTags.contains(child.tag),
         );
-    final groups = <List<BlockNode>>[];
-    for (var i = 0; i < nodes.length;) {
-      final node = nodes[i];
-      if (!batching || !batchable(node)) {
-        groups.add([node]);
-        i++;
-        continue;
-      }
-      final run = <BlockNode>[];
-      var characters = 0;
-      while (i < nodes.length &&
-          batchable(nodes[i]) &&
-          (run.isEmpty ||
-              characters + nodes[i].span.length <=
-                  PerformanceLimits.paragraphRunCharacters)) {
-        run.add(nodes[i]);
-        characters += nodes[i].span.length;
-        i++;
-      }
-      groups.add(run);
-    }
     final entries = <_BlockEntry>[];
-    var reuse = true;
-    for (var i = 0; i < groups.length; i++) {
-      final group = groups[i];
-      final active =
-          widget.streaming && identical(group.last, _document.children.last);
-      if (reuse &&
-          i < _entries.length &&
-          active == _entries[i].streaming &&
-          group.length == _entries[i].nodes.length &&
-          List.generate(
-            group.length,
-            (j) => identical(group[j], _entries[i].nodes[j]),
-          ).every((same) => same)) {
-        entries.add(_entries[i]);
-      } else {
-        reuse = false;
-        entries.add(_BlockEntry(group, active));
+    var nextNode = 0;
+    if (_entriesBatched == batching) {
+      // Keep completed groups without allocating their node lists again. The
+      // following node must also be unchanged: editing that boundary can merge
+      // a paragraph into the previous run. Always regroup the growing tail.
+      for (var index = 0; index + 1 < _entries.length; index++) {
+        final entry = _entries[index];
+        final end = nextNode + entry.nodes.length;
+        if (end >= nodes.length ||
+            (batching &&
+                batchable(entry.node) &&
+                !identical(nodes[end], _entries[index + 1].node)))
+          break;
+        var matches = true;
+        for (var offset = 0; offset < entry.nodes.length; offset++) {
+          if (!identical(nodes[nextNode + offset], entry.nodes[offset])) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) break;
+        entries.add(entry);
+        nextNode = end;
       }
     }
+    for (var i = nextNode; i < nodes.length;) {
+      final node = nodes[i];
+      final group = <BlockNode>[];
+      if (!batching || !batchable(node)) {
+        group.add(node);
+        i++;
+      } else {
+        var characters = 0;
+        while (i < nodes.length &&
+            batchable(nodes[i]) &&
+            (group.isEmpty ||
+                characters + nodes[i].span.length <=
+                    PerformanceLimits.paragraphRunCharacters)) {
+          group.add(nodes[i]);
+          characters += nodes[i].span.length;
+          i++;
+        }
+      }
+      entries.add(
+        _BlockEntry(
+          group,
+          widget.streaming && identical(group.last, _document.children.last),
+        ),
+      );
+    }
+    _entriesBatched = batching;
     _entries = entries;
     return _cachedView = SourceHighlightScope(
       highlights: highlights,

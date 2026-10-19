@@ -8,15 +8,34 @@ class StableSelectionDelegate extends StaticSelectionContainerDelegate {
   }
 
   final _pending = <Selectable>{};
+  final _orderingGeometry = Map<Selectable, _OrderingGeometry>.identity();
+  Map<Selectable, Matrix4>? _selectionTransforms;
+  bool _dispatching = false;
+
+  @override
+  Comparator<Selectable> get compareOrder => _compareOrder;
+
+  int _compareOrder(Selectable a, Selectable b) {
+    final compare = super.compareOrder;
+    if (_pending.isEmpty && !_dispatching) return compare(a, b);
+    // Reuse geometry only during this registration batch or synchronous input
+    // event, retaining Flutter's reading order without stale scroll coordinates.
+    return compare(
+      _orderingGeometry.putIfAbsent(a, () => _OrderingGeometry(a)),
+      _orderingGeometry.putIfAbsent(b, () => _OrderingGeometry(b)),
+    );
+  }
 
   @override
   void add(Selectable selectable) {
+    _orderingGeometry.clear();
     _pending.add(selectable);
     super.add(selectable);
   }
 
   @override
   void remove(Selectable selectable) {
+    _orderingGeometry.clear();
     _pending.remove(selectable);
     super.remove(selectable);
   }
@@ -33,14 +52,100 @@ class StableSelectionDelegate extends StaticSelectionContainerDelegate {
   @override
   void didChangeSelectables() {
     _pending.clear();
+    _orderingGeometry.clear();
     super.didChangeSelectables();
   }
 
   @override
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) {
+    _orderingGeometry.clear();
+    final wasDispatching = _dispatching;
+    _dispatching = true;
+    try {
+      return super.dispatchSelectionEvent(event);
+    } finally {
+      _dispatching = wasDispatching;
+      _orderingGeometry.clear();
+    }
+  }
+
+  @override
+  SelectedContentRange? getSelection() {
+    // Flutter collects every descendant range before checking these indices.
+    // An unselected group cannot contribute a range, including during copy.
+    if (currentSelectionStartIndex == -1 || currentSelectionEndIndex == -1) {
+      return null;
+    }
+    return super.getSelection();
+  }
+
+  @override
+  SelectionGeometry getSelectionGeometry() {
+    if (currentSelectionStartIndex == -1 || currentSelectionEndIndex == -1) {
+      return super.getSelectionGeometry();
+    }
+    final previous = _selectionTransforms;
+    // Flutter asks for the same child transform for every selected line.
+    // Share it within one geometry calculation, never across layout or input.
+    _selectionTransforms = Map.identity();
+    try {
+      return super.getSelectionGeometry();
+    } finally {
+      _selectionTransforms = previous;
+    }
+  }
+
+  @override
+  Matrix4 getTransformFrom(Selectable child) =>
+      _selectionTransforms?.putIfAbsent(
+        child,
+        () => super.getTransformFrom(child),
+      ) ??
+      super.getTransformFrom(child);
+
+  @override
   void dispose() {
     _pending.clear();
+    _orderingGeometry.clear();
     super.dispose();
   }
+}
+
+// Only used as a geometry argument to Flutter's comparator. The original
+// selectable remains registered and owns all selection state and resources.
+class _OrderingGeometry implements Selectable {
+  _OrderingGeometry(this.selectable);
+  final Selectable selectable;
+  late final _transform = selectable.getTransformTo(null);
+  late final _bounds = List<Rect>.of(selectable.boundingBoxes);
+  @override
+  Matrix4 getTransformTo(RenderObject? ancestor) =>
+      ancestor == null ? _transform : selectable.getTransformTo(ancestor);
+  @override
+  List<Rect> get boundingBoxes => _bounds;
+  @override
+  Size get size => selectable.size;
+  @override
+  int get contentLength => selectable.contentLength;
+  @override
+  SelectionGeometry get value => selectable.value;
+  @override
+  SelectedContent? getSelectedContent() => selectable.getSelectedContent();
+  @override
+  SelectedContentRange? getSelection() => selectable.getSelection();
+  @override
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) =>
+      selectable.dispatchSelectionEvent(event);
+  @override
+  void pushHandleLayers(LayerLink? startHandle, LayerLink? endHandle) =>
+      selectable.pushHandleLayers(startHandle, endHandle);
+  @override
+  void addListener(VoidCallback listener) => selectable.addListener(listener);
+  @override
+  void removeListener(VoidCallback listener) =>
+      selectable.removeListener(listener);
+  @override
+  void dispose() {}
 }
 
 /// Keeps one participant in the ancestor selection while descendants change.

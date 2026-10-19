@@ -45,6 +45,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   final _scroll = ScrollController();
   int _visibleRows = PerformanceLimits.initialTableRows;
   bool _capturing = false;
+  bool _hovered = false, _focused = false;
   @override
   void didUpdateWidget(MarkstreamTableBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -135,7 +136,8 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             defaultTargetPlatform == TargetPlatform.linux ||
             defaultTargetPlatform == TargetPlatform.macOS ||
             defaultTargetPlatform == TargetPlatform.windows;
-        final compact = !desktop || width < theme.compactBreakpoint;
+        final mobile = !desktop;
+        final compact = mobile || width < theme.compactBreakpoint;
         final columnWidth = columns == 1
             ? width.clamp(
                 theme.singleColumnMinWidth,
@@ -213,114 +215,168 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             itemBuilder: (_, index) => completeTable,
           );
         }
-        Widget clipped = ClipRRect(
-          borderRadius: BorderRadius.circular(radius),
-          child: ColoredBox(color: body, child: table),
+        Widget clipped = ColoredBox(
+          color: mobile && !_capturing ? Colors.transparent : body,
+          child: table,
         );
-        clipped = DecoratedBox(
-          key: const ValueKey('markstream-table-surface'),
-          position: DecorationPosition.foreground,
-          decoration: BoxDecoration(
-            border: Border.all(color: theme.borderColor, width: .8),
-            borderRadius: BorderRadius.circular(radius),
-          ),
-          child: clipped,
-        );
-        if (_capturing) clipped = ColoredBox(color: body, child: clipped);
+        if (!mobile) {
+          clipped = DecoratedBox(
+            key: const ValueKey('markstream-table-surface'),
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.borderColor, width: .8),
+              borderRadius: BorderRadius.circular(radius),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: clipped,
+            ),
+          );
+        }
         final surface = RepaintBoundary(key: _boundary, child: clipped);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!widget.exporting)
-                SelectionContainer.disabled(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    primary: false,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minWidth: width,
-                        minHeight: theme.toolbarHeight,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _action(
-                            MarkstreamActionKind.copyMarkdown,
-                            widget.labels.copyMarkdown,
-                            () => Clipboard.setData(
-                              ClipboardData(text: toMarkdown(widget.node)),
-                            ),
+        final actionContext = TableActionContext(
+          table: widget.node,
+          theme: widget.theme,
+          capturePng: _capture,
+        );
+        final toolbar = SelectionContainer.disabled(
+          child: mobile && widget.extensions.mobileTableToolbarBuilder != null
+              ? widget.extensions.mobileTableToolbarBuilder!(
+                  context,
+                  actionContext,
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  primary: false,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: width,
+                      minHeight: theme.toolbarHeight,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _action(
+                          MarkstreamActionKind.copyMarkdown,
+                          widget.labels.copyMarkdown,
+                          () => Clipboard.setData(
+                            ClipboardData(text: toMarkdown(widget.node)),
                           ),
-                          _action(
-                            MarkstreamActionKind.copyCsv,
-                            widget.labels.copyCsv,
-                            () => Clipboard.setData(
-                              ClipboardData(text: tableToCsv(widget.node)),
-                            ),
+                        ),
+                        _action(
+                          MarkstreamActionKind.copyCsv,
+                          widget.labels.copyCsv,
+                          () => Clipboard.setData(
+                            ClipboardData(text: tableToCsv(widget.node)),
                           ),
-                          ...?widget.extensions.tableExtraActions?.call(
-                            context,
-                            TableActionContext(
-                              table: widget.node,
-                              theme: widget.theme,
-                              capturePng: _capture,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        ...?widget.extensions.tableExtraActions?.call(
+                          context,
+                          actionContext,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              if (scroll)
-                SingleChildScrollView(
-                  key: const ValueKey('markstream-table-scroll'),
-                  controller: _scroll,
-                  physics: const ClampingScrollPhysics(),
-                  primary: false,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(width: columnWidth * columns, child: surface),
-                )
+        );
+        final media = MediaQuery.maybeOf(context);
+        final showToolbar =
+            _hovered || _focused || (media?.accessibleNavigation ?? false);
+        final reducedMotion = media?.disableAnimations ?? false;
+        Widget result = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!widget.exporting)
+              if (mobile)
+                toolbar
               else
-                surface,
-              if (!all &&
-                  !widget.streaming &&
-                  rows.length > PerformanceLimits.initialTableRows)
-                SelectionContainer.disabled(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    children: [
-                      if (_visibleRows > PerformanceLimits.initialTableRows)
-                        _action(
-                          MarkstreamActionKind.collapse,
-                          widget.labels.collapse,
-                          () async {
-                            setState(
-                              () => _visibleRows =
-                                  PerformanceLimits.initialTableRows,
-                            );
-                          },
-                        ),
-                      if (count < rows.length)
-                        _action(
-                          MarkstreamActionKind.showMore,
-                          widget.labels.moreRows(rows.length - count),
-                          () async {
-                            setState(
-                              () => _visibleRows = math.min(
-                                rows.length,
-                                _visibleRows + PerformanceLimits.tablePageRows,
-                              ),
-                            );
-                          },
-                        ),
-                    ],
+                IgnorePointer(
+                  ignoring: !showToolbar,
+                  child: AnimatedOpacity(
+                    key: const ValueKey('markstream-table-hover-toolbar'),
+                    opacity: showToolbar ? 1 : 0,
+                    duration: reducedMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 160),
+                    curve: Curves.easeOutCubic,
+                    child: toolbar,
                   ),
                 ),
-            ],
-          ),
+            if (scroll)
+              SingleChildScrollView(
+                key: const ValueKey('markstream-table-scroll'),
+                controller: _scroll,
+                physics: const ClampingScrollPhysics(),
+                primary: false,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(width: columnWidth * columns, child: surface),
+              )
+            else
+              surface,
+            if (!all &&
+                !widget.streaming &&
+                rows.length > PerformanceLimits.initialTableRows)
+              SelectionContainer.disabled(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    if (_visibleRows > PerformanceLimits.initialTableRows)
+                      _action(
+                        MarkstreamActionKind.collapse,
+                        widget.labels.collapse,
+                        () async {
+                          setState(
+                            () => _visibleRows =
+                                PerformanceLimits.initialTableRows,
+                          );
+                        },
+                      ),
+                    if (count < rows.length)
+                      _action(
+                        MarkstreamActionKind.showMore,
+                        widget.labels.moreRows(rows.length - count),
+                        () async {
+                          setState(
+                            () => _visibleRows = math.min(
+                              rows.length,
+                              _visibleRows + PerformanceLimits.tablePageRows,
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+        if (mobile) {
+          result = Container(
+            key: const ValueKey('markstream-table-surface'),
+            decoration: BoxDecoration(
+              color: theme.bodyBackgroundColor,
+              borderRadius: BorderRadius.circular(theme.compactRadius),
+            ),
+            foregroundDecoration: BoxDecoration(
+              border: Border.all(color: theme.borderColor, width: .8),
+              borderRadius: BorderRadius.circular(theme.compactRadius),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: result,
+          );
+        } else if (!widget.exporting) {
+          result = Focus(
+            onFocusChange: (value) => setState(() => _focused = value),
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _hovered = true),
+              onExit: (_) => setState(() => _hovered = false),
+              child: result,
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: result,
         );
       },
     );

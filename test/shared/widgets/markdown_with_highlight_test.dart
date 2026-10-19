@@ -25,6 +25,7 @@ import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
 import 'package:Kelivo/shared/markdown/diagram_code_blocks.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 import 'package:provider/provider.dart';
 
@@ -61,6 +62,13 @@ TableNode _tableFromRows(List<List<String>> values) {
 
 Finder _action(MarkstreamActionKind kind) => find.byWidgetPredicate(
   (widget) => widget is MarkstreamActionButton && widget.action.kind == kind,
+);
+
+Finder _codeHeader(bool expanded) => find.byWidgetPredicate(
+  (widget) =>
+      widget is Semantics &&
+      widget.key == const ValueKey('markstream-code-toggle') &&
+      widget.properties.expanded == expanded,
 );
 
 Finder _codeTextFinder() => find.descendant(
@@ -867,6 +875,173 @@ Inline ***strong emphasis*** text.
     },
   );
 
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('mobile table restores titled three-action card on $platform', (
+      tester,
+    ) async {
+      final previous = debugDefaultTargetPlatformOverride;
+      debugDefaultTargetPlatformOverride = platform;
+      try {
+        await tester.pumpWidget(
+          _markdownHarness(
+            '| Name | Value |\n| - | - |\n| Alpha | 42 |',
+            width: 320,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final toolbar = find.byKey(
+          const ValueKey('markdown-mobile-table-toolbar'),
+        );
+        expect(toolbar, findsOneWidget);
+        expect(
+          find.descendant(of: toolbar, matching: find.byType(IosIconButton)),
+          findsNWidgets(3),
+        );
+        expect(
+          find.descendant(of: toolbar, matching: find.text('Table')),
+          findsOneWidget,
+        );
+        final surface = tester.widget<Container>(
+          find.byKey(const ValueKey('markstream-table-surface')),
+        );
+        expect(
+          (surface.foregroundDecoration as BoxDecoration).borderRadius,
+          BorderRadius.circular(12),
+        );
+        expect(
+          tester.getBottomLeft(toolbar).dy,
+          tester.getTopLeft(find.byType(Table)).dy,
+        );
+        expect(
+          find.byKey(const ValueKey('markstream-table-hover-toolbar')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = previous;
+      }
+    });
+  }
+
+  for (final width in [360.0, 700.0]) {
+    testWidgets(
+      'desktop table fades five actions on hover without shifting content at $width',
+      (tester) async {
+        final previous = debugDefaultTargetPlatformOverride;
+        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+        try {
+          await tester.pumpWidget(
+            _markdownHarness(
+              '| A | B |\n| - | - |\n| alpha | beta |',
+              width: width,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final toolbar = find.byKey(
+            const ValueKey('markstream-table-hover-toolbar'),
+          );
+          expect(
+            find.byKey(const ValueKey('markdown-mobile-table-toolbar')),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: toolbar, matching: find.byType(IosIconButton)),
+            findsNWidgets(5),
+          );
+          final bounds = tester.getRect(find.byType(Table));
+          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+          final mouse = await tester.createGesture(
+            kind: ui.PointerDeviceKind.mouse,
+          );
+          await mouse.addPointer(location: Offset.zero);
+          await mouse.moveTo(bounds.center);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 80));
+          final fade = find
+              .descendant(of: toolbar, matching: find.byType(FadeTransition))
+              .first;
+          expect(
+            tester.widget<FadeTransition>(fade).opacity.value,
+            inExclusiveRange(0, 1),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+          expect(tester.getRect(find.byType(Table)), bounds);
+          await mouse.moveTo(tester.getCenter(toolbar));
+          await tester.pumpAndSettle();
+          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+          await mouse.moveTo(Offset.zero);
+          await tester.pumpAndSettle();
+          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+          expect(tester.getRect(find.byType(Table)), bounds);
+          await mouse.removePointer();
+        } finally {
+          debugDefaultTargetPlatformOverride = previous;
+        }
+      },
+    );
+  }
+
+  testWidgets(
+    'code header space toggles while right-aligned copy stays independent',
+    (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
+      await tester.pumpWidget(
+        _markdownHarness(
+          '```dart\nchrome-one\nchrome-two\nchrome-three\n```',
+          width: 360,
+          businessPreferences: harness.preferences,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final surface = find.byKey(const ValueKey('markstream-code-surface'));
+      final container = tester.widget<Container>(surface);
+      expect((container.decoration as BoxDecoration).border, isNull);
+      expect(
+        (container.foregroundDecoration as BoxDecoration).border!.top.width,
+        1,
+      );
+      expect(
+        (container.foregroundDecoration as BoxDecoration).borderRadius,
+        BorderRadius.circular(16),
+      );
+      expect(
+        tester.getRect(_action(MarkstreamActionKind.copyCode)).right,
+        closeTo(tester.getRect(surface).right - 12, .1),
+      );
+      expect(
+        tester.getRect(find.byTooltip('Save as file')).right,
+        lessThanOrEqualTo(
+          tester.getRect(_action(MarkstreamActionKind.copyCode)).left,
+        ),
+      );
+      expect(_codeHeader(false), findsOneWidget);
+      await tester.tap(_action(MarkstreamActionKind.copyCode));
+      await tester.pumpAndSettle();
+      expect(_codeHeader(false), findsOneWidget);
+      final header = tester.getRect(_codeHeader(false));
+      await tester.tapAt(Offset(header.right - 8, header.center.dy));
+      await tester.pumpAndSettle();
+      expect(_paragraphsWith('chrome-three', contains: true), hasLength(1));
+      expect(
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
+        findsNothing,
+      );
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+      expect(_paragraphsWith('chrome-three', contains: true), isEmpty);
+      expect(
+        find.byKey(const ValueKey('markstream-code-collapse-fade')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('MarkdownWithCodeHighlight renders mobile table export action', (
     tester,
   ) async {
@@ -882,7 +1057,11 @@ Inline ***strong emphasis*** text.
       );
       await tester.pump();
 
-      expect(_action(MarkstreamActionKind.copyMarkdown), findsOneWidget);
+      expect(find.text('Table'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('markdown-mobile-table-toolbar')),
+        findsOneWidget,
+      );
       expect(find.byTooltip('Copy Markdown'), findsOneWidget);
       expect(find.byTooltip('Export CSV'), findsOneWidget);
       expect(find.byTooltip('Save Image'), findsOneWidget);
@@ -1071,11 +1250,14 @@ Inline ***strong emphasis*** text.
       final table = tester.widget<Table>(find.byType(Table));
       expect(table.border?.horizontalInside.width, greaterThan(0));
       expect(table.border?.verticalInside.width, greaterThan(0));
-      final surface = tester.widget<DecoratedBox>(
+      final surface = tester.widget<Container>(
         find.byKey(const ValueKey('markstream-table-surface')),
       );
-      expect(surface.position, DecorationPosition.foreground);
-      expect((surface.decoration as BoxDecoration).border!.top.width, .8);
+      expect(
+        (surface.foregroundDecoration as BoxDecoration).border!.top.width,
+        .8,
+      );
+      expect(surface.clipBehavior, Clip.antiAlias);
       expect(
         find.descendant(
           of: tableBlock,
@@ -3630,25 +3812,27 @@ line3
 
       expect(_paragraphsWith('Expand', contains: false), isEmpty);
       expect(_paragraphsWith('Collapse', contains: false), isEmpty);
-      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
-      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
+      expect(_codeHeader(false), findsOneWidget);
+      expect(_action(MarkstreamActionKind.expand), findsNothing);
       expect(
-        tester.getTopLeft(find.text('dart')).dx,
-        lessThan(tester.getTopLeft(_action(MarkstreamActionKind.expand)).dx),
+        tester
+            .getRect(_codeHeader(false))
+            .contains(tester.getCenter(find.text('dart'))),
+        isTrue,
       );
       expect(_paragraphsWith('line3', contains: true), isEmpty);
       expect(_paragraphsWith('folded', contains: true), isEmpty);
 
       await tester.tap(
-        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-            ? _action(MarkstreamActionKind.expand)
-            : _action(MarkstreamActionKind.collapse),
+        _codeHeader(false).evaluate().isNotEmpty
+            ? _codeHeader(false)
+            : _codeHeader(true),
       );
       await tester.pumpAndSettle();
 
       expect(_paragraphsWith('Expand', contains: false), isEmpty);
       expect(_paragraphsWith('Collapse', contains: false), isEmpty);
-      expect(_action(MarkstreamActionKind.expand), findsNothing);
+      expect(_codeHeader(false), findsNothing);
       expect(_paragraphsWith('line3', contains: true), hasLength(1));
     },
   );
@@ -3681,9 +3865,9 @@ fade3
       expect(_paragraphsWith('fade3', contains: true), isEmpty);
 
       await tester.tap(
-        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-            ? _action(MarkstreamActionKind.expand)
-            : _action(MarkstreamActionKind.collapse),
+        _codeHeader(false).evaluate().isNotEmpty
+            ? _codeHeader(false)
+            : _codeHeader(true),
       );
       await tester.pumpAndSettle();
 
@@ -3708,9 +3892,9 @@ exact2
       );
       await tester.pumpAndSettle();
 
-      expect(_action(MarkstreamActionKind.collapse), findsNothing);
+      expect(_codeHeader(true), findsOneWidget);
 
-      expect(_action(MarkstreamActionKind.expand), findsNothing);
+      expect(_codeHeader(false), findsNothing);
       expect(
         find.byKey(const ValueKey('markstream-code-collapse-fade')),
         findsNothing,
@@ -3758,23 +3942,23 @@ disable3
       expect(_paragraphsWith('disable3', contains: true), hasLength(1));
 
       await tester.tap(
-        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-            ? _action(MarkstreamActionKind.expand)
-            : _action(MarkstreamActionKind.collapse),
+        _codeHeader(false).evaluate().isNotEmpty
+            ? _codeHeader(false)
+            : _codeHeader(true),
       );
       await tester.pumpAndSettle();
 
-      expect(_action(MarkstreamActionKind.expand), findsOneWidget);
+      expect(_codeHeader(false), findsOneWidget);
       expect(_paragraphsWith('disable3', contains: true), isEmpty);
 
       await tester.tap(
-        _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-            ? _action(MarkstreamActionKind.expand)
-            : _action(MarkstreamActionKind.collapse),
+        _codeHeader(false).evaluate().isNotEmpty
+            ? _codeHeader(false)
+            : _codeHeader(true),
       );
       await tester.pumpAndSettle();
 
-      expect(_action(MarkstreamActionKind.expand), findsNothing);
+      expect(_codeHeader(false), findsNothing);
       expect(_paragraphsWith('disable3', contains: true), hasLength(1));
     },
   );
@@ -3810,9 +3994,9 @@ alpha3
     expect(_paragraphsWith('alpha3', contains: true), isEmpty);
 
     await tester.tap(
-      _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-          ? _action(MarkstreamActionKind.expand)
-          : _action(MarkstreamActionKind.collapse),
+      _codeHeader(false).evaluate().isNotEmpty
+          ? _codeHeader(false)
+          : _codeHeader(true),
     );
     await tester.pumpAndSettle();
 
@@ -3831,9 +4015,9 @@ alpha4
     expect(_paragraphsWith('alpha4', contains: true), hasLength(1));
 
     await tester.tap(
-      _action(MarkstreamActionKind.expand).evaluate().isNotEmpty
-          ? _action(MarkstreamActionKind.expand)
-          : _action(MarkstreamActionKind.collapse),
+      _codeHeader(false).evaluate().isNotEmpty
+          ? _codeHeader(false)
+          : _codeHeader(true),
     );
     await tester.pumpAndSettle();
 
@@ -3880,7 +4064,7 @@ press3
       await tester.pumpAndSettle();
 
       final expandGesture = await tester.startGesture(
-        tester.getCenter(_action(MarkstreamActionKind.expand)),
+        tester.getCenter(_codeHeader(false)),
       );
       streamText.value = '''
 ```dart
@@ -3899,7 +4083,7 @@ press4
       expect(_paragraphsWith('press4', contains: true), hasLength(1));
 
       final collapseGesture = await tester.startGesture(
-        tester.getCenter(_action(MarkstreamActionKind.collapse)),
+        tester.getCenter(_codeHeader(true)),
       );
       streamText.value = '''
 ```dart

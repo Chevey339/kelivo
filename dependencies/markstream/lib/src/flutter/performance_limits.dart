@@ -12,6 +12,7 @@ abstract final class PerformanceLimits {
   static const streamingNativeCharacters = 512;
   static const staticNativeCharacters = 2048;
   static const paragraphRunCharacters = 4096;
+  static const nativeParagraphPaintCount = 8;
   static const tableImagePixels = 64000000;
   static const tableImageDimension = 32767;
 }

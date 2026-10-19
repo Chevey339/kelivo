@@ -6,12 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart' show ClipboardWriter;
 import '../markdown/rich_clipboard.dart';
 import 'snackbar.dart';
+import 'selection_scroll_container.dart';
 
 import 'package:markstream/markstream.dart'
-    show
-        StableSelectionContainer,
-        MarkstreamSelectionController,
-        MarkstreamSelectionScope;
+    show MarkstreamSelectionController, MarkstreamSelectionScope;
 import '../../l10n/app_localizations.dart';
 
 /// App-owned selection actions shared by messages and Markdown previews.
@@ -143,7 +141,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
         onSelectionChanged: (content) =>
             _selectedText = content?.plainText ?? '',
         contextMenuBuilder: _buildMenu,
-        child: StableSelectionContainer(child: widget.child),
+        child: SelectionScrollContainer(child: widget.child),
       ),
     );
   }

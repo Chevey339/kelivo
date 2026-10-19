@@ -105,6 +105,7 @@ final class MarkstreamExtensions {
       directiveBuilders = const {},
       namedInlineBuilders = const {},
       tableExtraActions = null,
+      mobileTableToolbarBuilder = null,
       codeExtraActions = null,
       actionButtonBuilder = null;
 
@@ -116,6 +117,7 @@ final class MarkstreamExtensions {
     Map<String, BlockNodeBuilder> directiveBuilders = const {},
     Map<String, InlineNodeBuilder> namedInlineBuilders = const {},
     this.tableExtraActions,
+    this.mobileTableToolbarBuilder,
     this.codeExtraActions,
     this.actionButtonBuilder,
   }) : blockSyntaxes = List.unmodifiable(blockSyntaxes),
@@ -131,6 +133,8 @@ final class MarkstreamExtensions {
   final Map<String, BlockNodeBuilder> directiveBuilders;
   final Map<String, InlineNodeBuilder> namedInlineBuilders;
   final TableExtraActions? tableExtraActions;
+  final Widget Function(BuildContext, TableActionContext)?
+  mobileTableToolbarBuilder;
   final CodeExtraActions? codeExtraActions;
   final MarkstreamActionButtonBuilder? actionButtonBuilder;
 

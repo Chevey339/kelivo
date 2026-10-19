@@ -30,6 +30,7 @@ final kelivoMarkdownExtensions = MarkstreamExtensions(
   actionButtonBuilder: markdownActionButton,
   codeExtraActions: markdownCodeActions,
   tableExtraActions: markdownTableActions,
+  mobileTableToolbarBuilder: markdownMobileTableToolbar,
 );
 
 Widget _diagram(

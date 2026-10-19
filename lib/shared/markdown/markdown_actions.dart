@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:file_picker/file_picker.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
@@ -17,6 +18,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/utils/clipboard_images.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Widget markdownActionButton(BuildContext context, MarkstreamAction action) {
   if (action.kind == MarkstreamActionKind.showMore) {
@@ -138,6 +140,104 @@ List<Widget> markdownTableActions(
       invoke: () => _tableImage(context, action, copy: true, gallery: false),
     ),
   ];
+}
+
+Widget markdownMobileTableToolbar(
+  BuildContext context,
+  TableActionContext action,
+) {
+  final l10n = AppLocalizations.of(context)!;
+  final scheme = Theme.of(context).colorScheme;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  Future<void> copy({bool csv = false}) async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: csv ? tableToCsv(action.table) : toMarkdown(action.table),
+      ),
+    );
+    if (context.mounted) {
+      showAppSnackBar(
+        context,
+        message: csv
+            ? l10n.chatMessageWidgetCopiedToClipboard
+            : l10n.markdownTableCopiedMarkdownSnackbar,
+        type: NotificationType.success,
+      );
+    }
+  }
+
+  Widget button(
+    IconData icon,
+    String label,
+    Future<void> Function() tap, {
+    Future<void> Function()? longPress,
+  }) => IosIconButton(
+    icon: icon,
+    tooltip: label,
+    semanticLabel: label,
+    size: 15,
+    minSize: 32,
+    padding: const EdgeInsets.all(7),
+    color: scheme.onSurfaceVariant.withValues(alpha: .68),
+    onTap: () => unawaited(tap()),
+    onLongPress: longPress == null ? null : () => unawaited(longPress()),
+  );
+  return Container(
+    key: const ValueKey('markdown-mobile-table-toolbar'),
+    height: action.theme.table.toolbarHeight,
+    padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
+    decoration: BoxDecoration(
+      color: action.theme.table.headerBackgroundColor,
+      border: Border(
+        bottom: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: dark ? .20 : .28),
+          width: .6,
+        ),
+      ),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            l10n.markdownTableLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant.withValues(alpha: .80),
+              fontSize: 12,
+              fontWeight: AppFontWeights.semibold,
+              height: 1,
+            ),
+          ),
+        ),
+        button(
+          Lucide.Copy,
+          l10n.markdownCopyMarkdownAction,
+          copy,
+          longPress: () =>
+              _tableImage(context, action, copy: true, gallery: false),
+        ),
+        button(
+          Lucide.ImageDown,
+          l10n.imageViewerPageSaveButton,
+          () => _tableImage(context, action, copy: false, gallery: true),
+          longPress: () =>
+              _tableImage(context, action, copy: false, gallery: false),
+        ),
+        button(
+          Lucide.Download,
+          l10n.markdownTableExportCsvTooltip,
+          () => _save(
+            context,
+            utf8.encode(tableToCsv(action.table)),
+            '.csv',
+            l10n.markdownTableDefaultFileNameStem,
+          ),
+          longPress: () => copy(csv: true),
+        ),
+      ],
+    ),
+  );
 }
 
 String _stamp() =>

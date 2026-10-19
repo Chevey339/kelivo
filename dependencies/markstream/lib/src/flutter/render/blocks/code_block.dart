@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/ast/nodes.dart';
 import '../../../core/serialize/to_plain_text.dart';
@@ -76,58 +77,67 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
     final mobile =
         defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
-    Widget action(
-      MarkstreamActionKind kind,
-      String label,
-      VoidCallback invoke,
-    ) => MarkstreamActionButton(
-      action: MarkstreamAction(kind: kind, label: label, onInvoke: invoke),
-      builder: widget.extensions.actionButtonBuilder,
+    void toggle() {
+      setState(() => _manual = !expanded);
+      widget.options.expansionState?.remember(
+        _language,
+        widget.node.code,
+        !expanded,
+      );
+    }
+
+    Widget content = MarkstreamCodeContent(
+      node: widget.node,
+      theme: widget.theme,
+      highlighter: widget.highlighter,
+      streaming: widget.streaming,
+      exporting: widget.exporting,
+      wrap: widget.exporting || !mobile || widget.options.mobileWrap,
+      highlight: widget.options.highlight,
+      maxLines: expanded ? null : widget.options.collapsedLines,
     );
-    final body = Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: MarkstreamCodeContent(
-            node: widget.node,
-            theme: widget.theme,
-            highlighter: widget.highlighter,
-            streaming: widget.streaming,
-            exporting: widget.exporting,
-            wrap: widget.exporting || !mobile || widget.options.mobileWrap,
-            highlight: widget.options.highlight,
-            maxLines: expanded ? null : widget.options.collapsedLines,
-          ),
-        ),
-        if (!expanded)
-          Positioned(
-            key: const ValueKey('markstream-code-collapse-fade'),
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: theme.fadeHeight,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      theme.backgroundColor.withValues(alpha: 0),
-                      theme.backgroundColor,
-                    ],
-                  ),
+    if (!expanded &&
+        lines > widget.options.collapsedLines &&
+        theme.fadeHeight > 0) {
+      // Fade the code itself so translucent surfaces retain their backdrop.
+      content = ShaderMask(
+        key: const ValueKey('markstream-code-collapse-fade'),
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) =>
+            LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black,
+                Colors.black.withValues(alpha: .28),
+                Colors.transparent,
+              ],
+            ).createShader(
+              Rect.fromLTRB(
+                bounds.left,
+                (bounds.bottom - theme.fadeHeight).clamp(
+                  bounds.top,
+                  bounds.bottom,
                 ),
+                bounds.right,
+                bounds.bottom,
               ),
             ),
-          ),
-      ],
+        child: content,
+      );
+    }
+    final body = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: content,
     );
     return Container(
       key: const ValueKey('markstream-code-surface'),
       margin: theme.margin,
       decoration: BoxDecoration(
         color: theme.backgroundColor,
+        borderRadius: BorderRadius.circular(theme.radius),
+      ),
+      foregroundDecoration: BoxDecoration(
         border: Border.all(color: theme.borderColor),
         borderRadius: BorderRadius.circular(theme.radius),
       ),
@@ -141,67 +151,102 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
               color: theme.headerBackgroundColor,
               child: Padding(
                 padding: theme.headerPadding,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _language.isEmpty
-                            ? widget.labels.unnamedCode
-                            : _language,
-                        style: theme.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (!widget.exporting)
-                      Flexible(
-                        flex: 4,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          primary: false,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (lines > widget.options.collapsedLines)
-                                action(
-                                  expanded
-                                      ? MarkstreamActionKind.collapse
-                                      : MarkstreamActionKind.expand,
-                                  expanded
-                                      ? widget.labels.collapse
-                                      : widget.labels.expand,
-                                  () {
-                                    setState(() => _manual = !expanded);
-                                    widget.options.expansionState?.remember(
-                                      _language,
-                                      widget.node.code,
-                                      !expanded,
-                                    );
-                                  },
-                                ),
-                              ...?widget.extensions.codeExtraActions?.call(
-                                context,
-                                CodeActionContext(
-                                  code: widget.node,
-                                  theme: widget.theme,
-                                  streaming: widget.streaming,
-                                ),
-                              ),
-                              MarkstreamActionButton(
-                                action: MarkstreamAction(
-                                  kind: MarkstreamActionKind.copyCode,
-                                  label: widget.labels.copyCode,
-                                  onInvoke: () => Clipboard.setData(
-                                    ClipboardData(text: widget.node.code),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          key: const ValueKey('markstream-code-toggle'),
+                          button: !widget.exporting,
+                          expanded: expanded,
+                          label: widget.exporting
+                              ? null
+                              : expanded
+                              ? widget.labels.collapse
+                              : widget.labels.expand,
+                          child: TextButton(
+                            onPressed: widget.exporting ? null : toggle,
+                            style:
+                                TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 30),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  alignment: Alignment.centerLeft,
+                                  foregroundColor: theme.label.color,
+                                  splashFactory: NoSplash.splashFactory,
+                                ).copyWith(
+                                  overlayColor: WidgetStateProperty.resolveWith(
+                                    (states) =>
+                                        states.contains(WidgetState.pressed)
+                                        ? Colors.transparent
+                                        : null,
                                   ),
                                 ),
-                                builder: widget.extensions.actionButtonBuilder,
-                              ),
-                            ],
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    _language.isEmpty
+                                        ? widget.labels.unnamedCode
+                                        : _language,
+                                    style: theme.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (!expanded)
+                                  ExcludeSemantics(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 4),
+                                      child: Icon(
+                                        LucideIcons.chevronRight,
+                                        size: 14,
+                                        color: theme.label.color,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                  ],
+                      if (!widget.exporting)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth * .75,
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            primary: false,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ...?widget.extensions.codeExtraActions?.call(
+                                  context,
+                                  CodeActionContext(
+                                    code: widget.node,
+                                    theme: widget.theme,
+                                    streaming: widget.streaming,
+                                  ),
+                                ),
+                                MarkstreamActionButton(
+                                  action: MarkstreamAction(
+                                    kind: MarkstreamActionKind.copyCode,
+                                    label: widget.labels.copyCode,
+                                    onInvoke: () => Clipboard.setData(
+                                      ClipboardData(text: widget.node.code),
+                                    ),
+                                  ),
+                                  builder:
+                                      widget.extensions.actionButtonBuilder,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -211,6 +256,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
           else
             AnimatedSize(
               duration: theme.collapseDuration,
+              curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               child: body,
             ),
