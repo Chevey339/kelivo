@@ -284,7 +284,12 @@ void main() {
           ),
         );
         await tester.pump(const Duration(seconds: 2));
-        expect(find.byType(BackdropFilter), findsWidgets);
+        expect(
+          find.byWidgetPredicate(
+            (widget) => widget is BackdropFilter && widget.enabled,
+          ),
+          findsWidgets,
+        );
         expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
         final field = tester.widget<LongMessageEditor>(
           find.byType(LongMessageEditor),

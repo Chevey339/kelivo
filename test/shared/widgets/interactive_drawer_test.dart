@@ -4,6 +4,36 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('disposing a replaced drawer does not detach its new owner', (
+    tester,
+  ) async {
+    final controller = InteractiveDrawerController();
+    Widget app(int generation) => MaterialApp(
+      home: InteractiveDrawer(
+        key: ValueKey(generation),
+        controller: controller,
+        drawer: const Text('Topics'),
+        child: const Text('Conversation'),
+      ),
+    );
+    await tester.pumpWidget(app(0));
+    await controller.open();
+    await tester.pumpAndSettle();
+    expect(controller.isOpen, isTrue);
+    await tester.pumpWidget(app(1));
+    await tester.pumpAndSettle();
+    expect(controller.isOpen, isTrue);
+    await controller.close();
+    await tester.pumpAndSettle();
+    expect(controller.isClosed, isTrue);
+    await controller.open();
+    await tester.pumpAndSettle();
+    expect(controller.isOpen, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
   testWidgets(
     'drawer motion retains paint and local semantics while content stays live',
     (tester) async {

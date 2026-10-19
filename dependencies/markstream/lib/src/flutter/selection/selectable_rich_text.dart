@@ -330,21 +330,28 @@ class _ParagraphSelectionDelegate
   }
 
   @override
-  Comparator<Selectable> get compareOrder => (a, b) {
+  Comparator<Selectable> get compareOrder {
     final paragraph = _paragraph();
-    int offset(Selectable child) =>
-        paragraph.selectableBelongsToParagraph(child)
-        ? _fragmentStart(child)
-        : _placeholderOffset(child);
-    return offset(a).compareTo(offset(b));
-  };
+    // A sort compares the same fragments repeatedly. Keep logical offsets
+    // within this comparator only, so later layouts always use fresh geometry.
+    final offsets = Map<Selectable, int>.identity();
+    int offset(Selectable child) => offsets.putIfAbsent(
+      child,
+      () => paragraph.selectableBelongsToParagraph(child)
+          ? _fragmentStart(child)
+          : _placeholderOffset(child),
+    );
+    return (a, b) => offset(a).compareTo(offset(b));
+  }
 
   int _fragmentStart(Selectable selectable) {
     final paragraph = _paragraph();
-    var start = paragraph
-        .getPositionForOffset(selectable.boundingBoxes.first.centerLeft)
-        .offset;
-    for (final box in selectable.boundingBoxes) {
+    final boxes = selectable.boundingBoxes;
+    var start = paragraph.getPositionForOffset(boxes.first.centerLeft).offset;
+    // Zero is already the minimum possible offset. Long leading fragments
+    // otherwise hit-test every line even when only their color has changed.
+    if (start == 0) return start;
+    for (final box in boxes) {
       start = math.min(
         start,
         paragraph.getPositionForOffset(box.centerLeft).offset,
@@ -353,6 +360,7 @@ class _ParagraphSelectionDelegate
         start,
         paragraph.getPositionForOffset(box.centerRight).offset,
       );
+      if (start == 0) break;
     }
     return start;
   }

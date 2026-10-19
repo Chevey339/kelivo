@@ -158,6 +158,51 @@ Future<Uint8List> movingScene(WidgetTester tester, bool batch) async {
 }
 
 void main() {
+  testWidgets(
+    'inline selection order survives theme, width and direction changes',
+    (tester) async {
+      for (final rtl in [false, true]) {
+        final start = rtl ? 'مرحبا بالعالم ' : 'Leading words ';
+        final tail = rtl ? ' نهاية الفقرة' : ' trailing words';
+        for (final width in [390.0, 140.0, 270.0]) {
+          for (final brightness in Brightness.values) {
+            final source =
+                '${List.filled(32, start).join()} `code` $tail **bold**';
+            final expected = '${List.filled(32, start).join()} code $tail bold';
+            SelectedContent? selected;
+            await tester.pumpWidget(
+              host(
+                MarkstreamView(
+                  source: source,
+                  theme: MarkstreamTheme.fromColorScheme(
+                    ColorScheme.fromSeed(
+                      seedColor: Colors.blue,
+                      brightness: brightness,
+                    ),
+                    bodyStyle: TextStyle(fontSize: width == 140 ? 19 : 15),
+                  ),
+                ),
+                width: width,
+                selectable: true,
+                onSelection: (value) => selected = value,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final region = tester.state<SelectableRegionState>(
+              find.byType(SelectableRegion),
+            );
+            region.selectAll(SelectionChangedCause.keyboard);
+            await tester.pump();
+            expect(selected?.plainText, expected);
+            expect(tester.takeException(), isNull);
+            region.clearSelection();
+            await tester.pump();
+          }
+        }
+      }
+    },
+  );
+
   testWidgets('completed paragraph paint survives tail growth and new chunks', (
     tester,
   ) async {
