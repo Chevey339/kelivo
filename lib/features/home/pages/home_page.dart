@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -706,7 +707,7 @@ class _HomePageState extends State<HomePage>
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = TextEditingController();
+  final TextEditingController _inputController = MessageEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();

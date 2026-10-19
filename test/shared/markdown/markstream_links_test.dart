@@ -1,6 +1,8 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
+import 'package:markstream/markstream.dart';
 // ignore: depend_on_referenced_packages
 import 'package:url_launcher_platform_interface/link.dart';
 // ignore: depend_on_referenced_packages
@@ -43,6 +45,45 @@ Offset _labelCenter(String label) {
 }
 
 void main() {
+  test('local image syntax accepts every incomplete escaped-label prefix', () {
+    final parser = MarkdownParser(
+      inlineSyntaxes: const [LocalImagePathSyntax()],
+    );
+    const source =
+        r'![an escaped \] label\\](/tmp/a picture.png "image title")';
+    for (var end = 0; end <= source.length; end++) {
+      expect(
+        () => parser.parse(source.substring(0, end)),
+        returnsNormally,
+        reason: 'streaming prefix ending at $end',
+      );
+    }
+    final images = parser
+        .parse(source)
+        .children
+        .single
+        .children
+        .whereType<ImageNode>();
+    expect(images.single.destination, '/tmp/a picture.png');
+  });
+
+  testWidgets(
+    'an escaped image label can stream through a trailing backslash',
+    (tester) async {
+      for (final source in [
+        r'![label\',
+        r'![label\] still open',
+        r'![label\] still open](/tmp/a picture.png)',
+      ]) {
+        await tester.pumpWidget(
+          host(MarkdownWithCodeHighlight(text: source, streaming: true)),
+        );
+        await tester.pump(const Duration(milliseconds: 60));
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   testWidgets('external links open their URL from a cached paragraph', (
     tester,
   ) async {

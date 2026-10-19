@@ -196,6 +196,7 @@ class _ParagraphImpl extends IParagraph {
 class _CodeParagraphProvider {
 
   final Map<TextSpan, _ParagraphImpl> _cachedParagraphs;
+  final Set<_ParagraphImpl> _ownedParagraphs = Set.identity();
 
   ui.TextStyle? _style;
   ui.ParagraphConstraints? _constraints;
@@ -262,6 +263,7 @@ class _CodeParagraphProvider {
       impl = _build(span, plainText, false);
     }
     _cachedParagraphs[span] = impl;
+    _ownedParagraphs.add(impl);
     return impl;
   }
 
@@ -309,6 +311,21 @@ class _CodeParagraphProvider {
   void retainParagraphs(Iterable<IParagraph> paragraphs) {
     final Set<IParagraph> retained = Set.identity()..addAll(paragraphs);
     _cachedParagraphs.removeWhere((_, paragraph) => !retained.contains(paragraph));
+    // Cache invalidation can happen before the renderer replaces its visible
+    // paragraphs. Release ownership only after the new layout is installed.
+    _ownedParagraphs.removeWhere((paragraph) {
+      if (retained.contains(paragraph)) return false;
+      paragraph.paragraph.dispose();
+      return true;
+    });
+  }
+
+  void dispose() {
+    for (final paragraph in _ownedParagraphs) {
+      paragraph.paragraph.dispose();
+    }
+    _ownedParagraphs.clear();
+    _cachedParagraphs.clear();
   }
 
   _ParagraphImpl _build(TextSpan span, String plainText, bool trucated) {

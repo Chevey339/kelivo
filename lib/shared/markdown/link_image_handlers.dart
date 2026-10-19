@@ -91,7 +91,9 @@ class LocalImagePathSyntax extends InlineSyntax {
       if (text[closeLabel] == '\\') closeLabel++;
       closeLabel++;
     }
-    if (!text.startsWith('](', closeLabel)) return null;
+    if (closeLabel >= text.length || !text.startsWith('](', closeLabel)) {
+      return null;
+    }
     final start = closeLabel + 2;
     var end = start, depth = 0;
     String? quote;

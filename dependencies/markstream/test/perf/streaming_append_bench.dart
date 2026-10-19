@@ -15,9 +15,8 @@ void main() {
   testWidgets('fixed-fixture streaming append and cold rendering', (
     tester,
   ) async {
-    final bytes = File(
-      '../../dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
-    ).readAsBytesSync();
+    final bytes = File('../../test/fixtures/fonts/JetBrainsMono-Regular.ttf')
+        .readAsBytesSync();
     await (FontLoader(
       'markstream-bench',
     )..addFont(Future.value(ByteData.sublistView(bytes)))).load();

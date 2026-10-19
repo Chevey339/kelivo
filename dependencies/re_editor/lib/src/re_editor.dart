@@ -26,6 +26,8 @@ part '_code_formatter.dart';
 part '_code_highlight.dart';
 part '_code_indicator.dart';
 part '_code_input.dart';
+part 'code_input_connection.dart';
+part 'code_navigation_layout.dart';
 part '_code_line.dart';
 part '_code_lines.dart';
 part '_code_paragraph.dart';
