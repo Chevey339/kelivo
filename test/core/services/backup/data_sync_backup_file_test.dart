@@ -251,29 +251,6 @@ Future<Directory> _singleRestoreRunDirectory(Directory appDataDirectory) async {
   return runs.single;
 }
 
-Future<void> _overwriteLastDataDescriptorUncompressedSize(
-  File zipFile,
-  int size,
-) async {
-  final bytes = await zipFile.readAsBytes();
-  const signature = [0x50, 0x4b, 0x07, 0x08];
-  var headerOffset = -1;
-  for (var i = bytes.length - signature.length; i >= 0; i--) {
-    if (bytes[i] == signature[0] &&
-        bytes[i + 1] == signature[1] &&
-        bytes[i + 2] == signature[2] &&
-        bytes[i + 3] == signature[3]) {
-      headerOffset = i;
-      break;
-    }
-  }
-  if (headerOffset < 0) throw StateError('data_descriptor');
-  for (var i = 0; i < 4; i++) {
-    bytes[headerOffset + 12 + i] = (size >> (8 * i)) & 0xff;
-  }
-  await zipFile.writeAsBytes(bytes, flush: true);
-}
-
 Future<void> _overwriteCentralDirectoryUncompressedSize(
   File zipFile,
   int size,
@@ -1635,7 +1612,7 @@ void main() {
           isFalse,
         );
 
-        await _overwriteLastDataDescriptorUncompressedSize(
+        await _overwriteCentralDirectoryUncompressedSize(
           backupFile,
           16 * 1024 * 1024 + 1,
         );
