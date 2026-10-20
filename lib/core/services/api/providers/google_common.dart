@@ -656,7 +656,6 @@ Stream<StreamChunk> sendGoogleStream(
     var pendingCalls = <EmitToolCall>[];
     var lastParts = <dynamic>[];
     var lastFunctionCallParts = <dynamic>[];
-    var lastText = '';
 
     yield* runProviderToolRounds(
       retryRound: retryRound,
@@ -665,7 +664,6 @@ Stream<StreamChunk> sendGoogleStream(
         pendingCalls = [];
         lastParts = [];
         lastFunctionCallParts = [];
-        lastText = '';
         final req = http.Request('POST', Uri.parse(url));
         req.headers.addAll(headers);
         final body = Map<String, dynamic>.from(baseBody);
@@ -694,27 +692,6 @@ Stream<StreamChunk> sendGoogleStream(
             .toList();
         lastParts = parts;
         lastFunctionCallParts = functionCallParts;
-        if (functionCallParts.isNotEmpty && onToolCall != null) {
-          pendingCalls = [
-            for (var idx = 0; idx < functionCallParts.length; idx++)
-              () {
-                final fc = functionCallParts[idx] as Map;
-                final call = (fc['functionCall'] as Map)
-                    .cast<String, dynamic>();
-                return emitToolCall(
-                  id: effectiveToolCallId(call['id'], 'fn', idx),
-                  name: (call['name'] ?? '').toString(),
-                  arguments:
-                      (call['args'] as Map?)?.cast<String, dynamic>() ??
-                      const <String, dynamic>{},
-                  metadata: {
-                    'google': {'part': fc.cast<String, dynamic>()},
-                  },
-                );
-              }(),
-          ];
-          return;
-        }
         // Provider-hosted code execution stays on ServerTool*, not ToolCallResult.
         var codeExecIdx = 0;
         for (final p in parts) {
@@ -762,15 +739,36 @@ Stream<StreamChunk> sendGoogleStream(
           }
         }
         final reasoningStr = reasoningBuf.toString();
-        if (reasoningStr.isNotEmpty) {
+        if (reasoningStr.isNotEmpty || buf.isNotEmpty) {
           yield* emitDelta(
             ids: StreamChunkIds('round-${currentContents.length}'),
+            content: buf.toString(),
             reasoning: reasoningStr,
             usage: totalUsage,
             totalTokens: totalUsage?.totalTokens ?? 0,
           );
         }
-        lastText = buf.toString();
+        if (functionCallParts.isNotEmpty && onToolCall != null) {
+          pendingCalls = [
+            for (var idx = 0; idx < functionCallParts.length; idx++)
+              () {
+                final fc = functionCallParts[idx] as Map;
+                final call = (fc['functionCall'] as Map)
+                    .cast<String, dynamic>();
+                return emitToolCall(
+                  id: effectiveToolCallId(call['id'], 'fn', idx),
+                  name: (call['name'] ?? '').toString(),
+                  arguments:
+                      (call['args'] as Map?)?.cast<String, dynamic>() ??
+                      const <String, dynamic>{},
+                  metadata: {
+                    'google': {'part': fc.cast<String, dynamic>()},
+                  },
+                );
+              }(),
+          ];
+          return;
+        }
         if (persistGeminiThoughtSigs) {
           final signature = collectGeminiThoughtSignatureFromParts(parts);
           if (signature.isNotEmpty) {
@@ -823,9 +821,8 @@ Stream<StreamChunk> sendGoogleStream(
           },
         ];
       },
-      finish: () => emitDone(
+      finish: () => emitFinish(
         ids: StreamChunkIds('finish'),
-        content: lastText,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       ),
