@@ -15,6 +15,7 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
+import '../../browser/browser_navigation.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -487,6 +488,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
     LocalToolNames.phoneControl => Lucide.Smartphone,
+    LocalToolNames.browser => Lucide.Globe,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -520,6 +522,7 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
     LocalToolNames.phoneControl => l10n.phoneControlTitle,
+    LocalToolNames.browser => l10n.browserToolTitle,
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>
@@ -5426,6 +5429,16 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
         : '';
     final Widget? summaryContent = _isAskUser
         ? _AskUserInlineBody(part: widget.part, compact: true)
+        : widget.part.toolName == LocalToolNames.browser
+        ? IosIconButton(
+            size: 16,
+            padding: const EdgeInsets.all(7),
+            color: fg.accent,
+            semanticLabel: AppLocalizations.of(context)!.browserOpen,
+            builder: (color) => Icon(Lucide.Globe, size: 16, color: color),
+            onTap: () =>
+                openBrowserPage(context, conversationId: widget.conversationId),
+          )
         : isWorkspace
         ? WorkspaceToolCardBody(
             part: workspacePart,
@@ -5834,6 +5847,18 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 conversationId: widget.conversationId,
               ),
             ],
+            if (widget.part.toolName == LocalToolNames.browser)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Lucide.Globe, size: 16),
+                  label: Text(l10n.browserOpen),
+                  onPressed: () => openBrowserPage(
+                    context,
+                    conversationId: widget.conversationId,
+                  ),
+                ),
+              ),
             if (ttsText.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildTextToSpeechReplayRow(

@@ -2831,7 +2831,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Tools button (local tools and MCP servers)
+        // Tools menu also includes independent browser navigation on desktop.
         if (widget.showToolsButton) {
           actions.add(
             _OverflowAction(

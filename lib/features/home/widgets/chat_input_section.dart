@@ -158,6 +158,8 @@ class ChatInputSection extends StatelessWidget {
 
     final pk = chatModelProviderKey;
     final mid = chatModelId;
+    final supportsModelTools =
+        pk != null && mid != null && isToolModel(pk, mid);
     final selectedReasoning = _selectedReasoning(settings, a, pk, mid);
     final reasoningSpec = (pk != null && mid != null)
         ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
@@ -234,8 +236,10 @@ class ChatInputSection extends StatelessWidget {
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
       onExpandedChanged: onExpandedChanged,
-      showToolsButton: _shouldShowToolsButton(pk, mid),
-      toolsActive: _isToolsActive(context, a, workspaceBound),
+      // Desktop tools also contains independent browser navigation.
+      showToolsButton: supportsModelTools || (isDesktop && onOpenTools != null),
+      toolsActive:
+          supportsModelTools && _isToolsActive(context, a, workspaceBound),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
@@ -385,13 +389,6 @@ class ChatInputSection extends StatelessWidget {
       modelId: modelId,
       assistant: assistant,
     );
-  }
-
-  /// The button hosts local tools and the workspace as well as MCP, so it
-  /// shows for every tool-capable model rather than only when MCP is set up.
-  bool _shouldShowToolsButton(String? pk, String? mid) {
-    if (pk == null || mid == null) return false;
-    return isToolModel(pk, mid);
   }
 
   bool _isToolsActive(BuildContext context, Assistant? a, bool workspaceBound) {

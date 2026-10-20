@@ -1583,6 +1583,14 @@ class _HomePageState extends State<HomePage>
             context,
             anchorKey: _inputBarKey,
             assistantId: a.id,
+            supportsModelTools:
+                chatModel.providerKey != null &&
+                chatModel.modelId != null &&
+                _controller.isToolModel(
+                  chatModel.providerKey!,
+                  chatModel.modelId!,
+                ),
+            conversationId: _controller.currentConversation?.id,
           );
         } else {
           _controller.dismissKeyboard();

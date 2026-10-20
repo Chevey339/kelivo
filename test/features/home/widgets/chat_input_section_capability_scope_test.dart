@@ -9,6 +9,8 @@ import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
+import 'package:Kelivo/desktop/tools_popover.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_section.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -34,7 +36,10 @@ void main() {
 
   /// Loads the provider outside the fake clock: it reads through drift, and a
   /// widget test's timers never advance on their own.
-  Future<AssistantProvider> loadAssistantWithMcp(WidgetTester tester) async {
+  Future<AssistantProvider> loadAssistantWithMcp(
+    WidgetTester tester, {
+    List<String> localToolIds = const [],
+  }) async {
     late AssistantProvider provider;
     await tester.runAsync(() async {
       await preferences.setString(
@@ -44,6 +49,7 @@ void main() {
             'id': 'assistant-1',
             'name': 'Assistant',
             'mcpServerIds': ['server-1'],
+            'localToolIds': localToolIds,
           },
         ]),
       );
@@ -63,8 +69,13 @@ void main() {
     required bool isConversationOverride,
     SettingsProvider? settingsOverride,
     bool supportsReasoning = false,
+    String? providerKey = 'SomeProvider',
+    String? modelId = 'no-tools-model',
+    bool supportsTools = false,
+    bool desktopTools = false,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
+    final inputBarKey = GlobalKey();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -79,25 +90,47 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          theme: desktopTools
+              ? ThemeData(platform: TargetPlatform.macOS)
+              : null,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ChatInputSection(
-              inputBarKey: GlobalKey(),
-              chatModelProviderKey: 'SomeProvider',
-              chatModelId: 'no-tools-model',
-              chatModelIsConversationOverride: isConversationOverride,
-              inputFocus: FocusNode(),
-              inputController: TextEditingController(),
-              mediaController: ChatInputBarController(),
-              isTablet: false,
-              isLoading: false,
-              // The model in play supports neither tools nor reasoning, which
-              // is what triggers the enforcement under test.
-              isToolModel: (_, _) => false,
-              isReasoningModel: (_, _) => supportsReasoning,
-              isReasoningEnabled: (request) =>
-                  request.level != ReasoningLevel.off,
+            body: Builder(
+              builder: (context) {
+                final section = ChatInputSection(
+                  inputBarKey: inputBarKey,
+                  chatModelProviderKey: providerKey,
+                  chatModelId: modelId,
+                  chatModelIsConversationOverride: isConversationOverride,
+                  inputFocus: FocusNode(),
+                  inputController: TextEditingController(),
+                  mediaController: ChatInputBarController(),
+                  isTablet: false,
+                  isLoading: false,
+                  isToolModel: (_, _) => supportsTools,
+                  isReasoningModel: (_, _) => supportsReasoning,
+                  isReasoningEnabled: (request) =>
+                      request.level != ReasoningLevel.off,
+                  onOpenTools: desktopTools
+                      ? () => showDesktopToolsPopover(
+                          context,
+                          anchorKey: inputBarKey,
+                          assistantId: assistants.currentAssistant!.id,
+                          supportsModelTools:
+                              providerKey != null &&
+                              modelId != null &&
+                              supportsTools,
+                        )
+                      : null,
+                );
+                return desktopTools
+                    ? Align(
+                        alignment: Alignment.bottomCenter,
+                        child: SizedBox(width: 800, child: section),
+                      )
+                    : section;
+              },
             ),
           ),
         ),
@@ -105,6 +138,64 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  for (final scenario in [
+    (name: 'no model', providerKey: null, modelId: null, supportsTools: false),
+    (
+      name: 'a model without tools',
+      providerKey: 'SomeProvider',
+      modelId: 'no-tools-model',
+      supportsTools: false,
+    ),
+    (
+      name: 'a tool-capable model',
+      providerKey: 'SomeProvider',
+      modelId: 'tool-model',
+      supportsTools: true,
+    ),
+  ]) {
+    testWidgets('desktop browser entry stays available with ${scenario.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1000, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final assistants = await loadAssistantWithMcp(
+        tester,
+        localToolIds: const [LocalToolNames.browser],
+      );
+      await pumpComposer(
+        tester,
+        assistants: assistants,
+        isConversationOverride: true,
+        providerKey: scenario.providerKey,
+        modelId: scenario.modelId,
+        supportsTools: scenario.supportsTools,
+        desktopTools: true,
+      );
+      final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+      expect(bar.showToolsButton, isTrue);
+      expect(bar.toolsActive, scenario.supportsTools);
+      await tester.tap(find.byTooltip('Tools'));
+      await tester.pumpAndSettle();
+      expect(find.text('Open browser'), findsOneWidget);
+      expect(
+        find.text('Local Tools'),
+        scenario.supportsTools ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text('Browser control'),
+        scenario.supportsTools ? findsOneWidget : findsNothing,
+      );
+      expect(assistants.currentAssistant!.localToolIds, [
+        LocalToolNames.browser,
+      ]);
+      expect(assistants.currentAssistant!.mcpServerIds, ['server-1']);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
   }
 
   testWidgets('a conversation-pinned model leaves the assistant alone', (

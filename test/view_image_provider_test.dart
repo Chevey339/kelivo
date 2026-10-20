@@ -383,15 +383,21 @@ void main() {
   );
 
   for (final api in _Api.values) {
-    for (final (stream, mcp) in [
-      (false, false),
-      (true, false),
-      (false, true),
-      (true, true),
+    for (final (stream, mcp, browser) in [
+      (false, false, false),
+      (true, false, false),
+      (false, true, false),
+      (true, true, false),
+      (false, false, true),
+      (true, false, true),
     ]) {
-      final toolName = mcp ? 'svguess__view_drawing' : 'view_image';
+      final toolName = browser
+          ? 'browser'
+          : mcp
+          ? 'svguess__view_drawing'
+          : 'view_image';
       test(
-        '${api.name} stream=$stream mcp=$mcp sends image pixels on continuation and replay',
+        '${api.name} stream=$stream mcp=$mcp browser=$browser sends image pixels on continuation and replay',
         () async {
           final file = File('${imageRoot.path}/images/mcp_img_drawing (1).png');
           final pixels = img.Image(width: 8, height: 4);
@@ -405,10 +411,17 @@ void main() {
               : ClientToolResult(
                   markdown,
                   metadata: {
-                    ...const WorkspaceToolMetadata(
-                      tool: 'view_image',
-                      status: 'ok',
-                    ).toJson(),
+                    if (browser)
+                      'browser': {
+                        'action': 'snapshot',
+                        'status': 'ok',
+                        'sessionId': 'test-chat',
+                      }
+                    else
+                      ...const WorkspaceToolMetadata(
+                        tool: 'view_image',
+                        status: 'ok',
+                      ).toJson(),
                     kMcpResultMetadataKey: mcpResultMetadata([file.path]),
                   },
                 );
@@ -573,7 +586,7 @@ void main() {
           });
           final errorResult = ClientToolResult(
             errorText,
-            metadata: mcp
+            metadata: mcp || browser
                 ? {kMcpResultMetadataKey: mcpResultMetadata([])}
                 : const WorkspaceToolMetadata(
                     tool: 'view_image',

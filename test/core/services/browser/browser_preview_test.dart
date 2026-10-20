@@ -1,0 +1,401 @@
+import 'dart:async';
+
+import 'package:Kelivo/core/services/browser/browser_engine.dart';
+import 'package:Kelivo/core/services/browser/browser_service.dart';
+import 'package:Kelivo/core/services/browser/browser_store.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late BrowserService service;
+  late Map<String, _Engine> engines;
+
+  void previewTest(String name, WidgetTesterCallback body) {
+    testWidgets(name, (tester) async {
+      engines = {};
+      service = BrowserService(
+        store: _Store(),
+        supported: true,
+        engineFactory:
+            ({
+              required tab,
+              required settings,
+              required onChanged,
+              required onDownload,
+              required onNewWindow,
+              required isAgentActive,
+            }) async => engines[tab.id] = _Engine(onChanged),
+      );
+      await service.initialize();
+      try {
+        await body(tester);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        service.dispose();
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pump();
+      }
+    });
+  }
+
+  Widget host() => Directionality(
+    textDirection: TextDirection.ltr,
+    child: ListenableBuilder(
+      listenable: service,
+      builder: (_, __) => service.activeTabId == null
+          ? const SizedBox.shrink()
+          : service.buildView(service.activeTabId!),
+    ),
+  );
+
+  previewTest('mobile native creation waits until route entry settles', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final tab = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              CupertinoPageRoute<void>(
+                builder: (_) => service.buildView(tab.id),
+              ),
+            ),
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      engines,
+      isEmpty,
+      reason: 'Do not create WKWebView in the entry animation.',
+    );
+    await tester.pumpAndSettle();
+    expect(engines.length, 1);
+  });
+
+  previewTest(
+    'covered tab selection defers new engine until motion is released',
+    (tester) async {
+      final tab = await service.createTab(url: 'https://one.example');
+      Widget scene(bool defer) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: service.buildViewport(deferNewViews: defer),
+      );
+      await tester.pumpWidget(scene(true));
+      await tester.pumpAndSettle();
+      expect(engines, isEmpty);
+      await tester.pumpWidget(scene(false));
+      await tester.pumpAndSettle();
+      expect(engines.keys, [tab.id]);
+    },
+  );
+
+  previewTest(
+    'preview never creates a background engine and captures a loaded visit once',
+    (tester) async {
+      final tab = await service.createTab(url: 'https://one.example');
+      await service.refreshActivePreview();
+      expect(engines, isEmpty);
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final engine = engines[tab.id]!;
+      expect(engine.captures, 1);
+      expect(service.previewForTab(tab.id), [1]);
+      engine.complete();
+      engine.complete();
+      for (var index = 0; index < 8; index++) {
+        engine.emit(BrowserPageState(progress: index / 10));
+      }
+      await tester.pumpAndSettle();
+      expect(engine.captures, 1);
+      engine.emit(const BrowserPageState(isLoading: true));
+      expect(service.previewForTab(tab.id), isNull);
+      engine.complete();
+      await tester.pumpAndSettle();
+      expect(engine.captures, 2);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await service.refreshActivePreview();
+      expect(engine.captures, 2);
+      expect(service.previewForTab(tab.id), [1]);
+    },
+  );
+
+  previewTest(
+    'new-tab and agent switches refresh the departing view without waiting',
+    (tester) async {
+      await service.updateSettings(
+        service.settings.copyWith(agentEnabled: true),
+      );
+      final a = await service.createTab(
+        url: 'https://one.example',
+        ownerSessionId: 'chat',
+      );
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final first = engines[a.id]!;
+      final b = await service.createTab(
+        url: 'https://two.example',
+        ownerSessionId: 'chat',
+      );
+      expect(first.captures, 2);
+      await tester.pumpAndSettle();
+      expect(service.previewForTab(a.id), [1]);
+      final second = engines[b.id]!;
+      final pending = Completer<Uint8List?>();
+      second.pending = pending;
+      await service.runAgentAction<void>(
+        sessionId: 'chat',
+        label: 'switch_tab',
+        tabId: a.id,
+        action: () => service.selectTab(a.id),
+      );
+      expect(service.activeTabId, a.id);
+      expect(pending.isCompleted, isFalse);
+      expect(second.captures, 2);
+      second.pending = null;
+      pending.complete(Uint8List.fromList([2]));
+      await tester.pumpAndSettle();
+      expect(service.previewForTab(a.id), [1]);
+      expect(service.previewForTab(b.id), [2]);
+      expect(engines.length, 2);
+    },
+  );
+
+  for (final change in ['navigate', 'reload', 'POST', 'loadHtml']) {
+    previewTest(
+      '$change rejects a late old-document image and queues a fresh one',
+      (tester) async {
+        final tab = await service.createTab(url: 'https://one.example');
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        final engine = engines[tab.id]!;
+        final pending = Completer<Uint8List?>();
+        engine.pending = pending;
+        final oldCapture = service.refreshActivePreview();
+        final duplicate = service.refreshActivePreview();
+        expect(identical(oldCapture, duplicate), isTrue);
+        expect(engine.captures, 2);
+        switch (change) {
+          case 'navigate':
+            await service.navigate('https://two.example');
+          case 'reload':
+            await service.reload();
+          case 'loadHtml':
+            await service.loadHtml('<p>New document</p>', tabId: tab.id);
+          case 'POST':
+            engine.emit(const BrowserPageState(isLoading: true));
+        }
+        expect(service.previewForTab(tab.id), isNull);
+        engine.complete();
+        engine.bytes = Uint8List.fromList([9]);
+        engine.pending = null;
+        pending.complete(Uint8List.fromList([77]));
+        await oldCapture;
+        await tester.pumpAndSettle();
+        expect(service.previewForTab(tab.id), [9]);
+        expect(engine.captures, 3);
+      },
+    );
+  }
+
+  previewTest('closed tabs cannot be resurrected by a pending snapshot', (
+    tester,
+  ) async {
+    final tab = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    final pending = Completer<Uint8List?>();
+    engines[tab.id]!.pending = pending;
+    final capture = service.refreshActivePreview();
+    final closing = service.closeTab(tab.id);
+    await tester.pump();
+    await tester.pump();
+    await closing;
+    pending.complete(Uint8List.fromList([7]));
+    await capture;
+    expect(service.previewForTab(tab.id), isNull);
+    expect(service.tabs, isEmpty);
+  });
+
+  previewTest('last-view thumbnail survives ordinary renderer eviction', (
+    tester,
+  ) async {
+    final first = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    final firstEngine = engines[first.id]!;
+    for (var index = 0; index < BrowserService.maxLiveViews; index++) {
+      await service.createTab(url: 'https://$index.example');
+      await tester.pumpAndSettle();
+    }
+    expect(firstEngine.disposed, isTrue);
+    expect(service.previewForTab(first.id), [1]);
+    expect(service.liveViewCount, BrowserService.maxLiveViews);
+  });
+
+  previewTest(
+    'a hidden desktop pane does not capture background load completion',
+    (tester) async {
+      final tab = await service.createTab(url: 'https://one.example');
+      var index = 0;
+      late StateSetter update;
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(
+            builder: (_, setState) {
+              update = setState;
+              return IndexedStack(
+                index: index,
+                children: [host(), const SizedBox.expand()],
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final engine = engines[tab.id]!;
+      expect(engine.captures, 1);
+      update(() => index = 1);
+      await tester.pump();
+      engine.emit(const BrowserPageState(isLoading: true));
+      engine.complete();
+      await service.refreshActivePreview();
+      await tester.pump();
+      expect(engine.captures, 1);
+      update(() => index = 0);
+      await tester.pumpAndSettle();
+      expect(engine.captures, 2);
+      expect(engines.length, 1);
+    },
+  );
+  previewTest(
+    'opaque management routes pause the retained viewport and skip background snapshots',
+    (tester) async {
+      final tab = await service.createTab(url: 'https://one.example');
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        WidgetsApp(
+          color: const Color(0xff000000),
+          navigatorKey: navigator,
+          pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
+            settings: settings,
+            pageBuilder: (context, _, __) => builder(context),
+          ),
+          home: service.buildViewport(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final engine = engines[tab.id]!;
+      expect(engine.visibility.last, isTrue);
+      expect(engine.captures, 1);
+      unawaited(
+        navigator.currentState!.push<void>(
+          PageRouteBuilder<void>(
+            opaque: false,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, __, ___) => const SizedBox.expand(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // A transparent menu still samples the live page behind it.
+      expect(engine.visibility.last, isTrue);
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      unawaited(
+        navigator.currentState!.push<void>(
+          PageRouteBuilder<void>(
+            transitionDuration: const Duration(milliseconds: 200),
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, __, ___) => const SizedBox.expand(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(engine.visibility.last, isTrue);
+      await tester.pumpAndSettle();
+      expect(engine.visibility.last, isFalse);
+      engine.emit(const BrowserPageState(isLoading: true));
+      engine.complete();
+      await service.refreshActivePreview();
+      await tester.pump();
+      expect(engine.captures, 1);
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(engine.visibility.last, isTrue);
+      expect(engine.captures, 2);
+      expect(engine.viewBuilds, 1);
+      expect(engines.length, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+class _Store extends BrowserStore {
+  @override
+  Future<Map<String, dynamic>> read() async => {};
+  @override
+  Future<void> write(Map<String, Object?> state) async {}
+}
+
+class _Engine extends BrowserEngine {
+  _Engine(this.emit);
+  final void Function(BrowserPageState) emit;
+  int captures = 0;
+  int viewBuilds = 0;
+  final List<bool> visibility = [];
+  bool disposed = false;
+  Uint8List bytes = Uint8List.fromList([1]);
+  Completer<Uint8List?>? pending;
+  void complete() =>
+      emit(const BrowserPageState(isLoading: false, completedNavigation: true));
+  @override
+  Widget buildView() {
+    viewBuilds++;
+    return const SizedBox.expand();
+  }
+
+  @override
+  Future<void> setVisible(bool visible) async => visibility.add(visible);
+  @override
+  Future<Uint8List?> thumbnail() {
+    captures++;
+    return pending?.future ?? Future.value(bytes);
+  }
+
+  @override
+  Future<Uint8List?> screenshot() async =>
+      throw StateError('tool screenshot must not be used for previews');
+  @override
+  Future<void> navigate(String url) async {}
+  @override
+  Future<void> loadHtml(String html, {String? baseUrl}) async {}
+  @override
+  Future<void> reload() async {}
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> resume() async {}
+  @override
+  Future<void> updateSettings(dynamic settings) async {}
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}

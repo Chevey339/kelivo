@@ -11,11 +11,14 @@ import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import '../features/browser/browser_navigation.dart';
 
 Future<void> showDesktopToolsPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required String assistantId,
+  required bool supportsModelTools,
+  String? conversationId,
 }) async {
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -39,6 +42,8 @@ Future<void> showDesktopToolsPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
+      supportsModelTools: supportsModelTools,
+      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -54,12 +59,16 @@ class _ToolsPopover extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
+    required this.supportsModelTools,
+    this.conversationId,
     required this.onClose,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final String assistantId;
+  final bool supportsModelTools;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -149,6 +158,8 @@ class _ToolsPopoverState extends State<_ToolsPopover>
                         ),
                         child: _ToolsContent(
                           assistantId: widget.assistantId,
+                          supportsModelTools: widget.supportsModelTools,
+                          conversationId: widget.conversationId,
                           onDone: _close,
                         ),
                       ),
@@ -205,8 +216,15 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _ToolsContent extends StatelessWidget {
-  const _ToolsContent({required this.assistantId, required this.onDone});
+  const _ToolsContent({
+    required this.assistantId,
+    required this.supportsModelTools,
+    required this.onDone,
+    this.conversationId,
+  });
   final String assistantId;
+  final bool supportsModelTools;
+  final String? conversationId;
   final VoidCallback onDone;
 
   @override
@@ -218,13 +236,33 @@ class _ToolsContent extends StatelessWidget {
     final a = ap.getById(assistantId)!;
     final selected = a.mcpServerIds.toSet();
     final servers = mcp.servers
-        .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
+        .where(
+          (s) =>
+              supportsModelTools && mcp.statusFor(s.id) == McpStatus.connected,
+        )
         .toList();
 
-    final localToolIds = availableLocalToolIds();
+    final localToolIds = supportsModelTools
+        ? availableLocalToolIds()
+        : const <String>[];
     final enabledLocalTools = a.localToolIds.toSet();
 
-    final rows = <Widget>[];
+    final rows = <Widget>[
+      _RowItem(
+        leading: Icon(Lucide.Globe, size: 16, color: cs.onSurface),
+        label: l10n.browserOpen,
+        selected: false,
+        onTap: () {
+          final navigatorContext = Navigator.of(context).context;
+          onDone();
+          openBrowserPage(
+            navigatorContext,
+            conversationId: conversationId,
+            assistantId: assistantId,
+          );
+        },
+      ),
+    ];
     if (localToolIds.isNotEmpty) {
       rows.add(_SectionLabel(text: l10n.assistantEditPageLocalToolsTab));
       for (final id in localToolIds) {

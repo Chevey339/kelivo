@@ -22,6 +22,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import 'tools_sheet_row.dart';
+import '../../browser/browser_navigation.dart';
 
 /// Everything the model can call in this chat: device-local tools, connected
 /// MCP servers, and the workspace binding. Replaces the MCP-only sheet that
@@ -155,6 +156,23 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ToolsSheetRow(
+                      key: const ValueKey('chat-tools-open-browser'),
+                      icon: Lucide.Globe,
+                      label: l10n.browserTitle,
+                      onTap: () {
+                        final navigatorContext = Navigator.of(context).context;
+                        widget.onClose?.call();
+                        unawaited(
+                          openBrowserPage(
+                            navigatorContext,
+                            conversationId: widget.conversationId,
+                            assistantId: widget.assistantId,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
                     _LocalToolsGroup(
                       assistantId: widget.assistantId,
                       expanded: _expanded.contains(_ToolsGroupId.local),
