@@ -207,7 +207,11 @@ void main() {
           'thoughtSignature': 'sig-$id',
         };
         final replies = [
-          [call('a'), call('b')],
+          [
+            {'text': 'Checking.'},
+            call('a'),
+            call('b'),
+          ],
           [call('c')],
           [
             {'text': 'Done.'},
