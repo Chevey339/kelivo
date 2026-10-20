@@ -36,7 +36,11 @@ class InlineCodeCapsule extends StatelessWidget {
         border:
             border ??
             (borderColor.a == 0 ? null : Border.all(color: borderColor)),
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: switch (radius) {
+          6 => const BorderRadius.all(Radius.circular(6)),
+          4 => const BorderRadius.all(Radius.circular(4)),
+          _ => BorderRadius.circular(radius),
+        },
       ),
       child: Padding(
         padding: padding,

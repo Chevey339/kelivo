@@ -663,12 +663,21 @@ final class MarkstreamTheme extends _ThemeTokens {
     MarkstreamFillAlphas fillAlphas = const MarkstreamFillAlphas(),
   }) {
     final dark = colors.brightness == Brightness.dark;
-    final body = (bodyStyle ?? const TextStyle()).copyWith(
-      fontSize: bodyStyle?.fontSize ?? 15.5,
-      height: bodyStyle?.height ?? 1.55,
-      letterSpacing: bodyStyle?.letterSpacing ?? (cjk ? 0 : .05),
-      color: bodyStyle?.color ?? colors.onSurface,
-    );
+    // App adapters already resolve these defaults. Keep that immutable style
+    // instead of allocating an identical copy for every theme construction.
+    final body =
+        bodyStyle != null &&
+            bodyStyle.fontSize != null &&
+            bodyStyle.height != null &&
+            bodyStyle.letterSpacing != null &&
+            bodyStyle.color != null
+        ? bodyStyle
+        : (bodyStyle ?? const TextStyle()).copyWith(
+            fontSize: bodyStyle?.fontSize ?? 15.5,
+            height: bodyStyle?.height ?? 1.55,
+            letterSpacing: bodyStyle?.letterSpacing ?? (cjk ? 0 : .05),
+            color: bodyStyle?.color ?? colors.onSurface,
+          );
     final b = body.fontSize!;
     final on = colors.onSurface;
     const white = Colors.white;

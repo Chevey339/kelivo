@@ -2,6 +2,10 @@
 
 Date: 2026-10-20. Baseline: `cf2af98e`; implementation: `feat/markdown-style-tokens`.
 
+These are the historical measurements for the style implementation in
+`437e7c50`. See [the UI allocation follow-up](markstream_ui_optimization.md) for
+the subsequent three-version comparisons; the batches should not be mixed.
+
 The style and geometry changes are ready for human review. **The strict ±3%
 performance acceptance criterion is not fully satisfied by the final measurements.**
 The remaining tail-latency differences are retained below; no zero-regression or
