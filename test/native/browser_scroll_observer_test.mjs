@@ -11,6 +11,7 @@ const listeners = new Map();
 const frames = new Map();
 const updates = [];
 let frameId = 0;
+let now = 0;
 const document = {
   documentElement: {clientHeight: 800, scrollHeight: 3000},
   body: {scrollHeight: 3000},
@@ -24,14 +25,17 @@ const window = {
 };
 window.top = window;
 vm.runInNewContext(script, {
-  window, document, performance: {timeOrigin: 1},
+  window, document, performance: {timeOrigin: 1, now: () => now},
   requestAnimationFrame(handler) { frames.set(++frameId, handler); return frameId; },
   cancelAnimationFrame(id) { frames.delete(id); },
 });
 await Promise.resolve();
 const dispatch = (type, rest = {}) => listeners.get(type)?.({type, isTrusted: true, target: document, ...rest});
 const touch = (type, x, y, rest = {}) => dispatch(type, {touches: type === 'touchend' || type === 'touchcancel' ? [] : [{clientX: x, clientY: y}], ...rest});
-const frame = () => { for (const [id, handler] of [...frames]) { frames.delete(id); handler(); } };
+const frame = (elapsed = 64) => {
+  now += elapsed;
+  for (const [id, handler] of [...frames]) { frames.delete(id); handler(now); }
+};
 const last = () => updates.at(-1);
 
 touch('touchstart', 100, 200); frame();
@@ -99,4 +103,22 @@ window.scrollY = 524; dispatch('scroll'); frame();
 assert.equal(last().offset, 524);
 assert.equal(last().gestureDelta, 0);
 assert.equal(last().isUserInteracting, false);
-console.log('Browser scroll observer gesture, boundary, release, cancellation and rebound checks passed.');
+const momentumStart = updates.length;
+for (let i = 0; i < 120; i++) {
+  window.scrollY += 1;
+  dispatch('scroll');
+  frame(1000 / 120);
+}
+const momentumMessages = updates.length - momentumStart;
+assert.ok(momentumMessages <= 16, `120 momentum frames sent ${momentumMessages} messages`);
+dispatch('scrollend');
+assert.equal(last().offset, window.scrollY, 'scroll end immediately delivers final geometry');
+touch('touchstart', 100, 200);
+touch('touchmove', 100, 190); frame(8);
+touch('touchmove', 100, 180); frame(8);
+assert.equal(last().gestureDelta, 20, 'coalescing retains every finger delta');
+touch('touchmove', 100, 170); frame(4);
+touch('touchend');
+assert.equal(updates.at(-2).gestureDelta, 10, 'release bypasses the frame budget');
+assert.equal(last().isUserInteracting, false);
+console.log(`Browser scroll observer checks passed; 120 momentum frames -> ${momentumMessages} bridge updates.`);

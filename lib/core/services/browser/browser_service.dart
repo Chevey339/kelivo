@@ -1000,6 +1000,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> updateSettings(BrowserSettings settings) async {
+    if (!BrowserSettings.isValidUserAgent(settings.customUserAgent)) {
+      throw const FormatException('Invalid browser User-Agent');
+    }
+    settings = settings.copyWith(
+      customUserAgent: settings.customUserAgent.trim(),
+    );
     await initialize();
     final old = _settings;
     _settings = settings;
@@ -1007,9 +1013,16 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _clearAgentPause();
       _invalidateAgentActions();
     }
-    if (settings.desktopMode != old.desktopMode) {
+    if (settings.desktopMode != old.desktopMode ||
+        settings.customUserAgent != old.customUserAgent) {
       for (final engine in _engines.values.toList()) {
         await engine.updateSettings(settings);
+      }
+      final tab = activeTab;
+      if (tab != null &&
+          tab.url != 'about:blank' &&
+          _engines.containsKey(tab.id)) {
+        await reload(tabId: tab.id);
       }
     }
     _notify();

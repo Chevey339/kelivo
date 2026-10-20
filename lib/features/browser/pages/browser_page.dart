@@ -112,6 +112,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   int _tabReturnCoverEpoch = 0;
   bool _editingAddress = false;
   bool _addressKeyboardSession = false;
+  bool _keyboardWasVisible = false;
   FlutterView? _view;
   Animation<double>? _entryAnimation;
   bool _opticsScheduled = false;
@@ -207,11 +208,15 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   void didChangeMetrics() {
     if (!mounted || _desktop) return;
     if ((_view?.viewInsets.bottom ?? 0) <= 0) {
+      final dismissed = _keyboardWasVisible;
+      _keyboardWasVisible = false;
+      if (dismissed && _addressFocus.hasFocus) _addressFocus.unfocus();
       if (_addressKeyboardSession && !_addressFocus.hasFocus) {
         setState(() => _addressKeyboardSession = false);
       }
       return;
     }
+    _keyboardWasVisible = true;
     // Webpage fields are native responders, so Flutter's address FocusNode
     // cannot report their keyboard session. Keep navigation expanded throughout
     // either keyboard's animation, including the final dismissal frame.
@@ -951,146 +956,157 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     )..layout();
     final hostWidth = hostPainter.width;
     hostPainter.dispose();
+    final editing = _editingAddress || _addressFocus.hasFocus;
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: canGoForward ? 1 : 0, end: canGoForward ? 1 : 0),
-      duration: Duration(milliseconds: reduced ? 0 : 220),
-      curve: Curves.easeInOutCubic,
-      builder: (context, forwardProgress, _) {
-        final navigationWidth = 48 + 36 * forwardProgress;
-        return ValueListenableBuilder<({double progress, bool animate})>(
-          valueListenable: _chromeMotion,
-          builder: (context, motion, _) => TweenAnimationBuilder<double>(
-            tween: Tween(begin: 1, end: _menuTransitionStarted ? 0 : 1),
-            duration: Duration(milliseconds: reduced ? 0 : 180),
-            curve: Curves.easeOutCubic,
-            builder: (context, toolbarOpacity, _) => LayoutBuilder(
-              builder: (context, constraints) {
-                final editing = _editingAddress || _addressFocus.hasFocus;
-                final expandedWidth = math.max(
-                  0.0,
-                  constraints.maxWidth - navigationWidth - 68,
-                );
-                final collapsedWidth = (hostWidth + 32).clamp(
-                  math.min(94.0, expandedWidth),
-                  expandedWidth,
-                );
-                return BrowserChromeTransition(
-                  progress: editing ? 0 : motion.progress,
-                  animate: !editing && motion.animate,
-                  reducedMotion: reduced,
-                  onProgress: (value) => _visibleCollapseProgress = value,
-                  builder: (context, t) {
-                    final width = constraints.maxWidth;
-                    final drop = BrowserMobileLayout.collapseDropFor(
-                      bottomSafeInset,
-                    );
-                    final sideOpacity = editing
-                        ? 0.0
-                        : toolbarOpacity * revealOpacity * (1 - t);
-                    final moreOpacity = editing || _menuTransitionStarted
-                        ? 0.0
-                        : (1 - t) * revealOpacity;
-                    final pillWidth = lerpDouble(
-                      editing ? width : expandedWidth,
-                      collapsedWidth,
-                      t,
-                    )!;
-                    final height = lerpDouble(48, 34, t)!;
-                    return SizedBox(
-                      height: BrowserMobileLayout.expandedChromeHeight + drop,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned(
-                            key: const ValueKey('browserBackPosition'),
-                            left: 0,
-                            bottom: drop,
-                            child: Transform.translate(
-                              offset: Offset(42 * t, drop * t),
-                              child: SizedBox(
-                                width: navigationWidth,
-                                height: 48,
-                                child: ExcludeSemantics(
-                                  excluding: editing || t >= .995,
-                                  child: IgnorePointer(
-                                    ignoring: editing || t >= .995,
-                                    child: BrowserPress(
-                                      draggable: true,
-                                      child: BrowserGlass(
-                                        key: const ValueKey(
-                                          'browserMobileNavigationGroup',
-                                        ),
-                                        radius: 1000,
-                                        opacity: sideOpacity,
-                                        child: Row(
-                                          children: [
-                                            SizedBox(
-                                              width: 48 - 6 * forwardProgress,
-                                              child: BrowserActionButton(
-                                                label: l.browserBack,
-                                                icon: LucideIcons.chevronLeft,
-                                                iconSize: 22,
-                                                foregroundShadows:
-                                                    foregroundShadows,
-                                                useParentFeedback: true,
-                                                onPressed:
-                                                    tab?.canGoBack == true
-                                                    ? () => unawaited(
-                                                        _userRun(
-                                                          () => _service.back(),
-                                                        ),
-                                                      )
-                                                    : null,
-                                                onLongPress: () => _openLibrary(
-                                                  BrowserLibrarySection.history,
+      key: const ValueKey('browserAddressEditingTransition'),
+      tween: Tween(begin: editing ? 1 : 0, end: editing ? 1 : 0),
+      duration: Duration(milliseconds: reduced ? 0 : 240),
+      curve: Curves.easeOutCubic,
+      builder: (context, editProgress, _) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: canGoForward ? 1 : 0, end: canGoForward ? 1 : 0),
+        duration: Duration(milliseconds: reduced ? 0 : 220),
+        curve: Curves.easeInOutCubic,
+        builder: (context, forwardProgress, _) {
+          final navigationWidth = 48 + 36 * forwardProgress;
+          return ValueListenableBuilder<({double progress, bool animate})>(
+            valueListenable: _chromeMotion,
+            builder: (context, motion, _) => TweenAnimationBuilder<double>(
+              tween: Tween(begin: 1, end: _menuTransitionStarted ? 0 : 1),
+              duration: Duration(milliseconds: reduced ? 0 : 180),
+              curve: Curves.easeOutCubic,
+              builder: (context, toolbarOpacity, _) => LayoutBuilder(
+                builder: (context, constraints) {
+                  final expandedWidth = math.max(
+                    0.0,
+                    constraints.maxWidth - navigationWidth - 68,
+                  );
+                  final collapsedWidth = (hostWidth + 32).clamp(
+                    math.min(94.0, expandedWidth),
+                    expandedWidth,
+                  );
+                  return BrowserChromeTransition(
+                    progress: editing ? 0 : motion.progress,
+                    animate: !editing && motion.animate,
+                    reducedMotion: reduced,
+                    onProgress: (value) => _visibleCollapseProgress = value,
+                    builder: (context, t) {
+                      final width = constraints.maxWidth;
+                      final drop = BrowserMobileLayout.collapseDropFor(
+                        bottomSafeInset,
+                      );
+                      final sideOpacity =
+                          (1 - editProgress) *
+                          toolbarOpacity *
+                          revealOpacity *
+                          (1 - t);
+                      final moreOpacity = _menuTransitionStarted
+                          ? 0.0
+                          : (1 - editProgress) * (1 - t) * revealOpacity;
+                      final pillWidth = lerpDouble(
+                        lerpDouble(expandedWidth, width, editProgress),
+                        collapsedWidth,
+                        t,
+                      )!;
+                      final height = lerpDouble(48, 34, t)!;
+                      return SizedBox(
+                        height: BrowserMobileLayout.expandedChromeHeight + drop,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned(
+                              key: const ValueKey('browserBackPosition'),
+                              left: 0,
+                              bottom: drop,
+                              child: Transform.translate(
+                                offset: Offset(42 * t, drop * t),
+                                child: SizedBox(
+                                  width: navigationWidth,
+                                  height: 48,
+                                  child: ExcludeSemantics(
+                                    excluding: editing || t >= .995,
+                                    child: IgnorePointer(
+                                      ignoring: editing || t >= .995,
+                                      child: BrowserPress(
+                                        draggable: true,
+                                        child: BrowserGlass(
+                                          key: const ValueKey(
+                                            'browserMobileNavigationGroup',
+                                          ),
+                                          radius: 1000,
+                                          opacity: sideOpacity,
+                                          child: Row(
+                                            children: [
+                                              SizedBox(
+                                                width: 48 - 6 * forwardProgress,
+                                                child: BrowserActionButton(
+                                                  label: l.browserBack,
+                                                  icon: LucideIcons.chevronLeft,
+                                                  iconSize: 22,
+                                                  foregroundShadows:
+                                                      foregroundShadows,
+                                                  useParentFeedback: true,
+                                                  onPressed:
+                                                      tab?.canGoBack == true
+                                                      ? () => unawaited(
+                                                          _userRun(
+                                                            () =>
+                                                                _service.back(),
+                                                          ),
+                                                        )
+                                                      : null,
+                                                  onLongPress: () =>
+                                                      _openLibrary(
+                                                        BrowserLibrarySection
+                                                            .history,
+                                                      ),
                                                 ),
                                               ),
-                                            ),
-                                            if (forwardProgress > 0)
-                                              SizedBox(
-                                                width: 42 * forwardProgress,
-                                                height: 48,
-                                                child: ClipRect(
-                                                  child: OverflowBox(
-                                                    minWidth: 42,
-                                                    maxWidth: 42,
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child: IgnorePointer(
-                                                      ignoring: !canGoForward,
-                                                      child: ExcludeSemantics(
-                                                        excluding:
-                                                            !canGoForward,
-                                                        child: Opacity(
-                                                          opacity:
-                                                              forwardProgress,
-                                                          child: BrowserActionButton(
-                                                            label: l
-                                                                .browserForward,
-                                                            icon: LucideIcons
-                                                                .chevronRight,
-                                                            iconSize: 22,
-                                                            foregroundShadows:
-                                                                foregroundShadows,
-                                                            useParentFeedback:
-                                                                true,
-                                                            onPressed:
-                                                                canGoForward
-                                                                ? () => unawaited(
-                                                                    _userRun(
-                                                                      () => _service
-                                                                          .forward(),
-                                                                    ),
-                                                                  )
-                                                                : null,
+                                              if (forwardProgress > 0)
+                                                SizedBox(
+                                                  width: 42 * forwardProgress,
+                                                  height: 48,
+                                                  child: ClipRect(
+                                                    child: OverflowBox(
+                                                      minWidth: 42,
+                                                      maxWidth: 42,
+                                                      alignment:
+                                                          Alignment.centerRight,
+                                                      child: IgnorePointer(
+                                                        ignoring: !canGoForward,
+                                                        child: ExcludeSemantics(
+                                                          excluding:
+                                                              !canGoForward,
+                                                          child: Opacity(
+                                                            opacity:
+                                                                forwardProgress,
+                                                            child: BrowserActionButton(
+                                                              label: l
+                                                                  .browserForward,
+                                                              icon: LucideIcons
+                                                                  .chevronRight,
+                                                              iconSize: 22,
+                                                              foregroundShadows:
+                                                                  foregroundShadows,
+                                                              useParentFeedback:
+                                                                  true,
+                                                              onPressed:
+                                                                  canGoForward
+                                                                  ? () => unawaited(
+                                                                      _userRun(
+                                                                        () => _service
+                                                                            .forward(),
+                                                                      ),
+                                                                    )
+                                                                  : null,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1098,104 +1114,113 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                          ),
-                          Positioned(
-                            key: const ValueKey('browserAddressPosition'),
-                            left: lerpDouble(
-                              editing ? 0 : navigationWidth + 10,
-                              (width - collapsedWidth) / 2,
-                              t,
-                            ),
-                            bottom: drop * (1 - t),
-                            width: pillWidth,
-                            height: height,
-                            child: BrowserAddressBar(
-                              foregroundShadows: foregroundShadows,
-                              opacity: toolbarOpacity * revealOpacity,
-                              controller: _address,
-                              focusNode: _addressFocus,
-                              onSubmitted: _navigate,
-                              loading: tab?.isLoading ?? false,
-                              progress: tab?.progress ?? 0,
-                              secure: tab?.url.startsWith('https://') ?? false,
-                              editing: editing,
-                              collapseProgress: t,
-                              displayText: _displayHost,
-                              onEdit: () {
-                                if (_visibleCollapseProgress > 0) {
-                                  setState(() {
-                                    _chromeMotion.value = (
-                                      progress: 0,
-                                      animate: true,
-                                    );
-                                  });
-                                } else {
-                                  _focusAddress();
-                                }
-                              },
-                              onPageMenu: _openMenu,
-                              onReload: _blank
-                                  ? null
-                                  : () => unawaited(
-                                      _userRun(
-                                        () => tab?.isLoading == true
-                                            ? _service.stop()
-                                            : _service.reload(),
+                            Positioned(
+                              key: const ValueKey('browserAddressPosition'),
+                              left: lerpDouble(
+                                (navigationWidth + 10) * (1 - editProgress),
+                                (width - collapsedWidth) / 2,
+                                t,
+                              ),
+                              bottom: drop * (1 - t),
+                              width: pillWidth,
+                              height: height,
+                              child: BrowserAddressBar(
+                                expandedContentWidth: expandedWidth,
+                                collapsedContentWidth: collapsedWidth
+                                    .toDouble(),
+                                siteIcon: BrowserFavicon(
+                                  url: tab?.url ?? '',
+                                  service: _service,
+                                  size: 20,
+                                ),
+                                foregroundShadows: foregroundShadows,
+                                opacity: toolbarOpacity * revealOpacity,
+                                controller: _address,
+                                focusNode: _addressFocus,
+                                onSubmitted: _navigate,
+                                loading: tab?.isLoading ?? false,
+                                progress: tab?.progress ?? 0,
+                                secure:
+                                    tab?.url.startsWith('https://') ?? false,
+                                editing: editing,
+                                collapseProgress: t,
+                                displayText: _displayHost,
+                                onEdit: () {
+                                  if (_visibleCollapseProgress > 0) {
+                                    setState(() {
+                                      _chromeMotion.value = (
+                                        progress: 0,
+                                        animate: true,
+                                      );
+                                    });
+                                  } else {
+                                    _focusAddress();
+                                  }
+                                },
+                                onPageMenu: _openMenu,
+                                onReload: _blank
+                                    ? null
+                                    : () => unawaited(
+                                        _userRun(
+                                          () => tab?.isLoading == true
+                                              ? _service.stop()
+                                              : _service.reload(),
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
-                          ),
-                          Positioned(
-                            key: const ValueKey('browserMorePosition'),
-                            right: 0,
-                            bottom: drop,
-                            child: Transform.translate(
-                              offset: Offset(-42 * t, drop * t),
-                              child: SizedBox(
-                                // Keep the resting anchor outside the hidden control so
-                                // a hidden held source still returns to 48x48.
-                                key: _menuRestKey,
-                                width: 48,
-                                height: 48,
-                                child: ExcludeSemantics(
-                                  excluding: editing || t >= .995,
-                                  child: IgnorePointer(
-                                    // Retain its material through keyboard and
-                                    // collapse transitions; alpha owns visibility.
-                                    ignoring: editing || t >= .995,
-                                    child: BrowserActionButton(
-                                      foregroundShadows: foregroundShadows,
-                                      surface: true,
-                                      // The menu owns this lens until its final frame.
-                                      // Only the companion controls use the fade above.
-                                      opacity: moreOpacity,
-                                      anchorKey: _menuButtonKey,
-                                      label: l.browserMore,
-                                      icon: LucideIcons.ellipsis,
-                                      onPressed: _openMenu,
-                                      onLongPress: _openMenu,
-                                      onLongPressStart: (pointer, details) =>
-                                          _openMenu(
-                                            heldPointer: pointer,
-                                            pressPosition:
-                                                details.globalPosition,
-                                          ),
+                            Positioned(
+                              key: const ValueKey('browserMorePosition'),
+                              right: 0,
+                              bottom: drop,
+                              child: Transform.translate(
+                                offset: Offset(-42 * t, drop * t),
+                                child: SizedBox(
+                                  // Keep the resting anchor outside the hidden control so
+                                  // a hidden held source still returns to 48x48.
+                                  key: _menuRestKey,
+                                  width: 48,
+                                  height: 48,
+                                  child: ExcludeSemantics(
+                                    excluding: editing || t >= .995,
+                                    child: IgnorePointer(
+                                      // Retain its material through keyboard and
+                                      // collapse transitions; alpha owns visibility.
+                                      ignoring: editing || t >= .995,
+                                      child: BrowserActionButton(
+                                        foregroundShadows: foregroundShadows,
+                                        surface: true,
+                                        // The menu owns this lens until its final frame.
+                                        // Only the companion controls use the fade above.
+                                        opacity: moreOpacity,
+                                        anchorKey: _menuButtonKey,
+                                        label: l.browserMore,
+                                        icon: LucideIcons.ellipsis,
+                                        onPressed: _openMenu,
+                                        onLongPress: _openMenu,
+                                        onLongPressStart: (pointer, details) =>
+                                            _openMenu(
+                                              heldPointer: pointer,
+                                              pressPosition:
+                                                  details.globalPosition,
+                                            ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1593,7 +1618,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         );
     if (!desktop) {
       await _pushManagementRoute(
-        BrowserManagementRoute<void>(
+        browserManagementRoute<void>(
+          context: context,
           builder: (pageContext) => themes.wrap(
             withSurfaceStyle(
               mobileOwnsPage
@@ -2002,7 +2028,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   Future<void> _openMenu({int? heldPointer, Offset? pressPosition}) async {
     if (_menuOpen) return;
-    if (!_desktop) unawaited(_prepareTabPreview());
     if (_service.agentActivityFor(
           sessionId: _visibleConversationId,
           tabId: _service.activeTabId,
@@ -2025,6 +2050,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         if (mounted && _menuOpen) {
           setState(() => _menuTransitionStarted = true);
         }
+      },
+      onOpened: () {
+        // A thumbnail is useful for the tab overview, but capture/encoding must
+        // not compete with the first response or the menu's opening animation.
+        if (mounted && _menuOpen) unawaited(_prepareTabPreview());
       },
       heldPointer: heldPointer,
       pressPosition: pressPosition,

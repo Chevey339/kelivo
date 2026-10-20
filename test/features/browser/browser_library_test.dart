@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -55,7 +55,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final clear = find.byTooltip('Clear history');
-      final search = find.byType(CupertinoTextField);
+      final search = find.byType(BrowserTextField);
       expect(clear, findsOneWidget);
       expect(find.text('Clear history'), findsNothing);
       final clearBounds = tester.getRect(clear);
@@ -160,7 +160,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(BrowserManagementPage), findsOneWidget);
-        expect(find.byType(CupertinoTextField), findsNothing);
+        expect(find.byType(BrowserTextField), findsNothing);
         expect(find.text('Keep'), findsOneWidget);
         expect(find.text('Hide'), findsOneWidget);
         final search = find.byKey(const ValueKey('browserLibrarySearchAction'));
@@ -177,10 +177,10 @@ void main() {
         );
         await tester.tap(search);
         await tester.pumpAndSettle();
-        final field = find.byType(CupertinoTextField);
+        final field = find.byType(BrowserTextField);
         expect(field, findsOneWidget);
         expect(
-          tester.widget<CupertinoTextField>(field).focusNode!.hasFocus,
+          tester.widget<BrowserTextField>(field).focusNode!.hasFocus,
           isTrue,
         );
         expect(tester.getRect(field).top, greaterThan(backBounds.bottom));
@@ -190,7 +190,7 @@ void main() {
         expect(find.text('Keep'), findsWidgets);
         await tester.tap(find.byTooltip('Cancel'));
         await tester.pumpAndSettle();
-        expect(find.byType(CupertinoTextField), findsNothing);
+        expect(find.byType(BrowserTextField), findsNothing);
         expect(find.text('Keep'), findsOneWidget);
         expect(find.text('Hide'), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -267,7 +267,7 @@ void main() {
       expect(tester.getRect(clear), clearBounds);
       await tester.tap(search);
       await tester.pumpAndSettle();
-      expect(find.byType(CupertinoTextField).hitTestable(), findsOneWidget);
+      expect(find.byType(BrowserTextField).hitTestable(), findsOneWidget);
       await tester.tap(find.byTooltip('Cancel'));
       await tester.pumpAndSettle();
       await tester.tap(clear);
@@ -284,7 +284,7 @@ void main() {
       await tester.tap(clear);
       await tester.pumpAndSettle();
       expect(find.text('Clear history'), findsNothing);
-      expect(find.byType(CupertinoTextField), findsNothing);
+      expect(find.byType(BrowserTextField), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       service.dispose();
@@ -496,7 +496,7 @@ void main() {
       tester.getRect(find.byType(CustomScrollView)),
       const Rect.fromLTWH(0, 0, 320, 844),
     );
-    final search = tester.getRect(find.byType(CupertinoTextField));
+    final search = tester.getRect(find.byType(BrowserTextField));
     final back = tester.getRect(
       find.byKey(const ValueKey('browserManagementBack')),
     );

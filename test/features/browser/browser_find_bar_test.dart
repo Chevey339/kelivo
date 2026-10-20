@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -204,7 +204,7 @@ void main() {
     expect(find.byType(BrowserGlass), findsNothing);
     expect(find.byType(BrowserSurfaceIconGroup), findsNothing);
     expect(tester.getSize(keyed('browserFindArrows')), const Size(68, 34));
-    final field = tester.widget<CupertinoTextField>(keyed('browserFindField'));
+    final field = tester.widget<BrowserTextField>(keyed('browserFindField'));
     expect(field.style!.fontSize, 13);
     expect(tester.takeException(), isNull);
   });

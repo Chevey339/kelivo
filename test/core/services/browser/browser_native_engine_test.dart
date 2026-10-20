@@ -563,6 +563,35 @@ void main() {
     },
   );
 
+  test('changing UA also invalidates the cached download header', () async {
+    final engine = await NativeBrowserEngine.create(
+      tab: const BrowserTab(id: 'ua-download'),
+      settings: const BrowserSettings(),
+      onChanged: (_) {},
+      onDownload: (_, __) {},
+      onNewWindow: (_, __) async => false,
+      isAgentActive: () => false,
+    );
+    try {
+      final document = platform.views.single.document;
+      document.userAgent = 'Mobile/1';
+      expect(
+        (await engine.downloadHeaders('https://example.com'))['User-Agent'],
+        'Mobile/1',
+      );
+      await engine.updateSettings(
+        const BrowserSettings(customUserAgent: 'Custom/2'),
+      );
+      document.userAgent = 'Custom/2';
+      expect(
+        (await engine.downloadHeaders('https://example.com'))['User-Agent'],
+        'Custom/2',
+      );
+    } finally {
+      await engine.dispose();
+    }
+  });
+
   test(
     'tab thumbnails are small JPEGs while agent screenshots retain their PNG contract',
     () async {
@@ -621,6 +650,37 @@ void main() {
     },
     skip: !Platform.isMacOS,
   );
+
+  test('custom UA reaches new and live engines and can be cleared', () async {
+    await service.initialize();
+    await service.updateSettings(
+      service.settings.copyWith(customUserAgent: 'Browser-Test/1.0'),
+    );
+    final tab = await service.createTab(url: 'https://ua.example');
+    await service.evaluateJavascript('1', tabId: tab.id);
+    final view = platform.views.single;
+    expect(view.params.initialSettings!.userAgent, 'Browser-Test/1.0');
+    await service.updateSettings(
+      service.settings.copyWith(customUserAgent: 'Browser-Test/2.0'),
+    );
+    expect(view.document.appliedSettings.last.userAgent, 'Browser-Test/2.0');
+    expect(view.document.reloads, 1);
+    await service.updateSettings(
+      service.settings.copyWith(customUserAgent: '', desktopMode: true),
+    );
+    expect(view.document.appliedSettings.last.userAgent, isEmpty);
+    expect(
+      view.document.appliedSettings.last.preferredContentMode,
+      UserPreferredContentMode.DESKTOP,
+    );
+    expect(view.document.reloads, 2);
+    await service.updateSettings(service.settings.copyWith(saveHistory: false));
+    expect(
+      view.document.reloads,
+      2,
+      reason: 'unrelated preferences do not reload',
+    );
+  });
 
   for (final desktopMode in [true, false]) {
     test(
@@ -1062,6 +1122,11 @@ class _BrowserPlatform extends InAppWebViewPlatform {
   final Map<Object, _Document> documents = {};
 
   @override
+  PlatformCookieManager createPlatformCookieManager(
+    PlatformCookieManagerCreationParams params,
+  ) => _CookieManager(params);
+
+  @override
   PlatformFindInteractionController createPlatformFindInteractionController(
     PlatformFindInteractionControllerCreationParams params,
   ) => _FindController(params);
@@ -1085,6 +1150,9 @@ class _BrowserPlatform extends InAppWebViewPlatform {
 }
 
 class _Document {
+  String userAgent = 'Default/1';
+  final List<InAppWebViewSettings> appliedSettings = [];
+  int reloads = 0;
   int focusClears = 0;
   int mediaPauses = 0;
   Completer<void>? clearFocusGate;
@@ -1271,7 +1339,15 @@ class _Controller extends PlatformInAppWebViewController {
   @override
   Future<void> pauseAllMediaPlayback() async => document.mediaPauses++;
   @override
-  Future<void> reload() async {}
+  Future<void> reload() async {
+    document.reloads++;
+  }
+
+  @override
+  Future<void> setSettings({required InAppWebViewSettings settings}) async {
+    document.appliedSettings.add(settings);
+  }
+
   @override
   Future<void> stopLoading() async {}
   @override
@@ -1290,6 +1366,7 @@ class _Controller extends PlatformInAppWebViewController {
     ContentWorld? contentWorld,
   }) async {
     document.evaluations.add(source);
+    if (source == 'navigator.userAgent') return document.userAgent;
     if (source == browserScrollIdentityScript) return document.documentId;
     return source == 'document.readyState' ? document.readiness : 1;
   }
@@ -1316,6 +1393,16 @@ class _Controller extends PlatformInAppWebViewController {
   }) async {
     document.url = urlRequest.url;
   }
+}
+
+class _CookieManager extends PlatformCookieManager {
+  _CookieManager(super.params) : super.implementation();
+  @override
+  Future<List<Cookie>> getCookies({
+    required WebUri url,
+    PlatformInAppWebViewController? iosBelow11WebViewController,
+    PlatformInAppWebViewController? webViewController,
+  }) async => [];
 }
 
 class _FindController extends PlatformFindInteractionController {

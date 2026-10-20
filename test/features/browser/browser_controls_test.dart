@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -73,8 +73,8 @@ void main() {
         );
       }
       if (editing) {
-        final field = tester.widget<CupertinoTextField>(
-          find.byType(CupertinoTextField),
+        final field = tester.widget<BrowserTextField>(
+          find.byType(BrowserTextField),
         );
         expect(field.placeholderStyle!.shadows, shadows);
         final editable = tester
@@ -84,7 +84,7 @@ void main() {
       }
       final visibleText = editing && text.isEmpty
           ? tester
-                .widget<CupertinoTextField>(find.byType(CupertinoTextField))
+                .widget<BrowserTextField>(find.byType(BrowserTextField))
                 .placeholder!
           : text;
       if (!editing || text.isEmpty) {

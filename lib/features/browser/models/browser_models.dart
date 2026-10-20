@@ -6,14 +6,20 @@ class BrowserSettings {
   const BrowserSettings({
     this.searchEngine = BrowserSearchEngine.bing,
     this.desktopMode = false,
+    this.customUserAgent = '',
     this.restoreTabs = true,
     this.saveHistory = true,
-    this.agentEnabled = false,
+    this.agentEnabled = true,
     this.surfaceStyle = BrowserSurfaceStyle.liquid,
   });
 
   final BrowserSearchEngine searchEngine;
   final bool desktopMode;
+
+  /// Empty uses the mobile/desktop preset. A custom value overrides that UA.
+  final String customUserAgent;
+  static bool isValidUserAgent(String value) =>
+      value.length <= 2048 && !RegExp(r'[^\x20-\x7e]').hasMatch(value);
   final bool restoreTabs;
   final bool saveHistory;
   final bool agentEnabled;
@@ -22,6 +28,7 @@ class BrowserSettings {
   BrowserSettings copyWith({
     BrowserSearchEngine? searchEngine,
     bool? desktopMode,
+    String? customUserAgent,
     bool? restoreTabs,
     bool? saveHistory,
     bool? agentEnabled,
@@ -29,6 +36,7 @@ class BrowserSettings {
   }) => BrowserSettings(
     searchEngine: searchEngine ?? this.searchEngine,
     desktopMode: desktopMode ?? this.desktopMode,
+    customUserAgent: customUserAgent ?? this.customUserAgent,
     restoreTabs: restoreTabs ?? this.restoreTabs,
     saveHistory: saveHistory ?? this.saveHistory,
     agentEnabled: agentEnabled ?? this.agentEnabled,
@@ -38,6 +46,7 @@ class BrowserSettings {
   Map<String, Object?> toJson() => {
     'searchEngine': searchEngine.name,
     'desktopMode': desktopMode,
+    'customUserAgent': customUserAgent,
     'restoreTabs': restoreTabs,
     'saveHistory': saveHistory,
     'agentEnabled': agentEnabled,
@@ -55,9 +64,13 @@ class BrowserSettings {
     desktopMode: json['desktopMode'] is bool
         ? json['desktopMode'] as bool
         : defaultDesktopMode,
+    customUserAgent: switch (json['customUserAgent']) {
+      final String value when isValidUserAgent(value) => value.trim(),
+      _ => '',
+    },
     restoreTabs: json['restoreTabs'] != false,
     saveHistory: json['saveHistory'] != false,
-    agentEnabled: json['agentEnabled'] == true,
+    agentEnabled: json['agentEnabled'] != false,
     surfaceStyle: BrowserSurfaceStyle.values.firstWhere(
       (value) => value.name == json['surfaceStyle'],
       orElse: () => BrowserSurfaceStyle.liquid,

@@ -14,7 +14,7 @@ import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 class _EntryBrowser extends ChangeNotifier implements BrowserService {
-  BrowserSettings configuration = const BrowserSettings();
+  BrowserSettings configuration = const BrowserSettings(agentEnabled: false);
   @override
   BrowserSettings get settings => configuration;
   @override

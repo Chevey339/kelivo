@@ -98,6 +98,7 @@ Future<T?> showBrowserMenu<T>(
   required bool desktop,
   Rect? Function()? resolveAnchor,
   VoidCallback? onTransitionStart,
+  VoidCallback? onOpened,
   int? heldPointer,
   Offset? pressPosition,
 }) {
@@ -201,6 +202,7 @@ Future<T?> showBrowserMenu<T>(
       reducedMotion: reduced,
       contact: contact,
       onTransitionStart: onTransitionStart,
+      onOpened: onOpened,
       builder: panel,
     );
   }
@@ -245,6 +247,7 @@ class _BrowserMenuHostState extends State<BrowserMenuHost> {
     required bool reducedMotion,
     required _HeldMenuPointer? contact,
     VoidCallback? onTransitionStart,
+    VoidCallback? onOpened,
     required Widget Function(
       BuildContext,
       Animation<double>,
@@ -301,6 +304,7 @@ class _BrowserMenuHostState extends State<BrowserMenuHost> {
         onDismiss: () => select(null),
         onClosed: finish,
         onTransitionStart: onTransitionStart,
+        onOpened: onOpened,
         builder: (context, animation, onReady, started) =>
             builder(context, animation, select, onReady, started),
       );
@@ -337,12 +341,14 @@ class _TouchMenuOverlay extends StatefulWidget {
     required this.onDismiss,
     required this.onClosed,
     this.onTransitionStart,
+    this.onOpened,
     required this.builder,
   });
   final bool reducedMotion;
   final String title;
   final VoidCallback onDismiss, onClosed;
   final VoidCallback? onTransitionStart;
+  final VoidCallback? onOpened;
   final Widget Function(BuildContext, Animation<double>, VoidCallback, bool)
   builder;
 
@@ -368,7 +374,13 @@ class _TouchMenuOverlayState extends State<_TouchMenuOverlay>
       if (!mounted || _closing || _started) return;
       setState(() => _started = true);
       widget.onTransitionStart?.call();
-      if (mounted && !_closing) _animation.forward();
+      if (mounted && !_closing) {
+        _animation.forward().whenCompleteOrCancel(() {
+          if (mounted && !_closing && _animation.isCompleted) {
+            widget.onOpened?.call();
+          }
+        });
+      }
     }
 
     _startScheduled = true;

@@ -1,7 +1,7 @@
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
@@ -210,6 +210,105 @@ void main() {
     expect(tester.widget<BrowserAddressBar>(address).collapsed, isTrue);
     return collapsedWidth;
   }
+
+  browserTestWidgets(
+    'address dismissal fades side controls and interpolates capsule width',
+    (tester) async {
+      await service.initialize();
+      await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final address = find.byType(BrowserAddressBar);
+      final normalWidth = tester.getSize(address).width;
+      final navigation = find.byKey(
+        const ValueKey('browserMobileNavigationGroup'),
+      );
+      await tester.tap(address);
+      await tester.pumpAndSettle();
+      final editWidth = tester.getSize(address).width;
+      expect(editWidth, greaterThan(normalWidth));
+      expect(tester.widget<BrowserGlass>(navigation).opacity, 0);
+      tester.widget<BrowserAddressBar>(address).focusNode.unfocus();
+      await tester.pump();
+      // FocusManager delivers the focus change after the current frame.
+      await tester.pump();
+      expect(tester.widget<BrowserGlass>(navigation).opacity, 0);
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(
+        tester.widget<BrowserGlass>(navigation).opacity,
+        inExclusiveRange(0, 1),
+      );
+      expect(
+        tester.getSize(address).width,
+        inExclusiveRange(normalWidth, editWidth),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<BrowserGlass>(navigation).opacity, 1);
+      expect(tester.getSize(address).width, normalWidth);
+    },
+  );
+
+  browserTestWidgets(
+    'Android keyboard Back leaves address editing and restores controls',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(tester.view.resetViewInsets);
+      await service.initialize();
+      await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final address = find.byType(BrowserAddressBar);
+      await tester.tap(address);
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(tester.widget<BrowserAddressBar>(address).editing, isTrue);
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      expect(tester.widget<BrowserAddressBar>(address).editing, isFalse);
+      expect(
+        tester
+            .widget<BrowserGlass>(
+              find.byKey(const ValueKey('browserMobileNavigationGroup')),
+            )
+            .opacity,
+        1,
+      );
+    },
+  );
+
+  browserTestWidgets(
+    'Android collapsed dock retains clearance above the gesture area',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+      addTearDown(tester.view.resetViewPadding);
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      engines[tab.id]!.onChanged(_scroll(180));
+      await tester.pumpAndSettle();
+      final address = find.byType(BrowserAddressBar);
+      expect(tester.widget<BrowserAddressBar>(address).collapsed, isTrue);
+      expect(tester.getRect(address).bottom, lessThanOrEqualTo(844 - 24));
+    },
+  );
+
+  browserTestWidgets(
+    'More defers webpage capture until its opening motion has finished',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      final captures = engine.screenshotCalls;
+      await tester.tap(find.byTooltip('More').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(find.text('New tab'), findsOneWidget);
+      expect(engine.screenshotCalls, captures);
+      await tester.pumpAndSettle();
+      expect(engine.screenshotCalls, captures + 1);
+    },
+  );
 
   browserTestWidgets(
     'collapsed address measures the inherited app typography',
@@ -620,7 +719,7 @@ void main() {
           ModalRoute.of(tester.element(page)),
           label.startsWith('Tabs')
               ? isA<BrowserTabsRoute>()
-              : isA<CupertinoPageRoute<void>>(),
+              : isA<MaterialPageRoute<void>>(),
         );
         expect(BrowserGlassBackdrop.nativeOf(tester.element(page)), isFalse);
         expect(tester.getSize(page), const Size(390, 844));
@@ -1399,7 +1498,7 @@ void main() {
         isTrue,
       );
       expect(
-        tester.widget<CupertinoTextField>(field).controller!.text,
+        tester.widget<BrowserTextField>(field).controller.text,
         'https://created.example',
       );
       expect(identical(tester.state(createdView), nativeState), isTrue);
@@ -1477,8 +1576,8 @@ void main() {
       await shortcut('f');
       await tester.pumpAndSettle();
       expect(field, findsOneWidget);
-      final findInput = tester.widget<CupertinoTextField>(input);
-      expect(findInput.controller!.text, 'kept query');
+      final findInput = tester.widget<BrowserTextField>(input);
+      expect(findInput.controller.text, 'kept query');
       expect(findInput.focusNode!.hasFocus, isTrue);
 
       await shortcut('r');
@@ -1614,7 +1713,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(CupertinoTextField, 'Search saved pages'),
+        find.widgetWithText(BrowserTextField, 'Search saved pages'),
         'dart',
       );
       await tester.pumpAndSettle();
@@ -1639,7 +1738,7 @@ void main() {
       await openMobileMenuItem(tester, 'Bookmarks');
       await tester.tap(find.byTooltip('Edit bookmark'));
       await tester.pumpAndSettle();
-      final fields = find.byType(CupertinoTextField);
+      final fields = find.byType(BrowserTextField);
       await tester.enterText(fields.last, 'javascript:alert(1)');
       await tester.tap(find.text('Save'));
       await tester.pump();
@@ -2295,9 +2394,12 @@ void main() {
             .collapseProgress;
         expect(identical(tester.element(glass), glassElement), isTrue);
         expect(tester.widget<BrowserGlass>(glass).clear, isFalse);
-        final text = tester.widget<Text>(host);
-        expect(text.style!.fontWeight, FontWeight.w500);
-        expect(text.style!.fontSize, closeTo(16 - 3 * progress, .00001));
+        final labels = tester.widgetList<Text>(host).toList();
+        expect(labels, hasLength(progress > 0 && progress < 1 ? 2 : 1));
+        for (final text in labels) {
+          expect(text.style!.fontWeight, FontWeight.w500);
+          expect(text.style!.fontSize, anyOf(13.0, 16.0));
+        }
       }
 
       expectStableMaterial();
@@ -2778,7 +2880,7 @@ void main() {
       engine.onChanged(_scroll(400));
       await tester.pumpAndSettle();
       expect(tester.widget<BrowserAddressBar>(address).collapseProgress, 0);
-      tester.widget<CupertinoTextField>(field).focusNode!.unfocus();
+      tester.widget<BrowserTextField>(field).focusNode!.unfocus();
       await tester.pumpAndSettle();
       engine.onChanged(_scroll(404));
       await tester.pumpAndSettle();
@@ -3154,6 +3256,7 @@ class _Engine extends BrowserEngine {
   int viewBuilds = 0;
   int viewDisposals = 0;
   Uint8List? previewBytes;
+  int screenshotCalls = 0;
   Completer<void>? attachmentReady;
   @override
   Future<void> get viewReady => attachmentReady?.future ?? Future<void>.value();
@@ -3199,7 +3302,11 @@ class _Engine extends BrowserEngine {
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async =>
       null;
   @override
-  Future<Uint8List?> screenshot() async => previewBytes;
+  Future<Uint8List?> screenshot() async {
+    screenshotCalls++;
+    return previewBytes;
+  }
+
   @override
   Future<void> updateSettings(BrowserSettings settings) async {}
   @override

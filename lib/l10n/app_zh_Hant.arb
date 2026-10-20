@@ -4669,5 +4669,12 @@
       }
     }
   },
-  "browserOpenInSidebar": "在側欄開啟"
+  "browserOpenInSidebar": "在側欄開啟",
+  "browserUserAgent": "使用者代理（UA）",
+  "browserUserAgentMobile": "行動版",
+  "browserUserAgentDesktop": "桌面版",
+  "browserUserAgentCustom": "自訂",
+  "browserUserAgentHint": "輸入自訂 User-Agent",
+  "browserUserAgentInvalid": "UA 僅支援可列印 ASCII 字元（英文字母、數字和英文符號），最多 2048 個字元。",
+  "browserUserAgentDescription": "變更後將重新載入目前網頁。"
 }

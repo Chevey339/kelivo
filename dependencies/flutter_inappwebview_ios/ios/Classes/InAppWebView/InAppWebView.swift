@@ -1207,8 +1207,8 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
             if newSettingsMap["applicationNameForUserAgent"] != nil && settings?.applicationNameForUserAgent != newSettings.applicationNameForUserAgent && newSettings.applicationNameForUserAgent != "" {
                 configuration.applicationNameForUserAgent = newSettings.applicationNameForUserAgent
             }
-            if newSettingsMap["userAgent"] != nil && settings?.userAgent != newSettings.userAgent && newSettings.userAgent != "" {
-                customUserAgent = newSettings.userAgent
+            if newSettingsMap["userAgent"] != nil && settings?.userAgent != newSettings.userAgent {
+                customUserAgent = newSettings.userAgent.isEmpty ? nil : newSettings.userAgent
             }
         }
         

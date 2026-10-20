@@ -1,8 +1,36 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/browser/browser_management_route.dart';
 
 void main() {
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('management navigation follows $platform', (tester) async {
+      late PageRoute<void> route;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          home: Builder(
+            builder: (context) {
+              route = browserManagementRoute<void>(
+                context: context,
+                builder: (_) => const SizedBox(),
+              );
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(
+        route,
+        platform == TargetPlatform.iOS
+            ? isA<BrowserManagementRoute<void>>()
+            : isA<MaterialPageRoute<void>>(),
+      );
+      route.dispose();
+    });
+  }
+
   const underlayKey = ValueKey('nativeBrowserBounds');
   const managementKey = ValueKey('managementPage');
 

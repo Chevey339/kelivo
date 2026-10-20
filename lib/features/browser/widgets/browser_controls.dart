@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'browser_text_field.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -120,6 +121,9 @@ class BrowserAddressBar extends StatelessWidget {
     this.displayText,
     this.opacity = 1,
     this.foregroundShadows,
+    this.siteIcon,
+    this.expandedContentWidth,
+    this.collapsedContentWidth,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -132,6 +136,8 @@ class BrowserAddressBar extends StatelessWidget {
   final VoidCallback? onReload, onEdit, onPageMenu;
   final String? displayText;
   final List<Shadow>? foregroundShadows;
+  final Widget? siteIcon;
+  final double? expandedContentWidth, collapsedContentWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -139,116 +145,150 @@ class BrowserAddressBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     final t = collapseProgress.clamp(0.0, 1.0);
-    final expandedHeight = compact ? 32.0 : 48.0;
-    final height = expandedHeight + (34 - expandedHeight) * t;
-    Widget sideControl(Widget child) => ClipRect(
-      child: Align(
-        widthFactor: 1 - t,
-        child: Opacity(opacity: 1 - t, child: child),
-      ),
-    );
-    final content = SizedBox(
-      height: height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 5 + 7 * t),
-            child: Row(
-              children: [
-                if (!collapsed && !editing && !compact)
-                  sideControl(
-                    BrowserActionButton(
-                      compact: true,
-                      label: l.browserPageOptions,
-                      icon: LucideIcons.panelTop,
-                      onPressed: onPageMenu,
-                      foregroundShadows: foregroundShadows,
+    Widget contents(double t) {
+      final collapsed = t >= .995;
+      final expandedHeight = compact ? 32.0 : 48.0;
+      final height = expandedHeight + (34 - expandedHeight) * t;
+      Widget sideControl(Widget child) => ClipRect(
+        child: Align(
+          widthFactor: 1 - t,
+          child: Opacity(opacity: 1 - t, child: child),
+        ),
+      );
+      return SizedBox(
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 5 + 7 * t),
+              child: Row(
+                children: [
+                  if (!collapsed && !editing && !compact)
+                    sideControl(
+                      BrowserActionButton(
+                        compact: true,
+                        label: l.browserPageOptions,
+                        icon: LucideIcons.globe,
+                        onPressed: onPageMenu,
+                        foregroundShadows: foregroundShadows,
+                        child: siteIcon,
+                      ),
                     ),
+                  if (compact && !editing) const SizedBox(width: 30),
+                  if (editing) const SizedBox(width: 12),
+                  Expanded(
+                    child: editing
+                        ? BrowserTextField(
+                            key: const ValueKey('browserAddressField'),
+                            controller: controller,
+                            focusNode: focusNode,
+                            autofocus: false,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            keyboardType: TextInputType.url,
+                            textInputAction: TextInputAction.go,
+                            placeholder: l.browserSearchHint,
+                            placeholderStyle: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontSize: compact ? 12.5 : 15,
+                              shadows: foregroundShadows,
+                            ),
+                            style: TextStyle(
+                              fontFamily: appTextStyle.fontFamily,
+                              fontFamilyFallback:
+                                  appTextStyle.fontFamilyFallback,
+                              color: cs.onSurface,
+                              fontSize: compact ? 13 : 16,
+                              shadows: foregroundShadows,
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              vertical: compact ? 5 : 8,
+                            ),
+                            onSubmitted: onSubmitted,
+                          )
+                        : Text(
+                            displayText?.isNotEmpty == true
+                                ? displayText!
+                                : l.browserSearchHint,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              shadows: foregroundShadows,
+                              fontSize: compact ? 12.5 : 16 - 3 * t,
+                              height: 1.15,
+                              fontWeight: compact
+                                  ? FontWeight.w400
+                                  : FontWeight.w500,
+                            ),
+                          ),
                   ),
-                if (compact && !editing) const SizedBox(width: 30),
-                if (editing) const SizedBox(width: 12),
-                Expanded(
-                  child: editing
-                      ? CupertinoTextField(
-                          key: const ValueKey('browserAddressField'),
-                          controller: controller,
-                          focusNode: focusNode,
-                          autofocus: false,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          keyboardType: TextInputType.url,
-                          textInputAction: TextInputAction.go,
-                          smartDashesType: SmartDashesType.disabled,
-                          smartQuotesType: SmartQuotesType.disabled,
-                          placeholder: l.browserSearchHint,
-                          placeholderStyle: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: compact ? 12.5 : 15,
-                            shadows: foregroundShadows,
-                          ),
-                          style: TextStyle(
-                            fontFamily: appTextStyle.fontFamily,
-                            fontFamilyFallback: appTextStyle.fontFamilyFallback,
-                            color: cs.onSurface,
-                            fontSize: compact ? 13 : 16,
-                            shadows: foregroundShadows,
-                          ),
-                          decoration: const BoxDecoration(),
-                          padding: EdgeInsets.symmetric(
-                            vertical: compact ? 5 : 8,
-                          ),
-                          textAlignVertical: TextAlignVertical.center,
-                          onSubmitted: onSubmitted,
-                        )
-                      : Text(
-                          displayText?.isNotEmpty == true
-                              ? displayText!
-                              : l.browserSearchHint,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: cs.onSurface,
-                            shadows: foregroundShadows,
-                            fontSize: compact ? 12.5 : 16 - 3 * t,
-                            height: 1.15,
-                            fontWeight: compact
-                                ? FontWeight.w400
-                                : FontWeight.w500,
-                          ),
-                        ),
+                  if (!collapsed)
+                    sideControl(
+                      BrowserActionButton(
+                        compact: true,
+                        size: compact ? 30 : null,
+                        iconSize: compact ? 14 : null,
+                        label: loading ? l.browserStop : l.browserReload,
+                        icon: loading ? LucideIcons.x : LucideIcons.rotateCw,
+                        onPressed: onReload,
+                        foregroundShadows: foregroundShadows,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (loading)
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: 0,
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  value: progress.clamp(.03, 1),
+                  backgroundColor: Colors.transparent,
+                  color: cs.primary,
                 ),
-                if (!collapsed)
-                  sideControl(
-                    BrowserActionButton(
-                      compact: true,
-                      size: compact ? 30 : null,
-                      iconSize: compact ? 14 : null,
-                      label: loading ? l.browserStop : l.browserReload,
-                      icon: loading ? LucideIcons.x : LucideIcons.rotateCw,
-                      onPressed: onReload,
-                      foregroundShadows: foregroundShadows,
+              ),
+          ],
+        ),
+      );
+    }
+
+    final content =
+        !editing &&
+            !compact &&
+            expandedContentWidth != null &&
+            collapsedContentWidth != null &&
+            t > 0 &&
+            t < 1
+        ? ClipRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                for (final endpoint in [0.0, 1.0])
+                  IgnorePointer(
+                    child: Opacity(
+                      opacity: endpoint == 0 ? 1 - t : t,
+                      child: OverflowBox(
+                        minWidth: endpoint == 0
+                            ? expandedContentWidth
+                            : collapsedContentWidth,
+                        maxWidth: endpoint == 0
+                            ? expandedContentWidth
+                            : collapsedContentWidth,
+                        minHeight: endpoint == 0 ? 48 : 34,
+                        maxHeight: endpoint == 0 ? 48 : 34,
+                        child: contents(endpoint),
+                      ),
                     ),
                   ),
               ],
             ),
-          ),
-          if (loading)
-            Positioned(
-              left: 18,
-              right: 18,
-              bottom: 0,
-              child: LinearProgressIndicator(
-                minHeight: 2,
-                value: progress.clamp(.03, 1),
-                backgroundColor: Colors.transparent,
-                color: cs.primary,
-              ),
-            ),
-        ],
-      ),
-    );
+          )
+        : contents(t);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final solid =
         BrowserGlassScope.of(context) == BrowserSurfaceStyle.solid ||

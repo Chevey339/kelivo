@@ -12746,6 +12746,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25416,6 +25438,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38165,4 +38209,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserOpenInSidebar => '在側欄開啟';
+
+  @override
+  String get browserUserAgent => '使用者代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '行動版';
+
+  @override
+  String get browserUserAgentDesktop => '桌面版';
+
+  @override
+  String get browserUserAgentCustom => '自訂';
+
+  @override
+  String get browserUserAgentHint => '輸入自訂 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 僅支援可列印 ASCII 字元（英文字母、數字和英文符號），最多 2048 個字元。';
+
+  @override
+  String get browserUserAgentDescription => '變更後將重新載入目前網頁。';
 }

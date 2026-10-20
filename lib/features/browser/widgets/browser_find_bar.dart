@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'browser_text_field.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -51,7 +51,7 @@ class BrowserFindBar extends StatelessWidget {
     );
     final field = ConstrainedBox(
       constraints: BoxConstraints(minHeight: targetSize),
-      child: CupertinoTextField(
+      child: BrowserTextField(
         key: const ValueKey('browserFindField'),
         controller: controller,
         focusNode: focusNode,
@@ -70,7 +70,6 @@ class BrowserFindBar extends StatelessWidget {
           color: colors.onSurfaceVariant,
         ),
         cursorColor: colors.primary,
-        decoration: null,
         padding: EdgeInsetsDirectional.only(
           top: compact ? 7 : 12,
           bottom: compact ? 7 : 12,
@@ -87,12 +86,9 @@ class BrowserFindBar extends StatelessWidget {
             color: colors.onSurfaceVariant,
           ),
         ),
-        textAlignVertical: TextAlignVertical.center,
         textInputAction: TextInputAction.search,
         autocorrect: false,
         enableSuggestions: false,
-        smartDashesType: SmartDashesType.disabled,
-        smartQuotesType: SmartQuotesType.disabled,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
       ),

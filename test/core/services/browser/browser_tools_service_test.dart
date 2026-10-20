@@ -128,16 +128,22 @@ void main() {
   Map<String, dynamic> payload(ClientToolResult result) =>
       jsonDecode(result.content.split('\n![](').first) as Map<String, dynamic>;
 
-  test('global opt-in is required before a tool creates tabs', () async {
-    final result = await tools.handle('chat-a', {
-      'action': 'open',
-      'url': 'https://example.com',
-    });
-    expect(payload(result)['ok'], false);
-    expect(result.content, contains('browser_agent_disabled'));
-    expect(browser.tabs, isEmpty);
-    expect(engines, isEmpty);
-  });
+  test(
+    'an explicit global opt-out prevents tools from creating tabs',
+    () async {
+      await browser.updateSettings(
+        browser.settings.copyWith(agentEnabled: false),
+      );
+      final result = await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      expect(payload(result)['ok'], false);
+      expect(result.content, contains('browser_agent_disabled'));
+      expect(browser.tabs, isEmpty);
+      expect(engines, isEmpty);
+    },
+  );
 
   test('allowing agent control does not start a browser action', () async {
     await enable();

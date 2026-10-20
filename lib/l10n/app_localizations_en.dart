@@ -13362,4 +13362,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserOpenInSidebar => 'Open in sidebar';
+
+  @override
+  String get browserUserAgent => 'User agent';
+
+  @override
+  String get browserUserAgentMobile => 'Mobile';
+
+  @override
+  String get browserUserAgentDesktop => 'Desktop';
+
+  @override
+  String get browserUserAgentCustom => 'Custom';
+
+  @override
+  String get browserUserAgentHint => 'Enter a custom User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'Use a single line of up to 2048 printable ASCII characters.';
+
+  @override
+  String get browserUserAgentDescription =>
+      'Changes reload the current webpage.';
 }

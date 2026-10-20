@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'browser_text_field.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
@@ -425,7 +426,7 @@ class BrowserSurfaceField extends StatelessWidget {
               width: .5,
             ),
           ),
-          child: CupertinoTextField(
+          child: BrowserTextField(
             controller: controller,
             focusNode: focusNode,
             placeholder: hintText,
@@ -436,12 +437,9 @@ class BrowserSurfaceField extends StatelessWidget {
             textInputAction: onSubmitted == null
                 ? TextInputAction.done
                 : TextInputAction.go,
-            smartDashesType: SmartDashesType.disabled,
-            smartQuotesType: SmartQuotesType.disabled,
             maxLines: maxLines,
             onChanged: onChanged,
             onSubmitted: onSubmitted,
-            decoration: null,
             padding: EdgeInsets.symmetric(
               horizontal: 14,
               vertical: desktop ? 8 : 14,

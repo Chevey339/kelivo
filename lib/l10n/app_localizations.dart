@@ -23861,6 +23861,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open in sidebar'**
   String get browserOpenInSidebar;
+
+  /// No description provided for @browserUserAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'User agent'**
+  String get browserUserAgent;
+
+  /// No description provided for @browserUserAgentMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get browserUserAgentMobile;
+
+  /// No description provided for @browserUserAgentDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Desktop'**
+  String get browserUserAgentDesktop;
+
+  /// No description provided for @browserUserAgentCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get browserUserAgentCustom;
+
+  /// No description provided for @browserUserAgentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a custom User-Agent'**
+  String get browserUserAgentHint;
+
+  /// No description provided for @browserUserAgentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a single line of up to 2048 printable ASCII characters.'**
+  String get browserUserAgentInvalid;
+
+  /// No description provided for @browserUserAgentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes reload the current webpage.'**
+  String get browserUserAgentDescription;
 }
 
 class _AppLocalizationsDelegate

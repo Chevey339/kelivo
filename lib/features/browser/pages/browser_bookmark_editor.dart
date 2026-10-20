@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../widgets/browser_text_field.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../models/browser_models.dart';
+import '../browser_management_route.dart';
 import '../widgets/browser_surface_controls.dart';
 import 'browser_management_page.dart';
 
@@ -42,7 +43,10 @@ Future<BrowserBookmarkEdit?> showBrowserBookmarkEditor(
   final navigator = Navigator.of(context);
   final themes = InheritedTheme.capture(from: context, to: navigator.context);
   return navigator.push<BrowserBookmarkEdit>(
-    CupertinoPageRoute(builder: (_) => themes.wrap(editor)),
+    browserManagementRoute(
+      context: context,
+      builder: (_) => themes.wrap(editor),
+    ),
   );
 }
 
@@ -157,13 +161,12 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
     return Semantics(
       label: label,
       textField: true,
-      child: CupertinoTextField(
+      child: BrowserTextField(
         key: ValueKey(
           url ? 'browserBookmarkUrlField' : 'browserBookmarkTitleField',
         ),
         controller: url ? _url : _title,
         placeholder: label,
-        decoration: null,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 2),
         style: TextStyle(
           fontFamily: appTextStyle.fontFamily,
@@ -179,8 +182,6 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
         textInputAction: url ? TextInputAction.done : TextInputAction.next,
         autocorrect: !url,
         enableSuggestions: !url,
-        smartDashesType: SmartDashesType.disabled,
-        smartQuotesType: SmartQuotesType.disabled,
         onChanged: url && _invalid
             ? (_) => setState(() => _invalid = false)
             : null,

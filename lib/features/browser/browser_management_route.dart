@@ -1,9 +1,17 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'widgets/browser_transition_snapshot.dart';
+
+PageRoute<T> browserManagementRoute<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) => Theme.of(context).platform == TargetPlatform.iOS
+    ? BrowserManagementRoute<T>(builder: builder)
+    : MaterialPageRoute<T>(builder: builder);
 
 /// Cupertino management navigation above the browser's native page.
 class BrowserManagementRoute<T> extends CupertinoPageRoute<T> {

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/physics.dart';
 
 import '../widgets/browser_progressive_edge.dart';
@@ -42,7 +43,13 @@ class BrowserMobileLayout extends StatelessWidget {
   static const double expandedChromeHeight = 54;
 
   static double collapseDropFor(double bottomSafeInset) =>
-      bottomSafeInset.clamp(0.0, 20.0);
+      bottomSafeInset.clamp(
+        0.0,
+        defaultTargetPlatform == TargetPlatform.android ? 16.0 : 20.0,
+      );
+
+  static double get toolbarBottomGap =>
+      defaultTargetPlatform == TargetPlatform.android ? 16 : 10;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +117,10 @@ class BrowserMobileLayout extends StatelessWidget {
               right: 16,
               // Reserve the whole travel inside the hit-test area, including the
               // lower position of the collapsed capsule above the home indicator.
-              bottom: dockInset + 10 - collapseDropFor(padding.bottom),
+              bottom:
+                  dockInset +
+                  toolbarBottomGap -
+                  collapseDropFor(padding.bottom),
               child: toolbar,
             ),
             if (findBar != null)

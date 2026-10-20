@@ -180,8 +180,11 @@ class NativeBrowserEngine implements BrowserEngine {
     preferredContentMode: settings.desktopMode
         ? UserPreferredContentMode.DESKTOP
         : UserPreferredContentMode.MOBILE,
-    userAgent:
-        settings.desktopMode && Platform.isAndroid && _defaultUserAgent != null
+    userAgent: settings.customUserAgent.isNotEmpty
+        ? settings.customUserAgent
+        : settings.desktopMode &&
+              Platform.isAndroid &&
+              _defaultUserAgent != null
         ? _defaultUserAgent!
               .replaceFirst(
                 RegExp(r'\(Linux; Android[^)]+\)'),
@@ -190,7 +193,7 @@ class NativeBrowserEngine implements BrowserEngine {
               .replaceAll(' Mobile', '')
         : Platform.isAndroid
         ? _defaultUserAgent
-        : null,
+        : '',
   );
 
   Future<void> _initialize() async {
@@ -912,6 +915,7 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<void> updateSettings(BrowserSettings settings) async {
     this.settings = settings;
     await _webView.setSettings(settings: _viewSettings);
+    _downloadUserAgent = null;
   }
 
   @override

@@ -4645,5 +4645,12 @@
       }
     }
   },
-  "browserOpenInSidebar": "在侧栏打开"
+  "browserOpenInSidebar": "在侧栏打开",
+  "browserUserAgent": "用户代理（UA）",
+  "browserUserAgentMobile": "移动端",
+  "browserUserAgentDesktop": "桌面端",
+  "browserUserAgentCustom": "自定义",
+  "browserUserAgentHint": "输入自定义 User-Agent",
+  "browserUserAgentInvalid": "UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。",
+  "browserUserAgentDescription": "更改后将重新加载当前网页。"
 }

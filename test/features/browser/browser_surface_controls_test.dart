@@ -1,6 +1,5 @@
 import 'dart:ui' show ImageByteFormat, PointerDeviceKind;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
@@ -22,6 +21,7 @@ import 'package:Kelivo/features/browser/widgets/browser_progressive_edge.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
     show GlassAccessibilityScope;
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 
 void main() {
   late BrowserService service;
@@ -71,6 +71,46 @@ void main() {
       }
     });
   }
+
+  browserTest('UA editor saves custom text and restores both presets', (
+    tester,
+  ) async {
+    final errors = <Object>[];
+    await mount(
+      tester,
+      BrowserSettingsPanel(
+        service: service,
+        onError: errors.add,
+        onDataCleared: () {},
+      ),
+    );
+    await tester.tap(find.text('User agent'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Custom').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('up to 2048'), findsOneWidget);
+    await tester.enterText(
+      find.byType(BrowserTextField),
+      'ExampleBrowser/12 Mobile',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(service.settings.customUserAgent, 'ExampleBrowser/12 Mobile');
+    for (final (label, desktop) in [('Desktop', true), ('Mobile', false)]) {
+      await tester.tap(find.text('User agent'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(service.settings.customUserAgent, isEmpty);
+      expect(service.settings.desktopMode, desktop);
+    }
+    expect(errors, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   browserTest('surface choices persist and update the open panel material', (
     tester,
@@ -294,7 +334,7 @@ void main() {
       expect(favicon.url, 'https://example.com');
       expect(
         ModalRoute.of(tester.element(editor)),
-        isA<CupertinoPageRoute<BrowserBookmarkEdit>>(),
+        isA<MaterialPageRoute<BrowserBookmarkEdit>>(),
       );
       expect(
         tester.getSize(find.byType(BrowserManagementPage)),

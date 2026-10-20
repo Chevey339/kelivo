@@ -117,8 +117,10 @@ class BrowserScrollObserver {
 }
 
 /// Installed at document start, main frame only. No timers infer scroll end.
-/// A single pending rAF batches scroll/resize metrics; a real end flushes the
-/// final geometry immediately, including programmatic smooth scrolling.
+/// A single pending rAF batches scroll/resize metrics. Finger intent is sent
+/// at most once per 16ms, passive momentum at most once per 64ms. This only
+/// limits bridge messages, not WebView rendering or Flutter's chrome spring.
+/// Touch boundaries and a real scroll end always flush immediately.
 const browserScrollObserverScript = r'''
 (() => {
   if (window !== window.top) return;
@@ -130,6 +132,7 @@ const browserScrollObserverScript = r'''
   const supportsScrollEnd = 'onscrollend' in document;
   let sequence = 0, frame = 0, ready = false, connecting = false, active = true;
   let pending = 'metrics', connection = 0;
+  let lastSent = -Infinity;
   let touching = false, touchX = 0, touchY = 0, gestureDelta = 0;
   const geometry = (phase) => {
     const root = document.documentElement, body = document.body;
@@ -151,13 +154,24 @@ const browserScrollObserverScript = r'''
     pending = 'metrics';
     const payload = geometry(phase);
     gestureDelta = 0;
+    lastSent = performance.now();
     bridge(payload).catch(() => {});
+  };
+  const deliverFrame = () => {
+    frame = 0;
+    if (!active || !ready) return;
+    if (pending === 'update' &&
+        performance.now() - lastSent < (touching ? 16 : 64)) {
+      frame = requestAnimationFrame(deliverFrame);
+      return;
+    }
+    flush();
   };
   const schedule = (phase) => {
     if (!active) return;
     if (phase !== 'metrics' || pending === 'metrics') pending = phase;
     if (phase === 'end') flush();
-    else if (!frame) frame = requestAnimationFrame(flush);
+    else if (!frame) frame = requestAnimationFrame(deliverFrame);
   };
   const connect = () => {
     if (!active || connecting || !window.flutter_inappwebview?.callHandler) return;

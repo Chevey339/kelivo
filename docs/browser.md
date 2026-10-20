@@ -1737,3 +1737,70 @@ not the appearance of every imported font file.
 The normal `lib/main.dart` iOS simulator build also passed and was installed
 in place. The browser menu was opened on iPhone 17 / iOS 26.5 and its text and
 layout visually checked. This is simulator evidence, not a physical-device run.
+
+## Browser mobile interaction and UA controls (2026-10-20, r16)
+
+The preceding font-only change was independently reviewed and committed locally
+as `98d4e768`. Before that commit, root analysis and all 8,352 root tests passed.
+This branch still uses gpt_markdown; the requested markstream gate was run in the
+main checkout's existing package, where analysis and all 290 tests passed.
+
+The mobile address action now shows the session's cached favicon. Address edit
+mode animates capsule width and companion-control visibility together. Collapsing
+uses fixed expanded/collapsed text layouts with a crossfade, so a long hostname
+is not re-ellipsized at each animation frame. Android adds bottom clearance and
+exits address editing when the IME is dismissed by the system Back action.
+
+BrowserTextField shares decoration and app fonts while choosing Material editing
+on Android/Windows/Linux and Cupertino editing on Apple platforms. Management
+and bookmark routes use the host platform's transitions. The custom tab-overview
+zoom and the iOS snapshot transition remain intact.
+
+Menu preview capture starts only after opening motion completes. Tab navigation
+does not await that background capture. The shipped DOM observer coalesces
+bridge delivery to 16ms during finger input and 64ms during passive momentum;
+start/release/cancel/end boundaries still flush immediately. Its executable JS
+regression simulates 120 momentum frames and observes 15 bridge updates. This
+measures bridge work, not device FPS or WebView rendering speed.
+
+Settings offer mobile, desktop and custom UA choices, with validation,
+persistence, live-engine application and a reload of the active webpage.
+Inactive engines receive settings without being reloaded or created. Apple
+plugin setters now clear WKWebView.customUserAgent when switching back to a
+preset. New/missing assistant-browser preferences default on; a saved explicit
+off remains off, and assistant tool selection and session ownership still apply.
+
+Per the user's request, no browser UI acceptance automation was performed in
+this round. ADB identified the connected arm64 Android phone; the app was not
+running when read-only frame diagnostics were queried, so no physical-device
+performance improvement is claimed from that query.
+
+Validation: all 489 browser widget/core-service tests passed, as did
+`dart analyze --fatal-infos lib test integration_test` and the executable scroll
+observer regression. Coverage includes intermediate keyboard-transition geometry,
+Android IME Back, collapsed dock clearance, menu capture deferral, Android/Apple
+text editing with custom fonts, adaptive routes, UA dialog/persistence/native
+application/preset restoration/download-header invalidation, and saved permission
+opt-out. Logs are `/tmp/browser-r16-focused-tests.log`,
+`/tmp/browser-r16-analyze.log`, `/tmp/browser-r16-android-release.log` and
+`/tmp/browser-r16-ios-build.log`.
+
+The final arm64 Android Release APK built successfully, was signed with the
+existing main-project release configuration, and its certificate matched the
+installed app. `adb -s fee8c1be install -r` completed successfully without an
+uninstall or data reset. The signed artifact is
+`build/app/outputs/flutter-apk/kelivo-browser-r16-arm64-release.apk`.
+The final normal-entry iOS simulator build also passed; the macOS WebView setter
+passed Swift syntax parsing. Physical-device interaction and FPS are left for
+the user's manual acceptance. The follow-up review found that non-ASCII custom UA values could fail in Dart
+HTTP download headers. Input, service updates and persisted values now share
+printable-ASCII validation, with localized guidance and regressions for Chinese,
+emoji and accented characters. The same reviewer rechecked the fix and reported
+no remaining findings.
+
+Pre-commit validation after the review fix: all 8,371 root tests passed
+(`flutter test --concurrency=4`), static analysis passed for lib/test/integration_test,
+and the markstream package passed analysis and all 290 tests in the primary
+checkout (this browser branch predates the package rename). One unrelated backup
+isolate timing test failed in the first full run, then passed both its isolated
+retry and the complete lower-concurrency run; its code and assertions were unchanged.

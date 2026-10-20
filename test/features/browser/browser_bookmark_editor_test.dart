@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
@@ -273,7 +274,7 @@ void main() {
           ModalRoute.of(tester.element(editor)),
           isA<PopupRoute<BrowserBookmarkEdit>>(),
         );
-        final fields = find.byType(CupertinoTextField);
+        final fields = find.byType(BrowserTextField);
         await tester.enterText(fields.first, '');
         await tester.enterText(fields.last, 'https://desktop.example');
         await tester.tap(find.text('Save'));

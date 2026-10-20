@@ -176,6 +176,62 @@ void main() {
     },
   );
 
+  test('assistant access defaults on but preserves a saved opt-out', () async {
+    expect(service.settings.agentEnabled, isTrue);
+    expect(const BrowserSettings().agentEnabled, isTrue);
+    expect(BrowserSettings.fromJson({}).agentEnabled, isTrue);
+    await service.updateSettings(
+      service.settings.copyWith(agentEnabled: false),
+    );
+    service.dispose();
+    service = createService();
+    await service.initialize();
+    expect(service.settings.agentEnabled, isFalse);
+  });
+
+  test(
+    'custom UA persists, resets to presets and rejects invalid header characters',
+    () async {
+      await service.updateSettings(
+        service.settings.copyWith(customUserAgent: '  Kelivo-Test/1.0  '),
+      );
+      service.dispose();
+      service = createService();
+      await service.initialize();
+      expect(service.settings.customUserAgent, 'Kelivo-Test/1.0');
+      for (final invalid in [
+        'Bad\r\nInjected: value',
+        'Bad\u0000UA',
+        'Kelivo/测试',
+        'Kelivo/😀',
+        'Kelivo/é',
+        'x' * 2049,
+      ]) {
+        await expectLater(
+          service.updateSettings(
+            service.settings.copyWith(customUserAgent: invalid),
+          ),
+          throwsFormatException,
+        );
+        expect(service.settings.customUserAgent, 'Kelivo-Test/1.0');
+        expect(
+          BrowserSettings.fromJson({
+            'customUserAgent': invalid,
+          }).customUserAgent,
+          isEmpty,
+        );
+      }
+      await service.updateSettings(
+        service.settings.copyWith(customUserAgent: '', desktopMode: false),
+      );
+      service.dispose();
+      service = createService();
+      await service.initialize();
+      expect(service.settings.customUserAgent, isEmpty);
+      expect(service.settings.desktopMode, isFalse);
+    },
+  );
+
   test(
     'missing desktop mode uses the caller default without overriding false',
     () {

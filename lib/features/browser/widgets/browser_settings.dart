@@ -13,6 +13,7 @@ import 'browser_surface_controls.dart';
 typedef _BrowserSettingsValues = ({
   BrowserSearchEngine searchEngine,
   bool desktopMode,
+  String customUserAgent,
   bool restoreTabs,
   bool saveHistory,
   bool agentEnabled,
@@ -53,6 +54,7 @@ class BrowserSettingsPanel extends StatelessWidget {
           return (
             searchEngine: settings.searchEngine,
             desktopMode: settings.desktopMode,
+            customUserAgent: settings.customUserAgent,
             restoreTabs: settings.restoreTabs,
             saveHistory: settings.saveHistory,
             agentEnabled: settings.agentEnabled,
@@ -150,16 +152,16 @@ class BrowserSettingsPanel extends StatelessWidget {
                     );
                   },
                 ),
-                _switchRow(
+                BrowserSurfaceRow(
                   icon: LucideIcons.monitor,
-                  label: l.browserDesktopMode,
-                  subtitle: l.browserDesktopModeDescription,
-                  value: s.desktopMode,
-                  onChanged: (value) => _run(
-                    () => service.updateSettings(
-                      service.settings.copyWith(desktopMode: value),
-                    ),
-                  ),
+                  label: l.browserUserAgent,
+                  subtitle: s.customUserAgent.isNotEmpty
+                      ? l.browserUserAgentCustom
+                      : s.desktopMode
+                      ? l.browserUserAgentDesktop
+                      : l.browserUserAgentMobile,
+                  trailing: const Icon(LucideIcons.chevronRight, size: 15),
+                  onTap: () => _chooseUserAgent(context),
                 ),
               ],
             ),
@@ -304,6 +306,144 @@ class BrowserSettingsPanel extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Future<void> _chooseUserAgent(BuildContext context) async {
+    final choice = await showBrowserDialog<BrowserSettings>(
+      context,
+      maxWidth: 420,
+      child: _UserAgentEditor(settings: service.settings),
+    );
+    if (choice == null) return;
+    await _run(
+      () => service.updateSettings(
+        service.settings.copyWith(
+          desktopMode: choice.desktopMode,
+          customUserAgent: choice.customUserAgent,
+        ),
+      ),
+    );
+  }
+}
+
+class _UserAgentEditor extends StatefulWidget {
+  const _UserAgentEditor({required this.settings});
+  final BrowserSettings settings;
+
+  @override
+  State<_UserAgentEditor> createState() => _UserAgentEditorState();
+}
+
+class _UserAgentEditorState extends State<_UserAgentEditor> {
+  late final _custom = TextEditingController(
+    text: widget.settings.customUserAgent,
+  );
+  late int _mode = widget.settings.customUserAgent.isNotEmpty
+      ? 2
+      : widget.settings.desktopMode
+      ? 1
+      : 0;
+  bool _invalid = false;
+
+  @override
+  void dispose() {
+    _custom.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final raw = _custom.text;
+    if (_mode == 2 &&
+        (raw.trim().isEmpty || !BrowserSettings.isValidUserAgent(raw))) {
+      setState(() => _invalid = true);
+      return;
+    }
+    Navigator.of(context).pop(
+      widget.settings.copyWith(
+        desktopMode: _mode == 1,
+        customUserAgent: _mode == 2 ? raw.trim() : '',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final labels = [
+      l.browserUserAgentMobile,
+      l.browserUserAgentDesktop,
+      l.browserUserAgentCustom,
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        BrowserDialogHeader(title: l.browserUserAgent),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  l.browserUserAgentDescription,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              BrowserSurfaceGroup(
+                filled: false,
+                children: [
+                  for (var index = 0; index < labels.length; index++)
+                    BrowserSurfaceRow(
+                      label: labels[index],
+                      trailing: _mode == index
+                          ? const Icon(LucideIcons.check, size: 20)
+                          : null,
+                      onTap: () => setState(() {
+                        _mode = index;
+                        _invalid = false;
+                      }),
+                    ),
+                ],
+              ),
+              if (_mode == 2) ...[
+                const SizedBox(height: 12),
+                BrowserSurfaceField(
+                  controller: _custom,
+                  hintText: l.browserUserAgentHint,
+                  onSubmitted: (_) => _save(),
+                  onChanged: (_) {
+                    if (_invalid) setState(() => _invalid = false);
+                  },
+                ),
+                if (_invalid)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      l.browserUserAgentInvalid,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: BrowserTextButton(
+                  filled: true,
+                  onPressed: _save,
+                  child: Text(l.browserSave),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

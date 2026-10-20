@@ -5847,5 +5847,12 @@
       }
     }
   },
-  "browserOpenInSidebar": "Open in sidebar"
+  "browserOpenInSidebar": "Open in sidebar",
+  "browserUserAgent": "User agent",
+  "browserUserAgentMobile": "Mobile",
+  "browserUserAgentDesktop": "Desktop",
+  "browserUserAgentCustom": "Custom",
+  "browserUserAgentHint": "Enter a custom User-Agent",
+  "browserUserAgentInvalid": "Use a single line of up to 2048 printable ASCII characters.",
+  "browserUserAgentDescription": "Changes reload the current webpage."
 }
