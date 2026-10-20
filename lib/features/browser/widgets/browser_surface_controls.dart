@@ -398,6 +398,7 @@ class BrowserSurfaceField extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final desktop = _desktopControls(context);
+    final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -446,6 +447,8 @@ class BrowserSurfaceField extends StatelessWidget {
               vertical: desktop ? 8 : 14,
             ),
             style: TextStyle(
+              fontFamily: appTextStyle.fontFamily,
+              fontFamilyFallback: appTextStyle.fontFamilyFallback,
               color: colors.onSurface,
               fontSize: desktop ? 13 : 16,
             ),

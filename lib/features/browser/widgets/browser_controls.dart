@@ -137,6 +137,7 @@ class BrowserAddressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     final t = collapseProgress.clamp(0.0, 1.0);
     final expandedHeight = compact ? 32.0 : 48.0;
     final height = expandedHeight + (34 - expandedHeight) * t;
@@ -187,6 +188,8 @@ class BrowserAddressBar extends StatelessWidget {
                             shadows: foregroundShadows,
                           ),
                           style: TextStyle(
+                            fontFamily: appTextStyle.fontFamily,
+                            fontFamilyFallback: appTextStyle.fontFamilyFallback,
                             color: cs.onSurface,
                             fontSize: compact ? 13 : 16,
                             shadows: foregroundShadows,

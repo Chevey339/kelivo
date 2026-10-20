@@ -95,6 +95,7 @@ void main() {
     bool open = true,
     bool selectable = false,
     BrowserSurfaceStyle style = BrowserSurfaceStyle.liquid,
+    ThemeData? theme,
   }) async {
     tester.view.physicalSize =
         size ?? (desktop ? const Size(800, 600) : const Size(390, 844));
@@ -105,6 +106,7 @@ void main() {
     addTearDown(fixture.underlyingClicks.dispose);
     await tester.pumpWidget(
       MaterialApp(
+        theme: theme,
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -136,6 +138,44 @@ void main() {
     } else {
       await primeReadyMotion(tester);
     }
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets('menu and submenu inherit the app font on desktop=$desktop', (
+      tester,
+    ) async {
+      const family = 'BrowserCustomFont';
+      const fallback = ['BrowserFallback'];
+      await mount(
+        tester,
+        desktop: desktop,
+        anchor: desktop
+            ? const Rect.fromLTWH(700, 540, 38, 38)
+            : const Rect.fromLTWH(326, 750, 48, 48),
+        theme: ThemeData(fontFamily: family, fontFamilyFallback: fallback),
+      );
+      void expectFont(String label) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(
+            of: find.text(label).last,
+            matching: find.byType(RichText),
+          ),
+        );
+        expect(paragraph.text.style!.fontFamily, family);
+        expect(paragraph.text.style!.fontFamilyFallback, fallback);
+        expect(paragraph.text.style!.decoration, TextDecoration.none);
+      }
+
+      expectFont('New tab');
+      expectFont('Bookmarks');
+      await tester.tap(find.text('Page options'));
+      await tester.pumpAndSettle();
+      expectFont('Page options');
+      expectFont('Copy link');
+      await tester.tap(find.text('Copy link'));
+      await tester.pumpAndSettle();
+      expect(fixture.results, ['copy']);
+    });
   }
 
   testWidgets('desktop menu fades out in place above and below its anchor', (

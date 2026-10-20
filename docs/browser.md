@@ -1712,3 +1712,28 @@ was installed in place. A long press still opens More in the running app;
 capture: `build/browser_validation/menu-stationary-r14/normal-menu.png`.
 Continuous held-drag geometry is established by the widget regression above,
 not by a physical-device gesture test. No commit or push was performed.
+
+## Browser app-font inheritance (2026-10-20, r15)
+
+The menu's explicit DefaultTextStyle now preserves the app theme's font family
+and fallbacks for its primary rows, footer and submenu. Address editing, find,
+shared library/tab search fields and mobile bookmark editing explicitly pass
+the same typography to CupertinoTextField; its placeholders inherit that input
+style. Only font family/fallback are supplied, preserving each control's existing
+size, spacing and colors. The collapsed address width now measures the same
+inherited typography as its visible label. Existing management-page, dialog and
+tab-preview text already inherit the app text theme and need no replacement.
+
+The new typography regressions failed against the original implementation:
+menu font family was null, input/placeholder text resolved to CupertinoSystemText,
+and a custom-spaced collapsed address was 15 points too narrow. RenderParagraph
+and RenderEditable checks now cover primary/submenu/footer text, mobile/desktop
+inputs, placeholder-to-input transitions and bookmark headers/actions. All 354
+browser widget tests passed, along with fatal-info analysis of lib, test and
+integration_test. Logs: `/tmp/browser-r15-browser-tests.log` and
+`/tmp/browser-r15-analyze.log`. These checks verify font routing and layout,
+not the appearance of every imported font file.
+
+The normal `lib/main.dart` iOS simulator build also passed and was installed
+in place. The browser menu was opened on iPhone 17 / iOS 26.5 and its text and
+layout visually checked. This is simulator evidence, not a physical-device run.

@@ -938,7 +938,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     final hostPainter = TextPainter(
       text: TextSpan(
         text: _displayHost,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        style: DefaultTextStyle.of(context).style.merge(
+          const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            height: 1.15,
+          ),
+        ),
       ),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),

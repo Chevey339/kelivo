@@ -152,6 +152,7 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
   Widget _mobileField(BuildContext context, {required bool url}) {
     final l = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
+    final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     final label = url ? l.browserBookmarkUrl : l.browserBookmarkTitle;
     return Semantics(
       label: label,
@@ -165,6 +166,8 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
         decoration: null,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 2),
         style: TextStyle(
+          fontFamily: appTextStyle.fontFamily,
+          fontFamilyFallback: appTextStyle.fontFamilyFallback,
           fontSize: url ? 15 : 17,
           color: url ? colors.onSurfaceVariant : colors.onSurface,
         ),

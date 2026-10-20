@@ -1037,6 +1037,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
 
   Widget _contents(BuildContext context, {required bool secondary}) {
     final colors = Theme.of(context).colorScheme;
+    final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     final l = AppLocalizations.of(context)!;
     final reduced = MediaQuery.disableAnimationsOf(context);
     Widget row({
@@ -1180,6 +1181,8 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
         ),
         child: DefaultTextStyle(
           style: TextStyle(
+            fontFamily: appTextStyle.fontFamily,
+            fontFamilyFallback: appTextStyle.fontFamilyFallback,
             color: colors.onSurface,
             fontSize: widget.desktop ? 13 : 16,
             decoration: TextDecoration.none,

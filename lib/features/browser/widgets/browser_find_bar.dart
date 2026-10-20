@@ -35,6 +35,7 @@ class BrowserFindBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
+    final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
     final targetSize = compact ? 34.0 : 48.0;
     final gap = compact ? 6.0 : 8.0;
     final fontSize = compact ? 13.0 : 16.0;
@@ -57,6 +58,8 @@ class BrowserFindBar extends StatelessWidget {
         autofocus: true,
         placeholder: l.browserFindHint,
         style: TextStyle(
+          fontFamily: appTextStyle.fontFamily,
+          fontFamilyFallback: appTextStyle.fontFamilyFallback,
           fontSize: fontSize,
           height: 1.2,
           color: colors.onSurface,

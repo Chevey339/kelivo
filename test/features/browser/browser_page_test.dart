@@ -122,6 +122,7 @@ void main() {
     bool embedded = false,
     bool shortcutsEnabled = true,
     bool settle = true,
+    ThemeData? theme,
     VoidCallback? onClose,
     VoidCallback? onExpand,
     VoidCallback? onDock,
@@ -134,6 +135,7 @@ void main() {
       ChangeNotifierProvider<SettingsProvider>.value(
         value: settings,
         child: MaterialApp(
+          theme: theme,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           locale: const Locale('en'),
@@ -208,6 +210,41 @@ void main() {
     expect(tester.widget<BrowserAddressBar>(address).collapsed, isTrue);
     return collapsedWidth;
   }
+
+  browserTestWidgets(
+    'collapsed address measures the inherited app typography',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://xy.io');
+      final base = ThemeData(fontFamily: 'BrowserCustomFont');
+      await mount(
+        tester,
+        theme: base.copyWith(
+          textTheme: base.textTheme.copyWith(
+            bodyMedium: base.textTheme.bodyMedium!.copyWith(letterSpacing: 3),
+          ),
+        ),
+      );
+      engines[tab.id]!.onChanged(_scroll(160));
+      await tester.pumpAndSettle();
+      final address = find.byType(BrowserAddressBar);
+      expect(tester.widget<BrowserAddressBar>(address).collapseProgress, 1);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: address,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is RichText && widget.text.toPlainText() == 'xy.io',
+          ),
+        ),
+      );
+      expect(paragraph.text.style!.fontFamily, 'BrowserCustomFont');
+      expect(
+        tester.getSize(address).width,
+        closeTo(paragraph.getMaxIntrinsicWidth(double.infinity) + 32, .01),
+      );
+    },
+  );
 
   browserTestWidgets(
     'mobile address submits a search and mounts the shared engine',
