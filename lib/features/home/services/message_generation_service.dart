@@ -193,7 +193,8 @@ class MessageGenerationService {
       versionSelections: versionSelections,
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
-      preserveToolTurns: kind == ProviderKind.openai,
+      // Claude replays its rounds from the native turn artifact instead.
+      preserveToolTurns: kind != ProviderKind.claude,
       claudeSource: kind == ProviderKind.claude
           ? (providerId: providerKey, modelId: modelId)
           : null,
