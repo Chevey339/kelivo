@@ -29,9 +29,14 @@ MarkstreamTheme mapMarkdownTheme(
                     : .05),
             color: DefaultTextStyle.of(context).style.color ?? scheme.onSurface,
           );
-  final theme = MarkstreamTheme.fromColorScheme(
+  final desktop =
+      defaultTargetPlatform == TargetPlatform.linux ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows;
+  return MarkstreamTheme.fromColorScheme(
     scheme,
     bodyStyle: body,
+    desktop: desktop,
     codeFontFamily: (settings.codeFontFamily?.isNotEmpty ?? false)
         ? settings.codeFontFamily!
         : 'monospace',
@@ -39,19 +44,4 @@ MarkstreamTheme mapMarkdownTheme(
     semibold: AppFontWeights.semibold,
     strong: AppFontWeights.strong,
   );
-  final mobile =
-      defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
-  return mobile
-      ? theme.copyWith(
-          table: theme.table.copyWith(
-            bodyBackgroundColor: Color.alphaBlend(
-              scheme.primary.withValues(
-                alpha: theme.brightness == Brightness.dark ? .045 : .018,
-              ),
-              scheme.surface,
-            ).withValues(alpha: theme.fillAlphas.table),
-          ),
-        )
-      : theme;
 }

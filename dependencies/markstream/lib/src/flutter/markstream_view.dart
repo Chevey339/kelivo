@@ -346,7 +346,11 @@ class _MarkstreamViewState extends State<MarkstreamView> {
             itemBuilder: (context, index) => Padding(
               key: ValueKey(entries[index].node.span.start),
               padding: EdgeInsets.only(
-                top: index == 0 ? 0 : theme.blockSpacing,
+                top: index == 0
+                    ? 0
+                    : entries[index - 1].nodes.last is HeadingNode
+                    ? theme.blockSpacing.clamp(0, 8)
+                    : theme.blockSpacing,
               ),
               child: batching && batchable(entries[index].node)
                   ? ParagraphRun(

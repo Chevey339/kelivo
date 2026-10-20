@@ -18,7 +18,6 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/utils/clipboard_images.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
 
 Widget markdownActionButton(BuildContext context, MarkstreamAction action) {
   if (action.kind == MarkstreamActionKind.showMore) {
@@ -29,6 +28,7 @@ Widget markdownActionButton(BuildContext context, MarkstreamAction action) {
   }
   return markdownIconAction(
     context,
+    chrome: action.chrome,
     icon: switch (action.kind) {
       MarkstreamActionKind.expand => Lucide.ChevronDown,
       MarkstreamActionKind.collapse => Lucide.ChevronUp,
@@ -57,6 +57,7 @@ Widget markdownActionButton(BuildContext context, MarkstreamAction action) {
 
 Widget markdownIconAction(
   BuildContext context, {
+  required MarkstreamChromeTheme chrome,
   required IconData icon,
   required String label,
   required FutureOr<void> Function() invoke,
@@ -64,10 +65,11 @@ Widget markdownIconAction(
   icon: icon,
   tooltip: label,
   semanticLabel: label,
-  size: 15,
-  minSize: 30,
-  padding: const EdgeInsets.all(7),
-  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .72),
+  size: chrome.actionIconSize,
+  minSize: chrome.actionSize,
+  borderRadius: chrome.actionRadius,
+  padding: const EdgeInsets.all(6.5),
+  color: chrome.actionColor,
   onTap: () => unawaited(Future<void>.sync(invoke)),
 );
 
@@ -84,6 +86,7 @@ List<Widget> markdownCodeActions(
   return [
     markdownIconAction(
       context,
+      chrome: action.theme.chrome,
       icon: Lucide.Download,
       label: l10n.codeBlockSaveAsButton,
       invoke: () => _save(
@@ -96,6 +99,7 @@ List<Widget> markdownCodeActions(
     if (isHtmlLanguage(language))
       markdownIconAction(
         context,
+        chrome: action.theme.chrome,
         icon: Lucide.Eye,
         label: l10n.codeBlockPreviewButton,
         invoke: () => previewMarkdownHtml(context, action.code.code),
@@ -115,6 +119,7 @@ List<Widget> markdownTableActions(
   return [
     markdownIconAction(
       context,
+      chrome: action.theme.chrome,
       icon: Lucide.Download,
       label: l10n.markdownTableExportCsvTooltip,
       invoke: () => _save(
@@ -126,6 +131,7 @@ List<Widget> markdownTableActions(
     ),
     markdownIconAction(
       context,
+      chrome: action.theme.chrome,
       icon: Lucide.ImageDown,
       label: desktop
           ? l10n.messageExportSheetExportImage
@@ -135,6 +141,7 @@ List<Widget> markdownTableActions(
     ),
     markdownIconAction(
       context,
+      chrome: action.theme.chrome,
       icon: Lucide.Clipboard,
       label: l10n.markdownCopyImageAction,
       invoke: () => _tableImage(context, action, copy: true, gallery: false),
@@ -147,8 +154,7 @@ Widget markdownMobileTableToolbar(
   TableActionContext action,
 ) {
   final l10n = AppLocalizations.of(context)!;
-  final scheme = Theme.of(context).colorScheme;
-  final dark = Theme.of(context).brightness == Brightness.dark;
+  final chrome = action.theme.chrome;
   Future<void> copy({bool csv = false}) async {
     await Clipboard.setData(
       ClipboardData(
@@ -175,23 +181,24 @@ Widget markdownMobileTableToolbar(
     icon: icon,
     tooltip: label,
     semanticLabel: label,
-    size: 15,
-    minSize: 32,
-    padding: const EdgeInsets.all(7),
-    color: scheme.onSurfaceVariant.withValues(alpha: .68),
+    size: chrome.actionIconSize,
+    minSize: chrome.actionSize,
+    borderRadius: chrome.actionRadius,
+    padding: const EdgeInsets.all(6.5),
+    color: chrome.actionColor,
     onTap: () => unawaited(tap()),
     onLongPress: longPress == null ? null : () => unawaited(longPress()),
   );
   return Container(
     key: const ValueKey('markdown-mobile-table-toolbar'),
-    height: action.theme.table.toolbarHeight,
-    padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
+    height: chrome.height,
+    padding: chrome.padding,
     decoration: BoxDecoration(
-      color: action.theme.table.headerBackgroundColor,
+      color: chrome.background,
       border: Border(
         bottom: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: dark ? .20 : .28),
-          width: .6,
+          color: chrome.divider,
+          width: MarkstreamTheme.stroke,
         ),
       ),
     ),
@@ -202,12 +209,7 @@ Widget markdownMobileTableToolbar(
             l10n.markdownTableLabel,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: scheme.onSurfaceVariant.withValues(alpha: .80),
-              fontSize: 12,
-              fontWeight: AppFontWeights.semibold,
-              height: 1,
-            ),
+            style: chrome.label,
           ),
         ),
         button(

@@ -158,6 +158,7 @@ class KelivoImageBuilder implements ImageBuilder {
     }
 
     return _MarkdownImage(
+      theme: theme,
       url: image.destination,
       width: size(dimensions?[1]),
       height: size(dimensions?[2] ?? dimensions?[3]),
@@ -185,7 +186,13 @@ ImageProvider? markdownImageProvider(String source) {
 }
 
 class _MarkdownImage extends StatefulWidget {
-  const _MarkdownImage({required this.url, this.width, this.height});
+  const _MarkdownImage({
+    required this.url,
+    required this.theme,
+    this.width,
+    this.height,
+  });
+  final MarkstreamTheme theme;
   final String url;
   final double? width, height;
   @override
@@ -221,10 +228,12 @@ class _MarkdownImageState extends State<_MarkdownImage> {
           );
   }
 
-  Widget _broken() => Icon(
-    Lucide.ImageOff,
-    size: 22,
-    color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget _broken() => ColoredBox(
+    color: widget.theme.colors.fillBlock,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Icon(Lucide.ImageOff, size: 22, color: widget.theme.colors.ink3),
+    ),
   );
   @override
   Widget build(BuildContext context) {
@@ -278,12 +287,21 @@ class _MarkdownImageState extends State<_MarkdownImage> {
                     1,
                     (width * MediaQuery.devicePixelRatioOf(context)).ceil(),
                   );
-            return Image(
-              image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
-              width: width,
-              height: height,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stack) => _broken(),
+            return Container(
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(widget.theme.imageRadius),
+                border: Border.all(
+                  color: widget.theme.colors.divider,
+                  width: MarkstreamTheme.stroke,
+                ),
+              ),
+              child: Image(
+                image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                width: width,
+                height: height,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stack) => _broken(),
+              ),
             );
           },
         ),

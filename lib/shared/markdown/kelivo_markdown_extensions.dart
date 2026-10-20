@@ -100,6 +100,7 @@ Widget _plantUml(
   final theme = rendering.theme;
   final streaming = rendering.streaming;
   return PlantUMLBlock(
+    theme: theme,
     code: node.code,
     codeBuilder: (_) => MarkstreamCodeContent(
       node: node,

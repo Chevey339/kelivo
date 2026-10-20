@@ -44,7 +44,10 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
       decoration: BoxDecoration(
         color: theme.backgroundColor,
         borderRadius: BorderRadius.circular(theme.radius),
-        border: Border.all(color: theme.borderColor, width: .8),
+        border: Border.all(
+          color: theme.borderColor,
+          width: MarkstreamTheme.stroke,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: AnimatedSize(
@@ -72,15 +75,13 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
                             dimension: theme.chevronSize,
                             child: CustomPaint(
                               painter: _Chevron(
-                                theme.summary.color ??
-                                    widget.theme.body.color ??
-                                    Colors.black,
+                                widget.theme.chrome.actionColor,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 6),
                       Expanded(child: widget.summary),
                     ],
                   ),
@@ -90,7 +91,7 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
             if (expanded)
               Padding(
                 key: const ValueKey('markstream-details-body'),
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: theme.contentPadding,
                 child: widget.body(context),
               ),
           ],

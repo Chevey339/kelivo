@@ -12,15 +12,14 @@ import '../selection/selectable_span_adapter.dart';
 import '../theme/markstream_theme.dart';
 import 'fitted_math.dart';
 import 'inline_code_capsule.dart';
+import 'optical_baseline.dart';
 import 'html_style.dart';
 import 'shifted_baseline.dart';
 import 'source_highlights.dart';
 import '../../core/serialize/to_html.dart' show isSafeHtmlUrl;
 
-typedef LinkRecognizerBuilder = TapGestureRecognizer Function(
-  LinkNode,
-  VoidCallback,
-);
+typedef LinkRecognizerBuilder =
+    TapGestureRecognizer Function(LinkNode, VoidCallback);
 
 class InlineSpanBuilder {
   const InlineSpanBuilder({
@@ -124,6 +123,51 @@ class InlineSpanBuilder {
       );
     }
 
+    WidgetSpan codeAtom(String value, {bool keyboard = false}) {
+      Widget capsule = InlineCodeCapsule(
+        text: value,
+        mouseCursor: onTap == null
+            ? SystemMouseCursors.text
+            : SystemMouseCursors.click,
+        style: theme.inlineCode.text,
+        backgroundColor: keyboard
+            ? theme.colors.fillBlock
+            : theme.inlineCode.backgroundColor,
+        borderColor: theme.inlineCode.borderColor,
+        padding: theme.inlineCode.padding,
+        radius: keyboard ? MarkstreamTheme.radiusXs : theme.inlineCode.radius,
+        border: keyboard
+            ? Border(
+                top: BorderSide(color: theme.colors.borderStrong),
+                left: BorderSide(color: theme.colors.borderStrong),
+                right: BorderSide(color: theme.colors.borderStrong),
+                bottom: BorderSide(
+                  color: theme.colors.borderStrong,
+                  width: 1.5,
+                ),
+              )
+            : null,
+      );
+      if (onTap != null)
+        capsule = MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(onTap: onTap, child: capsule),
+        );
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
+        child: unscaled(
+          highlights.atom(
+            node.span,
+            OpticalBaseline(
+              center: theme.inlineCode.opticalCenter,
+              child: capsule,
+            ),
+          ),
+        ),
+      );
+    }
+
     if (node is TextNode) {
       emit(node.text, node);
       final span = TextSpan(
@@ -168,27 +212,7 @@ class InlineSpanBuilder {
       return children(node.children, style.merge(theme.link), target: node);
     if (node is CodeSpanNode) {
       for (final fragment in node.children) emit(fragment.text, fragment);
-      Widget capsule = InlineCodeCapsule(
-        text: node.code,
-        mouseCursor: onTap == null
-            ? SystemMouseCursors.text
-            : SystemMouseCursors.click,
-        style: theme.inlineCode.text,
-        backgroundColor: theme.inlineCode.backgroundColor,
-        borderColor: theme.inlineCode.borderColor,
-        padding: theme.inlineCode.padding,
-        radius: theme.inlineCode.radius,
-      );
-      if (onTap != null)
-        capsule = MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(onTap: onTap, child: capsule),
-        );
-      return WidgetSpan(
-        alignment: PlaceholderAlignment.baseline,
-        baseline: TextBaseline.alphabetic,
-        child: unscaled(highlights.atom(node.span, capsule)),
-      );
+      return codeAtom(node.code);
     }
     if (node is MathInlineNode) {
       emit(toPlainText(node), node);
@@ -277,22 +301,7 @@ class InlineSpanBuilder {
       }
       if (node.tag == 'code' || node.tag == 'kbd') {
         emit(toPlainText(node), node);
-        return atom(
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.inlineCode.backgroundColor,
-              border: Border.all(color: theme.inlineCode.borderColor),
-              borderRadius: BorderRadius.circular(
-                node.tag == 'kbd' ? 3 : theme.inlineCode.radius,
-              ),
-            ),
-            child: Padding(
-              padding: theme.inlineCode.padding,
-              child: Text(toPlainText(node), style: theme.inlineCode.text),
-            ),
-          ),
-          toPlainText(node),
-        );
+        return codeAtom(toPlainText(node), keyboard: node.tag == 'kbd');
       }
       if (node.tag == 'sub' || node.tag == 'sup') {
         emit(toPlainText(node), node);

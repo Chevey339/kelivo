@@ -11,14 +11,13 @@ import 'package:markstream/markstream.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/mermaid_bridge.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/diagram_exporter.dart';
 import 'highlight_adapter.dart';
+import 'diagram_chrome.dart';
 
 enum MermaidBitmapRenderStatus { success, failed, unsupported }
 
@@ -104,7 +103,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final mermaidColors = _MermaidBlockColors.resolve(isDark);
+    final mermaidColors = widget.theme.colors;
 
     final themeVars = buildThemeVarsFromColorScheme(cs);
 
@@ -169,124 +168,60 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: mermaidColors.body,
-        borderRadius: BorderRadius.circular(8),
+        color: mermaidColors.fillBlock,
+        borderRadius: BorderRadius.circular(widget.theme.code.radius),
       ),
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(widget.theme.code.radius),
         border: Border.all(color: mermaidColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: mermaidColors.header,
-              border: Border(
-                bottom: BorderSide(color: mermaidColors.border, width: 1),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      start: 16,
-                      end: 10,
+          DiagramChrome(
+            theme: widget.theme,
+            imageSelected: _selectedTab == _MermaidTab.image,
+            onImage: () => setState(() => _selectedTab = _MermaidTab.image),
+            onCode: () => setState(() => _selectedTab = _MermaidTab.code),
+            actions: exporting
+                ? const []
+                : [
+                    DiagramAction(
+                      theme: widget.theme,
+                      icon: Lucide.Copy,
+                      label: l10n.shareProviderSheetCopyButton,
+                      onTap: () => _copyMermaidCode(context),
                     ),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: mermaidColors.tabTrack,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _MermaidTabButton(
-                                label: l10n.mermaidImageTab,
-                                selected: _selectedTab == _MermaidTab.image,
-                                colors: mermaidColors,
-                                onTap: () {
-                                  setState(
-                                    () => _selectedTab = _MermaidTab.image,
-                                  );
-                                },
-                              ),
-                              _MermaidTabButton(
-                                label: l10n.mermaidCodeTab,
-                                selected: _selectedTab == _MermaidTab.code,
-                                colors: mermaidColors,
-                                onTap: () {
-                                  setState(
-                                    () => _selectedTab = _MermaidTab.code,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    DiagramAction(
+                      theme: widget.theme,
+                      icon: Lucide.Download,
+                      label: l10n.mermaidExportPng,
+                      enabled: actionBytes != null && actionBytes.isNotEmpty,
+                      onTap: actionBytes == null || actionBytes.isEmpty
+                          ? null
+                          : () => _saveMermaidBytes(context, actionBytes),
                     ),
-                  ),
-                ),
-                if (!exporting)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 10),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _MermaidTextAction(
-                          icon: Lucide.Copy,
-                          label: l10n.shareProviderSheetCopyButton,
-                          colors: mermaidColors,
-                          onTap: () => _copyMermaidCode(context),
-                        ),
-                        const SizedBox(width: 4),
-                        _MermaidTextAction(
-                          icon: Lucide.Download,
-                          label: l10n.mermaidExportPng,
-                          colors: mermaidColors,
-                          enabled:
-                              actionBytes != null && actionBytes.isNotEmpty,
-                          onTap: actionBytes == null || actionBytes.isEmpty
-                              ? null
-                              : () => _saveMermaidBytes(context, actionBytes),
-                        ),
-                        const SizedBox(width: 4),
-                        _MermaidTextAction(
-                          icon: Lucide.Maximize2,
-                          label: l10n.mermaidFullScreen,
-                          colors: mermaidColors,
-                          enabled:
-                              actionBytes != null && actionBytes.isNotEmpty,
-                          onTap: actionBytes == null || actionBytes.isEmpty
-                              ? null
-                              : () => _openMermaidImageViewer(
-                                  context,
-                                  actionBytes,
-                                ),
-                        ),
-                      ],
+                    DiagramAction(
+                      theme: widget.theme,
+                      icon: Lucide.Maximize2,
+                      label: l10n.mermaidFullScreen,
+                      enabled: actionBytes != null && actionBytes.isNotEmpty,
+                      onTap: actionBytes == null || actionBytes.isEmpty
+                          ? null
+                          : () => _openMermaidImageViewer(context, actionBytes),
                     ),
-                  ),
-              ],
-            ),
+                  ],
           ),
           SizedBox(
             key: const ValueKey('mermaid-preview-body'),
             width: double.infinity,
             height: _previewHeight,
             child: ColoredBox(
-              color: mermaidColors.body,
+              color: mermaidColors.fillBlock,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 switchInCurve: Curves.easeOutCubic,
@@ -314,7 +249,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
   Widget _buildMermaidBody({
     required BuildContext context,
     required bool isDark,
-    required _MermaidBlockColors colors,
+    required MarkstreamColors colors,
     required Uint8List? displayBytes,
     required String cacheKey,
     required bool showLoading,
@@ -329,7 +264,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     if (displayBytes != null && displayBytes.isNotEmpty) {
       return Padding(
         key: ValueKey<String>('mermaid-image-$cacheKey'),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
@@ -692,173 +627,10 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
   }
 }
 
-class _MermaidBlockColors {
-  const _MermaidBlockColors({
-    required this.body,
-    required this.header,
-    required this.border,
-    required this.tabTrack,
-    required this.tabSelected,
-    required this.textPrimary,
-    required this.textSecondary,
-    required this.textTertiary,
-  });
-
-  final Color body;
-  final Color header;
-  final Color border;
-  final Color tabTrack;
-  final Color tabSelected;
-  final Color textPrimary;
-  final Color textSecondary;
-  final Color textTertiary;
-
-  static _MermaidBlockColors resolve(bool isDark) {
-    if (isDark) {
-      return const _MermaidBlockColors(
-        body: Color(0xFF212121),
-        header: Color(0xFF303030),
-        border: Color(0xFF383838),
-        tabTrack: Color(0xF2212121),
-        tabSelected: Color(0xFF333333),
-        textPrimary: Color(0xFFE6E6E6),
-        textSecondary: Color(0xFFA0A0A0),
-        textTertiary: Color(0xFF707070),
-      );
-    }
-
-    return const _MermaidBlockColors(
-      body: Color(0xFFF8F8F8),
-      header: Color(0xFFEDEDED),
-      border: Color(0xFFE0E0E0),
-      tabTrack: Color(0xCCD9D9D9),
-      tabSelected: Color(0xFFFFFFFF),
-      textPrimary: Color(0xFF261208),
-      textSecondary: Color(0xFF46352B),
-      textTertiary: Color(0xFF5B4C43),
-    );
-  }
-}
-
-class _MermaidTabButton extends StatefulWidget {
-  const _MermaidTabButton({
-    required this.label,
-    required this.selected,
-    required this.colors,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final _MermaidBlockColors colors;
-  final VoidCallback onTap;
-
-  @override
-  State<_MermaidTabButton> createState() => _MermaidTabButtonState();
-}
-
-class _MermaidTabButtonState extends State<_MermaidTabButton> {
-  bool _pressed = false;
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseColor = widget.selected
-        ? widget.colors.tabSelected
-        : Colors.transparent;
-    final hoverColor = Color.alphaBlend(
-      widget.colors.textPrimary.withValues(alpha: _pressed ? 0.10 : 0.06),
-      baseColor,
-    );
-    final bg = widget.selected || _pressed || _hovered
-        ? hoverColor
-        : Colors.transparent;
-
-    return Semantics(
-      button: true,
-      selected: widget.selected,
-      label: widget.label,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() {
-          _hovered = false;
-          _pressed = false;
-        }),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: SelectionContainer.disabled(
-              child: Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: widget.selected
-                      ? AppFontWeights.semibold
-                      : AppFontWeights.medium,
-                  color: widget.selected
-                      ? widget.colors.textPrimary
-                      : widget.colors.textSecondary,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MermaidTextAction extends StatelessWidget {
-  const _MermaidTextAction({
-    required this.icon,
-    required this.label,
-    required this.colors,
-    this.onTap,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String label;
-  final _MermaidBlockColors colors;
-  final VoidCallback? onTap;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = enabled && onTap != null;
-    final color = colors.textSecondary.withValues(alpha: active ? 0.88 : 0.38);
-
-    return Tooltip(
-      message: label,
-      child: IosIconButton(
-        onTap: onTap,
-        enabled: active,
-        semanticLabel: label,
-        color: color,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        builder: (buttonColor) => Icon(icon, size: 14, color: buttonColor),
-      ),
-    );
-  }
-}
-
 class _MermaidLoadingView extends StatefulWidget {
   const _MermaidLoadingView({super.key, required this.colors});
 
-  final _MermaidBlockColors colors;
+  final MarkstreamColors colors;
 
   @override
   State<_MermaidLoadingView> createState() => _MermaidLoadingViewState();
@@ -892,11 +664,7 @@ class _MermaidLoadingViewState extends State<_MermaidLoadingView>
         children: [
           RotationTransition(
             turns: _controller,
-            child: Icon(
-              Lucide.Loader,
-              size: 24,
-              color: widget.colors.textSecondary,
-            ),
+            child: Icon(Lucide.Loader, size: 24, color: widget.colors.ink2),
           ),
           const SizedBox(width: 8),
           Text(
@@ -904,7 +672,7 @@ class _MermaidLoadingViewState extends State<_MermaidLoadingView>
             style: TextStyle(
               fontSize: 14,
               height: 1.3,
-              color: widget.colors.textSecondary,
+              color: widget.colors.ink2,
             ),
           ),
         ],
@@ -916,7 +684,7 @@ class _MermaidLoadingViewState extends State<_MermaidLoadingView>
 class _MermaidErrorView extends StatelessWidget {
   const _MermaidErrorView({super.key, required this.colors});
 
-  final _MermaidBlockColors colors;
+  final MarkstreamColors colors;
 
   @override
   Widget build(BuildContext context) {
@@ -925,16 +693,12 @@ class _MermaidErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Lucide.ImageOff, size: 48, color: colors.textTertiary),
+          Icon(Lucide.ImageOff, size: 48, color: colors.ink3),
           const SizedBox(height: 8),
           Text(
             l10n.mermaidGenerationFailedHint,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.35,
-              color: colors.textTertiary,
-            ),
+            style: TextStyle(fontSize: 14, height: 1.35, color: colors.ink2),
           ),
         ],
       ),

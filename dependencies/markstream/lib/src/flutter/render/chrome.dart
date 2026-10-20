@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../theme/markstream_theme.dart';
 
 enum MarkstreamActionKind {
   copyCode,
@@ -14,18 +15,18 @@ enum MarkstreamActionKind {
 class MarkstreamAction {
   const MarkstreamAction({
     required this.kind,
+    required this.chrome,
     required this.label,
     required this.onInvoke,
   });
+  final MarkstreamChromeTheme chrome;
   final MarkstreamActionKind kind;
   final String label;
   final FutureOr<void> Function() onInvoke;
 }
 
-typedef MarkstreamActionButtonBuilder = Widget Function(
-  BuildContext,
-  MarkstreamAction,
-);
+typedef MarkstreamActionButtonBuilder =
+    Widget Function(BuildContext, MarkstreamAction);
 
 class MarkstreamActionButton extends StatelessWidget {
   const MarkstreamActionButton({super.key, required this.action, this.builder});
@@ -38,8 +39,13 @@ class MarkstreamActionButton extends StatelessWidget {
         TextButton(
           onPressed: () => unawaited(Future<void>.sync(action.onInvoke)),
           style: TextButton.styleFrom(
-            minimumSize: const Size(0, 30),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: Size(0, action.chrome.actionSize),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            foregroundColor: action.chrome.actionColor,
+            textStyle: action.chrome.label,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(action.chrome.actionRadius),
+            ),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: Text(action.label),

@@ -108,13 +108,17 @@ RenderedInline buildCitation(
   return RenderedInline(
     segments: [TextSegment(text: source, sourceSpan: node.span, node: node)],
     span: WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
       child: SelectableSpanAdapter(
         selectedText: source,
         mouseCursor: SystemMouseCursors.click,
         child: MediaQuery.withNoTextScaling(
-          child: _CitationChips(
-            refs: parseCitationRefs(citation.attributes['refs']!),
+          child: OpticalBaseline(
+            center: rendering.theme.inlineCode.opticalCenter,
+            child: _CitationChips(
+              refs: parseCitationRefs(citation.attributes['refs']!),
+            ),
           ),
         ),
       ),
@@ -142,21 +146,25 @@ class _CitationChips extends StatelessWidget {
                     ? null
                     : () => scope!.onTap!(ref.id),
                 child: Container(
-                  constraints: const BoxConstraints(minWidth: 20),
-                  height: 20,
+                  constraints: const BoxConstraints(minWidth: 18),
+                  height: 18,
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: .20),
-                    borderRadius: BorderRadius.circular(10),
+                    color: scheme.primary.withValues(
+                      alpha: scheme.brightness == Brightness.dark ? .22 : .12,
+                    ),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Center(
                     widthFactor: 1,
                     child: Text(
                       _label(ref, scope),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                         height: 1,
-                        color: DefaultTextStyle.of(context).style.color,
+                        color: scheme.primary,
                       ),
                     ),
                   ),

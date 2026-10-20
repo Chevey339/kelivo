@@ -68,6 +68,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme.code;
+    final chrome = widget.theme.chrome;
     final lines = codeLineCount(toPlainText(widget.node));
     final expanded =
         widget.exporting ||
@@ -127,7 +128,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
       );
     }
     final body = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: content,
     );
     return Container(
@@ -147,10 +148,20 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SelectionContainer.disabled(
-            child: ColoredBox(
-              color: theme.headerBackgroundColor,
+            child: Container(
+              key: const ValueKey('markstream-code-header'),
+              height: chrome.height,
+              decoration: BoxDecoration(
+                color: chrome.background,
+                border: Border(
+                  bottom: BorderSide(
+                    color: chrome.divider,
+                    width: MarkstreamTheme.stroke,
+                  ),
+                ),
+              ),
               child: Padding(
-                padding: theme.headerPadding,
+                padding: chrome.padding,
                 child: LayoutBuilder(
                   builder: (context, constraints) => Row(
                     children: [
@@ -168,12 +179,19 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
                             onPressed: widget.exporting ? null : toggle,
                             style:
                                 TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 30),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  minimumSize: Size(0, chrome.actionSize),
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
                                   alignment: Alignment.centerLeft,
                                   foregroundColor: theme.label.color,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      chrome.actionRadius,
+                                    ),
+                                  ),
                                   splashFactory: NoSplash.splashFactory,
                                 ).copyWith(
                                   overlayColor: WidgetStateProperty.resolveWith(
@@ -202,7 +220,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
                                       child: Icon(
                                         LucideIcons.chevronRight,
                                         size: 14,
-                                        color: theme.label.color,
+                                        color: chrome.actionColor,
                                       ),
                                     ),
                                   ),
@@ -232,6 +250,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
                                 ),
                                 MarkstreamActionButton(
                                   action: MarkstreamAction(
+                                    chrome: chrome,
                                     kind: MarkstreamActionKind.copyCode,
                                     label: widget.labels.copyCode,
                                     onInvoke: () => Clipboard.setData(

@@ -11,7 +11,8 @@ class InlineCodeCapsule extends StatelessWidget {
     required this.style,
     required this.backgroundColor,
     required this.borderColor,
-    this.padding = const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    this.padding = const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+    this.border,
     this.radius = 6,
     this.mouseCursor = SystemMouseCursors.text,
   });
@@ -20,6 +21,7 @@ class InlineCodeCapsule extends StatelessWidget {
   final TextStyle style;
   final Color backgroundColor;
   final Color borderColor;
+  final Border? border;
   final EdgeInsetsGeometry padding;
   final double radius;
   final MouseCursor mouseCursor;
@@ -31,12 +33,20 @@ class InlineCodeCapsule extends StatelessWidget {
     child: DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor,
-        border: Border.all(color: borderColor),
+        border:
+            border ??
+            (borderColor.a == 0 ? null : Border.all(color: borderColor)),
         borderRadius: BorderRadius.circular(radius),
       ),
       child: Padding(
         padding: padding,
-        child: Text(text, style: style),
+        child: Text(
+          text,
+          style: style,
+          textHeightBehavior: const TextHeightBehavior(
+            leadingDistribution: TextLeadingDistribution.even,
+          ),
+        ),
       ),
     ),
   );

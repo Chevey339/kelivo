@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/markstream_theme.dart';
 
@@ -26,40 +27,62 @@ class MarkstreamDirectiveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final colors = theme.colors;
     final dark = theme.brightness == Brightness.dark;
     final accent = switch (kind.toLowerCase()) {
-      'tip' => Color(dark ? 0xff75dfa3 : 0xff166534),
-      'warning' => Color(dark ? 0xffffd17b : 0xff855000),
-      'caution' || 'danger' => scheme.error,
-      'important' => scheme.tertiary,
-      _ => scheme.primary,
+      'tip' => colors.tip,
+      'warning' => colors.warning,
+      'caution' || 'danger' => colors.danger,
+      'important' => colors.important,
+      _ => colors.accent,
     };
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: DecoratedBox(
         key: ValueKey('markstream-directive-$kind'),
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: dark ? .10 : .05),
-          border: BorderDirectional(start: BorderSide(color: accent, width: 3)),
-          borderRadius: BorderRadius.circular(6),
+          color: accent.withValues(alpha: dark ? .10 : .06),
+          border: Border.all(
+            color: accent.withValues(alpha: dark ? .26 : .22),
+            width: MarkstreamTheme.stroke,
+          ),
+          borderRadius: BorderRadius.circular(MarkstreamTheme.radiusMd),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               SelectionContainer.disabled(
-                child: Text(
-                  title,
-                  style: theme.body.copyWith(
-                    color: accent,
-                    fontWeight: theme.strongWeight,
-                  ),
+                child: Row(
+                  children: [
+                    Icon(
+                      switch (kind.toLowerCase()) {
+                        'tip' => LucideIcons.lightbulb,
+                        'warning' => LucideIcons.triangleAlert,
+                        'caution' || 'danger' => LucideIcons.octagonAlert,
+                        'important' => LucideIcons.messageSquareWarning,
+                        _ => LucideIcons.info,
+                      },
+                      size: 15,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.body.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               child,
             ],
           ),

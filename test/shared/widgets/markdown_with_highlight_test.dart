@@ -806,7 +806,7 @@ Inline ***strong emphasis*** text.
             .first,
       );
       expect(capsuleSize.width, lessThan(40));
-      expect(capsuleSize.height, 20);
+      expect(capsuleSize.height, 18);
 
       await tester.tap(find.text('4'));
       expect(tapped, ['5675a3']);
@@ -1008,11 +1008,11 @@ Inline ***strong emphasis*** text.
       );
       expect(
         (container.foregroundDecoration as BoxDecoration).borderRadius,
-        BorderRadius.circular(16),
+        BorderRadius.circular(MarkstreamTheme.radiusMd),
       );
       expect(
         tester.getRect(_action(MarkstreamActionKind.copyCode)).right,
-        closeTo(tester.getRect(surface).right - 12, .1),
+        closeTo(tester.getRect(surface).right - 4, .1),
       );
       expect(
         tester.getRect(find.byTooltip('Save as file')).right,
@@ -1255,7 +1255,7 @@ Inline ***strong emphasis*** text.
       );
       expect(
         (surface.foregroundDecoration as BoxDecoration).border!.top.width,
-        .8,
+        MarkstreamTheme.stroke,
       );
       expect(surface.clipBehavior, Clip.antiAlias);
       expect(
@@ -1409,68 +1409,70 @@ Inline ***strong emphasis*** text.
     }
   });
 
-  testWidgets('paragraph selection keeps line breaks through streaming', (
-    tester,
-  ) async {
-    const text = 'First paragraph.\n\nSecond paragraph.';
-    final streaming = ValueNotifier(true);
-    addTearDown(streaming.dispose);
-    String? selected;
-    await tester.pumpWidget(
-      _settingsHarness(
-        onSettingsReady: (_) {},
-        child: SelectionArea(
-          onSelectionChanged: (content) => selected = content?.plainText,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: streaming,
-              builder: (_, value, _) =>
-                  MarkdownWithCodeHighlight(text: text, streaming: value),
+  testWidgets(
+    'paragraph selection keeps line breaks through streaming',
+    (tester) async {
+      const text = 'First paragraph.\n\nSecond paragraph.';
+      final streaming = ValueNotifier(true);
+      addTearDown(streaming.dispose);
+      String? selected;
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: SelectionArea(
+            onSelectionChanged: (content) => selected = content?.plainText,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: streaming,
+                builder: (_, value, _) =>
+                    MarkdownWithCodeHighlight(text: text, streaming: value),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    for (final value in [true, false]) {
-      streaming.value = value;
-      await tester.pumpAndSettle();
-      final region = tester.state<SelectableRegionState>(
-        find.byType(SelectableRegion),
       );
-      region.selectAll(SelectionChangedCause.keyboard);
       await tester.pumpAndSettle();
-      expect(selected, text, reason: 'streaming=$value');
-      region.clearSelection();
-      await tester.pump();
 
-      // A drag across the gap must include the same break as Select All.
-      final first = _paragraphContaining('First paragraph.');
-      final second = _paragraphContaining('Second paragraph.');
-      final start = first.localToGlobal(const Offset(1, 8));
-      final end = second.localToGlobal(Offset(second.size.width - 1, 8));
-      for (final reverse in [true, false]) {
-        // Separate the gestures so reversing at the previous endpoint does
-        // not become a double click and select a word instead of a range.
-        await tester.pump(const Duration(milliseconds: 400));
-        final gesture = await tester.startGesture(
-          reverse ? end : start,
-          kind: ui.PointerDeviceKind.mouse,
-        );
-        await tester.pump();
-        await gesture.moveTo(reverse ? start : end);
-        await tester.pump();
-        await gesture.up();
-        await gesture.removePointer();
+      for (final value in [true, false]) {
+        streaming.value = value;
         await tester.pumpAndSettle();
-        expect(selected, text, reason: 'streaming=$value reverse=$reverse');
+        final region = tester.state<SelectableRegionState>(
+          find.byType(SelectableRegion),
+        );
+        region.selectAll(SelectionChangedCause.keyboard);
+        await tester.pumpAndSettle();
+        expect(selected, text, reason: 'streaming=$value');
         region.clearSelection();
         await tester.pump();
+
+        // A drag across the gap must include the same break as Select All.
+        final first = _paragraphContaining('First paragraph.');
+        final second = _paragraphContaining('Second paragraph.');
+        final start = first.localToGlobal(const Offset(1, 8));
+        final end = second.localToGlobal(Offset(second.size.width - 1, 8));
+        for (final reverse in [true, false]) {
+          // Separate the gestures so reversing at the previous endpoint does
+          // not become a double click and select a word instead of a range.
+          await tester.pump(const Duration(milliseconds: 400));
+          final gesture = await tester.startGesture(
+            reverse ? end : start,
+            kind: ui.PointerDeviceKind.mouse,
+          );
+          await tester.pump();
+          await gesture.moveTo(reverse ? start : end);
+          await tester.pump();
+          await gesture.up();
+          await gesture.removePointer();
+          await tester.pumpAndSettle();
+          expect(selected, text, reason: 'streaming=$value reverse=$reverse');
+          region.clearSelection();
+          await tester.pump();
+        }
       }
-    }
-  }, variant: TargetPlatformVariant.desktop());
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
 
   for (final longReply in [false, true]) {
     testWidgets(
@@ -2157,10 +2159,10 @@ ${rows.join('\n')}
       expect(
         (Canvas canvas) => painter.paint(canvas, tester.getSize(blockquote)),
         paints..rrect(
-          color: cs.onSurfaceVariant.withValues(alpha: .36),
+          color: cs.onSurface.withValues(alpha: .14),
           rrect: RRect.fromRectAndRadius(
             Rect.fromLTWH(0, 0, 3, tester.getSize(blockquote).height),
-            const Radius.circular(2),
+            const Radius.circular(1.5),
           ),
         ),
       );
@@ -2185,10 +2187,9 @@ ${rows.join('\n')}
       expect(blockquote, findsOneWidget);
 
       final painter = tester.widget<CustomPaint>(blockquote).painter!;
-      final cs = Theme.of(tester.element(blockquote)).colorScheme;
       expect(
         (Canvas canvas) => painter.paint(canvas, tester.getSize(blockquote)),
-        paints..rrect(color: cs.onSurfaceVariant.withValues(alpha: .48)),
+        paints..rrect(color: Colors.white.withValues(alpha: .20)),
       );
     },
   );
@@ -4697,7 +4698,7 @@ press5
     expect(expandedSize.width, closeTo(360, 2));
   });
 
-  group('block fill translucency', () {
+  group('unified block and inline fills', () {
     double? fillAlpha(WidgetTester tester, Finder finder) {
       final container = tester.widget<Container>(finder);
       final decoration = container.decoration;
@@ -4705,7 +4706,7 @@ press5
       return (decoration as BoxDecoration).color?.a;
     }
 
-    testWidgets('details block fill is translucent in dark mode', (
+    testWidgets('details block fill is composited with surface in dark mode', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -4724,13 +4725,10 @@ press5
 
       final block = find.byKey(const ValueKey('markstream-details-surface'));
       expect(block, findsOneWidget);
-      expect(
-        fillAlpha(tester, block),
-        closeTo(const MarkstreamFillAlphas().details, 0.01),
-      );
+      expect(fillAlpha(tester, block), 1);
     });
 
-    testWidgets('details block fill is translucent in light mode', (
+    testWidgets('details block fill is composited with surface in light mode', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -4740,13 +4738,10 @@ press5
 
       final block = find.byKey(const ValueKey('markstream-details-surface'));
       expect(block, findsOneWidget);
-      expect(
-        fillAlpha(tester, block),
-        closeTo(const MarkstreamFillAlphas().details, 0.01),
-      );
+      expect(fillAlpha(tester, block), 1);
     });
 
-    testWidgets('table block fill is translucent', (tester) async {
+    testWidgets('table block fill is composited with surface', (tester) async {
       await tester.pumpWidget(
         _markdownHarness('''
 | Name | Value |
@@ -4765,20 +4760,17 @@ press5
             .table
             .bodyBackgroundColor
             .a,
-        closeTo(const MarkstreamFillAlphas().table, 0.01),
+        1,
       );
     });
 
-    testWidgets('code block fill is translucent', (tester) async {
+    testWidgets('code block fill is composited with surface', (tester) async {
       await tester.pumpWidget(_markdownHarness('```dart\nvoid main() {}\n```'));
       await tester.pump();
 
       final block = find.byKey(const ValueKey('markstream-code-surface'));
       expect(block, findsOneWidget);
-      expect(
-        fillAlpha(tester, block),
-        closeTo(const MarkstreamFillAlphas().content, 0.01),
-      );
+      expect(fillAlpha(tester, block), 1);
     });
 
     testWidgets('inline code fill is translucent in light mode', (
@@ -4791,7 +4783,7 @@ press5
       expect(chip, findsOneWidget);
       expect(
         tester.widget<InlineCodeCapsule>(chip).backgroundColor.a,
-        closeTo(const MarkstreamFillAlphas().inline, 0.01),
+        closeTo(.06, .001),
       );
     });
   });
@@ -5123,33 +5115,33 @@ void main() {
       [1],
     );
 
-    expect(_spanFontSize(tester, 'Real heading'), 24);
+    expect(_spanFontSize(tester, 'Real heading'), 15.5 * 1.45);
   });
 
-  testWidgets('regular and inline code text follow inherited ink color', (
-    tester,
-  ) async {
-    final previousPlatform = debugDefaultTargetPlatformOverride;
-    try {
-      const inheritedInk = Color(0xFF224466);
-      const themeInk = Color(0xFF112233);
-      _overrideMarkdownTablePlatform(TargetPlatform.android);
-      final baseTheme = ThemeData.light();
-      final theme = baseTheme.copyWith(
-        colorScheme: baseTheme.colorScheme.copyWith(onSurface: themeInk),
-      );
-      await tester.pumpWidget(
-        ChangeNotifierProvider(
-          create: (_) => SettingsProvider(createBusinessTestPreferences()),
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            theme: theme,
-            home: Scaffold(
-              body: DefaultTextStyle.merge(
-                style: const TextStyle(color: inheritedInk),
-                child: const MarkdownWithCodeHighlight(
-                  text: '''
+  testWidgets(
+    'body inherits ink while inline code follows the surface palette',
+    (tester) async {
+      final previousPlatform = debugDefaultTargetPlatformOverride;
+      try {
+        const inheritedInk = Color(0xFF224466);
+        const themeInk = Color(0xFF112233);
+        _overrideMarkdownTablePlatform(TargetPlatform.android);
+        final baseTheme = ThemeData.light();
+        final theme = baseTheme.copyWith(
+          colorScheme: baseTheme.colorScheme.copyWith(onSurface: themeInk),
+        );
+        await tester.pumpWidget(
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: theme,
+              home: Scaffold(
+                body: DefaultTextStyle.merge(
+                  style: const TextStyle(color: inheritedInk),
+                  child: const MarkdownWithCodeHighlight(
+                    text: '''
 # Real heading
 
 Body copy with `code`.
@@ -5162,42 +5154,46 @@ Body copy with `code`.
 Fenced code body
 ```
 ''',
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(
-        _paragraphContaining('Real heading').text.style?.color,
-        inheritedInk,
-      );
-      expect(
-        _paragraphContaining('Body copy with').text.style?.color,
-        inheritedInk,
-      );
-      expect(tester.widget<Text>(find.text('code')).style?.color, inheritedInk);
-      expect(
-        _paragraphContaining('Theme table header').text.style?.color,
-        themeInk,
-      );
-      expect(
-        _paragraphContaining('Theme table body').text.style?.color,
-        themeInk.withValues(alpha: 0.90),
-      );
-      final fencedCode = tester.widget<Text>(
-        find.descendant(
-          of: find.byType(MarkstreamCodeContent),
-          matching: _codeTextFinder(),
-        ),
-      );
-      expect(fencedCode.textSpan?.style?.color, themeInk);
-    } finally {
-      debugDefaultTargetPlatformOverride = previousPlatform;
-    }
-  });
+        expect(
+          _paragraphContaining('Real heading').text.style?.color,
+          inheritedInk,
+        );
+        expect(
+          _paragraphContaining('Body copy with').text.style?.color,
+          inheritedInk,
+        );
+        expect(
+          tester.widget<Text>(find.text('code')).style?.color,
+          themeInk.withValues(alpha: .92),
+        );
+        expect(
+          _paragraphContaining('Theme table header').text.style?.color,
+          themeInk,
+        );
+        expect(
+          _paragraphContaining('Theme table body').text.style?.color,
+          themeInk.withValues(alpha: .88),
+        );
+        final fencedCode = tester.widget<Text>(
+          find.descendant(
+            of: find.byType(MarkstreamCodeContent),
+            matching: _codeTextFinder(),
+          ),
+        );
+        expect(fencedCode.textSpan?.style?.color, themeInk);
+      } finally {
+        debugDefaultTargetPlatformOverride = previousPlatform;
+      }
+    },
+  );
 
   testWidgets(
     'four-space hashes are not rendered as a heading on either path',

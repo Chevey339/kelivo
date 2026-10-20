@@ -37,6 +37,28 @@ test-VM UI-pipeline observations, excluding raster time and physical-device
 scheduling; they are not Android frame timings. Benchmarks have no timing
 assertions and are excluded from the default `_test.dart` glob.
 
+Optional phase diagnostics use Flutter's existing timeline markers. Run the
+same benchmark file and SDK against both revisions:
+
+```sh
+flutter test --no-pub test/perf/markstream_render_bench.dart \
+  --dart-define=MARKSTREAM_PROFILE_PHASES=true \
+  --dart-define=MARKSTREAM_BENCH_CYCLES=5 --reporter expanded
+```
+
+This adds cold-frame and content-frame build/layout/paint measurements. Root
+layout and paint markers include descendant pipeline owners; child markers are
+not added again. BUILD may include layout-time builders, so these phases are
+not additive. Collection adds instrumentation overhead and excludes raster time.
+Compare instrumented runs only with other instrumented runs.
+
+`MARKSTREAM_BENCH_CYCLES` defaults to 1, preserving the original 56-sample
+protocol. A larger value repeats the same 64-character append window, rewinding
+outside the timers and discarding the first eight samples of every cycle. Five
+cycles produce 280 content-frame samples per fresh process; the cold document
+still renders only once. Phase collection defaults to off and runs only in this
+diagnostic test, never in the application renderer.
+
 Record all five output lines and the median of each round's metric in
 `baselines/markstream_baseline.md`. Android profile results require a physical
 device, independently collected `FrameTiming.buildDuration`, and the recorded

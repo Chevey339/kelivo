@@ -109,7 +109,12 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
     Future<void> Function() invoke,
   ) => MarkstreamActionButton(
     builder: widget.extensions.actionButtonBuilder,
-    action: MarkstreamAction(kind: kind, label: label, onInvoke: invoke),
+    action: MarkstreamAction(
+      kind: kind,
+      label: label,
+      onInvoke: invoke,
+      chrome: widget.theme.chrome,
+    ),
   );
   @override
   Widget build(BuildContext context) {
@@ -154,7 +159,10 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             columnWidth * columns > width;
         final radius = compact ? theme.compactRadius : theme.wideRadius;
         final header = _capturing
-            ? theme.headerBackgroundColor.withValues(alpha: 1)
+            ? Color.alphaBlend(
+                theme.headerBackgroundColor,
+                theme.bodyBackgroundColor,
+              )
             : theme.headerBackgroundColor;
         final body = _capturing
             ? theme.bodyBackgroundColor.withValues(alpha: 1)
@@ -165,8 +173,14 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
               : const FlexColumnWidth(),
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: TableBorder(
-            horizontalInside: BorderSide(color: theme.borderColor, width: .5),
-            verticalInside: BorderSide(color: theme.borderColor, width: .5),
+            horizontalInside: BorderSide(
+              color: theme.borderColor,
+              width: MarkstreamTheme.stroke,
+            ),
+            verticalInside: BorderSide(
+              color: theme.borderColor,
+              width: MarkstreamTheme.stroke,
+            ),
           ),
           children: [
             for (var row = 0; row < count; row++)
@@ -224,7 +238,10 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             key: const ValueKey('markstream-table-surface'),
             position: DecorationPosition.foreground,
             decoration: BoxDecoration(
-              border: Border.all(color: theme.borderColor, width: .8),
+              border: Border.all(
+                color: theme.outerBorderColor,
+                width: MarkstreamTheme.stroke,
+              ),
               borderRadius: BorderRadius.circular(radius),
             ),
             child: ClipRRect(
@@ -245,36 +262,57 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                   context,
                   actionContext,
                 )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  primary: false,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: width,
-                      minHeight: theme.toolbarHeight,
+              : Container(
+                  key: const ValueKey('markstream-table-toolbar'),
+                  height: widget.theme.chrome.height,
+                  padding: widget.theme.chrome.padding,
+                  decoration: BoxDecoration(
+                    color: widget.theme.chrome.background,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: widget.theme.chrome.divider,
+                        width: MarkstreamTheme.stroke,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _action(
-                          MarkstreamActionKind.copyMarkdown,
-                          widget.labels.copyMarkdown,
-                          () => Clipboard.setData(
-                            ClipboardData(text: toMarkdown(widget.node)),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    primary: false,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: math.max(
+                          0,
+                          width -
+                              widget.theme.chrome.padding
+                                  .resolve(Directionality.of(context))
+                                  .horizontal,
+                        ),
+                        minHeight:
+                            widget.theme.chrome.height - MarkstreamTheme.stroke,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _action(
+                            MarkstreamActionKind.copyMarkdown,
+                            widget.labels.copyMarkdown,
+                            () => Clipboard.setData(
+                              ClipboardData(text: toMarkdown(widget.node)),
+                            ),
                           ),
-                        ),
-                        _action(
-                          MarkstreamActionKind.copyCsv,
-                          widget.labels.copyCsv,
-                          () => Clipboard.setData(
-                            ClipboardData(text: tableToCsv(widget.node)),
+                          _action(
+                            MarkstreamActionKind.copyCsv,
+                            widget.labels.copyCsv,
+                            () => Clipboard.setData(
+                              ClipboardData(text: tableToCsv(widget.node)),
+                            ),
                           ),
-                        ),
-                        ...?widget.extensions.tableExtraActions?.call(
-                          context,
-                          actionContext,
-                        ),
-                      ],
+                          ...?widget.extensions.tableExtraActions?.call(
+                            context,
+                            actionContext,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -358,7 +396,10 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
               borderRadius: BorderRadius.circular(theme.compactRadius),
             ),
             foregroundDecoration: BoxDecoration(
-              border: Border.all(color: theme.borderColor, width: .8),
+              border: Border.all(
+                color: theme.outerBorderColor,
+                width: MarkstreamTheme.stroke,
+              ),
               borderRadius: BorderRadius.circular(theme.compactRadius),
             ),
             clipBehavior: Clip.antiAlias,
@@ -375,7 +416,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
           );
         }
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: result,
         );
       },

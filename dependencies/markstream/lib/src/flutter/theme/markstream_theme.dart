@@ -28,26 +28,177 @@ final class MarkstreamFillAlphas extends _ThemeTokens {
   List<Object?> get _values => [details, inline, table, content];
 }
 
+final class MarkstreamColors extends _ThemeTokens {
+  MarkstreamColors({
+    required this.ink,
+    required this.ink2,
+    required this.ink3,
+    required this.border,
+    required this.divider,
+    required this.borderStrong,
+    required this.fillBlock,
+    required this.fillHead,
+    required this.fillInline,
+    required this.quoteBar,
+    required this.accent,
+    required this.surface,
+    required this.tip,
+    required this.warning,
+    required this.danger,
+    required this.important,
+  }) : _values = [
+         ink,
+         ink2,
+         ink3,
+         border,
+         divider,
+         borderStrong,
+         fillBlock,
+         fillHead,
+         fillInline,
+         quoteBar,
+         accent,
+         surface,
+         tip,
+         warning,
+         danger,
+         important,
+       ];
+  final Color ink;
+  final Color ink2;
+  final Color ink3;
+  final Color border;
+  final Color divider;
+  final Color borderStrong;
+  final Color fillBlock;
+  final Color fillHead;
+  final Color fillInline;
+  final Color quoteBar;
+  final Color accent;
+  final Color surface;
+  final Color tip;
+  final Color warning;
+  final Color danger;
+  final Color important;
+  MarkstreamColors copyWith({
+    Color? ink,
+    Color? ink2,
+    Color? ink3,
+    Color? border,
+    Color? divider,
+    Color? borderStrong,
+    Color? fillBlock,
+    Color? fillHead,
+    Color? fillInline,
+    Color? quoteBar,
+    Color? accent,
+    Color? surface,
+    Color? tip,
+    Color? warning,
+    Color? danger,
+    Color? important,
+  }) => MarkstreamColors(
+    ink: ink ?? this.ink,
+    ink2: ink2 ?? this.ink2,
+    ink3: ink3 ?? this.ink3,
+    border: border ?? this.border,
+    divider: divider ?? this.divider,
+    borderStrong: borderStrong ?? this.borderStrong,
+    fillBlock: fillBlock ?? this.fillBlock,
+    fillHead: fillHead ?? this.fillHead,
+    fillInline: fillInline ?? this.fillInline,
+    quoteBar: quoteBar ?? this.quoteBar,
+    accent: accent ?? this.accent,
+    surface: surface ?? this.surface,
+    tip: tip ?? this.tip,
+    warning: warning ?? this.warning,
+    danger: danger ?? this.danger,
+    important: important ?? this.important,
+  );
+  @override
+  final List<Object?> _values;
+}
+
+final class MarkstreamChromeTheme extends _ThemeTokens {
+  MarkstreamChromeTheme({
+    required this.height,
+    required this.padding,
+    required this.background,
+    required this.divider,
+    required this.label,
+    required this.actionSize,
+    required this.actionIconSize,
+    required this.actionColor,
+    required this.actionRadius,
+  }) : _values = [
+         height,
+         padding,
+         background,
+         divider,
+         label,
+         actionSize,
+         actionIconSize,
+         actionColor,
+         actionRadius,
+       ];
+  final double height;
+  final EdgeInsetsGeometry padding;
+  final Color background;
+  final Color divider;
+  final TextStyle label;
+  final double actionSize;
+  final double actionIconSize;
+  final Color actionColor;
+  final double actionRadius;
+  MarkstreamChromeTheme copyWith({
+    double? height,
+    EdgeInsetsGeometry? padding,
+    Color? background,
+    Color? divider,
+    TextStyle? label,
+    double? actionSize,
+    double? actionIconSize,
+    Color? actionColor,
+    double? actionRadius,
+  }) => MarkstreamChromeTheme(
+    height: height ?? this.height,
+    padding: padding ?? this.padding,
+    background: background ?? this.background,
+    divider: divider ?? this.divider,
+    label: label ?? this.label,
+    actionSize: actionSize ?? this.actionSize,
+    actionIconSize: actionIconSize ?? this.actionIconSize,
+    actionColor: actionColor ?? this.actionColor,
+    actionRadius: actionRadius ?? this.actionRadius,
+  );
+  @override
+  final List<Object?> _values;
+}
+
 final class InlineCodeTheme extends _ThemeTokens {
   const InlineCodeTheme({
+    required this.opticalCenter,
     required this.text,
     required this.padding,
     required this.radius,
     required this.backgroundColor,
     required this.borderColor,
   });
+  final double opticalCenter;
   final TextStyle text;
   final EdgeInsetsGeometry padding;
   final double radius;
   final Color backgroundColor;
   final Color borderColor;
   InlineCodeTheme copyWith({
+    double? opticalCenter,
     TextStyle? text,
     EdgeInsetsGeometry? padding,
     double? radius,
     Color? backgroundColor,
     Color? borderColor,
   }) => InlineCodeTheme(
+    opticalCenter: opticalCenter ?? this.opticalCenter,
     text: text ?? this.text,
     padding: padding ?? this.padding,
     radius: radius ?? this.radius,
@@ -56,6 +207,7 @@ final class InlineCodeTheme extends _ThemeTokens {
   );
   @override
   List<Object?> get _values => [
+    opticalCenter,
     text,
     padding,
     radius,
@@ -132,24 +284,28 @@ final class CodeBlockTheme extends _ThemeTokens {
 
 final class QuoteTheme extends _ThemeTokens {
   const QuoteTheme({
+    required this.textColor,
     required this.margin,
     required this.padding,
     required this.barWidth,
     required this.barRadius,
     required this.barColor,
   });
+  final Color textColor;
   final EdgeInsetsGeometry margin;
   final EdgeInsetsGeometry padding;
   final double barWidth;
   final double barRadius;
   final Color barColor;
   QuoteTheme copyWith({
+    Color? textColor,
     EdgeInsetsGeometry? margin,
     EdgeInsetsGeometry? padding,
     double? barWidth,
     double? barRadius,
     Color? barColor,
   }) => QuoteTheme(
+    textColor: textColor ?? this.textColor,
     margin: margin ?? this.margin,
     padding: padding ?? this.padding,
     barWidth: barWidth ?? this.barWidth,
@@ -157,11 +313,19 @@ final class QuoteTheme extends _ThemeTokens {
     barColor: barColor ?? this.barColor,
   );
   @override
-  List<Object?> get _values => [margin, padding, barWidth, barRadius, barColor];
+  List<Object?> get _values => [
+    textColor,
+    margin,
+    padding,
+    barWidth,
+    barRadius,
+    barColor,
+  ];
 }
 
 final class TaskTheme extends _ThemeTokens {
   const TaskTheme({
+    required this.strokeWidth,
     required this.size,
     required this.radius,
     required this.borderColor,
@@ -170,6 +334,7 @@ final class TaskTheme extends _ThemeTokens {
     required this.checkSize,
     required this.checkedText,
   });
+  final double strokeWidth;
   final double size;
   final double radius;
   final Color borderColor;
@@ -178,6 +343,7 @@ final class TaskTheme extends _ThemeTokens {
   final double checkSize;
   final TextStyle checkedText;
   TaskTheme copyWith({
+    double? strokeWidth,
     double? size,
     double? radius,
     Color? borderColor,
@@ -186,6 +352,7 @@ final class TaskTheme extends _ThemeTokens {
     double? checkSize,
     TextStyle? checkedText,
   }) => TaskTheme(
+    strokeWidth: strokeWidth ?? this.strokeWidth,
     size: size ?? this.size,
     radius: radius ?? this.radius,
     borderColor: borderColor ?? this.borderColor,
@@ -196,6 +363,7 @@ final class TaskTheme extends _ThemeTokens {
   );
   @override
   List<Object?> get _values => [
+    strokeWidth,
     size,
     radius,
     borderColor,
@@ -208,6 +376,7 @@ final class TaskTheme extends _ThemeTokens {
 
 final class MarkdownTableTheme extends _ThemeTokens {
   const MarkdownTableTheme({
+    required this.outerBorderColor,
     required this.heading,
     required this.body,
     required this.cellPadding,
@@ -224,6 +393,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     required this.columnMaxWidth,
     required this.visibleColumns,
   });
+  final Color outerBorderColor;
   final TextStyle heading;
   final TextStyle body;
   final EdgeInsetsGeometry cellPadding;
@@ -240,6 +410,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
   final double columnMaxWidth;
   final double visibleColumns;
   MarkdownTableTheme copyWith({
+    Color? outerBorderColor,
     TextStyle? heading,
     TextStyle? body,
     EdgeInsetsGeometry? cellPadding,
@@ -256,6 +427,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     double? columnMaxWidth,
     double? visibleColumns,
   }) => MarkdownTableTheme(
+    outerBorderColor: outerBorderColor ?? this.outerBorderColor,
     heading: heading ?? this.heading,
     body: body ?? this.body,
     cellPadding: cellPadding ?? this.cellPadding,
@@ -274,6 +446,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
   );
   @override
   List<Object?> get _values => [
+    outerBorderColor,
     heading,
     body,
     cellPadding,
@@ -294,6 +467,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
 
 final class DetailsTheme extends _ThemeTokens {
   const DetailsTheme({
+    required this.contentPadding,
     required this.margin,
     required this.radius,
     required this.backgroundColor,
@@ -303,6 +477,7 @@ final class DetailsTheme extends _ThemeTokens {
     required this.chevronSize,
     required this.chevronDuration,
   });
+  final EdgeInsetsGeometry contentPadding;
   final EdgeInsetsGeometry margin;
   final double radius;
   final Color backgroundColor;
@@ -312,6 +487,7 @@ final class DetailsTheme extends _ThemeTokens {
   final double chevronSize;
   final Duration chevronDuration;
   DetailsTheme copyWith({
+    EdgeInsetsGeometry? contentPadding,
     EdgeInsetsGeometry? margin,
     double? radius,
     Color? backgroundColor,
@@ -321,6 +497,7 @@ final class DetailsTheme extends _ThemeTokens {
     double? chevronSize,
     Duration? chevronDuration,
   }) => DetailsTheme(
+    contentPadding: contentPadding ?? this.contentPadding,
     margin: margin ?? this.margin,
     radius: radius ?? this.radius,
     backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -332,6 +509,7 @@ final class DetailsTheme extends _ThemeTokens {
   );
   @override
   List<Object?> get _values => [
+    contentPadding,
     margin,
     radius,
     backgroundColor,
@@ -344,7 +522,11 @@ final class DetailsTheme extends _ThemeTokens {
 }
 
 final class MarkstreamTheme extends _ThemeTokens {
+  static const radiusXs = 4.0, radiusSm = 6.0, radiusMd = 12.0;
+  static const stroke = 1.0;
   MarkstreamTheme({
+    required this.chrome,
+    required this.colors,
     required this.brightness,
     required this.body,
     required this.strongWeight,
@@ -368,6 +550,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.fillAlphas,
   }) : assert(headings.length == 6),
        headings = List.unmodifiable(headings);
+  final MarkstreamChromeTheme chrome;
+  final MarkstreamColors colors;
   final Brightness brightness;
   final TextStyle body;
   final FontWeight strongWeight;
@@ -390,6 +574,8 @@ final class MarkstreamTheme extends _ThemeTokens {
   final DetailsTheme details;
   final MarkstreamFillAlphas fillAlphas;
   MarkstreamTheme copyWith({
+    MarkstreamChromeTheme? chrome,
+    MarkstreamColors? colors,
     Brightness? brightness,
     TextStyle? body,
     FontWeight? strongWeight,
@@ -412,6 +598,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     DetailsTheme? details,
     MarkstreamFillAlphas? fillAlphas,
   }) => MarkstreamTheme(
+    chrome: chrome ?? this.chrome,
+    colors: colors ?? this.colors,
     brightness: brightness ?? this.brightness,
     body: body ?? this.body,
     strongWeight: strongWeight ?? this.strongWeight,
@@ -436,6 +624,8 @@ final class MarkstreamTheme extends _ThemeTokens {
   );
   @override
   List<Object?> get _values => [
+    chrome,
+    colors,
     brightness,
     body,
     strongWeight,
@@ -465,6 +655,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     ColorScheme colors, {
     TextStyle? bodyStyle,
     String codeFontFamily = 'monospace',
+    bool desktop = false,
     FontWeight medium = FontWeight.w500,
     FontWeight semibold = FontWeight.w600,
     FontWeight strong = FontWeight.w700,
@@ -478,136 +669,188 @@ final class MarkstreamTheme extends _ThemeTokens {
       letterSpacing: bodyStyle?.letterSpacing ?? (cjk ? 0 : .05),
       color: bodyStyle?.color ?? colors.onSurface,
     );
-    final ink = body.color ?? body.foreground?.color ?? colors.onSurface;
+    final b = body.fontSize!;
+    final on = colors.onSurface;
+    const white = Colors.white;
+    final palette = MarkstreamColors(
+      ink: on,
+      ink2: on.withValues(alpha: dark ? .70 : .72),
+      ink3: on.withValues(alpha: dark ? .48 : .50),
+      border: (dark ? white : on).withValues(alpha: .10),
+      divider: (dark ? white : on).withValues(alpha: .07),
+      borderStrong: (dark ? white : on).withValues(alpha: dark ? .32 : .30),
+      fillBlock: Color.alphaBlend(
+        white.withValues(alpha: dark ? .04 : .70),
+        colors.surface,
+      ),
+      fillHead: (dark ? white : on).withValues(alpha: dark ? .06 : .04),
+      fillInline: (dark ? white : on).withValues(alpha: dark ? .10 : .06),
+      quoteBar: (dark ? white : on).withValues(alpha: dark ? .20 : .14),
+      accent: colors.primary,
+      surface: colors.surface,
+      tip: Color(dark ? 0xff75dfa3 : 0xff16a34a),
+      warning: Color(dark ? 0xffffd17b : 0xffb45309),
+      danger: colors.error,
+      important: colors.tertiary,
+    );
+    final chrome = MarkstreamChromeTheme(
+      height: 36,
+      padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
+      background: palette.fillHead,
+      divider: palette.divider,
+      label: body.copyWith(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+        color: palette.ink2,
+        letterSpacing: .2,
+        height: 1,
+      ),
+      actionSize: 28,
+      actionIconSize: 15,
+      actionColor: palette.ink3,
+      actionRadius: 7,
+    );
     final mono = TextStyle(
-      fontSize: 13,
-      height: 1.5,
-      color: colors.onSurface,
+      fontSize: desktop ? 12.5 : 13,
+      height: 1.55,
+      color: palette.ink,
       fontFamily: codeFontFamily,
       fontFamilyFallback: body.fontFamilyFallback,
     );
-    final extremeOutline =
-        colors.outlineVariant == Colors.black ||
-        colors.outlineVariant == Colors.white;
     return MarkstreamTheme(
+      colors: palette,
+      chrome: chrome,
       brightness: colors.brightness,
       body: body,
       strongWeight: strong,
       headings: [
-        body.copyWith(fontSize: 24, fontWeight: strong, height: 1.25),
-        body.copyWith(fontSize: 20, fontWeight: semibold, height: 1.30),
-        body.copyWith(fontSize: 18, fontWeight: semibold, height: 1.35),
-        body.copyWith(fontSize: 16, fontWeight: medium),
-        body.copyWith(fontSize: 15, fontWeight: medium),
-        body.copyWith(fontSize: 14, fontWeight: medium),
+        body.copyWith(
+          fontSize: b * 1.45,
+          fontWeight: FontWeight.w700,
+          height: 1.3,
+        ),
+        body.copyWith(
+          fontSize: b * 1.27,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+        ),
+        body.copyWith(
+          fontSize: b * 1.13,
+          fontWeight: FontWeight.w600,
+          height: 1.4,
+        ),
+        body.copyWith(fontSize: b, fontWeight: FontWeight.w600, height: 1.45),
+        body.copyWith(
+          fontSize: b * .94,
+          fontWeight: FontWeight.w600,
+          height: 1.45,
+        ),
+        body.copyWith(
+          fontSize: b * .88,
+          fontWeight: FontWeight.w600,
+          height: 1.45,
+          color: palette.ink2,
+        ),
       ],
-      headingPadding: const EdgeInsets.symmetric(vertical: 2),
-      blockSpacing: body.fontSize! * 1.15,
-      link: TextStyle(color: colors.primary, decoration: TextDecoration.none),
+      headingPadding: const EdgeInsets.only(top: 4),
+      blockSpacing: b * .9,
+      link: TextStyle(
+        color: palette.accent,
+        decoration: TextDecoration.underline,
+        decorationColor: palette.accent.withValues(alpha: .35),
+        decorationThickness: 1,
+      ),
       inlineCode: InlineCodeTheme(
-        text: mono.copyWith(height: 1.4, color: body.color),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        radius: 6,
-        backgroundColor: dark
-            ? Colors.white12
-            : const Color(0xFFF1F3F5).withValues(alpha: fillAlphas.inline),
-        borderColor: colors.outlineVariant.withValues(alpha: .22),
+        text: mono.copyWith(
+          fontSize: b * .86,
+          height: 1,
+          leadingDistribution: TextLeadingDistribution.even,
+          color: palette.ink.withValues(alpha: .92),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        opticalCenter: b * .35,
+        radius: radiusSm,
+        backgroundColor: palette.fillInline,
+        borderColor: Colors.transparent,
       ),
       code: CodeBlockTheme(
         text: mono,
-        label: body.copyWith(
-          fontSize: 12,
-          fontWeight: medium,
-          color: colors.onSurfaceVariant.withValues(alpha: .72),
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        headerPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        radius: 16,
-        borderColor: extremeOutline
-            ? Color.alphaBlend(
-                colors.onSurfaceVariant.withValues(alpha: dark ? .32 : .24),
-                colors.surface,
-              )
-            : colors.outlineVariant,
-        backgroundColor: colors.surfaceContainer.withValues(
-          alpha: fillAlphas.content,
-        ),
-        headerBackgroundColor: colors.surfaceContainerHighest.withValues(
-          alpha: fillAlphas.content,
-        ),
+        label: chrome.label,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        headerPadding: const EdgeInsets.symmetric(horizontal: 12),
+        radius: radiusMd,
+        borderColor: palette.border,
+        backgroundColor: palette.fillBlock,
+        headerBackgroundColor: palette.fillHead,
         collapseDuration: const Duration(milliseconds: 220),
         fadeHeight: 24,
         virtualizedHeight: 420,
       ),
       quote: QuoteTheme(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsetsDirectional.only(start: 13),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsetsDirectional.only(start: 12),
         barWidth: 3,
-        barRadius: 2,
-        barColor: colors.onSurfaceVariant.withValues(alpha: dark ? .48 : .36),
+        barRadius: 1.5,
+        barColor: palette.quoteBar,
+        textColor: palette.ink2,
       ),
-      listMarkerPadding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+      listMarkerPadding: const EdgeInsetsDirectional.only(end: 6),
       task: TaskTheme(
-        size: 18,
-        radius: 5,
-        borderColor: colors.outlineVariant.withValues(alpha: .8),
-        selectedColor: colors.primary.withValues(alpha: .12),
-        checkColor: colors.primary,
-        checkSize: 14,
+        size: 16,
+        radius: radiusXs,
+        strokeWidth: 1.5,
+        borderColor: palette.borderStrong,
+        selectedColor: colors.primary,
+        checkColor: colors.onPrimary,
+        checkSize: 10,
         checkedText: body.copyWith(
           decoration: TextDecoration.lineThrough,
-          color: ink.withValues(alpha: .75),
+          decorationColor: palette.ink3,
+          color: palette.ink3,
         ),
       ),
       table: MarkdownTableTheme(
         heading: body.copyWith(
           fontSize: 13,
-          height: 1.42,
-          fontWeight: semibold,
-          color: colors.onSurface,
+          height: 1.45,
+          fontWeight: FontWeight.w600,
+          color: palette.ink,
         ),
         body: body.copyWith(
           fontSize: 13.5,
-          height: 1.42,
-          color: colors.onSurface.withValues(alpha: .90),
+          height: 1.45,
+          color: palette.ink.withValues(alpha: .88),
         ),
-        cellPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        borderColor: colors.outlineVariant.withValues(alpha: dark ? .22 : .30),
-        headerBackgroundColor: Color.alphaBlend(
-          colors.primary.withValues(alpha: dark ? .15 : .07),
-          colors.surface,
-        ).withValues(alpha: fillAlphas.table),
-        bodyBackgroundColor: Color.alphaBlend(
-          colors.primary.withValues(alpha: dark ? .04 : .015),
-          colors.surface,
-        ).withValues(alpha: fillAlphas.table),
+        cellPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        borderColor: palette.divider,
+        outerBorderColor: palette.border,
+        headerBackgroundColor: palette.fillHead,
+        bodyBackgroundColor: palette.fillBlock,
         compactBreakpoint: 520,
-        compactRadius: 12,
-        wideRadius: 10,
-        toolbarHeight: 38,
+        compactRadius: radiusMd,
+        wideRadius: radiusMd,
+        toolbarHeight: chrome.height,
         singleColumnMinWidth: 220,
         singleColumnMaxWidth: 360,
         columnMinWidth: 112,
         columnMaxWidth: 178,
         visibleColumns: 2.45,
       ),
-      rulePadding: const EdgeInsets.symmetric(vertical: 10),
-      ruleThickness: 1,
-      ruleColor: colors.outlineVariant.withValues(alpha: .40),
-      imageRadius: 8,
-      inlineMathScale: 1.2,
-      mathPadding: const EdgeInsets.symmetric(vertical: 4),
+      rulePadding: const EdgeInsets.symmetric(vertical: 12),
+      ruleThickness: stroke,
+      ruleColor: palette.border,
+      imageRadius: radiusMd,
+      inlineMathScale: 1.1,
+      mathPadding: const EdgeInsets.symmetric(vertical: 8),
       details: DetailsTheme(
         margin: const EdgeInsets.symmetric(vertical: 4),
-        radius: 16,
-        backgroundColor: Color.alphaBlend(
-          colors.onSurface.withValues(alpha: dark ? .05 : .025),
-          colors.surface,
-        ).withValues(alpha: fillAlphas.details),
-        borderColor: colors.outlineVariant.withValues(alpha: dark ? .18 : .30),
+        radius: radiusMd,
+        backgroundColor: palette.fillBlock,
+        borderColor: palette.border,
         summary: body.copyWith(fontWeight: medium),
-        summaryPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        chevronSize: 15,
+        summaryPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        chevronSize: 14,
         chevronDuration: const Duration(milliseconds: 160),
       ),
       fillAlphas: fillAlphas,

@@ -248,7 +248,8 @@ void main() {
       await tester.pumpWidget(
         host(
           MarkstreamView(
-            source: '# [Big](https://big.test)\n\n[**bold** `code`](https://code.test)',
+            source:
+                '# [Big](https://big.test)\n\n[**bold** `code`](https://code.test)',
             linkHandler: links,
           ),
         ),
@@ -259,7 +260,7 @@ void main() {
         if (span is TextSpan && span.text == 'Big') styles.add(span.style);
         return true;
       });
-      expect(styles.single!.fontSize, 24);
+      expect(styles.single!.fontSize, 15.5 * 1.45);
       await tester.tapAt(edge(heading, 1));
       await tester.tapAt(edge(paragraph('bold'), 1));
       await tester.tap(find.byType(InlineCodeCapsule));
