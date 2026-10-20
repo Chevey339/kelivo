@@ -338,7 +338,7 @@ class MessageBuilderService {
   /// Build API messages list from current conversation state.
   ///
   /// Receives projected history and collapses versions. Attachments come from parts.
-  /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
+  /// [preserveToolTurns] replays each persisted tool round as its own turn.
   /// [responsesScope] selects native Responses replay for matching artifacts.
   /// [claudeSource] keeps ordinary Claude blocks on their original model.
   List<Map<String, dynamic>> buildApiMessages({
