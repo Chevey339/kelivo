@@ -162,6 +162,8 @@ abstract final class StorageUsageService {
     Future<Directory> Function()? rootfsUsageDirectory,
   }) async {
     final root = await AppDirectories.getAppDataDirectory();
+    final contentRoot = await AppDirectories.contentDirectoryFor(root);
+    final splitStorage = !p.equals(root.path, contentRoot.path);
     var migrationCompleted = false;
     try {
       migrationCompleted = HiveMigrationMarker.isMigrationComplete(
@@ -196,6 +198,7 @@ abstract final class StorageUsageService {
       'fonts': _MutableStats(),
       'local_models': _MutableStats(),
       'app': _MutableStats(),
+      'app_documents': _MutableStats(),
       'retained_data': _MutableStats(),
     };
 
@@ -215,7 +218,7 @@ abstract final class StorageUsageService {
     int totalBytes = 0;
     int totalFiles = 0;
 
-    if (!await root.exists()) {
+    if (!await root.exists() && !await contentRoot.exists()) {
       return StorageUsageReport(
         totalBytes: 0,
         totalFiles: 0,
@@ -231,142 +234,147 @@ abstract final class StorageUsageService {
       );
     }
 
-    try {
-      await for (final ent in _listFiles(
-        root,
-        excludedTopDirectories: _isolateMeasuredTopDirs,
-      )) {
-        final rel = p.relative(ent.path, from: root.path);
-        final parts = p.split(rel);
-        int bytes = 0;
-        try {
-          bytes = await ent.length();
-        } catch (_) {
-          bytes = 0;
-        }
-        totalFiles += 1;
-        totalBytes += bytes;
-
-        if (parts.isEmpty) {
-          byCat[StorageUsageCategoryKey.other]!.add(bytes);
-          otherSubs['app']!.add(bytes);
-          continue;
-        }
-
-        // Root-level chat data is stored by Drift in the SQLite database file
-        // family. Legacy Hive boxes are migration inputs only and should not
-        // affect the steady-state chat records size.
-        if (parts.length == 1) {
-          final name = parts.first;
-          final chatSubId = _chatDatabaseSubcategoryId(name);
-          if (RecoveryFileDiscovery.isSnapshotArchive(name) ||
-              (name.endsWith('.json') &&
-                  RecoveryFileDiscovery.isSnapshotArchive(
-                    name.substring(0, name.length - 5),
-                  ))) {
-            byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
-          } else if (name.startsWith(_displacedDatabasePrefix)) {
-            byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
-          } else if (chatSubId != null) {
-            byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
-            chatSubs[chatSubId]!.add(bytes);
-          } else if (migrationCompleted &&
-              LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
-            byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
-            legacyChatSubs[name]!.add(bytes);
-          } else {
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['app']!.add(bytes);
+    for (final scanRoot in [root, if (splitStorage) contentRoot]) {
+      final publicFiles =
+          splitStorage && p.equals(scanRoot.path, contentRoot.path);
+      final otherApp = otherSubs[publicFiles ? 'app_documents' : 'app']!;
+      try {
+        await for (final ent in _listFiles(
+          scanRoot,
+          excludedTopDirectories: _isolateMeasuredTopDirs,
+        )) {
+          final rel = p.relative(ent.path, from: scanRoot.path);
+          final parts = p.split(rel);
+          int bytes = 0;
+          try {
+            bytes = await ent.length();
+          } catch (_) {
+            bytes = 0;
           }
-          continue;
-        }
+          totalFiles += 1;
+          totalBytes += bytes;
 
-        final top = parts.first.toLowerCase();
-        if (DatabaseFamilyPreserver.isCopyDirectory(top)) {
-          byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
-          continue;
-        }
-        if (RecoveryFileDiscovery.isSnapshotDirectory(top)) {
-          byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
-          continue;
-        }
-        if (restoreTraces.visible &&
-            top == '.kelivo_restore' &&
-            parts.length >= 4 &&
-            parts[1] == 'completed' &&
-            RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
-          byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
-          continue;
-        }
-        switch (top) {
-          case LocalSnapshotPaths.directoryName:
+          if (parts.isEmpty) {
+            byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherApp.add(bytes);
+            continue;
+          }
+
+          // Root-level chat data is stored by Drift in the SQLite database file
+          // family. Legacy Hive boxes are migration inputs only and should not
+          // affect the steady-state chat records size.
+          if (parts.length == 1) {
+            final name = parts.first;
+            final chatSubId = _chatDatabaseSubcategoryId(name);
+            if (splitStorage &&
+                p.equals(scanRoot.path, contentRoot.path) &&
+                (chatSubId != null ||
+                    RecoveryFileDiscovery.isDatabaseFamilyFile(name) ||
+                    name.startsWith('database_installation_receipt_') ||
+                    LegacyDataRetirementService.hiveArtifactNames.contains(
+                      name,
+                    ))) {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['retained_data']!.add(bytes);
+            } else if (RecoveryFileDiscovery.isSnapshotArchive(name) ||
+                (name.endsWith('.json') &&
+                    RecoveryFileDiscovery.isSnapshotArchive(
+                      name.substring(0, name.length - 5),
+                    ))) {
+              byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+            } else if (name.startsWith(_displacedDatabasePrefix)) {
+              byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+            } else if (chatSubId != null) {
+              byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
+              chatSubs[chatSubId]!.add(bytes);
+            } else if (migrationCompleted &&
+                LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
+              byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
+              legacyChatSubs[name]!.add(bytes);
+            } else {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherApp.add(bytes);
+            }
+            continue;
+          }
+
+          final top = parts.first.toLowerCase();
+          if (DatabaseFamilyPreserver.isCopyDirectory(top)) {
+            if (publicFiles) {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['retained_data']!.add(bytes);
+            } else {
+              byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+            }
+            continue;
+          }
+          if (RecoveryFileDiscovery.isSnapshotDirectory(top)) {
             byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
-            break;
-          case 'upload':
-          case 'images':
-            final name = parts.last;
-            if (_isImageExt(name)) {
-              byCat[StorageUsageCategoryKey.images]!.add(bytes);
-            } else {
-              byCat[StorageUsageCategoryKey.files]!.add(bytes);
-            }
-            break;
-          case 'avatars':
-            byCat[StorageUsageCategoryKey.assistantData]!.add(bytes);
-            assistantSubs['avatars']!.add(bytes);
-            break;
-          case 'fonts':
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['fonts']!.add(bytes);
-            break;
-          case 'asr_models':
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['local_models']!.add(bytes);
-            break;
-          case 'cache':
-            byCat[StorageUsageCategoryKey.cache]!.add(bytes);
-            if (parts.length >= 2 && parts[1].toLowerCase() == 'avatars') {
-              cacheSubs['avatar_cache']!.add(bytes);
-            } else {
-              cacheSubs['other_cache']!.add(bytes);
-            }
-            break;
-          case 'logs':
-            byCat[StorageUsageCategoryKey.logs]!.add(bytes);
-            final name = parts.last.toLowerCase();
-            if (name.startsWith('context_logs')) {
-              logsSubs['context_logs']!.add(bytes);
-            } else if (name.startsWith('flutter_logs')) {
-              logsSubs['flutter_logs']!.add(bytes);
-            } else if (name.startsWith('logs')) {
-              logsSubs['request_logs']!.add(bytes);
-            } else {
-              logsSubs['other_logs']!.add(bytes);
-            }
-            break;
-          default:
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['app']!.add(bytes);
-            break;
+            continue;
+          }
+          if (!publicFiles &&
+              restoreTraces.visible &&
+              top == '.kelivo_restore' &&
+              parts.length >= 4 &&
+              parts[1] == 'completed' &&
+              RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
+            byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
+            continue;
+          }
+          switch (top) {
+            case LocalSnapshotPaths.directoryName:
+              byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+              break;
+            case 'upload':
+            case 'images':
+              final name = parts.last;
+              if (_isImageExt(name)) {
+                byCat[StorageUsageCategoryKey.images]!.add(bytes);
+              } else {
+                byCat[StorageUsageCategoryKey.files]!.add(bytes);
+              }
+              break;
+            case 'avatars':
+              byCat[StorageUsageCategoryKey.assistantData]!.add(bytes);
+              assistantSubs['avatars']!.add(bytes);
+              break;
+            case 'fonts':
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['fonts']!.add(bytes);
+              break;
+            case 'asr_models':
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['local_models']!.add(bytes);
+              break;
+            case 'cache':
+              byCat[StorageUsageCategoryKey.cache]!.add(bytes);
+              if (parts.length >= 2 && parts[1].toLowerCase() == 'avatars') {
+                cacheSubs['avatar_cache']!.add(bytes);
+              } else {
+                cacheSubs['other_cache']!.add(bytes);
+              }
+              break;
+            case 'logs':
+              byCat[StorageUsageCategoryKey.logs]!.add(bytes);
+              final name = parts.last.toLowerCase();
+              if (name.startsWith('context_logs')) {
+                logsSubs['context_logs']!.add(bytes);
+              } else if (name.startsWith('flutter_logs')) {
+                logsSubs['flutter_logs']!.add(bytes);
+              } else if (name.startsWith('logs')) {
+                logsSubs['request_logs']!.add(bytes);
+              } else {
+                logsSubs['other_logs']!.add(bytes);
+              }
+              break;
+            default:
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherApp.add(bytes);
+              break;
+          }
         }
-      }
-    } catch (_) {
-      // Keep successfully measured files if a file disappears during the scan.
-    }
-
-    final retainedRoot = await AppDirectories.retainedDataDirectory(root);
-    if (retainedRoot != null && await retainedRoot.exists()) {
-      await for (final file in _listFiles(retainedRoot)) {
-        int bytes;
-        try {
-          bytes = await file.length();
-        } on FileSystemException {
-          continue;
-        }
-        byCat[StorageUsageCategoryKey.other]!.add(bytes);
-        otherSubs['retained_data']!.add(bytes);
-        totalBytes += bytes;
-        totalFiles++;
+      } catch (_) {
+        // Keep successfully measured files if a file disappears during the scan.
       }
     }
 
@@ -410,11 +418,11 @@ abstract final class StorageUsageService {
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
-    final localModelsDir = Directory(p.join(root.path, 'asr_models'));
+    final localModelsDir = Directory(p.join(contentRoot.path, 'asr_models'));
     final cacheDir = await AppDirectories.getCacheDirectory();
     final systemCacheDir = await AppDirectories.getSystemCacheDirectory();
     final avatarCacheDir = await AppDirectories.getAvatarCacheDirectory();
-    final logsDir = Directory(p.join(root.path, 'logs'));
+    final logsDir = Directory(p.join(contentRoot.path, 'logs'));
 
     // Platform cache directory (e.g. Android /data/user/0/<package>/cache).
     try {
@@ -525,7 +533,7 @@ abstract final class StorageUsageService {
             StorageUsageSubcategory(
               id: 'local_snapshots',
               stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
-              path: LocalSnapshotPaths.directoryIn(root).path,
+              path: LocalSnapshotPaths.directoryIn(contentRoot).path,
             ),
           ],
         ),
@@ -607,12 +615,18 @@ abstract final class StorageUsageService {
               stats: otherSubs['local_models']!.toStats(),
               path: localModelsDir.path,
             ),
-          if (retainedRoot != null && otherSubs['retained_data']!.fileCount > 0)
+          if (splitStorage && otherSubs['retained_data']!.fileCount > 0)
             StorageUsageSubcategory(
               id: 'retained_data',
               stats: otherSubs['retained_data']!.toStats(),
-              path: retainedRoot.path,
+              path: contentRoot.path,
               isDirectory: true,
+            ),
+          if (otherSubs['app_documents']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'app_documents',
+              stats: otherSubs['app_documents']!.toStats(),
+              path: contentRoot.path,
             ),
           if (otherSubs['app']!.fileCount > 0)
             StorageUsageSubcategory(
@@ -716,7 +730,7 @@ abstract final class StorageUsageService {
     } catch (_) {}
 
     try {
-      final root = await AppDirectories.getAppDataDirectory();
+      final root = await AppDirectories.getContentDirectory();
       final logsDir = Directory(p.join(root.path, 'logs'));
       // The startup-recovery record is the only trace of an unattended rebuild
       // — the one startup outcome that destroys state without asking. Clearing
@@ -762,7 +776,7 @@ abstract final class StorageUsageService {
   }
 
   static Future<void> clearLocalModels() async {
-    final root = await AppDirectories.getAppDataDirectory();
+    final root = await AppDirectories.getContentDirectory();
     await _deleteDirectoryContents(Directory(p.join(root.path, 'asr_models')));
   }
 

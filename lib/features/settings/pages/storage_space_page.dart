@@ -216,6 +216,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLocalModels;
       case 'retained_data':
         return l10n.recoveryRetainedData;
+      case 'app_documents':
       case 'app':
         return l10n.storageSpaceSubOtherApp;
       case 'avatars':

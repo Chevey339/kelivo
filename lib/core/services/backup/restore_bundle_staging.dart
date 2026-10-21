@@ -23,6 +23,7 @@ import 'backup_settings_validator.dart';
 import 'backup_task_progress.dart';
 import 'restore_durability.dart';
 import 'restore_diagnostic_exception.dart';
+import '../../../utils/app_directories.dart';
 import 'restore_workspace_lock.dart';
 
 typedef ValidatedRestoreEntry = ({int bytes, String sha256});
@@ -123,6 +124,7 @@ final class RestoreBundleStaging {
     required bool includeFiles,
     BackupScope scope = const BackupScope(),
     bool useExistingLocalAttachments = false,
+    Directory? filesDirectory,
     bool? sourceIncludesChats,
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
@@ -276,7 +278,11 @@ final class RestoreBundleStaging {
         recomputeAttachmentsUnavailable:
             !includeFiles || !scope.includes(BackupCategory.files),
         localSnapshotAppDataPath: useExistingLocalAttachments
-            ? appDataDirectory.path
+            ? (filesDirectory ??
+                      await AppDirectories.contentDirectoryFor(
+                        appDataDirectory,
+                      ))
+                  .path
             : null,
         onProgress: onProgress,
         cancelToken: cancelToken,

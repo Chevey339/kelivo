@@ -23589,25 +23589,25 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryProtectingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Protecting your data'**
+  /// **'Protecting the chat database'**
   String get recoveryProtectingTitle;
 
   /// No description provided for @recoveryProtectingData.
   ///
   /// In en, this message translates to:
-  /// **'Copying and verifying your data in protected storage. Original files and snapshots will be kept. This can take a while for large histories.'**
+  /// **'Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.'**
   String get recoveryProtectingData;
 
   /// No description provided for @recoveryStorageReadyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Data storage is now protected'**
+  /// **'Chat database moved to internal storage'**
   String get recoveryStorageReadyTitle;
 
   /// No description provided for @recoveryStorageReadyBody.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo now keeps its internal data away from the Files app. The original data and snapshots in Documents have been retained. If older chats are missing, open Settings → Backup → Local Copies to review recovery copies.'**
+  /// **'The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.'**
   String get recoveryStorageReadyBody;
 
   /// No description provided for @recoveryRetainedData.
@@ -23625,7 +23625,7 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryStorageInsufficientSpaceBody.
   ///
   /// In en, this message translates to:
-  /// **'There is not enough free space to keep the original data and create a verified protected copy. Your original files and snapshots are unchanged. Free some space, then retry.'**
+  /// **'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.'**
   String get recoveryStorageInsufficientSpaceBody;
 }
 

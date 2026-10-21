@@ -356,6 +356,7 @@ class DataSync {
   static Future<void> prepareStartupSnapshotRestore({
     required Directory appDataDirectory,
     required File snapshot,
+    Directory? filesDirectory,
     RestoreBusinessLease? businessLease,
     BackupProgressSink? onProgress,
   }) async {
@@ -421,6 +422,7 @@ class DataSync {
         restoreChats: true,
         restoreFiles: false,
         useExistingLocalAttachments: true,
+        filesDirectory: filesDirectory,
         validatedSettings: settings,
         onProgress: onProgress,
       );
@@ -754,7 +756,7 @@ class DataSync {
       // Resolve directory paths (need AppDirectories on main isolate).
       // Join against the app-data root instead of the ensure-creating
       // helpers so a backup does not mkdir empty live roots.
-      final appData = await AppDirectories.getAppDataDirectory();
+      final appData = await AppDirectories.getContentDirectory();
       final assetRootPaths = {
         for (final name in _assetRootNames) name: p.join(appData.path, name),
       };
@@ -2554,7 +2556,7 @@ class DataSync {
     if (!_assetRootNames.contains(name)) {
       throw StateError('unknown_asset_root:$name');
     }
-    final appData = await AppDirectories.getAppDataDirectory();
+    final appData = await AppDirectories.getContentDirectory();
     return Directory(p.join(appData.path, name));
   }
 

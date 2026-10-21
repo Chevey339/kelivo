@@ -567,25 +567,32 @@ void main() {
               .firstWhere((file) => file.path.endsWith('.zip'));
           await archive.writeAsString('archive changed after validation');
         });
-        await tester.tap(find.text('Choose a snapshot'));
+        final chooseButton = tester.widget<FilledButton>(
+          find.ancestor(
+            of: find.text('Choose a snapshot'),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is FilledButton,
+            ),
+          ),
+        );
+        late Future<void> restore;
+        await tester.runAsync(() async {
+          // Invoke the same action once, retaining its completion so the test
+          // waits for validation and cleanup rather than a fixed I/O budget.
+          restore = (chooseButton.onPressed! as Future<void> Function())();
+        });
         await tester.pumpAndSettle();
         await tester.tap(find.text('2 chats · 42 messages'));
+        await tester.runAsync(() => Future<void>.delayed(Duration.zero));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Restore'));
+        await tester.runAsync(() => Future<void>.delayed(Duration.zero));
         await tester.pump();
         expect(find.text('Preparing copy'), findsOneWidget);
-        for (var round = 0; round < 100; round++) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 20)),
-          );
-          await tester.pump(const Duration(milliseconds: 20));
-          if (find
-              .textContaining('Could not prepare the snapshot restore')
-              .evaluate()
-              .isNotEmpty) {
-            break;
-          }
-        }
+        await tester.runAsync(
+          () => restore.timeout(const Duration(seconds: 10)),
+        );
+        await tester.pumpAndSettle();
         expect(
           find.textContaining('Could not prepare the snapshot restore'),
           findsOneWidget,

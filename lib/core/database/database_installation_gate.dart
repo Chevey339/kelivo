@@ -238,7 +238,7 @@ final class DatabaseInstallationGate {
   }
 
   static Future<File> _historyFile(Directory root) async {
-    final retained = await AppDirectories.retainedDataDirectory(root);
+    final retained = await AppDirectories.documentsDirectoryFor(root);
     return File(
       p.join(retained == null ? root.path : root.parent.path, historyFileName),
     );

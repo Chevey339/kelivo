@@ -12619,18 +12619,18 @@ class AppLocalizationsZh extends AppLocalizations {
       'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
 
   @override
-  String get recoveryProtectingTitle => '正在保护数据';
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
 
   @override
   String get recoveryProtectingData =>
-      '正在将数据复制到受保护的位置并校验。原文件和快照会保留，数据较多时需要一些时间。';
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
 
   @override
-  String get recoveryStorageReadyTitle => '数据已转存至受保护的位置';
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
 
   @override
   String get recoveryStorageReadyBody =>
-      'Kelivo 的内部数据现已与系统“文件”App 分开存放，Documents 中的原数据和快照均已保留。若之前的聊天仍然缺失，可以前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
 
   @override
   String get recoveryRetainedData => '保留的原数据';
@@ -12640,7 +12640,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get recoveryStorageInsufficientSpaceBody =>
-      '剩余空间不足，无法在保留原数据的同时建立经过校验的受保护副本。原文件和快照均未改动，请腾出一些空间后重试。';
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25184,18 +25184,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
 
   @override
-  String get recoveryProtectingTitle => '正在保护数据';
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
 
   @override
   String get recoveryProtectingData =>
-      '正在将数据复制到受保护的位置并校验。原文件和快照会保留，数据较多时需要一些时间。';
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
 
   @override
-  String get recoveryStorageReadyTitle => '数据已转存至受保护的位置';
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
 
   @override
   String get recoveryStorageReadyBody =>
-      'Kelivo 的内部数据现已与系统“文件”App 分开存放，Documents 中的原数据和快照均已保留。若之前的聊天仍然缺失，可以前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
 
   @override
   String get recoveryRetainedData => '保留的原数据';
@@ -25205,7 +25205,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get recoveryStorageInsufficientSpaceBody =>
-      '剩余空间不足，无法在保留原数据的同时建立经过校验的受保护副本。原文件和快照均未改动，请腾出一些空间后重试。';
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37828,18 +37828,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。';
 
   @override
-  String get recoveryProtectingTitle => '正在保護資料';
+  String get recoveryProtectingTitle => '正在保護聊天資料庫';
 
   @override
   String get recoveryProtectingData =>
-      '正在將資料複製到受保護的位置並驗證。原始檔案與快照會保留，資料較多時需要一些時間。';
+      '正在複製並驗證資料庫。圖片、附件和快照留在 Documents，不會重複複製；原資料庫也會保留。';
 
   @override
-  String get recoveryStorageReadyTitle => '資料已轉存至受保護的位置';
+  String get recoveryStorageReadyTitle => '聊天資料庫已轉存至 App 內部';
 
   @override
   String get recoveryStorageReadyBody =>
-      'Kelivo 的內部資料現已與系統「檔案」App 分開存放，Documents 中的原資料與快照均已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。';
+      '存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。';
 
   @override
   String get recoveryRetainedData => '保留的原資料';
@@ -37849,5 +37849,5 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get recoveryStorageInsufficientSpaceBody =>
-      '剩餘空間不足，無法在保留原資料的同時建立經過驗證的受保護副本。原始檔案與快照均未更動，請釋放一些空間後重試。';
+      '剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。';
 }

@@ -4,6 +4,9 @@ import '../services/backup/data_sync.dart';
 import '../services/backup/restore_startup_gate.dart';
 import 'startup_recovery_service.dart';
 import 'database_installation_gate.dart';
+import 'database_family_preserver.dart';
+import '../services/backup/restore_workspace_lock.dart';
+import '../services/legacy_data_retirement_service.dart';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
@@ -13,7 +16,8 @@ import '../services/backup/restore_business_lease.dart';
 import '../services/backup/restore_durability.dart';
 import '../services/storage/device_storage_probe.dart';
 
-/// One-way activation of private iOS storage. The source is never deleted.
+/// Activates private iOS database storage. Public files stay in Documents.
+/// The source database family is retained, not deleted.
 /// A complete, verified copy is published by directory rename. A durable
 /// installation record outside the data directory prevents a missing private
 /// directory from being silently repopulated with stale Documents data.
@@ -295,19 +299,10 @@ abstract final class PrivateDataStorage {
       final id = const Uuid().v4();
       final intent = <String, dynamic>{'version': 1, 'id': id};
       if (snapshot != null) {
-        // Snapshots omit attachments. Restore missing managed assets from
-        // retained roots before preparing the database's attachment references.
-        for (final root in await recoveryDirectories(
-          source: source,
-          target: target,
-        )) {
-          if (!p.equals(root.path, target.path)) {
-            await _copyMissingAssets(root, target, io);
-          }
-        }
         await DataSync.prepareStartupSnapshotRestore(
           appDataDirectory: target,
           snapshot: snapshot,
+          filesDirectory: source,
           businessLease: lease,
         );
         final pending = await RestoreStartupGate.inspect(
@@ -403,63 +398,6 @@ abstract final class PrivateDataStorage {
     );
   }
 
-  static Future<void> _copyMissingAssets(
-    Directory source,
-    Directory target,
-    RestoreDurability io,
-  ) async {
-    Future<void> copy(Directory from, Directory to) async {
-      final type = await FileSystemEntity.type(to.path, followLinks: false);
-      if (type != FileSystemEntityType.notFound &&
-          type != FileSystemEntityType.directory) {
-        return;
-      }
-      await to.create();
-      await io.restrictDirectory(to);
-      await for (final child in from.list(followLinks: false)) {
-        final path = p.join(to.path, p.basename(child.path));
-        if (child is Directory) {
-          await copy(child, Directory(path));
-        } else if (child is File &&
-            await FileSystemEntity.type(path, followLinks: false) ==
-                FileSystemEntityType.notFound) {
-          final expected = {
-            'bytes': await child.length(),
-            'sha256': (await sha256.bind(child.openRead()).first).toString(),
-          };
-          final temp = await child.copy('$path.${const Uuid().v4()}.tmp');
-          if (!await _matchesFile(temp, expected)) {
-            throw StateError('private_storage_copy_mismatch');
-          }
-          await io.restrictFile(temp);
-          await io.syncFile(temp, fullBarrier: true);
-          await io.renameAndSync(source: temp, targetPath: path);
-        }
-      }
-      await io.syncDirectory(to, fullBarrier: true);
-    }
-
-    for (final name in [
-      'images',
-      'upload',
-      'avatars',
-      'fonts',
-      'drafts',
-      'workspaces',
-      'sessions',
-      'skills',
-      'environment',
-      'asr_models',
-    ]) {
-      final directory = Directory(p.join(source.path, name));
-      if (await FileSystemEntity.type(directory.path, followLinks: false) ==
-          FileSystemEntityType.directory) {
-        await copy(directory, Directory(p.join(target.path, name)));
-      }
-    }
-    await io.syncDirectory(target, fullBarrier: true);
-  }
-
   static Future<Map<String, dynamic>> _readRecord(File file) async {
     if (await FileSystemEntity.type(file.path, followLinks: false) !=
             FileSystemEntityType.file ||
@@ -476,15 +414,78 @@ abstract final class PrivateDataStorage {
     return value;
   }
 
+  // Only persistence needed to open or finish recovering the live database.
+  // Images, uploads, snapshots, models and workspaces remain public and are
+  // neither copied nor hashed during activation.
+  static bool _isDatabaseState(String name) =>
+      DatabaseFamilyPreserver.suffixes.any((s) => name == 'kelivo.db$s') ||
+      name.startsWith('database_installation_receipt_') ||
+      name == DatabaseInstallationGate.historyFileName ||
+      name == RestoreWorkspaceLock.workspaceRootName ||
+      name == RestoreWorkspaceLock.snapshotRecoveryMarkerName ||
+      name == DatabaseFamilyPreserver.pendingName ||
+      LegacyDataRetirementService.hiveArtifactNames.contains(name);
+
   static Future<Map<String, dynamic>> _inventory(Directory root) async {
     final entries = <String, dynamic>{};
     if (!await root.exists()) return entries;
+    String? pendingFamily;
+    final preservation = File(
+      p.join(root.path, DatabaseFamilyPreserver.pendingName),
+    );
+    if (await preservation.exists()) {
+      if (await preservation.length() > 4096) {
+        throw StateError('private_storage_record_invalid');
+      }
+      final pending = jsonDecode(await preservation.readAsString());
+      if (pending is! Map ||
+          pending['directory'] is! String ||
+          !DatabaseFamilyPreserver.isCopyDirectory(
+            pending['directory'] as String,
+          )) {
+        throw StateError('private_storage_record_invalid');
+      }
+      pendingFamily = pending['directory'] as String;
+    }
+    String? archivingRun;
+    final archivingMarker = File(
+      p.join(
+        root.path,
+        RestoreWorkspaceLock.workspaceRootName,
+        RestoreWorkspaceLock.archivingRunFileName,
+      ),
+    );
+    if (await archivingMarker.exists()) {
+      if (await archivingMarker.length() != 32) {
+        throw StateError('private_storage_record_invalid');
+      }
+      final id = await archivingMarker.readAsString();
+      if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(id)) {
+        throw StateError('private_storage_record_invalid');
+      }
+      archivingRun = 'run_$id';
+    }
+    final completedPath = p.join(
+      RestoreWorkspaceLock.workspaceRootName,
+      RestoreWorkspaceLock.completedRunsDirectoryName,
+    );
     Future<void> walk(Directory directory) async {
       final children = await directory.list(followLinks: false).toList();
       children.sort((a, b) => a.path.compareTo(b.path));
       for (final child in children) {
         final relative = p.relative(child.path, from: root.path);
-        if (relative == RestoreBusinessLease.leaseDirectoryName) continue;
+        if (p.equals(directory.path, root.path) &&
+            !_isDatabaseState(p.basename(child.path)) &&
+            p.basename(child.path) != pendingFamily) {
+          continue;
+        }
+        // Completed recovery archives are retained public backups. Only an
+        // interrupted archive publication still needs its referenced run.
+        if (relative == completedPath && archivingRun == null) continue;
+        if (p.dirname(relative) == completedPath &&
+            p.basename(relative) != archivingRun) {
+          continue;
+        }
         if (child is Directory) {
           entries[relative] = {'kind': 'directory'};
           await walk(child);

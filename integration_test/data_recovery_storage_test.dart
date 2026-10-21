@@ -31,7 +31,7 @@ void main() {
         p.join(support.path, AppDirectories.privateDataDirectoryName),
       );
       expect(
-        (await AppDirectories.retainedDataDirectory(
+        (await AppDirectories.documentsDirectoryFor(
           await AppDirectories.getAppDataDirectory(),
         ))!.path,
         documents.path,
@@ -112,6 +112,7 @@ void main() {
               error: StateError('database_missing_with_prior_data'),
             ),
             appDataDirectory: destination,
+            privateStorageSource: source,
             restart: () async {
               restarted = true;
             },
@@ -173,8 +174,12 @@ void main() {
       expect(await sourceDatabase.readAsBytes(), sourceBeforeRestore);
       expect(await snapshot.readAsBytes(), originalArchive);
       expect(
-        await File(p.join(destination.path, 'snapshots 2', name)).readAsBytes(),
+        await File(p.join(source.path, 'snapshots 2', name)).readAsBytes(),
         originalArchive,
+      );
+      expect(
+        await Directory(p.join(destination.path, 'snapshots 2')).exists(),
+        isFalse,
       );
       // ignore: avoid_print
       print(

@@ -5825,11 +5825,11 @@
   "recoveryDiscoveredCopyBody": "Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.",
   "recoveryStorageFailureTitle": "Data storage needs attention",
   "recoveryStorageFailureBody": "Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.",
-  "recoveryProtectingTitle": "Protecting your data",
-  "recoveryProtectingData": "Copying and verifying your data in protected storage. Original files and snapshots will be kept. This can take a while for large histories.",
-  "recoveryStorageReadyTitle": "Data storage is now protected",
-  "recoveryStorageReadyBody": "Kelivo now keeps its internal data away from the Files app. The original data and snapshots in Documents have been retained. If older chats are missing, open Settings → Backup → Local Copies to review recovery copies.",
+  "recoveryProtectingTitle": "Protecting the chat database",
+  "recoveryProtectingData": "Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.",
+  "recoveryStorageReadyTitle": "Chat database moved to internal storage",
+  "recoveryStorageReadyBody": "The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.",
   "recoveryRetainedData": "Retained original data",
   "recoveryNoValidCopies": "Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.",
-  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original data and create a verified protected copy. Your original files and snapshots are unchanged. Free some space, then retry."
+  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry."
 }

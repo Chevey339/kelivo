@@ -144,10 +144,13 @@ class HiveToSqliteMigrationDecision {
     required this.appDataDir,
     required this.sqliteFile,
     required this.hiveFiles,
+    this.contentDirectory,
   });
 
   final bool needsMigration;
   final Directory appDataDir;
+  final Directory? contentDirectory;
+  Directory get filesDirectory => contentDirectory ?? appDataDir;
   final File sqliteFile;
   final List<File> hiveFiles;
 }
@@ -225,6 +228,9 @@ class HiveToSqliteMigrationService {
 
   static Future<HiveToSqliteMigrationDecision> check() async {
     final appDataDir = await AppDirectories.getAppDataDirectory();
+    final contentDirectory = await AppDirectories.contentDirectoryFor(
+      appDataDir,
+    );
     final sqliteFile = File(
       p.join(appDataDir.path, AppDatabase.databaseFileName),
     );
@@ -240,6 +246,7 @@ class HiveToSqliteMigrationService {
         appDataDir: appDataDir,
         sqliteFile: sqliteFile,
         hiveFiles: hiveFiles,
+        contentDirectory: contentDirectory,
       );
     }
     // Read the receipt off the file rather than through a live connection:
@@ -254,6 +261,7 @@ class HiveToSqliteMigrationService {
         appDataDir: appDataDir,
         sqliteFile: sqliteFile,
         hiveFiles: hiveFiles,
+        contentDirectory: contentDirectory,
       );
     }
 
@@ -262,6 +270,7 @@ class HiveToSqliteMigrationService {
       appDataDir: appDataDir,
       sqliteFile: sqliteFile,
       hiveFiles: hiveFiles,
+      contentDirectory: contentDirectory,
     );
   }
 
@@ -1137,7 +1146,7 @@ class HiveToSqliteMigrationService {
 
   bool _backupDirectoryMayContainFiles(String directoryName) {
     final directory = Directory(
-      p.join(decision.appDataDir.path, directoryName),
+      p.join(decision.filesDirectory.path, directoryName),
     );
     try {
       if (!directory.existsSync()) return false;
@@ -1219,7 +1228,7 @@ class HiveToSqliteMigrationService {
 
     for (final directory in _backupDirectories) {
       final source = Directory(
-        p.join(decision.appDataDir.path, directory.directoryName),
+        p.join(decision.filesDirectory.path, directory.directoryName),
       );
       final itemName = '${directory.zipPrefix}/';
       if (!items.any((item) => item.name == itemName)) continue;

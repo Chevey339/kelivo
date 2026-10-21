@@ -32,19 +32,23 @@ void main() {
   });
   tearDown(() async => root.delete(recursive: true));
   test(
-    'copies database family and renamed snapshots while preserving originals',
+    'copies only database state and leaves snapshots and assets in Documents',
     () async {
       await PrivateDataStorage.prepare(source: source, target: target);
-      for (final path in [
-        'kelivo.db',
-        'kelivo.db-wal',
-        'snapshots 2/kept.zip',
-      ]) {
+      for (final path in ['kelivo.db', 'kelivo.db-wal']) {
         expect(
           await File(p.join(target.path, path)).readAsBytes(),
           await File(p.join(source.path, path)).readAsBytes(),
         );
       }
+      expect(
+        await Directory(p.join(target.path, 'snapshots 2')).exists(),
+        isFalse,
+      );
+      expect(
+        await File(p.join(source.path, 'snapshots 2/kept.zip')).readAsString(),
+        'old snapshot',
+      );
       await File(
         p.join(target.path, 'kelivo.db'),
       ).writeAsString('new conversations');
@@ -63,6 +67,80 @@ void main() {
       );
     },
   );
+  test(
+    'retains completed archives publicly but copies a referenced archiving run',
+    () async {
+      final workspace = Directory(p.join(source.path, '.kelivo_restore'));
+      const active = '11111111111111111111111111111111';
+      const older = '22222222222222222222222222222222';
+      for (final id in [active, older]) {
+        final file = File(
+          p.join(
+            workspace.path,
+            'completed',
+            'run_$id',
+            'previous',
+            'images',
+            'old.png',
+          ),
+        );
+        await file.parent.create(recursive: true);
+        await file.writeAsString(id);
+      }
+      await File(
+        p.join(workspace.path, '.active_run.archiving'),
+      ).writeAsString(active);
+      await PrivateDataStorage.prepare(source: source, target: target);
+      expect(
+        await File(
+          p.join(
+            target.path,
+            '.kelivo_restore',
+            'completed',
+            'run_$active',
+            'previous',
+            'images',
+            'old.png',
+          ),
+        ).readAsString(),
+        active,
+      );
+      expect(
+        await Directory(
+          p.join(target.path, '.kelivo_restore', 'completed', 'run_$older'),
+        ).exists(),
+        isFalse,
+      );
+      expect(
+        await File(
+          p.join(
+            workspace.path,
+            'completed',
+            'run_$older',
+            'previous',
+            'images',
+            'old.png',
+          ),
+        ).readAsString(),
+        older,
+      );
+    },
+  );
+  test('copies the family needed to resume interrupted preservation', () async {
+    const family = 'kelivo.db.displaced-1792600000000000';
+    final copy = File(p.join(source.path, family, 'kelivo.db-wal'));
+    await copy.parent.create();
+    await copy.writeAsString('retained WAL');
+    await File(
+      p.join(source.path, '.kelivo_database_preservation.json'),
+    ).writeAsString('{"version":1,"directory":"$family"}');
+    await PrivateDataStorage.prepare(source: source, target: target);
+    expect(
+      await File(p.join(target.path, family, 'kelivo.db-wal')).readAsString(),
+      'retained WAL',
+    );
+    expect(await copy.readAsString(), 'retained WAL');
+  });
   test(
     'resumes interrupted directory publication using the verified staged copy',
     () async {
@@ -310,7 +388,7 @@ void main() {
         );
         expect(
           await File(
-            p.join(target.path, 'images', 'retained.png'),
+            p.join(source.path, 'images', 'retained.png'),
           ).readAsString(),
           'retained attachment',
         );
@@ -393,7 +471,7 @@ void main() {
       );
       expect(
         await File(
-          p.join(target.path, 'snapshots 2', 'kept.zip'),
+          p.join(source.path, 'snapshots 2', 'kept.zip'),
         ).readAsString(),
         'old snapshot',
       );

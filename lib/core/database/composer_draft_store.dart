@@ -115,7 +115,7 @@ class ComposerDraftStore extends ChangeNotifier {
               _drafts[id]?.edit != null));
 
   static Future<Directory> _defaultDirectory() async => Directory(
-    p.join((await AppDirectories.getAppDataDirectory()).path, 'drafts'),
+    p.join((await AppDirectories.getContentDirectory()).path, 'drafts'),
   );
 
   static String _directoryName(String owner) =>

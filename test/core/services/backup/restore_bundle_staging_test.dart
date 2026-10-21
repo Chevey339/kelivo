@@ -1339,6 +1339,9 @@ void main() {
       'does not delete candidate while the revalidation isolate has not exited',
       () async {
         final extracted = await _createExtractedBundle(root);
+        // Preparation may take longer than the cancellation deadline. Only
+        // cancel once the revalidation isolate has actually started.
+        RestoreBundleStaging.debugCandidateDbStallMs = 350;
         RestoreBundleStaging.debugCandidateValidateHangSeconds = 2;
         RestoreBundleStaging.debugIsolateKillGrace = const Duration(
           milliseconds: 40,
@@ -1346,11 +1349,9 @@ void main() {
         RestoreBundleStaging.debugIsolateExitDeadline = const Duration(
           milliseconds: 80,
         );
-        RestoreBundleStaging.debugIsolateTimeout = const Duration(
-          milliseconds: 150,
-        );
         debugSkipBackupIsolateKill = true;
         addTearDown(() {
+          RestoreBundleStaging.debugCandidateDbStallMs = 0;
           RestoreBundleStaging.debugCandidateValidateHangSeconds = 0;
           RestoreBundleStaging.debugIsolateKillGrace = null;
           RestoreBundleStaging.debugIsolateExitDeadline = null;
@@ -1362,6 +1363,7 @@ void main() {
         addTearDown(token.dispose);
         Directory? workspaceRoot;
         Object? error;
+        var revalidationStarted = false;
         try {
           await RestoreBundleStaging.create(
             appDataDirectory: root,
@@ -1372,6 +1374,7 @@ void main() {
             cancelToken: token,
             onProgress: (progress) {
               if (progress.detail == 'candidate-revalidate') {
+                revalidationStarted = true;
                 token.cancel();
               }
             },
@@ -1380,6 +1383,7 @@ void main() {
           error = e;
         }
 
+        expect(revalidationStarted, isTrue);
         expect(error, isNotNull);
         expect(backupIsolateStillAlive(error!), isTrue);
         workspaceRoot = Directory(

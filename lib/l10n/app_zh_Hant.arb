@@ -4631,11 +4631,11 @@
   "recoveryDiscoveredCopyBody": "在原儲存目錄或其他位置發現的副本。原始檔案會保留，還原前會進行完整驗證。",
   "recoveryStorageFailureTitle": "資料儲存需要檢查",
   "recoveryStorageFailureBody": "Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。",
-  "recoveryProtectingTitle": "正在保護資料",
-  "recoveryProtectingData": "正在將資料複製到受保護的位置並驗證。原始檔案與快照會保留，資料較多時需要一些時間。",
-  "recoveryStorageReadyTitle": "資料已轉存至受保護的位置",
-  "recoveryStorageReadyBody": "Kelivo 的內部資料現已與系統「檔案」App 分開存放，Documents 中的原資料與快照均已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。",
+  "recoveryProtectingTitle": "正在保護聊天資料庫",
+  "recoveryProtectingData": "正在複製並驗證資料庫。圖片、附件和快照留在 Documents，不會重複複製；原資料庫也會保留。",
+  "recoveryStorageReadyTitle": "聊天資料庫已轉存至 App 內部",
+  "recoveryStorageReadyBody": "存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。",
   "recoveryRetainedData": "保留的原資料",
   "recoveryNoValidCopies": "找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。",
-  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料的同時建立經過驗證的受保護副本。原始檔案與快照均未更動，請釋放一些空間後重試。"
+  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。"
 }

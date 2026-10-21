@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 ///
 /// - Windows/macOS/Linux: use the Application Support (app data) directory
 ///   provided by `path_provider`.
-/// - iOS: private Application Support storage; Documents is retained.
+/// - iOS: database state in Application Support; user files in Documents.
 /// - Android: Application Documents directory.
 class AppDirectories {
   AppDirectories._();
@@ -39,8 +39,8 @@ class AppDirectories {
 
   static const privateDataDirectoryName = 'kelivo-data';
 
-  /// Original iOS Documents is kept intact after private storage activation.
-  static Future<Directory?> retainedDataDirectory(Directory active) async {
+  /// Public iOS files, including the retained original database family.
+  static Future<Directory?> documentsDirectoryFor(Directory active) async {
     if (defaultTargetPlatform != TargetPlatform.iOS) return null;
     final support = await getApplicationSupportDirectory();
     if (!p.equals(
@@ -52,33 +52,44 @@ class AppDirectories {
     return getApplicationDocumentsDirectory();
   }
 
+  /// Files users may access in Files: snapshots, attachments and other assets.
+  static Future<Directory> getContentDirectory() async =>
+      defaultTargetPlatform == TargetPlatform.iOS
+      ? getApplicationDocumentsDirectory()
+      : getAppDataDirectory();
+
+  /// Resolve live assets for a database root without redirecting temporary
+  /// restore candidates or test directories to the real app container.
+  static Future<Directory> contentDirectoryFor(Directory databaseRoot) async =>
+      await documentsDirectoryFor(databaseRoot) ?? databaseRoot;
+
   /// Gets the directory for uploaded files.
   static Future<Directory> getUploadDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/upload');
   }
 
   /// Gets the directory for image files.
   static Future<Directory> getImagesDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/images');
   }
 
   /// Gets the directory for avatar files.
   static Future<Directory> getAvatarsDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/avatars');
   }
 
   /// Gets the directory for user-imported font files.
   static Future<Directory> getFontsDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/fonts');
   }
 
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/cache');
   }
 
@@ -117,7 +128,7 @@ class AppDirectories {
   static Future<Directory> _ensureSubdir(String name) => _ensurePath(name);
 
   static Future<Directory> _ensurePath(String relativePath) async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     final dir = Directory('${root.path}/$relativePath');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -136,7 +147,7 @@ class AppDirectories {
 
   /// Gets the directory for avatar cache files.
   static Future<Directory> getAvatarCacheDirectory() async {
-    final root = await getAppDataDirectory();
+    final root = await getContentDirectory();
     return Directory('${root.path}/cache/avatars');
   }
 

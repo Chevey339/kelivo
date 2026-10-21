@@ -171,7 +171,7 @@ Future<void> main() async {
         await _initDesktopWindow();
       }
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
-      final retained = await AppDirectories.retainedDataDirectory(
+      final retained = await AppDirectories.documentsDirectoryFor(
         appDataDirectory,
       );
       if (retained != null) {

@@ -29,7 +29,7 @@ abstract final class RecoveryFileDiscovery {
         caseSensitive: false,
       ).hasMatch(name);
 
-  static bool _isDatabaseFamilyFile(String name) =>
+  static bool isDatabaseFamilyFile(String name) =>
       isDatabaseCopy(name) ||
       _databaseSidecars.any(
         (suffix) =>
@@ -41,7 +41,7 @@ abstract final class RecoveryFileDiscovery {
     Directory root, {
     List<Directory> additionalRoots = const [],
   }) async {
-    final legacy = await AppDirectories.retainedDataDirectory(root);
+    final legacy = await AppDirectories.documentsDirectoryFor(root);
     final paths = <String>{};
     final result = <Directory>[];
     for (final directory in [
@@ -177,7 +177,7 @@ abstract final class RecoveryFileDiscovery {
         await for (final entry in directory.list(followLinks: false)) {
           final name = p.basename(entry.path);
           if (entry is File &&
-              (_isDatabaseFamilyFile(name) ||
+              (isDatabaseFamilyFile(name) ||
                   name.startsWith('kelivo.db-') ||
                   name == DatabaseFamilyPreserver.pendingName ||
                   isSnapshotArchive(name) ||

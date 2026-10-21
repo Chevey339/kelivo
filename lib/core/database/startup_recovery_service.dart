@@ -9,6 +9,7 @@ import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_business_lease.dart';
 import '../services/backup/restore_workspace_lock.dart';
 import 'app_database.dart';
+import '../../utils/app_directories.dart';
 import 'empty_database_recovery_guard.dart';
 import 'database_installation_gate.dart';
 
@@ -74,7 +75,7 @@ final class StartupRecoveryService {
     }
     await target.create(recursive: true);
     for (var i = 0; i < roots.length; i++) {
-      final destination = additionalDataDirectories.isEmpty
+      final destination = additionalDataDirectories.isEmpty && roots.length == 1
           ? target
           : await Directory(p.join(target.path, 'data-$i')).create();
       await _copyDirectory(roots[i], destination);
@@ -196,7 +197,11 @@ final class StartupRecoveryService {
   ) async {
     final paths = <String>{};
     final result = <Directory>[];
-    for (final directory in [root, ...additional]) {
+    for (final directory in [
+      root,
+      await AppDirectories.contentDirectoryFor(root),
+      ...additional,
+    ]) {
       if (!paths.add(p.normalize(directory.absolute.path))) continue;
       final type = await FileSystemEntity.type(
         directory.path,
@@ -335,7 +340,10 @@ final class StartupDiagnosticsService {
   }) async {
     try {
       final directory = Directory(
-        p.join(appDataDirectory.path, _logDirectoryName),
+        p.join(
+          (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+          _logDirectoryName,
+        ),
       );
       await directory.create(recursive: true);
       final stamp = (clock?.call() ?? DateTime.now())
@@ -416,9 +424,9 @@ final class StartupDiagnosticsService {
       throw StateError('startup_recovery_export_collision');
     }
     final encoder = ZipFileEncoder();
-    if (additionalDataDirectories.isEmpty) {
+    if (additionalDataDirectories.isEmpty && roots.length == 1) {
       await encoder.zipDirectory(
-        appDataDirectory,
+        roots.single,
         filename: archive.path,
         followLinks: false,
       );

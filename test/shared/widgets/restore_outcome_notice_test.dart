@@ -71,7 +71,10 @@ void main() {
       for (
         var i = 0;
         i < 100 &&
-            find.text('Data storage is now protected').evaluate().isEmpty;
+            find
+                .text('Chat database moved to internal storage')
+                .evaluate()
+                .isEmpty;
         i++
       ) {
         await tester.runAsync(
@@ -79,10 +82,13 @@ void main() {
         );
         await tester.pump();
       }
-      expect(find.text('Data storage is now protected'), findsOneWidget);
+      expect(
+        find.text('Chat database moved to internal storage'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(
-          'original data and snapshots in Documents have been retained',
+          'Snapshots, images and attachments remain accessible in the Files app',
         ),
         findsOneWidget,
       );
