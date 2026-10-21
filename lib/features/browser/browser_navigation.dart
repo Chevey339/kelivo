@@ -14,6 +14,7 @@ Future<void> openBrowserPage(
   BuildContext context, {
   String? conversationId,
   String? assistantId,
+  String? tabId,
   bool fullPage = false,
 }) async {
   final id = await ensureConversationId(
@@ -22,15 +23,25 @@ Future<void> openBrowserPage(
     assistantId: assistantId,
   );
   if (!context.mounted) return;
+  final browser = BrowserService.instance;
+  String? selectedTabId;
+  // A historical/closed tab falls back to the normal entry path. Let the page
+  // own cold initialization (including its existing storage-error UI).
+  if (tabId != null && browser.tabs.any((tab) => tab.id == tabId)) {
+    selectedTabId = tabId;
+    await browser.selectTab(tabId);
+    if (!context.mounted) return;
+  }
   final panel = BrowserPanelController.instance;
-  if (!fullPage && PlatformUtils.isDesktop && panel.open(conversationId: id)) {
+  if (!fullPage &&
+      PlatformUtils.isDesktop &&
+      panel.open(conversationId: id, initialTabId: selectedTabId)) {
     return;
   }
   final navigator = Navigator.of(context);
   final desktop = PlatformUtils.isDesktop;
-  final initialTabId = panel.isOpen
-      ? BrowserService.instance.activeTabId
-      : null;
+  final initialTabId =
+      selectedTabId ?? (panel.isOpen ? browser.activeTabId : null);
   final canDock = desktop && panel.hasHost;
   Widget buildPage(BuildContext pageContext) => BrowserPage(
     conversationId: id,

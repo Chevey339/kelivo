@@ -5854,5 +5854,131 @@
   "browserUserAgentCustom": "Custom",
   "browserUserAgentHint": "Enter a custom User-Agent",
   "browserUserAgentInvalid": "Use a single line of up to 2048 printable ASCII characters.",
-  "browserUserAgentDescription": "Changes reload the current webpage."
+  "browserUserAgentDescription": "Changes reload the current webpage.",
+  "browserStepGroupTitle": "Browsing",
+  "browserStepCount": "· {count} steps",
+  "@browserStepCount": {
+    "description": "Browser page card browserStepCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserStepCurrent": "· step {index}",
+  "@browserStepCurrent": {
+    "description": "Browser page card browserStepCurrent",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionCount": "{count} actions",
+  "@browserActionCount": {
+    "description": "Browser page card browserActionCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailedCount": "· {count} failed",
+  "@browserActionFailedCount": {
+    "description": "Browser page card browserActionFailedCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailed": "{action} failed",
+  "@browserActionFailed": {
+    "description": "Browser page card browserActionFailed",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardOpen": "Open",
+  "browserCardEnable": "Enable",
+  "browserCardRunning": "{action}…",
+  "@browserCardRunning": {
+    "description": "Browser page card browserCardRunning",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardLive": "Live",
+  "browserCardOpenFailed": "Couldn't open page",
+  "browserCardBlankPage": "Blank page",
+  "browserCardTabCount": "{count} tabs",
+  "@browserCardTabCount": {
+    "description": "Browser page card browserCardTabCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionOpen": "Open page",
+  "browserActionNewTab": "New tab",
+  "browserActionRender": "Render page",
+  "browserActionExtract": "Extract text",
+  "browserActionSnapshot": "Read page structure",
+  "browserActionClick": "Click",
+  "browserActionType": "Type",
+  "browserActionPress": "Press key",
+  "browserActionScroll": "Scroll",
+  "browserActionWait": "Wait",
+  "browserActionBack": "Back",
+  "browserActionForward": "Forward",
+  "browserActionReload": "Reload",
+  "browserActionEvaluate": "Run script",
+  "browserActionSwitchTab": "Switch tab",
+  "browserActionCloseTab": "Close tab",
+  "browserActionListTabs": "List tabs",
+  "browserActionUnknown": "Browser action",
+  "browserMetaChars": "{count} chars",
+  "@browserMetaChars": {
+    "description": "Browser page card browserMetaChars",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "browserMetaElements": "{count} elements",
+  "@browserMetaElements": {
+    "description": "Browser page card browserMetaElements",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserErrAgentDisabled": "Browser control is off",
+  "browserErrStaleRef": "Element is stale; page needs re-reading",
+  "browserErrNotVisible": "Element hidden or covered",
+  "browserErrNotFound": "Element not found",
+  "browserErrTimeout": "Page load timed out",
+  "browserErrHumanControl": "You're controlling the browser",
+  "browserErrTabClosed": "Tab was closed",
+  "browserErrGeneric": "Action failed",
+  "browserDirectionUp": "Up",
+  "browserDirectionDown": "Down",
+  "browserDirectionLeft": "Left",
+  "browserDirectionRight": "Right",
+  "browserMetaTabs": "{count} tabs",
+  "@browserMetaTabs": {
+    "description": "Number of tabs returned by list_tabs",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -1,3 +1,4 @@
+import '../../browser/models/browser_tool_presentation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -935,7 +936,10 @@ class _MessageListViewState extends State<MessageListView> {
       }
       if (!block.isThinking) continue;
       final collapsed = collapseTimelineSteps(
-        block.thinkingSteps,
+        groupBrowserTimelineSteps(
+          block.thinkingSteps,
+          isPendingApproval: isPending,
+        ),
         collapseThinkingSteps: settings.collapseThinkingSteps,
       );
       addVisible(
@@ -969,6 +973,32 @@ class _MessageListViewState extends State<MessageListView> {
           textWidth: textWidth,
           fontScale: fontScale,
         );
+      } else if (step.browserTools case final tools?) {
+        extent +=
+            _estimateCollapsedCard +
+            estimateBrowserGroupBodyHeight(
+              [
+                for (final tool in tools)
+                  BrowserToolAction(
+                    id: tool.id,
+                    arguments: tool.arguments,
+                    content: tool.content,
+                    metadata: tool.metadata,
+                    loading: tool.loading,
+                  ),
+              ],
+              lite: step.browserLite,
+              fontScale: fontScale,
+            );
+        if (!step.browserLite && !settings.hideToolResultImages) {
+          for (final tool in tools) {
+            final (_, images) = parseToolResultImages(
+              tool.content,
+              metadata: tool.metadata,
+            );
+            if (images.isNotEmpty) extent += timelineToolImageHeight + 8;
+          }
+        }
       } else {
         final tool = step.tool!;
         extent += _estimateCollapsedCard;

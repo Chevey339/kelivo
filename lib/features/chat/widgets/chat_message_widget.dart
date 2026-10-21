@@ -16,6 +16,9 @@ import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../browser/browser_navigation.dart';
+import '../../browser/widgets/browser_page_card.dart';
+import '../../browser/models/browser_tool_presentation.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -109,7 +112,7 @@ Uri? _tryNormalizeExternalUri(String raw) {
 }) => parseToolResultImages(content, metadata: metadata);
 
 @visibleForTesting
-const double kToolImageTimelineHeight = 120;
+const double kToolImageTimelineHeight = timelineToolImageHeight;
 @visibleForTesting
 const double kToolImageTimelineMaxWidth = 240;
 @visibleForTesting
@@ -488,7 +491,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
     LocalToolNames.phoneControl => Lucide.Smartphone,
-    LocalToolNames.browser => Lucide.Globe,
+    LocalToolNames.browser => LucideIcons.appWindow,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -522,7 +525,10 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
     LocalToolNames.phoneControl => l10n.phoneControlTitle,
-    LocalToolNames.browser => l10n.browserToolTitle,
+    LocalToolNames.browser => browserActionLabel(
+      l10n,
+      args['action']?.toString() ?? '',
+    ),
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>
@@ -4311,25 +4317,57 @@ class _TimelineStepData {
     required this.reasoningCountAfter,
     required this.toolCountAfter,
     this.sourceOrdinal = 0,
-  }) : tool = null;
-
+  }) : tool = null,
+       browserTools = null,
+       browserLite = false;
   const _TimelineStepData.tool({
     required this.tool,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
     this.sourceOrdinal = 0,
-  }) : reasoning = null;
-
+  }) : reasoning = null,
+       browserTools = null,
+       browserLite = false;
+  _TimelineStepData.browserGroup({
+    required List<ToolUIPart> tools,
+    required bool lite,
+    required this.sourceOrdinal,
+    required this.reasoningCountAfter,
+    required this.toolCountAfter,
+  }) : browserTools = tools,
+       browserLite = lite,
+       tool = tools.last,
+       reasoning = null;
   final ReasoningSegment? reasoning;
   final ToolUIPart? tool;
-  final int reasoningCountAfter;
-  final int toolCountAfter;
-  final int sourceOrdinal;
-
+  final List<ToolUIPart>? browserTools;
+  final bool browserLite;
+  final int reasoningCountAfter, toolCountAfter, sourceOrdinal;
   bool get isReasoning => reasoning != null;
   bool get isTool => tool != null;
-  bool get loading => reasoning?.loading ?? tool?.loading ?? false;
+  bool get loading =>
+      browserTools?.any((tool) => tool.loading) ??
+      reasoning?.loading ??
+      tool?.loading ??
+      false;
 }
+
+List<_TimelineStepData> _groupBrowserSteps(
+  List<_TimelineStepData> steps,
+  _IdSet pendingApprovalIds,
+) => groupAdjacentBrowserSteps(
+  steps,
+  eligible: (step) =>
+      step.tool?.toolName == LocalToolNames.browser &&
+      !pendingApprovalIds.contains(step.tool!.id),
+  group: (steps, lite) => _TimelineStepData.browserGroup(
+    tools: List.unmodifiable(steps.map((step) => step.tool!)),
+    lite: lite,
+    sourceOrdinal: steps.first.sourceOrdinal,
+    reasoningCountAfter: steps.last.reasoningCountAfter,
+    toolCountAfter: steps.last.toolCountAfter,
+  ),
+);
 
 /// Value-equal id set so [context.select] can ignore identical approval snapshots.
 class _IdSet {
@@ -4608,21 +4646,21 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
       (s) => s.enableReasoningMarkdown,
     );
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final filteredSteps = _visibleChatTimelineSteps(
+    final ungroupedSteps = _visibleChatTimelineSteps(
       context,
       widget.steps,
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
       conversationId: widget.conversationId,
     );
-    if (filteredSteps.isEmpty) {
+    if (ungroupedSteps.isEmpty) {
       return const SizedBox.shrink();
     }
     final pendingApprovalIds = context.select<ToolApprovalService, _IdSet>((
       approval,
     ) {
       return _IdSet({
-        for (final step in filteredSteps)
+        for (final step in ungroupedSteps)
           if (step.tool != null &&
               _matchingApprovalRequest(
                     approval: approval,
@@ -4633,6 +4671,10 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
             step.tool!.id,
       });
     });
+    final filteredSteps = _groupBrowserSteps(
+      ungroupedSteps,
+      pendingApprovalIds,
+    );
     final l10n = AppLocalizations.of(context)!;
     final enableAdaptiveWidth =
         filteredSteps.isNotEmpty &&
@@ -4705,9 +4747,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                           Text(
                             _showAllSteps
                                 ? l10n.chainOfThoughtCollapse
-                                : l10n.chainOfThoughtExpandSteps(
-                                    widget.steps.length - visibleSteps.length,
-                                  ),
+                                : l10n.chainOfThoughtExpandSteps(hiddenCount),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: AppFontWeights.semibold,
@@ -4748,6 +4788,46 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                       );
                     }
                     final part = step.tool!;
+                    if (step.browserTools case final tools?) {
+                      return _CachedTimelineStep(
+                        key: ValueKey(
+                          'browser-group-${tools.first.id}-${step.sourceOrdinal}',
+                        ),
+                        signature: (
+                          Object.hashAll(
+                            tools.map(
+                              (part) => (
+                                part.id,
+                                part.loading,
+                                part.content.hashCode,
+                                part.metadata.hashCode,
+                                Object.hashAll(
+                                  part.arguments.entries.map(
+                                    (entry) => (entry.key, entry.value),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          step.browserLite,
+                          isFirst,
+                          isLast,
+                          fg,
+                          theme.brightness,
+                          textScale,
+                          hideToolResultImages,
+                          widget.conversationId,
+                        ),
+                        builder: () => _ChainOfThoughtBrowserStep(
+                          tools: tools,
+                          lite: step.browserLite,
+                          conversationId: widget.conversationId,
+                          isFirst: isFirst,
+                          isLast: isLast,
+                          hideImages: hideToolResultImages,
+                        ),
+                      );
+                    }
                     return _CachedTimelineStep(
                       key: ValueKey<String>(
                         timelineToolStepKey(
@@ -4805,6 +4885,8 @@ class _TimelineStepShell extends StatelessWidget {
     this.content,
     this.contentVisible = false,
     this.expectContent = false,
+    this.stableKey,
+    this.contentTopPadding = 4,
   });
 
   final Widget icon;
@@ -4820,6 +4902,8 @@ class _TimelineStepShell extends StatelessWidget {
   /// Keep [AnimatedSize] mounted so a later result or expand can grow in.
   /// Finished steps with no body skip the slot entirely.
   final bool expectContent;
+  final Key? stableKey;
+  final double contentTopPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -4869,13 +4953,17 @@ class _TimelineStepShell extends StatelessWidget {
     );
     if (content == null && !expectContent) {
       return KeyedSubtree(
-        key: ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
+        key:
+            stableKey ??
+            ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
         child: pressableHeader,
       );
     }
 
     return KeyedSubtree(
-      key: ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
+      key:
+          stableKey ??
+          ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -4900,9 +4988,9 @@ class _TimelineStepShell extends StatelessWidget {
                 alignment: Alignment.topLeft,
                 child: contentVisible
                     ? Padding(
-                        padding: const EdgeInsets.only(
+                        padding: EdgeInsets.only(
                           left: _timelineIconColumnWidth + _timelineGap,
-                          top: 4,
+                          top: contentTopPadding,
                           bottom: 8,
                         ),
                         child: content,
@@ -5230,6 +5318,173 @@ class _ChainOfThoughtReasoningStepState
   }
 }
 
+class _ChainOfThoughtBrowserStep extends StatefulWidget {
+  const _ChainOfThoughtBrowserStep({
+    required this.tools,
+    required this.lite,
+    required this.conversationId,
+    required this.isFirst,
+    required this.isLast,
+    required this.hideImages,
+  });
+  final List<ToolUIPart> tools;
+  final bool lite, isFirst, isLast, hideImages;
+  final String conversationId;
+  @override
+  State<_ChainOfThoughtBrowserStep> createState() =>
+      _ChainOfThoughtBrowserStepState();
+}
+
+class _ChainOfThoughtBrowserStepState
+    extends State<_ChainOfThoughtBrowserStep> {
+  List<BrowserToolAction> _actions = const [];
+  List<Object> _inputs = const [];
+  List<List<String>> _images = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _parse();
+  }
+
+  @override
+  void didUpdateWidget(_ChainOfThoughtBrowserStep oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _parse();
+  }
+
+  void _parse() {
+    final actions = <BrowserToolAction>[];
+    final inputs = <Object>[];
+    final images = <List<String>>[];
+    for (var i = 0; i < widget.tools.length; i++) {
+      final tool = widget.tools[i];
+      final input = (
+        tool.id,
+        tool.loading,
+        tool.content,
+        tool.metadata,
+        Object.hashAll(
+          tool.arguments.entries.map((entry) => (entry.key, entry.value)),
+        ),
+      );
+      inputs.add(input);
+      if (i < _inputs.length && input == _inputs[i]) {
+        actions.add(_actions[i]);
+        images.add(_images[i]);
+      } else {
+        actions.add(
+          BrowserToolAction(
+            id: tool.id,
+            arguments: tool.arguments,
+            content: tool.content,
+            metadata: tool.metadata,
+            loading: tool.loading,
+          ),
+        );
+        images.add(
+          parseToolResultImages(tool.content, metadata: tool.metadata).$2,
+        );
+      }
+    }
+    _actions = actions;
+    _inputs = inputs;
+    _images = images;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = chatSurfaceForegroundPalette(context);
+    final l = AppLocalizations.of(context)!;
+    final running = _actions.any((action) => action.loading);
+    return _TimelineStepShell(
+      stableKey: ValueKey('browser-step-${widget.tools.first.id}'),
+      contentTopPadding: 0,
+      icon: running
+          ? BrowserActionSpinner(color: fg.strong, size: 16)
+          : Icon(LucideIcons.appWindow, size: 16, color: fg.strong),
+      label: Row(
+        children: [
+          Flexible(
+            child: ThinkingSheen(
+              enabled: running,
+              color: fg.strong,
+              child: Text(
+                l.browserStepGroupTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: AppFontWeights.semibold,
+                  color: fg.strong,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              running
+                  ? l.browserStepCurrent(_actions.length)
+                  : l.browserStepCount(_actions.length),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: fg.muted),
+            ),
+          ),
+        ],
+      ),
+      isFirst: widget.isFirst,
+      isLast: widget.isLast,
+      onTap: () => _showToolDetail(context, widget.tools.last),
+      indicator: Icon(LucideIcons.chevronRight, size: 16, color: fg.muted),
+      contentVisible: true,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BrowserStepGroupBody(
+            actions: _actions,
+            conversationId: widget.conversationId,
+            lite: widget.lite,
+          ),
+          if (!widget.lite && !widget.hideImages)
+            for (var i = 0; i < _images.length; i++)
+              if (_images[i].isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    key: ValueKey(
+                      'tool-image-thumbnails:${widget.tools[i].id}',
+                    ),
+                    height: kToolImageTimelineHeight,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _images[i].length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, j) {
+                        final path = _images[i][j];
+                        return GestureDetector(
+                          onTap: () => _showToolFullImage(context, path),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _buildToolImageFromPath(
+                              context,
+                              path,
+                              height: kToolImageTimelineHeight,
+                              maxLogicalWidth: kToolImageTimelineMaxWidth,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChainOfThoughtToolStep extends StatefulWidget {
   const _ChainOfThoughtToolStep({
     required this.part,
@@ -5429,16 +5684,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
         : '';
     final Widget? summaryContent = _isAskUser
         ? _AskUserInlineBody(part: widget.part, compact: true)
-        : widget.part.toolName == LocalToolNames.browser
-        ? IosIconButton(
-            size: 16,
-            padding: const EdgeInsets.all(7),
-            color: fg.accent,
-            semanticLabel: AppLocalizations.of(context)!.browserOpen,
-            builder: (color) => Icon(Lucide.Globe, size: 16, color: color),
-            onTap: () =>
-                openBrowserPage(context, conversationId: widget.conversationId),
-          )
         : isWorkspace
         ? WorkspaceToolCardBody(
             part: workspacePart,
@@ -5851,11 +6096,16 @@ class _ToolCallItemState extends State<_ToolCallItem> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  icon: const Icon(Lucide.Globe, size: 16),
+                  icon: const Icon(LucideIcons.appWindow, size: 16),
                   label: Text(l10n.browserOpen),
                   onPressed: () => openBrowserPage(
                     context,
                     conversationId: widget.conversationId,
+                    tabId: BrowserToolAction(
+                      id: widget.part.id,
+                      arguments: widget.part.arguments,
+                      metadata: widget.part.metadata,
+                    ).tabId,
                   ),
                 ),
               ),

@@ -73,6 +73,8 @@ void main() {
     String? modelId = 'no-tools-model',
     bool supportsTools = false,
     bool desktopTools = false,
+    double composerWidth = 800,
+    VoidCallback? openBrowser,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
     final inputBarKey = GlobalKey();
@@ -82,6 +84,13 @@ void main() {
           ChangeNotifierProvider.value(value: settings),
           ChangeNotifierProvider.value(value: assistants),
           ChangeNotifierProvider(create: (_) => AsrProvider()),
+          ChangeNotifierProvider(
+            create: (_) => WorldBookProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                InstructionInjectionProvider(preferences: preferences),
+          ),
           ChangeNotifierProvider(
             create: (_) => McpProvider(preferences: preferences),
           ),
@@ -106,12 +115,13 @@ void main() {
                   inputFocus: FocusNode(),
                   inputController: TextEditingController(),
                   mediaController: ChatInputBarController(),
-                  isTablet: false,
+                  isTablet: desktopTools,
                   isLoading: false,
                   isToolModel: (_, _) => supportsTools,
                   isReasoningModel: (_, _) => supportsReasoning,
                   isReasoningEnabled: (request) =>
                       request.level != ReasoningLevel.off,
+                  onOpenBrowser: desktopTools ? openBrowser ?? () {} : null,
                   onOpenTools: desktopTools
                       ? () => showDesktopToolsPopover(
                           context,
@@ -127,7 +137,7 @@ void main() {
                 return desktopTools
                     ? Align(
                         alignment: Alignment.bottomCenter,
-                        child: SizedBox(width: 800, child: section),
+                        child: SizedBox(width: composerWidth, child: section),
                       )
                     : section;
               },
@@ -176,19 +186,19 @@ void main() {
         desktopTools: true,
       );
       final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
-      expect(bar.showToolsButton, isTrue);
+      expect(bar.showToolsButton, scenario.supportsTools);
       expect(bar.toolsActive, scenario.supportsTools);
-      await tester.tap(find.byTooltip('Tools'));
-      await tester.pumpAndSettle();
-      expect(find.text('Open browser'), findsOneWidget);
-      expect(
-        find.text('Local Tools'),
-        scenario.supportsTools ? findsOneWidget : findsNothing,
-      );
-      expect(
-        find.text('Browser control'),
-        scenario.supportsTools ? findsOneWidget : findsNothing,
-      );
+      expect(bar.onOpenBrowser, isNotNull);
+      expect(find.byTooltip('Open browser'), findsOneWidget);
+      if (scenario.supportsTools) {
+        await tester.tap(find.byTooltip('Tools'));
+        await tester.pumpAndSettle();
+        expect(find.text('Open browser'), findsNothing);
+        expect(find.text('Local Tools'), findsOneWidget);
+        expect(find.text('Browser control'), findsOneWidget);
+      } else {
+        expect(find.byTooltip('Tools'), findsNothing);
+      }
       expect(assistants.currentAssistant!.localToolIds, [
         LocalToolNames.browser,
       ]);
@@ -197,6 +207,34 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  testWidgets(
+    'narrow desktop moves browser action into More without model tools',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var opened = false;
+      final assistants = await loadAssistantWithMcp(tester);
+      await pumpComposer(
+        tester,
+        assistants: assistants,
+        isConversationOverride: true,
+        desktopTools: true,
+        composerWidth: 220,
+        openBrowser: () => opened = true,
+      );
+      expect(find.byTooltip('Tools'), findsNothing);
+      await tester.tap(find.byTooltip('Add'));
+      await tester.pumpAndSettle();
+      expect(find.text('Open browser'), findsOneWidget);
+      await tester.tap(find.text('Open browser'));
+      await tester.pumpAndSettle();
+      expect(opened, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('a conversation-pinned model leaves the assistant alone', (
     tester,

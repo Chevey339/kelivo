@@ -11,7 +11,6 @@ import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
-import '../features/browser/browser_navigation.dart';
 
 Future<void> showDesktopToolsPopover(
   BuildContext context, {
@@ -247,22 +246,7 @@ class _ToolsContent extends StatelessWidget {
         : const <String>[];
     final enabledLocalTools = a.localToolIds.toSet();
 
-    final rows = <Widget>[
-      _RowItem(
-        leading: Icon(Lucide.Globe, size: 16, color: cs.onSurface),
-        label: l10n.browserOpen,
-        selected: false,
-        onTap: () {
-          final navigatorContext = Navigator.of(context).context;
-          onDone();
-          openBrowserPage(
-            navigatorContext,
-            conversationId: conversationId,
-            assistantId: assistantId,
-          );
-        },
-      ),
-    ];
+    final rows = <Widget>[];
     if (localToolIds.isNotEmpty) {
       rows.add(_SectionLabel(text: l10n.assistantEditPageLocalToolsTab));
       for (final id in localToolIds) {

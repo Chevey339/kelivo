@@ -12768,6 +12768,164 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '· $count 步';
+  }
+
+  @override
+  String browserStepCurrent(int index) {
+    return '· 第 $index 步';
+  }
+
+  @override
+  String browserActionCount(int count) {
+    return '$count 个操作';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25460,6 +25618,164 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '· $count 步';
+  }
+
+  @override
+  String browserStepCurrent(int index) {
+    return '· 第 $index 步';
+  }
+
+  @override
+  String browserActionCount(int count) {
+    return '$count 个操作';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38231,4 +38547,162 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserUserAgentDescription => '變更後將重新載入目前網頁。';
+
+  @override
+  String get browserStepGroupTitle => '瀏覽網頁';
+
+  @override
+  String browserStepCount(int count) {
+    return '· $count 步';
+  }
+
+  @override
+  String browserStepCurrent(int index) {
+    return '· 第 $index 步';
+  }
+
+  @override
+  String browserActionCount(int count) {
+    return '$count 個操作';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失敗';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失敗';
+  }
+
+  @override
+  String get browserCardOpen => '打開';
+
+  @override
+  String get browserCardEnable => '去開啟';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '即時';
+
+  @override
+  String get browserCardOpenFailed => '無法開啟頁面';
+
+  @override
+  String get browserCardBlankPage => '空白頁';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 個分頁';
+  }
+
+  @override
+  String get browserActionOpen => '開啟網頁';
+
+  @override
+  String get browserActionNewTab => '新增分頁';
+
+  @override
+  String get browserActionRender => '渲染頁面';
+
+  @override
+  String get browserActionExtract => '擷取正文';
+
+  @override
+  String get browserActionSnapshot => '讀取頁面結構';
+
+  @override
+  String get browserActionClick => '點擊';
+
+  @override
+  String get browserActionType => '輸入文字';
+
+  @override
+  String get browserActionPress => '按鍵';
+
+  @override
+  String get browserActionScroll => '捲動頁面';
+
+  @override
+  String get browserActionWait => '等待頁面';
+
+  @override
+  String get browserActionBack => '上一頁';
+
+  @override
+  String get browserActionForward => '下一頁';
+
+  @override
+  String get browserActionReload => '重新整理';
+
+  @override
+  String get browserActionEvaluate => '執行指令碼';
+
+  @override
+  String get browserActionSwitchTab => '切換分頁';
+
+  @override
+  String get browserActionCloseTab => '關閉分頁';
+
+  @override
+  String get browserActionListTabs => '檢視分頁';
+
+  @override
+  String get browserActionUnknown => '瀏覽器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 個元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '瀏覽器控制未開啟';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新讀取頁面';
+
+  @override
+  String get browserErrNotVisible => '元素不可見或被遮擋';
+
+  @override
+  String get browserErrNotFound => '找不到元素';
+
+  @override
+  String get browserErrTimeout => '頁面載入逾時';
+
+  @override
+  String get browserErrHumanControl => '你正在接管瀏覽器';
+
+  @override
+  String get browserErrTabClosed => '分頁已關閉';
+
+  @override
+  String get browserErrGeneric => '操作失敗';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 個';
+  }
 }

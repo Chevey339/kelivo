@@ -252,6 +252,11 @@ void main() {
     );
   }
 
+  testWidgets('tool sheet has no standalone browser entry', (tester) async {
+    await pumpSheet(tester);
+    expect(find.byKey(const ValueKey('chat-tools-open-browser')), findsNothing);
+  });
+
   testWidgets('shows the local tools group folded with an enabled count', (
     tester,
   ) async {

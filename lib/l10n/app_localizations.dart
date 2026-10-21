@@ -23903,6 +23903,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Changes reload the current webpage.'**
   String get browserUserAgentDescription;
+
+  /// No description provided for @browserStepGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browsing'**
+  String get browserStepGroupTitle;
+
+  /// Browser page card browserStepCount
+  ///
+  /// In en, this message translates to:
+  /// **'· {count} steps'**
+  String browserStepCount(int count);
+
+  /// Browser page card browserStepCurrent
+  ///
+  /// In en, this message translates to:
+  /// **'· step {index}'**
+  String browserStepCurrent(int index);
+
+  /// Browser page card browserActionCount
+  ///
+  /// In en, this message translates to:
+  /// **'{count} actions'**
+  String browserActionCount(int count);
+
+  /// Browser page card browserActionFailedCount
+  ///
+  /// In en, this message translates to:
+  /// **'· {count} failed'**
+  String browserActionFailedCount(int count);
+
+  /// Browser page card browserActionFailed
+  ///
+  /// In en, this message translates to:
+  /// **'{action} failed'**
+  String browserActionFailed(String action);
+
+  /// No description provided for @browserCardOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get browserCardOpen;
+
+  /// No description provided for @browserCardEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get browserCardEnable;
+
+  /// Browser page card browserCardRunning
+  ///
+  /// In en, this message translates to:
+  /// **'{action}…'**
+  String browserCardRunning(String action);
+
+  /// No description provided for @browserCardLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get browserCardLive;
+
+  /// No description provided for @browserCardOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open page'**
+  String get browserCardOpenFailed;
+
+  /// No description provided for @browserCardBlankPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank page'**
+  String get browserCardBlankPage;
+
+  /// Browser page card browserCardTabCount
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tabs'**
+  String browserCardTabCount(int count);
+
+  /// No description provided for @browserActionOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open page'**
+  String get browserActionOpen;
+
+  /// No description provided for @browserActionNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get browserActionNewTab;
+
+  /// No description provided for @browserActionRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Render page'**
+  String get browserActionRender;
+
+  /// No description provided for @browserActionExtract.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract text'**
+  String get browserActionExtract;
+
+  /// No description provided for @browserActionSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Read page structure'**
+  String get browserActionSnapshot;
+
+  /// No description provided for @browserActionClick.
+  ///
+  /// In en, this message translates to:
+  /// **'Click'**
+  String get browserActionClick;
+
+  /// No description provided for @browserActionType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get browserActionType;
+
+  /// No description provided for @browserActionPress.
+  ///
+  /// In en, this message translates to:
+  /// **'Press key'**
+  String get browserActionPress;
+
+  /// No description provided for @browserActionScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get browserActionScroll;
+
+  /// No description provided for @browserActionWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait'**
+  String get browserActionWait;
+
+  /// No description provided for @browserActionBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get browserActionBack;
+
+  /// No description provided for @browserActionForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get browserActionForward;
+
+  /// No description provided for @browserActionReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get browserActionReload;
+
+  /// No description provided for @browserActionEvaluate.
+  ///
+  /// In en, this message translates to:
+  /// **'Run script'**
+  String get browserActionEvaluate;
+
+  /// No description provided for @browserActionSwitchTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch tab'**
+  String get browserActionSwitchTab;
+
+  /// No description provided for @browserActionCloseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get browserActionCloseTab;
+
+  /// No description provided for @browserActionListTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'List tabs'**
+  String get browserActionListTabs;
+
+  /// No description provided for @browserActionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser action'**
+  String get browserActionUnknown;
+
+  /// Browser page card browserMetaChars
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chars'**
+  String browserMetaChars(String count);
+
+  /// Browser page card browserMetaElements
+  ///
+  /// In en, this message translates to:
+  /// **'{count} elements'**
+  String browserMetaElements(int count);
+
+  /// No description provided for @browserErrAgentDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser control is off'**
+  String get browserErrAgentDisabled;
+
+  /// No description provided for @browserErrStaleRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Element is stale; page needs re-reading'**
+  String get browserErrStaleRef;
+
+  /// No description provided for @browserErrNotVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Element hidden or covered'**
+  String get browserErrNotVisible;
+
+  /// No description provided for @browserErrNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Element not found'**
+  String get browserErrNotFound;
+
+  /// No description provided for @browserErrTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Page load timed out'**
+  String get browserErrTimeout;
+
+  /// No description provided for @browserErrHumanControl.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re controlling the browser'**
+  String get browserErrHumanControl;
+
+  /// No description provided for @browserErrTabClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab was closed'**
+  String get browserErrTabClosed;
+
+  /// No description provided for @browserErrGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Action failed'**
+  String get browserErrGeneric;
+
+  /// No description provided for @browserDirectionUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get browserDirectionUp;
+
+  /// No description provided for @browserDirectionDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Down'**
+  String get browserDirectionDown;
+
+  /// No description provided for @browserDirectionLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get browserDirectionLeft;
+
+  /// No description provided for @browserDirectionRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get browserDirectionRight;
+
+  /// Number of tabs returned by list_tabs
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tabs'**
+  String browserMetaTabs(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -146,7 +146,7 @@ class BottomToolsSheet extends StatelessWidget {
                     ),
                     ToolsSheetRow(
                       key: const ValueKey('bottom-tools-browser'),
-                      icon: Lucide.Globe,
+                      icon: Lucide.AppWindow,
                       label: l10n.browserTitle,
                       onTap: () {
                         final navigatorContext = Navigator.of(context).context;

@@ -35,7 +35,7 @@ IconData localToolIcon(String id) {
     case LocalToolNames.phoneControl:
       return Lucide.Smartphone;
     case LocalToolNames.browser:
-      return Lucide.Globe;
+      return Lucide.AppWindow;
     case LocalToolNames.weather:
       return Lucide.CloudSun;
     case LocalToolNames.healthSummary:

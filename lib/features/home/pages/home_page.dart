@@ -1,3 +1,4 @@
+import '../../browser/browser_navigation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -1641,6 +1642,11 @@ class _HomePageState extends State<HomePage>
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,
       onUploadFiles: _controller.onPickFiles,
+      onOpenBrowser: () => openBrowserPage(
+        context,
+        conversationId: _controller.currentConversation?.id,
+        assistantId: context.read<AssistantProvider>().currentAssistantId,
+      ),
       onToggleLearningMode: _openInstructionInjectionPopover,
       onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,
