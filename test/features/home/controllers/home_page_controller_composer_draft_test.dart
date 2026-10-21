@@ -181,7 +181,9 @@ void main() {
         done = true;
       },
     );
-    for (var i = 0; i < 200 && !done; i++) {
+    // File imports use the real clock. Keep the completion assertion bounded,
+    // but allow for filesystem contention when the entire suite runs together.
+    for (var i = 0; i < 1000 && !done; i++) {
       await tester.pump(const Duration(milliseconds: 10));
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 5)),

@@ -36,7 +36,9 @@ class _FakePathProvider extends PathProviderPlatform {
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
-  for (var attempt = 0; attempt < 40 && finder.evaluate().isEmpty; attempt++) {
+  // Filesystem scans run on the real clock, not the pumped frame clock.
+  // Keep the same UI assertion while allowing for full-suite I/O contention.
+  for (var attempt = 0; attempt < 400 && finder.evaluate().isEmpty; attempt++) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );

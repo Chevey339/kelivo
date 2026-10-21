@@ -255,7 +255,7 @@ void main() {
       final l10n = AppLocalizations.of(
         tester.element(find.byType(FileBrowser)),
       )!;
-      Future<void> createFile() async {
+      Future<void> createFile({required bool readOnly}) async {
         await tester.tap(find.byKey(FileBrowser.newKey));
         await settle(tester);
         await tester.tap(find.byKey(FileBrowser.newFileKey));
@@ -272,10 +272,25 @@ void main() {
             .last;
         await tester.ensureVisible(confirm);
         await tester.tap(confirm);
-        await settle(tester);
+        // Path resolution and writes use real I/O. Wait for the observable
+        // outcome instead of assuming the fixed animation delay finished it.
+        for (var i = 0; i < 400; i++) {
+          final completed = readOnly
+              ? AppSnackBarManager().activeToasts.any(
+                  (toast) => toast.notification.message.contains(
+                    l10n.workspaceMountReadOnly,
+                  ),
+                )
+              : File('${root.path}/new.txt').existsSync();
+          if (completed) break;
+          await tester.pump(const Duration(milliseconds: 10));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
       }
 
-      await createFile();
+      await createFile(readOnly: true);
       expect(File('${root.path}/new.txt').existsSync(), isFalse);
       expect(
         AppSnackBarManager().activeToasts.any(
@@ -305,7 +320,7 @@ void main() {
           readOnly: false,
         ),
       );
-      await createFile();
+      await createFile(readOnly: false);
       expect(File('${root.path}/new.txt').existsSync(), isTrue);
       debugDefaultTargetPlatformOverride = null;
       expect(tester.takeException(), isNull);

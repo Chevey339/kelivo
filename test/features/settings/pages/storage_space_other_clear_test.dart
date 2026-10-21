@@ -39,7 +39,9 @@ Future<void> _writeSizedFile(Directory root, String name, int size) async {
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
-  for (var attempt = 0; attempt < 40 && finder.evaluate().isEmpty; attempt++) {
+  // As in the legacy-file UI test, allow real filesystem work to finish
+  // under full-suite load; pumped frame time does not advance file I/O.
+  for (var attempt = 0; attempt < 400 && finder.evaluate().isEmpty; attempt++) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );
