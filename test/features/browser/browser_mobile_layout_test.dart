@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,70 @@ import 'package:Kelivo/features/browser/widgets/browser_glass.dart';
 import 'package:Kelivo/features/browser/widgets/browser_progressive_edge.dart';
 
 void main() {
+  testWidgets(
+    'Android keyboard moves the dock without rebuilding its viewport',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        Future<void> mount(double inset, {bool reduceMotion = false}) =>
+            tester.pumpWidget(
+              MaterialApp(
+                home: MediaQuery(
+                  data: MediaQueryData(disableAnimations: reduceMotion),
+                  child: BrowserMobileLayout(
+                    keyboardInset: inset,
+                    viewportResizesForKeyboard: false,
+                    viewPadding: const EdgeInsets.only(top: 24, bottom: 24),
+                    content: const ColoredBox(
+                      key: ValueKey('keyboardViewport'),
+                      color: Colors.white,
+                    ),
+                    toolbar: const SizedBox(
+                      key: ValueKey('keyboardDock'),
+                      height: 54,
+                    ),
+                  ),
+                ),
+              ),
+            );
+        final dock = find.byKey(const ValueKey('keyboardDock'));
+        final viewport = find.byKey(const ValueKey('keyboardViewport'));
+        await mount(0);
+        final original = tester.getTopLeft(dock).dy;
+        final viewportRect = tester.getRect(viewport);
+        final viewportElement = tester.element(viewport);
+        await mount(300);
+        expect(tester.getTopLeft(dock).dy, original);
+        await tester.pump(const Duration(milliseconds: 120));
+        expect(
+          tester.getTopLeft(dock).dy,
+          inExclusiveRange(original - 276, original),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(dock).dy, closeTo(original - 276, .01));
+        await mount(0);
+        await tester.pump(const Duration(milliseconds: 120));
+        expect(
+          tester.getTopLeft(dock).dy,
+          inExclusiveRange(original - 276, original),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(dock).dy, original);
+        expect(tester.getRect(viewport), viewportRect);
+        expect(identical(tester.element(viewport), viewportElement), isTrue);
+        await mount(300, reduceMotion: true);
+        await tester.pump();
+        expect(tester.getTopLeft(dock).dy, closeTo(original - 276, .01));
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
   testWidgets(
     'native dark toolbar fade preserves home indicator protection and tap access',
     (tester) async {

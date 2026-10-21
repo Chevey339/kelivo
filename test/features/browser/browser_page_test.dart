@@ -199,7 +199,7 @@ void main() {
     );
     expect(host, findsOneWidget);
     final paragraph = tester.renderObject<RenderParagraph>(host);
-    final hostWidth = paragraph.getMaxIntrinsicWidth(double.infinity);
+    final hostWidth = paragraph.getMaxIntrinsicWidth(double.infinity) * 13 / 16;
     final collapsedWidth = tester.getSize(address).width;
     // The capsule must shrink while preserving its host label and padding.
     // Its final width depends on the rendered font, not a fraction of the bar.
@@ -293,7 +293,7 @@ void main() {
   );
 
   browserTestWidgets(
-    'More defers webpage capture until its opening motion has finished',
+    'More never starts a native screenshot during its presentation',
     (tester) async {
       await service.initialize();
       final tab = await service.createTab(url: 'https://example.com');
@@ -306,7 +306,74 @@ void main() {
       expect(find.text('New tab'), findsOneWidget);
       expect(engine.screenshotCalls, captures);
       await tester.pumpAndSettle();
+      expect(engine.screenshotCalls, captures);
+    },
+  );
+
+  browserTestWidgets(
+    'preview capture waits for an idle viewport and does not repeat unchanged',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      engine.previewBytes = await previewFixture(tester);
+      final captures = engine.screenshotCalls;
+      final gesture = await tester.startGesture(
+        tester.getCenter(
+          find.byKey(const ValueKey('browserMobileViewportSlot')),
+        ),
+      );
+      engine.onChanged(_scroll(100));
+      await tester.pump(const Duration(seconds: 2));
+      expect(engine.screenshotCalls, captures);
+      await gesture.up();
+      engine.onChanged(_scroll(100, interacting: false));
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(engine.screenshotCalls, captures);
+      await tester.pump(const Duration(milliseconds: 200));
       expect(engine.screenshotCalls, captures + 1);
+      await tester.pump(const Duration(seconds: 3));
+      expect(engine.screenshotCalls, captures + 1);
+
+      // A new quiet period must be cancelled when address editing starts.
+      engine.onChanged(_scroll(120, interacting: false));
+      await tester.pump();
+      await tester.tap(find.byType(BrowserAddressBar));
+      await tester.pump(const Duration(seconds: 2));
+      expect(engine.screenshotCalls, captures + 1);
+    },
+  );
+
+  browserTestWidgets(
+    'tabs capture the current page before starting the card flight',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://preview.example');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      engine.previewBytes = await previewFixture(tester);
+      await service.refreshActivePreview();
+      final old = service.previewForTab(tab.id);
+      engine.onChanged(_scroll(200));
+      final current = await previewFixture(tester);
+      engine.previewBytes = current;
+      await tester.runAsync(
+        () => precacheImage(
+          MemoryImage(current),
+          tester.element(find.byType(BrowserPage)),
+        ),
+      );
+      final captures = engine.screenshotCalls;
+      await openMobileMenuItem(tester, 'Tabs (1)');
+      final overview = find.byType(BrowserTabOverview);
+      expect(overview, findsOneWidget);
+      final route =
+          ModalRoute.of(tester.element(overview))! as BrowserTabsRoute;
+      expect(engine.screenshotCalls, captures + 1);
+      expect(route.transition.openingPreviewReady, isTrue);
+      expect(route.transition.previewBytes, same(current));
+      expect(route.transition.previewBytes, isNot(same(old)));
     },
   );
 
@@ -340,7 +407,10 @@ void main() {
       expect(paragraph.text.style!.fontFamily, 'BrowserCustomFont');
       expect(
         tester.getSize(address).width,
-        closeTo(paragraph.getMaxIntrinsicWidth(double.infinity) + 32, .01),
+        closeTo(
+          paragraph.getMaxIntrinsicWidth(double.infinity) * 13 / 16 + 32,
+          .01,
+        ),
       );
     },
   );
@@ -2371,6 +2441,37 @@ void main() {
   }
 
   browserTestWidgets(
+    'fitting host scales continuously without endpoint crossfade',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://x.io');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      final address = find.byType(BrowserAddressBar);
+      final host = find.descendant(of: address, matching: find.text('x.io'));
+      var intermediateFrames = 0;
+      for (final offset in [100.0, 0.0]) {
+        engine.onChanged(_scroll(offset));
+        await tester.pump();
+        for (var frame = 0; frame < 36; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final bar = tester.widget<BrowserAddressBar>(address);
+          expect(bar.stabilizeTruncation, isFalse);
+          expect(host, findsOneWidget);
+          final text = tester.widget<Text>(host);
+          expect(text.style!.fontSize, 16);
+          if (bar.collapseProgress > 0 && bar.collapseProgress < 1) {
+            intermediateFrames++;
+          }
+        }
+      }
+      expect(intermediateFrames, greaterThan(1));
+      expect(engine.viewMounts, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  browserTestWidgets(
     'collapse endpoints keep the same address material and text weight',
     (tester) async {
       await service.initialize();
@@ -2398,7 +2499,7 @@ void main() {
         expect(labels, hasLength(progress > 0 && progress < 1 ? 2 : 1));
         for (final text in labels) {
           expect(text.style!.fontWeight, FontWeight.w500);
-          expect(text.style!.fontSize, anyOf(13.0, 16.0));
+          expect(text.style!.fontSize, 16);
         }
       }
 
@@ -2419,6 +2520,101 @@ void main() {
       }
       expect(engine.viewMounts, 1);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  browserTestWidgets(
+    'Android raw input survives DOM cancellation and ignores pinch and momentum',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final tab = await service.createTab(url: 'https://scroll.example');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      final chrome = find.byType(BrowserChromeTransition);
+      double target() =>
+          tester.widget<BrowserChromeTransition>(chrome).progress;
+      engine.onChanged(
+        _scroll(100, phase: BrowserScrollPhase.metrics, interacting: false),
+      );
+      final finger = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('fakeNativeView'))),
+      );
+      for (var i = 0; i < 4; i++) {
+        await finger.moveBy(const Offset(0, -4));
+        engine.onChanged(
+          _scroll(
+            104 + i * 4,
+            phase: BrowserScrollPhase.metrics,
+            interacting: false,
+          ),
+        );
+        await tester.pump();
+      }
+      expect(
+        target(),
+        1,
+        reason: 'DOM touchcancel must not cancel native scroll intent',
+      );
+      await finger.up();
+      engine.onChanged(_scroll(90, interacting: false));
+      await tester.pump();
+      expect(target(), 1, reason: 'momentum is not a new gesture');
+      final down = await tester.startGesture(const Offset(180, 300));
+      await down.moveBy(const Offset(0, 10));
+      await tester.pump();
+      expect(target(), 0);
+      final second = await tester.startGesture(
+        const Offset(240, 300),
+        pointer: 2,
+      );
+      await down.moveBy(const Offset(0, -100));
+      await tester.pump();
+      expect(target(), 0, reason: 'pinch does not collapse toolbar');
+      await second.up();
+      await down.up();
+      expect(engine.viewMounts, 1);
+    },
+  );
+
+  browserTestWidgets(
+    'Android raw input reveals chrome at document edges and after content shrinks',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final tab = await service.createTab(url: 'https://scroll.example');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      double target() => tester
+          .widget<BrowserChromeTransition>(find.byType(BrowserChromeTransition))
+          .progress;
+      engine.onChanged(_scroll(100, interacting: false));
+      final finger = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('fakeNativeView'))),
+      );
+      await finger.moveBy(const Offset(0, -16));
+      await tester.pump();
+      expect(target(), 1);
+      // A compositor can report the bottom with DOM touching already cancelled.
+      engine.onChanged(_scroll(3156, interacting: false));
+      await tester.pump();
+      expect(target(), 0);
+      await finger.moveBy(const Offset(0, -30));
+      await tester.pump();
+      expect(target(), 0, reason: 'pinned bottom cannot hide navigation');
+      await finger.up();
+      engine.onChanged(_scroll(100, interacting: false));
+      final next = await tester.startGesture(const Offset(180, 300));
+      await next.moveBy(const Offset(0, -16));
+      await next.up();
+      await tester.pump();
+      expect(target(), 1);
+      engine.onChanged(_scroll(0, content: 844, interacting: false));
+      await tester.pump();
+      expect(
+        target(),
+        0,
+        reason: 'a dynamically shortened page must reveal navigation',
+      );
+      expect(engine.viewMounts, 1);
     },
   );
 

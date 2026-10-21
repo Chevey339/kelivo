@@ -8,6 +8,68 @@ import 'package:Kelivo/features/browser/widgets/browser_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 void main() {
+  testWidgets('address baseline scales continuously inside the capsule', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    double? baselineOffset;
+    for (var frame = 0; frame <= 40; frame++) {
+      final t = frame / 40;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 250 - 70 * t,
+                height: 48 - 14 * t,
+                child: BrowserAddressBar(
+                  controller: controller,
+                  focusNode: focus,
+                  onSubmitted: (_) {},
+                  loading: false,
+                  progress: 0,
+                  onReload: () {},
+                  secure: true,
+                  editing: false,
+                  collapseProgress: t,
+                  displayText: 'short.io',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final address = find.byType(BrowserAddressBar);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.text('short.io'),
+      );
+      final baseline = paragraph
+          .localToGlobal(
+            Offset(
+              0,
+              paragraph.getDryBaseline(
+                paragraph.constraints,
+                TextBaseline.alphabetic,
+              )!,
+            ),
+          )
+          .dy;
+      final center = tester.getCenter(address).dy;
+      baselineOffset ??= baseline - center;
+      expect(
+        baseline - center,
+        closeTo(baselineOffset * (16 - 3 * t) / 16, .001),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   const shadows = [
     Shadow(color: Color(0x66000000), offset: Offset(0, .5), blurRadius: 0),
   ];

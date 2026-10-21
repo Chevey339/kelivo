@@ -85,6 +85,26 @@ void main() {
     expect(calls, 1);
   });
 
+  testWidgets('hidden optical material stops painting without remounting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(scene(style: BrowserSurfaceStyle.frosted));
+    await tester.pumpAndSettle();
+    final filter = tester.element(find.byType(BackdropFilter));
+    final paintGate = find.descendant(
+      of: find.byKey(const ValueKey('browserMaterialSurface')),
+      matching: find.byType(Visibility),
+    );
+    for (final opacity in [0.0, .4, 1.0]) {
+      await tester.pumpWidget(
+        scene(style: BrowserSurfaceStyle.frosted, opacity: opacity),
+      );
+      expect(tester.element(find.byType(BackdropFilter)), same(filter));
+      expect(tester.widget<Visibility>(paintGate).visible, opacity > 0);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('removal before the prepared frame suppresses readiness', (
     tester,
   ) async {

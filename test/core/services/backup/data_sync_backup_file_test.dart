@@ -3085,6 +3085,15 @@ void main() {
         expect(packing, isNotEmpty);
         expect(packing.last.total, greaterThanOrEqualTo(assetBytes));
         expect(packing.last.processed, packing.last.total);
+        for (final event in packing) {
+          expect(
+            event.processed,
+            lessThanOrEqualTo(event.total!),
+            reason:
+                'Generated manifest bytes are outside the source-file progress total',
+          );
+          expect(event.detail, isNot('manifest.json'));
+        }
 
         final input = InputFileStream(backupFile.path);
         Archive? archive;

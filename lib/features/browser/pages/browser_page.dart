@@ -91,6 +91,48 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   final GlobalKey _startPageBoundary = GlobalKey();
   final GlobalKey _mobileLayoutKey = GlobalKey();
   ({String id, int version, double? offset, Uint8List bytes})? _tabsPreview;
+  Timer? _previewIdleTimer;
+
+  bool get _hasCurrentTabPreview {
+    final tab = _service.activeTab;
+    final preview = _tabsPreview;
+    return tab != null &&
+        preview != null &&
+        preview.id == tab.id &&
+        preview.version == tab.runtimeVersion &&
+        preview.offset == _service.scrollStateForTab(tab.id)?.offset &&
+        identical(preview.bytes, _service.previewForTab(tab.id));
+  }
+
+  bool get _canPrepareIdlePreview =>
+      mounted &&
+      _ready &&
+      !_blank &&
+      !_desktop &&
+      !_menuOpen &&
+      !_showFind &&
+      !_openingMobileTabs &&
+      !_addressFocus.hasFocus &&
+      (_view?.viewInsets.bottom ?? 0) <= 0 &&
+      _viewportPointers.isEmpty &&
+      _service.activeTab?.isLoading == false &&
+      ModalRoute.of(context)?.isCurrent != false;
+
+  void _scheduleIdlePreview() {
+    _previewIdleTimer?.cancel();
+    if (!_canPrepareIdlePreview || _hasCurrentTabPreview) return;
+    // Native capture still draws the webpage on Android's UI thread. Keep it
+    // outside pointer/keyboard/menu motion, including the settling animation.
+    _previewIdleTimer = Timer(const Duration(seconds: 1), () {
+      if (!_canPrepareIdlePreview || _hasCurrentTabPreview) return;
+      if (WidgetsBinding.instance.transientCallbackCount > 0) {
+        _scheduleIdlePreview();
+        return;
+      }
+      unawaited(_prepareTabPreview());
+    });
+  }
+
   final GlobalKey _menuButtonKey = GlobalKey();
   final GlobalKey _menuRestKey = GlobalKey();
   final TextEditingController _address = TextEditingController();
@@ -124,6 +166,73 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   double _scrollIntent = 0;
   bool _scrollTouchActive = false;
   bool _scrollTouchHasIntent = false;
+  final _viewportPointers = <int>{};
+  bool _androidPointerInputSeen = false;
+  bool _androidMultiTouch = false;
+  double _androidScrollIntent = 0;
+
+  void _viewportPointerDown(PointerDownEvent event) {
+    _previewIdleTimer?.cancel();
+    _tabsPreview = null;
+    final firstPointer = _viewportPointers.isEmpty;
+    _viewportPointers.add(event.pointer);
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (firstPointer) {
+      _androidMultiTouch = false;
+      _androidScrollIntent = 0;
+    }
+    _androidPointerInputSeen = true;
+    if (_viewportPointers.length > 1) _androidMultiTouch = true;
+  }
+
+  void _viewportPointerEnd(PointerEvent event) {
+    _viewportPointers.remove(event.pointer);
+    if (_viewportPointers.isEmpty) {
+      _androidScrollIntent = 0;
+      _scheduleIdlePreview();
+    }
+  }
+
+  void _androidPointerMove(PointerMoveEvent event) {
+    if (defaultTargetPlatform != TargetPlatform.android ||
+        !_viewportPointers.contains(event.pointer) ||
+        _androidMultiTouch ||
+        _desktop ||
+        _blank ||
+        _editingAddress ||
+        _showFind ||
+        (_view?.viewInsets.bottom ?? 0) > 0 ||
+        event.delta.dy.abs() <= event.delta.dx.abs()) {
+      return;
+    }
+    final delta = -event.delta.dy;
+    if (delta.sign != _androidScrollIntent.sign) _androidScrollIntent = 0;
+    _androidScrollIntent += delta;
+    final scroll = _service.scrollStateForTab(_service.activeTabId ?? '');
+    if (scroll == null || scroll.viewportExtent <= 0) return;
+    final scale = _viewportHeight > 0
+        ? _viewportHeight / scroll.viewportExtent
+        : 1.0;
+    final maxOffset = math.max(
+      0.0,
+      scroll.contentExtent - scroll.viewportExtent,
+    );
+    if (maxOffset * scale <= 16 ||
+        (maxOffset - scroll.offset.clamp(0.0, maxOffset)) * scale <= 8) {
+      _androidScrollIntent = 0;
+      _chromeMotion.value = (progress: 0, animate: true);
+      return;
+    }
+    // Android's compositor cancels DOM touch events when it takes ownership of
+    // scrolling. Flutter's raw pointer route continues for the whole gesture;
+    // it observes input without competing with WebView's gesture recognizer.
+    if (_androidScrollIntent >= 12) {
+      _chromeMotion.value = (progress: 1, animate: true);
+    } else if (_androidScrollIntent <= -6) {
+      _chromeMotion.value = (progress: 0, animate: true);
+    }
+  }
+
   double _viewportHeight = 0;
   String? _initializationError;
   String? _addressTabId;
@@ -192,15 +301,21 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   void _prepareOpticsWhenSettled([AnimationStatus? _]) {
     if (_opticsScheduled ||
         !mounted ||
+        !_service.isInitialized ||
+        _service.settings.surfaceStyle == BrowserSurfaceStyle.solid ||
         (_entryAnimation != null && !_entryAnimation!.isCompleted)) {
       return;
     }
     _opticsScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(BrowserProgressiveEdge.prewarm());
-      unawaited(BrowserSwitchLens.prewarm());
-      unawaited(BrowserGlass.prewarm(nativeBackdrop: false));
+      if (_service.settings.surfaceStyle != BrowserSurfaceStyle.solid) {
+        unawaited(BrowserProgressiveEdge.prewarm());
+        unawaited(BrowserSwitchLens.prewarm());
+        if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+          unawaited(BrowserGlass.prewarm(nativeBackdrop: false));
+        }
+      }
     });
   }
 
@@ -211,11 +326,14 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       final dismissed = _keyboardWasVisible;
       _keyboardWasVisible = false;
       if (dismissed && _addressFocus.hasFocus) _addressFocus.unfocus();
+      if (dismissed) _scheduleIdlePreview();
       if (_addressKeyboardSession && !_addressFocus.hasFocus) {
         setState(() => _addressKeyboardSession = false);
       }
       return;
     }
+    _previewIdleTimer?.cancel();
+    _tabsPreview = null;
     _keyboardWasVisible = true;
     // Webpage fields are native responders, so Flutter's address FocusNode
     // cannot report their keyboard session. Keep navigation expanded throughout
@@ -226,7 +344,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   Future<void> _initialize() async {
     try {
-      await Future.wait([_service.initialize(), BrowserGlass.prewarm()]);
+      await _service.initialize();
+      if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+        await BrowserGlass.prewarm();
+      }
       if (!mounted) return;
       var tabLimitReached = false;
       if (_service.isSupported) {
@@ -272,6 +393,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _ready = true;
       _initializationError = null;
     });
+    _scheduleIdlePreview();
     if (tabLimitReached) {
       _notify(AppLocalizations.of(context)!.browserTabLimit);
     }
@@ -302,7 +424,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       }
       _syncAddress(force: true);
     }
-    if (mounted && _ready) setState(() {});
+    if (mounted && _ready) {
+      setState(() {});
+      _scheduleIdlePreview();
+    }
   }
 
   void _scrollChanged() {
@@ -319,7 +444,33 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     );
     final offset = scroll.offset.clamp(0.0, maxOffset);
     final cssDelta = offset - _lastScroll;
+    if (offset != _lastScroll) _tabsPreview = null;
     _lastScroll = offset;
+    if (scroll.isUserInteracting) {
+      _previewIdleTimer?.cancel();
+    } else {
+      _scheduleIdlePreview();
+    }
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        _androidPointerInputSeen) {
+      if (scroll.phase == BrowserScrollPhase.reset) {
+        _androidScrollIntent = 0;
+        _chromeMotion.value = (progress: 0, animate: false);
+      } else {
+        final scale = scroll.viewportExtent > 0 && _viewportHeight > 0
+            ? _viewportHeight / scroll.viewportExtent
+            : 1.0;
+        if (maxOffset * scale <= 16 ||
+            (offset * scale <= 8 && cssDelta < 0) ||
+            (_viewportPointers.isNotEmpty &&
+                _androidScrollIntent != 0 &&
+                (maxOffset - offset) * scale <= 8)) {
+          _androidScrollIntent = 0;
+          _chromeMotion.value = (progress: 0, animate: true);
+        }
+      }
+      return;
+    }
     if (scroll.phase == BrowserScrollPhase.reset) {
       _scrollIntent = 0;
       _scrollTouchActive = false;
@@ -388,6 +539,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _serviceChanged() {
+    _prepareOpticsWhenSettled();
     if (_addressTabId != _service.activeTabId) {
       _scrollIntent = 0;
       _scrollTouchActive = false;
@@ -410,6 +562,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _findTabId = null;
       if (mounted) setState(() => _showFind = false);
     }
+    _scheduleIdlePreview();
   }
 
   void _syncAddress({bool force = false}) {
@@ -426,6 +579,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     _entryAnimation?.removeStatusListener(_prepareOpticsWhenSettled);
     WidgetsBinding.instance.removeObserver(this);
     _service.removeListener(_serviceChanged);
+    _previewIdleTimer?.cancel();
     _service.scrollPosition.removeListener(_scrollChanged);
     _addressFocus.removeListener(_addressFocusChanged);
     _findDebounce?.cancel();
@@ -940,22 +1094,51 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     final tab = _service.activeTab;
     final reduced = MediaQuery.disableAnimationsOf(context);
     final canGoForward = tab?.canGoForward == true;
-    final hostPainter = TextPainter(
-      text: TextSpan(
-        text: _displayHost,
-        style: DefaultTextStyle.of(context).style.merge(
-          const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            height: 1.15,
+    // Measure once outside the per-frame chrome builder. Only labels that need
+    // ellipsis use two stable layouts; fitting hosts keep continuous scaling.
+    double measureHost(double fontSize) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: _displayHost,
+          style: DefaultTextStyle.of(context).style.merge(
+            TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w500,
+              height: 1.15,
+            ),
           ),
         ),
-      ),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final hostWidth = hostPainter.width;
-    hostPainter.dispose();
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final expandedHostWidth = measureHost(16);
+    final hostWidth = expandedHostWidth * 13 / 16;
+    final backControl = BrowserActionButton(
+      label: l.browserBack,
+      icon: LucideIcons.chevronLeft,
+      iconSize: 22,
+      foregroundShadows: foregroundShadows,
+      useParentFeedback: true,
+      onPressed: tab?.canGoBack == true
+          ? () => unawaited(_userRun(() => _service.back()))
+          : null,
+      onLongPress: () => _openLibrary(BrowserLibrarySection.history),
+    );
+    final forwardControl = BrowserActionButton(
+      label: l.browserForward,
+      icon: LucideIcons.chevronRight,
+      iconSize: 22,
+      foregroundShadows: foregroundShadows,
+      useParentFeedback: true,
+      onPressed: canGoForward
+          ? () => unawaited(_userRun(() => _service.forward()))
+          : null,
+    );
     final editing = _editingAddress || _addressFocus.hasFocus;
     return TweenAnimationBuilder<double>(
       key: const ValueKey('browserAddressEditingTransition'),
@@ -1038,28 +1221,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                             children: [
                                               SizedBox(
                                                 width: 48 - 6 * forwardProgress,
-                                                child: BrowserActionButton(
-                                                  label: l.browserBack,
-                                                  icon: LucideIcons.chevronLeft,
-                                                  iconSize: 22,
-                                                  foregroundShadows:
-                                                      foregroundShadows,
-                                                  useParentFeedback: true,
-                                                  onPressed:
-                                                      tab?.canGoBack == true
-                                                      ? () => unawaited(
-                                                          _userRun(
-                                                            () =>
-                                                                _service.back(),
-                                                          ),
-                                                        )
-                                                      : null,
-                                                  onLongPress: () =>
-                                                      _openLibrary(
-                                                        BrowserLibrarySection
-                                                            .history,
-                                                      ),
-                                                ),
+                                                child: backControl,
                                               ),
                                               if (forwardProgress > 0)
                                                 SizedBox(
@@ -1079,26 +1241,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                                           child: Opacity(
                                                             opacity:
                                                                 forwardProgress,
-                                                            child: BrowserActionButton(
-                                                              label: l
-                                                                  .browserForward,
-                                                              icon: LucideIcons
-                                                                  .chevronRight,
-                                                              iconSize: 22,
-                                                              foregroundShadows:
-                                                                  foregroundShadows,
-                                                              useParentFeedback:
-                                                                  true,
-                                                              onPressed:
-                                                                  canGoForward
-                                                                  ? () => unawaited(
-                                                                      _userRun(
-                                                                        () => _service
-                                                                            .forward(),
-                                                                      ),
-                                                                    )
-                                                                  : null,
-                                                            ),
+                                                            child:
+                                                                forwardControl,
                                                           ),
                                                         ),
                                                       ),
@@ -1125,6 +1269,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                               width: pillWidth,
                               height: height,
                               child: BrowserAddressBar(
+                                stabilizeTruncation:
+                                    expandedHostWidth > expandedWidth - 86 ||
+                                    hostWidth > collapsedWidth - 24,
                                 expandedContentWidth: expandedWidth,
                                 collapsedContentWidth: collapsedWidth
                                     .toDouble(),
@@ -1311,7 +1458,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       children: [
         Positioned.fill(
           child: Listener(
-            onPointerDown: (_) {
+            onPointerDown: (event) {
+              _viewportPointerDown(event);
               // A tap outside the address field starts keyboard dismissal.
               // Keep its full-height viewport until the final zero-inset
               // frame; changing avoidance here briefly shrinks the webpage.
@@ -1327,6 +1475,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               }
               _addressFocus.unfocus();
             },
+            onPointerMove: _androidPointerMove,
+            onPointerUp: _viewportPointerEnd,
+            onPointerCancel: _viewportPointerEnd,
             child: _service.buildViewport(
               deferNewViews: _deferNativeViews,
               previewTopInset: previewTopInset,
@@ -1548,7 +1699,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   Future<void> _prepareManagementMaterials() async {
-    if (!ui.ImageFilter.isShaderFilterSupported) return;
+    if (_service.settings.surfaceStyle == BrowserSurfaceStyle.solid ||
+        !ui.ImageFilter.isShaderFilterSupported) {
+      return;
+    }
     // Resolve optical programs before the transition captures its first frame.
     // The browser has already started this preload after its entry animation.
     await Future.wait([
@@ -1831,10 +1985,16 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   Future<void> _pushMobileTabs() async {
-    await _prepareManagementMaterials();
+    _previewIdleTimer?.cancel();
+    // Capture before covering/detaching the live view. An idle image is only
+    // a head start: it cannot represent a page the user has just scrolled.
+    await Future.wait([
+      _prepareManagementMaterials(),
+      _prepareTabPreview(fresh: true),
+    ]);
     if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
     // A frozen overview must not capture an Image widget before its first
-    // decoded frame. Freeze the identities before awaiting decoding: a menu's
+    // decoded frame. Freeze the identities before awaiting decoding: an idle
     // in-flight native capture may replace the service bytes during this wait.
     final previews = Map<String, Uint8List>.unmodifiable({
       for (final tab in _service.tabs)
@@ -2003,12 +2163,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _prepareTabPreview() async {
+  Future<void> _prepareTabPreview({bool fresh = false}) async {
+    if (!fresh && _hasCurrentTabPreview) return;
     final tab = _service.activeTab;
     if (tab == null || _blank) return;
     final offset = _service.scrollStateForTab(tab.id)?.offset;
     final previous = _service.previewForTab(tab.id);
-    await _service.refreshActivePreview();
+    await _service.refreshActivePreview(fresh: fresh);
     final bytes = _service.previewForTab(tab.id);
     if (!mounted ||
         bytes == null ||
@@ -2028,6 +2189,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   Future<void> _openMenu({int? heldPointer, Offset? pressPosition}) async {
     if (_menuOpen) return;
+    _previewIdleTimer?.cancel();
     if (_service.agentActivityFor(
           sessionId: _visibleConversationId,
           tabId: _service.activeTabId,
@@ -2050,11 +2212,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         if (mounted && _menuOpen) {
           setState(() => _menuTransitionStarted = true);
         }
-      },
-      onOpened: () {
-        // A thumbnail is useful for the tab overview, but capture/encoding must
-        // not compete with the first response or the menu's opening animation.
-        if (mounted && _menuOpen) unawaited(_prepareTabPreview());
       },
       heldPointer: heldPointer,
       pressPosition: pressPosition,
@@ -2159,7 +2316,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         _menuTransitionStarted = false;
       });
     }
-    if (action == null) return;
+    if (action == null) {
+      _scheduleIdlePreview();
+      return;
+    }
     switch (action) {
       case _BrowserMenu.newTab:
         await _newTab();

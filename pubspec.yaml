@@ -156,6 +156,9 @@ dev_dependencies:
   fake_async: ^1.3.3
 
 dependency_overrides:
+  # Retained Android hosts switch composition and omit unsubscribed scroll events.
+  flutter_inappwebview_android:
+    path: dependencies/flutter_inappwebview_android
   # Match each existing native iOS host without relying on shared popup scripts.
   flutter_inappwebview_ios:
     path: dependencies/flutter_inappwebview_ios

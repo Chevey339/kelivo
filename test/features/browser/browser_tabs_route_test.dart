@@ -712,7 +712,7 @@ class _PreviewService extends BrowserService {
   }
 
   @override
-  Future<void> refreshActivePreview() async => captures++;
+  Future<void> refreshActivePreview({bool fresh = false}) async => captures++;
 
   @override
   Uint8List? previewForTab(String id) => _replacements.containsKey(id)

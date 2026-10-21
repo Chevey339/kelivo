@@ -112,6 +112,45 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  browserTest(
+    'UA and search-engine selections share trailing values at large text sizes',
+    (tester) async {
+      await service.updateSettings(
+        service.settings.copyWith(desktopMode: false),
+      );
+      for (final scale in [1.0, 2.0]) {
+        await mount(
+          tester,
+          BrowserSettingsPanel(
+            service: service,
+            onError: (error) => fail('$error'),
+            onDataCleared: () {},
+          ),
+          size: const Size(320, 844),
+          scale: scale,
+        );
+        for (final (label, value) in [
+          ('Search engine', 'Bing'),
+          ('User agent', 'Mobile'),
+        ]) {
+          final row = find.byWidgetPredicate(
+            (widget) => widget is BrowserSurfaceRow && widget.label == label,
+          );
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          expect(tester.widget<BrowserSurfaceRow>(row).subtitle, isNull);
+          final text = find.descendant(of: row, matching: find.text(value));
+          expect(text, findsOneWidget);
+          expect(
+            tester.getCenter(text).dx,
+            greaterThan(tester.getCenter(find.text(label)).dx),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   browserTest('surface choices persist and update the open panel material', (
     tester,
   ) async {
@@ -1077,10 +1116,13 @@ void main() {
                   width: 90,
                   height: 60,
                   child: Center(
-                    child: BrowserSwitch(
-                      key: ValueKey(value),
-                      value: value,
-                      onChanged: (_) {},
+                    child: BrowserGlassScope(
+                      style: BrowserSurfaceStyle.liquid,
+                      child: BrowserSwitch(
+                        key: ValueKey(value),
+                        value: value,
+                        onChanged: (_) {},
+                      ),
                     ),
                   ),
                 ),

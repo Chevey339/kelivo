@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
@@ -75,6 +76,12 @@ class NativeBrowserEngine implements BrowserEngine {
   @override
   Future<void> get viewReady => _viewReady?.future ?? Future<void>.value();
   bool _converted = false;
+  bool get _usesHybridComposition =>
+      defaultTargetPlatform == TargetPlatform.android &&
+      (settings.surfaceStyle == BrowserSurfaceStyle.solid ||
+          (settings.surfaceStyle == BrowserSurfaceStyle.liquid &&
+              !ui.ImageFilter.isShaderFilterSupported));
+  late final _composition = ValueNotifier<bool>(_usesHybridComposition);
   String? _defaultUserAgent;
   String? _downloadUserAgent;
   String? _renderedDocumentUrl;
@@ -162,8 +169,10 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   InAppWebViewSettings get _viewSettings => InAppWebViewSettings(
-    // A texture-composed Android view lets the glass shader sample live pages.
-    useHybridComposition: false,
+    // Glass needs a texture for Flutter backdrop sampling. Solid controls can
+    // use the native hierarchy, avoiding a second raster/composition pass on
+    // each WebView scroll frame.
+    useHybridComposition: _usesHybridComposition,
     javaScriptEnabled: true,
     useShouldOverrideUrlLoading: true,
     useOnDownloadStart: true,
@@ -527,6 +536,11 @@ class NativeBrowserEngine implements BrowserEngine {
         return null;
       }
       _finishHistoryTraversal();
+      // Hash/History API traversal and BFCache can keep the same DOM without
+      // a load-stop callback. The native history item has now moved, so allow
+      // that document to re-handshake after _beginNavigation invalidated it.
+      if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
+      unawaited(_installScrollObserver());
     }
     return history;
   }
@@ -700,8 +714,27 @@ class NativeBrowserEngine implements BrowserEngine {
 
   @override
   Widget buildView() {
-    final ready = _viewReady = Completer<void>();
+    final initialReady = _viewReady = Completer<void>();
+    Widget? host;
+    bool? hostComposition;
+    return ValueListenableBuilder<bool>(
+      valueListenable: _composition,
+      builder: (_, hybrid, _) {
+        if (host == null || hostComposition != hybrid) {
+          final ready = host == null
+              ? initialReady
+              : (_viewReady = Completer<void>());
+          hostComposition = hybrid;
+          host = _buildNativeView(hybrid, ready);
+        }
+        return host!;
+      },
+    );
+  }
+
+  Widget _buildNativeView(bool hybrid, Completer<void> ready) {
     return InAppWebView(
+      key: ValueKey(hybrid),
       initialSettings: _viewSettings,
       initialUserScripts: _userScripts,
       keepAlive: _keepAlive,
@@ -882,6 +915,17 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<Uint8List?> thumbnail() async {
     InAppWebViewRect? rect;
     var snapshotWidth = 440.0;
+    if (Platform.isAndroid) {
+      // Android also interprets snapshotWidth in logical pixels. Match iOS's
+      // 440 physical-pixel thumbnail budget instead of encoding a full-size
+      // screenshot (and sometimes upscaling it) for each preview.
+      snapshotWidth /= WidgetsBinding
+          .instance
+          .platformDispatcher
+          .views
+          .first
+          .devicePixelRatio;
+    }
     if (Platform.isIOS) {
       final viewId = _webView.getViewId();
       if (viewId == null) return null;
@@ -913,9 +957,16 @@ class NativeBrowserEngine implements BrowserEngine {
 
   @override
   Future<void> updateSettings(BrowserSettings settings) async {
+    final previousComposition = _composition.value;
     this.settings = settings;
     await _webView.setSettings(settings: _viewSettings);
     _downloadUserAgent = null;
+    if (!_disposed && previousComposition != _usesHybridComposition) {
+      // Reattach the retained native view with a different platform host. The
+      // keep-alive token preserves the document, forms, scroll and history;
+      // changing the visual style must not navigate or reload the page.
+      _composition.value = _usesHybridComposition;
+    }
   }
 
   @override
@@ -984,6 +1035,7 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _composition.dispose();
     _historyCommandEpoch++;
     _finishHistoryTraversal();
     if (Platform.isIOS) {

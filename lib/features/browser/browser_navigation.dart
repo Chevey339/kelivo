@@ -56,7 +56,7 @@ Future<void> openBrowserPage(
           reduceMotion: MediaQuery.disableAnimationsOf(context),
           builder: buildPage,
         )
-      : MaterialPageRoute<void>(builder: buildPage);
+      : MaterialPageRoute<void>(builder: buildPage, allowSnapshotting: false);
   // Native WebViews must never participate in Material's whole-route zoom or
   // slide transform. Removing the pane and pushing the untransformed page in
   // one frame also prevents an intermediate full-width chat flash on expand.

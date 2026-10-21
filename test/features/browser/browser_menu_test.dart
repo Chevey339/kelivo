@@ -318,7 +318,13 @@ void main() {
     'mobile lens rounds outward while content scales and clears inside it',
     (tester) async {
       const anchor = Rect.fromLTWH(326, 750, 48, 48);
-      await mount(tester, desktop: false, anchor: anchor, settle: false);
+      await mount(
+        tester,
+        desktop: false,
+        anchor: anchor,
+        settle: false,
+        theme: ThemeData(platform: TargetPlatform.iOS),
+      );
       final initialRadius = tester.widget<BrowserGlass>(surface).radius;
       expect(initialRadius, 1000);
       expect(
@@ -354,6 +360,26 @@ void main() {
       expect(tester.widget<ImageFiltered>(blur).enabled, isFalse);
       expect(tester.widget<BrowserGlass>(surface).radius, 25);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Android menu morph keeps foreground sharp without an offscreen blur',
+    (tester) async {
+      await mount(
+        tester,
+        desktop: false,
+        anchor: const Rect.fromLTWH(326, 750, 48, 48),
+        settle: false,
+      );
+      await tester.pump(const Duration(milliseconds: 90));
+      final blur = tester.widget<ImageFiltered>(
+        find.byKey(const ValueKey('browserMenuContentBlur')),
+      );
+      expect(blur.enabled, isFalse);
+      expect(tester.getSize(surface).width, inExclusiveRange(48, 250));
+      await tester.pumpAndSettle();
+      expect(find.text('New tab'), findsOneWidget);
     },
   );
 

@@ -9,6 +9,7 @@ import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_scroll_observer.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -651,6 +652,116 @@ void main() {
     skip: !Platform.isMacOS,
   );
 
+  test(
+    'surface changes update native composition without reloading documents',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final tab = await service.createTab(url: 'https://history.example/page');
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      var applied = native.document.appliedSettings.length;
+      for (final style in [
+        BrowserSurfaceStyle.frosted,
+        BrowserSurfaceStyle.solid,
+      ]) {
+        await service.updateSettings(
+          service.settings.copyWith(surfaceStyle: style),
+        );
+        expect(native.document.appliedSettings.length, ++applied);
+        expect(
+          native.document.appliedSettings.last.useHybridComposition,
+          style == BrowserSurfaceStyle.solid,
+        );
+        expect(native.document.reloads, 0);
+        expect(platform.views, hasLength(1));
+      }
+    },
+  );
+
+  for (final target in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('material changes reattach the same document on $target', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = target;
+      const tab = BrowserTab(id: 'composition-test');
+      final engine = await NativeBrowserEngine.create(
+        tab: tab,
+        settings: const BrowserSettings(
+          surfaceStyle: BrowserSurfaceStyle.solid,
+        ),
+        onChanged: (_) {},
+        onDownload: (_, _) {},
+        onNewWindow: (_, _) async => false,
+        isAgentActive: () => false,
+      );
+      try {
+        final native = platform.views.single;
+        native.document.historyIndex = 1;
+        native.document.historyLength = 3;
+        native.document.documentId = 'retained-form-document';
+        final host = engine.buildView();
+        await tester.pumpWidget(host);
+        await engine.viewReady;
+        final token = platform.widgets.single.params.keepAlive;
+        expect(
+          platform.widgets.single.params.initialSettings!.useHybridComposition,
+          target == TargetPlatform.android,
+        );
+        for (final style in [
+          BrowserSurfaceStyle.frosted,
+          BrowserSurfaceStyle.solid,
+        ]) {
+          await engine.updateSettings(BrowserSettings(surfaceStyle: style));
+          await tester.pump();
+          await engine.viewReady;
+          expect(
+            platform.widgets.last.params.initialSettings!.useHybridComposition,
+            target == TargetPlatform.android &&
+                style == BrowserSurfaceStyle.solid,
+          );
+          expect(platform.widgets.last.params.keepAlive, same(token));
+          expect(platform.views, hasLength(1));
+          expect(native.document.reloads, 0);
+          expect(native.document.historyIndex, 1);
+          expect(native.document.historyLength, 3);
+          expect(native.document.documentId, 'retained-form-document');
+        }
+        // Unsupported shader filters already render liquid as a solid surface.
+        // Match that effective material instead of allocating a texture host.
+        await engine.updateSettings(
+          const BrowserSettings(surfaceStyle: BrowserSurfaceStyle.liquid),
+        );
+        await tester.pump();
+        await engine.viewReady;
+        final hosts = target == TargetPlatform.android ? 3 : 1;
+        expect(platform.widgets, hasLength(hosts));
+        // Changes coalescing back to the mounted composition must not strand
+        // the first-frame readiness future or replace its native document.
+        await engine.updateSettings(
+          const BrowserSettings(surfaceStyle: BrowserSurfaceStyle.frosted),
+        );
+        await engine.updateSettings(
+          const BrowserSettings(surfaceStyle: BrowserSurfaceStyle.solid),
+        );
+        await tester.pump();
+        await engine.viewReady;
+        await engine.updateSettings(
+          const BrowserSettings(
+            surfaceStyle: BrowserSurfaceStyle.solid,
+            customUserAgent: 'Test/1.0',
+          ),
+        );
+        await tester.pump();
+        expect(platform.widgets, hasLength(hosts));
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await engine.dispose();
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+  }
+
   test('custom UA reaches new and live engines and can be cleared', () async {
     await service.initialize();
     await service.updateSettings(
@@ -1053,6 +1164,58 @@ void main() {
     },
   );
 
+  test(
+    'same-document back and forward reconnect scroll without load-stop',
+    () async {
+      const url = 'https://history.example/page';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      native.document.historyIndex = 1;
+      native.document.historyLength = 2;
+      await native.stop(url);
+      final handler = native.document.handlers[browserScrollHandlerName]!;
+      var sequence = 0;
+      Map<String, Object> event(String phase, double offset) => {
+        'documentId': native.document.documentId,
+        'sequence': ++sequence,
+        'phase': phase,
+        'offset': offset,
+        'viewportExtent': 800,
+        'contentExtent': 3000,
+        'supportsScrollEnd': true,
+        'isUserInteracting': phase == 'update',
+        'gestureDelta': phase == 'update' ? 20 : 0,
+      };
+      expect(await handler([event('reset', 0)]), isTrue);
+      native.document.onBack = () => native.document.historyIndex = 0;
+      native.document.onForward = () => native.document.historyIndex = 1;
+      for (var round = 0; round < 3; round++) {
+        for (final forward in [false, true]) {
+          final before = native.document.evaluations
+              .where((script) => script.contains('?.reconnect()'))
+              .length;
+          await (forward
+              ? service.forward(tabId: tab.id)
+              : service.back(tabId: tab.id));
+          await Future<void>.delayed(Duration.zero);
+          expect(
+            native.document.evaluations
+                .where((script) => script.contains('?.reconnect()'))
+                .length,
+            greaterThan(before),
+          );
+          // The same document ID remains valid; no native load-stop occurs.
+          expect(await handler([event('reset', 100)]), isTrue);
+          expect(await handler([event('update', 120)]), isTrue);
+          expect(service.scrollStateForTab(tab.id)!.offset, 120);
+          expect(service.requireTab(tab.id).canGoForward, !forward);
+        }
+      }
+    },
+  );
+
   test('navigation and disposal reject stale document scroll events', () async {
     final tab = await service.createTab();
     await service.evaluateJavascript('1', tabId: tab.id);
@@ -1120,6 +1283,28 @@ class _MemoryStore extends BrowserStore {
 class _BrowserPlatform extends InAppWebViewPlatform {
   final List<_HeadlessView> views = [];
   final Map<Object, _Document> documents = {};
+  final List<_WidgetView> widgets = [];
+  final Map<InAppWebViewKeepAlive, String> retained = {};
+
+  @override
+  PlatformInAppWebViewWidget createPlatformInAppWebViewWidget(
+    PlatformInAppWebViewWidgetCreationParams params,
+  ) {
+    final id = retained.putIfAbsent(
+      params.keepAlive!,
+      () => params.headlessWebView!.id,
+    );
+    final view = _WidgetView(params, id, documents[id]!);
+    widgets.add(view);
+    return view;
+  }
+
+  @override
+  PlatformInAppWebViewController createPlatformInAppWebViewControllerStatic() =>
+      _Controller(
+        const PlatformInAppWebViewControllerCreationParams(id: 'static'),
+        _Document(),
+      );
 
   @override
   PlatformCookieManager createPlatformCookieManager(
@@ -1134,7 +1319,7 @@ class _BrowserPlatform extends InAppWebViewPlatform {
   @override
   PlatformInAppWebViewController createPlatformInAppWebViewController(
     PlatformInAppWebViewControllerCreationParams params,
-  ) => _Controller(params, documents[params.id]!);
+  ) => _Controller(params, documents[params.id] ?? _Document());
 
   @override
   PlatformHeadlessInAppWebView createPlatformHeadlessInAppWebView(
@@ -1147,6 +1332,42 @@ class _BrowserPlatform extends InAppWebViewPlatform {
     views.add(view);
     return view;
   }
+}
+
+class _WidgetView extends PlatformInAppWebViewWidget {
+  _WidgetView(super.params, this.id, this.document) : super.implementation();
+  final String id;
+  final _Document document;
+  bool created = false;
+  bool disposed = false;
+
+  @override
+  T controllerFromPlatform<T>(PlatformInAppWebViewController controller) =>
+      params.controllerFromPlatform!(controller) as T;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!created) {
+      created = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (disposed) return;
+        final controller = _Controller(
+          PlatformInAppWebViewControllerCreationParams(
+            id: id,
+            webviewParams: params,
+          ),
+          document,
+        );
+        params.onWebViewCreated!(
+          controllerFromPlatform<InAppWebViewController>(controller),
+        );
+      });
+    }
+    return const SizedBox.expand();
+  }
+
+  @override
+  void dispose() => disposed = true;
 }
 
 class _Document {
@@ -1352,6 +1573,8 @@ class _Controller extends PlatformInAppWebViewController {
   Future<void> stopLoading() async {}
   @override
   void dispose({bool isKeepAlive = false}) {}
+  @override
+  Future<void> disposeKeepAlive(InAppWebViewKeepAlive keepAlive) async {}
   @override
   void addJavaScriptHandler({
     required String handlerName,

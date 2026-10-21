@@ -25,7 +25,7 @@ class BrowserGlassScope extends InheritedTheme {
 
   static BrowserSurfaceStyle of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<BrowserGlassScope>()?.style ??
-      BrowserSurfaceStyle.liquid;
+      BrowserSurfaceStyle.solid;
 
   @override
   bool updateShouldNotify(BrowserGlassScope oldWidget) =>
@@ -281,11 +281,12 @@ class _BrowserGlassState extends State<BrowserGlass>
     final dark = Theme.of(context).brightness == Brightness.dark;
     final contrast = MediaQuery.highContrastOf(context);
     final style = _style!;
-    final interaction = _BrowserGlassInteraction.of(context);
-    final intensity = interaction.intensity.clamp(0.0, 1.0);
+    final interaction = _BrowserGlassInteraction.of(context, opticsOnly: true);
     // Touch uses the shared, clipped highlight below. The material itself is
     // not independently brightened on top of that legacy-style response.
-    final opticalIntensity = interaction.touch ? 0.0 : intensity;
+    final opticalIntensity = interaction.touch
+        ? 0.0
+        : interaction.intensity.clamp(0.0, 1.0);
     final isClear = clear || !blur;
     final corners = BorderRadius.circular(radius);
 
@@ -360,10 +361,10 @@ class _BrowserGlassState extends State<BrowserGlass>
       surface = ClipRRect(
         borderRadius: corners,
         child: BackdropFilter(
-          enabled: opacity > 0,
+          enabled: opacity > 0 && widget.blur,
           // Keep the filter in the scene's backdrop pass while it dissolves.
           // An Opacity/ColorFiltered ancestor would isolate its input.
-          filter: ImageFilter.blur(sigmaX: 20 * opacity, sigmaY: 20 * opacity),
+          filter: _frostedFilter(opacity),
           child: ColoredBox(
             color: (dark ? const Color(0xFF252A30) : Colors.white).withValues(
               alpha: (.48 + opticalIntensity * .08) * opacity,
@@ -373,6 +374,19 @@ class _BrowserGlassState extends State<BrowserGlass>
       );
     } else {
       surface = const SizedBox.expand();
+    }
+
+    if (_opticalStyle != null && !_usesNative(_opticalStyle)) {
+      // A zero shader visibility still submits the backdrop/refraction passes.
+      // Skip painting fully hidden Flutter materials while retaining their
+      // prepared renderers, without introducing a separate backdrop render pass.
+      surface = Visibility(
+        visible: opacity > 0,
+        maintainState: true,
+        maintainAnimation: true,
+        maintainSize: true,
+        child: surface,
+      );
     }
 
     final cover = AnimatedBuilder(
@@ -392,73 +406,95 @@ class _BrowserGlassState extends State<BrowserGlass>
       ),
     );
 
+    final hasShadow =
+        elevated &&
+        (!_usesNative(style) || style != BrowserSurfaceStyle.liquid);
+    final content = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          key: const ValueKey('browserMaterialSurface'),
+          child: IgnorePointer(child: surface),
+        ),
+        Positioned.fill(
+          key: const ValueKey('browserMaterialCoverSlot'),
+          child: IgnorePointer(child: cover),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Builder(
+              builder: (context) {
+                final feedback = _BrowserGlassInteraction.of(context);
+                return feedback.intensity <= 0
+                    ? const SizedBox.expand()
+                    : CustomPaint(
+                        key: const ValueKey('browserGlassTouchLight'),
+                        painter: _GlassTouchLightPainter(
+                          radius: radius,
+                          intensity:
+                              feedback.intensity.clamp(0.0, 1.0) * opacity,
+                          position: feedback.position,
+                          touch: feedback.touch,
+                          dark: dark,
+                        ),
+                      );
+              },
+            ),
+          ),
+        ),
+        Opacity(
+          key: const ValueKey('browserGlassForeground'),
+          opacity: opacity,
+          child: Padding(padding: padding, child: child),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Builder(
+              builder: (context) {
+                if (!_BrowserGlassInteraction.of(context).focused) {
+                  return const SizedBox.expand();
+                }
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: corners,
+                    border: Border.all(
+                      color: (dark ? Colors.white : const Color(0xFF26384B))
+                          .withValues(alpha: opacity),
+                      width: 2,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
     return RepaintBoundary(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: corners,
-          boxShadow:
-              elevated &&
-                  (!_usesNative(style) || style != BrowserSurfaceStyle.liquid)
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: (dark ? .19 : .10) * opacity,
-                    ),
-                    blurRadius: 22,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              key: const ValueKey('browserMaterialSurface'),
-              child: IgnorePointer(child: surface),
-            ),
-            Positioned.fill(
-              key: const ValueKey('browserMaterialCoverSlot'),
-              child: IgnorePointer(child: cover),
-            ),
-            if (intensity > 0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    key: const ValueKey('browserGlassTouchLight'),
-                    painter: _GlassTouchLightPainter(
-                      radius: radius,
-                      intensity: intensity * opacity,
-                      position: interaction.position,
-                      touch: interaction.touch,
-                      dark: dark,
-                    ),
-                  ),
-                ),
+      child: defaultTargetPlatform == TargetPlatform.android
+          ? CustomPaint(
+              painter: hasShadow
+                  ? _BrowserSurfaceShadow(radius, (dark ? .19 : .10) * opacity)
+                  : null,
+              child: content,
+            )
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: corners,
+                boxShadow: hasShadow
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: (dark ? .19 : .10) * opacity,
+                          ),
+                          blurRadius: 22,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : null,
               ),
-            Opacity(
-              key: const ValueKey('browserGlassForeground'),
-              opacity: opacity,
-              child: Padding(padding: padding, child: child),
+              child: content,
             ),
-            if (interaction.focused)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: corners,
-                      border: Border.all(
-                        color: (dark ? Colors.white : const Color(0xFF26384B))
-                            .withValues(alpha: opacity),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -542,7 +578,9 @@ class BrowserControlFeedback extends StatelessWidget {
 
 /// Press state is separate from the content so the material can respond to
 /// pointer movement without painting a second rectangular highlight over it.
-class _BrowserGlassInteraction extends InheritedWidget {
+enum _BrowserInteractionPart { optics, feedback }
+
+class _BrowserGlassInteraction extends InheritedModel<_BrowserInteractionPart> {
   const _BrowserGlassInteraction({
     required this.intensity,
     required this.position,
@@ -556,8 +594,16 @@ class _BrowserGlassInteraction extends InheritedWidget {
   final bool focused;
   final bool touch;
 
-  static _BrowserGlassInteraction of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<_BrowserGlassInteraction>() ??
+  static _BrowserGlassInteraction of(
+    BuildContext context, {
+    bool opticsOnly = false,
+  }) =>
+      InheritedModel.inheritFrom<_BrowserGlassInteraction>(
+        context,
+        aspect: opticsOnly
+            ? _BrowserInteractionPart.optics
+            : _BrowserInteractionPart.feedback,
+      ) ??
       const _BrowserGlassInteraction(
         intensity: 0,
         position: Offset.zero,
@@ -572,6 +618,16 @@ class _BrowserGlassInteraction extends InheritedWidget {
       position != oldWidget.position ||
       focused != oldWidget.focused ||
       touch != oldWidget.touch;
+
+  @override
+  bool updateShouldNotifyDependent(
+    _BrowserGlassInteraction oldWidget,
+    Set<_BrowserInteractionPart> dependencies,
+  ) =>
+      dependencies.contains(_BrowserInteractionPart.feedback) ||
+      (touch ? 0 : intensity) != (oldWidget.touch ? 0 : oldWidget.intensity) ||
+      (touch ? Offset.zero : position) !=
+          (oldWidget.touch ? Offset.zero : oldWidget.position);
 }
 
 /// A glass control grows under a finger, stretches toward it, and springs home.
@@ -1229,4 +1285,46 @@ class _WallpaperPainter extends CustomPainter {
   @override
   bool shouldRepaint(_WallpaperPainter oldDelegate) =>
       oldDelegate.dark != dark || oldDelegate.highContrast != highContrast;
+}
+
+class _BrowserSurfaceShadow extends CustomPainter {
+  const _BrowserSurfaceShadow(this.radius, this.opacity);
+  final double radius;
+  final double opacity;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (opacity <= 0) return;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
+      );
+    canvas.drawShadow(path, Colors.black.withValues(alpha: opacity), 6, true);
+  }
+
+  @override
+  bool shouldRepaint(_BrowserSurfaceShadow oldDelegate) =>
+      radius != oldDelegate.radius || opacity != oldDelegate.opacity;
+}
+
+ImageFilter _frostedFilter(double opacity) {
+  final sigma = 20 * opacity;
+  if (defaultTargetPlatform != TargetPlatform.android) {
+    return ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+  }
+  // Blur a smaller intermediate while preserving the same effective radius.
+  // A fixed small kernel avoids large Gaussian passes and changing kernels
+  // throughout an optical fade. The foreground and webpage stay full resolution.
+  final scale = (sigma / 5).clamp(1.0, 4.0);
+  final blur = ImageFilter.blur(sigmaX: sigma / scale, sigmaY: sigma / scale);
+  if (scale == 1) return blur;
+  return ImageFilter.compose(
+    outer: ImageFilter.matrix(Matrix4.diagonal3Values(scale, scale, 1).storage),
+    inner: ImageFilter.compose(
+      outer: blur,
+      inner: ImageFilter.matrix(
+        Matrix4.diagonal3Values(1 / scale, 1 / scale, 1).storage,
+      ),
+    ),
+  );
 }

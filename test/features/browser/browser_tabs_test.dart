@@ -449,7 +449,7 @@ class _PreviewService extends BrowserService {
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1UAAAAASUVORK5CYII=',
   );
   @override
-  Future<void> refreshActivePreview() async {
+  Future<void> refreshActivePreview({bool fresh = false}) async {
     captures.add(activeTabId!);
     notifyListeners();
   }

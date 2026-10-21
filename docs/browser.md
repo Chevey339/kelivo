@@ -1804,3 +1804,608 @@ and the markstream package passed analysis and all 290 tests in the primary
 checkout (this browser branch predates the package rename). One unrelated backup
 isolate timing test failed in the first full run, then passed both its isolated
 retry and the complete lower-concurrency run; its code and assertions were unchanged.
+
+
+### R17: adaptive address motion and Android scroll composition
+
+R16 was independently reviewed, repaired and committed as `b3d7d483` before
+this work. Address labels now retain continuous layout/font interpolation when
+they fit at both endpoints. Labels needing ellipsis retain the two stable
+endpoint layouts. Measurements use the inherited font and text scale outside
+the per-frame spring builder.
+
+Android solid surfaces now use hybrid composition, while liquid/frosted surfaces
+retain texture composition for live Flutter backdrop sampling. Changing style
+reattaches the same keep-alive WebView, without navigation/reload. Coalesced
+style changes retain the existing host and cannot strand the attachment future.
+The browser route disables Flutter route snapshots, which cannot capture native
+hybrid views. The vendored Android plugin remains at 1.1.3; its local patches
+synchronize the input proxy/container/layer when reattaching a retained view and
+avoid scroll/overscroll channel messages without Dart subscribers. Native
+scrolling, content quality and system refresh requests are unchanged.
+
+The user's initial manual comparison was captured on Android 11/API 30,
+1080x2400 at an actual 120 Hz. In this capture, Kelivo's Android main-thread
+Choreographer span p95 was 7.40 ms versus Bothub's 5.76 ms, and
+syncAndDrawFrame p95 was 5.23 ms versus 1.91 ms. Kelivo had 3,553 DrawFrame spans
+for 1,776 WebView draws, versus Bothub's 2,071/2,071. These are Android trace
+costs, not end-to-end Flutter FPS or a controlled lab benchmark; interactions
+were manually performed and aggregate gfxinfo jank includes input-latency
+classification. SurfaceFlinger did not return valid presentation timestamps.
+The initial evidence is `/tmp/browser-r17-scroll-compare.atrace` and
+`/tmp/browser-r17-trace-summary.json`. The Bothub package was inspected read-only
+using Android SDK tools after REA reported its Android backend unavailable.
+
+Focused validation: 493 browser tests passed, including retained document/history,
+style changes without reload, short-label scaling and long-label stability.
+The final native-engine/page subset passed all 129 tests after adding the
+coalesced-style regression. Static analysis and the JS scroll-observer regression
+passed. The two Android Robolectric tests passed: unsubscribed scroll events
+are suppressed while subscribed/other events still arrive, and switching
+composition clears the old IME proxy and permits a new proxy on return.
+No automated browser UI acceptance was performed.
+
+The arm64 Release APK built and was signed with the existing project certificate
+(SHA-256 `00cdebef78297ab3e7df18792d43df6c734acd22a7a71d286928eea5cef1b6c1`).
+`adb -s fee8c1be install -r` succeeded without uninstalling or resetting data.
+Artifact: `build/app/outputs/flutter-apk/kelivo-browser-r17-arm64-release.apk`.
+
+
+The user completed the second comparison and reported improved webpage scrolling,
+but retained jank in menus, keyboard and chrome motion, plus pages where chrome
+would not collapse. Read-only Android view hierarchy and R8 mapping confirmed the
+solid page was hosted by FlutterMutatorView/FlutterImageView (hybrid composition).
+The capture also exposed WebView screenshot work taking about 80-90 ms of main
+thread CPU in individual long messages. The upstream screenshot implementation
+allocated a full viewport bitmap, cropped/scaled it and compressed it on main;
+Android thumbnails additionally multiplied the requested 440 width by density.
+
+The follow-up draws directly at the requested dimensions, bounds Android tab
+previews to 440 physical pixels like iOS, and encodes on one background worker,
+returning the channel result on main. Agent PNG screenshot requests keep their
+original size/format contract. Android chrome direction now observes Flutter's
+raw pointer stream rather than depending on DOM touches surviving compositor
+scroll ownership. DOM scroll metrics also follow scrollable inner elements;
+root gestures restore root metrics. Pinches, keyboard editing and passive
+momentum cannot reverse the chrome.
+
+Follow-up checks: all 494 browser tests, static analysis and the executable JS
+observer regression passed. All three Android Robolectric tests passed, including
+native Skia pixel verification of scaled/cropped screenshots, async completion
+and main-thread replies. This is not a final real-device smoothness result for
+the follow-up; the user has only confirmed improvement in the earlier build's
+webpage scrolling. R17 remains uncommitted, separately from R16.
+
+The final follow-up Release build also passed and was installed with `adb install -r`
+on `fee8c1be`, with the same certificate and no uninstall/data reset. Its distinct
+artifact is `build/app/outputs/flutter-apk/kelivo-browser-r17b-arm64-release.apk`;
+logs: `/tmp/browser-r17-ui-release.log`, `/tmp/browser-r17-ui-followup-tests.log`,
+`/tmp/browser-r17-next-analyze.log`, `/tmp/browser-r17-native-followup-final.log`.
+Both passive atrace captures were stopped. Final UI smoothness is awaiting the
+user's manual check; no further automated UI actions were performed.
+
+### R18: Android controls, idle previews and address baseline
+
+The user confirmed smooth solid-mode webpage scrolling but reported delayed
+controls, retained optical-mode scroll cost and a moving address baseline.
+The baseline now uses one fixed line box plus a paint transform; changing
+fractional font sizes no longer rounds the ascent/descent separately each frame.
+Long truncated hosts still use stable endpoint layouts; fitting hosts retain
+continuous motion. Android keyboard dock changes interpolate over 240 ms while
+retaining the webpage's bounds and element; reduced motion skips interpolation.
+
+More no longer requests a native tab screenshot during presentation. The active
+preview is prepared after one second without viewport input/scroll updates,
+provided no keyboard, menu, find UI, tab transition or Flutter animation is active.
+The callback rechecks those conditions and the route before capturing; unchanged
+previews are reused. Android menu text keeps its scale/fade without the additional
+large foreground blur. Its background material is unchanged. Fully hidden
+Flutter optical surfaces now skip paint via Visibility while retaining their
+prepared renderers, size and state. A zero shader visibility alone still submitted
+backdrop/refraction passes. Visible surfaces retain their blur, tint and render path;
+native iOS hosts retain their existing material-opacity handling.
+
+An explicit profile probe lives in
+`integration_test/browser_android_composition_bench.dart`. It uses a local HTML
+fixture, temporary browser files and an in-memory settings database, records
+menu/IME/collapse/expand phases in all three styles, and does not navigate or
+modify the user's real tabs. Run drive with `--keep-app-running` to avoid the
+integration driver's default uninstall. FrameTiming reports engine build/raster
+and total span, not display presentation FPS. The Android 11 physical device
+remained at 120 Hz; samples are not controlled lab or iOS measurements.
+
+Initial A/B results (`/tmp/browser-r18-baseline.json` and
+`/tmp/browser-r18-lean.json`) reduced warmed solid-menu raster maximum from
+22.308 ms to 8.595 ms and p95 from 6.040 ms to 5.335 ms; total-span p95 was nearly
+unchanged (13.782 vs 13.936 ms). Frosted/liquid results were mixed, so this does
+not establish that optical scrolling is fully fixed. The final probe repeats
+with stricter idle-capture guards. Uniform texture composition, forcing hardware
+layers, shared backdrop groups and disabling Flutter's native-view synchronization
+were also measured; none gave a consistent improvement and none of those
+experiments is shipped. In particular, the shared group increased some liquid
+collapse/expand samples, so the final change only skips fully hidden material paint.
+
+Flutter's platform-view tradeoffs are documented at
+https://docs.flutter.dev/platform-integration/android/platform-views and
+https://flutter.googlesource.com/mirrors/flutter/+/HEAD/docs/platforms/android/Android-Platform-Views.md.
+The current API 30 device cannot use the newer API 34+ HCPP path. The final code
+retains R17's solid hybrid/optical texture split, and does not change the global
+renderer, system refresh policy or webpage rendering resolution.
+
+Final candidate evidence: `/tmp/browser-r18-hidden.json` and
+`/tmp/browser-r18-hidden-drive.log` completed all 36 measured phases. Warmed
+solid menu raster maximum was 7.317 ms versus baseline 22.308 ms; raster p95
+5.289 vs 6.040 ms and total-span p95 13.161 vs 13.782 ms. Solid address-open
+raster p95 was essentially unchanged (2.732 vs 2.685 ms). Liquid collapse raster
+p95 was 5.137 vs 5.213 ms, while expand was 6.183 vs 5.270 ms; frosted collapse
+was 9.395 vs 8.840 ms and expand 10.551 vs 10.721 ms. These mixed optical results
+do not establish consistent scroll improvement. Battery temperature during the
+last run was around 39.5 C; sample order, thermal conditions and native pipeline
+latency were not controlled. No claim of stable 120 FPS or complete jank removal.
+
+Validation: the combined browser core/widget run passed 498 tests before the
+last paint-gate change; the final browser widget suite passed all 376 tests after
+it. Static analysis of lib/test/integration_test, changed-file formatting,
+`git diff --check`, and executable JS observer checks passed. New regressions
+cover continuous address baselines, deferred/cancelled idle capture, retained
+viewport geometry during keyboard motion, Android menu content without extra
+foreground blur, and hidden optical renderers surviving hide/show without remount.
+The initial opacity-wrapper experiment tripped the existing backdrop-isolation
+regression and was replaced by Flutter Visibility, which skips paint without
+an opacity layer. R18 remains uncommitted along with R17.
+
+The final normal-entry arm64 Release build passed and was signed with the existing
+project certificate (`00cdebef78297ab3e7df18792d43df6c734acd22a7a71d286928eea5cef1b6c1`).
+`adb -s fee8c1be install -r` returned Success and the normal MainActivity launched;
+no uninstall or user-data reset was performed. The temporary profile probe was
+replaced by `build/app/outputs/flutter-apk/kelivo-browser-r18-arm64-release.apk`.
+Final analyzer log: `/tmp/browser-r18-analyze-final.log`; build log:
+`/tmp/browser-r18-release-build.log`. No real-tab UI acceptance was automated.
+
+### R19 candidate (withdrawn with R20): one Android composition path for browser materials
+
+R18 did not resolve the reported tradeoff: solid webpage scrolling improved but
+Flutter controls remained uneven, while optical modes had different scroll costs.
+The experimental API 30+ browser embeds the real Chromium hierarchy in a
+`SurfaceControlViewHost`/`SurfaceView`. Flutter's texture controller selects its
+virtual-display path for that surface, instead of replaying `WebView.draw` into
+a second canvas or inserting a hybrid-composition Flutter overlay. All three
+styles retain the same native host/document. Android versions below API 30 keep
+the ordinary texture path; iOS is unchanged. The global renderer, display mode,
+webpage resolution and material appearance are unchanged.
+
+The host forwards native input connections, retains the embedded hierarchy when
+Android 11 replaces a destination surface during resize, and transfers a separate
+SurfacePackage handle to SurfaceView. Native selection uses an Android floating
+toolbar anchored to the Flutter viewport. Native hosts for one retained document
+are serialized: outstanding resize replies complete before disposal/reattachment.
+The virtual-display input client is released before destroying its view, without
+clearing a Flutter text field that has already taken focus. These are required
+lifetime contracts, not delays inserted in interaction animations.
+
+The isolated physical-device probe now covers native HTML input/IME, six retained
+tab round trips (form value and scroll position), long-press selection and closing
+the focused tab while its keyboard is resizing. Temporary browser data and an
+in-memory settings database are used. It can measure the public homepage via
+`BROWSER_BENCH_URL`, and reports the source in its output. No real user tabs are
+navigated by the probe. Performance timings describe Flutter engine work, not
+SurfaceFlinger presentation FPS or a guarantee of stable 120 FPS.
+
+Rejected experiments are not shipped: Vulkan failed to initialize on this phone;
+this Flutter build does not support separating platform/UI threads; forcing the
+older GL texture producer did not consistently improve the measurements. The
+phone's existing Android 11 renderer policy remains Skia. Shader image filters
+are unavailable there, so liquid mode exercises the established non-shader
+fallback, not the premium refraction shader on newer devices.
+
+At the end of the R19 investigation this candidate was **not ready for delivery**. The final 507 browser Dart tests, four Android
+native tests and JS scroll-observer regression passed, but the physical-device
+probe still finds the IME reappearing after closing an input-focused tab. Earlier
+crashes in resize/disposal and stale input clients were fixed; the remaining
+functional failure must not be counted as a performance-test pass. The full
+homepage probe recorded all 36 timing phases before failing its final keyboard
+assertion (`/tmp/browser-r19-complete-drive.log`). Results remain mixed and do not
+establish that all modes are completely smooth. A subsequent run was invalidated
+by device lock; its driver printed success despite the actual test timing out,
+so both device logs and assertions must be checked, not only the driver exit.
+
+The device has been restored with `adb install -r` to the existing normal-entry
+`kelivo-browser-r18-arm64-release.apk` (Success, MainActivity launch confirmed).
+No uninstall or data reset was used. The original stay-awake setting, `7`, was
+restored. That candidate was left uncommitted, with no R19 production APK delivered.
+Device validation was waiting for the phone to be unlocked. Logs: `/tmp/browser-r19-browser-tests.log`,
+`/tmp/browser-r19-native-tests.log`, `/tmp/browser-r19-observer-tests.log`,
+`/tmp/browser-r19-finalhost-drive.log`; final keyboard failure is also in the
+Flutter logcat for PID 29201. R20 passed the synthetic probe below but was
+subsequently withdrawn for a real input-dispatch regression.
+
+
+### R20 (withdrawn): input ownership and valid native gesture sampling
+
+**Do not install this candidate.** Actual user touch failed after installation:
+clicks and horizontal gestures stopped working. The emergency rollback below
+supersedes the synthetic probe's pass and the delivery notes in this section.
+
+Input cleanup now retains the focused native view's ancestor chain before it
+is detached. Focus returning to that same page/route is released; focus moving
+to any other branch is preserved, including custom editors that do not use
+EditableText. The controller releases its owned input client before native
+teardown and rechecks ownership afterwards. No widget-type heuristics, global
+input interception or delayed keyboard-dismiss timers were retained.
+
+The native-gesture probe had a separate defect: WidgetTester's default
+longPressAt sends zero timestamps for both down and up. Android could therefore
+recognize a held gesture yet the native IME bridge classify its release as a
+short tap. Native presses and flings now use monotonic timestamps and elapsed
+movement/hold times. Selection must leave the keyboard hidden, and closing the
+focused tab must leave it hidden after an additional settled interval. Previous
+zero-timestamp gesture samples must not be used as a controlled before/after
+performance comparison.
+
+The final physical-device run completed all 36 homepage phases and its native
+input, selection, six retained-tab/form/scroll checks, and closing-while-IME-
+resizing checks. Both the test assertions and driver result passed. Evidence:
+`/tmp/browser-r20-complete-drive.log`, `/tmp/browser-r20-final-metrics.json`.
+It used temporary browser storage, not the user's tabs. The Android 11 Skia
+renderer still reports shader image filters unsupported, so liquid selection
+uses the established fallback. No iOS or newer Android GPU performance claim.
+
+Warm second-round raster p95 in milliseconds (engine timing, not presentation
+FPS):
+
+| Phase | Solid | Frosted | Liquid selection |
+| --- | ---: | ---: | ---: |
+| Menu open | 8.925 | 9.499 | 8.796 |
+| Address open | 4.127 | 7.021 | 3.821 |
+| Collapse | 6.434 | 9.462 | 5.873 |
+| Expand | 4.760 | 9.684 | 9.512 |
+
+The shared native host removes the material-dependent composition switch and
+second WebView Canvas replay. This run still contains long frames, particularly
+in frosted mode; these results do **not** prove all scenes stay within the
+8.33 ms/120 Hz budget or that all jank has been eliminated. Battery temperature
+was approximately 38 C during sampling, and this is not a controlled lab A/B.
+
+Final validation: 509 browser core/widget tests, four Android native regressions,
+JS observer checks, root fatal-info analysis and formatting/diff checks passed.
+The changed vendored files have no new diagnostics; their two existing
+`overridden_fields` infos match the saved upstream baseline. This was focused
+browser validation, not the complete repository/markstream suite. No commit or
+push was made.
+
+The normal-entry arm64 Release built successfully and was signed with the
+existing project certificate. `adb -s fee8c1be install -r` returned Success,
+MainActivity launched, and process 23005 was confirmed alive. The temporary
+profile app was replaced; no uninstall/data reset occurred. The original
+stay-awake value is still `7`.
+Artifact: `build/app/outputs/flutter-apk/kelivo-browser-r20-arm64-release.apk`.
+SHA-256: `afba441a3be1003cc1b311ecd70cc3f8c203a235e95c23103fce0d95a5ad9c42`.
+Logs: `/tmp/browser-r20-browser-tests.log`, `/tmp/browser-r20-native-tests.log`,
+`/tmp/browser-r20-analyze.log`, `/tmp/browser-r20-release-build.log`.
+Real-tab UI acceptance is left to the user as requested.
+
+### R20 emergency rollback: physical input dispatch regression
+
+The user reported loss of taps and horizontal gestures across the phone after
+R20, not only inside the webpage. The app was force-stopped and the existing R18
+normal Release restored with `adb install -r` (Success); no uninstall/data reset
+was used. The user confirmed that normal input returned.
+
+The new host created its SurfaceControlViewHost on `owner.getDisplay()` (the
+physical display) while its SurfaceView belonged to Flutter's virtual display.
+This incorrectly registered the embedded input window on the physical display.
+The device's retained input log shows events dispatched to that embedded window;
+after rollback it is absent from the live input-window list. The prior injected
+WidgetTester gestures bypassed that system dispatch path and did not validate
+physical input routing. The R20 pass therefore must not be used as functional
+acceptance or proof that the user's performance problem is fixed.
+
+R19/R20's host, input bridge and lifetime wrapper were withdrawn from the active
+browser checkout; R18 hosting and its material-change document retention are
+restored. The withdrawn source is retained in `/tmp/browser-r20-withdrawn-20261020`
+for diagnosis. Further host experiments run in the separate
+`browser-input-probe` worktree with package `com.psyche.kelivo.browserprobe`,
+not the user's installed application. Input validation must pass through Android
+InputDispatcher and check foreground/background window ownership. Performance
+remains unresolved in the restored R18 application.
+
+### Isolated R21 experiment rejected after system-input comparison
+
+A separate `com.psyche.kelivo.browserprobe` application corrected the embedded
+host's display to its actual virtual display and rejected a physical-display
+attachment. A local coordinator sent gestures through `adb shell input`;
+`shouldPropagateDevicePointerEvents` was enabled in the test binding, which
+otherwise silently drops real device events. Before each gesture it checked
+that no embedded input window existed on display 0 and that the probe remained
+foreground. The existing production app/data were never replaced by this probe.
+
+The corrected candidate passed 36 fixture phases plus native input, selection,
+retained tab/document checks and keyboard dismissal. Its live embedded window
+was on virtual display 5; the display reports a nominal 60 Hz mode. A matching
+R18-host baseline also completed all 36 phases with the same system-input path.
+These are profile/local-fixture engine timings, not physical finger acceptance,
+homepage measurements, presentation FPS, or a controlled thermal laboratory A/B.
+
+Selected warmed total-span p95 in ms (R18 baseline -> R21 candidate):
+
+| Phase | Baseline | Candidate |
+| --- | ---: | ---: |
+| Solid menu open | 11.979 | 8.932 |
+| Solid address close | 10.093 | 12.785 |
+| Frosted collapse | 13.519 | 15.818 |
+| Frosted expand | 16.811 | 17.441 |
+| Liquid expand | 10.004 | 8.816 |
+
+The mixed results do not justify replacing R18. The experimental host remains
+withdrawn. Logs: `/tmp/browser-r21-system-drive.log`,
+`/tmp/browser-r21-baseline-drive.log`, `/tmp/browser-r21-system-input.log`;
+parsed comparison and retained candidate: `/tmp/browser-r21-candidate/`.
+The diagnostic application and its ADB reverse mapping were removed afterwards;
+the normal R18 application remains installed and was reopened.
+
+The user-selected Bothub APK was also inspected read-only. Package
+`com.jiangzikang.bothub`, SHA-256
+`004055a63e71cda9198e0657f18abac85681ede2a539717a03b484783d268587`,
+has Compose metadata and two classes directly extending `android.webkit.WebView`,
+with no `libflutter.so` or Flutter assets in the sole installed APK. This
+establishes a different packaged implementation, not why every frame is faster.
+REA artifact evidence: `ev_81ad36d153b1e138eafab44fc25eef70b32c57d7150aba2da629636abef7185d`.
+DEX structure was separately read with Android SDK apkanalyzer and a bounded
+header parser; REA's Android decompiler was unavailable because its JADX provider
+was not installed. No prerequisite was installed and no Bothub data was read.
+
+Rollback validation: 499 browser core/widget tests, three Android native tests,
+root fatal-info analysis, JS observer checks and diff checks passed. No commit
+or push was made. The performance objective remains unresolved.
+
+
+### R22: isolated Android rendering and interaction validation
+
+R22 uses the restored R18 WebView host. It adds no SurfaceControlViewHost,
+input window, custom virtual-display controller or device input setting. Work
+was first exercised in the separate `com.psyche.kelivo.browserprobe` package;
+normal application data was not used by the fixture.
+
+Changes:
+
+- Match composition to the effective material: on Android renderers without
+  shader-filter support, liquid already paints the opaque fallback, so it now
+  uses the same hybrid host as solid instead of paying for a texture host.
+  Supported shader glass and frosted still use the texture composition path.
+- Replace Android blurred box shadows with `Canvas.drawShadow`. Frosted blurs
+  use a smaller intermediate with the same effective radius; page content and
+  foreground controls remain full resolution. Pixel comparisons cover light/
+  dark, 1x/3x and three opacity levels against the original Gaussian filter.
+- Visible Android 29+ WebView snapshots record a RenderNode on UI, render/read
+  it on a dedicated worker and encode off UI. The single-frame ImageReader is
+  drained before the producer is destroyed. This creates no window/input host.
+  Headless/hidden screenshots retain software capture. Automatic thumbnails
+  wait for native presentation, and a screenshot already on UI does not post
+  another main-loop turn that could race tab detachment.
+- Android management pages retain Material foreground motion while leaving the
+  underlying native browser stationary. A uniform frosted settings sample
+  skips its redundant blur; two pixel checks confirm the same appearance.
+
+Physical-device evidence: Xiaomi 2112123AC, Android 11/API 30, same public Kelivo
+homepage, profile/AOT, two menu/address/scroll rounds per style plus settings
+and tabs. Input goes through Android InputDispatcher, not WidgetTester taps.
+Each style switch checks an ordinary native Activity for taps, horizontal and
+vertical swipes, and rejects embedded input windows on physical display 0.
+All 48 phases completed successfully. Separate tests passed on all three
+styles for real Sogou IME input, selection without opening IME, six retained-tab
+round trips per style (text and scroll preserved), closing a focused tab during
+IME resize, and fresh nonblank 440px native previews. Hardware key injection
+was unsuitable for testing IME commits; actual keyboard touches were used.
+
+Selected warmed Flutter total-span p95, R18 comparison -> R22, milliseconds:
+
+| Operation | R18 | R22 |
+| --- | ---: | ---: |
+| Solid menu open | 13.119 | 12.311 |
+| Solid menu close | 11.415 | 9.444 |
+| Solid address open | 10.084 | 8.632 |
+| Solid collapse / expand | 11.754 / 12.332 | 10.836 / 11.264 |
+| Frosted menu open / close | 12.383 / 12.263 | 14.295 / 13.376 |
+| Frosted collapse / expand | 14.313 / 17.934 | 13.118 / 15.139 |
+| Frosted settings open / close | 16.530 / 18.111 | 13.461 / 13.096 |
+| Liquid collapse / expand | 12.077 / 12.669 | 11.111 / 11.113 |
+
+Across those 48 sampling windows, total spans over 16.67ms were 31/101/11
+(solid/frosted/liquid) in the comparison and 28/46/12 in R22. Counts and phase
+p95s include dispatch/settling frames, are not display-presented FPS, and are
+not a controlled thermal benchmark. Some individual phases did not improve.
+Device battery temperature was roughly 39-41 C, thermal service status 0.
+This Android 11 device exercises liquid's existing unsupported-renderer
+fallback; it does not validate shader glass on newer Android GPUs.
+
+A subsequent six-phase settings run after skipping the uniform preview blur
+passed: frosted open/close p95 12.381/11.634ms, solid close 8.587ms, liquid
+open/close 9.042/9.950ms. First settings entry still had a roughly 118ms total
+outlier (96ms raster). Disabling Material snapshotting did not remove that
+cold outlier and was rejected. This is measurable improvement, not proof of
+zero jank or stable 120 FPS across all actions/websites. Diagnostic visible
+snapshot recording was usually 0.15-0.45ms versus roughly 9-14ms for hidden
+software drawing; GPU rendering/readback and encoding occur separately.
+
+Validation: 527 focused browser tests (including 26 pixel comparisons), three
+Android native tests, the native scroll observer test, fatal-info root analysis
+and diff/format checks. The full root/markstream suites were not rerun; R22 does
+not change markstream and no commit was requested. Temporary timing logs and
+input diagnostic Activity are excluded from the normal application. Normal
+release entry is explicitly `lib/main.dart`; never use a diagnostic APK as the
+normal application. The previous named R18 APK remains available for rollback.
+
+R22 promotion status: keep the normal installed R18 package while real Release
+interaction is checked in the separate, normally launchable Browser Probe app.
+The cold outlier above is still open; do not interpret the successful functional
+checks as acceptance of the complete performance objective. The normal installed
+base APK was rehashed and still matched the named R18 rollback artifact
+(`48f6e3bbf091af4ef883025d44b5a9ecc95a1a94204e74753f733b9c13c1ef96`).
+The probe's diagnostic Activity was moved to the profile source set before its
+normal-entry Release build, so that application contains no input-test Activity.
+
+The normally launchable independent ARM64 Release was installed successfully as
+`com.psyche.kelivo.browserprobe`, label `Kelivo Browser Probe`, version code 2080.
+APK SHA-256: `f1ce1ccb27a5f4901665cc420455134d801713d51cf8a38a8a266186e5418409`.
+Its debug signing certificate matches the isolated profile package; it cannot
+replace the separately identified normal application. Launch completed (1079ms
+Activity cold-start time, not browser-open latency). The input coordinator and
+its ADB reverse mapping were stopped/removed. Normal R18 remains installed.
+Manual Release feedback is pending; no commit or push was made.
+
+After installing the independent Release, a read-only 66-second compositor
+sample contained only 6 Flutter and 1 window presentation timestamps: it was
+idle, not a manual browser interaction sample, and is not performance evidence.
+Both installed APK hashes were rechecked: normal R18 unchanged, probe R22 exact.
+
+
+### R22.1: repair independent Release startup and dependency parity
+
+The first normally launchable R22 probe showed recovery, despite Android
+reporting a successful Activity start. Its screen exposed
+`NoSuchMethodError: SharedPreferencesApiRegistrar.getAll(...Continuation)`.
+This was a dependency/build failure, not evidence of a damaged database.
+`ActivityManager Status: ok` was insufficient startup validation.
+
+The restored probe worktree had regenerated its ignored `pubspec.lock` instead
+of retaining the normal browser worktree's graph. Its preferences implementation
+was 2.5.1 (JNI/Pigeon suspend bindings), while the normal checkout used 2.4.28
+(method channels). Its Release R8 mapping changed `kotlin.coroutines.Continuation`
+to `p4.c`, and the APK method descriptor used `Lp4/c;`; the generated Dart JNI
+binding still looked for `Lkotlin/coroutines/Continuation;`. Other Kotlin JNI
+runtime type names were also obfuscated. Profile tests do not exercise R8.
+The problem was confirmed from the package's bindings, its R8 mapping and DEX.
+
+The scoped correction is to use the same dependency graph for the probe and
+normal app. Copy `pubspec.lock` from the reference checkout before running
+`flutter pub get --enforce-lockfile`, verify byte-for-byte equality before and after the Release build. Let Flutter
+regenerate its Release plugin registrant: using `--no-pub` immediately after an
+ordinary pub-get left the dev-only integration_test/native_splash registrations
+in this SDK and failed Java compilation. Keep the graph outside discarded/archived generated state or
+recopy the current reference lock when recreating an independent checkout.
+The temporary keep-rule experiment for the unplanned upgrade was removed;
+production application behavior and recovery safeguards are unchanged. No
+reset, restore action, database deletion, or normal-package install was used.
+
+Reference/probe lock SHA-256 after alignment:
+`a834a14e792b70ec9c90eadb83de1cf1fa4975b8468ed299a7eb47d0531593a2`.
+The invalid named R22 APK was quarantined as
+`WITHDRAWN-r22-probe-invalid-dependencies.apk`. The prior relative profile
+comparison used the same graph within its two arms, but that graph differed
+from production; it must not be presented as full-app Release acceptance.
+
+
+Dependency alignment also required a clean compile in the probe checkout.
+The first incremental rebuild had correct old-version DEX but still carried the
+new JNI registrar string in `libapp.so`; the actual startup therefore changed
+from NoSuchMethodError to ClassNotFoundException. This was verified in the
+artifact rather than attributed to device data. Before `flutter clean`, probe
+APKs/reports and the matching lock were preserved outside the build tree.
+After the clean, the freshly compiled Dart AOT no longer contained that JNI
+registrar. Both native DEX and Dart AOT must match the locked graph, followed by
+an actual application-page check; Activity-start success is not sufficient.
+
+
+R22.1 final verification: clean independent Release installed successfully;
+SHA-256 `5e71a8fff88c37ac743f9ae13e2fd55b14587b989340c123a0ec3a06c3866ef6`.
+Both DEX and `lib/arm64-v8a/libapp.so` were checked for absence of the unintended
+2.5.x JNI registrar, and root dependency locks matched before/after build.
+Two cold launches were visually verified at the real New Conversation home
+screen. The Kelivo website/browser menu was subsequently observed with the
+foreground package confirmed as `com.psyche.kelivo.browserprobe`; input automation
+was stopped for manual use. The installed normal package hash still exactly
+matches R18. No data-reset or recovery action was performed. Performance
+acceptance remains pending on this dependency-aligned, normally launched Release.
+
+### R23: current tab previews, solid defaults and control updates
+
+Tab overview explicitly requests a fresh thumbnail before covering the live
+viewport. A request started after an older capture waits past that capture;
+load completion during an in-flight partial image queues a completed-page
+capture. Navigation, disposal and renderer-version checks still discard stale
+results. The overview decodes and freezes one set of pixels before starting the
+page-to-card flight, so the image is not swapped halfway through the animation.
+Explicit overview requests may capture a page that is still loading resources;
+automatic background captures still wait for load completion. The existing
+440-physical-pixel preview limit and background Android encoder remain in use.
+This introduces a bounded wait for a fresh thumbnail on tab-overview entry;
+normal menu/keyboard transitions do not request a screenshot.
+
+Solid is now the default in settings construction, missing/invalid serialized
+settings and the page-local material scope. Explicitly saved liquid/frosted
+choices are preserved. UA and search-engine rows share one trailing-value layout,
+including ellipsis at narrow widths and large text scales.
+
+A confirmed native history-item movement reconnects the scroll observer even
+when a hash/History API/BFCache traversal does not produce load-stop. Android's
+raw-pointer chrome path also retains the document-edge and short-content
+rules, in CSS-normalized screen coordinates. Momentum alone still does not
+reopen controls at the bottom. Selection-menu cleanup is initialized for both
+Android composition modes, so a retained solid-created WebView can later use
+texture composition without leaving its selection menu behind.
+
+Control rendering changes:
+
+- Press illumination and focus updates rebuild their own small feedback layers;
+  unchanged optical surfaces do not subscribe to every touch-light frame.
+- Navigation button widgets remain stable while their capsule widths animate.
+- Menu contents retain a repaint layer during the morph. This uses a temporary
+  display list/cache while the menu is mounted; contents remain live and retain
+  their normal input and accessibility behavior.
+- Solid startup and management entry do not wait for unused glass shader warmup.
+  Selecting an optical material still prepares its renderer before use.
+
+These changes do not replace Android's platform-view input host or add any
+system input window. The normal application remains on its previous installed
+version. The independent probe uses the same pinned dependencies as this tree.
+
+Validation of the R23 source includes independent subagent review. Its selection
+cleanup, Android edge behavior and partial-capture/load-stop findings were fixed
+with regressions and re-reviewed with no remaining actionable finding. Native
+Robolectric checks cover callback subscriptions, bounded screenshot encoding,
+composition input-proxy switching, and selection cleanup after changing mode.
+
+`integration_test/browser_ui_motion_bench.dart` uses a real Android WebView and
+local HTTP pages, invokes the app's control callbacks for repeated back/forward
+and menu motion, then scrolls and opens the overview without an idle capture.
+It decodes the card thumbnail and verifies pixels from the new viewport. Control
+callback invocation does not certify physical touch/IME dispatch. The independent
+Android 36.1 emulator passed this current-pixel assertion.
+
+In one emulator profile comparison (four warmed rounds, excluding round zero),
+the means of each round's frame p50 were:
+
+| Motion | UI build before/after (ms) | Raster before/after (ms) |
+| --- | --- | --- |
+| Back / one-to-two buttons | 0.651 / 0.480 | 15.474 / 13.643 |
+| Forward / two-to-one buttons | 0.644 / 0.502 | 14.578 / 12.787 |
+| Menu open | 0.598 / 0.472 | 28.619 / 21.585 |
+| Menu close | 0.422 / 0.389 | 24.514 / 21.939 |
+
+These are emulator frame-work samples, not screen-presented FPS or physical
+Android 11 results. Host scheduling and slow outliers remain: the mean total-span
+p95 improved for Back/menu-open, was nearly unchanged for Forward, and increased
+for menu-close. This is evidence of reduced routine work, not proof that every
+frame is within the refresh budget or that all modes are universally smooth.
+
+Final R23 checks: fatal-info analysis of `lib test integration_test`, the full
+root suite (8,417 tests), four Android host tests, and the native JS scroll
+observer test passed. The main checkout's separate `markstream` package also
+passed its analyzer and 290 tests; this older browser worktree does not yet
+contain that path package. Changed project/patched vendor Dart sources are
+formatted, and the staged whitespace check passes. Upstream vendor trailing
+whitespace was normalized without reformatting its implementation.
+
+The full suite exposed a pre-existing backup progress error: generated manifest
+bytes increased the processed count although the total measured only source
+files. The writer now excludes generated metadata from that progress counter,
+while preserving archive bytes, hashes and per-chunk cancellation. The repair
+and its additional progress assertions received independent review too.
+
+The final independent normal-entry ARM64 Release was verified on emulator cold
+startup and installed with `adb install -r` as `com.psyche.kelivo.browserprobe`.
+APK SHA-256: `73e6378b37c61d3d4cd87435e042220e9b727aef02858298edb432c80b17bd2c`.
+The physical phone remained locked, so R23 physical-device frame/input checks
+were not performed. The normal `com.psyche.kelivo` APK still hashes to
+`48f6e3bbf091af4ef883025d44b5a9ecc95a1a94204e74753f733b9c13c1ef96`;
+it was not replaced, cleared or reset.

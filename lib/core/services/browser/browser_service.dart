@@ -74,7 +74,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, Uint8List> _tabPreviews = {};
   final Map<String, int> _previewEpochs = {};
   final Map<String, int> _previewCompletedEpochs = {};
-  final Map<String, ({int epoch, Future<void> future})> _previewFlights = {};
+  final Map<String, ({int epoch, bool wasLoading, Future<void> future})>
+  _previewFlights = {};
   final Set<String> _previewPending = {};
   Future<void>? _runtimeQueue;
   Future<void>? _agentQueue;
@@ -529,7 +530,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _previewPending.remove(id);
   }
 
-  bool _canPreview(BrowserTab? tab) =>
+  bool _canPreview(BrowserTab? tab, {bool allowLoading = false}) =>
       !_disposed &&
       tab != null &&
       tab.id == _activeTabId &&
@@ -538,11 +539,13 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             (host) =>
                 host._previewVisible &&
                 !host._duplicate &&
-                host._nativeView != null,
+                host._nativeView != null &&
+                (defaultTargetPlatform != TargetPlatform.android ||
+                    !host._attaching),
           ) ??
           false) &&
       _engines.containsKey(tab.id) &&
-      !tab.isLoading &&
+      (allowLoading || !tab.isLoading) &&
       tab.error == null &&
       (tab.url != 'about:blank' || tab.hasContent);
 
@@ -551,41 +554,59 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     if (tab?.id != id || !_canPreview(tab)) return;
     final epoch = _previewEpochs[id] ?? 0;
     if (_previewCompletedEpochs[id] == epoch) return;
-    _previewCompletedEpochs[id] = epoch;
+    if (_previewFlights[id]?.wasLoading == true) {
+      _previewPending.add(id);
+      return;
+    }
     unawaited(refreshActivePreview());
   }
 
   /// Never creates/resumes an inactive renderer. Tab changes start this before
   /// detaching the old host, without waiting for image encoding to finish.
-  Future<void> refreshActivePreview() {
+  Future<void> refreshActivePreview({bool fresh = false}) {
     final tab = activeTab;
-    if (!_canPreview(tab)) return Future<void>.value();
+    if (!_canPreview(tab, allowLoading: fresh)) return Future<void>.value();
     final id = tab!.id;
     final epoch = _previewEpochs[id] ?? 0;
     final existing = _previewFlights[id];
     if (existing != null) {
+      // A tab-overview request must sample the current viewport, not join an
+      // older idle capture that may have started before the last scroll.
+      if (fresh) {
+        return existing.future.then((_) {
+          if (activeTabId == id && (_previewEpochs[id] ?? 0) == epoch) {
+            return refreshActivePreview(fresh: true);
+          }
+        });
+      }
       if (existing.epoch != epoch) _previewPending.add(id);
       return existing.future;
     }
     final engine = _engines[id]!;
     late final Future<void> future;
-    future = _capturePreview(tab, engine, epoch).whenComplete(() {
-      if (identical(_previewFlights[id]?.future, future)) {
-        _previewFlights.remove(id);
-      }
-      if (_previewPending.remove(id) && activeTabId == id) {
-        unawaited(refreshActivePreview());
-      }
-    });
-    _previewFlights[id] = (epoch: epoch, future: future);
+    future = _capturePreview(tab, engine, epoch, allowLoading: fresh)
+        .whenComplete(() {
+          if (identical(_previewFlights[id]?.future, future)) {
+            _previewFlights.remove(id);
+          }
+          if (_previewPending.remove(id) && activeTabId == id) {
+            unawaited(refreshActivePreview());
+          }
+        });
+    _previewFlights[id] = (
+      epoch: epoch,
+      wasLoading: tab.isLoading,
+      future: future,
+    );
     return future;
   }
 
   Future<void> _capturePreview(
     BrowserTab before,
     BrowserEngine engine,
-    int epoch,
-  ) async {
+    int epoch, {
+    required bool allowLoading,
+  }) async {
     try {
       final bytes = await engine.thumbnail().timeout(
         const Duration(seconds: 2),
@@ -598,13 +619,16 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           current == null ||
           current.url != before.url ||
           current.runtimeVersion != before.runtimeVersion ||
-          current.isLoading ||
+          (!allowLoading && current.isLoading) ||
           current.error != null ||
           (_previewEpochs[before.id] ?? 0) != epoch ||
           !identical(_engines[before.id], engine)) {
         return;
       }
       _tabPreviews[before.id] = bytes;
+      if (!before.isLoading && !current.isLoading) {
+        _previewCompletedEpochs[before.id] = epoch;
+      }
       _notify();
     } catch (_) {
       // A hidden/terminated native view may not produce a snapshot. Keep its
@@ -1013,11 +1037,15 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _clearAgentPause();
       _invalidateAgentActions();
     }
-    if (settings.desktopMode != old.desktopMode ||
-        settings.customUserAgent != old.customUserAgent) {
+    final userAgentChanged =
+        settings.desktopMode != old.desktopMode ||
+        settings.customUserAgent != old.customUserAgent;
+    if (userAgentChanged || settings.surfaceStyle != old.surfaceStyle) {
       for (final engine in _engines.values.toList()) {
         await engine.updateSettings(settings);
       }
+    }
+    if (userAgentChanged) {
       final tab = activeTab;
       if (tab != null &&
           tab.url != 'about:blank' &&
@@ -1800,6 +1828,9 @@ class _BrowserViewHostState extends State<_BrowserViewHost> {
     if (mounted && epoch == _attachmentEpoch) {
       setState(() => _attaching = false);
       widget.service._notify();
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        widget.service._captureLoadedPreview(widget.tabId);
+      }
     }
   }
 

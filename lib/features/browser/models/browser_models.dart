@@ -10,7 +10,7 @@ class BrowserSettings {
     this.restoreTabs = true,
     this.saveHistory = true,
     this.agentEnabled = true,
-    this.surfaceStyle = BrowserSurfaceStyle.liquid,
+    this.surfaceStyle = BrowserSurfaceStyle.solid,
   });
 
   final BrowserSearchEngine searchEngine;
@@ -73,7 +73,7 @@ class BrowserSettings {
     agentEnabled: json['agentEnabled'] != false,
     surfaceStyle: BrowserSurfaceStyle.values.firstWhere(
       (value) => value.name == json['surfaceStyle'],
-      orElse: () => BrowserSurfaceStyle.liquid,
+      orElse: () => BrowserSurfaceStyle.solid,
     ),
   );
 }

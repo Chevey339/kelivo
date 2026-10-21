@@ -20,6 +20,7 @@ const document = {
 };
 const window = {
   document, innerHeight: 800, scrollY: 0,
+  getComputedStyle(element) { return {overflowY: element.overflowY}; },
   flutter_inappwebview: {callHandler: async (_, value) => { updates.push(value); return true; }},
   addEventListener(name, handler) { listeners.set(name, handler); },
 };
@@ -121,4 +122,29 @@ touch('touchmove', 100, 170); frame(4);
 touch('touchend');
 assert.equal(updates.at(-2).gestureDelta, 10, 'release bypasses the frame budget');
 assert.equal(last().isUserInteracting, false);
+
+
+// Full-height apps often scroll an inner element, not window/document.
+const nested = {clientHeight: 600, scrollHeight: 2400, scrollTop: 100,
+  overflowY: 'auto', isConnected: true, parentElement: document.body};
+const child = {parentElement: nested};
+touch('touchstart', 100, 200, {target: child});
+assert.equal(last().viewportExtent, 600);
+assert.equal(last().contentExtent, 2400);
+touch('touchmove', 100, 160, {target: child});
+nested.scrollTop = 140;
+dispatch('scroll', {target: nested}); frame();
+assert.equal(last().offset, 140);
+assert.equal(last().gestureDelta, 40);
+touch('touchend');
+nested.scrollTop = 200;
+dispatch('scroll', {target: nested}); frame();
+assert.equal(last().offset, 200);
+assert.equal(last().isUserInteracting, false);
+dispatch('scrollend', {target: nested});
+assert.equal(last().phase, 'end');
+touch('touchstart', 100, 200);
+assert.equal(last().offset, window.scrollY, 'a root gesture resets nested metrics');
+touch('touchend');
+
 console.log(`Browser scroll observer checks passed; 120 momentum frames -> ${momentumMessages} bridge updates.`);

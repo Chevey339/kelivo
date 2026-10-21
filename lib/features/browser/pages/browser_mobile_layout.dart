@@ -111,8 +111,16 @@ class BrowserMobileLayout extends StatelessWidget {
                 right: 12,
                 child: agentStatus!,
               ),
-            Positioned(
+            AnimatedPositioned(
               key: const ValueKey('browserMobileToolbarSlot'),
+              duration: Duration(
+                milliseconds:
+                    defaultTargetPlatform == TargetPlatform.android &&
+                        !MediaQuery.disableAnimationsOf(context)
+                    ? 240
+                    : 0,
+              ),
+              curve: Curves.easeOutCubic,
               left: 16,
               right: 16,
               // Reserve the whole travel inside the hit-test area, including the

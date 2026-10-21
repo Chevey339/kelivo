@@ -11,10 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   late BrowserService service;
   late Map<String, _Engine> engines;
+  Future<void>? nextViewReady;
 
   void previewTest(String name, WidgetTesterCallback body) {
     testWidgets(name, (tester) async {
       engines = {};
+      nextViewReady = null;
       service = BrowserService(
         store: _Store(),
         supported: true,
@@ -26,7 +28,7 @@ void main() {
               required onDownload,
               required onNewWindow,
               required isAgentActive,
-            }) async => engines[tab.id] = _Engine(onChanged),
+            }) async => engines[tab.id] = _Engine(onChanged, nextViewReady),
       );
       await service.initialize();
       try {
@@ -49,6 +51,86 @@ void main() {
           : service.buildView(service.activeTabId!),
     ),
   );
+
+  previewTest('Android thumbnails wait for a presented native view', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final ready = Completer<void>();
+    nextViewReady = ready.future;
+    final tab = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(host());
+    await tester.pump();
+    await tester.pump();
+    final engine = engines[tab.id]!;
+    await service.refreshActivePreview();
+    expect(engine.captures, 0);
+    expect(service.isTabPresented(tab.id), isFalse);
+    ready.complete();
+    await tester.pumpAndSettle();
+    expect(service.isTabPresented(tab.id), isTrue);
+    expect(engine.captures, 1);
+    expect(service.previewForTab(tab.id), [1]);
+  });
+
+  previewTest('fresh overview capture waits past an older in-flight image', (
+    tester,
+  ) async {
+    final tab = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    final engine = engines[tab.id]!;
+    final pending = Completer<Uint8List?>();
+    engine.pending = pending;
+    final oldCapture = service.refreshActivePreview();
+    final freshCapture = service.refreshActivePreview(fresh: true);
+    final count = engine.captures;
+    engine.pending = null;
+    engine.bytes = Uint8List.fromList([3]);
+    pending.complete(Uint8List.fromList([2]));
+    await oldCapture;
+    await freshCapture;
+    expect(engine.captures, count + 1);
+    expect(service.previewForTab(tab.id), [3]);
+  });
+
+  previewTest(
+    'explicit overview captures visible pixels while resources still load',
+    (tester) async {
+      final tab = await service.createTab(url: 'https://one.example');
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final engine = engines[tab.id]!;
+      engine.emit(const BrowserPageState(isLoading: true));
+      engine.bytes = Uint8List.fromList([4]);
+      await service.refreshActivePreview();
+      expect(service.previewForTab(tab.id), isNull);
+      await service.refreshActivePreview(fresh: true);
+      expect(service.previewForTab(tab.id), [4]);
+    },
+  );
+
+  previewTest('load completion replaces an in-flight partial preview', (
+    tester,
+  ) async {
+    final tab = await service.createTab(url: 'https://one.example');
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    final engine = engines[tab.id]!;
+    engine.emit(const BrowserPageState(isLoading: true));
+    final pending = Completer<Uint8List?>();
+    engine.pending = pending;
+    final partial = service.refreshActivePreview(fresh: true);
+    final count = engine.captures;
+    engine.complete();
+    engine.pending = null;
+    engine.bytes = Uint8List.fromList([5]);
+    pending.complete(Uint8List.fromList([4]));
+    await partial;
+    await tester.pumpAndSettle();
+    expect(engine.captures, count + 1);
+    expect(service.previewForTab(tab.id), [5]);
+  });
 
   previewTest('mobile native creation waits until route entry settles', (
     tester,
@@ -350,7 +432,10 @@ class _Store extends BrowserStore {
 }
 
 class _Engine extends BrowserEngine {
-  _Engine(this.emit);
+  _Engine(this.emit, this.ready);
+  final Future<void>? ready;
+  @override
+  Future<void> get viewReady => ready ?? Future<void>.value();
   final void Function(BrowserPageState) emit;
   int captures = 0;
   int viewBuilds = 0;

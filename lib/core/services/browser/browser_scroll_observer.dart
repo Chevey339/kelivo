@@ -134,15 +134,27 @@ const browserScrollObserverScript = r'''
   let pending = 'metrics', connection = 0;
   let lastSent = -Infinity;
   let touching = false, touchX = 0, touchY = 0, gestureDelta = 0;
+  let scroller = null;
+  const isNestedScroller = (element) => element && element !== document &&
+    element !== document.documentElement && element !== document.body &&
+    element.clientHeight > 0 && element.scrollHeight > element.clientHeight + 1 &&
+    /^(auto|scroll|overlay)$/.test(window.getComputedStyle(element).overflowY);
+  const scrollContainer = (target) => {
+    for (let element = target; element && element !== document; element = element.parentElement) {
+      if (isNestedScroller(element)) return element;
+    }
+    return null;
+  };
   const geometry = (phase) => {
     const root = document.documentElement, body = document.body;
-    const viewportExtent = Math.max(1, window.innerHeight || root?.clientHeight || 1);
+    if (scroller && !scroller.isConnected) scroller = null;
+    const viewportExtent = Math.max(1, scroller?.clientHeight || window.innerHeight || root?.clientHeight || 1);
     return {
       documentId, sequence: ++sequence, phase, supportsScrollEnd,
       isUserInteracting: touching, gestureDelta,
-      offset: window.scrollY,
+      offset: scroller ? scroller.scrollTop : window.scrollY,
       viewportExtent,
-      contentExtent: Math.max(viewportExtent, root?.scrollHeight || 0, body?.scrollHeight || 0)
+      contentExtent: scroller ? Math.max(viewportExtent, scroller.scrollHeight) : Math.max(viewportExtent, root?.scrollHeight || 0, body?.scrollHeight || 0)
     };
   };
   const bridge = (payload) => window.flutter_inappwebview.callHandler('kelivoBrowserScroll', payload);
@@ -192,6 +204,7 @@ const browserScrollObserverScript = r'''
   };
   document.addEventListener('touchstart', (event) => {
     if (!event.isTrusted) return;
+    scroller = scrollContainer(event.target);
     touching = event.touches.length === 1;
     gestureDelta = 0;
     if (touching) {
@@ -226,11 +239,15 @@ const browserScrollObserverScript = r'''
   document.addEventListener('touchend', release, {passive: true, capture: true});
   document.addEventListener('touchcancel', release, {passive: true, capture: true});
   document.addEventListener('scroll', (event) => {
-    if (event.target === document && event.isTrusted) schedule('update');
-  }, {passive: true});
+    if (!event.isTrusted) return;
+    if (event.target === document) scroller = null;
+    else if (isNestedScroller(event.target)) scroller = event.target;
+    else return;
+    schedule('update');
+  }, {passive: true, capture: true});
   if (supportsScrollEnd) document.addEventListener('scrollend', (event) => {
-    if (event.target === document && event.isTrusted) schedule('end');
-  }, {passive: true});
+    if ((event.target === document || event.target === scroller) && event.isTrusted) schedule('end');
+  }, {passive: true, capture: true});
   window.addEventListener('resize', () => schedule('metrics'), {passive: true});
   window.addEventListener('flutterInAppWebViewPlatformReady', refresh);
   window.addEventListener('pageshow', () => { active = true; refresh(); });

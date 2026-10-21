@@ -124,6 +124,7 @@ class BrowserAddressBar extends StatelessWidget {
     this.siteIcon,
     this.expandedContentWidth,
     this.collapsedContentWidth,
+    this.stabilizeTruncation = false,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -138,6 +139,7 @@ class BrowserAddressBar extends StatelessWidget {
   final List<Shadow>? foregroundShadows;
   final Widget? siteIcon;
   final double? expandedContentWidth, collapsedContentWidth;
+  final bool stabilizeTruncation;
 
   @override
   Widget build(BuildContext context) {
@@ -207,17 +209,15 @@ class BrowserAddressBar extends StatelessWidget {
                             ),
                             onSubmitted: onSubmitted,
                           )
-                        : Text(
+                        : _AddressLabel(
                             displayText?.isNotEmpty == true
                                 ? displayText!
                                 : l.browserSearchHint,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
+                            scale: compact ? 1 : (16 - 3 * t) / 16,
                             style: TextStyle(
                               color: cs.onSurface,
                               shadows: foregroundShadows,
-                              fontSize: compact ? 12.5 : 16 - 3 * t,
+                              fontSize: compact ? 12.5 : 16,
                               height: 1.15,
                               fontWeight: compact
                                   ? FontWeight.w400
@@ -258,7 +258,8 @@ class BrowserAddressBar extends StatelessWidget {
     }
 
     final content =
-        !editing &&
+        stabilizeTruncation &&
+            !editing &&
             !compact &&
             expandedContentWidth != null &&
             collapsedContentWidth != null &&
@@ -316,6 +317,33 @@ class BrowserAddressBar extends StatelessWidget {
       child: surface,
     );
   }
+}
+
+/// Keep one font size/line box while the capsule moves. Fractional font-size
+/// layouts round ascent/descent independently, making the URL baseline wobble.
+class _AddressLabel extends StatelessWidget {
+  const _AddressLabel(this.text, {required this.scale, required this.style});
+  final String text;
+  final double scale;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Transform.scale(
+      scale: scale,
+      child: OverflowBox(
+        minWidth: constraints.maxWidth / scale,
+        maxWidth: constraints.maxWidth / scale,
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: style,
+        ),
+      ),
+    ),
+  );
 }
 
 class BrowserEmptyState extends StatelessWidget {

@@ -11,7 +11,16 @@ PageRoute<T> browserManagementRoute<T>({
   required WidgetBuilder builder,
 }) => Theme.of(context).platform == TargetPlatform.iOS
     ? BrowserManagementRoute<T>(builder: builder)
-    : MaterialPageRoute<T>(builder: builder);
+    : _BrowserMaterialManagementRoute<T>(builder: builder);
+
+/// Keep the Android foreground transition, but do not scale the native WebView
+/// and its backdrop filters behind it on every transition frame.
+class _BrowserMaterialManagementRoute<T> extends MaterialPageRoute<T> {
+  _BrowserMaterialManagementRoute({required super.builder});
+
+  @override
+  bool canTransitionFrom(TransitionRoute<dynamic> previousRoute) => false;
+}
 
 /// Cupertino management navigation above the browser's native page.
 class BrowserManagementRoute<T> extends CupertinoPageRoute<T> {

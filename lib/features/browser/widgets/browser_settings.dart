@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -107,60 +108,20 @@ class BrowserSettingsPanel extends StatelessWidget {
             const SizedBox(height: 24),
             BrowserSurfaceGroup(
               children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stacked =
-                        constraints.maxWidth < 400 &&
-                        MediaQuery.textScalerOf(context).scale(13) > 20;
-                    return BrowserSurfaceRow(
-                      icon: LucideIcons.search,
-                      label: l.browserSearchEngine,
-                      subtitle: stacked
-                          ? browserSearchEngineName(s.searchEngine)
-                          : null,
-                      trailing: stacked
-                          ? const Icon(LucideIcons.chevronRight, size: 15)
-                          : ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: constraints.maxWidth * .4,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      browserSearchEngineName(s.searchEngine),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  const Icon(
-                                    LucideIcons.chevronRight,
-                                    size: 15,
-                                  ),
-                                ],
-                              ),
-                            ),
-                      onTap: () => _chooseSearchEngine(context),
-                    );
-                  },
+                _choiceRow(
+                  icon: LucideIcons.search,
+                  label: l.browserSearchEngine,
+                  value: browserSearchEngineName(s.searchEngine),
+                  onTap: () => _chooseSearchEngine(context),
                 ),
-                BrowserSurfaceRow(
+                _choiceRow(
                   icon: LucideIcons.monitor,
                   label: l.browserUserAgent,
-                  subtitle: s.customUserAgent.isNotEmpty
+                  value: s.customUserAgent.isNotEmpty
                       ? l.browserUserAgentCustom
                       : s.desktopMode
                       ? l.browserUserAgentDesktop
                       : l.browserUserAgentMobile,
-                  trailing: const Icon(LucideIcons.chevronRight, size: 15),
                   onTap: () => _chooseUserAgent(context),
                 ),
               ],
@@ -249,6 +210,40 @@ class BrowserSettingsPanel extends StatelessWidget {
       ),
     );
   }
+
+  Widget _choiceRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) => LayoutBuilder(
+    builder: (context, constraints) => BrowserSurfaceRow(
+      icon: icon,
+      label: label,
+      trailing: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: constraints.maxWidth * .4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            const Icon(LucideIcons.chevronRight, size: 15),
+          ],
+        ),
+      ),
+      onTap: onTap,
+    ),
+  );
 
   Widget _switchRow({
     required IconData icon,
@@ -477,6 +472,11 @@ class _SurfaceChoice extends StatelessWidget {
                 child: BrowserGlass(
                   radius: 24,
                   elevated: false,
+                  // This sample sits on a uniform page color; blurring that
+                  // color is identical to drawing it, but allocates a GPU pass.
+                  blur:
+                      defaultTargetPlatform != TargetPlatform.android ||
+                      style != BrowserSurfaceStyle.frosted,
                   child: Center(
                     child: Icon(
                       switch (style) {

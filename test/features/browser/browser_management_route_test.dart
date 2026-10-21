@@ -88,6 +88,48 @@ void main() {
     );
   }
 
+  testWidgets(
+    'Android management motion leaves the native viewport stationary',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigator = GlobalKey<NavigatorState>();
+      late PageRoute<dynamic> underlay;
+      late BuildContext browserContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          navigatorKey: navigator,
+          home: Builder(
+            builder: (context) {
+              browserContext = context;
+              underlay = ModalRoute.of(context)! as PageRoute<dynamic>;
+              return const SizedBox.expand(key: underlayKey);
+            },
+          ),
+        ),
+      );
+      final route = browserManagementRoute<String>(
+        context: browserContext,
+        builder: (_) => const Scaffold(body: Text('Settings')),
+      );
+      final result = navigator.currentState!.push(route);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(route.animation!.value, inExclusiveRange(0, 1));
+      expectStationary(tester, underlay);
+      await tester.pumpAndSettle();
+      navigator.currentState!.pop('saved');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(route.animation!.value, inExclusiveRange(0, 1));
+      expectStationary(tester, underlay);
+      await tester.pumpAndSettle();
+      expect(await result, 'saved');
+    },
+  );
+
   testWidgets('enter and cancelled edge swipe keep native page stationary', (
     tester,
   ) async {

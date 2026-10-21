@@ -1302,11 +1302,13 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final content = SizedBox(
-          width: constraints.maxWidth,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: constraints.maxHeight),
-            child: _contents(context, secondary: false),
+        final content = RepaintBoundary(
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+              child: _contents(context, secondary: false),
+            ),
           ),
         );
         return AnimatedBuilder(
@@ -1376,7 +1378,14 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
                                 radius: radius,
                                 child: ImageFiltered(
                                   key: const ValueKey('browserMenuContentBlur'),
-                                  enabled: sigma > .01,
+                                  // Android already composites the WebView
+                                  // and menu on competing render paths. Keep
+                                  // the geometry/fade, without an extra large
+                                  // offscreen blur of the menu's sharp text.
+                                  enabled:
+                                      Theme.of(context).platform !=
+                                          TargetPlatform.android &&
+                                      sigma > .01,
                                   imageFilter: ui.ImageFilter.blur(
                                     sigmaX: sigma,
                                     sigmaY: sigma,

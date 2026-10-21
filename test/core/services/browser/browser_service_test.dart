@@ -176,6 +176,34 @@ void main() {
     },
   );
 
+  test(
+    'solid is the default without overriding a saved material choice',
+    () async {
+      expect(const BrowserSettings().surfaceStyle, BrowserSurfaceStyle.solid);
+      expect(
+        BrowserSettings.fromJson({}).surfaceStyle,
+        BrowserSurfaceStyle.solid,
+      );
+      expect(
+        BrowserSettings.fromJson({'surfaceStyle': 'unknown'}).surfaceStyle,
+        BrowserSurfaceStyle.solid,
+      );
+      for (final style in BrowserSurfaceStyle.values) {
+        expect(
+          BrowserSettings.fromJson({'surfaceStyle': style.name}).surfaceStyle,
+          style,
+        );
+      }
+      await service.updateSettings(
+        service.settings.copyWith(surfaceStyle: BrowserSurfaceStyle.frosted),
+      );
+      service.dispose();
+      service = createService();
+      await service.initialize();
+      expect(service.settings.surfaceStyle, BrowserSurfaceStyle.frosted);
+    },
+  );
+
   test('assistant access defaults on but preserves a saved opt-out', () async {
     expect(service.settings.agentEnabled, isTrue);
     expect(const BrowserSettings().agentEnabled, isTrue);
