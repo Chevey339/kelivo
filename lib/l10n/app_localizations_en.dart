@@ -13253,10 +13253,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserDownloadFailed => 'Download failed';
 
   @override
-  String get browserTabLimit =>
-      'Close a tab before opening another. You can keep up to 8 tabs.';
-
-  @override
   String get browserAgentEnableHint =>
       'Enable the Browser tool in chat tools, then allow control here.';
 
@@ -13543,4 +13539,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String browserMetaTabs(int count) {
     return '$count tabs';
   }
+
+  @override
+  String get browserTabsCurrentConversation => 'This chat';
+
+  @override
+  String get browserTabsAll => 'All tabs';
+
+  @override
+  String get browserTabsUnassigned => 'Personal tabs';
+
+  @override
+  String get browserTabsUnknownConversation => 'Other chat';
+
+  @override
+  String get browserTabsEmptyConversation =>
+      'No tabs here yet. Open a page or choose a tab from All tabs.';
+
+  @override
+  String get browserTabsNoResults => 'No matching tabs';
+
+  @override
+  String get browserMoveToConversation => 'Move to this chat';
+
+  @override
+  String get browserReopenInConversation => 'Reopen in this chat';
+
+  @override
+  String get browserTabBusy =>
+      'An assistant is still using this page. Wait for it to finish or stop the task before moving it.';
+
+  @override
+  String get browserLiveViewLimit =>
+      'All browser resources are in use. Try again when a task finishes, or close an unused page.';
+
+  @override
+  String get browserAskAiInOwnerConversation => 'Ask AI in the owning chat';
 }

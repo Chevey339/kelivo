@@ -12654,9 +12654,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserDownloadFailed => '下载失败';
 
   @override
-  String get browserTabLimit => '最多可打开 8 个标签页，请先关闭一个。';
-
-  @override
   String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
 
   @override
@@ -12926,6 +12923,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String browserMetaTabs(int count) {
     return '$count 个';
   }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25504,9 +25534,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get browserDownloadFailed => '下载失败';
 
   @override
-  String get browserTabLimit => '最多可打开 8 个标签页，请先关闭一个。';
-
-  @override
   String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
 
   @override
@@ -25776,6 +25803,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String browserMetaTabs(int count) {
     return '$count 个';
   }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38433,9 +38493,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get browserDownloadFailed => '下載失敗';
 
   @override
-  String get browserTabLimit => '最多可開啟 8 個分頁，請先關閉一個。';
-
-  @override
   String get browserAgentEnableHint => '在聊天工具中啟用瀏覽器工具，再在這裡允許控制。';
 
   @override
@@ -38705,4 +38762,37 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String browserMetaTabs(int count) {
     return '$count 個';
   }
+
+  @override
+  String get browserTabsCurrentConversation => '目前對話';
+
+  @override
+  String get browserTabsAll => '所有分頁';
+
+  @override
+  String get browserTabsUnassigned => '個人分頁';
+
+  @override
+  String get browserTabsUnknownConversation => '其他對話';
+
+  @override
+  String get browserTabsEmptyConversation => '這裡還沒有分頁。開啟網頁，或從「所有分頁」選擇現有頁面。';
+
+  @override
+  String get browserTabsNoResults => '沒有符合的分頁';
+
+  @override
+  String get browserMoveToConversation => '移到目前對話';
+
+  @override
+  String get browserReopenInConversation => '在目前對話重新開啟';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此頁面，請等待任務完成或停止任務後再移動。';
+
+  @override
+  String get browserLiveViewLimit => '瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '讓所屬對話的 AI 處理';
 }

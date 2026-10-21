@@ -41,7 +41,8 @@ Future<void> openBrowserPage(
   final navigator = Navigator.of(context);
   final desktop = PlatformUtils.isDesktop;
   final initialTabId =
-      selectedTabId ?? (panel.isOpen ? browser.activeTabId : null);
+      selectedTabId ??
+      (panel.isOpen && panel.conversationId == id ? browser.activeTabId : null);
   final canDock = desktop && panel.hasHost;
   Widget buildPage(BuildContext pageContext) => BrowserPage(
     conversationId: id,

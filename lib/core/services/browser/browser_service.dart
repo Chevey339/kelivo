@@ -25,8 +25,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
        _engineFactory = engineFactory ?? NativeBrowserEngine.create;
 
   static final BrowserService instance = BrowserService();
-  static const int maxTabs = 8;
+  // Bound agent fan-out and native memory separately from saved/user tabs.
+  static const int maxAgentTabsPerSession = 3;
   static const int maxLiveViews = 3;
+  static const int maxCachedPreviews = 8;
   static const int maxHistory = 2000;
   static const _uuid = Uuid();
   static final Object _actionKey = Object();
@@ -87,6 +89,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   int _controlEpoch = 0;
   Completer<void> _controlCancelled = Completer<void>();
   String? _activeTabId;
+  String? _selectedSessionId;
+  final Map<String, String> _lastTabBySession = {};
   String? _agentSessionId;
   String? _agentAction;
   String? _agentTabId;
@@ -113,6 +117,9 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   bool get supportsWebsiteDataClear => isSupported && !Platform.isWindows;
   bool get isInitialized => _initialized;
   List<BrowserTab> get tabs => List.unmodifiable(_tabs);
+  List<BrowserTab> tabsForSession(String? sessionId) => _tabs
+      .where((tab) => tab.ownerSessionId == sessionId)
+      .toList(growable: false);
   List<BrowserBookmark> get bookmarks => List.unmodifiable(_bookmarks);
   List<BrowserHistoryEntry> get history => List.unmodifiable(_history);
   List<BrowserDownload> get downloads => List.unmodifiable(_downloads);
@@ -205,17 +212,27 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _readRecords(state['tabs'], BrowserTab.fromJson, saved);
       final seen = <String>{};
       _tabs.addAll(
-        saved
-            .where(
-              (tab) =>
-                  tab.id.isNotEmpty && _isPageUrl(tab.url) && seen.add(tab.id),
-            )
-            .take(maxTabs),
+        saved.where(
+          (tab) => tab.id.isNotEmpty && _isPageUrl(tab.url) && seen.add(tab.id),
+        ),
       );
       final active = state['activeTabId'];
       _activeTabId = _tabs.any((tab) => tab.id == active)
           ? active as String
           : _tabs.firstOrNull?.id;
+      final selected = state['lastTabBySession'];
+      if (selected is Map) {
+        for (final tab in _tabs) {
+          final owner = tab.ownerSessionId;
+          if (owner != null && selected[owner] == tab.id) {
+            _lastTabBySession[owner] = tab.id;
+          }
+        }
+      }
+      _selectedSessionId = activeTab?.ownerSessionId;
+      if (_selectedSessionId != null && _activeTabId != null) {
+        _lastTabBySession.putIfAbsent(_selectedSessionId!, () => _activeTabId!);
+      }
     }
     if (_history.length > maxHistory) {
       _history.removeRange(maxHistory, _history.length);
@@ -296,20 +313,54 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   BrowserTab requireAgentTab(String sessionId, String? tabId) {
     final tab = tabId == null
-        ? _tabs
-                  .where(
-                    (tab) =>
-                        tab.ownerSessionId == sessionId &&
-                        tab.id == _activeTabId,
-                  )
-                  .firstOrNull ??
-              _tabs.where((tab) => tab.ownerSessionId == sessionId).lastOrNull
+        ? selectedTabForSession(sessionId)
         : requireTab(tabId);
     if (tab == null) throw StateError('browser_no_session_tab');
     if (tab.ownerSessionId != sessionId) {
       throw StateError('browser_tab_not_owned');
     }
     return tab;
+  }
+
+  BrowserTab? selectedTabForSession(String sessionId) {
+    final owned = tabsForSession(sessionId);
+    return owned
+            .where((tab) => tab.id == _lastTabBySession[sessionId])
+            .firstOrNull ??
+        owned.lastOrNull;
+  }
+
+  /// Enter a conversation without allocating a blank page or borrowing a tab
+  /// from another conversation. Each conversation remembers its own selection.
+  Future<void> selectSession(String sessionId) async {
+    await initialize();
+    _checkAction();
+    final action = Zone.current[_actionKey] as _BrowserAction?;
+    if (action != null && action.sessionId != sessionId) {
+      throw StateError('browser_tab_not_owned');
+    }
+    final selected = selectedTabForSession(sessionId);
+    if (_selectedSessionId == sessionId && _activeTabId == selected?.id) return;
+    if (_activeTabId != selected?.id) unawaited(refreshActivePreview());
+    _selectedSessionId = sessionId;
+    _activeTabId = selected?.id;
+    if (selected != null) _lastTabBySession[sessionId] = selected.id;
+    _changed();
+  }
+
+  void _selectTab(BrowserTab tab) {
+    final owner = tab.ownerSessionId;
+    if (owner != null) _lastTabBySession[owner] = tab.id;
+    final action = Zone.current[_actionKey] as _BrowserAction?;
+    // Background conversations must not replace the page the user is viewing.
+    if (action != null &&
+        (_selectedSessionId != null || _activeTabId != null) &&
+        _selectedSessionId != action.sessionId) {
+      return;
+    }
+    if (_activeTabId != tab.id) unawaited(refreshActivePreview());
+    _activeTabId = tab.id;
+    _selectedSessionId = owner;
   }
 
   Future<BrowserTab> createTab({
@@ -325,8 +376,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     if (action != null && ownerSessionId != action.sessionId) {
       throw StateError('browser_tab_not_owned');
     }
-    if (_tabs.length >= maxTabs) throw StateError('browser_tab_limit');
-    unawaited(refreshActivePreview());
+    if (action != null &&
+        tabsForSession(action.sessionId).length >= maxAgentTabsPerSession) {
+      throw StateError(
+        'browser_session_tab_limit: This conversation already has '
+        '$maxAgentTabsPerSession or more tabs. Use list_tabs, then reuse '
+        'an existing tab with open and tab_id, or close one of your tabs.',
+      );
+    }
     final tab = BrowserTab(
       id: 'tab-${_uuid.v4()}',
       url: normalizeAddress(url ?? '', searchEngine: _settings.searchEngine),
@@ -337,17 +394,53 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       hasContent: windowId != null,
     );
     _tabs.add(tab);
-    _activeTabId = tab.id;
+    if (openerTabId != null && _activeTabId != openerTabId) {
+      // A popup from a background page belongs to its parent, but must not
+      // switch the visible conversation away from the user's current page.
+      if (ownerSessionId != null) _lastTabBySession[ownerSessionId] = tab.id;
+    } else {
+      _selectTab(tab);
+    }
     _changed();
     return tab;
   }
 
   Future<void> selectTab(String id) async {
     _checkAction(id);
-    requireTab(id);
-    if (id == _activeTabId) return;
-    unawaited(refreshActivePreview());
-    _activeTabId = id;
+    final tab = requireTab(id);
+    if (_activeTabId == id &&
+        (tab.ownerSessionId == null ||
+            _lastTabBySession[tab.ownerSessionId] == id)) {
+      return;
+    }
+    _selectTab(tab);
+    _changed();
+  }
+
+  /// An explicit user handoff. Popup families move together so login flows
+  /// and future popup callbacks cannot retain another conversation's owner.
+  Future<void> moveTabToSession(String id, String sessionId) async {
+    _checkAction();
+    if (sessionId.isEmpty || Zone.current[_actionKey] != null) {
+      throw StateError('browser_user_handoff_required');
+    }
+    final tab = requireTab(id);
+    final group = tab.popupGroupId ?? tab.id;
+    final family = _tabs.where((tab) => (tab.popupGroupId ?? tab.id) == group);
+    final ids = family.map((tab) => tab.id).toSet();
+    if (_runningAgentGuard != null &&
+        (_agentTabId == null ||
+            ids.contains(_agentTabId) ||
+            _engineGroups[_agentTabId] == group)) {
+      throw StateError('browser_tab_busy');
+    }
+    _lastTabBySession.removeWhere((_, tabId) => ids.contains(tabId));
+    for (var index = 0; index < _tabs.length; index++) {
+      if (ids.contains(_tabs[index].id)) {
+        _tabs[index] = _tabs[index].copyWith(ownerSessionId: sessionId);
+      }
+    }
+    _selectTab(requireTab(id));
     _changed();
   }
 
@@ -355,6 +448,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _checkAction(id);
     final index = _tabs.indexWhere((tab) => tab.id == id);
     if (index < 0) return;
+    final owner = _tabs[index].ownerSessionId;
     final opener = _tabs[index].openerTabId;
     final popupGroupId = _tabs[index].popupGroupId ?? id;
     final wasMounted = _mountedTabs.containsKey(id);
@@ -366,12 +460,15 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _previewEpochs.remove(id);
     _previewCompletedEpochs.remove(id);
     _previewPending.remove(id);
+    _lastTabBySession.removeWhere((_, selected) => selected == id);
     if (_activeTabId == id) {
+      final owned = tabsForSession(owner);
       _activeTabId = opener != null && _tabs.any((tab) => tab.id == opener)
           ? opener
-          : _tabs.isEmpty
-          ? null
-          : _tabs[index.clamp(0, _tabs.length - 1)].id;
+          : owned.lastOrNull?.id;
+      if (owner != null && _activeTabId != null) {
+        _lastTabBySession[owner] = _activeTabId!;
+      }
     }
     _changed();
     if (wasMounted) {
@@ -520,7 +617,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _call(tabId, (engine) => engine.screenshot());
 
   /// Memory-only last views survive panel dismissal and ordinary engine eviction.
-  /// The tab quota bounds their count; a navigation/close discards the old image.
+  /// A separate cache budget bounds their count; navigation/close discards the
+  /// old image without imposing a limit on saved tabs.
   Uint8List? previewForTab(String id) => _tabPreviews[id];
 
   void _invalidatePreview(String id) {
@@ -625,7 +723,15 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           !identical(_engines[before.id], engine)) {
         return;
       }
+      _tabPreviews.remove(before.id);
       _tabPreviews[before.id] = bytes;
+      while (_tabPreviews.length > maxCachedPreviews) {
+        final oldest = _tabPreviews.keys.firstWhere(
+          (id) => id != _activeTabId && id != before.id,
+        );
+        _tabPreviews.remove(oldest);
+        _previewCompletedEpochs.remove(oldest);
+      }
       if (!before.isLoading && !current.isLoading) {
         _previewCompletedEpochs[before.id] = epoch;
       }
@@ -706,9 +812,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
                   (_engineGroups[candidate] ?? candidate) == group &&
                   (_hasVisibleView(candidate) ||
                       candidate == _activeTabId ||
-                      (_agentAction != null &&
-                          !_agentPaused &&
-                          candidate == _agentTabId)),
+                      (_runningAgentGuard != null && candidate == _agentTabId)),
             );
             if (!pinned) return group;
           }
@@ -765,7 +869,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             try {
               child = await createTab(
                 url: url,
-                ownerSessionId: tab.ownerSessionId,
+                ownerSessionId: requireTab(id).ownerSessionId,
                 windowId: windowId,
                 openerTabId: id,
                 popupGroupId: tab.popupGroupId ?? tab.id,
@@ -1172,6 +1276,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     if (tabId != null) {
       requireAgentTab(guard.sessionId, tabId);
       _agentTabId = tabId;
+      if (_lastTabBySession[guard.sessionId] != tabId) {
+        _lastTabBySession[guard.sessionId] = tabId;
+        _scheduleSave();
+      }
     }
   }
 
@@ -1456,6 +1564,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           ? _tabs.map((tab) => tab.toJson()).toList()
           : [],
       'activeTabId': _settings.restoreTabs ? _activeTabId : null,
+      'lastTabBySession': _settings.restoreTabs ? _lastTabBySession : {},
       'bookmarks': _bookmarks.map((entry) => entry.toJson()).toList(),
       'history': _history.map((entry) => entry.toJson()).toList(),
       'downloads': _downloads.map((entry) => entry.toJson()).toList(),

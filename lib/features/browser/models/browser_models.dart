@@ -114,6 +114,7 @@ class BrowserTab {
   BrowserTab copyWith({
     String? url,
     String? title,
+    String? ownerSessionId,
     bool? isLoading,
     double? progress,
     bool? canGoBack,
@@ -127,7 +128,7 @@ class BrowserTab {
     id: id,
     url: url ?? this.url,
     title: title ?? this.title,
-    ownerSessionId: ownerSessionId,
+    ownerSessionId: ownerSessionId ?? this.ownerSessionId,
     isLoading: isLoading ?? this.isLoading,
     progress: progress ?? this.progress,
     canGoBack: canGoBack ?? this.canGoBack,

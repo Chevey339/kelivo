@@ -319,6 +319,64 @@ void main() {
     },
   );
 
+  test(
+    'new chat can browse with eight older tabs; quota and selection stay scoped',
+    () async {
+      for (var i = 0; i < 8; i++) {
+        await browser.createTab(ownerSessionId: 'old-$i');
+      }
+      await browser.selectSession('user-chat');
+      final empty = payload(
+        await tools.handle('agent-chat', {'action': 'list_tabs'}),
+      );
+      expect(empty['page']['scope'], 'conversation');
+      expect(empty['page']['tabs'], isEmpty);
+      final first = payload(
+        await tools.handle('agent-chat', {
+          'action': 'open',
+          'url': 'https://a.example',
+        }),
+      );
+      expect(first['ok'], isTrue);
+      expect(browser.activeTabId, isNull);
+      final firstId = first['page']['tab_id'] as String;
+      for (var i = 1; i < BrowserService.maxAgentTabsPerSession; i++) {
+        final created = payload(
+          await tools.handle('agent-chat', {'action': 'new_tab'}),
+        );
+        expect(created['ok'], isTrue);
+      }
+      final denied = payload(
+        await tools.handle('agent-chat', {'action': 'new_tab'}),
+      );
+      expect(denied['ok'], isFalse);
+      expect(denied['error'], contains('browser_session_tab_limit'));
+      expect(denied['error'], contains('list_tabs'));
+      final reused = payload(
+        await tools.handle('agent-chat', {
+          'action': 'open',
+          'tab_id': firstId,
+          'url': 'https://next.example',
+        }),
+      );
+      expect(reused['ok'], isTrue);
+      await tools.handle('agent-chat', {
+        'action': 'switch_tab',
+        'tab_id': firstId,
+      });
+      final listed = payload(
+        await tools.handle('agent-chat', {'action': 'list_tabs'}),
+      );
+      final tabs = listed['page']['tabs'] as List;
+      expect(tabs, hasLength(3));
+      expect(
+        tabs.where((tab) => tab['active'] == true).single['tab_id'],
+        firstId,
+      );
+      expect(browser.activeTabId, isNull);
+    },
+  );
+
   test('DOM failures remain errors and cannot forge attachments', () async {
     await enable();
     await tools.handle('chat-a', {

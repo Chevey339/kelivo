@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
@@ -17,6 +18,23 @@ class _Paths extends PathProviderPlatform {
   final String path;
   @override
   Future<String?> getApplicationSupportPath() async => path;
+}
+
+// Store writes started by a pumped debounce timer continue in the fake zone.
+// Let real I/O finish AND pump those continuations instead of awaiting their
+// queue from runAsync, which cannot drain the fake zone while it is blocked.
+Future<void> _flushBrowser(WidgetTester tester, BrowserService browser) async {
+  var done = false;
+  final pending = browser.flush().whenComplete(() => done = true);
+  pending.ignore();
+  for (var i = 0; i < 400 && !done; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+  }
+  expect(done, isTrue, reason: 'Browser state writes must finish');
+  await pending;
 }
 
 void main() {
@@ -60,12 +78,14 @@ void main() {
         await browser.initialize();
       });
       addTearDown(() async {
-        panel.detachHost();
-        await browser.flush();
-        browser.dispose();
-        settings.dispose();
-        PathProviderPlatform.instance = oldPaths;
-        await directory.delete(recursive: true);
+        await _flushBrowser(tester, browser);
+        await tester.runAsync(() async {
+          panel.detachHost();
+          browser.dispose();
+          settings.dispose();
+          PathProviderPlatform.instance = oldPaths;
+          await directory.delete(recursive: true);
+        });
       });
       final first = (await tester.runAsync(
         () => browser.createTab(ownerSessionId: 'chat'),
@@ -112,9 +132,39 @@ void main() {
       Navigator.of(tester.element(find.byType(BrowserPage))).pop();
       await tester.pumpAndSettle();
       await route;
+      // Expanding this conversation must not inherit another chat's docked tab.
+      final other = (await tester.runAsync(
+        () => browser.createTab(ownerSessionId: 'other-chat'),
+      ))!;
+      panel.open(conversationId: 'other-chat', initialTabId: other.id);
+      final ownRoute = openBrowserPage(
+        entry,
+        conversationId: 'chat',
+        fullPage: true,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<BrowserPage>(find.byType(BrowserPage)).initialTabId,
+        isNull,
+      );
+      expect(browser.activeTabId, first.id);
+      Navigator.of(tester.element(find.byType(BrowserPage))).pop();
+      await tester.pumpAndSettle();
+      await ownRoute;
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
-      await tester.runAsync(browser.flush);
+      await _flushBrowser(tester, browser);
+      final saved =
+          (await tester.runAsync(
+                () async => jsonDecode(
+                  await File(
+                    '${directory.path}/browser/state.json',
+                  ).readAsString(),
+                ),
+              ))
+              as Map;
+      expect(saved['activeTabId'], first.id);
+      expect((saved['lastTabBySession'] as Map)['chat'], first.id);
     },
   );
 }

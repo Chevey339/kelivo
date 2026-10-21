@@ -52,6 +52,38 @@ void main() {
     ),
   );
 
+  previewTest('many saved tabs keep thumbnails and native instances bounded', (
+    tester,
+  ) async {
+    final ids = <String>[];
+    for (var index = 0; index < 12; index++) {
+      final tab = await service.createTab(
+        url: 'https://page$index.example',
+        ownerSessionId: 'chat-$index',
+      );
+      ids.add(tab.id);
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      await service.refreshActivePreview(fresh: true);
+      expect(
+        service.liveViewCount,
+        lessThanOrEqualTo(BrowserService.maxLiveViews),
+      );
+    }
+    expect(service.tabs, hasLength(12));
+    expect(
+      ids.where((id) => service.previewForTab(id) != null),
+      hasLength(BrowserService.maxCachedPreviews),
+    );
+    expect(service.previewForTab(ids.first), isNull);
+    expect(service.previewForTab(ids.last), isNotNull);
+    await service.selectTab(ids.first);
+    await tester.pumpAndSettle();
+    await service.refreshActivePreview(fresh: true);
+    expect(service.previewForTab(ids.first), isNotNull);
+    expect(service.requireTab(ids.first).url, 'https://page0.example');
+  });
+
   previewTest('Android thumbnails wait for a presented native view', (
     tester,
   ) async {

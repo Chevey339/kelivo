@@ -23682,12 +23682,6 @@ abstract class AppLocalizations {
   /// **'Download failed'**
   String get browserDownloadFailed;
 
-  /// No description provided for @browserTabLimit.
-  ///
-  /// In en, this message translates to:
-  /// **'Close a tab before opening another. You can keep up to 8 tabs.'**
-  String get browserTabLimit;
-
   /// No description provided for @browserAgentEnableHint.
   ///
   /// In en, this message translates to:
@@ -24179,6 +24173,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} tabs'**
   String browserMetaTabs(int count);
+
+  /// No description provided for @browserTabsCurrentConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat'**
+  String get browserTabsCurrentConversation;
+
+  /// No description provided for @browserTabsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All tabs'**
+  String get browserTabsAll;
+
+  /// No description provided for @browserTabsUnassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal tabs'**
+  String get browserTabsUnassigned;
+
+  /// No description provided for @browserTabsUnknownConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Other chat'**
+  String get browserTabsUnknownConversation;
+
+  /// No description provided for @browserTabsEmptyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'No tabs here yet. Open a page or choose a tab from All tabs.'**
+  String get browserTabsEmptyConversation;
+
+  /// No description provided for @browserTabsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching tabs'**
+  String get browserTabsNoResults;
+
+  /// No description provided for @browserMoveToConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to this chat'**
+  String get browserMoveToConversation;
+
+  /// No description provided for @browserReopenInConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen in this chat'**
+  String get browserReopenInConversation;
+
+  /// No description provided for @browserTabBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'An assistant is still using this page. Wait for it to finish or stop the task before moving it.'**
+  String get browserTabBusy;
+
+  /// No description provided for @browserLiveViewLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'All browser resources are in use. Try again when a task finishes, or close an unused page.'**
+  String get browserLiveViewLimit;
+
+  /// No description provided for @browserAskAiInOwnerConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI in the owning chat'**
+  String get browserAskAiInOwnerConversation;
 }
 
 class _AppLocalizationsDelegate

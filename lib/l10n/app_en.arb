@@ -5810,7 +5810,6 @@
   "browserDownloadCancel": "Cancel download",
   "browserOpenDownload": "Open file",
   "browserDownloadFailed": "Download failed",
-  "browserTabLimit": "Close a tab before opening another. You can keep up to 8 tabs.",
   "browserAgentEnableHint": "Enable the Browser tool in chat tools, then allow control here.",
   "browserSessionRequired": "Open the browser from a conversation to allow agent control.",
   "browserDownloadCancelled": "Cancelled",
@@ -5980,5 +5979,16 @@
         "type": "int"
       }
     }
-  }
+  },
+  "browserTabsCurrentConversation": "This chat",
+  "browserTabsAll": "All tabs",
+  "browserTabsUnassigned": "Personal tabs",
+  "browserTabsUnknownConversation": "Other chat",
+  "browserTabsEmptyConversation": "No tabs here yet. Open a page or choose a tab from All tabs.",
+  "browserTabsNoResults": "No matching tabs",
+  "browserMoveToConversation": "Move to this chat",
+  "browserReopenInConversation": "Reopen in this chat",
+  "browserTabBusy": "An assistant is still using this page. Wait for it to finish or stop the task before moving it.",
+  "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
+  "browserAskAiInOwnerConversation": "Ask AI in the owning chat"
 }

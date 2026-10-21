@@ -560,19 +560,72 @@ void main() {
     },
   );
 
-  browserTestWidgets('opening from a new chat creates its own tab', (
-    tester,
-  ) async {
-    await service.initialize();
-    await service.createTab(
-      url: 'https://other.example',
-      ownerSessionId: 'chat-b',
+  browserTestWidgets(
+    'opening from a new chat shows a start page without allocating a tab',
+    (tester) async {
+      await service.initialize();
+      await service.createTab(
+        url: 'https://other.example',
+        ownerSessionId: 'chat-b',
+      );
+      await mount(tester, conversationId: 'chat-a');
+      expect(service.tabs, hasLength(1));
+      expect(service.activeTab, isNull);
+      expect(find.text('Kelivo'), findsOneWidget);
+      expect(service.liveViewCount, 0);
+    },
+  );
+
+  for (final move in [true, false]) {
+    browserTestWidgets(
+      'user can ${move ? "move" : "reopen"} a page in this chat',
+      (tester) async {
+        final other = await service.createTab(
+          url: 'https://other.example',
+          ownerSessionId: 'other',
+        );
+        await mount(tester, conversationId: 'chat-a', initialTabId: other.id);
+        final originalEngine = engines[other.id];
+        await openMobileMenuItem(
+          tester,
+          move ? 'Move to this chat' : 'Reopen in this chat',
+        );
+        expect(service.activeTab!.ownerSessionId, 'chat-a');
+        expect(service.activeTab!.url, 'https://other.example');
+        if (move) {
+          expect(service.activeTabId, other.id);
+          expect(service.tabs, hasLength(1));
+          expect(engines[other.id], same(originalEngine));
+        } else {
+          expect(service.activeTabId, isNot(other.id));
+          expect(service.requireTab(other.id).ownerSessionId, 'other');
+          expect(service.tabs, hasLength(2));
+        }
+        expect(tester.takeException(), isNull);
+      },
     );
-    await mount(tester, conversationId: 'chat-a');
-    expect(service.tabs, hasLength(2));
-    expect(service.activeTab!.ownerSessionId, 'chat-a');
-    expect(service.activeTab!.url, 'about:blank');
-  });
+  }
+
+  browserTestWidgets(
+    'personal tabs stay visible when opened from another chat',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      final personal = await service.createTab(url: 'https://personal.example');
+      await service.createTab(ownerSessionId: 'chat-a');
+      await mount(
+        tester,
+        conversationId: 'chat-a',
+        initialTabId: personal.id,
+        size: const Size(1200, 800),
+      );
+      final strip = tester.widget<BrowserTabStrip>(
+        find.byType(BrowserTabStrip),
+      );
+      expect(strip.tabs.map((tab) => tab.id), [personal.id]);
+      expect(strip.activeId, personal.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final ownedTabExists in [false, true]) {
     browserTestWidgets(
@@ -622,37 +675,24 @@ void main() {
   }
 
   browserTestWidgets(
-    'full browser remains usable when a new chat cannot create a tab',
+    'eight old tabs do not block a new conversation or leak into its overview',
     (tester) async {
       await service.initialize();
-      for (var index = 0; index < BrowserService.maxTabs; index++) {
+      for (var index = 0; index < 8; index++) {
         await service.createTab(ownerSessionId: 'other-$index');
       }
       await mount(tester, conversationId: 'chat-a');
-      expect(service.tabs, hasLength(BrowserService.maxTabs));
-      expect(
-        service.tabs.every((tab) => tab.ownerSessionId != 'chat-a'),
-        isTrue,
-      );
-      expect(find.byType(BrowserAddressBar), findsOneWidget);
-      expect(
-        find.text(
-          'Close a tab before opening another. You can keep up to 8 tabs.',
-        ),
-        findsOneWidget,
-      );
-      await tester.pump(const Duration(seconds: 4));
+      expect(service.tabs, hasLength(8));
+      expect(service.activeTab, isNull);
+      await openMobileMenuItem(tester, 'Tabs (0)');
+      expect(find.byKey(const ValueKey('browserTabScope')), findsOneWidget);
+      expect(find.byTooltip('Close tab'), findsNothing);
+      await tester.tap(find.text('All tabs'));
       await tester.pumpAndSettle();
-      await openMobileMenuItem(tester, 'Tabs (8)');
       expect(find.byTooltip('Close tab'), findsWidgets);
-      // Opening tabs brings the active card into view. Cached grid children
-      // above it can still exist, so target a visible close control.
-      await tester.tap(find.byTooltip('Close tab').hitTestable().first);
-      await tester.pumpAndSettle();
-      expect(service.tabs, hasLength(7));
       await tester.tap(find.byTooltip('New tab'));
       await tester.pumpAndSettle();
-      expect(service.tabs, hasLength(8));
+      expect(service.tabs, hasLength(9));
       expect(service.activeTab!.ownerSessionId, 'chat-a');
       expect(tester.takeException(), isNull);
     },
@@ -747,6 +787,7 @@ void main() {
   );
 
   browserTestWidgets('closing the final tab disables reload', (tester) async {
+    await service.createTab();
     await mount(tester);
     await service.closeTab(service.activeTabId!);
     await tester.pumpAndSettle();
@@ -1096,6 +1137,7 @@ void main() {
   browserTestWidgets(
     'start page tab flight keeps its Flutter backdrop outside the route builder',
     (tester) async {
+      await service.createTab();
       await mount(tester);
       await tester.tap(find.byTooltip('More').last);
       await tester.pumpAndSettle();

@@ -4609,7 +4609,6 @@
   "browserDownloadCancel": "取消下载",
   "browserOpenDownload": "打开文件",
   "browserDownloadFailed": "下载失败",
-  "browserTabLimit": "最多可打开 8 个标签页，请先关闭一个。",
   "browserAgentEnableHint": "在聊天工具中启用浏览器工具，再在这里允许控制。",
   "browserSessionRequired": "从一个对话中打开浏览器，即可允许 Agent 控制。",
   "browserDownloadCancelled": "已取消",
@@ -4698,5 +4697,16 @@
   "browserDirectionDown": "下",
   "browserDirectionLeft": "左",
   "browserDirectionRight": "右",
-  "browserMetaTabs": "{count} 个"
+  "browserMetaTabs": "{count} 个",
+  "browserTabsCurrentConversation": "当前对话",
+  "browserTabsAll": "全部标签",
+  "browserTabsUnassigned": "个人标签",
+  "browserTabsUnknownConversation": "其他对话",
+  "browserTabsEmptyConversation": "这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。",
+  "browserTabsNoResults": "没有匹配的标签页",
+  "browserMoveToConversation": "移到当前对话",
+  "browserReopenInConversation": "在当前对话重新打开",
+  "browserTabBusy": "助手仍在操作此页面，请等待任务完成或停止任务后再移动。",
+  "browserLiveViewLimit": "浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。",
+  "browserAskAiInOwnerConversation": "让所属对话的 AI 处理"
 }

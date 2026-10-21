@@ -391,22 +391,317 @@ void main() {
     },
   );
 
+  test('saved tabs exceed eight without allocating native views', () async {
+    for (var index = 0; index < 12; index++) {
+      await service.createTab(url: 'https://$index.example');
+    }
+    final ids = service.tabs.map((tab) => tab.id).toList();
+    expect(service.tabs, hasLength(12));
+    expect(service.liveViewCount, 0);
+    await service.flush();
+    service.dispose();
+    service = createService();
+    await service.initialize();
+    expect(service.tabs.map((tab) => tab.id), ids);
+    await service.closeTab(ids[3]);
+    expect(service.tabs.map((tab) => tab.id), ids.where((id) => id != ids[3]));
+    expect(service.activeTabId, ids.last);
+  });
+
   test(
-    'tab quota rejects the ninth and closing preserves survivor identity',
+    'conversation selection is lazy and remembers each conversation across restart',
     () async {
-      for (var index = 0; index < BrowserService.maxTabs; index++) {
-        await service.createTab(url: 'https://$index.example');
-      }
-      final ids = service.tabs.map((tab) => tab.id).toList();
-      await expectLater(service.createTab(), throwsStateError);
-      await service.closeTab(ids[3]);
-      expect(
-        service.tabs.map((tab) => tab.id),
-        ids.where((id) => id != ids[3]),
-      );
-      expect(service.activeTabId, ids.last);
+      final a = await service.createTab(ownerSessionId: 'a');
+      await service.createTab(ownerSessionId: 'a');
+      final b = await service.createTab(ownerSessionId: 'b');
+      await service.selectTab(a.id);
+      await service.selectSession('new-chat');
+      expect(service.activeTab, isNull);
+      expect(service.tabs, hasLength(3));
+      expect(service.liveViewCount, 0);
+      await service.selectSession('b');
+      expect(service.activeTabId, b.id);
+      await service.flush();
+      service.dispose();
+      service = createService();
+      await service.initialize();
+      await service.selectSession('a');
+      expect(service.activeTabId, a.id);
+      expect(service.requireAgentTab('a', null).id, a.id);
+      await service.closeTab(a.id);
+      expect(service.activeTab!.ownerSessionId, 'a');
+      await service.closeTab(service.activeTabId!);
+      expect(service.activeTabId, isNull);
+      expect(service.tabs.single.id, b.id);
     },
   );
+
+  test('agent quota is per conversation and does not cap user tabs', () async {
+    Future<BrowserTab> agentTab(String owner) => service.runAgentAction(
+      sessionId: owner,
+      label: 'new_tab',
+      action: () => service.createTab(ownerSessionId: owner),
+    );
+    for (var i = 0; i < BrowserService.maxAgentTabsPerSession; i++) {
+      await agentTab('a');
+    }
+    await expectLater(
+      agentTab('a'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('browser_session_tab_limit'),
+        ),
+      ),
+    );
+    final b = await agentTab('b');
+    expect(b.ownerSessionId, 'b');
+    await service.createTab(ownerSessionId: 'a');
+    expect(service.tabsForSession('a'), hasLength(4));
+    expect(service.liveViewCount, 0);
+  });
+
+  test(
+    'background agent selection does not replace another chat viewport',
+    () async {
+      final a = await service.createTab(ownerSessionId: 'a');
+      final b = await service.createTab(ownerSessionId: 'b');
+      final secondA = await service.runAgentAction(
+        sessionId: 'a',
+        label: 'new_tab',
+        action: () => service.createTab(ownerSessionId: 'a'),
+      );
+      expect(service.activeTabId, b.id);
+      expect(service.requireAgentTab('a', null).id, secondA.id);
+      await service.runAgentAction(
+        sessionId: 'a',
+        label: 'switch_tab',
+        action: () => service.selectTab(a.id),
+      );
+      expect(service.activeTabId, b.id);
+      await service.selectSession('empty');
+      await service.runAgentAction(
+        sessionId: 'a',
+        label: 'switch_tab',
+        action: () => service.selectTab(secondA.id),
+      );
+      expect(service.activeTab, isNull);
+      await service.selectSession('a');
+      expect(service.activeTabId, secondA.id);
+    },
+  );
+
+  test(
+    'explicit handoff moves popup family without recreating its pages',
+    () async {
+      final a = await service.createTab(
+        url: 'https://a.example',
+        ownerSessionId: 'a',
+      );
+      await service.evaluateJavascript('ready', tabId: a.id);
+      expect(await popupCallbacks[a.id]!(null, 42), isTrue);
+      final child = service.activeTab!;
+      final rootEngine = engines[a.id];
+      await service.moveTabToSession(child.id, 'b');
+      expect(service.tabsForSession('a'), isEmpty);
+      expect(service.tabsForSession('b'), hasLength(2));
+      expect(service.requireAgentTab('b', child.id).id, child.id);
+      expect(() => service.requireAgentTab('a', a.id), throwsStateError);
+      expect(engines[a.id], same(rootEngine));
+      expect(rootEngine!.disposed, isFalse);
+      expect(await popupCallbacks[a.id]!(null, 43), isTrue);
+      expect(service.tabs.last.ownerSessionId, 'b');
+      expect(service.activeTabId, child.id);
+      await service.flush();
+      service.dispose();
+      service = createService();
+      await service.initialize();
+      expect(service.tabs.every((tab) => tab.ownerSessionId == 'b'), isTrue);
+    },
+  );
+
+  test(
+    'busy tab cannot be transferred or reclaimed by another conversation',
+    () async {
+      final a = await service.createTab(
+        url: 'https://a.example',
+        ownerSessionId: 'a',
+      );
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final running = service.runAgentAction(
+        sessionId: 'a',
+        label: 'wait',
+        tabId: a.id,
+        action: () async {
+          await service.evaluateJavascript('ready', tabId: a.id);
+          started.complete();
+          await finish.future;
+        },
+      );
+      await started.future;
+      await expectLater(service.moveTabToSession(a.id, 'b'), throwsStateError);
+      for (var i = 0; i < 3; i++) {
+        final tab = await service.createTab(
+          url: 'https://$i.example',
+          ownerSessionId: 'b',
+        );
+        await service.evaluateJavascript('ready', tabId: tab.id);
+      }
+      expect(service.liveViewCount, BrowserService.maxLiveViews);
+      expect(engines[a.id]!.disposed, isFalse);
+      expect(service.requireTab(a.id).ownerSessionId, 'a');
+      expect(service.agentSessionId, 'a');
+      finish.complete();
+      await running;
+      await Future<void>.delayed(Duration.zero);
+      await service.moveTabToSession(a.id, 'b');
+      expect(service.requireTab(a.id).ownerSessionId, 'b');
+      await expectLater(
+        service.runAgentAction(
+          sessionId: 'b',
+          label: 'move',
+          action: () => service.moveTabToSession(a.id, 'c'),
+        ),
+        throwsStateError,
+      );
+    },
+  );
+
+  test(
+    'takeover keeps a cancelled native action protected until it settles',
+    () async {
+      final tab = await service.createTab(
+        url: 'https://busy.example',
+        ownerSessionId: 'a',
+      );
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final running = service.runAgentAction(
+        sessionId: 'a',
+        label: 'wait',
+        tabId: tab.id,
+        action: () async {
+          await service.evaluateJavascript('ready', tabId: tab.id);
+          started.complete();
+          await finish.future;
+        },
+      );
+      final cancelled = expectLater(running, throwsStateError);
+      await started.future;
+      service.takeOver(sessionId: 'a', tabId: tab.id);
+      await cancelled;
+      for (var i = 0; i < 3; i++) {
+        final other = await service.createTab(
+          url: 'https://$i.example',
+          ownerSessionId: 'b',
+        );
+        await service.evaluateJavascript('ready', tabId: other.id);
+      }
+      expect(service.liveViewCount, BrowserService.maxLiveViews);
+      expect(engines[tab.id]!.disposed, isFalse);
+      await expectLater(
+        service.moveTabToSession(tab.id, 'b'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'browser_tab_busy',
+          ),
+        ),
+      );
+      finish.complete();
+      await Future<void>.delayed(Duration.zero);
+      await service.moveTabToSession(tab.id, 'b');
+      expect(service.requireTab(tab.id).ownerSessionId, 'b');
+    },
+  );
+
+  test('a queued action loses access when the user moves its tab', () async {
+    final old = await service.createTab(ownerSessionId: 'old-chat');
+    final busy = await service.createTab(ownerSessionId: 'busy-chat');
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final first = service.runAgentAction(
+      sessionId: 'busy-chat',
+      label: 'wait',
+      tabId: busy.id,
+      action: () async {
+        started.complete();
+        await finish.future;
+      },
+    );
+    await started.future;
+    var called = false;
+    final queued = service.runAgentAction(
+      sessionId: 'old-chat',
+      label: 'evaluate',
+      tabId: old.id,
+      action: () async {
+        called = true;
+      },
+    );
+    final rejected = expectLater(
+      queued,
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'browser_tab_not_owned',
+        ),
+      ),
+    );
+    await service.moveTabToSession(old.id, 'new-chat');
+    finish.complete();
+    await first;
+    await rejected;
+    expect(called, isFalse);
+    expect(service.requireAgentTab('new-chat', old.id).id, old.id);
+  });
+
+  test('popup handoff waits for a closed but retained parent action', () async {
+    final parent = await service.createTab(
+      url: 'https://parent.example',
+      ownerSessionId: 'a',
+    );
+    await service.evaluateJavascript('ready', tabId: parent.id);
+    await popupCallbacks[parent.id]!(null, 42);
+    final child = service.activeTab!;
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final running = service.runAgentAction(
+      sessionId: 'a',
+      label: 'wait',
+      tabId: parent.id,
+      action: () async {
+        started.complete();
+        await finish.future;
+      },
+    );
+    await started.future;
+    try {
+      await service.closeTab(parent.id);
+      expect(engines[parent.id]!.disposed, isFalse);
+      await expectLater(
+        service.moveTabToSession(child.id, 'b'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'browser_tab_busy',
+          ),
+        ),
+      );
+      expect(service.requireTab(child.id).ownerSessionId, 'a');
+    } finally {
+      finish.complete();
+      await running;
+      await Future<void>.delayed(Duration.zero);
+    }
+    await service.moveTabToSession(child.id, 'b');
+    expect(service.requireTab(child.id).ownerSessionId, 'b');
+  });
 
   test(
     'native views are created lazily and evict the least recently used view',
@@ -659,14 +954,23 @@ void main() {
       expect(child.hasContent, isTrue);
       expect(engines[child.id]!.tab.windowId, 42);
       expect(child.windowId, isNull);
-      while (service.tabs.length < BrowserService.maxTabs) {
-        await service.createTab();
+      for (var index = 0; index < 8; index++) {
+        await service.createTab(ownerSessionId: 'other-$index');
       }
       expect(
         await popupCallbacks[parent.id]!('https://popup.example', 43),
+        isTrue,
+      );
+      final third = service.tabs.last;
+      expect(service.activeTab!.ownerSessionId, 'other-7');
+      expect(third.ownerSessionId, 'chat');
+      expect(service.liveViewCount, BrowserService.maxLiveViews);
+      expect(
+        await popupCallbacks[parent.id]!('https://overflow.example', 44),
         isFalse,
       );
-      expect(service.tabs, hasLength(BrowserService.maxTabs));
+      expect(service.liveViewCount, BrowserService.maxLiveViews);
+      await service.closeTab(third.id);
       await service.selectTab(child.id);
       engines[child.id]!.onChanged(
         const BrowserPageState(closeRequested: true),

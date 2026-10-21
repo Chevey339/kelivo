@@ -4633,7 +4633,6 @@
   "browserDownloadCancel": "取消下載",
   "browserOpenDownload": "開啟檔案",
   "browserDownloadFailed": "下載失敗",
-  "browserTabLimit": "最多可開啟 8 個分頁，請先關閉一個。",
   "browserAgentEnableHint": "在聊天工具中啟用瀏覽器工具，再在這裡允許控制。",
   "browserSessionRequired": "從一個對話中開啟瀏覽器，即可允許 Agent 控制。",
   "browserDownloadCancelled": "已取消",
@@ -4722,5 +4721,16 @@
   "browserDirectionDown": "下",
   "browserDirectionLeft": "左",
   "browserDirectionRight": "右",
-  "browserMetaTabs": "{count} 個"
+  "browserMetaTabs": "{count} 個",
+  "browserTabsCurrentConversation": "目前對話",
+  "browserTabsAll": "所有分頁",
+  "browserTabsUnassigned": "個人分頁",
+  "browserTabsUnknownConversation": "其他對話",
+  "browserTabsEmptyConversation": "這裡還沒有分頁。開啟網頁，或從「所有分頁」選擇現有頁面。",
+  "browserTabsNoResults": "沒有符合的分頁",
+  "browserMoveToConversation": "移到目前對話",
+  "browserReopenInConversation": "在目前對話重新開啟",
+  "browserTabBusy": "助手仍在操作此頁面，請等待任務完成或停止任務後再移動。",
+  "browserLiveViewLimit": "瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。",
+  "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理"
 }

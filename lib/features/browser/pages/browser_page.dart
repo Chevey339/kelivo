@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/browser/browser_service.dart';
 import '../../../core/services/browser/browser_engine.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -42,6 +43,8 @@ import 'browser_management_page.dart';
 
 enum _BrowserMenu {
   newTab,
+  moveToConversation,
+  reopenInConversation,
   tabs,
   bookmark,
   bookmarks,
@@ -241,6 +244,20 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   String? get _visibleConversationId =>
       _service.activeTab?.ownerSessionId ?? widget.conversationId;
 
+  String? get _visibleTabScope => _service.activeTab == null
+      ? widget.conversationId
+      : _service.activeTab!.ownerSessionId;
+
+  String _conversationTitle(String? id) {
+    final l = AppLocalizations.of(context)!;
+    if (id == null) return l.browserTabsUnassigned;
+    final chat = context.read<ChatService?>();
+    final title = chat?.getConversation(id)?.title.trim();
+    return title == null || title.isEmpty
+        ? l.browserTabsUnknownConversation
+        : title;
+  }
+
   bool get _desktop =>
       widget.embedded ||
       ResponsiveHelper.isDesktop(context) ||
@@ -349,7 +366,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         await BrowserGlass.prewarm();
       }
       if (!mounted) return;
-      var tabLimitReached = false;
       if (_service.isSupported) {
         final conversationId = widget.conversationId;
         final initialTab = _service.tabs
@@ -357,36 +373,19 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
             .firstOrNull;
         if (initialTab != null) {
           await _service.selectTab(initialTab.id);
-        } else if (conversationId != null &&
-            _service.activeTab?.ownerSessionId != conversationId) {
-          final owned = _service.tabs
-              .where((tab) => tab.ownerSessionId == conversationId)
-              .firstOrNull;
-          if (owned != null) {
-            await _service.selectTab(owned.id);
-          } else if (_service.tabs.length < BrowserService.maxTabs) {
-            await _service.createTab(ownerSessionId: conversationId);
-          } else {
-            tabLimitReached = true;
-          }
-        } else if (_service.tabs.isEmpty) {
-          await _service.createTab(ownerSessionId: conversationId);
+        } else if (conversationId != null) {
+          await _service.selectSession(conversationId);
         }
       }
-      _finishInitialization(tabLimitReached: tabLimitReached);
+      _finishInitialization();
     } catch (error) {
-      if (_isTabLimit(error) && _service.isInitialized) {
-        _finishInitialization(tabLimitReached: true);
-      } else if (mounted) {
+      if (mounted) {
         setState(() => _initializationError = error.toString());
       }
     }
   }
 
-  bool _isTabLimit(Object error) =>
-      error is StateError && error.message == 'browser_tab_limit';
-
-  void _finishInitialization({bool tabLimitReached = false}) {
+  void _finishInitialization() {
     if (!mounted) return;
     _syncAddress(force: true);
     setState(() {
@@ -394,9 +393,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _initializationError = null;
     });
     _scheduleIdlePreview();
-    if (tabLimitReached) {
-      _notify(AppLocalizations.of(context)!.browserTabLimit);
-    }
   }
 
   void _addressFocusChanged() {
@@ -614,12 +610,14 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     try {
       await operation();
     } catch (error) {
-      _notify(
-        _isTabLimit(error) && mounted
-            ? AppLocalizations.of(context)!.browserTabLimit
-            : error.toString(),
-        error: true,
-      );
+      if (!mounted) return;
+      final l = AppLocalizations.of(context)!;
+      _notify(switch (error) {
+        StateError(message: 'browser_tab_busy') => l.browserTabBusy,
+        StateError(message: 'browser_live_view_limit') =>
+          l.browserLiveViewLimit,
+        _ => error.toString(),
+      }, error: true);
     }
   }
 
@@ -681,7 +679,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _newTab() => _userRun(() async {
+  Future<void> _newTab() => _run(() async {
     await _service.createTab(ownerSessionId: widget.conversationId);
     if (mounted) _focusAddress();
   });
@@ -884,7 +882,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                     underlapHeader: underlap,
                                     tabBar: BrowserTabStrip(
                                       service: _service,
-                                      tabs: _service.tabs,
+                                      tabs: _service.tabsForSession(
+                                        _visibleTabScope,
+                                      ),
                                       activeId: _service.activeTabId,
                                       onSelect: _selectDesktopTab,
                                       onClose: (id) => unawaited(
@@ -894,6 +894,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                     tabActions: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        BrowserActionButton(
+                                          compact: true,
+                                          iconSize: 16,
+                                          label: l.browserTabsAll,
+                                          icon: LucideIcons.panelsTopLeft,
+                                          onPressed: _openTabs,
+                                        ),
                                         BrowserActionButton(
                                           compact: true,
                                           iconSize: 16,
@@ -1900,6 +1907,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
             ),
             child: BrowserTabOverview(
               service: _service,
+              conversationId: widget.conversationId,
+              conversationTitle: _conversationTitle,
               onDone: () => setState(() => _showDesktopTabs = false),
               onSelect: _selectDesktopTab,
               onClose: (id) => unawaited(_userRun(() => _service.closeTab(id))),
@@ -2094,6 +2103,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               showHeader: false,
               child: BrowserTabOverview(
                 service: _service,
+                conversationId: widget.conversationId,
+                conversationTitle: _conversationTitle,
                 transition: motion,
                 onDone: () => Navigator.of(panelContext).pop(),
                 onSelect: (id) {
@@ -2227,8 +2238,24 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           footer: true,
           group: BrowserMenuGroup.navigation,
           icon: LucideIcons.panelsTopLeft,
-          label: '${l.browserTabs} (${_service.tabs.length})',
+          label:
+              '${l.browserTabs} (${_service.tabsForSession(_visibleTabScope).length})',
         ),
+        if (widget.conversationId != null &&
+            _service.activeTab != null &&
+            _service.activeTab!.ownerSessionId != widget.conversationId) ...[
+          BrowserMenuEntry(
+            value: _BrowserMenu.moveToConversation,
+            icon: LucideIcons.folderInput,
+            label: l.browserMoveToConversation,
+          ),
+          if (_hasWebAddress)
+            BrowserMenuEntry(
+              value: _BrowserMenu.reopenInConversation,
+              icon: LucideIcons.copy,
+              label: l.browserReopenInConversation,
+            ),
+        ],
         if (_hasWebAddress)
           BrowserMenuEntry(
             value: _BrowserMenu.bookmark,
@@ -2279,7 +2306,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           value: _BrowserMenu.askAi,
           group: BrowserMenuGroup.application,
           icon: LucideIcons.sparkles,
-          label: l.browserAskAi,
+          label:
+              widget.conversationId != null &&
+                  _visibleConversationId != widget.conversationId
+              ? l.browserAskAiInOwnerConversation
+              : l.browserAskAi,
         ),
         if (_service.agentActivityFor(
               sessionId: _visibleConversationId,
@@ -2323,6 +2354,22 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     switch (action) {
       case _BrowserMenu.newTab:
         await _newTab();
+      case _BrowserMenu.moveToConversation:
+        final id = _service.activeTabId;
+        final sessionId = widget.conversationId;
+        if (id != null && sessionId != null) {
+          await _run(() => _service.moveTabToSession(id, sessionId));
+        }
+      case _BrowserMenu.reopenInConversation:
+        final url = _service.activeTab?.url;
+        if (url != null) {
+          await _run(() async {
+            await _service.createTab(
+              url: url,
+              ownerSessionId: widget.conversationId,
+            );
+          });
+        }
       case _BrowserMenu.tabs:
         _openTabs();
       case _BrowserMenu.bookmark:

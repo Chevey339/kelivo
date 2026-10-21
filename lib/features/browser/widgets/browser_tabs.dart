@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../../core/services/browser/browser_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
+import '../../../shared/widgets/segmented_tabs.dart';
 import '../browser_tabs_route.dart';
 import '../models/browser_models.dart';
 import 'browser_glass.dart';
@@ -174,6 +175,8 @@ class BrowserTabOverview extends StatefulWidget {
     this.onDone,
     this.scrollController,
     this.transition,
+    this.conversationId,
+    this.conversationTitle,
   });
   final BrowserService service;
   final ValueChanged<String> onSelect, onClose;
@@ -181,6 +184,8 @@ class BrowserTabOverview extends StatefulWidget {
   final VoidCallback? onDone;
   final ScrollController? scrollController;
   final BrowserTabTransitionController? transition;
+  final String? conversationId;
+  final String Function(String?)? conversationTitle;
   @override
   State<BrowserTabOverview> createState() => _BrowserTabOverviewState();
 }
@@ -190,10 +195,15 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
   final _searchFocus = FocusNode();
   String _query = '';
   bool _searchExpanded = false;
+  late bool _showAll;
   ScrollController? _gridController;
   @override
   void initState() {
     super.initState();
+    _showAll =
+        widget.conversationId == null ||
+        (widget.service.activeTab != null &&
+            widget.service.activeTab!.ownerSessionId != widget.conversationId);
     // Mobile's transition already captured its source before opening. Starting
     // another native snapshot here would overlap JPEG encoding and decoding
     // with the first frames of the page-to-card flight.
@@ -223,6 +233,28 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
       ? widget.service.previewForTab(id)
       : widget.transition!.previewForTab(id);
 
+  Widget _scopeSelector(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return SegmentedTabs(
+      key: const ValueKey('browserTabScope'),
+      height: math.max(
+        44,
+        MediaQuery.textScalerOf(context).scale(13) * 1.3 + 12,
+      ),
+      tabs: [
+        SegmentedTab(label: l.browserTabsCurrentConversation),
+        SegmentedTab(label: l.browserTabsAll),
+      ],
+      index: _showAll ? 1 : 0,
+      onChanged: (value) {
+        widget.transition?.invalidateGeometry();
+        setState(() => _showAll = value == 1);
+        final controller = widget.scrollController ?? _gridController;
+        if (controller?.hasClients == true) controller!.jumpTo(0);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -248,16 +280,31 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
               tab.title,
               tab.url,
               tab.hasContent,
+              tab.ownerSessionId,
               _previewForTab(tab.id),
             ),
         ],
         builder: (context, _, _) {
-          final tabs = widget.service.tabs
+          final scopedTabs = _showAll
+              ? widget.service.tabs
+              : widget.service.tabsForSession(widget.conversationId);
+          final tabs = scopedTabs
               .where(
                 (tab) =>
                     '${tab.title} ${tab.url}'.toLowerCase().contains(_query),
               )
               .toList();
+          final groups = <String?, List<BrowserTab>>{};
+          for (final tab in tabs) {
+            (groups[tab.ownerSessionId] ??= []).add(tab);
+          }
+          final groupEntries = [
+            if (groups[widget.conversationId] case final current?)
+              MapEntry(widget.conversationId, current),
+            for (final group in groups.entries)
+              if (group.key != widget.conversationId) group,
+          ];
+          final grouped = _showAll && widget.conversationId != null;
           final showNewCard = desktop && (_query.isEmpty || tabs.isEmpty);
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -276,10 +323,19 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                   MediaQuery.textScalerOf(context).scale(14) * 1.3 + 18;
               final previewHeight = cardWidth * (desktop ? .62 : 1.4);
               final safe = MediaQuery.paddingOf(context);
-              final searchHeight = _searchExpanded
+              final fieldHeight = _searchExpanded
                   ? (MediaQuery.textScalerOf(context).scale(16) * 1.3 + 28)
                         .clamp(44.0, 120.0)
                   : 44.0;
+              final scopeHeight = math.max(
+                44.0,
+                MediaQuery.textScalerOf(context).scale(13) * 1.3 + 12,
+              );
+              final searchHeight = widget.conversationId == null
+                  ? fieldHeight
+                  : _searchExpanded
+                  ? scopeHeight + 8 + fieldHeight
+                  : scopeHeight;
               final toolbarHeight =
                   (MediaQuery.textScalerOf(context).scale(15) * 1.3 + 30).clamp(
                     52.0,
@@ -294,6 +350,8 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
               final activeIndex = tabs.indexWhere(
                 (tab) => tab.id == widget.service.activeTabId,
               );
+              final headerHeight =
+                  MediaQuery.textScalerOf(context).scale(12) * 1.3 + 16;
               if (widget.scrollController == null &&
                   widget.transition != null &&
                   _gridController == null) {
@@ -305,60 +363,144 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                 final rows = (tabs.length / columns).ceil();
                 final cellHeight = previewHeight + labelHeight;
                 final stride = cellHeight + 22;
-                final contentHeight =
+                var contentHeight =
                     gridPadding.vertical +
                     rows * cellHeight +
                     math.max(0, rows - 1) * 22;
+                var activeBottom = gridPadding.top + row * stride + cellHeight;
+                if (grouped) {
+                  var offset = gridPadding.top;
+                  for (final group in groupEntries) {
+                    final index = group.value.indexWhere(
+                      (tab) => tab.id == widget.service.activeTabId,
+                    );
+                    if (index >= 0) {
+                      activeBottom =
+                          offset +
+                          headerHeight +
+                          (index ~/ columns) * stride +
+                          cellHeight;
+                    }
+                    offset +=
+                        headerHeight +
+                        (group.value.length / columns).ceil() * stride;
+                  }
+                  contentHeight = offset + gridPadding.bottom;
+                }
                 final maxOffset = math.max(
                   0.0,
                   contentHeight - constraints.maxHeight,
                 );
                 final revealOffset =
-                    gridPadding.top +
-                    row * stride +
-                    cellHeight -
-                    (constraints.maxHeight - gridPadding.bottom);
+                    activeBottom - (constraints.maxHeight - gridPadding.bottom);
                 _gridController = ScrollController(
                   initialScrollOffset: revealOffset.clamp(0.0, maxOffset),
                 );
               }
-              Widget grid(EdgeInsets padding) =>
-                  NotificationListener<ScrollMetricsNotification>(
-                    onNotification: (_) {
-                      widget.transition?.invalidateGeometry();
-                      return false;
-                    },
-                    child: GridView.builder(
-                      key: const ValueKey('browserTabGrid'),
-                      controller: widget.scrollController ?? _gridController,
-                      padding: padding,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        mainAxisExtent: previewHeight + labelHeight,
-                        crossAxisSpacing: gap,
-                        mainAxisSpacing: 22,
+              Widget card(BrowserTab tab) => _TabCard(
+                key: ValueKey('browserTabCard-${tab.id}'),
+                tab: tab,
+                desktop: desktop,
+                active: tab.id == widget.service.activeTabId,
+                service: widget.service,
+                bytes: _previewForTab(tab.id),
+                raster: widget.transition?.startPageSnapshotFor(tab),
+                previewKey: widget.transition?.previewKeyFor(tab.id),
+                onSelect: () => widget.onSelect(tab.id),
+                onClose: () => widget.onClose(tab.id),
+              );
+              final delegate = SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisExtent: previewHeight + labelHeight,
+                crossAxisSpacing: gap,
+                mainAxisSpacing: 22,
+              );
+              Widget grid(
+                EdgeInsets padding,
+              ) => NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  widget.transition?.invalidateGeometry();
+                  return false;
+                },
+                child: grouped
+                    ? CustomScrollView(
+                        key: const ValueKey('browserTabGrid'),
+                        controller: widget.scrollController ?? _gridController,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: SizedBox(height: padding.top),
+                          ),
+                          for (final group in groupEntries) ...[
+                            SliverToBoxAdapter(
+                              child: SizedBox(
+                                height: headerHeight,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: inset,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${group.key == widget.conversationId ? l.browserTabsCurrentConversation : widget.conversationTitle?.call(group.key) ?? (group.key == null ? l.browserTabsUnassigned : l.browserTabsUnknownConversation)} · ${group.value.length}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.3,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(
+                                inset,
+                                0,
+                                inset,
+                                22,
+                              ),
+                              sliver: SliverGrid(
+                                gridDelegate: delegate,
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) => card(group.value[index]),
+                                  childCount: group.value.length,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (showNewCard)
+                            SliverPadding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: inset,
+                              ),
+                              sliver: SliverGrid(
+                                gridDelegate: delegate,
+                                delegate: SliverChildListDelegate.fixed([
+                                  _NewTabCard(onNew: widget.onNew),
+                                ]),
+                              ),
+                            ),
+                          SliverToBoxAdapter(
+                            child: SizedBox(height: padding.bottom),
+                          ),
+                        ],
+                      )
+                    : GridView.builder(
+                        key: const ValueKey('browserTabGrid'),
+                        controller: widget.scrollController ?? _gridController,
+                        padding: padding,
+                        gridDelegate: delegate,
+                        itemCount: tabs.length + (showNewCard ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == tabs.length) {
+                            return _NewTabCard(onNew: widget.onNew);
+                          }
+                          return card(tabs[index]);
+                        },
                       ),
-                      itemCount: tabs.length + (showNewCard ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == tabs.length) {
-                          return _NewTabCard(onNew: widget.onNew);
-                        }
-                        final tab = tabs[index];
-                        return _TabCard(
-                          key: ValueKey('browserTabCard-${tab.id}'),
-                          tab: tab,
-                          desktop: desktop,
-                          active: tab.id == widget.service.activeTabId,
-                          service: widget.service,
-                          bytes: _previewForTab(tab.id),
-                          raster: widget.transition?.startPageSnapshotFor(tab),
-                          previewKey: widget.transition?.previewKeyFor(tab.id),
-                          onSelect: () => widget.onSelect(tab.id),
-                          onClose: () => widget.onClose(tab.id),
-                        );
-                      },
-                    ),
-                  );
+              );
               if (desktop) {
                 return Column(
                   children: [
@@ -366,9 +508,21 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
                       child: Align(
                         alignment: Alignment.centerRight,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 280),
-                          child: _searchField(context),
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 16,
+                          runSpacing: 12,
+                          children: [
+                            if (widget.conversationId != null)
+                              SizedBox(
+                                width: math.min(300, constraints.maxWidth - 40),
+                                child: _scopeSelector(context),
+                              ),
+                            SizedBox(
+                              width: math.min(280, constraints.maxWidth - 40),
+                              child: _searchField(context),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -386,6 +540,23 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                   // The viewport itself covers both safe areas. Insets only position
                   // the initial/final cards, so scrolling passes beneath the edges.
                   Positioned.fill(child: grid(gridPadding)),
+                  if (tabs.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          _query.isNotEmpty
+                              ? l.browserTabsNoResults
+                              : l.browserTabsEmptyConversation,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned(
                     top: 0,
                     left: 0,
@@ -416,10 +587,26 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                     top: safe.top + 12,
                     left: 20,
                     right: 20,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: _mobileSearch(context),
-                    ),
+                    child: widget.conversationId == null
+                        ? Align(
+                            alignment: Alignment.centerRight,
+                            child: _mobileSearch(context),
+                          )
+                        : _searchExpanded
+                        ? Column(
+                            children: [
+                              _scopeSelector(context),
+                              const SizedBox(height: 8),
+                              _mobileSearch(context),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(child: _scopeSelector(context)),
+                              const SizedBox(width: 10),
+                              _mobileSearch(context),
+                            ],
+                          ),
                   ),
                   Positioned(
                     left: 20,
@@ -448,9 +635,7 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                                   vertical: 15,
                                 ),
                                 child: Text(
-                                  l.browserTabsCount(
-                                    widget.service.tabs.length,
-                                  ),
+                                  l.browserTabsCount(scopedTabs.length),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(

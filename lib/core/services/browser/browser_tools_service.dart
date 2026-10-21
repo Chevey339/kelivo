@@ -45,7 +45,11 @@ class BrowserToolsService {
       'description':
           'Control the visible in-app browser, using its login state. The user '
           'must enable browser control for this assistant and in browser settings. '
-          'Tabs are scoped to this conversation. Open a tab, snapshot to discover '
+          'Tabs are scoped to this conversation; list_tabs lists only this '
+          'conversation, not every tab in the app. New conversations start with '
+          'no tabs. Reuse your existing tabs with open and tab_id; at '
+          '${BrowserService.maxAgentTabsPerSession} tabs you must reuse or '
+          'close one before creating another. Open a tab, snapshot to discover '
           'visible elements, act by ref, then snapshot again after each change. '
           'Snapshots include up to 4000 characters of page text by default. '
           'Confirm action results from snapshot text or extract; unchanged '
@@ -293,16 +297,17 @@ class BrowserToolsService {
   ) async {
     ToolCallCancellation.current?.throwIfCancelled();
     if (action == 'list_tabs') {
+      final activeId = browser.selectedTabForSession(sessionId)?.id;
       return _result(sessionId, action, {
+        'scope': 'conversation',
         'tabs': [
-          for (final tab in browser.tabs)
-            if (tab.ownerSessionId == sessionId)
-              {
-                'tab_id': tab.id,
-                'url': tab.url,
-                'title': tab.title,
-                'active': browser.activeTabId == tab.id,
-              },
+          for (final tab in browser.tabsForSession(sessionId))
+            {
+              'tab_id': tab.id,
+              'url': tab.url,
+              'title': tab.title,
+              'active': activeId == tab.id,
+            },
         ],
       });
     }
@@ -310,7 +315,7 @@ class BrowserToolsService {
     if (action == 'new_tab' ||
         ((action == 'open' || action == 'render') &&
             args['tab_id'] == null &&
-            !browser.tabs.any((tab) => tab.ownerSessionId == sessionId))) {
+            browser.tabsForSession(sessionId).isEmpty)) {
       tabId = (await browser.createTab(ownerSessionId: sessionId)).id;
     } else {
       tabId = browser.requireAgentTab(sessionId, args['tab_id'] as String?).id;

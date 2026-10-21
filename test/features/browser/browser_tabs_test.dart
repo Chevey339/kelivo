@@ -405,6 +405,52 @@ void main() {
     },
   );
 
+  for (final (desktop, size, scale) in [
+    (false, const Size(390, 844), 1.0),
+    (true, const Size(1200, 800), 1.0),
+    (false, const Size(320, 844), 3.0),
+  ]) {
+    testWidgets('scope selector keeps chat tabs separate at $size / $scale', (
+      tester,
+    ) async {
+      final service = _PreviewService(owners: {'a': 'chat-a', 'b': 'chat-b'});
+      await service.initialize();
+      try {
+        await mount(
+          tester,
+          BrowserTabOverview(
+            service: service,
+            conversationId: 'chat-a',
+            conversationTitle: (id) => id == 'chat-b' ? 'Research' : 'Writing',
+            onSelect: (_) {},
+            onClose: (_) {},
+            onNew: () {},
+          ),
+          desktop: desktop,
+          size: size,
+          scale: scale,
+        );
+        expect(find.byKey(const ValueKey('browserTabCard-a')), findsOneWidget);
+        expect(find.byKey(const ValueKey('browserTabCard-b')), findsNothing);
+        await tester.tap(find.text('All tabs'));
+        await tester.pumpAndSettle();
+        expect(find.text('This chat · 1'), findsOneWidget);
+        expect(find.byKey(const ValueKey('browserTabCard-b')), findsOneWidget);
+        expect(find.text('Research · 1'), findsOneWidget);
+        expect(service.liveViewCount, 0);
+        await tester.tap(find.text('This chat'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('browserTabCard-b')), findsNothing);
+        expect(service.captures, ['a']);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        service.dispose();
+        await tester.pumpAndSettle();
+      }
+    });
+  }
+
   testWidgets(
     'management shell is a full route and Back returns to its caller',
     (tester) async {
@@ -442,8 +488,11 @@ void main() {
 }
 
 class _PreviewService extends BrowserService {
-  _PreviewService({int tabCount = 2})
-    : super(store: _MemoryStore(tabCount: tabCount), supported: true);
+  _PreviewService({int tabCount = 2, Map<String, String> owners = const {}})
+    : super(
+        store: _MemoryStore(tabCount: tabCount, owners: owners),
+        supported: true,
+      );
   final captures = <String>[];
   final _bytes = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1UAAAAASUVORK5CYII=',
@@ -461,14 +510,25 @@ class _PreviewService extends BrowserService {
 }
 
 class _MemoryStore extends BrowserStore {
-  _MemoryStore({this.tabCount = 2});
+  _MemoryStore({this.tabCount = 2, this.owners = const {}});
   final int tabCount;
+  final Map<String, String> owners;
   @override
   Future<Map<String, dynamic>> read() async => {
     'activeTabId': 'a',
     'tabs': [
-      {'id': 'a', 'url': 'https://first.example', 'title': 'First page'},
-      {'id': 'b', 'url': 'https://second.example', 'title': 'Second page'},
+      {
+        'id': 'a',
+        'url': 'https://first.example',
+        'title': 'First page',
+        'ownerSessionId': owners['a'],
+      },
+      {
+        'id': 'b',
+        'url': 'https://second.example',
+        'title': 'Second page',
+        'ownerSessionId': owners['b'],
+      },
       for (var index = 2; index < tabCount; index++)
         {
           'id': String.fromCharCode(97 + index),
