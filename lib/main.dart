@@ -202,6 +202,7 @@ Future<void> main() async {
         }
       }
       final RestoreReceipt? restoreOutcome;
+      final restoreDiagnostics = RestoreStartupDiagnostics();
       RestoreBusinessLease? businessLease;
       // A restore large enough to take seconds would otherwise spend all of
       // them before the first frame, which is indistinguishable from a hang.
@@ -226,6 +227,7 @@ Future<void> main() async {
             await RestoreStartupGate.recoverAndRequireBusinessReady(
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
+              diagnostics: restoreDiagnostics,
               onStage: restoreStage == null
                   ? null
                   : (stage) => restoreStage.value = stage,
@@ -240,6 +242,7 @@ Future<void> main() async {
               error: error,
               step: 'recover_and_require_business_ready',
               stackTrace: stackTrace,
+              restoreDetails: restoreDiagnostics.details,
             ),
             appDataDirectory: appDataDirectory,
             businessLease: businessLease,
