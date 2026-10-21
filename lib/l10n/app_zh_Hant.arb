@@ -585,10 +585,10 @@
   "startupRecoveryBusy": "處理中…",
   "startupRecoveryExportSucceeded": "已儲存一份資料副本。",
   "startupRecoveryExportFailed": "無法匯出資料副本。",
-  "startupRecoveryRepairFailed": "修復未能解決問題。請先匯出資料副本，然後重設。",
+  "startupRecoveryRepairFailed": "修復未能完成。資料已保留，可選擇通過驗證的副本還原，或匯出資料進一步檢查。",
   "startupRecoveryResetFailed": "重設失敗。請完全關閉 Kelivo 後再重新開啟。",
   "startupRecoveryResetDialogTitle": "重設全部資料？",
-  "startupRecoveryResetDialogContent": "這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。",
+  "startupRecoveryResetDialogContent": "開始使用新的空資料庫？目前資料庫及其日誌檔案、既有副本都會保留，以供日後還原。",
   "startupRecoveryResetDialogConfirm": "重設並重新啟動",
   "startupRecoveryResetDialogCancel": "取消",
   "startupRecoveryWhatFailed": "失敗原因",
@@ -621,8 +621,8 @@
   "startupRecoveryIntegrityMissing": "資料目錄中找不到資料庫檔案。",
   "startupRecoveryIntegrityFailed": "完整性檢查無法執行。",
   "startupRecoveryDangerZone": "危險操作",
-  "startupRecoveryDangerBody": "重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。",
-  "startupRecoveryResetAcknowledge": "我已匯出副本，或不需要這些資料。",
+  "startupRecoveryDangerBody": "重新開始後，目前資料將不再顯示。Kelivo 會保留舊資料庫與既有副本以供還原，建議先匯出一份資料副本。",
+  "startupRecoveryResetAcknowledge": "我確認開始使用新的空資料庫。",
   "startupDatabaseUpdateRequiredTitle": "請更新 Kelivo 以繼續",
   "startupDatabaseUpdateRequiredContent": "本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。",
   "startupDatabaseUpdateRequiredDowngradeTitle": "若要改用舊版",
@@ -4603,5 +4603,39 @@
   "markdownCautionLabel": "注意",
   "markdownDangerLabel": "危險",
   "markdownCopyRichTextAction": "複製富文字",
-  "markdownCopySelectionFailed": "複製所選內容失敗。"
+  "markdownCopySelectionFailed": "複製所選內容失敗。",
+  "recoveryMissingDataTitle": "偵測到既有資料",
+  "recoveryMissingDataBody": "目前資料庫遺失，但裝置上仍有舊資料。Kelivo 已暫停啟動，沒有建立空資料庫，並保留現有檔案與副本。",
+  "recoveryEmptyDataTitle": "目前聊天記錄為空",
+  "recoveryEmptyDataBody": "目前資料庫沒有對話，但發現了歷史副本。Kelivo 已暫停啟動，你可以還原副本，也可以明確選擇保留目前資料。應用程式不會自動覆寫資料。",
+  "recoveryKeepCurrent": "保留目前資料並繼續",
+  "recoveryKeepCurrentConfirm": "繼續使用目前的空資料庫？歷史副本仍會保留，可稍後還原。",
+  "recoverySearchingCopies": "正在尋找並驗證本機資料副本…",
+  "recoveryFoundCopies": "找到 {count} 份通過驗證的副本。可選擇還原聊天與設定，原始檔案會保留。",
+  "@recoveryFoundCopies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryInvalidCopy": "{name}：驗證未通過，原始檔案已保留。",
+  "@recoveryInvalidCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverySearchFailed": "部分資料位置無法讀取。現有檔案已保留，請先匯出資料副本再嘗試其他還原操作。",
+  "recoveryDiscoveredCopyBody": "在原儲存目錄或其他位置發現的副本。原始檔案會保留，還原前會進行完整驗證。",
+  "recoveryStorageFailureTitle": "資料儲存需要檢查",
+  "recoveryStorageFailureBody": "Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。",
+  "recoveryProtectingTitle": "正在保護資料",
+  "recoveryProtectingData": "正在將資料複製到受保護的位置並驗證。原始檔案與快照會保留，資料較多時需要一些時間。",
+  "recoveryStorageReadyTitle": "資料已轉存至受保護的位置",
+  "recoveryStorageReadyBody": "Kelivo 的內部資料現已與系統「檔案」App 分開存放，Documents 中的原資料與快照均已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。",
+  "recoveryRetainedData": "保留的原資料",
+  "recoveryNoValidCopies": "找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。",
+  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料的同時建立經過驗證的受保護副本。原始檔案與快照均未更動，請釋放一些空間後重試。"
 }

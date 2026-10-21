@@ -2,6 +2,7 @@ import 'package:sqlite3/sqlite3.dart' as composer_sqlite;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../database/database_family_preserver.dart';
 
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
@@ -97,6 +98,7 @@ typedef _VersionedBackupInfo = ({
   BackupScope scope,
   Map<String, Object?>? businessEntityRowIds,
   String normalizedManifestSha256,
+  ChatDatabaseSnapshotInfo? databaseInfo,
 });
 
 /// Recompute [ImagePart]/[FilePart.unavailable] against the live filesystem.
@@ -395,7 +397,7 @@ class DataSync {
             ),
             onProgress: onProgress,
           );
-      if (!info.includeChats) {
+      if (!info.includeChats || info.databaseInfo == null) {
         throw const FormatException('restore_preparation_database_required');
       }
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
@@ -439,6 +441,52 @@ class DataSync {
       } finally {
         await ownedLease?.close();
       }
+    }
+  }
+
+  /// Full validation on a temporary extraction. Never opens a source database
+  /// or rewrites the retained archive / its sidecar metadata.
+  static Future<ChatDatabaseSnapshotInfo> inspectRecoverySnapshot(
+    File snapshot,
+  ) async {
+    final extracted = await Directory.systemTemp.createTemp(
+      'kelivo-recovery-check-',
+    );
+    registerLiveTempPath(extracted.path);
+    Object? failure;
+    try {
+      await runBackupIsolate<void, _BackupExtractArgs>(
+        body: _extractZipInIsolate,
+        payload: _BackupExtractArgs(
+          zipPath: snapshot.path,
+          extractDirPath: extracted.path,
+        ),
+      );
+      final info =
+          await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
+            body: _preflightVersionedBackupInIsolate,
+            payload: _BackupPreflightArgs(
+              manifestPath: p.join(extracted.path, _manifestEntryName),
+              extractDirPath: extracted.path,
+              allowUnverifiedForwardCompatible: false,
+            ),
+          );
+      if (!info.includeChats) {
+        throw const FormatException('restore_preparation_database_required');
+      }
+      final settings = await runBackupIsolate<Map<String, dynamic>, String>(
+        body: _readSettingsJsonInIsolate,
+        payload: p.join(extracted.path, 'settings.json'),
+      );
+      BackupSettingsValidator.normalizeAndValidate(settings);
+      // Preflight already validated the database on its worker isolate. Reuse
+      // those verified counts instead of blocking the UI with a second pass.
+      return info.databaseInfo!;
+    } catch (error) {
+      failure = error;
+      rethrow;
+    } finally {
+      await deleteTempDirectoryWhenIsolateSafe(extracted, error: failure);
     }
   }
 
@@ -577,6 +625,7 @@ class DataSync {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async => (await _prepareBackupArchive(
+    chatService: chatService,
     includeChats: cfg.scope.includes(BackupCategory.chats),
     includeFiles: cfg.scope.assetRoots.isNotEmpty,
     scope: cfg.scope,
@@ -600,6 +649,7 @@ class DataSync {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) => _prepareBackupArchive(
+    chatService: chatService,
     includeChats: true,
     includeFiles: false,
     exportSettings: _exportBusinessSettings,
@@ -618,7 +668,8 @@ class DataSync {
   /// Split out of [prepareBackupFile] so a database that is not the live one
   /// -- a copy set aside by crash recovery -- can be turned into an ordinary
   /// backup rather than needing a restore path of its own.
-  Future<PreparedBackupArchive> _prepareBackupArchive({
+  static Future<PreparedBackupArchive> _prepareBackupArchive({
+    ChatService? chatService,
     required bool includeChats,
     required bool includeFiles,
     BackupScope scope = const BackupScope(),
@@ -681,7 +732,7 @@ class DataSync {
       }
 
       if (!includeChats && includeFiles) {
-        final store = chatService.composerDrafts;
+        final store = chatService?.composerDrafts;
         publishedDraftFiles = store != null
             ? await store.publishedFiles()
             : _publishedDraftFilesFrom(
@@ -793,7 +844,20 @@ class DataSync {
     bool allowForwardCompatible = false,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+  }) => prepareRecoveryDatabaseArchive(
+    sourceDatabase,
+    allowForwardCompatible: allowForwardCompatible,
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  );
+
+  static Future<File> prepareRecoveryDatabaseArchive(
+    File sourceDatabase, {
+    bool allowForwardCompatible = false,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
+    await DatabaseFamilyPreserver.validateSource(sourceDatabase);
     if (!await sourceDatabase.exists()) {
       throw FileSystemException(
         'Database copy does not exist',
@@ -2083,7 +2147,7 @@ class DataSync {
   }
 
   /// Ensures the temporary directory exists (some macOS installs may not create the cache folder until first use).
-  Future<Directory> _ensureTempDir() async {
+  static Future<Directory> _ensureTempDir() async {
     Directory dir = await getTemporaryDirectory();
     if (!await dir.exists()) {
       try {
@@ -2096,7 +2160,7 @@ class DataSync {
     return dir;
   }
 
-  Future<File> _writeTempText(
+  static Future<File> _writeTempText(
     Directory directory,
     String name,
     String content,
@@ -2300,6 +2364,7 @@ class DataSync {
       ),
     );
 
+    ChatDatabaseSnapshotInfo? validatedDatabase;
     final rawDatabase = manifest['database'];
     if (payloadKind == 'sqlite') {
       if (!includeChats ||
@@ -2354,6 +2419,7 @@ class DataSync {
                 verdict == BackupSchemaVerdict.forwardCompatible ||
                 verdict == BackupSchemaVerdict.forwardUndeclared,
           );
+      validatedDatabase = databaseInfo;
       // The manifest records the schema the backup was AUTHORED at; the info
       // records the schema after prepareSnapshotForRestore migrated it, so the
       // two legitimately differ for an older backup. Row counts are the
@@ -2405,6 +2471,7 @@ class DataSync {
       scope: scope,
       businessEntityRowIds: businessEntityRowIds,
       normalizedManifestSha256: normalizedManifestSha256,
+      databaseInfo: validatedDatabase,
     );
   }
 

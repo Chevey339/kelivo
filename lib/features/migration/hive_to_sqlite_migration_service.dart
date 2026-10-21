@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:uuid/uuid.dart';
+import '../../core/database/database_family_preserver.dart';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -245,7 +247,8 @@ class HiveToSqliteMigrationService {
     // connection refuses any schema that is not already current.
     if (sqliteFile.existsSync() &&
         HiveMigrationMarker.requireMigrationComplete(sqliteFile)) {
-      await _deleteSqliteFamilyStatic(File('${sqliteFile.path}.previous'));
+      // Startup admission still needs to inspect retained copies if the live
+      // database is unexpectedly empty. Do not erase that evidence here.
       return HiveToSqliteMigrationDecision(
         needsMigration: false,
         appDataDir: appDataDir,
@@ -1084,21 +1087,33 @@ class HiveToSqliteMigrationService {
       final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
       try {
         if (await lockFile.exists()) {
-          await lockFile.rename('${lockFile.path}.retired');
+          await _retainLegacyFile(lockFile);
         }
       } catch (error) {
         // Lock files are advisory; leaving one behind must not block the skip.
         _logLine('skip-migration lock rename: $error');
       }
       if (await hiveFile.exists()) {
-        await hiveFile.rename('${hiveFile.path}.retired');
+        await _retainLegacyFile(hiveFile);
       }
     }
     // A failed attempt can leave the temporary database family behind.
     await _deleteSqliteFamily(File('${decision.sqliteFile.path}.migrating'));
-    await _deleteSqliteFamily(File('${decision.sqliteFile.path}.previous'));
+    await DatabaseFamilyPreserver.preserve(
+      File('${decision.sqliteFile.path}.previous'),
+      durability: _durability,
+    );
     await _clearAttemptState();
     _logLine('skip-migration: legacy hive files retired');
+  }
+
+  Future<void> _retainLegacyFile(File file) async {
+    var destination = '${file.path}.retired';
+    if (await FileSystemEntity.type(destination, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      destination = '$destination-${const Uuid().v4()}';
+    }
+    await _durability.renameAndSync(source: file, targetPath: destination);
   }
 
   Future<void> dispose() async {
@@ -1708,8 +1723,10 @@ class HiveToSqliteMigrationService {
       if (liveType != FileSystemEntityType.file) {
         throw StateError('migration_publish_missing_temp');
       }
-      await _deleteDatabaseSidecars(sqliteFile);
-      await _deleteSqliteFamily(asideFile);
+      await DatabaseFamilyPreserver.preserve(
+        asideFile,
+        durability: _durability,
+      );
       return;
     }
     if (tempType != FileSystemEntityType.file) {
@@ -1720,14 +1737,8 @@ class HiveToSqliteMigrationService {
     if (liveType == FileSystemEntityType.directory) {
       throw StateError('migration_publish_live_not_file');
     }
-    if (liveType == FileSystemEntityType.file) {
-      await _deleteDatabaseSidecars(sqliteFile);
-      await _deleteSqliteFamily(asideFile);
-      await _durability.renameAndSync(
-        source: sqliteFile,
-        targetPath: asideFile.path,
-      );
-    }
+    await DatabaseFamilyPreserver.preserve(asideFile, durability: _durability);
+    await DatabaseFamilyPreserver.preserve(sqliteFile, durability: _durability);
 
     final liveAfterAside = await FileSystemEntity.type(
       sqliteFile.path,
@@ -1746,7 +1757,6 @@ class HiveToSqliteMigrationService {
       Directory(p.dirname(sqliteFile.path)),
       fullBarrier: true,
     );
-    await _deleteSqliteFamily(asideFile);
   }
 
   Future<void> _requireNoDatabaseSidecars(File databaseFile) async {

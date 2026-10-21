@@ -577,7 +577,7 @@ void main() {
             isA<StateError>().having(
               (e) => e.message,
               'message',
-              'database_missing',
+              'database_missing_with_prior_data',
             ),
           ),
         );
@@ -617,11 +617,20 @@ void main() {
         }
         expect(await asset.readAsString(), 'keep attachment');
         expect(await _fileSha256(snapshot), originalHash);
-        final preservedWal = root.listSync().whereType<File>().singleWhere(
-          (file) =>
-              file.path.contains('.displaced-') && file.path.endsWith('-wal'),
+        final preserved = root.listSync().whereType<Directory>().singleWhere(
+          (directory) =>
+              p.basename(directory.path).startsWith('kelivo.db.displaced-'),
         );
-        expect(await preservedWal.readAsString(), 'orphan WAL evidence');
+        expect(
+          await File(p.join(preserved.path, 'kelivo.db-wal')).readAsString(),
+          'orphan WAL evidence',
+        );
+        expect(
+          await File(
+            p.join(preserved.path, 'original-kelivo.db-wal'),
+          ).readAsString(),
+          'orphan WAL evidence',
+        );
       },
     );
 
@@ -4523,6 +4532,9 @@ void main() {
     );
 
     test('chat-only overwrite preserves live uploaded files', () async {
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
       final uploadDir = Directory('${root.path}/upload');
       await uploadDir.create(recursive: true);
       final uploadFile = File('${uploadDir.path}/preserved.txt');
@@ -4542,9 +4554,6 @@ void main() {
       encoder.addFileSync(chatsFile, 'chats.json');
       encoder.closeSync();
 
-      final chatService = ChatService();
-      await chatService.init();
-      addTearDown(chatService.close);
       final sync = DataSync(
         businessRepository: businessRepository,
         chatService: chatService,

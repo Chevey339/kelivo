@@ -1249,7 +1249,7 @@ void main() {
 
       final token = BackupCancelToken();
       addTearDown(token.dispose);
-      final started = DateTime.now();
+      final cancellation = Stopwatch();
 
       await expectLater(
         RestoreBundleStaging.create(
@@ -1261,16 +1261,17 @@ void main() {
           cancelToken: token,
           onProgress: (progress) {
             if (progress.detail == 'candidate-revalidate') {
+              cancellation.start();
               token.cancel();
             }
           },
         ),
         throwsA(isA<BackupCancelledException>()),
       );
-      expect(
-        DateTime.now().difference(started) < const Duration(seconds: 2),
-        isTrue,
-      );
+      // Measure cancellation latency, not the unrelated database/file
+      // preparation that happens before the cancellation is requested.
+      expect(cancellation.isRunning, isTrue);
+      expect(cancellation.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
     test(

@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -1587,6 +1588,76 @@ void main() {
     },
   );
 
+  test(
+    'migration skip and replacement retain previous database family and journals',
+    () async {
+      final live = File('${tempDir.path}/kelivo.db')
+        ..writeAsStringSync('current database');
+      final aside = File('${live.path}.previous')
+        ..writeAsStringSync('previous database');
+      await File('${aside.path}-wal').writeAsString('previous WAL');
+      await File('${live.path}-wal').writeAsString('current WAL');
+      final temp = File('${live.path}.migrating')
+        ..writeAsStringSync('new validated database');
+      final legacy = File('${tempDir.path}/conversations.hive');
+      await legacy.writeAsString('current legacy');
+      await File(
+        '${legacy.path}.retired',
+      ).writeAsString('earlier retained legacy');
+      final service = HiveToSqliteMigrationService(
+        HiveToSqliteMigrationDecision(
+          needsMigration: true,
+          appDataDir: tempDir,
+          sqliteFile: live,
+          hiveFiles: [legacy],
+        ),
+      );
+      addTearDown(service.dispose);
+      await service.skipMigrationAndStartFresh();
+      expect(
+        await File('${legacy.path}.retired').readAsString(),
+        'earlier retained legacy',
+      );
+      final retired = await tempDir
+          .list()
+          .where(
+            (file) =>
+                file is File && file.path.startsWith('${legacy.path}.retired-'),
+          )
+          .cast<File>()
+          .toList();
+      expect(await retired.single.readAsString(), 'current legacy');
+      // skip only discards its owned temporary candidate.
+      final copiesAfterSkip =
+          await DatabaseInstallationGate.listDisplacedDatabases(
+            appDataDirectory: tempDir,
+          );
+      expect(
+        await copiesAfterSkip.single.file.readAsString(),
+        'previous database',
+      );
+      expect(
+        await File('${copiesAfterSkip.single.file.path}-wal').readAsString(),
+        'previous WAL',
+      );
+      await temp.writeAsString('new validated database');
+      await service.replaceSqliteForTest(temp, live);
+      expect(await live.readAsString(), 'new validated database');
+      final copies = await DatabaseInstallationGate.listDisplacedDatabases(
+        appDataDirectory: tempDir,
+      );
+      expect(
+        await Future.wait(copies.map((copy) => copy.file.readAsString())),
+        containsAll(['previous database', 'current database']),
+      );
+      expect(
+        await Future.wait(
+          copies.map((copy) => File('${copy.file.path}-wal').readAsString()),
+        ),
+        containsAll(['previous WAL', 'current WAL']),
+      );
+    },
+  );
   test('replaceSqlite recovers after rename-aside before move-in', () async {
     final live = File('${tempDir.path}/kelivo.db');
     final temp = File('${tempDir.path}/kelivo.db.migrating')
@@ -1945,6 +2016,21 @@ void main() {
         expect(decision.hiveFiles, isNotEmpty);
       });
     }
+
+    test('keeps previous database and WAL for the recovery check', () async {
+      await seedMigratedDatabaseAt(AppDatabase.currentSchemaVersion);
+      final previous = File('${tempDir.path}/kelivo.db.previous');
+      final wal = File('${previous.path}-wal');
+      await previous.writeAsString('retained original database');
+      await wal.writeAsString('retained committed transactions');
+
+      expect(
+        (await HiveToSqliteMigrationService.check()).needsMigration,
+        isFalse,
+      );
+      expect(await previous.readAsString(), 'retained original database');
+      expect(await wal.readAsString(), 'retained committed transactions');
+    });
 
     test('still asks to migrate when the receipt is absent', () async {
       await _seedHiveChat(

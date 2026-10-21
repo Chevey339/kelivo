@@ -2,30 +2,54 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 /// Platform-specific application data directory utilities.
 ///
 /// - Windows/macOS/Linux: use the Application Support (app data) directory
 ///   provided by `path_provider`.
-/// - Android/iOS: keep using the Application Documents directory.
+/// - iOS: private Application Support storage; Documents is retained.
+/// - Android: Application Documents directory.
 class AppDirectories {
   AppDirectories._();
 
   /// Gets the root directory for application data storage.
   ///
   /// - Windows/macOS/Linux: Application Support directory
-  /// - Android/iOS: Application Documents directory
+  /// - iOS: private Application Support storage
+  /// - Android: Application Documents directory
   static Future<Directory> getAppDataDirectory() async {
     switch (defaultTargetPlatform) {
       case TargetPlatform.windows:
       case TargetPlatform.macOS:
       case TargetPlatform.linux:
         return await getApplicationSupportDirectory();
-      case TargetPlatform.android:
       case TargetPlatform.iOS:
+        return Directory(
+          p.join(
+            (await getApplicationSupportDirectory()).path,
+            privateDataDirectoryName,
+          ),
+        );
+      case TargetPlatform.android:
       case TargetPlatform.fuchsia:
         return await getApplicationDocumentsDirectory();
     }
+  }
+
+  static const privateDataDirectoryName = 'kelivo-data';
+
+  /// Original iOS Documents is kept intact after private storage activation.
+  static Future<Directory?> retainedDataDirectory(Directory active) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return null;
+    final support = await getApplicationSupportDirectory();
+    if (!p.equals(
+      active.path,
+      p.join(support.path, privateDataDirectoryName),
+    )) {
+      return null;
+    }
+    return getApplicationDocumentsDirectory();
   }
 
   /// Gets the directory for uploaded files.

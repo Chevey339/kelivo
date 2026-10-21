@@ -21,6 +21,7 @@ import '../../utils/kelivo_file_uri.dart';
 import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
+import 'empty_database_recovery_guard.dart';
 import 'message_timeline_index.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
@@ -4263,7 +4264,15 @@ class ChatDatabaseRepository {
     _messageSearchFtsReady = true;
   }
 
+  Future<void> _invalidateEmptyAcknowledgement() async {
+    final file = _databaseFile;
+    if (file != null) {
+      await EmptyDatabaseRecoveryGuard.invalidate(file.parent);
+    }
+  }
+
   Future<void> putConversation(Conversation conversation) async {
+    await _invalidateEmptyAcknowledgement();
     await _db.transaction(() async {
       // Existing rows keep the database-owned hash written by prompt freeze;
       // cached Conversation instances may still hold an older value.
@@ -4855,7 +4864,7 @@ class ChatDatabaseRepository {
     required bool selectVersion,
     required bool touchUpdatedAt,
     String? afterGroupId,
-  }) {
+  }) async {
     if (message.conversationId != conversation.id) {
       throw ArgumentError.value(
         message.conversationId,
@@ -4863,6 +4872,7 @@ class ChatDatabaseRepository {
         'Message and conversation IDs must match.',
       );
     }
+    await _invalidateEmptyAcknowledgement();
     return _db.transaction(() async {
       final existingRow = await (_db.select(
         _db.conversationRows,
@@ -5284,6 +5294,7 @@ class ChatDatabaseRepository {
   }
 
   Future<BackupMergeReport> mergeBackupSnapshot(File snapshotFile) async {
+    await _invalidateEmptyAcknowledgement();
     if (!await snapshotFile.exists()) {
       throw FileSystemException(
         'Snapshot database does not exist',
@@ -5976,6 +5987,9 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
+    if (conversations.isNotEmpty) {
+      await _invalidateEmptyAcknowledgement();
+    }
     await _db.batch((batch) {
       for (final conversation in conversations) {
         batch.insert(

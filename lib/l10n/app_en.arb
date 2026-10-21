@@ -717,10 +717,10 @@
   "startupRecoveryBusy": "Working…",
   "startupRecoveryExportSucceeded": "A copy of your data was saved.",
   "startupRecoveryExportFailed": "Could not export a copy of your data.",
-  "startupRecoveryRepairFailed": "Repair could not fix this. Export a copy of your data, then reset.",
+  "startupRecoveryRepairFailed": "Repair could not complete. Your data is preserved; choose a validated copy or export your data for further diagnosis.",
   "startupRecoveryResetFailed": "Reset failed. Fully close Kelivo, then open it again.",
   "startupRecoveryResetDialogTitle": "Reset all data?",
-  "startupRecoveryResetDialogContent": "This permanently deletes Kelivo's database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.",
+  "startupRecoveryResetDialogContent": "Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.",
   "startupRecoveryResetDialogConfirm": "Reset and restart",
   "startupRecoveryResetDialogCancel": "Cancel",
   "startupRecoveryWhatFailed": "What failed",
@@ -791,8 +791,8 @@
   "startupRecoveryIntegrityMissing": "No database file was found in the data folder.",
   "startupRecoveryIntegrityFailed": "The integrity check could not run.",
   "startupRecoveryDangerZone": "Danger zone",
-  "startupRecoveryDangerBody": "Resetting permanently deletes Kelivo's database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.",
-  "startupRecoveryResetAcknowledge": "I exported a copy, or I do not need this data.",
+  "startupRecoveryDangerBody": "A fresh start removes the current data from view. Kelivo will preserve the old database and existing copies for recovery. Export a data copy first if possible.",
+  "startupRecoveryResetAcknowledge": "I want to start with a new empty database.",
   "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
   "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
   "startupDatabaseUpdateRequiredDowngradeTitle": "If you need an older version",
@@ -5797,5 +5797,39 @@
   "markdownCautionLabel": "Caution",
   "markdownDangerLabel": "Danger",
   "markdownCopyRichTextAction": "Copy rich text",
-  "markdownCopySelectionFailed": "Could not copy the selected text."
+  "markdownCopySelectionFailed": "Could not copy the selected text.",
+  "recoveryMissingDataTitle": "Previous data detected",
+  "recoveryMissingDataBody": "The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.",
+  "recoveryEmptyDataTitle": "Current chat history is empty",
+  "recoveryEmptyDataBody": "The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.",
+  "recoveryKeepCurrent": "Keep current data and continue",
+  "recoveryKeepCurrentConfirm": "Continue with the current empty database? Previous copies will remain available for recovery later.",
+  "recoverySearchingCopies": "Finding and validating local data copies…",
+  "recoveryFoundCopies": "Found {count} validated copies. Choose one to recover your chats and settings. The original files will be kept.",
+  "@recoveryFoundCopies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryInvalidCopy": "{name}: validation failed. The original file has been kept.",
+  "@recoveryInvalidCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverySearchFailed": "Some data locations could not be read. Your files have been kept; export a data copy before trying other recovery actions.",
+  "recoveryDiscoveredCopyBody": "Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.",
+  "recoveryStorageFailureTitle": "Data storage needs attention",
+  "recoveryStorageFailureBody": "Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.",
+  "recoveryProtectingTitle": "Protecting your data",
+  "recoveryProtectingData": "Copying and verifying your data in protected storage. Original files and snapshots will be kept. This can take a while for large histories.",
+  "recoveryStorageReadyTitle": "Data storage is now protected",
+  "recoveryStorageReadyBody": "Kelivo now keeps its internal data away from the Files app. The original data and snapshots in Documents have been retained. If older chats are missing, open Settings → Backup → Local Copies to review recovery copies.",
+  "recoveryRetainedData": "Retained original data",
+  "recoveryNoValidCopies": "Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.",
+  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original data and create a verified protected copy. Your original files and snapshots are unchanged. Free some space, then retry."
 }

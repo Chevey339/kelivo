@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/core/database/private_data_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
@@ -40,6 +42,63 @@ void main() {
     expect(find.text('business ready'), findsOneWidget);
   });
 
+  testWidgets(
+    'explains protected storage and retains the notice until acknowledged',
+    (tester) async {
+      final directory = (await tester.runAsync(() async {
+        final root = await Directory.systemTemp.createTemp(
+          'kelivo-storage-notice-',
+        );
+        await File(
+          '${root.path}/${PrivateDataStorage.noticeName}',
+        ).writeAsString('pending');
+        return root;
+      }))!;
+      addTearDown(() async => directory.delete(recursive: true));
+      final notice = File('${directory.path}/${PrivateDataStorage.noticeName}');
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: RestoreOutcomeNotice(
+            outcome: null,
+            dataDirectory: directory,
+            child: const Scaffold(body: Text('business ready')),
+          ),
+        ),
+      );
+      for (
+        var i = 0;
+        i < 100 &&
+            find.text('Data storage is now protected').evaluate().isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      }
+      expect(find.text('Data storage is now protected'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'original data and snapshots in Documents have been retained',
+        ),
+        findsOneWidget,
+      );
+      expect(await tester.runAsync(() => notice.exists()), isTrue);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 100 && notice.existsSync(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      }
+      expect(notice.existsSync(), isFalse);
+    },
+  );
   testWidgets('does not interrupt a committed startup', (tester) async {
     await tester.pumpWidget(_testApp(RestoreReceiptState.committed));
     await tester.pumpAndSettle();

@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../database/database_family_preserver.dart';
 
 import 'package:path/path.dart' as p;
 
@@ -17,6 +18,7 @@ import 'restore_workspace_lock.dart';
 /// nothing is indistinguishable from a hang. These are what a pre-business
 /// progress screen can show without touching any business data.
 enum RestoreStartupStage {
+  protectingData,
   checkingBackup,
   preservingCurrentData,
   installingBackup,
@@ -306,6 +308,10 @@ final class RestoreStartupGate {
       durability: resolvedDurability,
     );
     try {
+      await DatabaseFamilyPreserver.resume(
+        appDataDirectory,
+        durability: resolvedDurability,
+      );
       if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
         throw StateError('restore_startup_snapshot_preparation_incomplete');
       }

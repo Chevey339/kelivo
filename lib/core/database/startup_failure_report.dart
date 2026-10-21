@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/isolate.dart';
 import 'package:path/path.dart' as p;
@@ -127,6 +128,7 @@ final class StartupFailureEnvironment {
     Directory? appDataDirectory,
     String? appVersion,
     String? buildNumber,
+    bool inspectDatabase = true,
   }) async {
     final files = <StartupFailureFileFact>[];
     int? installedSchemaVersion;
@@ -141,7 +143,7 @@ final class StartupFailureEnvironment {
           (a, b) => p.basename(a.path).compareTo(p.basename(b.path)),
         );
         for (final entity in entities.take(_maximumListedEntries)) {
-          files.add(await _describe(entity));
+          files.add(await _describe(entity, inspectDatabase: inspectDatabase));
         }
         if (entities.length > _maximumListedEntries) {
           files.add(
@@ -165,7 +167,7 @@ final class StartupFailureEnvironment {
         p.join(appDataDirectory.path, AppDatabase.databaseFileName),
       );
       try {
-        if (databaseFile.existsSync()) {
+        if (inspectDatabase && databaseFile.existsSync()) {
           installedSchemaVersion = _readUserVersion(databaseFile);
         }
       } catch (error) {
@@ -190,8 +192,9 @@ final class StartupFailureEnvironment {
   }
 
   static Future<StartupFailureFileFact> _describe(
-    FileSystemEntity entity,
-  ) async {
+    FileSystemEntity entity, {
+    required bool inspectDatabase,
+  }) async {
     final name = p.basename(entity.path);
     if (entity is Directory) {
       final note = <String>[];
@@ -223,12 +226,17 @@ final class StartupFailureEnvironment {
       kind: 'file',
       sizeBytes: size,
       modified: modified,
-      note: await _noteFor(entity, name),
+      note: await _noteFor(entity, name, inspectDatabase: inspectDatabase),
     );
   }
 
-  static Future<String?> _noteFor(File file, String name) async {
+  static Future<String?> _noteFor(
+    File file,
+    String name, {
+    required bool inspectDatabase,
+  }) async {
     if (name == AppDatabase.databaseFileName) {
+      if (!inspectDatabase) return null;
       try {
         return 'user_version=${_readUserVersion(file)}';
       } catch (error) {
@@ -253,14 +261,20 @@ final class StartupFailureEnvironment {
   }
 
   static int _readUserVersion(File file) {
-    final database = sqlite.sqlite3.open(
-      file.absolute.path,
-      mode: sqlite.OpenMode.readOnly,
-    );
+    // Diagnostics must not open SQLite: even read-only connections can change
+    // SHM, invalidating a pending preservation transaction. This is the main
+    // file's header version; uncheckpointed WAL may contain a newer version.
+    final input = file.openSync();
     try {
-      return database.userVersion;
+      final header = input.readSync(100);
+      if (header.length != 100 ||
+          ascii.decode(header.sublist(0, 16), allowInvalid: true) !=
+              'SQLite format 3\x00') {
+        throw const FormatException('database_header_invalid');
+      }
+      return ByteData.sublistView(header).getUint32(60);
     } finally {
-      database.close();
+      input.closeSync();
     }
   }
 }

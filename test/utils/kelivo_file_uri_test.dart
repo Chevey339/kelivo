@@ -2,6 +2,29 @@ import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('recognizes private iOS data paths across container changes', () {
+    const id = 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890';
+    for (final root in [
+      '/var/mobile/Containers/Data/Application/$id/Library/Application Support/kelivo-data',
+      '/Users/alice/Library/Developer/CoreSimulator/Devices/$id/data/Containers/Data/Application/$id/Library/Application Support/kelivo-data',
+    ]) {
+      expect(
+        KelivoFileUri.tryEncodeLegacyAbsolutePath(
+          '$root/upload/file.txt',
+          allowGenericFallback: false,
+        ),
+        'kelivo-file:///upload/file.txt',
+      );
+    }
+    expect(
+      KelivoFileUri.tryEncodeLegacyAbsolutePath(
+        '/var/mobile/Containers/Data/Application/$id/Library/Application Support/unrelated/upload/file.txt',
+        allowGenericFallback: false,
+      ),
+      isNull,
+    );
+  });
+
   group('KelivoFileUri encode/decode roundtrip', () {
     test('handles spaces, #, %, and Unicode filenames', () {
       const cases = <String>[

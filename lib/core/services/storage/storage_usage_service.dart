@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../database/database_family_preserver.dart';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
@@ -9,6 +10,7 @@ import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
 import '../backup/local_snapshot_schedule.dart';
+import '../backup/recovery_file_discovery.dart';
 import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
@@ -194,6 +196,7 @@ abstract final class StorageUsageService {
       'fonts': _MutableStats(),
       'local_models': _MutableStats(),
       'app': _MutableStats(),
+      'retained_data': _MutableStats(),
     };
 
     final cacheSubs = <String, _MutableStats>{
@@ -256,7 +259,13 @@ abstract final class StorageUsageService {
         if (parts.length == 1) {
           final name = parts.first;
           final chatSubId = _chatDatabaseSubcategoryId(name);
-          if (name.startsWith(_displacedDatabasePrefix)) {
+          if (RecoveryFileDiscovery.isSnapshotArchive(name) ||
+              (name.endsWith('.json') &&
+                  RecoveryFileDiscovery.isSnapshotArchive(
+                    name.substring(0, name.length - 5),
+                  ))) {
+            byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+          } else if (name.startsWith(_displacedDatabasePrefix)) {
             byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
           } else if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
@@ -273,6 +282,14 @@ abstract final class StorageUsageService {
         }
 
         final top = parts.first.toLowerCase();
+        if (DatabaseFamilyPreserver.isCopyDirectory(top)) {
+          byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+          continue;
+        }
+        if (RecoveryFileDiscovery.isSnapshotDirectory(top)) {
+          byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+          continue;
+        }
         if (restoreTraces.visible &&
             top == '.kelivo_restore' &&
             parts.length >= 4 &&
@@ -335,6 +352,22 @@ abstract final class StorageUsageService {
       }
     } catch (_) {
       // Keep successfully measured files if a file disappears during the scan.
+    }
+
+    final retainedRoot = await AppDirectories.retainedDataDirectory(root);
+    if (retainedRoot != null && await retainedRoot.exists()) {
+      await for (final file in _listFiles(retainedRoot)) {
+        int bytes;
+        try {
+          bytes = await file.length();
+        } on FileSystemException {
+          continue;
+        }
+        byCat[StorageUsageCategoryKey.other]!.add(bytes);
+        otherSubs['retained_data']!.add(bytes);
+        totalBytes += bytes;
+        totalFiles++;
+      }
     }
 
     final [
@@ -573,6 +606,13 @@ abstract final class StorageUsageService {
               id: 'local_models',
               stats: otherSubs['local_models']!.toStats(),
               path: localModelsDir.path,
+            ),
+          if (retainedRoot != null && otherSubs['retained_data']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'retained_data',
+              stats: otherSubs['retained_data']!.toStats(),
+              path: retainedRoot.path,
+              isDirectory: true,
             ),
           if (otherSubs['app']!.fileCount > 0)
             StorageUsageSubcategory(
