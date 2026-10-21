@@ -10,11 +10,11 @@ import 'package:provider/provider.dart';
 import '../../../core/services/browser/browser_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
 import '../browser_tabs_route.dart';
 import '../models/browser_models.dart';
 import 'browser_glass.dart';
 import 'browser_favicon.dart';
+import 'browser_menu.dart';
 import 'browser_surface_controls.dart';
 import 'browser_progressive_edge.dart';
 
@@ -196,6 +196,7 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
   String _query = '';
   bool _searchExpanded = false;
   late bool _showAll;
+  final _scopeButtonKey = GlobalKey();
   ScrollController? _gridController;
   @override
   void initState() {
@@ -233,30 +234,68 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
       ? widget.service.previewForTab(id)
       : widget.transition!.previewForTab(id);
 
-  Widget _scopeSelector(BuildContext context) {
+  Widget _scopeSelector(BuildContext context, {required bool desktop}) {
     final l = AppLocalizations.of(context)!;
-    return SegmentedTabs(
-      key: const ValueKey('browserTabScope'),
-      height: math.max(
-        44,
-        MediaQuery.textScalerOf(context).scale(13) * 1.3 + 12,
+    return BrowserTextButton(
+      key: _scopeButtonKey,
+      filled: true,
+      onPressed: () => _chooseScope(context, desktop: desktop),
+      child: Row(
+        key: const ValueKey('browserTabScope'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              _showAll ? l.browserTabsAll : l.browserTabsCurrentConversation,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, height: 1.3),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(LucideIcons.chevronDown, size: 14),
+        ],
       ),
-      tabs: [
-        SegmentedTab(label: l.browserTabsCurrentConversation),
-        SegmentedTab(label: l.browserTabsAll),
-      ],
-      index: _showAll ? 1 : 0,
-      onChanged: (value) {
-        widget.transition?.invalidateGeometry();
-        setState(() => _showAll = value == 1);
-        final controller = widget.scrollController ?? _gridController;
-        if (controller?.hasClients == true) controller!.jumpTo(0);
-      },
     );
   }
 
+  Future<void> _chooseScope(
+    BuildContext context, {
+    required bool desktop,
+  }) async {
+    final box = _scopeButtonKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final l = AppLocalizations.of(context)!;
+    final value = await showBrowserMenu<bool>(
+      context,
+      title: l.browserTabs,
+      desktop: desktop,
+      anchorRect: box.localToGlobal(Offset.zero) & box.size,
+      items: [
+        BrowserMenuEntry(
+          value: false,
+          icon: !_showAll ? LucideIcons.check : LucideIcons.messageSquare,
+          label: l.browserTabsCurrentConversation,
+        ),
+        BrowserMenuEntry(
+          value: true,
+          icon: _showAll ? LucideIcons.check : LucideIcons.panelsTopLeft,
+          label: l.browserTabsAll,
+        ),
+      ],
+    );
+    if (!mounted || value == null || value == _showAll) return;
+    widget.transition?.invalidateGeometry();
+    setState(() => _showAll = value);
+    final controller = widget.scrollController ?? _gridController;
+    if (controller?.hasClients == true) controller!.jumpTo(0);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      BrowserMenuHost(child: Builder(builder: _buildOverview));
+
+  Widget _buildOverview(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final desktop =
         ResponsiveHelper.isDesktop(context) ||
@@ -329,12 +368,11 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                   : 44.0;
               final scopeHeight = math.max(
                 44.0,
-                MediaQuery.textScalerOf(context).scale(13) * 1.3 + 12,
+                MediaQuery.textScalerOf(context).scale(13) * 1.3 + 24,
               );
-              final searchHeight = widget.conversationId == null
+              final searchHeight =
+                  widget.conversationId == null || _searchExpanded
                   ? fieldHeight
-                  : _searchExpanded
-                  ? scopeHeight + 8 + fieldHeight
                   : scopeHeight;
               final toolbarHeight =
                   (MediaQuery.textScalerOf(context).scale(15) * 1.3 + 30).clamp(
@@ -506,24 +544,29 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          alignment: WrapAlignment.end,
-                          spacing: 16,
-                          runSpacing: 12,
-                          children: [
-                            if (widget.conversationId != null)
-                              SizedBox(
-                                width: math.min(300, constraints.maxWidth - 40),
-                                child: _scopeSelector(context),
+                      child: Row(
+                        children: [
+                          if (widget.conversationId != null) ...[
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: (constraints.maxWidth - 52) / 2,
                               ),
-                            SizedBox(
-                              width: math.min(280, constraints.maxWidth - 40),
-                              child: _searchField(context),
+                              child: _scopeSelector(context, desktop: true),
                             ),
+                            const SizedBox(width: 12),
                           ],
-                        ),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 280,
+                                ),
+                                child: _searchField(context),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Expanded(
@@ -587,22 +630,22 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                     top: safe.top + 12,
                     left: 20,
                     right: 20,
-                    child: widget.conversationId == null
+                    child: widget.conversationId == null || _searchExpanded
                         ? Align(
                             alignment: Alignment.centerRight,
                             child: _mobileSearch(context),
                           )
-                        : _searchExpanded
-                        ? Column(
-                            children: [
-                              _scopeSelector(context),
-                              const SizedBox(height: 8),
-                              _mobileSearch(context),
-                            ],
-                          )
                         : Row(
                             children: [
-                              Expanded(child: _scopeSelector(context)),
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _scopeSelector(
+                                    context,
+                                    desktop: false,
+                                  ),
+                                ),
+                              ),
                               const SizedBox(width: 10),
                               _mobileSearch(context),
                             ],

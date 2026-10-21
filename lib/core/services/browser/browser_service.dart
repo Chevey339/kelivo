@@ -437,7 +437,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _lastTabBySession.removeWhere((_, tabId) => ids.contains(tabId));
     for (var index = 0; index < _tabs.length; index++) {
       if (ids.contains(_tabs[index].id)) {
-        _tabs[index] = _tabs[index].copyWith(ownerSessionId: sessionId);
+        _tabs[index] = _tabs[index].copyWith(
+          ownerSessionId: sessionId,
+          error: _tabs[index].error,
+        );
       }
     }
     _selectTab(requireTab(id));
@@ -865,14 +868,26 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           },
           onNewWindow: (url, windowId) async {
             if (!isCurrent()) return false;
+            final group = tab.popupGroupId ?? id;
+            final popupGuard =
+                _isRunningAgentAction &&
+                    (_agentTabId == id || _engineGroups[_agentTabId] == group)
+                ? _runningAgentGuard
+                : null;
             BrowserTab? child;
             try {
-              child = await createTab(
-                url: url,
-                ownerSessionId: requireTab(id).ownerSessionId,
-                windowId: windowId,
-                openerTabId: id,
-                popupGroupId: tab.popupGroupId ?? tab.id,
+              // Native events outlive the action that created their engine.
+              // Apply only the triggering action's tab quota and selection;
+              // later engine completion must not retarget a newer action.
+              child = await runZoned<Future<BrowserTab>>(
+                () => createTab(
+                  url: url,
+                  ownerSessionId: requireTab(id).ownerSessionId,
+                  windowId: windowId,
+                  openerTabId: id,
+                  popupGroupId: group,
+                ),
+                zoneValues: {_actionKey: popupGuard},
               );
               await _engine(child.id);
               return true;

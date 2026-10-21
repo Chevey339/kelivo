@@ -47,8 +47,12 @@ class BrowserTextField extends StatelessWidget {
         controller: controller,
         focusNode: focusNode,
         placeholder: placeholder,
-        style: textStyle,
-        placeholderStyle: hintStyle,
+        // Cupertino aligns placeholder/input baselines, but RenderParagraph
+        // reports alphabetic even when a CJK theme requests ideographic.
+        style: textStyle.copyWith(textBaseline: TextBaseline.alphabetic),
+        placeholderStyle: hintStyle.copyWith(
+          textBaseline: TextBaseline.alphabetic,
+        ),
         cursorColor: cursorColor,
         padding: padding,
         prefix: prefix,
@@ -94,6 +98,10 @@ class BrowserTextField extends StatelessWidget {
                   hintText: placeholder,
                   hintStyle: hintStyle,
                   isCollapsed: true,
+                  isDense: true,
+                  // The browser already owns the field's padding. Compact
+                  // desktop density otherwise offsets its placeholder.
+                  visualDensity: VisualDensity.standard,
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,

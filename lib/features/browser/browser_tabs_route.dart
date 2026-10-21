@@ -196,8 +196,10 @@ class BrowserTabsRoute extends PageRoute<void> {
 
   @override
   bool didPop(void result) {
-    transition.prepareDefaultReturn();
     final accepted = super.didPop(result);
+    // Local history can consume Back to dismiss the scope menu while keeping
+    // this route open. Resolve its return target only when the route exits.
+    if (accepted) transition.prepareDefaultReturn();
     if (accepted && !_returnNotified) {
       _returnNotified = true;
       onReturnStarted?.call();

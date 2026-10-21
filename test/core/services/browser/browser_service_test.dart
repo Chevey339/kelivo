@@ -120,6 +120,8 @@ void main() {
   late Map<String, FakeBrowserEngine> engines;
   late List<String> disposedIds;
   late Map<String, Future<bool> Function(String?, int)> popupCallbacks;
+  Completer<void>? popupCreating;
+  Completer<void>? popupReady;
 
   BrowserService createService({BrowserStore? store}) => BrowserService(
     store: store ?? BrowserStore(directory: directory),
@@ -139,7 +141,11 @@ void main() {
             onDisposed: () => disposedIds.add(tab.id),
           );
           engines[tab.id] = engine;
-          popupCallbacks[tab.id] = onNewWindow;
+          popupCallbacks[tab.id] = Zone.current.bindBinaryCallback(onNewWindow);
+          if (tab.windowId != null && popupReady != null) {
+            popupCreating!.complete();
+            await popupReady!.future;
+          }
           return engine;
         },
   );
@@ -149,6 +155,8 @@ void main() {
     engines = {};
     disposedIds = [];
     popupCallbacks = {};
+    popupCreating = null;
+    popupReady = null;
     service = createService();
     await service.initialize();
   });
@@ -462,6 +470,98 @@ void main() {
     expect(service.liveViewCount, 0);
   });
 
+  test('native agent popups share the conversation quota', () async {
+    final parent = await service.createTab(
+      url: 'https://parent.example',
+      ownerSessionId: 'a',
+    );
+    await service.createTab(ownerSessionId: 'a');
+    await service.evaluateJavascript('ready', tabId: parent.id);
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final running = service.runAgentAction(
+      sessionId: 'a',
+      label: 'click',
+      tabId: parent.id,
+      action: () async {
+        started.complete();
+        await finish.future;
+      },
+    );
+    await started.future;
+    try {
+      expect(await popupCallbacks[parent.id]!(null, 42), isTrue);
+      final child = service.tabs.last;
+      expect(service.tabsForSession('a'), hasLength(3));
+      expect(await popupCallbacks[parent.id]!(null, 43), isFalse);
+      expect(await popupCallbacks[child.id]!(null, 44), isFalse);
+      expect(service.tabsForSession('a'), hasLength(3));
+      expect(service.liveViewCount, 2);
+    } finally {
+      finish.complete();
+      await running;
+      await Future<void>.delayed(Duration.zero);
+    }
+    // A later user popup is not constrained by an old agent action's guard.
+    expect(await popupCallbacks[parent.id]!(null, 45), isTrue);
+    expect(service.tabsForSession('a'), hasLength(4));
+    expect(service.liveViewCount, 3);
+  });
+
+  test(
+    'late native popup completion cannot retarget the next agent action',
+    () async {
+      final parent = await service.createTab(
+        url: 'https://parent.example',
+        ownerSessionId: 'a',
+      );
+      final other = await service.createTab(ownerSessionId: 'b');
+      await service.evaluateJavascript('ready', tabId: parent.id);
+      popupCreating = Completer<void>();
+      popupReady = Completer<void>();
+      final firstStarted = Completer<void>();
+      final firstFinish = Completer<void>();
+      final first = service.runAgentAction(
+        sessionId: 'a',
+        label: 'click',
+        tabId: parent.id,
+        action: () async {
+          firstStarted.complete();
+          await firstFinish.future;
+        },
+      );
+      await firstStarted.future;
+      final popup = popupCallbacks[parent.id]!(null, 42);
+      await popupCreating!.future;
+      firstFinish.complete();
+      await first;
+      final nextStarted = Completer<void>();
+      final nextFinish = Completer<void>();
+      final next = service.runAgentAction(
+        sessionId: 'b',
+        label: 'wait',
+        tabId: other.id,
+        action: () async {
+          nextStarted.complete();
+          await nextFinish.future;
+        },
+      );
+      await nextStarted.future;
+      try {
+        popupReady!.complete();
+        expect(await popup, isTrue);
+        expect(service.agentSessionId, 'b');
+        expect(service.agentTabId, other.id);
+        expect(service.activeTabId, other.id);
+        expect(service.selectedTabForSession('b')!.id, other.id);
+        expect(service.tabsForSession('a'), hasLength(2));
+      } finally {
+        nextFinish.complete();
+        await next;
+      }
+    },
+  );
+
   test(
     'background agent selection does not replace another chat viewport',
     () async {
@@ -520,6 +620,24 @@ void main() {
       expect(service.tabs.every((tab) => tab.ownerSessionId == 'b'), isTrue);
     },
   );
+
+  test('handoff preserves a failed page until it is retried', () async {
+    final tab = await service.createTab(
+      url: 'https://failed.example',
+      ownerSessionId: 'a',
+    );
+    await service.evaluateJavascript('ready', tabId: tab.id);
+    final engine = engines[tab.id]!;
+    engine.onChanged(const BrowserPageState(error: 'connection_failed'));
+    expect(service.requireTab(tab.id).error, 'connection_failed');
+    await service.moveTabToSession(tab.id, 'b');
+    expect(service.requireTab(tab.id).ownerSessionId, 'b');
+    expect(service.requireTab(tab.id).error, 'connection_failed');
+    expect(engines[tab.id], same(engine));
+    expect(engine.disposed, isFalse);
+    await service.refreshActivePreview();
+    expect(service.previewForTab(tab.id), isNull);
+  });
 
   test(
     'busy tab cannot be transferred or reclaimed by another conversation',

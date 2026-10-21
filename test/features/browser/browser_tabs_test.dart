@@ -408,6 +408,7 @@ void main() {
   for (final (desktop, size, scale) in [
     (false, const Size(390, 844), 1.0),
     (true, const Size(1200, 800), 1.0),
+    (true, const Size(360, 800), 1.0),
     (false, const Size(320, 844), 3.0),
   ]) {
     testWidgets('scope selector keeps chat tabs separate at $size / $scale', (
@@ -432,12 +433,28 @@ void main() {
         );
         expect(find.byKey(const ValueKey('browserTabCard-a')), findsOneWidget);
         expect(find.byKey(const ValueKey('browserTabCard-b')), findsNothing);
+        final scope = find.byKey(const ValueKey('browserTabScope'));
+        expect(find.text('All tabs'), findsNothing);
+        if (scale == 1) {
+          expect(tester.getSize(scope).width, lessThan(180));
+        }
+        if (desktop) {
+          final search = find.byType(BrowserSurfaceField);
+          expect(
+            tester.getCenter(scope).dy,
+            closeTo(tester.getCenter(search).dy, 1),
+          );
+        }
+        await tester.tap(scope);
+        await tester.pumpAndSettle();
         await tester.tap(find.text('All tabs'));
         await tester.pumpAndSettle();
         expect(find.text('This chat · 1'), findsOneWidget);
         expect(find.byKey(const ValueKey('browserTabCard-b')), findsOneWidget);
         expect(find.text('Research · 1'), findsOneWidget);
         expect(service.liveViewCount, 0);
+        await tester.tap(scope);
+        await tester.pumpAndSettle();
         await tester.tap(find.text('This chat'));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('browserTabCard-b')), findsNothing);

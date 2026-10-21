@@ -28,6 +28,7 @@ void main() {
     Rect Function(BrowserTab?)? contentRectForTab,
     VoidCallback? onFallbackBuild,
     VoidCallback? onReturnStarted,
+    String? conversationId,
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -85,13 +86,14 @@ void main() {
                         showHeader: false,
                         child: BrowserTabOverview(
                           service: service,
+                          conversationId: conversationId,
                           transition: motion,
                           onDone: () => Navigator.of(pageContext).pop(),
                           onSelect: (id) {
                             motion.prepareReturn(id);
                             Navigator.of(pageContext).pop();
                           },
-                          onClose: (_) {},
+                          onClose: (id) => service.closeTab(id),
                           onNew: () {
                             motion.prepareReturn(null);
                             Navigator.of(pageContext).pop();
@@ -126,6 +128,36 @@ void main() {
     await tester.pump();
     return (route: route, service: service);
   }
+
+  testWidgets('closing the scope menu does not freeze the tab return target', (
+    tester,
+  ) async {
+    var returns = 0;
+    final state = await mount(
+      tester,
+      conversationId: 'chat-a',
+      onReturnStarted: () => returns++,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('browserTabScope')));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(state.route.isCurrent, isTrue);
+    expect(returns, 0);
+    final current = find.byKey(const ValueKey('browserTabCard-a'));
+    await tester.tap(
+      find.descendant(of: current, matching: find.byTooltip('Close tab')),
+    );
+    await tester.pumpAndSettle();
+    expect(state.service.activeTabId, 'b');
+    await tester.tap(find.byTooltip('Done'));
+    await tester.pump();
+    expect(state.route.transition.tabId, 'b');
+    expect(returns, 1);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   const landmarks = <(Offset, Color)>[
     (Offset(35, 140), Color(0xffff0000)),

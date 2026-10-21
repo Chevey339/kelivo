@@ -687,6 +687,8 @@ void main() {
       await openMobileMenuItem(tester, 'Tabs (0)');
       expect(find.byKey(const ValueKey('browserTabScope')), findsOneWidget);
       expect(find.byTooltip('Close tab'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('browserTabScope')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('All tabs'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('Close tab'), findsWidgets);

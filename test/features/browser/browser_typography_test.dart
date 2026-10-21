@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/features/browser/pages/browser_bookmark_editor.dart';
@@ -22,6 +23,8 @@ void main() {
   ]) {
     final desktop =
         platform == TargetPlatform.macOS || platform == TargetPlatform.windows;
+    final apple =
+        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
     for (final kind in ['address', 'find', 'search', 'bookmark']) {
       testWidgets(
         '$kind input and placeholder use app font, platform=$platform',
@@ -55,7 +58,8 @@ void main() {
             'search' => BrowserSurfaceField(
               controller: controller,
               focusNode: focus,
-              hintText: 'Search saved pages',
+              hintText: apple ? '搜索标签页' : 'Search saved pages',
+              prefixIcon: LucideIcons.search,
             ),
             _ => BrowserBookmarkEditor(
               bookmark: BrowserBookmark(
@@ -66,14 +70,23 @@ void main() {
               fullPage: !desktop,
             ),
           };
+          final baseTheme = ThemeData(
+            platform: platform,
+            fontFamily: family,
+            fontFamilyFallback: fallback,
+          );
           await tester.pumpWidget(
             MaterialApp(
-              theme: ThemeData(
-                platform: platform,
-                fontFamily: family,
-                fontFamilyFallback: fallback,
-              ),
-              locale: const Locale('en'),
+              theme: apple && kind == 'search'
+                  ? baseTheme.copyWith(
+                      textTheme: baseTheme.textTheme.copyWith(
+                        bodyMedium: baseTheme.textTheme.bodyMedium!.copyWith(
+                          textBaseline: TextBaseline.ideographic,
+                        ),
+                      ),
+                    )
+                  : baseTheme,
+              locale: Locale(apple && kind == 'search' ? 'zh' : 'en'),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
@@ -99,9 +112,6 @@ void main() {
             expect(style.fontFamilyFallback, fallback);
           }
 
-          final apple =
-              platform == TargetPlatform.iOS ||
-              platform == TargetPlatform.macOS;
           expect(
             find.byType(CupertinoTextField),
             apple ? findsWidgets : findsNothing,
@@ -123,6 +133,17 @@ void main() {
                 ),
               );
               expectFont(placeholder.text.style!);
+              if (kind == 'search') {
+                final icon = find.byIcon(LucideIcons.search);
+                final paragraphRect =
+                    placeholder.localToGlobal(Offset.zero) & placeholder.size;
+                expect(
+                  paragraphRect.center.dy,
+                  closeTo(tester.getCenter(icon).dy, 1),
+                  reason:
+                      'The search placeholder stays centered beside its icon.',
+                );
+              }
             } else {
               // Desktop bookmark fields use visible labels, not placeholders.
               expect((kind, desktop), ('bookmark', true));
