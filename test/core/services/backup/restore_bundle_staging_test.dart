@@ -16,6 +16,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/startup_failure_report.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
@@ -943,7 +944,16 @@ void main() {
           candidateDirectory: staged.payloadDirectory,
           expectedManifestSha256: staged.candidateManifestSha256,
         ),
-        throwsA(isA<FormatException>()),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+            ).causes.single.details,
+            'directory differences',
+            containsPair('missing directories (first 10)', '["fonts"]'),
+          ),
+        ),
       );
     });
 
@@ -965,8 +975,59 @@ void main() {
           candidateDirectory: staged.payloadDirectory,
           expectedManifestSha256: staged.candidateManifestSha256,
         ),
-        throwsA(isA<FormatException>()),
+        throwsA(
+          isA<FormatException>()
+              .having(
+                (error) => restoreFailureDiagnosticCode(error),
+                'unchanged diagnostic code',
+                'restore_staging_candidate_directory',
+              )
+              .having(
+                (error) => StartupFailureReport.capture(
+                  stage: StartupFailureStage.restoreGate,
+                  error: error,
+                ).causes.single.details,
+                'details transported from validation isolate',
+                containsPair('unexpected directory', 'upload/unexpected'),
+              ),
+        ),
       );
+    });
+
+    test('reports bounded unexpected file names on revalidation', () async {
+      final extracted = await _createExtractedBundle(root, includeFiles: true);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: true,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+      for (var index = 0; index < 12; index++) {
+        await File(
+          p.join(staged.payloadDirectory.path, 'upload', 'extra_$index.txt'),
+        ).writeAsString('extra');
+      }
+      try {
+        await RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: staged.candidateManifestSha256,
+        );
+        fail('Extra files must still be rejected');
+      } on FormatException catch (error) {
+        final report = StartupFailureReport.capture(
+          stage: StartupFailureStage.restoreGate,
+          error: error,
+        );
+        expect(report.diagnosticCode, 'restore_staging_candidate_entries');
+        final details = report.causes.single.details;
+        expect(details['unexpected files count'], '12');
+        expect(details['missing files count'], '0');
+        expect(
+          jsonDecode(details['unexpected files (first 10)']!) as List,
+          hasLength(10),
+        );
+      }
     });
 
     test(

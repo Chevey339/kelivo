@@ -42,6 +42,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 class _TestChatService extends ChatService {
   final List<String> timelineCalls = <String>[];
   int notifyCount = 0;
+  Completer<void>? batchDeleteCompletion;
   List<Conversation>? _stubConversations;
   int? _stubRevision;
   bool? _stubInitialized;
@@ -87,6 +88,17 @@ class _TestChatService extends ChatService {
   void notifyListeners() {
     notifyCount++;
     super.notifyListeners();
+  }
+
+  @override
+  Future<int> deleteConversations(Iterable<String> ids) async {
+    final completion = Completer<void>();
+    batchDeleteCompletion = completion;
+    try {
+      return await super.deleteConversations(ids);
+    } finally {
+      completion.complete();
+    }
   }
 
   @override
@@ -325,10 +337,10 @@ void main() {
         expect(confirmButton, findsOneWidget);
         await tester.tap(confirmButton);
         await tester.pump();
-        // deleteConversations does sqlite + asset-maintenance dart:io; those
-        // hops complete in the real async zone and need interleaved pumps.
-        for (var i = 0; i < 40; i++) {
-          if (service.notifyCount > notifyBeforeDelete) break;
+        // Wait for the real delete operation, not a two-second notification
+        // deadline. SQLite and asset I/O still need interleaved real/fake pumps.
+        expect(service.batchDeleteCompletion, isNotNull);
+        while (!service.batchDeleteCompletion!.isCompleted) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 50)),
           );
