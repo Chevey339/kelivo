@@ -5831,5 +5831,30 @@
   "recoveryStorageReadyBody": "The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.",
   "recoveryRetainedData": "Retained original data",
   "recoveryNoValidCopies": "Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.",
-  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry."
+  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.",
+  "imageExportPreparing": "Preparing image…",
+  "imageExportDiagrams": "Preparing diagrams {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "Capturing image {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "Combining image and preparing preview…",
+  "imageExportSaving": "Saving image…"
 }

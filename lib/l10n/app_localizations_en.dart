@@ -13240,4 +13240,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.';
+
+  @override
+  String get imageExportPreparing => 'Preparing image…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return 'Preparing diagrams $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return 'Capturing image $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => 'Combining image and preparing preview…';
+
+  @override
+  String get imageExportSaving => 'Saving image…';
 }

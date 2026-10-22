@@ -74,8 +74,9 @@ Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
 
 Future<void> preRenderDiagramCodesForExport(
   BuildContext context,
-  List<DiagramCode> codes,
-) async {
+  List<DiagramCode> codes, {
+  void Function(int completed, int total)? onProgress,
+}) async {
   if (codes.isEmpty) return;
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -96,6 +97,8 @@ Future<void> preRenderDiagramCodesForExport(
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
 
+  var completed = 0;
+  onProgress?.call(completed, distinct.length);
   // Sequentially render codes with a single offscreen overlay to avoid heavy composites
   for (final diagram in distinct) {
     if (!context.mounted) return;
@@ -110,7 +113,10 @@ Future<void> preRenderDiagramCodesForExport(
             viewKey: key,
             isSvg: diagram.isSvg,
           );
-    if (handle == null) continue;
+    if (handle == null) {
+      onProgress?.call(++completed, distinct.length);
+      continue;
+    }
     final ready = Completer<void>();
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -149,6 +155,7 @@ Future<void> preRenderDiagramCodesForExport(
       }
     } finally {
       entry.remove();
+      onProgress?.call(++completed, distinct.length);
     }
   }
 }

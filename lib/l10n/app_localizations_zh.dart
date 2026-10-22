@@ -12641,6 +12641,25 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25206,6 +25225,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37850,4 +37888,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。';
+
+  @override
+  String get imageExportPreparing => '正在準備圖片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在準備圖表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在擷取圖片 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成圖片並準備預覽…';
+
+  @override
+  String get imageExportSaving => '正在儲存圖片…';
 }
