@@ -13587,4 +13587,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserAskAiInOwnerConversation => 'Ask AI in the owning chat';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle =>
+      'Show webpage cards';
 }

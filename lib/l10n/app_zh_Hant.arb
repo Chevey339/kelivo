@@ -4736,5 +4736,6 @@
   "browserReopenInConversation": "在目前對話重新開啟",
   "browserTabBusy": "助手仍在操作此頁面，請等待任務完成或停止任務後再移動。",
   "browserLiveViewLimit": "瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。",
-  "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理"
+  "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理",
+  "displaySettingsPageShowBrowserPageCardsTitle": "顯示網頁卡片"
 }

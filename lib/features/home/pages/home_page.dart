@@ -1454,6 +1454,7 @@ class _HomePageState extends State<HomePage>
       showProducedFiles: settings.showProducedFiles,
       showToolResultSummary: settings.showToolResultSummary,
       hideToolResultImages: settings.hideToolResultImages,
+      showBrowserPageCards: settings.showBrowserPageCards,
       collapsedCodeLines: settings.autoCollapseCodeBlock
           ? settings.autoCollapseCodeBlockLines
           : null,

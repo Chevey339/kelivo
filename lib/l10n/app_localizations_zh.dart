@@ -12968,6 +12968,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25860,6 +25863,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38831,4 +38837,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserAskAiInOwnerConversation => '讓所屬對話的 AI 處理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '顯示網頁卡片';
 }

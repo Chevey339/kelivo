@@ -52,6 +52,181 @@ void main() {
     ),
   );
 
+  Future<String> backgroundPage() async {
+    final tab = await service.createTab(
+      url: 'https://agent.example',
+      ownerSessionId: 'chat',
+    );
+    await service.runAgentAction<void>(
+      sessionId: 'chat',
+      label: 'open',
+      action: () async {
+        await service.navigate('https://agent.example', tabId: tab.id);
+        engines[tab.id]!.complete();
+      },
+    );
+    return tab.id;
+  }
+
+  previewTest(
+    'chat preview captures an existing headless page without presenting or resuming it',
+    (tester) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      final resumes = engine.resumes;
+      expect(engine.captures, 0);
+      final unwatch = service.watchTabPreview(id);
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(service.previewForTab(id), [1]);
+      expect(engine.captures, 1);
+      expect(engine.viewBuilds, 0);
+      expect(engine.resumes, resumes);
+      unwatch();
+      final saved = await service.createTab(url: 'https://saved.example');
+      final release = service.watchTabPreview(saved.id);
+      await tester.pump(const Duration(seconds: 2));
+      expect(engines.containsKey(saved.id), isFalse);
+      release();
+    },
+  );
+
+  previewTest(
+    'fast actions coalesce and the final snapshot updates at most once per second',
+    (tester) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      final release = service.watchTabPreview(id);
+      await tester.pump(const Duration(milliseconds: 160));
+      for (var i = 0; i < 8; i++) {
+        await service.runAgentAction<void>(
+          sessionId: 'chat',
+          label: 'scroll',
+          tabId: id,
+          action: () async {},
+        );
+      }
+      engine.bytes = Uint8List.fromList([9]);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(engine.captures, 1);
+      await tester.pump(const Duration(milliseconds: 510));
+      expect(engine.captures, 2);
+      expect(service.previewForTab(id), [9]);
+      await tester.pump(const Duration(seconds: 4));
+      expect(engine.captures, 2, reason: 'No permanent polling timer');
+      release();
+    },
+  );
+
+  previewTest('hidden cards and background app cancel queued preview work', (
+    tester,
+  ) async {
+    final id = await backgroundPage();
+    var release = service.watchTabPreview(id);
+    release();
+    await tester.pump(const Duration(seconds: 2));
+    expect(engines[id]!.captures, 0);
+    release = service.watchTabPreview(id);
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 2));
+    expect(engines[id]!.captures, 0);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(engines[id]!.captures, 1);
+    release();
+  });
+
+  previewTest(
+    'timed out encoder stays single flight and closed headless tabs discard late images',
+    (tester) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      final pending = Completer<Uint8List?>();
+      engine.pending = pending;
+      final release = service.watchTabPreview(id);
+      await tester.pump(const Duration(milliseconds: 160));
+      await tester.pump(const Duration(seconds: 3));
+      await service.runAgentAction<void>(
+        sessionId: 'chat',
+        label: 'click',
+        tabId: id,
+        action: () async {},
+      );
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(
+        engine.captures,
+        1,
+        reason: 'Dart timeout must not start another native encoder',
+      );
+      await service.closeTab(id);
+      pending.complete(Uint8List.fromList([8]));
+      await tester.pump();
+      expect(service.previewForTab(id), isNull);
+      release();
+    },
+  );
+
+  for (final hideApp in [true, false]) {
+    previewTest(
+      'waiting encoder does not start new work after ${hideApp ? "backgrounding" : "card removal"}',
+      (tester) async {
+        final id = await backgroundPage();
+        final engine = engines[id]!;
+        final pending = Completer<Uint8List?>();
+        engine.pending = pending;
+        final release = service.watchTabPreview(id);
+        await tester.pump(const Duration(milliseconds: 160));
+        await tester.pump(const Duration(seconds: 3));
+        await service.runAgentAction<void>(
+          sessionId: 'chat',
+          label: 'scroll',
+          tabId: id,
+          action: () async {},
+        );
+        await tester.pump(const Duration(milliseconds: 1010));
+        if (hideApp) {
+          service.didChangeAppLifecycleState(AppLifecycleState.paused);
+        } else {
+          release();
+        }
+        engine.pending = null;
+        pending.complete(Uint8List.fromList([8]));
+        await tester.pump();
+        expect(engine.captures, 1);
+        release();
+      },
+    );
+  }
+
+  for (final navigate in [true, false]) {
+    previewTest(
+      'a timed-out native image is discarded before ${navigate ? "a new document" : "a fresh viewport"}',
+      (tester) async {
+        final tab = await service.createTab(url: 'https://one.example');
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        final engine = engines[tab.id]!;
+        final pending = Completer<Uint8List?>();
+        engine.pending = pending;
+        final old = service.refreshActivePreview();
+        await tester.pump(const Duration(seconds: 3));
+        await old;
+        if (navigate) {
+          await service.navigate('https://two.example', tabId: tab.id);
+          engine.complete();
+        }
+        final fresh = service.refreshActivePreview(fresh: true);
+        final captures = engine.captures;
+        engine.pending = null;
+        engine.bytes = Uint8List.fromList([9]);
+        pending.complete(Uint8List.fromList([77]));
+        await fresh;
+        await tester.pumpAndSettle();
+        expect(engine.captures, greaterThan(captures));
+        expect(service.previewForTab(tab.id), [9]);
+      },
+    );
+  }
+
   previewTest('many saved tabs keep thumbnails and native instances bounded', (
     tester,
   ) async {
@@ -470,6 +645,7 @@ class _Engine extends BrowserEngine {
   Future<void> get viewReady => ready ?? Future<void>.value();
   final void Function(BrowserPageState) emit;
   int captures = 0;
+  int resumes = 0;
   int viewBuilds = 0;
   final List<bool> visibility = [];
   bool disposed = false;
@@ -505,7 +681,10 @@ class _Engine extends BrowserEngine {
   @override
   Future<void> pause() async {}
   @override
-  Future<void> resume() async {}
+  Future<void> resume() async {
+    resumes++;
+  }
+
   @override
   Future<void> updateSettings(dynamic settings) async {}
   @override

@@ -4736,5 +4736,6 @@
   "browserReopenInConversation": "在当前对话重新打开",
   "browserTabBusy": "助手仍在操作此页面，请等待任务完成或停止任务后再移动。",
   "browserLiveViewLimit": "浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。",
-  "browserAskAiInOwnerConversation": "让所属对话的 AI 处理"
+  "browserAskAiInOwnerConversation": "让所属对话的 AI 处理",
+  "displaySettingsPageShowBrowserPageCardsTitle": "显示网页卡片"
 }

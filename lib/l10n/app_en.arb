@@ -5993,5 +5993,6 @@
   "browserReopenInConversation": "Reopen in this chat",
   "browserTabBusy": "An assistant is still using this page. Wait for it to finish or stop the task before moving it.",
   "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
-  "browserAskAiInOwnerConversation": "Ask AI in the owning chat"
+  "browserAskAiInOwnerConversation": "Ask AI in the owning chat",
+  "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards"
 }

@@ -14,9 +14,22 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 class CardBrowser extends BrowserService {
   Uint8List? preview;
+  String? runningTab;
+  final watched = <String>{};
+  @override
+  String? get agentSessionId => runningTab == null ? null : 'chat';
+  @override
+  String? get agentTabId => runningTab;
+  @override
+  VoidCallback watchTabPreview(String id) {
+    watched.add(id);
+    return () => watched.remove(id);
+  }
+
   @override
   List<BrowserTab> get tabs => const [
     BrowserTab(id: 'one', url: 'https://www.example.com/path', title: 'Title'),
+    BrowserTab(id: 'second', url: 'https://two.example', title: 'Second page'),
   ];
   @override
   Uint8List? previewForTab(String id) => id == 'one' ? preview : null;
@@ -71,6 +84,7 @@ void main() {
     bool lite = false,
     bool dark = false,
     Locale locale = const Locale('en'),
+    bool visible = true,
     ValueChanged<String?>? onOpen,
   }) async {
     await tester.pumpWidget(
@@ -88,13 +102,16 @@ void main() {
               alignment: Alignment.topLeft,
               child: SizedBox(
                 width: 300,
-                child: BrowserStepGroupBody(
-                  key: const ValueKey('body'),
-                  actions: actions,
-                  conversationId: 'chat',
-                  lite: lite,
-                  service: browser,
-                  onOpen: onOpen,
+                child: TickerMode(
+                  enabled: visible,
+                  child: BrowserStepGroupBody(
+                    key: const ValueKey('body'),
+                    actions: actions,
+                    conversationId: 'chat',
+                    lite: lite,
+                    service: browser,
+                    onOpen: onOpen,
+                  ),
                 ),
               ),
             ),
@@ -167,6 +184,40 @@ void main() {
       );
     });
   }
+  testWidgets(
+    'live preview opens the displayed tab before its tool result arrives',
+    (tester) async {
+      browser.runningTab = 'second';
+      String? opened;
+      await pump(tester, [
+        action('a'),
+        action('b', loading: true),
+      ], onOpen: (id) => opened = id);
+      await tester.tap(find.byKey(const ValueKey('browser-page-card')));
+      await tester.pump();
+      expect(opened, 'second');
+      expect(find.text('Second page'), findsOneWidget);
+      expect(browser.watched, {'second'});
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    },
+  );
+
+  testWidgets('covered and lightweight cards release preview observation', (
+    tester,
+  ) async {
+    final actions = [action('a')];
+    await pump(tester, actions);
+    expect(browser.watched, {'one'});
+    await pump(tester, actions, visible: false);
+    expect(browser.watched, isEmpty);
+    await pump(tester, actions, visible: true);
+    expect(browser.watched, {'one'});
+    await pump(tester, actions, lite: true);
+    expect(browser.watched, isEmpty);
+  });
+
   testWidgets(
     'cached preview text follows locale changes without new actions',
     (tester) async {

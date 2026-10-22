@@ -79,6 +79,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, ({int epoch, bool wasLoading, Future<void> future})>
   _previewFlights = {};
   final Set<String> _previewPending = {};
+  final Map<String, ({BrowserEngine engine, Future<Uint8List?> future})>
+  _nativePreviewFlights = {};
+  final Map<String, int> _previewWatchers = {};
+  final Map<String, Timer> _chatPreviewTimers = {};
+  final Map<String, DateTime> _chatPreviewTimes = {};
+  bool _previewForeground = true;
   Future<void>? _runtimeQueue;
   Future<void>? _agentQueue;
   Future<void>? _initializing;
@@ -510,6 +516,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       await _disposeEngineGroup(popupGroupId);
     } else if (id != popupGroupId) {
       await _engines.remove(id)?.dispose();
+      _nativePreviewFlights.remove(id);
       _engineGroups.remove(id);
     } else {
       final retained = _engines[id];
@@ -624,6 +631,71 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   /// old image without imposing a limit on saved tabs.
   Uint8List? previewForTab(String id) => _tabPreviews[id];
 
+  /// A visible chat card requests snapshots of an already-existing renderer.
+  /// This never creates, selects, resizes or resumes a WebView. Updates are
+  /// event driven (page loaded / action finished), merged and capped at 1 Hz.
+  VoidCallback watchTabPreview(String id) {
+    _previewWatchers.update(id, (count) => count + 1, ifAbsent: () => 1);
+    if (!_tabPreviews.containsKey(id) && !_hasVisibleView(id)) {
+      _scheduleChatPreview(id);
+    }
+    var released = false;
+    return () {
+      if (released) return;
+      released = true;
+      final remaining = (_previewWatchers[id] ?? 1) - 1;
+      if (remaining > 0) {
+        _previewWatchers[id] = remaining;
+      } else {
+        _previewWatchers.remove(id);
+        _chatPreviewTimers.remove(id)?.cancel();
+        _chatPreviewTimes.remove(id);
+      }
+    };
+  }
+
+  void _scheduleChatPreview(String id) {
+    if (_disposed ||
+        !_previewForeground ||
+        !_previewWatchers.containsKey(id) ||
+        _chatPreviewTimers.containsKey(id)) {
+      return;
+    }
+    final elapsed = DateTime.now()
+        .difference(
+          _chatPreviewTimes[id] ?? DateTime.fromMillisecondsSinceEpoch(0),
+        )
+        .inMilliseconds;
+    final delay = (1000 - elapsed).clamp(150, 1000);
+    _chatPreviewTimers[id] = Timer(Duration(milliseconds: delay), () {
+      _chatPreviewTimers.remove(id);
+      if (_disposed ||
+          !_previewForeground ||
+          !_previewWatchers.containsKey(id)) {
+        return;
+      }
+      final tab = _tabs.where((tab) => tab.id == id).firstOrNull;
+      final engine = _engines[id];
+      if (tab == null ||
+          engine == null ||
+          tab.isLoading ||
+          tab.error != null ||
+          (tab.url == 'about:blank' && !tab.hasContent)) {
+        return;
+      }
+      final existing = _previewFlights[id];
+      if (existing != null) {
+        // One trailing request, not another capture alongside the native one.
+        unawaited(existing.future.then((_) => _scheduleChatPreview(id)));
+        return;
+      }
+      _chatPreviewTimes[id] = DateTime.now();
+      unawaited(
+        _startPreviewCapture(tab, engine, allowLoading: false, observed: true),
+      );
+    });
+  }
+
   void _invalidatePreview(String id) {
     _previewEpochs[id] = (_previewEpochs[id] ?? 0) + 1;
     _tabPreviews.remove(id);
@@ -683,10 +755,26 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       if (existing.epoch != epoch) _previewPending.add(id);
       return existing.future;
     }
-    final engine = _engines[id]!;
+    return _startPreviewCapture(tab, _engines[id]!, allowLoading: fresh);
+  }
+
+  Future<void> _startPreviewCapture(
+    BrowserTab tab,
+    BrowserEngine engine, {
+    required bool allowLoading,
+    bool observed = false,
+  }) {
+    final id = tab.id;
+    final epoch = _previewEpochs[id] ?? 0;
     late final Future<void> future;
-    future = _capturePreview(tab, engine, epoch, allowLoading: fresh)
-        .whenComplete(() {
+    future =
+        _capturePreview(
+          tab,
+          engine,
+          epoch,
+          allowLoading: allowLoading,
+          observed: observed,
+        ).whenComplete(() {
           if (identical(_previewFlights[id]?.future, future)) {
             _previewFlights.remove(id);
           }
@@ -707,11 +795,41 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     BrowserEngine engine,
     int epoch, {
     required bool allowLoading,
+    required bool observed,
   }) async {
     try {
-      final bytes = await engine.thumbnail().timeout(
-        const Duration(seconds: 2),
-      );
+      // A timed-out native encoder may still be running. Wait for it, but
+      // discard its pixels: they belong to an older document or viewport.
+      final pending = _nativePreviewFlights[before.id];
+      if (pending != null && identical(pending.engine, engine)) {
+        try {
+          await pending.future.timeout(const Duration(seconds: 2));
+        } on TimeoutException {
+          return;
+        } catch (_) {
+          // Its failure does not prevent a new snapshot of the current page.
+        }
+        if (_disposed ||
+            (_previewEpochs[before.id] ?? 0) != epoch ||
+            !identical(_engines[before.id], engine) ||
+            (observed
+                ? !_previewForeground ||
+                      !_previewWatchers.containsKey(before.id)
+                : !_canPreview(activeTab, allowLoading: allowLoading) ||
+                      activeTabId != before.id)) {
+          return;
+        }
+      }
+      final future = Future<Uint8List?>.sync(engine.thumbnail);
+      _nativePreviewFlights[before.id] = (engine: engine, future: future);
+      void clear() {
+        if (identical(_nativePreviewFlights[before.id]?.future, future)) {
+          _nativePreviewFlights.remove(before.id);
+        }
+      }
+
+      unawaited(future.then((_) => clear(), onError: (Object _) => clear()));
+      final bytes = await future.timeout(const Duration(seconds: 2));
       final current = _tabs.where((tab) => tab.id == before.id).firstOrNull;
       if (_disposed ||
           bytes == null ||
@@ -1005,6 +1123,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         error: tab.error,
       );
       final retired = _engines.remove(id);
+      _nativePreviewFlights.remove(id);
       _engineGroups.remove(id);
       if (retired != null) unawaited(_disposeRetired(id, retired));
     }
@@ -1033,6 +1152,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _notify();
     if (state.completedNavigation && state.error == null) {
       _captureLoadedPreview(id);
+      if (!_hasVisibleView(id)) _scheduleChatPreview(id);
     }
   }
 
@@ -1065,6 +1185,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     // the old instance that this operation is about to destroy.
     final retired = {for (final id in ids) id: _engines.remove(id)};
     for (final id in ids) {
+      _nativePreviewFlights.remove(id);
       _engineGroups.remove(id);
     }
     for (var index = 0; index < _tabs.length; index++) {
@@ -1248,6 +1369,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
               }),
           ]);
           _checkAction();
+          if (_agentTabId case final id?) _scheduleChatPreview(id);
           result.complete(value);
         } catch (error, stack) {
           result.completeError(error, stack);
@@ -1595,6 +1717,17 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final resumed = state == AppLifecycleState.resumed;
+    _previewForeground = resumed;
+    if (!resumed) {
+      for (final timer in _chatPreviewTimers.values) {
+        timer.cancel();
+      }
+      _chatPreviewTimers.clear();
+    } else {
+      for (final id in _previewWatchers.keys) {
+        _scheduleChatPreview(id);
+      }
+    }
     for (final entry in _engines.entries) {
       unawaited(
         entry.value
@@ -1618,8 +1751,15 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _invalidateAgentActions();
     _disposed = true;
     _tabPreviews.clear();
+    _nativePreviewFlights.clear();
     _favicons.clear();
     _previewPending.clear();
+    for (final timer in _chatPreviewTimers.values) {
+      timer.cancel();
+    }
+    _chatPreviewTimers.clear();
+    _previewWatchers.clear();
+    _chatPreviewTimes.clear();
     scrollPosition.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _saveTimer?.cancel();

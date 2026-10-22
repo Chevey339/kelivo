@@ -24263,6 +24263,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ask AI in the owning chat'**
   String get browserAskAiInOwnerConversation;
+
+  /// No description provided for @displaySettingsPageShowBrowserPageCardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show webpage cards'**
+  String get displaySettingsPageShowBrowserPageCardsTitle;
 }
 
 class _AppLocalizationsDelegate

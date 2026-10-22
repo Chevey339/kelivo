@@ -67,6 +67,7 @@ void main() {
     bool narrow = false,
     double scale = 1,
     bool reduceMotion = false,
+    bool? streaming,
   }) async {
     tester.view.physicalSize = Size(narrow ? 320 : 800, 1500);
     tester.view.devicePixelRatio = 1;
@@ -100,7 +101,7 @@ void main() {
                   id: 'message',
                   conversationId: conversationId,
                   role: 'assistant',
-                  isStreaming: tools.any((tool) => tool.loading),
+                  isStreaming: streaming ?? tools.any((tool) => tool.loading),
                 ),
                 toolParts: tools,
                 showModelIcon: false,
@@ -123,7 +124,17 @@ void main() {
         (widget.key! as ValueKey<String>).value.startsWith('browser-step-'),
   );
   Future<void> toggle(WidgetTester tester) async {
-    await tester.tap(find.text('Browsing'));
+    await tester.tap(
+      find
+          .byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith(
+                  'browser-group-header-',
+                ),
+          )
+          .first,
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
   }
@@ -280,7 +291,7 @@ void main() {
         conversationId: 'new-chat',
         reduceMotion: true,
       );
-      expect(steps(), findsNWidgets(2));
+      expect(steps(), findsNothing);
       await pump(
         tester,
         [_tool('a'), _tool('b')],
@@ -311,22 +322,59 @@ void main() {
     expect(find.text('· 1 failed'), findsOneWidget);
   });
 
-  testWidgets('streaming completion auto collapses until the user chooses', (
+  testWidgets('running actions share the header without expanding the list', (
     tester,
   ) async {
-    await pump(tester, [_tool('a'), _tool('b', loading: true)]);
-    expect(steps(), findsNWidgets(2));
+    await pump(tester, [
+      _tool('a'),
+      _tool('b', action: 'click', loading: true),
+    ]);
+    expect(steps(), findsNothing);
+    expect(find.text('Click'), findsOneWidget);
     expect(find.text('step 2'), findsOneWidget);
-    expect(find.text('Live'), findsOneWidget);
-    await pump(tester, [_tool('a'), _tool('b')]);
+    final card = tester.element(find.byType(BrowserPageCard));
+    final y = tester.getTopLeft(find.byType(BrowserPageCard)).dy;
+    await pump(tester, [
+      _tool('a'),
+      _tool('b', action: 'click'),
+    ], streaming: true);
+    expect(find.text('Click'), findsOneWidget);
     expect(steps(), findsNothing);
+    await pump(tester, [
+      _tool('a'),
+      _tool('b'),
+      _tool('c', action: 'scroll', loading: true),
+    ]);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Scroll'), findsOneWidget);
+    expect(tester.element(find.byType(BrowserPageCard)), same(card));
+    expect(tester.getTopLeft(find.byType(BrowserPageCard)).dy, closeTo(y, .01));
+    await pump(tester, [_tool('a'), _tool('b'), _tool('c')]);
+    await tester.pumpAndSettle();
+    expect(find.text('Browsing'), findsOneWidget);
+    expect(steps(), findsNothing);
+    // Users may still inspect steps while the agent runs; keep their choice.
     await pump(tester, [_tool('a'), _tool('b', loading: true)]);
     await toggle(tester);
-    await toggle(tester);
+    expect(steps(), findsNWidgets(2));
     await pump(tester, [_tool('a'), _tool('b')]);
     expect(steps(), findsNWidgets(2));
-    await pump(tester, [_tool('a'), _tool('b')], conversationId: 'other-chat');
-    expect(steps(), findsNothing);
+  });
+
+  testWidgets('hiding webpage cards preserves the group and its details', (
+    tester,
+  ) async {
+    await pump(tester, [_tool('a'), _tool('b')]);
+    expect(find.byType(BrowserPageCard), findsOneWidget);
+    await tester.runAsync(() => settings.setShowBrowserPageCards(false));
+    await tester.pumpAndSettle();
+    expect(find.byType(BrowserStepGroupBody), findsNothing);
+    expect(find.text('Browsing'), findsOneWidget);
+    await toggle(tester);
+    expect(steps(), findsNWidgets(2));
+    await tester.runAsync(() => settings.setShowBrowserPageCards(true));
+    await tester.pumpAndSettle();
+    expect(find.byType(BrowserPageCard), findsOneWidget);
   });
 
   testWidgets(
@@ -400,6 +448,17 @@ void main() {
             find.byKey(const ValueKey('browser-step-detail-open')),
           );
           expect(button.onPressed, isNull);
+          final pageRect = tester.getRect(
+            find.byKey(const ValueKey('browser-step-detail-page')),
+          );
+          final buttonRect = tester.getRect(
+            find.byKey(const ValueKey('browser-step-detail-open')),
+          );
+          expect(
+            buttonRect.right,
+            closeTo(pageRect.right - 10, 1),
+            reason: 'The action must align with the trailing page inset',
+          );
           expect(find.text('Tab was closed'), findsOneWidget);
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());

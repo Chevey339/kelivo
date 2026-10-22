@@ -915,10 +915,9 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<Uint8List?> thumbnail() async {
     InAppWebViewRect? rect;
     var snapshotWidth = 440.0;
-    if (Platform.isAndroid) {
-      // Android also interprets snapshotWidth in logical pixels. Match iOS's
-      // 440 physical-pixel thumbnail budget instead of encoding a full-size
-      // screenshot (and sometimes upscaling it) for each preview.
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      // These platforms interpret snapshotWidth in logical pixels. Bound the
+      // encoded image to 440 physical pixels, including Retina desktop screens.
       snapshotWidth /= WidgetsBinding
           .instance
           .platformDispatcher
@@ -926,23 +925,31 @@ class NativeBrowserEngine implements BrowserEngine {
           .first
           .devicePixelRatio;
     }
-    if (Platform.isIOS) {
+    if (Platform.isIOS && _headless == null) {
       final viewId = _webView.getViewId();
-      if (viewId == null) return null;
-      final viewport = await const MethodChannel(
-        'app.browser_window',
-      ).invokeMapMethod<String, num>('browserSnapshotRect', viewId.toString());
-      if (viewport == null) return null;
-      // WKSnapshotConfiguration measures width in points; its UIImage uses the
-      // hosting screen's scale. Bound the decoded thumbnail to 440 pixels,
-      // rather than allocating a 1320px image on every 3x iPhone tab.
-      snapshotWidth /= viewport['scale']!.toDouble();
-      rect = InAppWebViewRect(
-        x: viewport['x']!.toDouble(),
-        y: viewport['y']!.toDouble(),
-        width: viewport['width']!.toDouble(),
-        height: viewport['height']!.toDouble(),
-      );
+      final viewport = viewId == null
+          ? null
+          : await const MethodChannel(
+              'app.browser_window',
+            ).invokeMapMethod<String, num>(
+              'browserSnapshotRect',
+              viewId.toString(),
+            );
+      // A keep-alive view can be detached after the browser page closes.
+      // Its own bounds still describe webpage content; only attached views
+      // need the native status-bar crop.
+      if (viewport != null) {
+        // WKSnapshotConfiguration measures width in points; its UIImage uses the
+        // hosting screen's scale. Bound the decoded thumbnail to 440 pixels,
+        // rather than allocating a 1320px image on every 3x iPhone tab.
+        snapshotWidth = 440 / viewport['scale']!.toDouble();
+        rect = InAppWebViewRect(
+          x: viewport['x']!.toDouble(),
+          y: viewport['y']!.toDouble(),
+          width: viewport['width']!.toDouble(),
+          height: viewport['height']!.toDouble(),
+        );
+      }
     }
     return _webView.takeScreenshot(
       screenshotConfiguration: ScreenshotConfiguration(

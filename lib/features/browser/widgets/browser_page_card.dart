@@ -23,12 +23,14 @@ class BrowserStepGroupBody extends StatefulWidget {
     this.lite = false,
     this.service,
     this.onOpen,
+    this.running,
   });
   final List<BrowserToolAction> actions;
   final String conversationId;
   final bool lite;
   final BrowserService? service;
   final ValueChanged<String?>? onOpen;
+  final bool? running;
 
   @override
   State<BrowserStepGroupBody> createState() => _BrowserStepGroupBodyState();
@@ -37,22 +39,72 @@ class BrowserStepGroupBody extends StatefulWidget {
 class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
   Object? _cardSignature;
   Widget? _card;
+  String? _watchedTab;
+  bool _previewVisible = false;
+  VoidCallback? _releasePreview;
   BrowserService get _browser => widget.service ?? BrowserService.instance;
-  bool get _running => widget.actions.any((action) => action.loading);
+  bool get _running =>
+      widget.running ?? widget.actions.any((action) => action.loading);
   int get _failures => widget.actions.where((action) => action.failed).length;
+
+  String? get _previewTabId {
+    if (_running &&
+        _browser.agentSessionId == widget.conversationId &&
+        _browser.agentTabId != null) {
+      return _browser.agentTabId;
+    }
+    return widget.actions.reversed
+        .map((action) => action.tabId)
+        .whereType<String>()
+        .firstOrNull;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _browser.addListener(_syncPreview);
+  }
+
+  void _syncPreview() {
+    final id = widget.lite || !_previewVisible ? null : _previewTabId;
+    if (_watchedTab == id) return;
+    _releasePreview?.call();
+    _watchedTab = id;
+    _releasePreview = id == null ? null : _browser.watchTabPreview(id);
+  }
+
+  @override
+  void dispose() {
+    _browser.removeListener(_syncPreview);
+    _releasePreview?.call();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _card = null;
+    _previewVisible =
+        Visibility.of(context) && TickerMode.valuesOf(context).enabled;
+    _syncPreview();
   }
 
   @override
   void didUpdateWidget(BrowserStepGroupBody oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.service != widget.service) {
+      (oldWidget.service ?? BrowserService.instance).removeListener(
+        _syncPreview,
+      );
+      _releasePreview?.call();
+      _watchedTab = null;
+      _browser.addListener(_syncPreview);
+    }
+    _syncPreview();
     if (!identical(oldWidget.actions, widget.actions) ||
         oldWidget.conversationId != widget.conversationId ||
         oldWidget.lite != widget.lite ||
+        oldWidget.running != widget.running ||
         oldWidget.service != widget.service ||
         oldWidget.onOpen != widget.onOpen) {
       _card = null;
@@ -66,13 +118,13 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
         .map((action) => action.tabId)
         .whereType<String>()
         .firstOrNull;
-    final previewId = page?.tabId ?? lastTabId;
+    final previewId = _previewTabId ?? page?.tabId ?? lastTabId;
     final liveTab = _browser.tabs
         .where((tab) => tab.id == previewId)
         .firstOrNull;
     final bytes = previewId == null ? null : _browser.previewForTab(previewId);
     final l = AppLocalizations.of(context)!;
-    final signature = (bytes, liveTab?.title, liveTab?.url, l);
+    final signature = (previewId, bytes, liveTab?.title, liveTab?.url, l);
     if (_card != null && signature == _cardSignature) return _card!;
     _cardSignature = signature;
     final current = actions.lastWhere(
@@ -84,6 +136,7 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
         .firstOrNull;
     final failed = !_running && page == null && _failures > 0;
     final url =
+        (_running ? liveTab?.url : null) ??
         page?.url ??
         actions.reversed
             .map((action) => action.url)
@@ -91,7 +144,9 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
             .firstOrNull ??
         liveTab?.url ??
         '';
-    final title = page?.title.isNotEmpty == true
+    final title = _running && liveTab?.title.isNotEmpty == true
+        ? liveTab!.title
+        : page?.title.isNotEmpty == true
         ? page!.title
         : (url == 'about:blank' || url.isEmpty
               ? l.browserCardBlankPage
@@ -124,12 +179,12 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
       service: _browser,
       onTap: () {
         if (widget.onOpen case final open?) {
-          open(lastTabId);
+          open(previewId ?? lastTabId);
         } else {
           openBrowserPage(
             context,
             conversationId: widget.conversationId,
-            tabId: lastTabId,
+            tabId: previewId ?? lastTabId,
           );
         }
       },

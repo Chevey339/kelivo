@@ -867,30 +867,34 @@ class _BrowserStepDetailHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Flexible(
-                  child: ListenableBuilder(
-                    listenable: BrowserService.instance,
-                    builder: (context, _) {
-                      final exists = BrowserService.instance.tabs.any(
-                        (tab) => tab.id == action.tabId,
-                      );
-                      return TextButton.icon(
-                        key: const ValueKey('browser-step-detail-open'),
-                        icon: const Icon(Lucide.AppWindow, size: 15),
-                        label: Text(
-                          exists
-                              ? l.browserOpenThisPage
-                              : l.browserErrTabClosed,
-                        ),
-                        onPressed: !exists
-                            ? null
-                            : () async {
-                                final closed = await Navigator.of(
-                                  context,
-                                ).maybePop();
-                                if (closed) onOpen();
-                              },
-                      );
-                    },
+                  fit: FlexFit.tight,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ListenableBuilder(
+                      listenable: BrowserService.instance,
+                      builder: (context, _) {
+                        final exists = BrowserService.instance.tabs.any(
+                          (tab) => tab.id == action.tabId,
+                        );
+                        return TextButton.icon(
+                          key: const ValueKey('browser-step-detail-open'),
+                          icon: const Icon(Lucide.AppWindow, size: 15),
+                          label: Text(
+                            exists
+                                ? l.browserOpenThisPage
+                                : l.browserErrTabClosed,
+                          ),
+                          onPressed: !exists
+                              ? null
+                              : () async {
+                                  final closed = await Navigator.of(
+                                    context,
+                                  ).maybePop();
+                                  if (closed) onOpen();
+                                },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -3312,6 +3316,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     conversationId: widget.message.conversationId,
                     showThinkingCards: showThinkingCards,
                     showToolCards: showToolCards,
+                    streaming:
+                        widget.message.isStreaming &&
+                        blockIndex == visibleBlocks.length - 1,
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
                   ),
                 );
@@ -4750,6 +4757,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
     required this.conversationId,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.streaming,
     this.onRecoveredAnswer,
   });
 
@@ -4757,6 +4765,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
   final String conversationId;
   final bool showThinkingCards;
   final bool showToolCards;
+  final bool streaming;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -4834,6 +4843,9 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     );
     final hideToolResultImages = context.select<SettingsProvider, bool>(
       (s) => s.hideToolResultImages,
+    );
+    final showBrowserPageCards = context.select<SettingsProvider, bool>(
+      (s) => s.showBrowserPageCards,
     );
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
@@ -5009,6 +5021,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                           theme.brightness,
                           textScale,
                           hideToolResultImages,
+                          showBrowserPageCards,
+                          widget.streaming,
                           widget.conversationId,
                         ),
                         builder: () => _ChainOfThoughtBrowserGroup(
@@ -5018,6 +5032,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                           isFirst: isFirst,
                           isLast: isLast,
                           hideImages: hideToolResultImages,
+                          showPageCard: showBrowserPageCards,
+                          streaming: widget.streaming,
                         ),
                       );
                     }
@@ -5551,9 +5567,11 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
     required this.isFirst,
     required this.isLast,
     required this.hideImages,
+    required this.showPageCard,
+    required this.streaming,
   });
   final List<ToolUIPart> tools;
-  final bool lite, isFirst, isLast, hideImages;
+  final bool lite, isFirst, isLast, hideImages, showPageCard, streaming;
   final String conversationId;
   @override
   State<_ChainOfThoughtBrowserGroup> createState() =>
@@ -5570,6 +5588,7 @@ class _ChainOfThoughtBrowserGroupState
   void initState() {
     super.initState();
     _parse();
+    _syncAction(immediate: true);
     _keepSteps = _isExpanded;
   }
 
@@ -5585,6 +5604,7 @@ class _ChainOfThoughtBrowserGroupState
       _showAll = false;
     }
     _parse();
+    _syncAction(immediate: changedGroup);
     if (changedGroup || MediaQuery.disableAnimationsOf(context)) {
       _keepSteps = _isExpanded;
       if (!_keepSteps) _showAll = false;
@@ -5646,10 +5666,53 @@ class _ChainOfThoughtBrowserGroupState
   bool _showAll = false;
   bool _keepSteps = false;
 
+  // Keep fast calls in one header. Coalesce updates instead of stacking
+  // transitions for steps that can finish within a single frame.
+  Timer? _actionTimer;
+  BrowserToolAction? _displayAction, _pendingAction;
+  bool get _executing =>
+      _actions.any((action) => action.loading) ||
+      (widget.streaming && widget.isLast && !widget.lite);
+
+  void _syncAction({bool immediate = false}) {
+    _pendingAction = _executing
+        ? _actions.lastWhere(
+            (action) => action.loading,
+            orElse: () => _actions.last,
+          )
+        : null;
+    if (immediate) {
+      _actionTimer?.cancel();
+      _actionTimer = null;
+      _displayAction = _pendingAction;
+    } else if (_displayAction?.id == _pendingAction?.id &&
+        _displayAction?.action == _pendingAction?.action) {
+      _actionTimer?.cancel();
+      _actionTimer = null;
+      _displayAction = _pendingAction;
+    } else {
+      _actionTimer ??= Timer(const Duration(milliseconds: 200), () {
+        _actionTimer = null;
+        setState(() {
+          _displayAction = _pendingAction;
+          if (_isExpanded) _keepSteps = true;
+        });
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _actionTimer?.cancel();
+    super.dispose();
+  }
+
   bool get _isExpanded => _userToggled
       ? _expanded!
       : !widget.lite &&
-            _actions.any((action) => action.loading || action.failed);
+            !_executing &&
+            _displayAction == null &&
+            _actions.any((action) => action.failed);
 
   void _finishStepsAnimation() {
     if (!_isExpanded && _keepSteps) {
@@ -5668,7 +5731,7 @@ class _ChainOfThoughtBrowserGroupState
     final fg = chatSurfaceForegroundPalette(context);
     final cs = Theme.of(context).colorScheme;
     final l = AppLocalizations.of(context)!;
-    final running = _actions.any((action) => action.loading);
+    final running = _executing || _displayAction != null;
     final failures = _actions.where((action) => action.failed).length;
     final expanded = _isExpanded;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
@@ -5682,6 +5745,7 @@ class _ChainOfThoughtBrowserGroupState
       actions: _actions,
       conversationId: widget.conversationId,
       lite: widget.lite,
+      running: running,
     );
     final header = _TimelineStepShell(
       stableKey: ValueKey('browser-group-header-${widget.tools.first.id}'),
@@ -5699,14 +5763,26 @@ class _ChainOfThoughtBrowserGroupState
               child: ThinkingSheen(
                 enabled: running,
                 color: fg.strong,
-                child: Text(
-                  l.browserStepGroupTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: AppFontWeights.semibold,
-                    color: fg.strong,
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 160),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: AlignmentDirectional.centerStart,
+                    children: [...previous, if (current != null) current],
+                  ),
+                  child: Text(
+                    _displayAction?.label(l) ?? l.browserStepGroupTitle,
+                    key: ValueKey(_displayAction?.action ?? 'browser-idle'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.semibold,
+                      color: fg.strong,
+                    ),
                   ),
                 ),
               ),
@@ -5827,11 +5903,12 @@ class _ChainOfThoughtBrowserGroupState
                   child: stepsContent,
                 ),
         ),
-        _TimelineStepBody(
-          isLast: widget.isLast,
-          animate: false,
-          content: pageCard,
-        ),
+        if (widget.showPageCard)
+          _TimelineStepBody(
+            isLast: widget.isLast,
+            animate: false,
+            content: pageCard,
+          ),
       ],
     );
   }
