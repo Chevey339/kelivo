@@ -1,17 +1,19 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'database_family_preserver.dart';
 import 'dart:io';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:uuid/uuid.dart';
 
 import '../services/backup/local_copy_catalog.dart';
 import '../services/backup/recovery_file_discovery.dart';
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
+import 'chat_database_repository.dart' show ChatStorageMetaKeys;
+import 'empty_database_permission.dart';
 
 /// A valid SQLite file is not sufficient proof that an empty installation is
 /// intentional. Stop before providers seed defaults or schedule new snapshots.
@@ -27,6 +29,7 @@ abstract final class EmptyDatabaseRecoveryGuard {
       mode: sqlite.OpenMode.readOnly,
     );
     final bool hasChats;
+    final String? token;
     try {
       hasChats =
           database
@@ -35,28 +38,36 @@ abstract final class EmptyDatabaseRecoveryGuard {
               )
               .single['present'] ==
           1;
+      final rows = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?',
+        [EmptyDatabasePermission.tokenKey],
+      );
+      token = rows.isEmpty ? null : rows.single['value'] as String;
     } finally {
       database.close();
     }
     final ack = File(p.join(appDataDirectory.path, acknowledgementName));
     if (hasChats) {
-      if (await ack.exists()) await ack.delete();
+      await invalidate(appDataDirectory);
       return;
     }
-    final catalog = LocalCopyCatalog(appDataDirectory: appDataDirectory);
-    final copies = await catalog.list();
-    final signature = await _copySignature(copies, catalog.hadReadErrors);
     try {
       if (await ack.length() > 4096) {
         throw StateError('database_acknowledgement_size');
       }
       final value = jsonDecode(await ack.readAsString());
-      if (value['databaseId'] == databaseId && value['copies'] == signature) {
+      if (token != null &&
+          value is Map &&
+          value['version'] == 1 &&
+          value['databaseId'] == databaseId &&
+          value['token'] == token) {
         return;
       }
     } catch (_) {
       // A stale, absent or damaged acknowledgement never authorizes an empty start.
     }
+    final catalog = LocalCopyCatalog(appDataDirectory: appDataDirectory);
+    final copies = await catalog.list();
     if (catalog.hadReadErrors) {
       throw StateError('database_empty_with_recovery_copies');
     }
@@ -125,45 +136,63 @@ abstract final class EmptyDatabaseRecoveryGuard {
     );
   }
 
-  static Future<String> _copySignature(
-    List<LocalCopy> copies,
-    bool readErrors,
-  ) async {
-    final state = <String>[];
-    for (final copy in copies) {
-      for (final suffix
-          in copy.isArchive ? [''] : DatabaseFamilyPreserver.suffixes) {
-        final path = '${copy.file.absolute.path}$suffix';
-        final stat = await FileStat.stat(path);
-        state.add(
-          jsonEncode([
-            path,
-            stat.type.toString(),
-            stat.size,
-            stat.modified.microsecondsSinceEpoch,
-          ]),
-        );
-      }
-    }
-    state.sort();
-    return sha256
-        .convert(utf8.encode(jsonEncode([readErrors, state])))
-        .toString();
-  }
-
-  /// Only called after an explicit choice to keep the current empty database.
+  /// Only called after an explicit keep/reset/restore choice, before business
+  /// services open the database. Nonempty restores never receive permission.
   static Future<void> acknowledge(Directory directory) async {
     final receipt = await DatabaseInstallationGate.read(
       appDataDirectory: directory,
     );
     if (receipt == null) throw StateError('database_identity_missing');
-    final catalog = LocalCopyCatalog(appDataDirectory: directory);
-    final copies = await catalog.list();
-    final signature = await _copySignature(copies, catalog.hadReadErrors);
+    final database = sqlite.sqlite3.open(
+      p.join(directory.path, AppDatabase.databaseFileName),
+      mode: sqlite.OpenMode.readWrite,
+    );
+    try {
+      database.execute('BEGIN IMMEDIATE');
+      final identity = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?',
+        [ChatStorageMetaKeys.databaseIdentity],
+      );
+      if (identity.length != 1 ||
+          identity.single['value'] != receipt.databaseId) {
+        throw StateError('database_identity_mismatch');
+      }
+      if (database
+              .select(EmptyDatabasePermission.hasDataQuery)
+              .single['present'] ==
+          1) {
+        await invalidate(directory);
+      } else {
+        for (final statement in EmptyDatabasePermission.invalidationTriggers) {
+          database.execute(statement);
+        }
+        final token = await recordEmptyState(directory, receipt.databaseId);
+        database.execute(
+          'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) VALUES (?, ?)',
+          [EmptyDatabasePermission.tokenKey, token],
+        );
+      }
+      database.execute('COMMIT');
+    } catch (_) {
+      if (!database.autocommit) database.execute('ROLLBACK');
+      rethrow;
+    } finally {
+      database.close();
+    }
+  }
+
+  /// The caller must hold a DB transaction, verify it is empty, then store the
+  /// returned token in that same transaction. A rollback cannot authorize an
+  /// older DB state because the durable file already contains a new token.
+  static Future<String> recordEmptyState(
+    Directory directory,
+    String databaseId,
+  ) async {
+    final token = const Uuid().v4();
     final target = File(p.join(directory.path, acknowledgementName));
-    final temporary = File('${target.path}.tmp');
+    final temporary = File('${target.path}.${const Uuid().v4()}.tmp');
     await temporary.writeAsString(
-      jsonEncode({'databaseId': receipt.databaseId, 'copies': signature}),
+      jsonEncode({'version': 1, 'databaseId': databaseId, 'token': token}),
       flush: true,
     );
     final durability = RestorePlatformDurability();
@@ -179,5 +208,6 @@ abstract final class EmptyDatabaseRecoveryGuard {
       await durability.syncDirectory(directory, fullBarrier: true);
     }
     await durability.renameAndSync(source: temporary, targetPath: target.path);
+    return token;
   }
 }

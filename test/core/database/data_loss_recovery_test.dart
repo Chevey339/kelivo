@@ -155,6 +155,249 @@ void main() {
     },
   );
   test(
+    'deleting the last conversation intentionally allows an empty startup',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/kelivo.db'),
+      );
+      try {
+        await repository.putConversation(
+          Conversation(id: 'last', title: 'Last'),
+        );
+        await repository.putMessage(
+          ChatMessage(
+            id: 'last-message',
+            conversationId: 'last',
+            role: 'user',
+            content: 'Last message',
+          ),
+        );
+        await repository.deleteConversation('last');
+        expect(await repository.readTombstones(), hasLength(1));
+      } finally {
+        await repository.close();
+      }
+      await EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: root,
+        databaseId: receipt.databaseId,
+      );
+    },
+  );
+  test(
+    'a no-op deletion cannot authorize an unexplained empty database',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/kelivo.db'),
+      );
+      try {
+        await repository.deleteConversation('missing');
+      } finally {
+        await repository.close();
+      }
+      await expectLater(
+        EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: root,
+          databaseId: receipt.databaseId,
+        ),
+        throwsStateError,
+      );
+    },
+  );
+  for (final replace in [false, true]) {
+    test(
+      'explicit ${replace ? 'empty replacement' : 'clear all'} remains allowed with retained chats',
+      () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: root,
+        );
+        await writeRecoverySnapshot(
+          File('${root.path}/kelivo-snapshot-old.zip'),
+        );
+        final repository = ChatDatabaseRepository.open(
+          file: File('${root.path}/kelivo.db'),
+        );
+        try {
+          await repository.putConversation(
+            Conversation(id: 'old', title: 'Old'),
+          );
+          if (replace) {
+            await repository.replaceBackupData(
+              conversations: [],
+              messages: [],
+              toolEventsByMessageId: {},
+              geminiSignaturesByMessageId: {},
+            );
+          } else {
+            await repository.clearAllData();
+          }
+        } finally {
+          await repository.close();
+        }
+        await EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: root,
+          databaseId: receipt.databaseId,
+        );
+      },
+    );
+  }
+  test(
+    'a rolled-back last deletion cannot grant empty-state permission',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+      final live = File('${root.path}/kelivo.db');
+      var repository = ChatDatabaseRepository.open(file: live);
+      await repository.putConversation(Conversation(id: 'last', title: 'Last'));
+      await repository.close();
+      final fault = sqlite.sqlite3.open(live.path);
+      fault.execute(
+        "CREATE TRIGGER reject_empty_permission BEFORE INSERT ON chat_storage_meta_rows WHEN NEW.key = 'intentional_empty_chat_state_v1' BEGIN SELECT RAISE(ABORT, 'injected failure after permission file'); END",
+      );
+      fault.close();
+      repository = ChatDatabaseRepository.open(file: live);
+      try {
+        await expectLater(
+          repository.deleteConversation('last'),
+          throwsA(anything),
+        );
+        expect(await repository.getConversation('last'), isNotNull);
+        expect(await repository.readTombstones(), isEmpty);
+      } finally {
+        await repository.close();
+      }
+      // The acknowledgement file was published, but its DB transaction failed.
+      final later = sqlite.sqlite3.open(live.path);
+      later.execute('DELETE FROM conversation_rows');
+      later.close();
+      await expectLater(
+        EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: root,
+          databaseId: receipt.databaseId,
+        ),
+        throwsStateError,
+      );
+    },
+  );
+  test(
+    'restoring an old empty database cannot restore its expired permission',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+      await EmptyDatabaseRecoveryGuard.acknowledge(root);
+      final live = File('${root.path}/kelivo.db');
+      final priorEmpty = await live.copy('${root.path}/old-empty.sqlite');
+      final repository = ChatDatabaseRepository.open(file: live);
+      try {
+        await repository.putConversation(Conversation(id: 'new', title: 'New'));
+      } finally {
+        await repository.close();
+      }
+      await priorEmpty.copy(live.path);
+      await expectLater(
+        EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: root,
+          databaseId: receipt.databaseId,
+        ),
+        throwsStateError,
+      );
+    },
+  );
+  test(
+    'failed and empty merges do not revoke a valid empty-state choice',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+      await EmptyDatabaseRecoveryGuard.acknowledge(root);
+      final empty = File('${root.path}/empty-source.sqlite');
+      final source = ChatDatabaseRepository.open(file: empty);
+      await source.ensureReady();
+      await source.close();
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/kelivo.db'),
+      );
+      try {
+        await expectLater(
+          repository.mergeBackupSnapshot(File('${root.path}/missing.sqlite')),
+          throwsA(isA<FileSystemException>()),
+        );
+        final report = await repository.mergeBackupSnapshot(empty);
+        expect(report.importedConversations, 0);
+      } finally {
+        await repository.close();
+      }
+      await EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: root,
+        databaseId: receipt.databaseId,
+      );
+    },
+  );
+  test(
+    'empty snapshots and removal of old copies keep an empty choice valid',
+    () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: root,
+      );
+      final old = await writeRecoverySnapshot(
+        File('${root.path}/kelivo-snapshot-old.zip'),
+      );
+      await EmptyDatabaseRecoveryGuard.acknowledge(root);
+      await writeRecoverySnapshot(
+        File('${root.path}/kelivo-snapshot-empty.zip'),
+        conversations: 0,
+        messages: 0,
+      );
+      Future<void> check() => EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: root,
+        databaseId: receipt.databaseId,
+      );
+      await check();
+      await old.delete();
+      await check();
+    },
+  );
+  test('a nonempty database cannot receive an empty-start permission', () async {
+    final receipt = await DatabaseInstallationGate.ensureReady(
+      appDataDirectory: root,
+    );
+    await writeRecoverySnapshot(File('${root.path}/kelivo-snapshot-old.zip'));
+    final repository = ChatDatabaseRepository.open(
+      file: File('${root.path}/kelivo.db'),
+    );
+    try {
+      await repository.putConversation(
+        Conversation(id: 'restored', title: 'Restored'),
+      );
+    } finally {
+      await repository.close();
+    }
+    // main calls this after a successful database restore, including nonempty ones.
+    await EmptyDatabaseRecoveryGuard.acknowledge(root);
+    final database = sqlite.sqlite3.open('${root.path}/kelivo.db');
+    database.execute('DELETE FROM conversation_rows');
+    database.close();
+    await expectLater(
+      EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: root,
+        databaseId: receipt.databaseId,
+      ),
+      throwsStateError,
+    );
+  });
+  test(
     'an acknowledgement cannot hide data loss after a new snapshot in the same session',
     () async {
       final receipt = await DatabaseInstallationGate.ensureReady(

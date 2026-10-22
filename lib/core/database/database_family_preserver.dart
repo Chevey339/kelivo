@@ -15,6 +15,7 @@ abstract final class DatabaseFamilyPreserver {
   static const manifestName = '.kelivo_database_family.json';
   static const directoryPrefix = 'kelivo.db.displaced-';
   static const suffixes = ['', '-wal', '-shm', '-journal'];
+  static const failedRecoveryPhase = 'retiring failed database preservation';
 
   static bool isCopyDirectory(String name) =>
       RegExp(r'^kelivo\.db\.displaced-[0-9]+$').hasMatch(name);
@@ -110,6 +111,78 @@ abstract final class DatabaseFamilyPreserver {
     }
     await pending.delete();
     await durability.syncDirectory(root, fullBarrier: true);
+  }
+
+  /// Only for a confirmed reset or snapshot recovery under both leases and an
+  /// already durable recovery barrier. Normal startup must still call resume.
+  static Future<void> prepareExplicitRecovery(
+    Directory root, {
+    required File recoveryBarrier,
+    required RestoreDurability durability,
+    bool retireExistingFamilies = false,
+  }) async {
+    if (await FileSystemEntity.type(recoveryBarrier.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw StateError('database_preservation_recovery_barrier');
+    }
+    // The barrier's existence is authoritative. Unknown/truncated bytes from
+    // an interrupted phase write conservatively require retiring all families.
+    var retiring =
+        await recoveryBarrier.length() > 512 ||
+        utf8.decode(
+              await recoveryBarrier.readAsBytes(),
+              allowMalformed: true,
+            ) !=
+            'preparing snapshot recovery';
+    if (retireExistingFamilies && !retiring) {
+      await recoveryBarrier.writeAsString(failedRecoveryPhase, flush: true);
+      await durability.syncFile(recoveryBarrier, fullBarrier: true);
+      await durability.syncDirectory(root, fullBarrier: true);
+      retiring = true;
+    }
+    try {
+      await resume(root, durability: durability);
+    } catch (_) {
+      // Publish this phase before removing the broken association. A retry
+      // must preserve remaining originals even if the pending file is gone.
+      if (!retiring) {
+        await recoveryBarrier.writeAsString(failedRecoveryPhase, flush: true);
+        await durability.syncFile(recoveryBarrier, fullBarrier: true);
+        await durability.syncDirectory(root, fullBarrier: true);
+      }
+      retiring = true;
+      final pendingPath = p.join(root.path, pendingName);
+      final type = await FileSystemEntity.type(pendingPath, followLinks: false);
+      final FileSystemEntity pending;
+      if (type == FileSystemEntityType.file) {
+        pending = File(pendingPath);
+      } else if (type == FileSystemEntityType.directory) {
+        pending = Directory(pendingPath);
+      } else {
+        rethrow;
+      }
+      final archive = await root.createTemp('.kelivo_retained_preservation_');
+      await durability.restrictDirectory(archive);
+      await durability.syncDirectory(root, fullBarrier: true);
+      await durability.renameAndSync(
+        source: pending,
+        targetPath: p.join(archive.path, pendingName),
+      );
+    }
+    // Healthy snapshot restores keep the live database as their rollback
+    // source. Explicit resets and failed preservation retire the raw originals.
+    if (!retiring) return;
+    final names = <String>{};
+    final pattern = RegExp(
+      r'^(kelivo\.db(?:\.previous|\.premigrate-v[0-9]+)?)(?:-(?:wal|shm|journal))?$',
+    );
+    await for (final entry in root.list(followLinks: false)) {
+      final match = pattern.firstMatch(p.basename(entry.path));
+      if (match != null) names.add(match.group(1)!);
+    }
+    for (final name in names.toList()..sort()) {
+      await preserve(File(p.join(root.path, name)), durability: durability);
+    }
   }
 
   /// Every reader of a published family checks all journals against its

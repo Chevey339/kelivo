@@ -12,6 +12,7 @@ import 'app_database.dart';
 import '../../utils/app_directories.dart';
 import 'empty_database_recovery_guard.dart';
 import 'database_installation_gate.dart';
+import 'database_family_preserver.dart';
 
 /// User-initiated recovery actions for the pre-initialization failure screen.
 ///
@@ -158,6 +159,17 @@ final class StartupRecoveryService {
         // the fresh database on the next launch. Keep admission blocked until
         // both the new database and installation receipt are durable.
         await workspaceLock.beginSnapshotRecoveryWhileLocked();
+        await DatabaseFamilyPreserver.prepareExplicitRecovery(
+          appDataDirectory,
+          recoveryBarrier: File(
+            p.join(
+              appDataDirectory.path,
+              RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+            ),
+          ),
+          durability: resolvedDurability,
+          retireExistingFamilies: true,
+        );
         await _sweepReceiptTemporaries(appDataDirectory);
         final receipts = Directory(
           p.join(

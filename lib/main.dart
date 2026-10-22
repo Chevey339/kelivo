@@ -288,7 +288,10 @@ Future<void> main() async {
           if (migrationDecision.needsMigration) {
             runApp(
               MigrationApp(
-                service: HiveToSqliteMigrationService(migrationDecision),
+                service: HiveToSqliteMigrationService(
+                  migrationDecision,
+                  businessLease: businessLease,
+                ),
                 restoreOutcome: restoreOutcome?.state,
               ),
             );
@@ -352,6 +355,7 @@ Future<void> main() async {
                 MigrationApp(
                   service: HiveToSqliteMigrationService(
                     _legacyMigrationDecision(appDataDirectory),
+                    businessLease: businessLease,
                   ),
                   restoreOutcome: restoreOutcome?.state,
                 ),

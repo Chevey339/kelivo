@@ -13,11 +13,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/chat_database_repository.dart';
+import '../../core/database/startup_recovery_service.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/conversation.dart';
 import '../../core/models/message_part.dart';
 import '../../core/services/backup/backup_settings_validator.dart';
 import '../../core/services/backup/restore_durability.dart';
+import '../../core/services/backup/restore_business_lease.dart';
 import '../../core/services/hive_migration_marker.dart';
 import '../../core/services/migration/legacy_message_content_decoder.dart';
 import '../../core/services/migration/legacy_record_sanitizer.dart';
@@ -156,8 +158,11 @@ class HiveToSqliteMigrationDecision {
 }
 
 class HiveToSqliteMigrationService {
-  HiveToSqliteMigrationService(this.decision, {RestoreDurability? durability})
-    : _durability = durability ?? RestorePlatformDurability();
+  HiveToSqliteMigrationService(
+    this.decision, {
+    RestoreDurability? durability,
+    this.businessLease,
+  }) : _durability = durability ?? RestorePlatformDurability();
 
   static const skipAttemptThreshold = 2;
   static const _attemptStateFileName =
@@ -201,6 +206,7 @@ class HiveToSqliteMigrationService {
   @visibleForTesting
   int? debugZip64ThresholdForTest;
   final RestoreDurability _durability;
+  final RestoreBusinessLease? businessLease;
   final _controller = StreamController<HiveToSqliteMigrationStatus>.broadcast();
   final _log = <String>[];
   var _lastBackupItems = const <HiveToSqliteBackupItem>[];
@@ -1089,31 +1095,52 @@ class HiveToSqliteMigrationService {
 
   /// Escape hatch after repeated migration failures: renames the legacy Hive
   /// artifacts to `<name>.retired` so [check] stops requesting migration and
-  /// the next launch starts with an empty SQLite database. The retired files
+  /// creates an explicitly authorized empty SQLite database. The retired files
   /// stay on disk for manual recovery.
   Future<void> skipMigrationAndStartFresh() async {
-    for (final hiveFile in decision.hiveFiles) {
-      final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
-      try {
-        if (await lockFile.exists()) {
-          await _retainLegacyFile(lockFile);
+    final ownedLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(
+            appDataDirectory: decision.appDataDir,
+            durability: _durability,
+          )
+        : null;
+    final lease = businessLease ?? ownedLease!;
+    try {
+      final expectedLease = p.join(
+        decision.appDataDir.absolute.path,
+        RestoreBusinessLease.leaseDirectoryName,
+        RestoreBusinessLease.lockFileName,
+      );
+      if (lease.isClosed ||
+          !p.equals(lease.lockFile.absolute.path, expectedLease)) {
+        throw StateError('restore_startup_business_lease');
+      }
+      for (final hiveFile in decision.hiveFiles) {
+        final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
+        try {
+          if (await lockFile.exists()) {
+            await _retainLegacyFile(lockFile);
+          }
+        } catch (error) {
+          // Lock files are advisory; leaving one behind must not block the skip.
+          _logLine('skip-migration lock rename: $error');
         }
-      } catch (error) {
-        // Lock files are advisory; leaving one behind must not block the skip.
-        _logLine('skip-migration lock rename: $error');
+        if (await hiveFile.exists()) {
+          await _retainLegacyFile(hiveFile);
+        }
       }
-      if (await hiveFile.exists()) {
-        await _retainLegacyFile(hiveFile);
-      }
+      // A failed attempt can leave the temporary database family behind.
+      await _deleteSqliteFamily(File('${decision.sqliteFile.path}.migrating'));
+      await StartupRecoveryService.reset(
+        appDataDirectory: decision.appDataDir,
+        businessLease: lease,
+        durability: _durability,
+      );
+      await _clearAttemptState();
+      _logLine('skip-migration: legacy hive files retired');
+    } finally {
+      await ownedLease?.close();
     }
-    // A failed attempt can leave the temporary database family behind.
-    await _deleteSqliteFamily(File('${decision.sqliteFile.path}.migrating'));
-    await DatabaseFamilyPreserver.preserve(
-      File('${decision.sqliteFile.path}.previous'),
-      durability: _durability,
-    );
-    await _clearAttemptState();
-    _logLine('skip-migration: legacy hive files retired');
   }
 
   Future<void> _retainLegacyFile(File file) async {

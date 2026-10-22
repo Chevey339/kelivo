@@ -410,9 +410,19 @@ class DataSync {
       final workspaceLock = RestoreWorkspaceLock(
         appDataDirectory: appDataDirectory,
       );
-      await workspaceLock.synchronized(
-        workspaceLock.beginSnapshotRecoveryWhileLocked,
-      );
+      await workspaceLock.synchronized(() async {
+        await workspaceLock.beginSnapshotRecoveryWhileLocked();
+        await DatabaseFamilyPreserver.prepareExplicitRecovery(
+          appDataDirectory,
+          recoveryBarrier: File(
+            p.join(
+              appDataDirectory.path,
+              RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+            ),
+          ),
+          durability: workspaceLock.durability,
+        );
+      });
       await RestoreBundlePreparation.prepare(
         appDataDirectory: appDataDirectory,
         extractedDirectory: extractDir,

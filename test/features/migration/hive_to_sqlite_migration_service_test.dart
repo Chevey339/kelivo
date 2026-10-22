@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/database/empty_database_recovery_guard.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +17,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/hive_migration_marker.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -1476,6 +1478,47 @@ void main() {
     );
   });
 
+  test(
+    'skipping migration admits a fresh database beside retained files',
+    () async {
+      final hiveFile = File('${tempDir.path}/conversations.hive');
+      await hiveFile.writeAsString('legacy evidence');
+      final image = File('${tempDir.path}/images/old.png');
+      await image.parent.create();
+      await image.writeAsString('original image');
+      final lease = await RestoreBusinessLease.acquire(
+        appDataDirectory: tempDir,
+      );
+      addTearDown(lease.close);
+      final service = HiveToSqliteMigrationService(
+        HiveToSqliteMigrationDecision(
+          needsMigration: true,
+          appDataDir: tempDir,
+          sqliteFile: File('${tempDir.path}/kelivo.db'),
+          hiveFiles: [hiveFile],
+        ),
+        businessLease: lease,
+      );
+      addTearDown(service.dispose);
+      await service.skipMigrationAndStartFresh();
+      expect(lease.isClosed, isFalse);
+      final decision = await HiveToSqliteMigrationService.check();
+      expect(decision.needsMigration, isFalse);
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: tempDir,
+      );
+      await EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: tempDir,
+        databaseId: receipt.databaseId,
+      );
+      expect(
+        await File('${hiveFile.path}.retired').readAsString(),
+        'legacy evidence',
+      );
+      expect(await image.readAsString(), 'original image');
+    },
+  );
+
   test('attempt counter clears when migration is skipped', () async {
     final hiveFile = File('${tempDir.path}/conversations.hive')
       ..writeAsBytesSync([1, 2, 3]);
@@ -1627,18 +1670,24 @@ void main() {
           .cast<File>()
           .toList();
       expect(await retired.single.readAsString(), 'current legacy');
-      // skip only discards its owned temporary candidate.
+      // A fresh start preserves both live and previous families.
       final copiesAfterSkip =
           await DatabaseInstallationGate.listDisplacedDatabases(
             appDataDirectory: tempDir,
           );
       expect(
-        await copiesAfterSkip.single.file.readAsString(),
-        'previous database',
+        await Future.wait(
+          copiesAfterSkip.map((copy) => copy.file.readAsString()),
+        ),
+        containsAll(['previous database', 'current database']),
       );
       expect(
-        await File('${copiesAfterSkip.single.file.path}-wal').readAsString(),
-        'previous WAL',
+        await Future.wait(
+          copiesAfterSkip.map(
+            (copy) => File('${copy.file.path}-wal').readAsString(),
+          ),
+        ),
+        containsAll(['previous WAL', 'current WAL']),
       );
       await temp.writeAsString('new validated database');
       await service.replaceSqliteForTest(temp, live);
@@ -1647,15 +1696,18 @@ void main() {
         appDataDirectory: tempDir,
       );
       expect(
-        await Future.wait(copies.map((copy) => copy.file.readAsString())),
-        containsAll(['previous database', 'current database']),
+        await Future.wait(copies.map((copy) => copy.file.readAsBytes())),
+        containsAll([
+          utf8.encode('previous database'),
+          utf8.encode('current database'),
+        ]),
       );
-      expect(
-        await Future.wait(
-          copies.map((copy) => File('${copy.file.path}-wal').readAsString()),
-        ),
-        containsAll(['previous WAL', 'current WAL']),
-      );
+      final journals = <String>[];
+      for (final copy in copies) {
+        final wal = File('${copy.file.path}-wal');
+        if (await wal.exists()) journals.add(await wal.readAsString());
+      }
+      expect(journals, containsAll(['previous WAL', 'current WAL']));
     },
   );
   test('replaceSqlite recovers after rename-aside before move-in', () async {

@@ -22,6 +22,7 @@ import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
 import 'empty_database_recovery_guard.dart';
+import 'empty_database_permission.dart';
 import 'message_timeline_index.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
@@ -4271,9 +4272,36 @@ class ChatDatabaseRepository {
     }
   }
 
+  /// Called at the end of an explicit deletion/reset, inside its transaction.
+  Future<void> _acknowledgeIntentionalEmptyState() async {
+    final file = _databaseFile;
+    if (file == null) return;
+    final hasData = await _db
+        .customSelect(EmptyDatabasePermission.hasDataQuery)
+        .getSingle();
+    if (hasData.read<int>('present') != 0) return;
+    final identity = await getDatabaseIdentity();
+    if (identity == null) return;
+    for (final statement in EmptyDatabasePermission.invalidationTriggers) {
+      await _db.customStatement(statement);
+    }
+    final token = await EmptyDatabaseRecoveryGuard.recordEmptyState(
+      file.parent,
+      identity,
+    );
+    await _db
+        .into(_db.chatStorageMetaRows)
+        .insertOnConflictUpdate(
+          ChatStorageMetaRowsCompanion.insert(
+            key: EmptyDatabasePermission.tokenKey,
+            value: token,
+          ),
+        );
+  }
+
   Future<void> putConversation(Conversation conversation) async {
-    await _invalidateEmptyAcknowledgement();
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       // Existing rows keep the database-owned hash written by prompt freeze;
       // cached Conversation instances may still hold an older value.
       final updated =
@@ -4370,6 +4398,7 @@ class ChatDatabaseRepository {
             ? -1
             : sourceMessages.last.messageOrder,
       );
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insert(_conversationCompanion(duplicate));
@@ -4548,6 +4577,7 @@ class ChatDatabaseRepository {
       selections[groupIdMap[targetGroupId]!] = target.version;
 
       final now = DateTime.now();
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insert(
@@ -4625,6 +4655,7 @@ class ChatDatabaseRepository {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       // An upsert may be an update in disguise, so it bumps updated_at; a
       // fresh insert getting "updated_at = now ≈ timestamp" is harmless.
       await _db
@@ -4872,8 +4903,8 @@ class ChatDatabaseRepository {
         'Message and conversation IDs must match.',
       );
     }
-    await _invalidateEmptyAcknowledgement();
     return _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       final existingRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(conversation.id))).getSingleOrNull();
@@ -5019,6 +5050,7 @@ class ChatDatabaseRepository {
               .getSingleOrNull();
       if (conversationRow == null) return null;
 
+      await _invalidateEmptyAcknowledgement();
       // Metadata only — body text is written via message parts.
       final groupId = originalRow.groupId ?? originalRow.id;
       final maxVersion = _db.messageRows.version.max();
@@ -5272,6 +5304,7 @@ class ChatDatabaseRepository {
         transformBusiness,
         writeReceipt: true,
       );
+      if (overwrite) await _acknowledgeIntentionalEmptyState();
     });
   }
 
@@ -5290,11 +5323,11 @@ class ChatDatabaseRepository {
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
       );
       await _writeMigrationCompleteReceipt();
+      await _acknowledgeIntentionalEmptyState();
     });
   }
 
   Future<BackupMergeReport> mergeBackupSnapshot(File snapshotFile) async {
-    await _invalidateEmptyAcknowledgement();
     if (!await snapshotFile.exists()) {
       throw FileSystemException(
         'Snapshot database does not exist',
@@ -5863,6 +5896,7 @@ class ChatDatabaseRepository {
     required String targetId,
     required Map<String, String> messageIdMap,
   }) async {
+    await _invalidateEmptyAcknowledgement();
     final sourceMessages = await _db
         .customSelect(
           'SELECT id, group_id FROM merge_source.message_rows '
@@ -5987,7 +6021,7 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
-    if (conversations.isNotEmpty) {
+    if (conversations.isNotEmpty || messages.isNotEmpty) {
       await _invalidateEmptyAcknowledgement();
     }
     await _db.batch((batch) {
@@ -6056,13 +6090,15 @@ class ChatDatabaseRepository {
     final current = await (_db.select(
       _db.messageRows,
     )..where((t) => t.id.equals(message.id))).getSingleOrNull();
+    if (current == null) return;
+    await _invalidateEmptyAcknowledgement();
     await (_db.update(
       _db.messageRows,
     )..where((t) => t.id.equals(message.id))).write(
       _messageUpdate(message).copyWith(
         extrasJson: Value(
           _encodeTokenExtras(
-            current?.extrasJson ?? '{}',
+            current.extrasJson,
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
@@ -6130,21 +6166,21 @@ class ChatDatabaseRepository {
     );
     return _db.transaction(() async {
       var write = companion;
+      final current = await (_db.select(
+        _db.messageRows,
+      )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+      if (current == null) return null;
+      await _invalidateEmptyAcknowledgement();
       if (reasoningTokens != null || cacheWriteTokens != null) {
-        final current = await (_db.select(
-          _db.messageRows,
-        )..where((t) => t.id.equals(messageId))).getSingleOrNull();
-        if (current != null) {
-          write = companion.copyWith(
-            extrasJson: Value(
-              _encodeTokenExtras(
-                current.extrasJson,
-                reasoningTokens: reasoningTokens,
-                cacheWriteTokens: cacheWriteTokens,
-              ),
+        write = companion.copyWith(
+          extrasJson: Value(
+            _encodeTokenExtras(
+              current.extrasJson,
+              reasoningTokens: reasoningTokens,
+              cacheWriteTokens: cacheWriteTokens,
             ),
-          );
-        }
+          ),
+        );
       }
       await (_db.update(
         _db.messageRows,
@@ -6241,6 +6277,7 @@ class ChatDatabaseRepository {
     required List<String> messageIds,
   }) async {
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insertOnConflictUpdate(
@@ -6292,6 +6329,7 @@ class ChatDatabaseRepository {
               ),
             ))
             .go();
+        await _acknowledgeIntentionalEmptyState();
       },
     );
   }
@@ -6496,6 +6534,7 @@ class ChatDatabaseRepository {
   Future<void> clearAllData() async {
     await _db.transaction(() async {
       await _clearChatRows();
+      await _acknowledgeIntentionalEmptyState();
     });
   }
 
