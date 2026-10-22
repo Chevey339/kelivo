@@ -302,6 +302,7 @@ class BrowserTextButton extends StatelessWidget {
     this.filled = false,
     this.foregroundColor,
     this.backgroundColor,
+    this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
   });
 
   final VoidCallback? onPressed;
@@ -310,6 +311,7 @@ class BrowserTextButton extends StatelessWidget {
   final bool destructive;
   final bool filled;
   final Color? foregroundColor, backgroundColor;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +319,7 @@ class BrowserTextButton extends StatelessWidget {
     final color =
         foregroundColor ?? (destructive ? colors.error : colors.onSurface);
     final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: padding,
       child: IconTheme(
         data: IconThemeData(color: color, size: 18),
         child: DefaultTextStyle.merge(

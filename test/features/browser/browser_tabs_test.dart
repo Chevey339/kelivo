@@ -4,6 +4,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
@@ -21,6 +22,7 @@ void main() {
     Size size = const Size(390, 844),
     bool desktop = false,
     double scale = 1,
+    TargetPlatform? platform,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -30,7 +32,9 @@ void main() {
       MaterialApp(
         locale: const Locale('en'),
         theme: ThemeData(
-          platform: desktop ? TargetPlatform.macOS : TargetPlatform.android,
+          platform:
+              platform ??
+              (desktop ? TargetPlatform.macOS : TargetPlatform.android),
         ),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -440,6 +444,11 @@ void main() {
         }
         if (desktop) {
           final search = find.byType(BrowserSurfaceField);
+          final button = find.ancestor(
+            of: scope,
+            matching: find.byType(BrowserTextButton),
+          );
+          expect(tester.getSize(button).height, lessThanOrEqualTo(32));
           expect(
             tester.getCenter(scope).dy,
             closeTo(tester.getCenter(search).dy, 1),
@@ -466,6 +475,71 @@ void main() {
         await tester.pumpAndSettle();
       }
     });
+  }
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    for (final style in BrowserSurfaceStyle.values) {
+      testWidgets(
+        'scope menu fades away from its button on $platform / $style',
+        (tester) async {
+          final service = _PreviewService(
+            owners: {'a': 'chat-a', 'b': 'chat-b'},
+          );
+          await service.initialize();
+          try {
+            await mount(
+              tester,
+              BrowserGlassScope(
+                style: style,
+                child: BrowserTabOverview(
+                  service: service,
+                  conversationId: 'chat-a',
+                  onSelect: (_) {},
+                  onClose: (_) {},
+                  onNew: () {},
+                ),
+              ),
+              platform: platform,
+            );
+            final scope = find.byKey(const ValueKey('browserTabScope'));
+            final button = find.ancestor(
+              of: scope,
+              matching: find.byType(BrowserTextButton),
+            );
+            final before = tester.getRect(button);
+            await tester.tap(scope);
+            await tester.pumpAndSettle();
+            final menu = find.byKey(const ValueKey('browserMenuSurface'));
+            final expanded = tester.getRect(menu);
+            expect(expanded.top, greaterThan(before.bottom));
+            await tester.tapAt(const Offset(350, 400));
+            await tester.pump();
+            var previousOpacity = 1.0;
+            for (var frame = 0; frame < 14; frame++) {
+              await tester.pump(const Duration(milliseconds: 16));
+              expect(tester.getRect(button), before);
+              expect(tester.getRect(menu), expanded);
+              expect(find.byIcon(LucideIcons.ellipsis), findsNothing);
+              final opacity = tester.widget<BrowserGlass>(menu).opacity;
+              expect(opacity, lessThan(previousOpacity));
+              previousOpacity = opacity;
+            }
+            await tester.pumpAndSettle();
+            expect(menu, findsNothing);
+            expect(find.text('This chat'), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('browserTabCard-b')),
+              findsNothing,
+            );
+            expect(tester.takeException(), isNull);
+          } finally {
+            await tester.pumpWidget(const SizedBox.shrink());
+            service.dispose();
+            await tester.pumpAndSettle();
+          }
+        },
+      );
+    }
   }
 
   testWidgets(

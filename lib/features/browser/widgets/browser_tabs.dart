@@ -239,6 +239,10 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
     return BrowserTextButton(
       key: _scopeButtonKey,
       filled: true,
+      padding: EdgeInsets.symmetric(
+        horizontal: desktop ? 12 : 16,
+        vertical: desktop ? 7 : 12,
+      ),
       onPressed: () => _chooseScope(context, desktop: desktop),
       child: Row(
         key: const ValueKey('browserTabScope'),
@@ -249,11 +253,15 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
               _showAll ? l.browserTabsAll : l.browserTabsCurrentConversation,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, height: 1.3),
+              style: TextStyle(
+                fontSize: desktop ? 12 : 13,
+                height: 1.3,
+                fontWeight: desktop ? FontWeight.w500 : null,
+              ),
             ),
           ),
-          const SizedBox(width: 6),
-          const Icon(LucideIcons.chevronDown, size: 14),
+          SizedBox(width: desktop ? 4 : 6),
+          Icon(LucideIcons.chevronDown, size: desktop ? 12 : 14),
         ],
       ),
     );
@@ -270,6 +278,7 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
       context,
       title: l.browserTabs,
       desktop: desktop,
+      morphFromAnchor: false,
       anchorRect: box.localToGlobal(Offset.zero) & box.size,
       items: [
         BrowserMenuEntry(
