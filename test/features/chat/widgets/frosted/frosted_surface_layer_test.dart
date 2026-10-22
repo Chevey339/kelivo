@@ -54,6 +54,7 @@ void main() {
       // Keep the scope element in place while testing the uniform mode.
       surface = ChatFrostedBackdropScope(
         controller: controller,
+        backgroundActive: true,
         child: surface,
       );
       return MaterialApp(home: Scaffold(body: surface));

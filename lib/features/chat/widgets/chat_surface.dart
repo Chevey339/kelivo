@@ -5,6 +5,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/chat_bubble_style.dart';
 
 import 'frosted/frosted_surface.dart';
+import 'package:Kelivo/shared/markdown/markdown_surface_scope.dart';
 
 ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
 _chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
@@ -72,7 +73,10 @@ Widget buildSharedChatSurface(
         style: resolved,
         borderRadius: radius,
         isUser: isUser,
-        child: paddedChild,
+        child: MarkdownSurfaceScope(
+          kind: MarkdownSurfaceKind.frosted,
+          child: paddedChild,
+        ),
       );
     case ChatMessageBackgroundStyle.solid:
       final radius = BorderRadius.circular(resolved.radius);
@@ -85,7 +89,10 @@ Widget buildSharedChatSurface(
             width: resolved.borderWidth,
           ),
         ),
-        child: paddedChild,
+        child: MarkdownSurfaceScope(
+          kind: MarkdownSurfaceKind.solid,
+          child: paddedChild,
+        ),
       );
     case ChatMessageBackgroundStyle.defaultStyle:
       if (bareOnDefault) {
@@ -99,7 +106,10 @@ Widget buildSharedChatSurface(
           color: defaultColor,
           borderRadius: borderRadius,
         ),
-        child: paddedChild,
+        child: MarkdownSurfaceScope(
+          kind: MarkdownSurfaceKind.tinted,
+          child: paddedChild,
+        ),
       );
   }
 }

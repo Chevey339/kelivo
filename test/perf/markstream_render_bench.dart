@@ -1,3 +1,4 @@
+import '../support/markdown_backdrop_host.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -55,24 +56,30 @@ void main() {
             theme: ThemeData(fontFamily: 'markstream-bench'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(
-              body: AppSelectionArea(
-                child: SingleChildScrollView(
-                  controller: scroll,
-                  child: ValueListenableBuilder<String>(
-                    valueListenable: source,
-                    builder: (_, value, _) => renderMarkdown
-                        ? MarkdownWithCodeHighlight(
-                            text: value,
-                            streaming: streaming,
-                            useBlockRendering: true,
-                            baseStyle: const TextStyle(
-                              fontFamily: 'markstream-bench',
-                              fontSize: 15.5,
-                              height: 1.55,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+            home: markdownBenchmarkBackdrop(
+              Scaffold(
+                backgroundColor:
+                    const bool.fromEnvironment('MARKSTREAM_BENCH_WALLPAPER')
+                    ? Colors.transparent
+                    : null,
+                body: AppSelectionArea(
+                  child: SingleChildScrollView(
+                    controller: scroll,
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: source,
+                      builder: (_, value, _) => renderMarkdown
+                          ? MarkdownWithCodeHighlight(
+                              text: value,
+                              streaming: streaming,
+                              useBlockRendering: true,
+                              baseStyle: const TextStyle(
+                                fontFamily: 'markstream-bench',
+                                fontSize: 15.5,
+                                height: 1.55,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               ),

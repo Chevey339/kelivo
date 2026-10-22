@@ -221,7 +221,8 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
             width: double.infinity,
             height: _previewHeight,
             child: ColoredBox(
-              color: mermaidColors.fillBlock,
+              // The enclosing surface already paints this tint once.
+              color: Colors.transparent,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 switchInCurve: Curves.easeOutCubic,
