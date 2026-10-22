@@ -13240,4 +13240,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.';
+
+  @override
+  String get migrationFreshStartTitle => 'Fresh start is ready';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      'A new empty database is ready, and your previous data has been retained. Restart the app to continue.';
+
+  @override
+  String get migrationFreshStartFailedTitle =>
+      'Fresh start could not be completed';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      'Your previous data has been retained. Retry starting fresh, or close and reopen the app.';
 }

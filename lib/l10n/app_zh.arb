@@ -4637,5 +4637,9 @@
   "recoveryStorageReadyBody": "存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。",
   "recoveryRetainedData": "保留的原数据",
   "recoveryNoValidCopies": "找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。",
-  "recoveryStorageInsufficientSpaceBody": "剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。"
+  "recoveryStorageInsufficientSpaceBody": "剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。",
+  "migrationFreshStartTitle": "已重新开始",
+  "migrationFreshStartSubtitle": "已新建空数据库，旧数据已保留。请重启 App 后继续使用。",
+  "migrationFreshStartFailedTitle": "重新开始未完成",
+  "migrationFreshStartFailedSubtitle": "旧数据已保留。请重试重新开始，或关闭并重新打开 App。"
 }

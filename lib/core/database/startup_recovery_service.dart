@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:uuid/uuid.dart';
 
 import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_business_lease.dart';
@@ -159,6 +160,10 @@ final class StartupRecoveryService {
         // the fresh database on the next launch. Keep admission blocked until
         // both the new database and installation receipt are durable.
         await workspaceLock.beginSnapshotRecoveryWhileLocked();
+        // A process exit between Hive renames must remain behind the durable
+        // barrier. A later explicit reset resumes retirement before admission,
+        // instead of migrating the remaining, incomplete set of legacy boxes.
+        await _retainLegacyHiveFiles(appDataDirectory, resolvedDurability);
         await DatabaseFamilyPreserver.prepareExplicitRecovery(
           appDataDirectory,
           recoveryBarrier: File(
@@ -200,6 +205,28 @@ final class StartupRecoveryService {
       });
     } finally {
       await ownedLease?.close();
+    }
+  }
+
+  static Future<void> _retainLegacyHiveFiles(
+    Directory root,
+    RestoreDurability durability,
+  ) async {
+    for (final name in ['conversations', 'messages', 'tool_events_v1']) {
+      for (final extension in ['hive', 'lock']) {
+        final file = File(p.join(root.path, '$name.$extension'));
+        final type = await FileSystemEntity.type(file.path, followLinks: false);
+        if (type == FileSystemEntityType.notFound) continue;
+        if (type != FileSystemEntityType.file) {
+          throw StateError('startup_recovery_hive_type');
+        }
+        var destination = '${file.path}.retired';
+        if (await FileSystemEntity.type(destination, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+          destination = '$destination-${const Uuid().v4()}';
+        }
+        await durability.renameAndSync(source: file, targetPath: destination);
+      }
     }
   }
 

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:uuid/uuid.dart';
 import '../../core/database/database_family_preserver.dart';
 import 'dart:typed_data';
 
@@ -216,12 +215,47 @@ class HiveToSqliteMigrationService {
   var _malformed = 0;
   var _missingFiles = 0;
   String? _persistedStageBreadcrumb;
+  HiveToSqliteMigrationStatus? _completion;
+  HiveToSqliteMigrationStatus? _freshStartStatus;
+  bool _freshStartSelected = false;
+  bool _operationInProgress = false;
+
+  bool get isComplete => _completion != null;
+  bool get freshStartSelected => _freshStartSelected;
+
+  void _requireMigrationAvailable() {
+    if (isComplete) throw StateError('migration_already_complete');
+    if (_freshStartSelected) throw StateError('migration_fresh_start_selected');
+    if (_operationInProgress) {
+      throw StateError('migration_operation_in_progress');
+    }
+  }
+
+  void _publishStatus(HiveToSqliteMigrationStatus status) {
+    if (isComplete) return;
+    if (status.stage == HiveToSqliteMigrationStage.complete) {
+      _completion = status;
+    }
+    if (_freshStartSelected) _freshStartStatus = status;
+    if (!_controller.isClosed) _controller.add(status);
+  }
+
+  Future<void> _clearCompletedAttemptState() async {
+    try {
+      await _clearAttemptState();
+    } catch (error) {
+      // Data is already published. Cleanup must never reopen migration.
+      _logLine('completed attempt cleanup: $error');
+    }
+  }
 
   Stream<HiveToSqliteMigrationStatus> get statusStream => _controller.stream;
 
   int get attemptCount => _attemptCount;
 
-  bool get canOfferSkip => _attemptCount >= skipAttemptThreshold;
+  bool get canOfferSkip =>
+      !isComplete &&
+      (_freshStartSelected || _attemptCount >= skipAttemptThreshold);
 
   String? get lastAttemptStage => _persistedStageBreadcrumb;
 
@@ -281,6 +315,8 @@ class HiveToSqliteMigrationService {
   }
 
   HiveToSqliteMigrationStatus initialStatus() {
+    if (_completion != null) return _completion!;
+    if (_freshStartStatus != null) return _freshStartStatus!;
     return HiveToSqliteMigrationStatus(
       stage: HiveToSqliteMigrationStage.intro,
       progress: 0,
@@ -295,6 +331,7 @@ class HiveToSqliteMigrationService {
     Directory selectedDirectory, {
     bool includeChatsJson = true,
   }) async {
+    _requireMigrationAvailable();
     await selectedDirectory.create(recursive: true);
     final backupFile = File(p.join(selectedDirectory.path, backupFileName()));
     return _backupToFile(
@@ -305,6 +342,7 @@ class HiveToSqliteMigrationService {
   }
 
   Future<File> backupToTemporaryFile({bool includeChatsJson = true}) async {
+    _requireMigrationAvailable();
     final backupFile = File(
       p.join(Directory.systemTemp.path, backupFileName()),
     );
@@ -358,6 +396,8 @@ class HiveToSqliteMigrationService {
     required File? managedOutputFile,
     required String? visibleBackupPath,
   }) async {
+    _requireMigrationAvailable();
+    _operationInProgress = true;
     Directory? workDir;
     _chatsExportDegraded = false;
     final plannedItems = _updateBackupItem(
@@ -553,7 +593,7 @@ class HiveToSqliteMigrationService {
       if (managedOutputFile != null && await managedOutputFile.exists()) {
         await managedOutputFile.delete();
       }
-      _controller.add(
+      _publishStatus(
         HiveToSqliteMigrationStatus(
           stage: HiveToSqliteMigrationStage.failed,
           progress: lastProgress.clamp(0, 1).toDouble(),
@@ -570,8 +610,12 @@ class HiveToSqliteMigrationService {
       );
       rethrow;
     } finally {
-      await writer?.closeIfNeeded();
-      await _deleteDirectoryQuietly(workDir);
+      try {
+        await writer?.closeIfNeeded();
+        await _deleteDirectoryQuietly(workDir);
+      } finally {
+        _operationInProgress = false;
+      }
     }
 
     _emit(
@@ -585,6 +629,8 @@ class HiveToSqliteMigrationService {
   }
 
   Future<void> migrate({String? backupPath}) async {
+    _requireMigrationAvailable();
+    _operationInProgress = true;
     ChatDatabaseRepository? repo;
     LazyBox<Conversation>? conversationsBox;
     LazyBox<ChatMessage>? messagesBox;
@@ -920,7 +966,6 @@ class HiveToSqliteMigrationService {
       );
       await _replaceSqlite(tempFile, decision.sqliteFile);
       published = true;
-      await _clearAttemptState();
       _emit(
         HiveToSqliteMigrationStage.complete,
         1,
@@ -931,10 +976,11 @@ class HiveToSqliteMigrationService {
         conversations: conversations.length,
         messages: migratedMessages,
       );
+      await _clearCompletedAttemptState();
     } catch (error, stackTrace) {
       _logLine('$error');
       _logLine(stackTrace.toString());
-      _controller.add(
+      _publishStatus(
         HiveToSqliteMigrationStatus(
           stage: HiveToSqliteMigrationStage.failed,
           progress: 0,
@@ -952,16 +998,18 @@ class HiveToSqliteMigrationService {
       );
       rethrow;
     } finally {
-      await repo?.close();
-      await conversationsBox?.close();
-      await messagesBox?.close();
-      await toolEventsBox?.close();
-      if (!published) {
-        // A failed attempt must not leave the half-migrated database family
-        // behind; the startup gate would otherwise keep rejecting it.
-        await _deleteSqliteFamily(
-          File('${decision.sqliteFile.path}.migrating'),
-        );
+      try {
+        await repo?.close();
+        await conversationsBox?.close();
+        await messagesBox?.close();
+        await toolEventsBox?.close();
+        if (!published) {
+          await _deleteSqliteFamily(
+            File('${decision.sqliteFile.path}.migrating'),
+          );
+        }
+      } finally {
+        _operationInProgress = false;
       }
     }
   }
@@ -1098,14 +1146,21 @@ class HiveToSqliteMigrationService {
   /// creates an explicitly authorized empty SQLite database. The retired files
   /// stay on disk for manual recovery.
   Future<void> skipMigrationAndStartFresh() async {
-    final ownedLease = businessLease == null
-        ? await RestoreBusinessLease.acquire(
-            appDataDirectory: decision.appDataDir,
-            durability: _durability,
-          )
-        : null;
-    final lease = businessLease ?? ownedLease!;
+    if (isComplete) throw StateError('migration_already_complete');
+    if (_operationInProgress) {
+      throw StateError('migration_operation_in_progress');
+    }
+    _operationInProgress = true;
+    _freshStartSelected = true;
+    RestoreBusinessLease? ownedLease;
     try {
+      if (businessLease == null) {
+        ownedLease = await RestoreBusinessLease.acquire(
+          appDataDirectory: decision.appDataDir,
+          durability: _durability,
+        );
+      }
+      final lease = businessLease ?? ownedLease!;
       final expectedLease = p.join(
         decision.appDataDir.absolute.path,
         RestoreBusinessLease.leaseDirectoryName,
@@ -1115,20 +1170,6 @@ class HiveToSqliteMigrationService {
           !p.equals(lease.lockFile.absolute.path, expectedLease)) {
         throw StateError('restore_startup_business_lease');
       }
-      for (final hiveFile in decision.hiveFiles) {
-        final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
-        try {
-          if (await lockFile.exists()) {
-            await _retainLegacyFile(lockFile);
-          }
-        } catch (error) {
-          // Lock files are advisory; leaving one behind must not block the skip.
-          _logLine('skip-migration lock rename: $error');
-        }
-        if (await hiveFile.exists()) {
-          await _retainLegacyFile(hiveFile);
-        }
-      }
       // A failed attempt can leave the temporary database family behind.
       await _deleteSqliteFamily(File('${decision.sqliteFile.path}.migrating'));
       await StartupRecoveryService.reset(
@@ -1136,20 +1177,32 @@ class HiveToSqliteMigrationService {
         businessLease: lease,
         durability: _durability,
       );
-      await _clearAttemptState();
+      _converted = 0;
+      _malformed = 0;
+      _missingFiles = 0;
+      _chatsExportDegraded = false;
+      _lastBackupItems = const [];
+      _emit(HiveToSqliteMigrationStage.complete, 1, 'complete', 'startedFresh');
+      await _clearCompletedAttemptState();
       _logLine('skip-migration: legacy hive files retired');
+    } catch (error, stackTrace) {
+      _logLine('$error');
+      _logLine(stackTrace.toString());
+      _emit(
+        HiveToSqliteMigrationStage.failed,
+        0,
+        'failed',
+        'freshStart',
+        error: '$error',
+      );
+      rethrow;
     } finally {
-      await ownedLease?.close();
+      try {
+        await ownedLease?.close();
+      } finally {
+        _operationInProgress = false;
+      }
     }
-  }
-
-  Future<void> _retainLegacyFile(File file) async {
-    var destination = '${file.path}.retired';
-    if (await FileSystemEntity.type(destination, followLinks: false) !=
-        FileSystemEntityType.notFound) {
-      destination = '$destination-${const Uuid().v4()}';
-    }
-    await _durability.renameAndSync(source: file, targetPath: destination);
   }
 
   Future<void> dispose() async {
@@ -1946,7 +1999,7 @@ class HiveToSqliteMigrationService {
   }) {
     final bounded = progress.clamp(0, 1).toDouble();
     _logLine('$title: $detail ${(bounded * 100).toStringAsFixed(0)}%');
-    _controller.add(
+    _publishStatus(
       HiveToSqliteMigrationStatus(
         stage: stage,
         progress: bounded,

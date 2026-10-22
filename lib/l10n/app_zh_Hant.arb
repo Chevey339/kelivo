@@ -4637,5 +4637,9 @@
   "recoveryStorageReadyBody": "存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。",
   "recoveryRetainedData": "保留的原資料",
   "recoveryNoValidCopies": "找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。",
-  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。"
+  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。",
+  "migrationFreshStartTitle": "已重新開始",
+  "migrationFreshStartSubtitle": "已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。",
+  "migrationFreshStartFailedTitle": "重新開始未完成",
+  "migrationFreshStartFailedSubtitle": "舊資料已保留。請重試重新開始，或關閉並重新開啟 App。"
 }

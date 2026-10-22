@@ -12641,6 +12641,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25206,6 +25219,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37850,4 +37876,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get recoveryStorageInsufficientSpaceBody =>
       '剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新開始';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      '已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新開始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '舊資料已保留。請重試重新開始，或關閉並重新開啟 App。';
 }

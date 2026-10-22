@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/empty_database_recovery_guard.dart';
+import 'package:Kelivo/core/database/startup_recovery_service.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -18,6 +19,8 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/hive_migration_marker.dart';
 import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
+import 'package:Kelivo/core/services/backup/restore_durability.dart';
+import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -1519,6 +1522,168 @@ void main() {
     },
   );
 
+  test(
+    'successful skip is terminal and cannot migrate retired Hive again',
+    () async {
+      final hive = await File(
+        '${tempDir.path}/conversations.hive',
+      ).writeAsString('retained original');
+      final service = HiveToSqliteMigrationService(
+        HiveToSqliteMigrationDecision(
+          needsMigration: true,
+          appDataDir: tempDir,
+          sqliteFile: File('${tempDir.path}/kelivo.db'),
+          hiveFiles: [hive],
+        ),
+      );
+      addTearDown(service.dispose);
+      await service.skipMigrationAndStartFresh();
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: tempDir,
+      );
+      final databaseBytes = await File(
+        '${tempDir.path}/kelivo.db',
+      ).readAsBytes();
+      await expectLater(service.migrate(), throwsStateError);
+      await expectLater(service.skipMigrationAndStartFresh(), throwsStateError);
+      await expectLater(service.backupToTemporaryFile(), throwsStateError);
+      expect(
+        service.initialStatus().stage,
+        HiveToSqliteMigrationStage.complete,
+      );
+      expect(await hive.exists(), isFalse);
+      expect(
+        await File('${hive.path}.retired').readAsString(),
+        'retained original',
+      );
+      expect(
+        await File('${tempDir.path}/kelivo.db').readAsBytes(),
+        databaseBytes,
+      );
+      expect(
+        (await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: tempDir,
+        )).databaseId,
+        receipt.databaseId,
+      );
+    },
+  );
+
+  for (final afterRestart in [false, true]) {
+    test(
+      'partial Hive retirement stays blocked and resumes (afterRestart=$afterRestart)',
+      () async {
+        final hive = await File(
+          '${tempDir.path}/conversations.hive',
+        ).writeAsString('retained original');
+        final messages = await File(
+          '${tempDir.path}/messages.hive',
+        ).writeAsString('original messages');
+        final service = HiveToSqliteMigrationService(
+          HiveToSqliteMigrationDecision(
+            needsMigration: true,
+            appDataDir: tempDir,
+            sqliteFile: File('${tempDir.path}/kelivo.db'),
+            hiveFiles: [hive, messages],
+          ),
+          durability: _FailHiveRetirementOnce(messages.path),
+        );
+        addTearDown(service.dispose);
+        await expectLater(
+          service.skipMigrationAndStartFresh(),
+          throwsA(anything),
+        );
+        expect(service.freshStartSelected, isTrue);
+        expect(service.isComplete, isFalse);
+        expect(
+          service.initialStatus().stage,
+          HiveToSqliteMigrationStage.failed,
+        );
+        expect(await hive.exists(), isFalse);
+        expect(
+          await File('${hive.path}.retired').readAsString(),
+          'retained original',
+        );
+        expect(await messages.readAsString(), 'original messages');
+        expect(
+          await RestoreStartupGate.hasPendingWork(appDataDirectory: tempDir),
+          isTrue,
+        );
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: tempDir,
+          ),
+          throwsStateError,
+        );
+        await expectLater(service.migrate(), throwsStateError);
+        await expectLater(service.backupToTemporaryFile(), throwsStateError);
+        expect(await hive.exists(), isFalse);
+        if (afterRestart) {
+          // The cold-start failure screen uses the generic reset entry point;
+          // it must retire remaining Hive without the old service's memory.
+          await StartupRecoveryService.reset(appDataDirectory: tempDir);
+        } else {
+          await service.skipMigrationAndStartFresh();
+          expect(service.isComplete, isTrue);
+          expect(service.initialStatus().detail, 'startedFresh');
+        }
+        expect(
+          await File('${hive.path}.retired').readAsString(),
+          'retained original',
+        );
+        expect(
+          await File('${messages.path}.retired').readAsString(),
+          'original messages',
+        );
+        expect(
+          (await HiveToSqliteMigrationService.check()).needsMigration,
+          isFalse,
+        );
+        await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: tempDir,
+        );
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: tempDir);
+      },
+    );
+  }
+
+  test(
+    'attempt cleanup failure cannot reopen a completed fresh start',
+    () async {
+      final hive = await File(
+        '${tempDir.path}/conversations.hive',
+      ).writeAsString('retained original');
+      final attemptPath = Directory(
+        '${tempDir.path}/hive_to_sqlite_migration_attempt_v1.json',
+      );
+      await attemptPath.create();
+      await File('${attemptPath.path}/evidence').writeAsString('keep');
+      final service = HiveToSqliteMigrationService(
+        HiveToSqliteMigrationDecision(
+          needsMigration: true,
+          appDataDir: tempDir,
+          sqliteFile: File('${tempDir.path}/kelivo.db'),
+          hiveFiles: [hive],
+        ),
+      );
+      addTearDown(service.dispose);
+      await service.skipMigrationAndStartFresh();
+      expect(service.isComplete, isTrue);
+      expect(
+        service.initialStatus().stage,
+        HiveToSqliteMigrationStage.complete,
+      );
+      expect(service.canOfferSkip, isFalse);
+      expect(await File('${attemptPath.path}/evidence').readAsString(), 'keep');
+      expect(
+        await File('${hive.path}.retired').readAsString(),
+        'retained original',
+      );
+      await expectLater(service.migrate(), throwsStateError);
+      await DatabaseInstallationGate.ensureReady(appDataDirectory: tempDir);
+    },
+  );
+
   test('attempt counter clears when migration is skipped', () async {
     final hiveFile = File('${tempDir.path}/conversations.hive')
       ..writeAsBytesSync([1, 2, 3]);
@@ -2194,6 +2359,40 @@ void main() {
       expect(message?.content, 'retry me');
     },
   );
+}
+
+final class _FailHiveRetirementOnce implements RestoreDurability {
+  _FailHiveRetirementOnce(this.path);
+  final String path;
+  final _delegate = RestorePlatformDurability();
+  bool _failed = false;
+
+  @override
+  Future<void> restrictFile(File file) => _delegate.restrictFile(file);
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      _delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) =>
+      _delegate.syncFile(file, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> syncDirectory(Directory directory, {bool fullBarrier = false}) =>
+      _delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    if (!_failed && source.path == path) {
+      _failed = true;
+      throw const FileSystemException('injected partial retirement failure');
+    }
+    await _delegate.renameAndSync(source: source, targetPath: targetPath);
+  }
 }
 
 void _registerHiveAdapters() {

@@ -23627,6 +23627,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.'**
   String get recoveryStorageInsufficientSpaceBody;
+
+  /// No description provided for @migrationFreshStartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh start is ready'**
+  String get migrationFreshStartTitle;
+
+  /// No description provided for @migrationFreshStartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A new empty database is ready, and your previous data has been retained. Restart the app to continue.'**
+  String get migrationFreshStartSubtitle;
+
+  /// No description provided for @migrationFreshStartFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh start could not be completed'**
+  String get migrationFreshStartFailedTitle;
+
+  /// No description provided for @migrationFreshStartFailedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your previous data has been retained. Retry starting fresh, or close and reopen the app.'**
+  String get migrationFreshStartFailedSubtitle;
 }
 
 class _AppLocalizationsDelegate
