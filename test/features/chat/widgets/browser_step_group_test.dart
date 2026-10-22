@@ -66,6 +66,7 @@ void main() {
     String conversationId = 'chat',
     bool narrow = false,
     double scale = 1,
+    bool reduceMotion = false,
   }) async {
     tester.view.physicalSize = Size(narrow ? 320 : 800, 1500);
     tester.view.devicePixelRatio = 1;
@@ -86,9 +87,10 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(scale)),
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+              disableAnimations: reduceMotion,
+            ),
             child: child!,
           ),
           home: Scaffold(
@@ -136,8 +138,8 @@ void main() {
       await toggle(tester);
       expect(steps(), findsNWidgets(3));
       expect(
-        find.descendant(of: step('c'), matching: find.byType(BrowserPageCard)),
-        findsOneWidget,
+        tester.getBottomLeft(step('c')).dy,
+        lessThan(tester.getTopLeft(find.byType(BrowserPageCard)).dy),
       );
       expect(
         tester.getTopLeft(find.byType(BrowserPageCard)).dy,
@@ -175,6 +177,117 @@ void main() {
       await toggle(tester);
       expect(steps(), findsNothing);
       expect(find.byType(BrowserPageCard), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'preview stays mounted and moves continuously in both directions',
+    (tester) async {
+      await pump(tester, [_tool('a'), _tool('b'), _tool('c')]);
+      final preview = find.byType(BrowserStepGroupBody);
+      final card = find.byType(BrowserPageCard);
+      final state = tester.state(preview);
+      final element = tester.element(card);
+      final widget = tester.widget<BrowserPageCard>(card);
+      double y() => tester.getTopLeft(card).dy;
+      final collapsedY = y();
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(
+        y(),
+        closeTo(collapsedY, .01),
+        reason: 'Do not teleport the preview on the first frame',
+      );
+      var previousY = y();
+      for (final ms in [16, 32, 48, 80, 140]) {
+        await tester.pump(Duration(milliseconds: ms));
+        expect(y(), greaterThanOrEqualTo(previousY));
+        expect(tester.state(preview), same(state));
+        expect(tester.element(card), same(element));
+        expect(tester.widget<BrowserPageCard>(card), same(widget));
+        previousY = y();
+      }
+      final expandedY = y();
+      expect(expandedY, greaterThan(collapsedY + 60));
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(y(), closeTo(expandedY, .01));
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(
+        steps(),
+        findsNWidgets(3),
+        reason: 'Closing keeps the existing rows until the clip closes',
+      );
+      final closingY = y();
+      expect(closingY, inExclusiveRange(collapsedY, expandedY));
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(
+        y(),
+        closeTo(closingY, .01),
+        reason: 'Mid-flight reversal must preserve the current position',
+      );
+      await tester.pumpAndSettle();
+      expect(y(), closeTo(expandedY, .01));
+      await toggle(tester);
+      expect(y(), closeTo(collapsedY, .01));
+      expect(steps(), findsNothing);
+      expect(tester.state(preview), same(state));
+      expect(tester.element(card), same(element));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'closing a long expanded list keeps its rows until settled then resets the tail',
+    (tester) async {
+      await pump(tester, [for (var i = 0; i < 12; i++) _tool('$i')]);
+      await toggle(tester);
+      await tester.tap(find.text('7 earlier steps'));
+      await tester.pumpAndSettle();
+      final before = tester.getTopLeft(find.byType(BrowserPageCard)).dy;
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(steps(), findsNWidgets(12));
+      expect(
+        tester.getTopLeft(find.byType(BrowserPageCard)).dy,
+        closeTo(before, .01),
+      );
+      await tester.pumpAndSettle();
+      expect(steps(), findsNothing);
+      await toggle(tester);
+      expect(steps(), findsNWidgets(5));
+      expect(find.text('7 earlier steps'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'reduced motion applies the new layout immediately and keeps the preview',
+    (tester) async {
+      await pump(tester, [_tool('a'), _tool('b')], reduceMotion: true);
+      final state = tester.state(find.byType(BrowserStepGroupBody));
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(steps(), findsNWidgets(2));
+      await tester.tap(find.text('Browsing'));
+      await tester.pump();
+      expect(steps(), findsNothing);
+      expect(tester.state(find.byType(BrowserStepGroupBody)), same(state));
+      await pump(
+        tester,
+        [_tool('a'), _tool('b', loading: true)],
+        conversationId: 'new-chat',
+        reduceMotion: true,
+      );
+      expect(steps(), findsNWidgets(2));
+      await pump(
+        tester,
+        [_tool('a'), _tool('b')],
+        conversationId: 'new-chat',
+        reduceMotion: true,
+      );
+      expect(steps(), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -399,10 +512,9 @@ void main() {
       find.descendant(of: step('b'), matching: find.byType(BrowserFavicon)),
       findsNothing,
     );
-    // The final row has one extra favicon, plus the placeholder/card favicons.
     expect(
       find.descendant(of: step('c'), matching: find.byType(BrowserFavicon)),
-      findsNWidgets(3),
+      findsOneWidget,
     );
   });
 

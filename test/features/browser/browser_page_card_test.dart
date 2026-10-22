@@ -70,6 +70,7 @@ void main() {
     List<BrowserToolAction> actions, {
     bool lite = false,
     bool dark = false,
+    Locale locale = const Locale('en'),
     ValueChanged<String?>? onOpen,
   }) async {
     await tester.pumpWidget(
@@ -79,7 +80,7 @@ void main() {
           theme: ThemeData(
             brightness: dark ? Brightness.dark : Brightness.light,
           ),
-          locale: const Locale('en'),
+          locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
@@ -166,6 +167,24 @@ void main() {
       );
     });
   }
+  testWidgets(
+    'cached preview text follows locale changes without new actions',
+    (tester) async {
+      final actions = [action('a', failed: true)];
+      await pump(tester, actions);
+      final state = tester.state(find.byType(BrowserStepGroupBody));
+      expect(find.text("Couldn't open page"), findsOneWidget);
+      expect(find.text('Browser control is off'), findsOneWidget);
+      await pump(tester, actions, locale: const Locale('zh'));
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(BrowserStepGroupBody)), same(state));
+      expect(find.text('未能打开页面'), findsOneWidget);
+      expect(find.text('浏览器控制未开启'), findsOneWidget);
+      expect(find.text('去开启'), findsOneWidget);
+      expect(find.text("Couldn't open page"), findsNothing);
+    },
+  );
+
   testWidgets(
     'unrelated browser notifications reuse the card, cached pixels update it without capture',
     (tester) async {

@@ -5079,6 +5079,7 @@ class _TimelineStepShell extends StatelessWidget {
     this.contentVisible = false,
     this.expectContent = false,
     this.stableKey,
+    this.contentBottomPadding = 8,
   });
 
   final Widget icon;
@@ -5095,6 +5096,7 @@ class _TimelineStepShell extends StatelessWidget {
   /// Finished steps with no body skip the slot entirely.
   final bool expectContent;
   final Key? stableKey;
+  final double contentBottomPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -5159,39 +5161,71 @@ class _TimelineStepShell extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           pressableHeader,
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (!isLast)
-                Positioned(
-                  left: _timelineLineX,
-                  top: 0,
-                  bottom: 0,
-                  child: SizedBox(
-                    key: const ValueKey('chatMessageTimelineContentLine'),
-                    width: 1,
-                    child: ColoredBox(color: fg.divider),
-                  ),
-                ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                curve: const Cubic(0.2, 0.8, 0.2, 1),
-                alignment: Alignment.topLeft,
-                child: contentVisible
-                    ? Padding(
-                        padding: EdgeInsets.only(
-                          left: _timelineIconColumnWidth + _timelineGap,
-                          top: 4,
-                          bottom: 8,
-                        ),
-                        child: content,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+          _TimelineStepBody(
+            isLast: isLast,
+            content: content,
+            visible: contentVisible,
+            bottomPadding: contentBottomPadding,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shared connector and inset for timeline content, including a group's
+/// persistent preview. Only the owner of changing content animates its height.
+class _TimelineStepBody extends StatelessWidget {
+  const _TimelineStepBody({
+    required this.isLast,
+    required this.content,
+    this.visible = true,
+    this.animate = true,
+    this.bottomPadding = 8,
+  });
+
+  final bool isLast, visible, animate;
+  final Widget? content;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = visible
+        ? Padding(
+            padding: EdgeInsets.only(
+              left: _timelineIconColumnWidth + _timelineGap,
+              top: 4,
+              bottom: bottomPadding,
+            ),
+            child: content,
+          )
+        : const SizedBox.shrink();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (!isLast)
+          Positioned(
+            left: _timelineLineX,
+            top: 0,
+            bottom: 0,
+            child: SizedBox(
+              key: const ValueKey('chatMessageTimelineContentLine'),
+              width: 1,
+              child: ColoredBox(
+                color: chatSurfaceForegroundPalette(context).divider,
+              ),
+            ),
+          ),
+        if (animate)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: const Cubic(0.2, 0.8, 0.2, 1),
+            alignment: Alignment.topLeft,
+            child: body,
+          )
+        else
+          body,
+      ],
     );
   }
 }
@@ -5536,18 +5570,36 @@ class _ChainOfThoughtBrowserGroupState
   void initState() {
     super.initState();
     _parse();
+    _keepSteps = _isExpanded;
   }
 
   @override
   void didUpdateWidget(_ChainOfThoughtBrowserGroup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tools.first.id != widget.tools.first.id ||
-        oldWidget.conversationId != widget.conversationId) {
+    final changedGroup =
+        oldWidget.tools.first.id != widget.tools.first.id ||
+        oldWidget.conversationId != widget.conversationId;
+    if (changedGroup) {
       _expanded = null;
       _userToggled = false;
       _showAll = false;
     }
     _parse();
+    if (changedGroup || MediaQuery.disableAnimationsOf(context)) {
+      _keepSteps = _isExpanded;
+      if (!_keepSteps) _showAll = false;
+    } else if (_isExpanded) {
+      _keepSteps = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context) && !_isExpanded) {
+      _keepSteps = false;
+      _showAll = false;
+    }
   }
 
   void _parse() {
@@ -5592,6 +5644,21 @@ class _ChainOfThoughtBrowserGroupState
   bool? _expanded;
   bool _userToggled = false;
   bool _showAll = false;
+  bool _keepSteps = false;
+
+  bool get _isExpanded => _userToggled
+      ? _expanded!
+      : !widget.lite &&
+            _actions.any((action) => action.loading || action.failed);
+
+  void _finishStepsAnimation() {
+    if (!_isExpanded && _keepSteps) {
+      setState(() {
+        _keepSteps = false;
+        _showAll = false;
+      });
+    }
+  }
 
   Widget _loadingIcon(Color color) =>
       LoadingIndicator(height: 12, dotSize: 3, spacing: 2, color: color);
@@ -5603,11 +5670,10 @@ class _ChainOfThoughtBrowserGroupState
     final l = AppLocalizations.of(context)!;
     final running = _actions.any((action) => action.loading);
     final failures = _actions.where((action) => action.failed).length;
-    final expanded = _userToggled
-        ? _expanded!
-        : !widget.lite && (running || failures > 0);
+    final expanded = _isExpanded;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final firstVisible =
-        expanded &&
+        _keepSteps &&
             !_showAll &&
             widget.tools.length > _browserStepsFoldThreshold
         ? widget.tools.length - _browserStepsTail
@@ -5617,80 +5683,79 @@ class _ChainOfThoughtBrowserGroupState
       conversationId: widget.conversationId,
       lite: widget.lite,
     );
-    final children = <Widget>[
-      _TimelineStepShell(
-        stableKey: ValueKey('browser-group-header-${widget.tools.first.id}'),
-        icon: running
-            ? _loadingIcon(fg.strong)
-            : Icon(Lucide.AppWindow, size: 16, color: fg.strong),
-        label: Semantics(
-          button: true,
-          expanded: expanded,
-          label: l.browserGroupToggleSemantics,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ThinkingSheen(
-                  enabled: running,
-                  color: fg.strong,
-                  child: Text(
-                    l.browserStepGroupTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.semibold,
-                      color: fg.strong,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
+    final header = _TimelineStepShell(
+      stableKey: ValueKey('browser-group-header-${widget.tools.first.id}'),
+      icon: running
+          ? _loadingIcon(fg.strong)
+          : Icon(Lucide.AppWindow, size: 16, color: fg.strong),
+      label: Semantics(
+        button: true,
+        expanded: expanded,
+        label: l.browserGroupToggleSemantics,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: ThinkingSheen(
+                enabled: running,
+                color: fg.strong,
                 child: Text(
-                  running
-                      ? l.browserStepCurrent(_actions.length)
-                      : l.browserStepCount(_actions.length),
+                  l.browserStepGroupTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: fg.medium),
-                ),
-              ),
-              if (failures > 0) ...[
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    l.browserActionFailedCount(failures),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: cs.error),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                    color: fg.strong,
                   ),
                 ),
-              ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                running
+                    ? l.browserStepCurrent(_actions.length)
+                    : l.browserStepCount(_actions.length),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: fg.medium),
+              ),
+            ),
+            if (failures > 0) ...[
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  l.browserActionFailedCount(failures),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: cs.error),
+                ),
+              ),
             ],
-          ),
+          ],
         ),
-        isFirst: widget.isFirst,
-        isLast: widget.isLast && !expanded,
-        onTap: () => setState(() {
-          _expanded = !expanded;
-          _userToggled = true;
-          _showAll = false;
-        }),
-        indicator: Icon(
-          expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
-          size: 16,
-          color: fg.muted,
-        ),
-        content: expanded ? null : pageCard,
-        contentVisible: !expanded,
-        expectContent: true,
       ),
-    ];
-    if (expanded) {
+      isFirst: widget.isFirst,
+      isLast: widget.isLast && !_keepSteps,
+      onTap: () => setState(() {
+        _expanded = !expanded;
+        _userToggled = true;
+        // Keep the current rows (including revealed earlier steps) until
+        // closing ends, so reversal starts at the same visual position.
+        _keepSteps = !reduceMotion || _expanded!;
+        if (!_keepSteps) _showAll = false;
+      }),
+      indicator: Icon(
+        expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+        size: 16,
+        color: fg.muted,
+      ),
+    );
+    final steps = <Widget>[];
+    if (_keepSteps) {
       if (firstVisible > 0) {
-        children.add(
+        steps.add(
           KeyedSubtree(
             key: ValueKey('browser-steps-earlier-${widget.tools.first.id}'),
             child: _TimelineStepShell(
@@ -5713,31 +5778,61 @@ class _ChainOfThoughtBrowserGroupState
       for (var i = 0; i < _actions.length; i++) {
         final action = _actions[i];
         if (i >= firstVisible) {
-          children.add(
-            _step(
-              context,
-              i,
-              snapshot: snapshot,
-              previousUrl: previousUrl,
-              pageCard: i == _actions.length - 1 ? pageCard : null,
-            ),
+          steps.add(
+            _step(context, i, snapshot: snapshot, previousUrl: previousUrl),
           );
         }
         if (action.action == 'snapshot') snapshot = action;
         if (action.hasPage && action.url.isNotEmpty) previousUrl = action.url;
       }
     }
-    return AnimatedSize(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 300),
-      curve: const Cubic(0.2, 0.8, 0.2, 1),
+    final stepsContent = Align(
       alignment: Alignment.topLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: children,
+      heightFactor: expanded ? 1 : 0,
+      child: IgnorePointer(
+        ignoring: !expanded,
+        child: ExcludeSemantics(
+          excluding: !expanded,
+          child: TickerMode(
+            enabled: expanded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: steps,
+            ),
+          ),
+        ),
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        header,
+        // Align reports the target height while retaining the laid-out rows.
+        // The outer clip follows AnimatedSize in both directions; the footer
+        // stays mounted and is pushed by that single animated extent.
+        ClipRect(
+          child: reduceMotion
+              ? stepsContent
+              : AnimatedSize(
+                  key: ValueKey(
+                    'browser-steps-motion-${widget.tools.first.id}',
+                  ),
+                  duration: const Duration(milliseconds: 300),
+                  curve: const Cubic(0.2, 0.8, 0.2, 1),
+                  alignment: Alignment.topLeft,
+                  clipBehavior: Clip.none,
+                  onEnd: _finishStepsAnimation,
+                  child: stepsContent,
+                ),
+        ),
+        _TimelineStepBody(
+          isLast: widget.isLast,
+          animate: false,
+          content: pageCard,
+        ),
+      ],
     );
   }
 
@@ -5746,7 +5841,6 @@ class _ChainOfThoughtBrowserGroupState
     int index, {
     required BrowserToolAction? snapshot,
     required String? previousUrl,
-    required Widget? pageCard,
   }) {
     final part = widget.tools[index];
     final action = _actions[index];
@@ -5798,7 +5892,6 @@ class _ChainOfThoughtBrowserGroupState
             },
           ),
         ),
-      if (pageCard != null) pageCard,
     ];
     return KeyedSubtree(
       key: ValueKey('browser-step-${part.id}'),
@@ -5866,6 +5959,8 @@ class _ChainOfThoughtBrowserGroupState
                 ],
               ),
         contentVisible: content.isNotEmpty,
+        // This row's body and the persistent preview share an 8dp gap.
+        contentBottomPadding: index == widget.tools.length - 1 ? 4 : 8,
         expectContent: part.loading || content.isNotEmpty,
         onTap: () => _showBrowserStepDetail(
           context,

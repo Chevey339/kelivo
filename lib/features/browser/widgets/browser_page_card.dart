@@ -50,7 +50,13 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
   @override
   void didUpdateWidget(BrowserStepGroupBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _card = null;
+    if (!identical(oldWidget.actions, widget.actions) ||
+        oldWidget.conversationId != widget.conversationId ||
+        oldWidget.lite != widget.lite ||
+        oldWidget.service != widget.service ||
+        oldWidget.onOpen != widget.onOpen) {
+      _card = null;
+    }
   }
 
   Widget _pageCard(BuildContext context) {
@@ -65,10 +71,10 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
         .where((tab) => tab.id == previewId)
         .firstOrNull;
     final bytes = previewId == null ? null : _browser.previewForTab(previewId);
-    final signature = (bytes, liveTab?.title, liveTab?.url);
+    final l = AppLocalizations.of(context)!;
+    final signature = (bytes, liveTab?.title, liveTab?.url, l);
     if (_card != null && signature == _cardSignature) return _card!;
     _cardSignature = signature;
-    final l = AppLocalizations.of(context)!;
     final current = actions.lastWhere(
       (action) => action.loading,
       orElse: () => actions.last,
