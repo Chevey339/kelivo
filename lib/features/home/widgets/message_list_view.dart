@@ -973,32 +973,10 @@ class _MessageListViewState extends State<MessageListView> {
           textWidth: textWidth,
           fontScale: fontScale,
         );
-      } else if (step.browserTools case final tools?) {
+      } else if (step.browserTools != null) {
         extent +=
             _estimateCollapsedCard +
-            estimateBrowserGroupBodyHeight(
-              [
-                for (final tool in tools)
-                  BrowserToolAction(
-                    id: tool.id,
-                    arguments: tool.arguments,
-                    content: tool.content,
-                    metadata: tool.metadata,
-                    loading: tool.loading,
-                  ),
-              ],
-              lite: step.browserLite,
-              fontScale: fontScale,
-            );
-        if (!step.browserLite && !settings.hideToolResultImages) {
-          for (final tool in tools) {
-            final (_, images) = parseToolResultImages(
-              tool.content,
-              metadata: tool.metadata,
-            );
-            if (images.isNotEmpty) extent += timelineToolImageHeight + 8;
-          }
-        }
+            estimateBrowserGroupBodyHeight(lite: step.browserLite);
       } else {
         final tool = step.tool!;
         extent += _estimateCollapsedCard;

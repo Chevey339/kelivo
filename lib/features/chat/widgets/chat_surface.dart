@@ -104,6 +104,14 @@ Widget buildSharedChatSurface(
   }
 }
 
+/// Quiet fill used by compact cards and chips inside the chat timeline.
+Color chatQuietFill(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.colorScheme.onSurface.withValues(
+    alpha: theme.brightness == Brightness.dark ? 0.06 : 0.04,
+  );
+}
+
 class ChatSurfaceForegroundPalette {
   const ChatSurfaceForegroundPalette({
     required this.strong,

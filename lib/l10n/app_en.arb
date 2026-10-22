@@ -5856,8 +5856,18 @@
   "browserUserAgentHint": "Enter a custom User-Agent",
   "browserUserAgentInvalid": "Use a single line of up to 2048 printable ASCII characters.",
   "browserUserAgentDescription": "Changes reload the current webpage.",
+  "browserStepsShowEarlier": "{count} earlier steps",
+  "browserOpenThisPage": "Open in browser",
+  "browserGroupToggleSemantics": "Show or hide browser steps",
+  "@browserStepsShowEarlier": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "browserStepGroupTitle": "Browsing",
-  "browserStepCount": "· {count} steps",
+  "browserStepCount": "{count} steps",
   "@browserStepCount": {
     "description": "Browser page card browserStepCount",
     "placeholders": {
@@ -5866,18 +5876,9 @@
       }
     }
   },
-  "browserStepCurrent": "· step {index}",
+  "browserStepCurrent": "step {count}",
   "@browserStepCurrent": {
     "description": "Browser page card browserStepCurrent",
-    "placeholders": {
-      "index": {
-        "type": "int"
-      }
-    }
-  },
-  "browserActionCount": "{count} actions",
-  "@browserActionCount": {
-    "description": "Browser page card browserActionCount",
     "placeholders": {
       "count": {
         "type": "int"

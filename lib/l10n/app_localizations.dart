@@ -23910,6 +23910,24 @@ abstract class AppLocalizations {
   /// **'Changes reload the current webpage.'**
   String get browserUserAgentDescription;
 
+  /// No description provided for @browserStepsShowEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} earlier steps'**
+  String browserStepsShowEarlier(int count);
+
+  /// No description provided for @browserOpenThisPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get browserOpenThisPage;
+
+  /// No description provided for @browserGroupToggleSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide browser steps'**
+  String get browserGroupToggleSemantics;
+
   /// No description provided for @browserStepGroupTitle.
   ///
   /// In en, this message translates to:
@@ -23919,20 +23937,14 @@ abstract class AppLocalizations {
   /// Browser page card browserStepCount
   ///
   /// In en, this message translates to:
-  /// **'· {count} steps'**
+  /// **'{count} steps'**
   String browserStepCount(int count);
 
   /// Browser page card browserStepCurrent
   ///
   /// In en, this message translates to:
-  /// **'· step {index}'**
-  String browserStepCurrent(int index);
-
-  /// Browser page card browserActionCount
-  ///
-  /// In en, this message translates to:
-  /// **'{count} actions'**
-  String browserActionCount(int count);
+  /// **'step {count}'**
+  String browserStepCurrent(int count);
 
   /// Browser page card browserActionFailedCount
   ///

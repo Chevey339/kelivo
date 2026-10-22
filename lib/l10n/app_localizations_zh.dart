@@ -12773,21 +12773,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserUserAgentDescription => '更改后将重新加载当前网页。';
 
   @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
   String get browserStepGroupTitle => '浏览网页';
 
   @override
   String browserStepCount(int count) {
-    return '· $count 步';
+    return '$count 步';
   }
 
   @override
-  String browserStepCurrent(int index) {
-    return '· 第 $index 步';
-  }
-
-  @override
-  String browserActionCount(int count) {
-    return '$count 个操作';
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
   }
 
   @override
@@ -25659,21 +25665,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get browserUserAgentDescription => '更改后将重新加载当前网页。';
 
   @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
   String get browserStepGroupTitle => '浏览网页';
 
   @override
   String browserStepCount(int count) {
-    return '· $count 步';
+    return '$count 步';
   }
 
   @override
-  String browserStepCurrent(int index) {
-    return '· 第 $index 步';
-  }
-
-  @override
-  String browserActionCount(int count) {
-    return '$count 个操作';
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
   }
 
   @override
@@ -38624,21 +38636,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get browserUserAgentDescription => '變更後將重新載入目前網頁。';
 
   @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在瀏覽器中開啟';
+
+  @override
+  String get browserGroupToggleSemantics => '展開或收合瀏覽步驟';
+
+  @override
   String get browserStepGroupTitle => '瀏覽網頁';
 
   @override
   String browserStepCount(int count) {
-    return '· $count 步';
+    return '$count 步';
   }
 
   @override
-  String browserStepCurrent(int index) {
-    return '· 第 $index 步';
-  }
-
-  @override
-  String browserActionCount(int count) {
-    return '$count 個操作';
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
   }
 
   @override

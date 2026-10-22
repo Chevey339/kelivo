@@ -88,7 +88,7 @@ void main() {
       await tester.runAsync(() => settings.setShowToolResultSummary(false));
       await pump(tester, [for (var i = 0; i < 4; i++) browserPart('call-$i')]);
       expect(find.text('Browsing'), findsOneWidget);
-      expect(find.text('· 4 steps'), findsOneWidget);
+      expect(find.text('4 steps'), findsOneWidget);
       expect(find.byType(BrowserPageCard), findsOneWidget);
       expect(find.text('Browser control'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -109,10 +109,12 @@ void main() {
     expect(cards, hasLength(2));
     expect(cards.first.lite, isTrue);
     expect(cards.last.lite, isFalse);
-    expect(
-      find.byKey(const ValueKey('browser-actions-toggle')),
-      findsOneWidget,
-    );
+    await tester.tap(find.text('Browsing').first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('browser-step-a')), findsOneWidget);
+    expect(find.byType(BrowserPageCard), findsNWidgets(2));
+    expect(tester.getSize(find.byType(BrowserPageCard).first).height, 36);
+    expect(find.byKey(const ValueKey('browser-actions-toggle')), findsNothing);
   });
   testWidgets('pending browser approval stays separate and actionable', (
     tester,
@@ -145,15 +147,35 @@ void main() {
     (tester) async {
       await tester.runAsync(() => settings.setCollapseThinkingSteps(false));
       await pump(tester, [browserPart('a')]);
-      await tester.tap(find.byKey(const ValueKey('browser-actions-toggle')));
+      await tester.tap(find.text('Browsing'));
       await tester.pumpAndSettle();
-      expect(find.byType(BrowserActionRow), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is KeyedSubtree &&
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'browser-step-',
+              ),
+        ),
+        findsOneWidget,
+      );
       await pump(tester, [
         browserPart('a'),
         browserPart('b'),
         const ReasoningPart('Done'),
       ]);
-      expect(find.byType(BrowserActionRow), findsNWidgets(2));
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is KeyedSubtree &&
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'browser-step-',
+              ),
+        ),
+        findsNWidgets(2),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -164,6 +186,8 @@ void main() {
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
       await tester.runAsync(() => settings.setHideToolResultImages(true));
       await pump(tester, [browserPart('image', image: image)]);
+      await tester.tap(find.text('Browsing'));
+      await tester.pumpAndSettle();
       expect(find.byType(BrowserPageCard), findsOneWidget);
       expect(
         find.byKey(const ValueKey('tool-image-thumbnails:image')),

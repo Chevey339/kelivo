@@ -10,6 +10,7 @@ import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/features/browser/models/browser_tool_presentation.dart';
 import 'package:Kelivo/features/browser/widgets/browser_page_card.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 class CardBrowser extends BrowserService {
   Uint8List? preview;
@@ -113,55 +114,58 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('example.com'), findsOneWidget);
-      expect(find.text('1 actions'), findsOneWidget);
-      expect(find.byType(BrowserActionRow), findsNothing);
-      expect(tester.getSize(find.byType(BrowserPageCard)).height, 64);
-      await tester.tap(find.byType(BrowserPageCard));
-      expect(opened, 'one');
-      await tester.tap(find.byKey(const ValueKey('browser-actions-toggle')));
-      await tester.pumpAndSettle();
-      expect(find.byType(BrowserActionRow), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'failed card defaults expanded with enable action and bounded error',
-    (tester) async {
-      await pump(tester, [action('a', failed: true)], dark: true);
-      expect(find.text("Couldn't open page"), findsOneWidget);
-      expect(find.text('Enable'), findsOneWidget);
-      expect(find.text('Browser control is off'), findsNWidgets(2));
-      expect(
-        find.byKey(const ValueKey('browser-preview-error')),
-        findsOneWidget,
-      );
-      expect(find.byType(BrowserActionRow), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'streaming defaults expand then collapse, explicit choice survives group growth',
-    (tester) async {
-      await pump(tester, [action('a'), action('b', loading: true)]);
-      expect(find.text('Live'), findsOneWidget);
-      expect(find.byType(BrowserActionRow), findsNWidgets(2));
-      await pump(tester, [action('a'), action('b')]);
-      await tester.pumpAndSettle();
-      expect(find.byType(BrowserActionRow), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('browser-actions-toggle')));
-      await tester.pumpAndSettle();
-      await pump(tester, [action('a'), action('b'), action('c')]);
-      await tester.pumpAndSettle();
-      expect(find.byType(BrowserActionRow), findsNWidgets(3));
-      await pump(tester, [action('a'), action('b')], lite: true);
-      await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('browser-actions-toggle')),
         findsNothing,
       );
-      expect(tester.getSize(find.byType(BrowserPageCard)).height, 36);
+      expect(tester.getSize(find.byType(BrowserPageCard)).height, 64);
+      await tester.tap(find.byType(BrowserPageCard));
+      expect(opened, 'one');
+      expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('failed card shows enable action and bounded error', (
+    tester,
+  ) async {
+    await pump(tester, [action('a', failed: true)], dark: true);
+    expect(find.text("Couldn't open page"), findsOneWidget);
+    expect(find.text('Enable'), findsOneWidget);
+    expect(find.text('Browser control is off'), findsOneWidget);
+    expect(find.byKey(const ValueKey('browser-preview-error')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'preview follows running/completed state and lightweight layout',
+    (tester) async {
+      await pump(tester, [action('a'), action('b', loading: true)]);
+      expect(find.text('Live'), findsOneWidget);
+      await pump(tester, [action('a'), action('b')]);
+      await tester.pumpAndSettle();
+      expect(find.text('Live'), findsNothing);
+      await pump(tester, [action('a'), action('b')], lite: true);
+      expect(tester.getSize(find.byType(BrowserPageCard)).height, 36);
+      expect(
+        find.byKey(const ValueKey('browser-actions-toggle')),
+        findsNothing,
+      );
+    },
+  );
+  for (final dark in [false, true]) {
+    testWidgets('card uses quiet fill in ${dark ? 'dark' : 'light'} theme', (
+      tester,
+    ) async {
+      await pump(tester, [action('a')], dark: dark);
+      final card = find.byKey(const ValueKey('browser-page-card'));
+      final press = tester.widget<IosCardPress>(card);
+      final cs = Theme.of(tester.element(card)).colorScheme;
+      expect(press.baseColor, cs.onSurface.withValues(alpha: dark ? .06 : .04));
+      expect(press.baseColor, isNot(Colors.white));
+      expect(
+        press.border!.top.color,
+        cs.onSurface.withValues(alpha: dark ? .08 : .06),
+      );
+    });
+  }
   testWidgets(
     'unrelated browser notifications reuse the card, cached pixels update it without capture',
     (tester) async {

@@ -15,6 +15,13 @@ void main() {
     arguments: {'action': name, ...args},
     content: raw ?? jsonEncode({'ok': true, 'page': page}),
   );
+  test(
+    'preview height estimate follows collapsed cards without an operations row',
+    () {
+      expect(estimateBrowserGroupBodyHeight(lite: false), 76);
+      expect(estimateBrowserGroupBodyHeight(lite: true), 48);
+    },
+  );
   test('every browser operation has a localized label', () {
     const labels = {
       'open': '打开网页',

@@ -193,25 +193,7 @@ String browserErrorSummary(AppLocalizations l, String error) {
   return l.browserErrGeneric;
 }
 
-/// Default body extent for the lazy message list. User expansion is measured
-/// by the list itself; no expansion state is persisted in message data.
-double estimateBrowserGroupBodyHeight(
-  List<BrowserToolAction> actions, {
-  required bool lite,
-  required double fontScale,
-}) {
-  if (lite) return 36 + 8;
-  final expanded = actions.any((action) => action.loading || action.failed);
-  return 64 +
-      28 +
-      8 +
-      (expanded
-          ? actions.fold<double>(
-              4,
-              (height, action) =>
-                  height +
-                  28 * fontScale +
-                  (action.failed ? 32 * fontScale : 0),
-            )
-          : 0);
-}
+/// Collapsed preview estimate. Expanded rows are measured by the lazy list;
+/// estimating them must not decode every tool result in a long browser run.
+double estimateBrowserGroupBodyHeight({required bool lite}) =>
+    (lite ? 36 : 64) + 4 + 8;

@@ -13389,21 +13389,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Changes reload the current webpage.';
 
   @override
+  String browserStepsShowEarlier(int count) {
+    return '$count earlier steps';
+  }
+
+  @override
+  String get browserOpenThisPage => 'Open in browser';
+
+  @override
+  String get browserGroupToggleSemantics => 'Show or hide browser steps';
+
+  @override
   String get browserStepGroupTitle => 'Browsing';
 
   @override
   String browserStepCount(int count) {
-    return '· $count steps';
+    return '$count steps';
   }
 
   @override
-  String browserStepCurrent(int index) {
-    return '· step $index';
-  }
-
-  @override
-  String browserActionCount(int count) {
-    return '$count actions';
+  String browserStepCurrent(int count) {
+    return 'step $count';
   }
 
   @override
