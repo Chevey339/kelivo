@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import '../../../desktop/macos_window_drag_area.dart';
 import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -352,6 +353,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required bool workspaceBound,
   }) {
     return AppBar(
+      flexibleSpace: const MacosWindowDragArea(child: SizedBox.expand()),
       centerTitle: false,
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
           ? const SystemUiOverlayStyle(
