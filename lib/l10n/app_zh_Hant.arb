@@ -1033,6 +1033,7 @@
       }
     }
   },
+  "sideDrawerDeleteConfirmContent": "刪除 \"{title}\"?",
   "sideDrawerDeleteSelectedSnackbar": "已刪除 {count} 個話題",
   "@sideDrawerDeleteSelectedSnackbar": {
     "placeholders": {

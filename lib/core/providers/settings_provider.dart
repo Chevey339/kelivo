@@ -2131,10 +2131,10 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // ===== App locale (UI language) =====
-  String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'
+  String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US', 'ko_KR'
   static String _readAppLocaleTag(BusinessPreferences preferences) {
     final value = preferences.get(_appLocaleKey);
-    const supportedTags = {'system', 'zh_CN', 'zh_Hant', 'en_US'};
+    const supportedTags = {'system', 'zh_CN', 'zh_Hant', 'en_US', 'ko_KR'};
     return value is String && supportedTags.contains(value) ? value : 'system';
   }
 
@@ -2167,6 +2167,7 @@ class SettingsProvider extends ChangeNotifier {
       if (script == 'hant') return 'zh_Hant';
       return 'zh_CN';
     }
+    if (lc == 'ko') return 'ko_KR';
     return 'en_US';
   }
 
@@ -2176,6 +2177,8 @@ class SettingsProvider extends ChangeNotifier {
         return const Locale('zh', 'CN');
       case 'zh_Hant':
         return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+      case 'ko_KR':
+        return const Locale('ko', 'KR');
       case 'en_US':
       default:
         return const Locale('en', 'US');

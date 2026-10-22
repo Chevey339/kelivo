@@ -182,6 +182,7 @@ ThemePalette buildCustomThemePalette(CustomTheme theme) {
     id: ThemePalettes.customPaletteId,
     zhName: theme.name.isEmpty ? '自定义' : theme.name,
     enName: theme.name.isEmpty ? 'Custom' : theme.name,
+    koName: theme.name.isEmpty ? '사용자 지정' : theme.name,
     light: customThemeColorScheme(theme, dark: false),
     dark: customThemeColorScheme(theme, dark: true),
   );

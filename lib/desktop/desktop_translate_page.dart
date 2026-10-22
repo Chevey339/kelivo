@@ -62,7 +62,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final locale = Localizations.localeOf(context).languageCode.toLowerCase();
     final localeLang = locale.startsWith('zh')
         ? _languageForCode('zh-CN')
-        : _languageForCode('en');
+        : _languageForCode(locale) ?? _languageForCode('en');
     setState(() {
       _targetLang = savedLang ?? localeLang ?? supportedLanguages.first;
     });

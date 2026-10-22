@@ -75,10 +75,14 @@ class _BackupPageState extends State<BackupPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final locale = Localizations.localeOf(context);
-    final isZh = locale.languageCode.startsWith('zh');
-    final String body = isZh
-        ? '此功能目前仍处于实验阶段。\n目前仅能导入助手，对话内容，供应商和文件，\n一些供应商需要在baseurl后面添加/v1 or /v1beta。 \n为确保数据安全，建议在导入前先执行备份。\n是否已知晓并继续选择文件？'
-        : 'This feature is experimental.\nTo keep your data safe, it is recommended to back up before importing.\nProceed to choose a file?';
+    final String body = switch (locale.languageCode) {
+      'zh' =>
+        '此功能目前仍处于实验阶段。\n目前仅能导入助手，对话内容，供应商和文件，\n一些供应商需要在baseurl后面添加/v1 or /v1beta。 \n为确保数据安全，建议在导入前先执行备份。\n是否已知晓并继续选择文件？',
+      'ko' =>
+        '이 기능은 아직 실험 단계입니다.\n현재는 어시스턴트, 대화, 제공업체, 파일만 가져올 수 있습니다.\n일부 제공업체는 API 기본 URL 뒤에 /v1 또는 /v1beta를 추가해야 합니다.\n데이터를 안전하게 지키려면 가져오기 전에 먼저 백업하는 것이 좋습니다.\n위 내용을 확인했다면 계속해서 파일을 선택하시겠습니까?',
+      _ =>
+        'This feature is experimental.\nTo keep your data safe, it is recommended to back up before importing.\nProceed to choose a file?',
+    };
 
     return showModalBottomSheet<bool>(
       context: context,

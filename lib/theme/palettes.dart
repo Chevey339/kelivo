@@ -4,6 +4,7 @@ class ThemePalette {
   final String id;
   final String zhName;
   final String enName;
+  final String koName;
   final ColorScheme light;
   final ColorScheme dark;
 
@@ -11,12 +12,14 @@ class ThemePalette {
     required this.id,
     required this.zhName,
     required this.enName,
+    required this.koName,
     required this.light,
     required this.dark,
   });
 
   String get displayNameZh => zhName;
   String get displayNameEn => enName;
+  String get displayNameKo => koName;
 }
 
 class ThemePalettes {
@@ -34,6 +37,7 @@ class ThemePalettes {
     id: defaultId,
     zhName: '默认',
     enName: 'Default',
+    koName: '기본',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF4D5C92),
@@ -101,6 +105,7 @@ class ThemePalettes {
     id: blueId,
     zhName: '海霄蓝',
     enName: 'Aether Blue',
+    koName: '에테르 블루',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF3E5E98),
@@ -168,6 +173,7 @@ class ThemePalettes {
     id: greenId,
     zhName: '竹影绿',
     enName: 'Bamboo Green',
+    koName: '뱀부 그린',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF166C47),
@@ -235,6 +241,7 @@ class ThemePalettes {
     id: purpleId,
     zhName: '暮紫韵',
     enName: 'Twilight Purple',
+    koName: '트와일라이트 퍼플',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF5D5698),
@@ -302,6 +309,7 @@ class ThemePalettes {
     id: yellowId,
     zhName: '琥珀金',
     enName: 'Amber Gold',
+    koName: '앰버 골드',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF855304),
@@ -369,6 +377,7 @@ class ThemePalettes {
     id: smokyRoseId,
     zhName: '暮霭玫',
     enName: 'Smoky Rose',
+    koName: '스모키 로즈',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF824E6C),
@@ -436,6 +445,7 @@ class ThemePalettes {
     id: terracottaId,
     zhName: '陶砂红',
     enName: 'Terracotta Clay',
+    koName: '테라코타 클레이',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF8B4E3B),
@@ -502,6 +512,7 @@ class ThemePalettes {
     id: monochromeId,
     zhName: '纸墨灰',
     enName: 'Frost Gray',
+    koName: '프로스트 그레이',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF000000),
@@ -569,6 +580,7 @@ class ThemePalettes {
     id: docThemeId,
     zhName: '樱桃绿',
     enName: 'Verdant Mint',
+    koName: '버던트 민트',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF00B96B),

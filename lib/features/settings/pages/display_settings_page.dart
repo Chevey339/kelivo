@@ -42,9 +42,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     String paletteName() {
       final settings = context.read<SettingsProvider>();
       final palette = ThemePalettes.byId(settings.themePaletteId);
-      return Localizations.localeOf(context).languageCode == 'zh'
-          ? palette.displayNameZh
-          : palette.displayNameEn;
+      return switch (Localizations.localeOf(context).languageCode) {
+        'zh' => palette.displayNameZh,
+        'ko' => palette.displayNameKo,
+        _ => palette.displayNameEn,
+      };
     }
 
     return Scaffold(
@@ -88,6 +90,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         return l10n.languageDisplayTraditionalChinese;
                       }
                       return l10n.displaySettingsPageLanguageChineseLabel;
+                    }
+                    if (l.languageCode == 'ko') {
+                      return l10n.languageDisplayKorean;
                     }
                     return l10n.displaySettingsPageLanguageEnglishLabel;
                   }
@@ -455,6 +460,12 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   label: l10n.displaySettingsPageLanguageEnglishLabel,
                   onTap: () => Navigator.of(ctx).pop('en_US'),
                 ),
+                _sheetDividerNoIcon(ctx),
+                _sheetOption(
+                  ctx,
+                  label: l10n.languageDisplayKorean,
+                  onTap: () => Navigator.of(ctx).pop('ko_KR'),
+                ),
               ],
             ),
           ),
@@ -476,6 +487,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         await settings.setAppLocale(
           const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
         );
+        break;
+      case 'ko_KR':
+        await settings.setAppLocale(const Locale('ko', 'KR'));
         break;
       case 'en_US':
       default:

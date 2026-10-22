@@ -19,6 +19,7 @@
 		<string>en</string>
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
+		<string>ko</string>
 	</array>
 	<key>CFBundleName</key>
 	<string>kelivo</string>
