@@ -480,7 +480,7 @@ void main() {
   for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
     for (final style in BrowserSurfaceStyle.values) {
       testWidgets(
-        'scope menu fades away from its button on $platform / $style',
+        'scope menu morphs back into its own label on $platform / $style',
         (tester) async {
           final service = _PreviewService(
             owners: {'a': 'chat-a', 'b': 'chat-b'},
@@ -507,25 +507,75 @@ void main() {
               matching: find.byType(BrowserTextButton),
             );
             final before = tester.getRect(button);
+            final sourceGlass = find.descendant(
+              of: button,
+              matching: find.byType(BrowserGlass),
+            );
+            final preparedSource = tester.element(sourceGlass);
             await tester.tap(scope);
-            await tester.pumpAndSettle();
+            await tester.pump();
             final menu = find.byKey(const ValueKey('browserMenuSurface'));
+            expect(tester.getRect(menu), before);
+            expect(tester.widget<BrowserGlass>(menu).opacity, 0);
+            expect(tester.widget<BrowserGlass>(sourceGlass).opacity, 1);
+            for (var frame = 0; frame < 6; frame++) {
+              await tester.pump();
+            }
+            expect(tester.widget<BrowserGlass>(menu).opacity, 1);
+            expect(tester.widget<BrowserGlass>(sourceGlass).opacity, 0);
+            await tester.pump(const Duration(milliseconds: 70));
+            final opening = tester.getSize(menu);
+            expect(opening.width, greaterThan(before.width));
+            await tester.pumpAndSettle();
             final expanded = tester.getRect(menu);
-            expect(expanded.top, greaterThan(before.bottom));
+            expect(expanded.width, greaterThan(opening.width));
+            expect(expanded.height, greaterThan(before.height));
             await tester.tapAt(const Offset(350, 400));
             await tester.pump();
-            var previousOpacity = 1.0;
+            var previousWidth = expanded.width;
             for (var frame = 0; frame < 14; frame++) {
               await tester.pump(const Duration(milliseconds: 16));
               expect(tester.getRect(button), before);
-              expect(tester.getRect(menu), expanded);
+              final width = tester.getSize(menu).width;
+              expect(width, lessThan(previousWidth));
+              previousWidth = width;
               expect(find.byIcon(LucideIcons.ellipsis), findsNothing);
-              final opacity = tester.widget<BrowserGlass>(menu).opacity;
-              expect(opacity, lessThan(previousOpacity));
-              previousOpacity = opacity;
+              expect(tester.widget<BrowserGlass>(sourceGlass).opacity, 0);
             }
+            await tester.pump(const Duration(milliseconds: 25));
+            final ending = tester.getRect(menu);
+            expect(ending.left, closeTo(before.left, .8));
+            expect(ending.top, closeTo(before.top, .8));
+            expect(ending.width, closeTo(before.width, .8));
+            expect(ending.height, closeTo(before.height, .8));
+            final label = find.byKey(const ValueKey('browserTabScopeSource'));
+            expect(
+              find.descendant(of: label, matching: find.text('This chat')),
+              findsOneWidget,
+            );
+            final originalText = tester.widget<RichText>(
+              find.descendant(
+                of: find.descendant(
+                  of: scope,
+                  matching: find.text('This chat'),
+                ),
+                matching: find.byType(RichText),
+              ),
+            );
+            final returningText = tester.widget<RichText>(
+              find.descendant(
+                of: find.descendant(
+                  of: label,
+                  matching: find.text('This chat'),
+                ),
+                matching: find.byType(RichText),
+              ),
+            );
+            expect(returningText.text.style, originalText.text.style);
             await tester.pumpAndSettle();
             expect(menu, findsNothing);
+            expect(tester.widget<BrowserGlass>(sourceGlass).opacity, 1);
+            expect(tester.element(sourceGlass), same(preparedSource));
             expect(find.text('This chat'), findsOneWidget);
             expect(
               find.byKey(const ValueKey('browserTabCard-b')),
@@ -541,6 +591,107 @@ void main() {
       );
     }
   }
+
+  testWidgets('scope morph preserves a wide source at large text sizes', (
+    tester,
+  ) async {
+    final service = _PreviewService(owners: {'a': 'chat-a'});
+    await service.initialize();
+    try {
+      await mount(
+        tester,
+        BrowserTabOverview(
+          service: service,
+          conversationId: 'chat-a',
+          onSelect: (_) {},
+          onClose: (_) {},
+          onNew: () {},
+        ),
+        size: const Size(1024, 844),
+        scale: 3,
+        platform: TargetPlatform.iOS,
+      );
+      final scope = find.byKey(const ValueKey('browserTabScope'));
+      final button = find.ancestor(
+        of: scope,
+        matching: find.byType(BrowserTextButton),
+      );
+      final before = tester.getRect(button);
+      expect(before.width, greaterThan(250));
+      await tester.tap(scope);
+      await tester.pump();
+      final menu = find.byKey(const ValueKey('browserMenuSurface'));
+      expect(tester.getRect(menu), before);
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(800, 400));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 249));
+      expect(tester.getSize(menu).width, closeTo(before.width, .8));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(button), before);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      service.dispose();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('scope source recovers after an interrupted opening', (
+    tester,
+  ) async {
+    final service = _PreviewService(owners: {'a': 'chat-a', 'b': 'chat-b'});
+    await service.initialize();
+    try {
+      await mount(
+        tester,
+        BrowserTabOverview(
+          service: service,
+          conversationId: 'chat-a',
+          onSelect: (_) {},
+          onClose: (_) {},
+          onNew: () {},
+        ),
+        platform: TargetPlatform.iOS,
+      );
+      final scope = find.byKey(const ValueKey('browserTabScope'));
+      final button = find.ancestor(
+        of: scope,
+        matching: find.byType(BrowserTextButton),
+      );
+      for (final delay in [Duration.zero, const Duration(milliseconds: 70)]) {
+        await tester.tap(scope);
+        await tester.pump();
+        if (delay != Duration.zero) {
+          for (var frame = 0; frame < 6; frame++) {
+            await tester.pump();
+          }
+          await tester.pump(delay);
+        }
+        await tester.tapAt(const Offset(350, 400));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('browserMenuSurface')), findsNothing);
+        expect(tester.widget<BrowserTextButton>(button).opacity, 1);
+      }
+      await tester.tap(scope);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All tabs'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('browserTabCard-b')), findsOneWidget);
+      expect(tester.widget<BrowserTextButton>(button).opacity, 1);
+      await tester.tap(scope);
+      await tester.pumpAndSettle();
+      // Disposing the overview with an active menu must complete its caller
+      // without setting state on a removed source or leaving an overlay alive.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      service.dispose();
+      await tester.pumpAndSettle();
+    }
+  });
 
   testWidgets(
     'management shell is a full route and Back returns to its caller',

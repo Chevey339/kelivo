@@ -197,6 +197,8 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
   bool _searchExpanded = false;
   late bool _showAll;
   final _scopeButtonKey = GlobalKey();
+  bool _scopeMenuOpen = false;
+  bool _scopeMenuTransitionStarted = false;
   ScrollController? _gridController;
   @override
   void initState() {
@@ -234,68 +236,110 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
       ? widget.service.previewForTab(id)
       : widget.transition!.previewForTab(id);
 
-  Widget _scopeSelector(BuildContext context, {required bool desktop}) {
+  EdgeInsets _scopePadding(bool desktop) => EdgeInsets.symmetric(
+    horizontal: desktop ? 12 : 16,
+    vertical: desktop ? 7 : 12,
+  );
+
+  Widget _scopeLabel(BuildContext context, {required bool desktop}) {
     final l = AppLocalizations.of(context)!;
+    final color = Theme.of(context).colorScheme.onSurface;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            _showAll ? l.browserTabsAll : l.browserTabsCurrentConversation,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: desktop ? 12 : 13,
+              height: 1.3,
+              fontWeight: desktop ? FontWeight.w500 : FontWeight.w600,
+            ),
+          ),
+        ),
+        SizedBox(width: desktop ? 4 : 6),
+        Icon(LucideIcons.chevronDown, size: desktop ? 12 : 14, color: color),
+      ],
+    );
+  }
+
+  Widget _scopeSelector(BuildContext context, {required bool desktop}) {
     return BrowserTextButton(
       key: _scopeButtonKey,
       filled: true,
-      padding: EdgeInsets.symmetric(
-        horizontal: desktop ? 12 : 16,
-        vertical: desktop ? 7 : 12,
-      ),
+      padding: _scopePadding(desktop),
+      // Keep its prepared material and layout; the menu owns the visible lens
+      // from its first motion frame until it returns to this exact rectangle.
+      opacity: _scopeMenuTransitionStarted ? 0 : 1,
       onPressed: () => _chooseScope(context, desktop: desktop),
-      child: Row(
+      child: KeyedSubtree(
         key: const ValueKey('browserTabScope'),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              _showAll ? l.browserTabsAll : l.browserTabsCurrentConversation,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: desktop ? 12 : 13,
-                height: 1.3,
-                fontWeight: desktop ? FontWeight.w500 : null,
-              ),
-            ),
-          ),
-          SizedBox(width: desktop ? 4 : 6),
-          Icon(LucideIcons.chevronDown, size: desktop ? 12 : 14),
-        ],
+        child: _scopeLabel(context, desktop: desktop),
       ),
     );
+  }
+
+  Rect? _scopeAnchor() {
+    final box = _scopeButtonKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   Future<void> _chooseScope(
     BuildContext context, {
     required bool desktop,
   }) async {
-    final box = _scopeButtonKey.currentContext?.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) return;
+    if (_scopeMenuOpen) return;
+    final anchor = _scopeAnchor();
+    if (anchor == null) return;
     final l = AppLocalizations.of(context)!;
-    final value = await showBrowserMenu<bool>(
-      context,
-      title: l.browserTabs,
-      desktop: desktop,
-      morphFromAnchor: false,
-      anchorRect: box.localToGlobal(Offset.zero) & box.size,
-      items: [
-        BrowserMenuEntry(
-          value: false,
-          icon: !_showAll ? LucideIcons.check : LucideIcons.messageSquare,
-          label: l.browserTabsCurrentConversation,
+    _scopeMenuOpen = true;
+    final bool? value;
+    try {
+      value = await showBrowserMenu<bool>(
+        context,
+        title: l.browserTabs,
+        desktop: desktop,
+        anchorRect: anchor,
+        resolveAnchor: _scopeAnchor,
+        sourceContent: Padding(
+          key: const ValueKey('browserTabScopeSource'),
+          padding: _scopePadding(desktop),
+          child: _scopeLabel(context, desktop: desktop),
         ),
-        BrowserMenuEntry(
-          value: true,
-          icon: _showAll ? LucideIcons.check : LucideIcons.panelsTopLeft,
-          label: l.browserTabsAll,
-        ),
-      ],
-    );
-    if (!mounted || value == null || value == _showAll) return;
+        onTransitionStart: () {
+          if (mounted && !desktop && _scopeMenuOpen) {
+            setState(() => _scopeMenuTransitionStarted = true);
+          }
+        },
+        items: [
+          BrowserMenuEntry(
+            value: false,
+            icon: !_showAll ? LucideIcons.check : LucideIcons.messageSquare,
+            label: l.browserTabsCurrentConversation,
+          ),
+          BrowserMenuEntry(
+            value: true,
+            icon: _showAll ? LucideIcons.check : LucideIcons.panelsTopLeft,
+            label: l.browserTabsAll,
+          ),
+        ],
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _scopeMenuOpen = false;
+          _scopeMenuTransitionStarted = false;
+        });
+      }
+    }
+    final selected = value;
+    if (!mounted || selected == null || selected == _showAll) return;
     widget.transition?.invalidateGeometry();
-    setState(() => _showAll = value);
+    setState(() => _showAll = selected);
     final controller = widget.scrollController ?? _gridController;
     if (controller?.hasClients == true) controller!.jumpTo(0);
   }

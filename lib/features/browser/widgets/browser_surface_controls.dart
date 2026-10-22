@@ -303,7 +303,8 @@ class BrowserTextButton extends StatelessWidget {
     this.foregroundColor,
     this.backgroundColor,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  });
+    this.opacity = 1,
+  }) : assert(opacity >= 0 && opacity <= 1);
 
   final VoidCallback? onPressed;
   final Widget child;
@@ -312,6 +313,7 @@ class BrowserTextButton extends StatelessWidget {
   final bool filled;
   final Color? foregroundColor, backgroundColor;
   final EdgeInsetsGeometry padding;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
@@ -339,16 +341,24 @@ class BrowserTextButton extends StatelessWidget {
       ),
     );
     final surface = backgroundColor != null
-        ? DecoratedBox(
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(28),
+        ? Opacity(
+            opacity: opacity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: BrowserControlFeedback(radius: 28, child: content),
             ),
-            child: BrowserControlFeedback(radius: 28, child: content),
           )
         : filled
-        ? BrowserGlass(radius: 28, elevated: false, child: content)
-        : content;
+        ? BrowserGlass(
+            radius: 28,
+            elevated: false,
+            opacity: opacity,
+            child: content,
+          )
+        : Opacity(opacity: opacity, child: content);
     if (!_desktopControls(context)) {
       return _BrowserControlBoundary(
         child: BrowserPress(

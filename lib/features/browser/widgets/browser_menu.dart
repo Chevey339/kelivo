@@ -96,7 +96,7 @@ Future<T?> showBrowserMenu<T>(
   required List<BrowserMenuEntry<T>> items,
   required Rect anchorRect,
   required bool desktop,
-  bool morphFromAnchor = true,
+  Widget? sourceContent,
   Rect? Function()? resolveAnchor,
   VoidCallback? onTransitionStart,
   VoidCallback? onOpened,
@@ -108,15 +108,12 @@ Future<T?> showBrowserMenu<T>(
     to: Navigator.of(context, rootNavigator: true).context,
   );
   final reduced = MediaQuery.disableAnimationsOf(context);
-  // Only the More menu replaces its trigger with an expanding ellipsis lens.
-  // Selectors keep their label visible and show a separate anchored popover.
-  final morph = !desktop && morphFromAnchor;
   final contact = !desktop && heldPointer != null
       ? _HeldMenuPointer(heldPointer, pressPosition ?? anchorRect.center)
       : null;
   Rect lastAnchor = anchorRect;
   Rect currentAnchor(Animation<double> animation) {
-    if (!morph || animation is! _TouchMenuAnimation || !animation.reversing) {
+    if (desktop || animation is! _TouchMenuAnimation || !animation.reversing) {
       return anchorRect;
     }
     final resolved = resolveAnchor?.call();
@@ -154,7 +151,7 @@ Future<T?> showBrowserMenu<T>(
             title: title,
             items: items,
             desktop: desktop,
-            morphFromAnchor: morph,
+            sourceContent: sourceContent,
             animation: animation,
             onSelected: select,
             contact: contact,
@@ -166,7 +163,6 @@ Future<T?> showBrowserMenu<T>(
                   anchor: anchorRect,
                   insets: insets,
                   desktop: desktop,
-                  morphFromAnchor: morph,
                   progress: 1,
                 )._below(
                   Rect.fromLTRB(
@@ -184,8 +180,7 @@ Future<T?> showBrowserMenu<T>(
                 anchor: currentAnchor(animation),
                 insets: insets,
                 desktop: desktop,
-                morphFromAnchor: morph,
-                progress: !morph || (reduced && transitionStarted)
+                progress: desktop || (reduced && transitionStarted)
                     ? 1
                     : progress,
               ),
@@ -515,14 +510,12 @@ class _MenuPosition extends SingleChildLayoutDelegate {
     required this.anchor,
     required this.insets,
     required this.desktop,
-    required this.morphFromAnchor,
     required this.progress,
   });
 
   final Rect anchor;
   final EdgeInsets insets;
   final bool desktop;
-  final bool morphFromAnchor;
   final double progress;
   static const double _gap = 7;
 
@@ -534,18 +527,16 @@ class _MenuPosition extends SingleChildLayoutDelegate {
   );
 
   bool _below(Rect available) {
-    final below = morphFromAnchor
-        ? available.bottom - anchor.top
-        : available.bottom - anchor.bottom - _gap;
-    final above = morphFromAnchor
-        ? anchor.bottom - available.top
-        : anchor.top - available.top - _gap;
-    final preferred = morphFromAnchor ? above : below;
-    final alternate = morphFromAnchor ? below : above;
-    if (preferred >= math.min(300, available.height * .55)) {
-      return !morphFromAnchor;
-    }
-    return preferred >= alternate ? !morphFromAnchor : morphFromAnchor;
+    final below = desktop
+        ? available.bottom - anchor.bottom - _gap
+        : available.bottom - anchor.top;
+    final above = desktop
+        ? anchor.top - available.top - _gap
+        : anchor.bottom - available.top;
+    final preferred = desktop ? below : above;
+    final alternate = desktop ? above : below;
+    if (preferred >= math.min(300, available.height * .55)) return desktop;
+    return preferred >= alternate ? desktop : !desktop;
   }
 
   @override
@@ -553,12 +544,14 @@ class _MenuPosition extends SingleChildLayoutDelegate {
     final available = _available(constraints.biggest);
     final below = _below(available);
     final space = below
-        ? available.bottom -
-              (morphFromAnchor ? anchor.top : anchor.bottom + _gap)
-        : (morphFromAnchor ? anchor.bottom : anchor.top - _gap) - available.top;
-    final width = math.min(desktop ? 256.0 : 250.0, available.width);
+        ? available.bottom - (desktop ? anchor.bottom + _gap : anchor.top)
+        : (desktop ? anchor.top - _gap : anchor.bottom) - available.top;
+    final width = math.min(
+      desktop ? 256.0 : math.max(250.0, anchor.width),
+      available.width,
+    );
     return BoxConstraints(
-      minWidth: morphFromAnchor ? 0 : width,
+      minWidth: desktop ? width : 0,
       maxWidth: width,
       maxHeight: math.max(0, math.min(available.height, math.max(80, space))),
     );
@@ -574,8 +567,8 @@ class _MenuPosition extends SingleChildLayoutDelegate {
     );
     final y =
         (below
-                ? (morphFromAnchor ? anchor.top : anchor.bottom + _gap)
-                : (morphFromAnchor ? anchor.bottom : anchor.top - _gap) -
+                ? (desktop ? anchor.bottom + _gap : anchor.top)
+                : (desktop ? anchor.top - _gap : anchor.bottom) -
                       childSize.height)
             .clamp(
               available.top,
@@ -583,7 +576,7 @@ class _MenuPosition extends SingleChildLayoutDelegate {
             );
     // The small lens lifts off the trigger, then settles into the panel. The
     // same spatial path brings it back to the trigger on dismissal.
-    if (morphFromAnchor) {
+    if (!desktop) {
       final lift = 48 * math.sin(math.pi * progress);
       return Offset(
         x.toDouble(),
@@ -602,7 +595,6 @@ class _MenuPosition extends SingleChildLayoutDelegate {
       anchor != oldDelegate.anchor ||
       insets != oldDelegate.insets ||
       desktop != oldDelegate.desktop ||
-      morphFromAnchor != oldDelegate.morphFromAnchor ||
       progress != oldDelegate.progress;
 }
 
@@ -611,8 +603,8 @@ class _BrowserMenuPanel<T> extends StatefulWidget {
     required this.title,
     required this.items,
     required this.desktop,
-    required this.morphFromAnchor,
     required this.animation,
+    this.sourceContent,
     required this.sourceSize,
     required this.alignBottom,
     required this.onSelected,
@@ -627,7 +619,7 @@ class _BrowserMenuPanel<T> extends StatefulWidget {
   final String title;
   final List<BrowserMenuEntry<T>> items;
   final bool desktop;
-  final bool morphFromAnchor;
+  final Widget? sourceContent;
   final ValueChanged<T?> onSelected;
   final _HeldMenuPointer? contact;
   final VoidCallback? onReady;
@@ -1357,8 +1349,6 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
             final corners = _smoothRange(progress, .85, 1);
             final radius = widget.desktop
                 ? 16.0
-                : !widget.morphFromAnchor
-                ? 25.0
                 : corners == 0
                 ? 1000.0
                 : currentWidth / 2 + (25 - currentWidth / 2) * corners;
@@ -1381,11 +1371,11 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
                     radius: radius,
                     opacity: !widget.transitionStarted
                         ? 0
-                        : widget.morphFromAnchor
-                        ? 1
-                        : progress,
+                        : widget.desktop
+                        ? progress
+                        : 1,
                     onReady: widget.onReady,
-                    child: !widget.morphFromAnchor
+                    child: widget.desktop
                         ? child!
                         : Stack(
                             children: [
@@ -1426,10 +1416,19 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
                                       opacity:
                                           1 - _smoothRange(progress, 0, .25),
                                       child: Center(
-                                        child: Icon(
-                                          LucideIcons.ellipsis,
-                                          size: 22,
-                                          color: colors.onSurface,
+                                        child: ExcludeSemantics(
+                                          child: SizedBox.fromSize(
+                                            size: sourceSize,
+                                            child: Center(
+                                              child:
+                                                  widget.sourceContent ??
+                                                  Icon(
+                                                    LucideIcons.ellipsis,
+                                                    size: 22,
+                                                    color: colors.onSurface,
+                                                  ),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1514,7 +1513,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
                       radius: widget.desktop ? 16 : 25,
                       opacity: (p * rootProgress).clamp(0.0, 1.0),
                       onReady: _startSubmenu,
-                      child: !widget.morphFromAnchor
+                      child: widget.desktop
                           ? child!
                           : _MenuMorph(
                               progress: rootProgress,
