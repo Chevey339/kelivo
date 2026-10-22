@@ -4641,5 +4641,30 @@
   "migrationFreshStartTitle": "已重新開始",
   "migrationFreshStartSubtitle": "已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。",
   "migrationFreshStartFailedTitle": "重新開始未完成",
-  "migrationFreshStartFailedSubtitle": "舊資料已保留。請重試重新開始，或關閉並重新開啟 App。"
+  "migrationFreshStartFailedSubtitle": "舊資料已保留。請重試重新開始，或關閉並重新開啟 App。",
+  "imageExportPreparing": "正在準備圖片…",
+  "imageExportDiagrams": "正在準備圖表 {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "正在擷取圖片 {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "正在合成圖片並準備預覽…",
+  "imageExportSaving": "正在儲存圖片…"
 }

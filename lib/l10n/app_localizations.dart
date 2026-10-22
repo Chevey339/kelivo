@@ -23651,6 +23651,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your previous data has been retained. Retry starting fresh, or close and reopen the app.'**
   String get migrationFreshStartFailedSubtitle;
+
+  /// No description provided for @imageExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing image…'**
+  String get imageExportPreparing;
+
+  /// No description provided for @imageExportDiagrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing diagrams {completed}/{total}…'**
+  String imageExportDiagrams(int completed, int total);
+
+  /// No description provided for @imageExportCapturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Capturing image {completed}/{total}…'**
+  String imageExportCapturing(int completed, int total);
+
+  /// No description provided for @imageExportProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Combining image and preparing preview…'**
+  String get imageExportProcessing;
+
+  /// No description provided for @imageExportSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving image…'**
+  String get imageExportSaving;
 }
 
 class _AppLocalizationsDelegate

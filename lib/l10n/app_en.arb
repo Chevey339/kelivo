@@ -5835,5 +5835,30 @@
   "migrationFreshStartTitle": "Fresh start is ready",
   "migrationFreshStartSubtitle": "A new empty database is ready, and your previous data has been retained. Restart the app to continue.",
   "migrationFreshStartFailedTitle": "Fresh start could not be completed",
-  "migrationFreshStartFailedSubtitle": "Your previous data has been retained. Retry starting fresh, or close and reopen the app."
+  "migrationFreshStartFailedSubtitle": "Your previous data has been retained. Retry starting fresh, or close and reopen the app.",
+  "imageExportPreparing": "Preparing image…",
+  "imageExportDiagrams": "Preparing diagrams {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "Capturing image {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "Combining image and preparing preview…",
+  "imageExportSaving": "Saving image…"
 }
