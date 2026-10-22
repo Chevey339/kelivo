@@ -1066,7 +1066,6 @@ class MyApp extends StatelessWidget {
                 themeMode: settings.themeMode,
                 navigatorObservers: <NavigatorObserver>[routeObserver],
                 home: RestoreOutcomeNotice(
-                  dataDirectory: appDataDirectory,
                   outcome: restoreOutcome,
                   child: _selectHome(),
                 ),

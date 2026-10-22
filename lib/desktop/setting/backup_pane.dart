@@ -28,6 +28,7 @@ import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../features/backup/widgets/backup_scope_tile.dart';
+import '../../features/backup/widgets/storage_migration_notice_button.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -281,6 +282,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             ),
                           ),
                         ),
+                      ),
+                      StorageMigrationNoticeButton(
+                        dataDirectory: context
+                            .read<LocalSnapshotProvider>()
+                            .appDataDirectory,
                       ),
                       if (showHeaderBusy) const SizedBox(width: 8),
                       if (showHeaderBusy)

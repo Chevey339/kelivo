@@ -35,6 +35,7 @@ import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import '../widgets/backup_scope_tile.dart';
+import '../widgets/storage_migration_notice_button.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../../../core/database/startup_failure_report.dart' show formatBytes;
@@ -297,7 +298,14 @@ class _BackupPageState extends State<BackupPage> {
                 ),
               ),
               title: Text(l10n.backupPageTitle),
-              actions: const [SizedBox(width: 12)],
+              actions: [
+                StorageMigrationNoticeButton(
+                  dataDirectory: context
+                      .read<LocalSnapshotProvider>()
+                      .appDataDirectory,
+                ),
+                const SizedBox(width: 12),
+              ],
             ),
             body: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
