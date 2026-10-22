@@ -4600,6 +4600,8 @@
   "browserCancel": "取消",
   "browserDone": "完成",
   "browserFind": "在頁面中尋找",
+  "browserFindPreviousMatch": "上一個符合項目",
+  "browserFindNextMatch": "下一個符合項目",
   "browserFindHint": "尋找文字",
   "browserSearchEngine": "搜尋引擎",
   "browserDesktopMode": "電腦版網站",

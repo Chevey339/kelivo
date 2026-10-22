@@ -23484,6 +23484,18 @@ abstract class AppLocalizations {
   /// **'Find on page'**
   String get browserFind;
 
+  /// No description provided for @browserFindPreviousMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get browserFindPreviousMatch;
+
+  /// No description provided for @browserFindNextMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get browserFindNextMatch;
+
   /// No description provided for @browserFindHint.
   ///
   /// In en, this message translates to:

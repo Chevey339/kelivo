@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'browser_text_field.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -8,8 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import 'browser_glass.dart';
 import 'browser_surface_controls.dart';
 
-/// A bounded-width find dock with independent Done, search and traversal areas.
-/// The parent positions it above the keyboard; no extra mobile surface is needed.
+/// Touch uses separate glass controls; desktop uses a compact keyboard-first row.
 class BrowserFindBar extends StatelessWidget {
   const BrowserFindBar({
     super.key,
@@ -36,19 +36,9 @@ class BrowserFindBar extends StatelessWidget {
     final l = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
     final appTextStyle = Theme.of(context).textTheme.bodyMedium!;
-    final targetSize = compact ? 34.0 : 48.0;
-    final gap = compact ? 6.0 : 8.0;
+    final targetSize = compact ? 28.0 : 48.0;
+    const gap = 8.0;
     final fontSize = compact ? 13.0 : 16.0;
-    final done = BrowserSurfaceIconButton(
-      key: const ValueKey('browserFindDone'),
-      label: l.browserDone,
-      icon: LucideIcons.check,
-      size: targetSize,
-      iconSize: compact ? 19 : 23,
-      backgroundColor: const Color(0xff007aff),
-      foregroundColor: Colors.white,
-      onPressed: onDone,
-    );
     final field = ConstrainedBox(
       constraints: BoxConstraints(minHeight: targetSize),
       child: BrowserTextField(
@@ -71,8 +61,8 @@ class BrowserFindBar extends StatelessWidget {
         ),
         cursorColor: colors.primary,
         padding: EdgeInsetsDirectional.only(
-          top: compact ? 7 : 12,
-          bottom: compact ? 7 : 12,
+          top: compact ? 6 : 12,
+          bottom: compact ? 6 : 12,
           end: compact ? 10 : 14,
         ),
         prefix: Padding(
@@ -93,20 +83,22 @@ class BrowserFindBar extends StatelessWidget {
         onSubmitted: onSubmitted,
       ),
     );
-    final search = compact
-        ? DecoratedBox(
-            key: const ValueKey('browserFindSearch'),
-            decoration: BoxDecoration(
-              color: colors.onSurface.withValues(alpha: .055),
-              borderRadius: BorderRadius.circular(1000),
-            ),
-            child: field,
-          )
-        : BrowserGlass(
-            key: const ValueKey('browserFindSearch'),
-            radius: 1000,
-            child: field,
-          );
+    if (compact) return _desktopBar(context, field);
+    final done = BrowserSurfaceIconButton(
+      key: const ValueKey('browserFindDone'),
+      label: l.browserDone,
+      icon: LucideIcons.check,
+      size: targetSize,
+      iconSize: 23,
+      backgroundColor: const Color(0xff007aff),
+      foregroundColor: Colors.white,
+      onPressed: onDone,
+    );
+    final search = BrowserGlass(
+      key: const ValueKey('browserFindSearch'),
+      radius: 1000,
+      child: field,
+    );
     final arrows = ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -117,8 +109,8 @@ class BrowserFindBar extends StatelessWidget {
             label: l.browserBack,
             icon: LucideIcons.chevronUp,
             size: targetSize,
-            iconSize: compact ? 18 : 22,
-            useParentFeedback: !compact,
+            iconSize: 22,
+            useParentFeedback: true,
             foregroundColor: colors.onSurface.withValues(
               alpha: enabled ? 1 : .28,
             ),
@@ -129,30 +121,24 @@ class BrowserFindBar extends StatelessWidget {
             label: l.browserForward,
             icon: LucideIcons.chevronDown,
             size: targetSize,
-            iconSize: compact ? 18 : 22,
-            useParentFeedback: !compact,
+            iconSize: 22,
+            useParentFeedback: true,
             foregroundColor: colors.onSurface.withValues(
               alpha: enabled ? 1 : .28,
             ),
             onPressed: enabled ? onNext : null,
           ),
         ];
-        return compact
-            ? Row(
-                key: const ValueKey('browserFindArrows'),
-                mainAxisSize: MainAxisSize.min,
-                children: children,
-              )
-            : BrowserSurfaceIconGroup(
-                key: const ValueKey('browserFindArrows'),
-                children: children,
-              );
+        return BrowserSurfaceIconGroup(
+          key: const ValueKey('browserFindArrows'),
+          children: children,
+        );
       },
     );
     return LayoutBuilder(
       builder: (context, constraints) {
         final minimumSearchWidth = math.max(
-          compact ? 100.0 : 112.0,
+          112.0,
           MediaQuery.textScalerOf(context).scale(fontSize) * 4 + 40,
         );
         final wrap =
@@ -176,6 +162,138 @@ class BrowserFindBar extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Widget _desktopBar(BuildContext context, Widget field) {
+    final l = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    void submit() {
+      if (controller.text.trim().isNotEmpty) onSubmitted(controller.text);
+    }
+
+    void previous() {
+      if (controller.text.trim().isNotEmpty) onPrevious();
+    }
+
+    Widget action(
+      String key,
+      String label,
+      IconData icon,
+      VoidCallback? onTap,
+    ) => Tooltip(
+      message: label,
+      child: BrowserSurfaceButton(
+        key: ValueKey(key),
+        semanticLabel: label,
+        radius: 6,
+        onPressed: onTap,
+        child: SizedBox.square(
+          dimension: 28,
+          child: Icon(
+            icon,
+            size: 15,
+            color: colors.onSurface.withValues(alpha: onTap == null ? .28 : 1),
+          ),
+        ),
+      ),
+    );
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+          return KeyEventResult.ignored;
+        }
+        final enter =
+            event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter;
+        final escape = event.logicalKey == LogicalKeyboardKey.escape;
+        if (!enter && !escape) return KeyEventResult.ignored;
+        final composing = controller.value.composing;
+        if (focusNode.hasFocus && composing.isValid && !composing.isCollapsed) {
+          // Leave candidate confirmation/cancellation to the platform IME,
+          // without allowing the page's ancestor Escape shortcut to close us.
+          return KeyEventResult.skipRemainingHandlers;
+        }
+        final keyboard = HardwareKeyboard.instance;
+        if (keyboard.isAltPressed ||
+            keyboard.isControlPressed ||
+            keyboard.isMetaPressed) {
+          return KeyEventResult.ignored;
+        }
+        if (escape && !keyboard.isShiftPressed) {
+          onDone();
+          return KeyEventResult.handled;
+        }
+        if (enter && focusNode.hasFocus) {
+          keyboard.isShiftPressed ? previous() : submit();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Row(
+          children: [
+            Expanded(
+              child: ListenableBuilder(
+                listenable: focusNode,
+                builder: (context, child) => DecoratedBox(
+                  key: const ValueKey('browserFindSearch'),
+                  decoration: BoxDecoration(
+                    color: colors.onSurface.withValues(alpha: .055),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: focusNode.hasFocus
+                          ? colors.primary.withValues(alpha: .7)
+                          : colors.onSurface.withValues(alpha: .12),
+                    ),
+                  ),
+                  child: child,
+                ),
+                child: field,
+              ),
+            ),
+            const SizedBox(width: 4),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final enabled = value.text.trim().isNotEmpty;
+                return Row(
+                  key: const ValueKey('browserFindArrows'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    action(
+                      'browserFindPrevious',
+                      l.browserFindPreviousMatch,
+                      LucideIcons.chevronUp,
+                      enabled ? onPrevious : null,
+                    ),
+                    action(
+                      'browserFindNext',
+                      l.browserFindNextMatch,
+                      LucideIcons.chevronDown,
+                      enabled ? onNext : null,
+                    ),
+                  ],
+                );
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: SizedBox(
+                height: 16,
+                width: 1,
+                child: ColoredBox(
+                  color: colors.onSurface.withValues(alpha: .12),
+                ),
+              ),
+            ),
+            action('browserFindDone', l.commonClose, LucideIcons.x, onDone),
+          ],
+        ),
+      ),
     );
   }
 }

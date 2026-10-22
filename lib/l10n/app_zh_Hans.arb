@@ -4576,6 +4576,8 @@
   "browserCancel": "取消",
   "browserDone": "完成",
   "browserFind": "在页面中查找",
+  "browserFindPreviousMatch": "上一个匹配项",
+  "browserFindNextMatch": "下一个匹配项",
   "browserFindHint": "查找文字",
   "browserSearchEngine": "搜索引擎",
   "browserDesktopMode": "桌面版网站",

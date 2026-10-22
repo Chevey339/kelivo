@@ -5777,6 +5777,8 @@
   "browserCancel": "Cancel",
   "browserDone": "Done",
   "browserFind": "Find on page",
+  "browserFindPreviousMatch": "Previous match",
+  "browserFindNextMatch": "Next match",
   "browserFindHint": "Find text",
   "browserSearchEngine": "Search engine",
   "browserDesktopMode": "Desktop website",

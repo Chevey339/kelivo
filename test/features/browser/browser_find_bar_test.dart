@@ -1,5 +1,6 @@
 import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -54,16 +55,22 @@ void main() {
                       16,
                       MediaQuery.viewInsetsOf(context).bottom + 16,
                     ),
-                    child: BrowserFindBar(
-                      key: const ValueKey('findDock'),
-                      controller: controller,
-                      focusNode: focus,
-                      compact: compact,
-                      onChanged: (value) => calls.add('change:$value'),
-                      onSubmitted: (value) => calls.add('submit:$value'),
-                      onPrevious: () => calls.add('previous'),
-                      onNext: () => calls.add('next'),
-                      onDone: () => calls.add('done'),
+                    child: CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(LogicalKeyboardKey.escape): () =>
+                            calls.add('ancestorEscape'),
+                      },
+                      child: BrowserFindBar(
+                        key: const ValueKey('findDock'),
+                        controller: controller,
+                        focusNode: focus,
+                        compact: compact,
+                        onChanged: (value) => calls.add('change:$value'),
+                        onSubmitted: (value) => calls.add('submit:$value'),
+                        onPrevious: () => calls.add('previous'),
+                        onNext: () => calls.add('next'),
+                        onDone: () => calls.add('done'),
+                      ),
                     ),
                   ),
                 ),
@@ -200,12 +207,118 @@ void main() {
     tester,
   ) async {
     await mount(tester, compact: true, width: 360);
-    expect(tester.getSize(keyed('findDock')).height, 34);
+    expect(tester.getSize(keyed('findDock')).height, 40);
     expect(find.byType(BrowserGlass), findsNothing);
     expect(find.byType(BrowserSurfaceIconGroup), findsNothing);
-    expect(tester.getSize(keyed('browserFindArrows')), const Size(68, 34));
+    expect(tester.getSize(keyed('browserFindArrows')), const Size(56, 28));
+    expect(find.byIcon(LucideIcons.check), findsNothing);
+    expect(find.byIcon(LucideIcons.x), findsOneWidget);
+    expect(
+      tester.getRect(keyed('browserFindDone')).left,
+      greaterThan(tester.getRect(keyed('browserFindArrows')).right),
+    );
+    final search = tester.widget<DecoratedBox>(keyed('browserFindSearch'));
+    expect(
+      (search.decoration as BoxDecoration).borderRadius,
+      BorderRadius.circular(7),
+    );
     final field = tester.widget<BrowserTextField>(keyed('browserFindField'));
     expect(field.style!.fontSize, 13);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'desktop find supports Enter, Shift+Enter, Escape and button focus',
+    (tester) async {
+      final result = await mount(tester, compact: true, width: 360);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(result.calls, isEmpty);
+      await tester.enterText(keyed('browserFindField'), 'needle');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(result.calls, ['change:needle', 'submit:needle']);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      expect(result.calls.last, 'previous');
+      for (var tab = 0; tab < 3; tab++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(result.calls.last, 'done');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      expect(result.calls.where((call) => call == 'done'), hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('desktop leaves composing Enter and Escape to the IME', (
+    tester,
+  ) async {
+    final result = await mount(tester, compact: true);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'ni',
+        selection: TextSelection.collapsed(offset: 2),
+        composing: TextRange(start: 0, end: 2),
+      ),
+    );
+    await tester.pump();
+    result.calls.clear();
+    for (final key in [
+      LogicalKeyboardKey.enter,
+      LogicalKeyboardKey.numpadEnter,
+      LogicalKeyboardKey.escape,
+    ]) {
+      expect(await tester.sendKeyEvent(key), isFalse);
+    }
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    expect(await tester.sendKeyEvent(LogicalKeyboardKey.enter), isFalse);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(result.calls, isEmpty);
+    expect(
+      result.controller.value.composing,
+      const TextRange(start: 0, end: 2),
+    );
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '你',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await tester.pump();
+    result.calls.clear();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    expect(result.calls, ['submit:你', 'done']);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final direction in TextDirection.values) {
+    testWidgets(
+      'desktop find fits a narrow panel with large text in $direction',
+      (tester) async {
+        await mount(
+          tester,
+          compact: true,
+          width: 240,
+          scale: 2,
+          direction: direction,
+        );
+        final dock = tester.getRect(keyed('findDock'));
+        for (final key in [
+          'browserFindSearch',
+          'browserFindArrows',
+          'browserFindDone',
+        ]) {
+          final rect = tester.getRect(keyed(key));
+          expect(rect.left, greaterThanOrEqualTo(dock.left));
+          expect(rect.right, lessThanOrEqualTo(dock.right));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

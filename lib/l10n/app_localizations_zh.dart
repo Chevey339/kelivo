@@ -12553,6 +12553,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserFind => '在页面中查找';
 
   @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
+
+  @override
   String get browserFindHint => '查找文字';
 
   @override
@@ -25431,6 +25437,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserFind => '在页面中查找';
+
+  @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
 
   @override
   String get browserFindHint => '查找文字';
@@ -38390,6 +38402,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserFind => '在頁面中尋找';
+
+  @override
+  String get browserFindPreviousMatch => '上一個符合項目';
+
+  @override
+  String get browserFindNextMatch => '下一個符合項目';
 
   @override
   String get browserFindHint => '尋找文字';

@@ -56,6 +56,12 @@ private final class BrowserGlassSurface: NSView {
       name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
       object: nil
     )
+    for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                 NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+      NotificationCenter.default.addObserver(
+        self, selector: #selector(activityChanged(_:)), name: name, object: nil
+      )
+    }
     update(arguments)
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else {
@@ -79,6 +85,18 @@ private final class BrowserGlassSurface: NSView {
 
   override var isOpaque: Bool { false }
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    guard !disposed else { return }
+    updateMaterial()
+  }
+
+  @objc private func activityChanged(_ notification: Notification) {
+    guard !disposed else { return }
+    if let changedWindow = notification.object as? NSWindow, changedWindow !== window { return }
+    updateMaterial()
+  }
 
   override func layout() {
     super.layout()
@@ -174,9 +192,17 @@ private final class BrowserGlassSurface: NSView {
       addSubview(next)
       material = next
     }
-    wash.layer?.backgroundColor = NSColor.white.withAlphaComponent(
-      CGFloat(opaque ? 0 : intensity * (dark ? 0.08 : 0.045))
-    ).cgColor
+    let inactive = !NSApp.isActive || window?.isKeyWindow != true
+    if #available(macOS 26.0, *), material is NSGlassEffectView, dark && inactive {
+      // AppKit de-emphasizes tinted glass when its window loses focus, but
+      // Flutter's light foreground stays unchanged. Keep its contrast using
+      // the existing content layer; retain the live glass and its compositor.
+      wash.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.88).cgColor
+    } else {
+      wash.layer?.backgroundColor = NSColor.white.withAlphaComponent(
+        CGFloat(opaque ? 0 : intensity * (dark ? 0.08 : 0.045))
+      ).cgColor
+    }
     if highContrast {
       material?.layer?.borderWidth = 1
       material?.layer?.borderColor = (dark ? NSColor.white : NSColor.black).cgColor
@@ -210,6 +236,7 @@ private final class BrowserGlassSurface: NSView {
   private func dispose() {
     guard !disposed else { return }
     disposed = true
+    NotificationCenter.default.removeObserver(self)
     NSWorkspace.shared.notificationCenter.removeObserver(self)
     channel.setMethodCallHandler(nil)
     material?.removeFromSuperview()
@@ -217,6 +244,7 @@ private final class BrowserGlassSurface: NSView {
   }
 
   deinit {
+    NotificationCenter.default.removeObserver(self)
     NSWorkspace.shared.notificationCenter.removeObserver(self)
     channel.setMethodCallHandler(nil)
   }

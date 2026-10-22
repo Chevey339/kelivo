@@ -13148,6 +13148,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserFind => 'Find on page';
 
   @override
+  String get browserFindPreviousMatch => 'Previous match';
+
+  @override
+  String get browserFindNextMatch => 'Next match';
+
+  @override
   String get browserFindHint => 'Find text';
 
   @override

@@ -114,7 +114,7 @@ class BrowserDesktopLayout extends StatelessWidget {
                     ),
                     child: BrowserGlass(
                       key: const ValueKey('browserDesktopFindSurface'),
-                      radius: 28,
+                      radius: 12,
                       child: findBar!,
                     ),
                   ),
