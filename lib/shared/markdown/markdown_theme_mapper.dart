@@ -13,7 +13,7 @@ MarkstreamTheme mapMarkdownTheme(
   SettingsProvider settings,
   TextStyle? baseStyle,
 ) {
-  final scheme = Theme.of(context).colorScheme;
+  var scheme = Theme.of(context).colorScheme;
   final family = settings.appFontFamily;
   final body =
       (baseStyle ?? Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
@@ -37,6 +37,19 @@ MarkstreamTheme mapMarkdownTheme(
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows;
   final backdrop = resolveMarkdownBackdrop(context, settings);
+  if (backdrop != MarkstreamBackdrop.plain) {
+    final customBackground = MarkdownSurfaceScope.maybeOf(
+      context,
+    )?.customBackground;
+    if (customBackground != null) {
+      // Only explicit bubble overrides need a local scheme. Pair the fill and
+      // syntax brightness with that background, not the surrounding app theme.
+      scheme = scheme.copyWith(
+        surface: customBackground,
+        brightness: ThemeData.estimateBrightnessForColor(customBackground),
+      );
+    }
+  }
   return MarkstreamTheme.fromColorScheme(
     scheme,
     backdrop: backdrop,
@@ -63,10 +76,19 @@ MarkstreamBackdrop resolveMarkdownBackdrop(
   // Reuse that boolean instead of registering another selector per stream tick.
   final scope = ChatFrostedBackdropScope.maybeOf(context);
   if (scope == null || !scope.backgroundActive) return MarkstreamBackdrop.plain;
-  return switch (MarkdownSurfaceScope.maybeOf(context)) {
+  final surface = MarkdownSurfaceScope.maybeOf(context);
+  // An explicit bubble color can invert the syntax theme. Its translucent
+  // surface needs enough coverage for those fixed syntax colors as well.
+  if (surface?.customBackground != null &&
+      surface!.kind != MarkdownSurfaceKind.solid) {
+    return MarkstreamBackdrop.wallpaper;
+  }
+  return switch (surface?.kind) {
     MarkdownSurfaceKind.solid => MarkstreamBackdrop.solidBubble,
-    MarkdownSurfaceKind.frosted ||
-    MarkdownSurfaceKind.tinted => MarkstreamBackdrop.frostedBubble,
+    MarkdownSurfaceKind.frosted => MarkstreamBackdrop.frostedBubble,
+    // User/reasoning tints can be only 8% opaque and cannot shield the text
+    // like a frosted bubble. Keep the wallpaper readability guard here.
+    MarkdownSurfaceKind.tinted => MarkstreamBackdrop.wallpaper,
     null => MarkstreamBackdrop.wallpaper,
   };
 }

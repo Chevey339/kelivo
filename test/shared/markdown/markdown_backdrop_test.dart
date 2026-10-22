@@ -96,7 +96,7 @@ void main() {
       expect(selected!.backdrop, MarkstreamBackdrop.wallpaper);
       for (final pair in [
         (MarkdownSurfaceKind.frosted, MarkstreamBackdrop.frostedBubble),
-        (MarkdownSurfaceKind.tinted, MarkstreamBackdrop.frostedBubble),
+        (MarkdownSurfaceKind.tinted, MarkstreamBackdrop.wallpaper),
         (MarkdownSurfaceKind.solid, MarkstreamBackdrop.solidBubble),
       ]) {
         await tester.pumpWidget(app(surface: pair.$1));
@@ -168,7 +168,7 @@ void main() {
                   bareOnDefault: bare,
                   child: Builder(
                     builder: (context) {
-                      kind = MarkdownSurfaceScope.maybeOf(context);
+                      kind = MarkdownSurfaceScope.maybeOf(context)?.kind;
                       return const SizedBox(width: 100, height: 100);
                     },
                   ),

@@ -700,7 +700,11 @@ final class MarkstreamTheme extends _ThemeTokens {
             color: bodyStyle?.color ?? colors.onSurface,
           );
     final b = body.fontSize!;
-    final on = body.color!;
+    // Opaque surfaces keep their paired scheme ink, independently of a
+    // surrounding bubble's text override. Translucent surfaces inherit it.
+    final on = backdrop == MarkstreamBackdrop.plain
+        ? colors.onSurface
+        : body.color!;
     const white = Colors.white;
     final tint = dark ? white : on;
     final surface = colors.surface;
@@ -709,6 +713,8 @@ final class MarkstreamTheme extends _ThemeTokens {
       surface,
     );
     final wallpaper = backdrop == MarkstreamBackdrop.wallpaper;
+    final translucent =
+        wallpaper || backdrop == MarkstreamBackdrop.frostedBubble;
     final bubble =
         backdrop == MarkstreamBackdrop.frostedBubble ||
         backdrop == MarkstreamBackdrop.solidBubble;
@@ -729,7 +735,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       ink: on,
       ink2: on.withValues(alpha: dark ? .70 : .72),
       ink3: on.withValues(
-        alpha: wallpaper ? (dark ? .58 : .60) : (dark ? .48 : .50),
+        alpha: translucent ? (dark ? .58 : .60) : (dark ? .48 : .50),
       ),
       border: tint.withValues(
         alpha: bubble ? (dark ? .14 : .12) : (wallpaper && dark ? .12 : .10),

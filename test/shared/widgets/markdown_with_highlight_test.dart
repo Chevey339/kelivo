@@ -5117,7 +5117,7 @@ void main() {
   });
 
   testWidgets(
-    'body, inline code, tables and code blocks inherit custom surface ink',
+    'body inherits custom ink while opaque blocks keep their paired scheme ink',
     (tester) async {
       final previousPlatform = debugDefaultTargetPlatformOverride;
       try {
@@ -5170,15 +5170,15 @@ Fenced code body
         );
         expect(
           tester.widget<Text>(find.text('code')).style?.color,
-          inheritedInk.withValues(alpha: .92),
+          themeInk.withValues(alpha: .92),
         );
         expect(
           _paragraphContaining('Theme table header').text.style?.color,
-          inheritedInk,
+          themeInk,
         );
         expect(
           _paragraphContaining('Theme table body').text.style?.color,
-          inheritedInk.withValues(alpha: .88),
+          themeInk.withValues(alpha: .88),
         );
         final fencedCode = tester.widget<Text>(
           find.descendant(
@@ -5186,7 +5186,7 @@ Fenced code body
             matching: _codeTextFinder(),
           ),
         );
-        expect(fencedCode.textSpan?.style?.color, inheritedInk);
+        expect(fencedCode.textSpan?.style?.color, themeInk);
       } finally {
         debugDefaultTargetPlatformOverride = previousPlatform;
       }

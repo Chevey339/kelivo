@@ -35,7 +35,8 @@ class KelivoCodeHighlighter implements CodeHighlighter {
   final bool wallpaper;
 
   factory KelivoCodeHighlighter.forTheme(MarkstreamTheme theme) =>
-      theme.backdrop == MarkstreamBackdrop.wallpaper
+      theme.backdrop == MarkstreamBackdrop.wallpaper ||
+          theme.backdrop == MarkstreamBackdrop.frostedBubble
       ? const KelivoCodeHighlighter(wallpaper: true)
       : const KelivoCodeHighlighter();
   @override

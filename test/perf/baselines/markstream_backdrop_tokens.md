@@ -1,5 +1,10 @@
 # Markdown backdrop tokens: validation and performance
 
+This is the historical report for the two original commits, before independent
+review. Subsequent correctness repairs and fresh measurements are documented in
+[`markstream_backdrop_review.md`](markstream_backdrop_review.md). The source
+hashes and passing phase batch below must not be attributed to later revisions.
+
 Date: 2026-10-22. Comparison baseline: `a8364707`. Branch parent: `22c384b5`
 (the intervening change is the already-merged long-image export fix).
 The surface commit is `ec0a355e`; this report accompanies the subsequent

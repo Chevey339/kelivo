@@ -57,6 +57,19 @@ Widget buildSharedChatSurface(
   final style = selection.style;
   final overrides = selection.overrides;
   final resolved = resolveBubbleStyle(cs, theme.brightness, style, overrides);
+  final customBackgroundArgb = theme.brightness == Brightness.dark
+      ? overrides.backgroundArgbDark
+      : overrides.backgroundArgbLight;
+  final customBackground = customBackgroundArgb == null
+      ? null
+      : resolved.background.withValues(alpha: 1);
+  // A lightly tinted bubble does not provide the .66 veil assumed by the
+  // frosted block tokens. A translucent solid bubble needs the same treatment.
+  final surfaceKind = resolved.background.a < .66
+      ? MarkdownSurfaceKind.tinted
+      : style == ChatMessageBackgroundStyle.solid && resolved.background.a == 1
+      ? MarkdownSurfaceKind.solid
+      : MarkdownSurfaceKind.frosted;
   Widget paddedChild = Padding(padding: padding, child: child);
   if (style != ChatMessageBackgroundStyle.defaultStyle &&
       overrides.hasTextOverride(theme.brightness)) {
@@ -74,7 +87,8 @@ Widget buildSharedChatSurface(
         borderRadius: radius,
         isUser: isUser,
         child: MarkdownSurfaceScope(
-          kind: MarkdownSurfaceKind.frosted,
+          kind: surfaceKind,
+          customBackground: customBackground,
           child: paddedChild,
         ),
       );
@@ -90,7 +104,8 @@ Widget buildSharedChatSurface(
           ),
         ),
         child: MarkdownSurfaceScope(
-          kind: MarkdownSurfaceKind.solid,
+          kind: surfaceKind,
+          customBackground: customBackground,
           child: paddedChild,
         ),
       );

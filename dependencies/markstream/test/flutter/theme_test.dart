@@ -84,9 +84,13 @@ void main() {
       expect(theme.code.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamily, 'AppMono');
-      expect(theme.inlineCode.text.color, Colors.purple.withValues(alpha: .92));
-      expect(theme.code.text.color, Colors.purple);
-      expect(theme.colors.ink, Colors.purple);
+      expect(theme.body.color, Colors.purple);
+      expect(
+        theme.inlineCode.text.color,
+        light.onSurface.withValues(alpha: .92),
+      );
+      expect(theme.code.text.color, light.onSurface);
+      expect(theme.colors.ink, light.onSurface);
       expect(theme.task.checkedText.decoration, TextDecoration.lineThrough);
       final minimal = MarkstreamTheme.fromColorScheme(
         light,
