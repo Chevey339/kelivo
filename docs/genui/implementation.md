@@ -157,4 +157,31 @@ environment variables, never read from the app's accounts or logged.
   `flutter build macos --debug --no-pub` passed with existing native dependency
   warnings. Formatting and diff checks passed. Baseline accepted; no GenUI
   renderer or model capability is registered in this step.
-- C02–C26: not implemented. No complete-delivery claim.
+- C02: catalog/typed contracts accepted. Independent review found no actionable
+  defects; fatal-info analysis passed; root 9,097 passed/2 skipped; markstream
+  analysis and 296 tests passed; macOS debug build and diff check passed.
+- C03–C26: not implemented. No complete-delivery claim.
+
+## C02 contracts
+
+`catalog/ui_catalog.dart` owns all 21 component descriptors, semantic fields,
+tone/chart enums, named slots, function/action signatures and synthetic example
+documents. `UiCatalog.encodeReference()` produces deterministic sorted JSON;
+no generated Skill is registered yet. `ui_budgets.dart` owns the proposal's
+shared limits. `protocol/ui_ir.dart` distinguishes input bindings, structural
+children, non-structural FormRef, expressions and action descriptions.
+
+Contract choices that the proposal leaves to the catalog: gaps are the semantic
+values small/medium/large; Row distribution is equal/fit; display precision is
+0–10 digits; TextField defaults to a 2,000-character limit (explicit bounds up
+to 8,192); number/slider step defaults to 1; min/max are binary pure functions;
+round/formatNumber accept an optional precision argument. These are fixed
+language contracts, not model-controlled pixels or colors. Dropdown/radio
+options use `{value: scalar, label: string}` records; table columns use
+`{key: string, label: string, digits?: number}` records. Detailed graph/type
+validation and executable parsing of all examples follow in C03.
+
+Plain Dart smoke import of both the catalog and IR succeeded without Flutter,
+Drift or platform libraries. Contract tests cover deterministic reference
+generation, semantic coverage, unique example symbols, distinct reference
+types, immutable collection ownership and JSON-safe IR serialization.
