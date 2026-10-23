@@ -1,4 +1,11 @@
 {
+  "forwardMessagesRequiredQuestion": "已随选中的回复保留原问题",
+  "forwardMessagesTitle": "合并转发消息",
+  "forwardMessagesAction": "转发",
+  "forwardMessagesRecord": "合并聊天记录",
+  "forwardMessagesComment": "附加说明",
+  "forwardMessagesDestination": "选择目标会话",
+  "forwardMessagesEmpty": "暂无可用会话",
   "settingsSearchHint": "搜索设置",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清空搜索",

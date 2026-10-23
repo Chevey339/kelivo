@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -50,11 +51,13 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var generateTextRequestCount = 0;
+  var lastRequest = '';
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
         jsonDecode(await utf8.decoder.bind(request).join())
             as Map<String, dynamic>;
+    lastRequest = jsonEncode(body);
     if (body['stream'] != true) {
       generateTextRequestCount++;
     }
@@ -212,6 +215,42 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('summary includes forwarded history without an added note', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await chatService.createConversation(
+        title: 'Forwarded',
+        assistantId: assistantProvider.currentAssistantId,
+      );
+      await chatService.addMessage(
+        conversationId: convo.id,
+        role: 'user',
+        parts: [
+          ForwardedMessagesPart(
+            messages: [
+              ForwardedMessageSnapshot(
+                author: 'A',
+                role: 'assistant',
+                timestamp: DateTime.utc(2026),
+                parts: const [TextPart('Historical dark mode preference')],
+              ),
+            ],
+          ),
+        ],
+      );
+      await chatService.addMessage(
+        conversationId: convo.id,
+        role: 'assistant',
+        content: 'Noted',
+      );
+      await controller.debugViewModel.debugMaybeGenerateSummaryFor(convo.id);
+      expect(generateTextRequestCount, 1);
+      expect(lastRequest, contains('Historical dark mode preference'));
+    });
+  });
 
   testWidgets('ordinary conversation still generates a summary via the model', (
     tester,

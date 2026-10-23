@@ -1764,7 +1764,7 @@ class HomeViewModel extends ChangeNotifier {
     // Get all messages and filter user messages
     final msgs = await _chatService.loadMessages(convo.id);
     final allUserMsgs = msgs
-        .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
+        .where((m) => m.role == 'user' && m.contextContent.trim().isNotEmpty)
         .toList();
 
     if (allUserMsgs.isEmpty) return;
@@ -1779,7 +1779,7 @@ class HomeViewModel extends ChangeNotifier {
         : convo.lastSummarizedMessageCount;
     final msgsAtLastSummary = msgs.take(lastSummarizedMsgCount).toList();
     final userMsgsAtLastSummary = msgsAtLastSummary
-        .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
+        .where((m) => m.role == 'user' && m.contextContent.trim().isNotEmpty)
         .length;
 
     // Get new user messages since last summary
@@ -1787,7 +1787,7 @@ class HomeViewModel extends ChangeNotifier {
     if (newUserMsgs.isEmpty) return;
 
     final recentMessages = newUserMsgs
-        .map((m) => m.content.trim())
+        .map((m) => m.contextContent.trim())
         .join('\n\n');
 
     // Truncate if too long

@@ -113,6 +113,7 @@ class MessageListView extends StatefulWidget {
     required this.translations,
     required this.selecting,
     required this.selectedItems,
+    this.lockedSelectionIds = const {},
     required this.dividerPadding,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
@@ -133,6 +134,7 @@ class MessageListView extends StatefulWidget {
     this.onDeleteAllVersions,
     this.onForkConversation,
     this.onShareMessage,
+    this.onForwardMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
     this.suggestions = const <String>[],
@@ -190,6 +192,7 @@ class MessageListView extends StatefulWidget {
   final Map<String, TranslationUiState> translations;
   final bool selecting;
   final Set<String> selectedItems;
+  final Set<String> lockedSelectionIds;
   final EdgeInsetsGeometry dividerPadding;
   final double topContentPadding;
   final double bottomContentPadding;
@@ -226,6 +229,7 @@ class MessageListView extends StatefulWidget {
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
+  final OnShareMessage? onForwardMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
@@ -2061,13 +2065,26 @@ class _MessageListViewState extends State<MessageListView> {
                 (message.role == 'user' || message.role == 'assistant'))
               Padding(
                 padding: const EdgeInsets.only(left: 10, right: 6),
-                child: IosCheckbox(
-                  value: widget.selectedItems.contains(message.id),
-                  size: 20,
-                  hitTestSize: 28,
-                  onChanged: (v) {
-                    widget.onToggleSelection?.call(message.id, v);
-                  },
+                child: Tooltip(
+                  message: widget.lockedSelectionIds.contains(message.id)
+                      ? AppLocalizations.of(
+                          context,
+                        )!.forwardMessagesRequiredQuestion
+                      : '',
+                  child: IosCheckbox(
+                    value: widget.selectedItems.contains(message.id),
+                    semanticLabel:
+                        widget.lockedSelectionIds.contains(message.id)
+                        ? AppLocalizations.of(
+                            context,
+                          )!.forwardMessagesRequiredQuestion
+                        : null,
+                    size: 20,
+                    hitTestSize: 28,
+                    onChanged: widget.lockedSelectionIds.contains(message.id)
+                        ? null
+                        : (v) => widget.onToggleSelection?.call(message.id, v),
+                  ),
                 ),
               ),
             Expanded(
@@ -2144,8 +2161,12 @@ class _MessageListViewState extends State<MessageListView> {
                   final isSelected = widget.selectedItems.contains(message.id);
                   content = GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () =>
-                        widget.onToggleSelection?.call(message.id, !isSelected),
+                    onTap: widget.lockedSelectionIds.contains(message.id)
+                        ? null
+                        : () => widget.onToggleSelection?.call(
+                            message.id,
+                            !isSelected,
+                          ),
                     child: IgnorePointer(ignoring: true, child: content),
                   );
                 }
@@ -2428,6 +2449,8 @@ class _MessageListViewState extends State<MessageListView> {
           widget.onEditMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {
           await widget.onForkConversation?.call(message);
+        } else if (action == MessageMoreAction.forward) {
+          widget.onForwardMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.selectMessages) {

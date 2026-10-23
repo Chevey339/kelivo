@@ -100,6 +100,48 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @forwardMessagesRequiredQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Included with its selected replies'**
+  String get forwardMessagesRequiredQuestion;
+
+  /// No description provided for @forwardMessagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward messages'**
+  String get forwardMessagesTitle;
+
+  /// No description provided for @forwardMessagesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get forwardMessagesAction;
+
+  /// No description provided for @forwardMessagesRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Forwarded conversation'**
+  String get forwardMessagesRecord;
+
+  /// No description provided for @forwardMessagesComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a note'**
+  String get forwardMessagesComment;
+
+  /// No description provided for @forwardMessagesDestination.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a conversation'**
+  String get forwardMessagesDestination;
+
+  /// No description provided for @forwardMessagesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations available'**
+  String get forwardMessagesEmpty;
+
   /// No description provided for @settingsSearchHint.
   ///
   /// In en, this message translates to:

@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
@@ -82,6 +83,50 @@ void main() {
     await action();
     expect(chat.contextRevision(conversationId), before);
   }
+
+  test(
+    'forwarded record survives reopen and backup without source changes',
+    () async {
+      final chat = await createService();
+      final source = await chat.createConversation(title: 'Source');
+      final target = await chat.createConversation(title: 'Target');
+      final original = await chat.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: '@B historical answer @全部',
+      );
+      final record = ForwardedMessagesPart(
+        messages: [
+          ForwardedMessageSnapshot(
+            author: 'Assistant A',
+            role: original.role,
+            timestamp: original.timestamp,
+            parts: [TextPart(original.content)],
+          ),
+        ],
+      );
+      await chat.addMessage(
+        conversationId: target.id,
+        role: 'user',
+        parts: [const TextPart('Please review'), record],
+      );
+      await chat.updateMessage(original.id, content: 'Changed later');
+      await chat.close();
+      services.remove(chat);
+      final reopened = await createService();
+      final messages = await reopened.loadMessages(target.id);
+      expect(messages, hasLength(1));
+      expect(messages.single.content, 'Please review');
+      final restored = messages.single.parts
+          .whereType<ForwardedMessagesPart>()
+          .single;
+      expect(restored.messages.single.author, 'Assistant A');
+      expect(restored.messages.single.text, '@B historical answer @全部');
+      expect(restored.messages.single.timestamp, original.timestamp);
+      final backup = ChatMessage.fromJson(messages.single.toJson());
+      expect(backup.parts.whereType<ForwardedMessagesPart>().single, restored);
+    },
+  );
 
   test(
     'structural mutations bump context revision; streaming deltas do not',

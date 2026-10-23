@@ -1,4 +1,11 @@
 {
+  "forwardMessagesRequiredQuestion": "Included with its selected replies",
+  "forwardMessagesTitle": "Forward messages",
+  "forwardMessagesAction": "Forward",
+  "forwardMessagesRecord": "Forwarded conversation",
+  "forwardMessagesComment": "Add a note",
+  "forwardMessagesDestination": "Choose a conversation",
+  "forwardMessagesEmpty": "No conversations available",
   "settingsSearchHint": "Search settings",
   "settingsSearchCancel": "Cancel",
   "settingsSearchClear": "Clear search",

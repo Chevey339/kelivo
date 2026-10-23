@@ -9,6 +9,28 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get forwardMessagesRequiredQuestion =>
+      'Included with its selected replies';
+
+  @override
+  String get forwardMessagesTitle => 'Forward messages';
+
+  @override
+  String get forwardMessagesAction => 'Forward';
+
+  @override
+  String get forwardMessagesRecord => 'Forwarded conversation';
+
+  @override
+  String get forwardMessagesComment => 'Add a note';
+
+  @override
+  String get forwardMessagesDestination => 'Choose a conversation';
+
+  @override
+  String get forwardMessagesEmpty => 'No conversations available';
+
+  @override
   String get settingsSearchHint => 'Search settings';
 
   @override

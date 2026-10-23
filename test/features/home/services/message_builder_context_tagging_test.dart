@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -71,6 +72,105 @@ void main() {
   tearDown(() async {
     await ContextLogger.setEnabled(false);
   });
+
+  test(
+    'forwarded transcript enters model history without becoming a new turn',
+    () {
+      final record = ForwardedMessagesPart(
+        messages: [
+          ForwardedMessageSnapshot(
+            author: 'A',
+            role: 'assistant',
+            timestamp: DateTime.utc(2026, 1, 1),
+            parts: const [TextPart('@B historical answer @全部')],
+          ),
+        ],
+      );
+      final message = ChatMessage(
+        role: 'user',
+        conversationId: 'target',
+        parts: [const TextPart('Review this'), record],
+      );
+      final history = _service().buildApiMessages(
+        messages: [message],
+        versionSelections: const {},
+        currentConversation: Conversation(id: 'target', title: 'Target'),
+      );
+      expect(history, hasLength(1));
+      expect(history.single['role'], 'user');
+      expect(history.single['content'], contains('Review this'));
+      expect(history.single['content'], contains('A (assistant)'));
+      expect(history.single['content'], contains('@B historical answer @全部'));
+      expect(message.content, 'Review this');
+    },
+  );
+
+  test(
+    'forwarded attachments enter model media and document input with authors',
+    () {
+      final message = ChatMessage(
+        role: 'user',
+        conversationId: 'target',
+        parts: [
+          ForwardedMessagesPart(
+            messages: [
+              ForwardedMessageSnapshot(
+                author: 'Reviewer',
+                role: 'assistant',
+                timestamp: DateTime.utc(2026),
+                parts: [
+                  const TextPart('Historical @全部'),
+                  const ReasoningPart('hidden reasoning'),
+                  const ImagePart(
+                    uri: '/private/images/photo.png',
+                    mime: 'image/png',
+                  ),
+                  ForwardedMessagesPart(
+                    messages: [
+                      ForwardedMessageSnapshot(
+                        author: 'User',
+                        role: 'user',
+                        timestamp: DateTime.utc(2026),
+                        parts: const [
+                          FilePart(
+                            uri: '/private/upload/note.txt',
+                            name: 'note.txt',
+                            mime: 'text/plain',
+                          ),
+                          ImagePart(
+                            uri: '/private/images/missing.png',
+                            unavailable: true,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+      final service = _service();
+      final history = service.buildApiMessages(
+        messages: [message],
+        versionSelections: const {},
+        currentConversation: Conversation(id: 'target', title: 'Target'),
+      );
+      final input = service.parseInputFromApiMap(history.single);
+      expect(input.imagePaths, ['/private/images/photo.png']);
+      expect(input.documents.single.fileName, 'note.txt');
+      expect(input.text, contains('Reviewer (assistant)'));
+      expect(input.text, contains('User (user)'));
+      expect(input.text, contains('Historical @全部'));
+      expect(input.text, isNot(contains('/private/')));
+      expect(input.text, isNot(contains('hidden reasoning')));
+      final persistedInput = service.parseInputFromMessage(message);
+      expect(persistedInput.imagePaths, input.imagePaths);
+      expect(persistedInput.documents.single.fileName, 'note.txt');
+      expect(persistedInput.text, contains('Reviewer (assistant)'));
+    },
+  );
 
   test(
     'source attribution works with logging disabled and is stripped before sending',

@@ -1,4 +1,11 @@
 {
+  "forwardMessagesRequiredQuestion": "已隨選取的回覆保留原問題",
+  "forwardMessagesTitle": "合併轉發訊息",
+  "forwardMessagesAction": "轉發",
+  "forwardMessagesRecord": "合併聊天記錄",
+  "forwardMessagesComment": "附加說明",
+  "forwardMessagesDestination": "選擇目標對話",
+  "forwardMessagesEmpty": "暫無可用對話",
   "settingsSearchHint": "搜尋設定",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清除搜尋",

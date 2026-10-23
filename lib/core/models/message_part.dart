@@ -28,6 +28,8 @@ sealed class MessagePart {
         return ImagePart.fromPayload(payload);
       case 'file':
         return FilePart.fromPayload(payload);
+      case 'forwarded_messages':
+        return ForwardedMessagesPart.fromPayload(payload);
       case 'provider_auth_error':
         return ProviderAuthErrorPart.fromPayload(payload);
       default:
@@ -38,6 +40,154 @@ sealed class MessagePart {
   String get kind;
 
   String encodePayload();
+}
+
+/// Walk message parts, preserving order and including nested forwarded records.
+/// Forwarded containers are yielded before their children.
+Iterable<MessagePart> walkMessageParts(Iterable<MessagePart> parts) sync* {
+  for (final part in parts) {
+    yield part;
+    if (part is ForwardedMessagesPart) {
+      for (final message in part.messages) {
+        yield* walkMessageParts(message.parts);
+      }
+    }
+  }
+}
+
+/// Map leaves in a message tree without losing forwarded identities or order.
+/// Unchanged branches retain identity so callers can avoid unnecessary writes.
+List<MessagePart> mapMessageParts(
+  List<MessagePart> parts,
+  MessagePart Function(MessagePart part) transform,
+) {
+  var changed = false;
+  final result = <MessagePart>[];
+  for (final part in parts) {
+    MessagePart next = part;
+    if (part is ForwardedMessagesPart) {
+      var nestedChanged = false;
+      final messages = part.messages.map((message) {
+        final mapped = mapMessageParts(message.parts, transform);
+        if (identical(mapped, message.parts)) return message;
+        nestedChanged = true;
+        return ForwardedMessageSnapshot(
+          author: message.author,
+          authorId: message.authorId,
+          authorAvatar: message.authorAvatar,
+          role: message.role,
+          timestamp: message.timestamp,
+          parts: mapped,
+        );
+      }).toList();
+      if (nestedChanged) next = ForwardedMessagesPart(messages: messages);
+    } else {
+      next = transform(part);
+    }
+    changed |= !identical(next, part);
+    result.add(next);
+  }
+  return changed ? List.unmodifiable(result) : parts;
+}
+
+/// A copied transcript entry, independent of later source edits or deletion.
+final class ForwardedMessageSnapshot {
+  ForwardedMessageSnapshot({
+    required this.author,
+    required this.role,
+    required this.timestamp,
+    required Iterable<MessagePart> parts,
+    this.authorId,
+    this.authorAvatar,
+  }) : parts = List.unmodifiable(parts);
+
+  final String author;
+  final String? authorId;
+  final String? authorAvatar;
+  final String role;
+  final DateTime timestamp;
+  final List<MessagePart> parts;
+
+  String get text => [
+    for (final part in parts)
+      if (part is TextPart)
+        part.text
+      else if (part is ForwardedMessagesPart)
+        part.transcript,
+  ].join('\n\n');
+
+  Map<String, dynamic> toJson() => {
+    'author': author,
+    if (authorId != null) 'authorId': authorId,
+    if (authorAvatar != null) 'authorAvatar': authorAvatar,
+    'role': role,
+    'timestamp': timestamp.toIso8601String(),
+    'parts': [
+      for (final part in parts)
+        {'kind': part.kind, 'payload': part.encodePayload()},
+    ],
+  };
+
+  factory ForwardedMessageSnapshot.fromJson(Map<String, dynamic> json) {
+    final timestamp = DateTime.tryParse(_requiredString(json, 'timestamp'));
+    if (timestamp == null) {
+      throw const _MessagePartFormatException('invalid_timestamp');
+    }
+    return ForwardedMessageSnapshot(
+      author: _requiredString(json, 'author'),
+      authorId: _optionalString(json, 'authorId'),
+      authorAvatar: _optionalString(json, 'authorAvatar'),
+      role: _requiredString(json, 'role'),
+      timestamp: timestamp,
+      parts: [
+        for (final entry in _requiredObjectList(json, 'parts'))
+          MessagePart.fromRow(
+            _requiredString(entry, 'kind'),
+            _requiredString(entry, 'payload'),
+          ),
+      ],
+    );
+  }
+}
+
+/// Historical content only: mentions in this snapshot never route a new call.
+final class ForwardedMessagesPart extends MessagePart {
+  ForwardedMessagesPart({required Iterable<ForwardedMessageSnapshot> messages})
+    : messages = List.unmodifiable(messages);
+
+  factory ForwardedMessagesPart.fromPayload(String payload) {
+    final data = _decodeObjectPayload(payload);
+    return ForwardedMessagesPart(
+      messages: _requiredObjectList(
+        data,
+        'messages',
+      ).map(ForwardedMessageSnapshot.fromJson),
+    );
+  }
+
+  final List<ForwardedMessageSnapshot> messages;
+
+  /// Separate from ChatMessage.content so historical mentions cannot become
+  /// composer instructions. Context builders explicitly include this text.
+  String get transcript => messages
+      .map(
+        (entry) =>
+            '[${entry.timestamp.toIso8601String()}] ${entry.author} (${entry.role})\n${entry.text}',
+      )
+      .join('\n\n');
+
+  @override
+  String get kind => 'forwarded_messages';
+  @override
+  String encodePayload() => jsonEncode({
+    'messages': messages.map((entry) => entry.toJson()).toList(),
+  });
+  @override
+  bool operator ==(Object other) =>
+      other is ForwardedMessagesPart &&
+      encodePayload() == other.encodePayload();
+  @override
+  int get hashCode => encodePayload().hashCode;
 }
 
 /// Durable recovery action for an OAuth failure, excluded from model input.
@@ -308,7 +458,10 @@ final class MalformedPart extends MessagePart {
   final String rawPayload;
   final String parseError;
 
-  bool get isAttachmentKind => rawKind == 'image' || rawKind == 'file';
+  bool get isAttachmentKind =>
+      rawKind == 'image' ||
+      rawKind == 'file' ||
+      rawKind == 'forwarded_messages';
 
   @override
   String get kind => rawKind;
@@ -351,6 +504,30 @@ Map<String, dynamic> _decodeObjectPayload(String payload) {
     throw const _MessagePartFormatException('not_object');
   }
   return Map<String, dynamic>.from(decoded);
+}
+
+String _requiredString(Map<String, dynamic> map, String key) {
+  final value = map[key];
+  if (value is! String) {
+    throw _MessagePartFormatException('invalid_$key');
+  }
+  return value;
+}
+
+Iterable<Map<String, dynamic>> _requiredObjectList(
+  Map<String, dynamic> map,
+  String key,
+) sync* {
+  final value = map[key];
+  if (value is! List) {
+    throw _MessagePartFormatException('invalid_$key');
+  }
+  for (final entry in value) {
+    if (entry is! Map<String, dynamic>) {
+      throw _MessagePartFormatException('invalid_${key}_entry');
+    }
+    yield entry;
+  }
 }
 
 String? _optionalString(Map<String, dynamic> map, String key) {

@@ -9,6 +9,27 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get forwardMessagesRequiredQuestion => '已随选中的回复保留原问题';
+
+  @override
+  String get forwardMessagesTitle => '合并转发消息';
+
+  @override
+  String get forwardMessagesAction => '转发';
+
+  @override
+  String get forwardMessagesRecord => '合并聊天记录';
+
+  @override
+  String get forwardMessagesComment => '附加说明';
+
+  @override
+  String get forwardMessagesDestination => '选择目标会话';
+
+  @override
+  String get forwardMessagesEmpty => '暂无可用会话';
+
+  @override
   String get settingsSearchHint => '搜索设置';
 
   @override
@@ -12731,6 +12752,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
 
   @override
+  String get forwardMessagesRequiredQuestion => '已随选中的回复保留原问题';
+
+  @override
+  String get forwardMessagesTitle => '合并转发消息';
+
+  @override
+  String get forwardMessagesAction => '转发';
+
+  @override
+  String get forwardMessagesRecord => '合并聊天记录';
+
+  @override
+  String get forwardMessagesComment => '附加说明';
+
+  @override
+  String get forwardMessagesDestination => '选择目标会话';
+
+  @override
+  String get forwardMessagesEmpty => '暂无可用会话';
+
+  @override
   String get settingsSearchHint => '搜索设置';
 
   @override
@@ -25377,6 +25419,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 /// The translations for Chinese, using the Han script (`zh_Hant`).
 class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
+
+  @override
+  String get forwardMessagesRequiredQuestion => '已隨選取的回覆保留原問題';
+
+  @override
+  String get forwardMessagesTitle => '合併轉發訊息';
+
+  @override
+  String get forwardMessagesAction => '轉發';
+
+  @override
+  String get forwardMessagesRecord => '合併聊天記錄';
+
+  @override
+  String get forwardMessagesComment => '附加說明';
+
+  @override
+  String get forwardMessagesDestination => '選擇目標對話';
+
+  @override
+  String get forwardMessagesEmpty => '暫無可用對話';
 
   @override
   String get settingsSearchHint => '搜尋設定';

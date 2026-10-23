@@ -126,8 +126,8 @@ String buildCompressContextContent(
 }
 
 String? conversationLineForCompression(ChatMessage message) {
-  if (message.content.trim().isEmpty) return null;
-  return '${message.role == "assistant" ? "Assistant" : "User"}: ${message.content}';
+  if (message.contextContent.trim().isEmpty) return null;
+  return '${message.role == "assistant" ? "Assistant" : "User"}: ${message.contextContent}';
 }
 
 String buildConversationTextForCompression(List<ChatMessage> messages) {
@@ -159,7 +159,7 @@ String _buildStartBoundedConversationText(
 ) {
   final buf = StringBuffer();
   for (final message in messages) {
-    if (message.content.trim().isEmpty) continue;
+    if (message.contextContent.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sep = buf.isEmpty ? '' : '\n\n';
     final remaining = maxChars - buf.length;
@@ -170,13 +170,13 @@ String _buildStartBoundedConversationText(
       break;
     }
     final contentBudget = remaining - head.length;
-    final content = message.content.length <= contentBudget
-        ? message.content
-        : truncateHeadUtf16Safe(message.content, contentBudget);
+    final content = message.contextContent.length <= contentBudget
+        ? message.contextContent
+        : truncateHeadUtf16Safe(message.contextContent, contentBudget);
     buf
       ..write(head)
       ..write(content);
-    if (message.content.length > contentBudget) break;
+    if (message.contextContent.length > contentBudget) break;
   }
   return buf.toString();
 }
@@ -189,18 +189,22 @@ String _buildRecentBoundedConversationText(
   var used = 0;
   for (var i = messages.length - 1; i >= 0; i--) {
     final message = messages[i];
-    if (message.content.trim().isEmpty) continue;
+    if (message.contextContent.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sepLen = parts.isEmpty ? 0 : 2;
     final remaining = maxChars - used - sepLen;
     if (remaining <= 0) break;
-    final lineLen = prefix.length + message.content.length;
+    final lineLen = prefix.length + message.contextContent.length;
     if (lineLen <= remaining) {
-      parts.add('$prefix${message.content}');
+      parts.add('$prefix${message.contextContent}');
       used += lineLen + sepLen;
       continue;
     }
-    final tail = _utf16SafeTailOfPrefixed(prefix, message.content, remaining);
+    final tail = _utf16SafeTailOfPrefixed(
+      prefix,
+      message.contextContent,
+      remaining,
+    );
     if (tail.isNotEmpty) parts.add(tail);
     break;
   }
@@ -324,7 +328,7 @@ List<ChatMessage> selectKeepRecentMessages(
   final userIndices = <int>[];
   for (var i = 0; i < messages.length; i++) {
     final m = messages[i];
-    if (m.role == 'user' && m.content.trim().isNotEmpty) {
+    if (m.role == 'user' && m.contextContent.trim().isNotEmpty) {
       userIndices.add(i);
     }
   }
@@ -337,7 +341,7 @@ List<ChatMessage> selectKeepRecentMessages(
 /// content) — the count that [selectKeepRecentMessages] counts against.
 int countUserMessages(List<ChatMessage> messages) {
   return messages
-      .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
+      .where((m) => m.role == 'user' && m.contextContent.trim().isNotEmpty)
       .length;
 }
 

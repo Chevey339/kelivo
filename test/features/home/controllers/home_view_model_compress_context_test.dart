@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/features/home/controllers/home_view_model.dart';
 
 ChatMessage _message({
@@ -22,6 +23,29 @@ ChatMessage _message({
 }
 
 void main() {
+  test('compression retains a forwarded record with no added note', () {
+    final message = ChatMessage(
+      role: 'user',
+      conversationId: 'target',
+      parts: [
+        ForwardedMessagesPart(
+          messages: [
+            ForwardedMessageSnapshot(
+              author: 'A',
+              role: 'assistant',
+              timestamp: DateTime.utc(2026),
+              parts: const [TextPart('Historical answer')],
+            ),
+          ],
+        ),
+      ],
+    );
+    final chunks = buildCompressRequestContents([
+      message,
+    ], const CompressContextOptions(mode: CompressContextLimitMode.unlimited));
+    expect(chunks.single, contains('A (assistant)'));
+    expect(chunks.single, contains('Historical answer'));
+  });
   group('buildCompressContextContent', () {
     test('短内容在限制内保持原样', () {
       const joined = 'User: hello\n\nAssistant: hi';

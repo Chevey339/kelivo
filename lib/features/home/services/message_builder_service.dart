@@ -210,7 +210,7 @@ class MessageBuilderService {
       if (remaining <= 0) break;
       final raw = message.role == 'assistant'
           ? ThinkingTagParser.parseWithRanges(message.content).visibleContent
-          : message.content;
+          : message.contextContent;
       if (raw.trim().isEmpty) continue;
       final text = truncateHeadTailUtf16Safe(
         raw,
@@ -380,7 +380,7 @@ class MessageBuilderService {
           continue;
         }
       }
-      var content = m.content;
+      var content = m.contextContent;
       var hasClaudeToolTurn = false;
       // Signed native blocks belong to the provider/model that produced them.
       // Tool turns carry their artifact on the tool-call message below.
@@ -598,7 +598,7 @@ class MessageBuilderService {
   /// provider that takes the file itself.
   static List<Map<String, dynamic>> mediaRefsFromParts(ChatMessage message) {
     final refs = <Map<String, dynamic>>[];
-    for (final part in message.parts) {
+    for (final part in walkMessageParts(message.parts)) {
       if (part is ImagePart) {
         if (part.unavailable) continue;
         final uri = part.uri.trim();
@@ -635,7 +635,7 @@ class MessageBuilderService {
   /// [mediaRefsFromParts] leaves out.
   static List<Map<String, dynamic>> documentRefsFromParts(ChatMessage message) {
     final refs = <Map<String, dynamic>>[];
-    for (final part in message.parts) {
+    for (final part in walkMessageParts(message.parts)) {
       if (part is! FilePart || part.unavailable) continue;
       final uri = part.uri.trim();
       if (uri.isEmpty) continue;
@@ -657,7 +657,7 @@ class MessageBuilderService {
   /// True when the message still has a non-unavailable image/file attachment
   /// that should survive into API preparation even without media refs.
   static bool _hasUsableAttachmentPart(ChatMessage message) {
-    for (final part in message.parts) {
+    for (final part in walkMessageParts(message.parts)) {
       if (part is ImagePart && !part.unavailable) {
         if (part.uri.trim().isNotEmpty) return true;
       } else if (part is FilePart && !part.unavailable) {
@@ -787,11 +787,8 @@ class MessageBuilderService {
   }) {
     final images = <String>[];
     final docs = <DocumentAttachment>[];
-    final textParts = <String>[];
-    for (final part in message.parts) {
-      if (part is TextPart) {
-        textParts.add(part.text);
-      } else if (part is ImagePart) {
+    for (final part in walkMessageParts(message.parts)) {
+      if (part is ImagePart) {
         // Unavailable parts stay in persisted history for UI placeholders but
         // must not enter API media paths.
         if (part.unavailable) continue;
@@ -816,7 +813,7 @@ class MessageBuilderService {
       }
     }
     return ChatInputData(
-      text: textParts.join().trim(),
+      text: message.contextContent.trim(),
       imagePaths: images,
       documents: docs,
     );
@@ -1198,7 +1195,7 @@ class MessageBuilderService {
 
       final mimeByPath = <String, String>{};
       if (chatMessageForParts != null) {
-        for (final part in chatMessageForParts.parts) {
+        for (final part in walkMessageParts(chatMessageForParts.parts)) {
           if (part is ImagePart) {
             if (part.unavailable) continue;
             final uri = part.uri.trim();

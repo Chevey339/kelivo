@@ -83,6 +83,94 @@ void main() {
       );
     }
 
+    for (final difference in [
+      'none',
+      'text',
+      'attachment',
+      'author',
+      'availability',
+    ]) {
+      test('merge preserves forwarded identity: $difference', () async {
+        for (final repository in [live, source]) {
+          await putConversation(
+            repository,
+            conversationId: 'conversation',
+            title: 'Forward',
+            messageId: 'message',
+            content: 'same note',
+          );
+          final original = (await repository.getMessage('message'))!;
+          final changed = identical(repository, source);
+          await repository.updateMessage(
+            original.copyWith(
+              parts: [
+                const TextPart('same note'),
+                ForwardedMessagesPart(
+                  messages: [
+                    ForwardedMessageSnapshot(
+                      author: changed && difference == 'author' ? 'B' : 'A',
+                      role: 'assistant',
+                      timestamp: DateTime.utc(2026),
+                      parts: [
+                        ForwardedMessagesPart(
+                          messages: [
+                            ForwardedMessageSnapshot(
+                              author: 'User',
+                              role: 'user',
+                              timestamp: DateTime.utc(2026),
+                              parts: [
+                                TextPart(
+                                  changed && difference == 'text'
+                                      ? 'other body'
+                                      : 'original body',
+                                ),
+                                ImagePart(
+                                  uri: changed && difference == 'attachment'
+                                      ? 'https://example.com/b.png'
+                                      : 'https://example.com/a.png',
+                                  unavailable:
+                                      changed && difference == 'availability',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+        await source.close();
+        sourceClosed = true;
+        final report = await live.mergeBackupSnapshot(sourceFile);
+        final identicalRecord =
+            difference == 'none' || difference == 'availability';
+        expect(report.deduplicatedConversations, identicalRecord ? 1 : 0);
+        expect(report.importedConversations, identicalRecord ? 0 : 1);
+        if (!identicalRecord) {
+          final importedId = report.importedConversationIds.single;
+          final messages = await live.getMessagesRange(
+            importedId,
+            start: 0,
+            limit: 10,
+          );
+          final record = messages.single.parts
+              .whereType<ForwardedMessagesPart>()
+              .single;
+          expect(
+            record.messages.single.author,
+            difference == 'author' ? 'B' : 'A',
+          );
+          final repeated = await live.mergeBackupSnapshot(sourceFile);
+          expect(repeated.importedConversations, 0);
+          expect(repeated.deduplicatedConversations, 1);
+        }
+      });
+    }
+
     /// Two messages whose text, reasoning and tool payloads differ. Both carry
     /// the same thought signature on purpose: a swapped-body variant must then
     /// differ only in which revision owns which part, leaving part grouping as

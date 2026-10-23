@@ -110,130 +110,76 @@ typedef _VersionedBackupInfo = ({
 /// Intended for post-file-restore refresh of legacy chats.json imports that
 /// decoded before assets were copied.
 
-List<MessagePart> _normalizeAttachmentPartUris(List<MessagePart> parts) {
-  var changed = false;
-  final out = <MessagePart>[];
-  for (final part in parts) {
-    if (part is ImagePart) {
-      final uri = SandboxPathResolver.canonicalize(part.uri);
-      if (uri != part.uri) {
-        changed = true;
-        out.add(
-          ImagePart(
-            uri: uri,
-            mime: part.mime,
-            assetId: part.assetId,
-            unavailable: part.unavailable,
-          ),
-        );
-      } else {
-        out.add(part);
-      }
-    } else if (part is FilePart) {
-      final uri = SandboxPathResolver.canonicalize(part.uri);
-      if (uri != part.uri) {
-        changed = true;
-        out.add(
-          FilePart(
-            uri: uri,
-            name: part.name,
-            mime: part.mime,
-            assetId: part.assetId,
-            unavailable: part.unavailable,
-          ),
-        );
-      } else {
-        out.add(part);
-      }
-    } else {
-      out.add(part);
-    }
-  }
-  return changed ? out : parts;
-}
+List<MessagePart> _normalizeAttachmentPartUris(List<MessagePart> parts) =>
+    _mapAttachmentUris(parts, SandboxPathResolver.canonicalize);
 
-List<MessagePart> _remapRestoredAttachmentPartUris(List<MessagePart> parts) {
-  var changed = false;
-  final out = <MessagePart>[];
-  for (final part in parts) {
-    if (part is ImagePart) {
-      final uri =
-          SandboxPathResolver.tryRemapRestoredManagedAbsolute(part.uri) ??
-          part.uri;
-      if (uri != part.uri) {
-        changed = true;
-        out.add(
-          ImagePart(
+List<MessagePart> _remapRestoredAttachmentPartUris(List<MessagePart> parts) =>
+    _mapAttachmentUris(
+      parts,
+      (uri) => SandboxPathResolver.tryRemapRestoredManagedAbsolute(uri) ?? uri,
+    );
+
+List<MessagePart> _mapAttachmentUris(
+  List<MessagePart> parts,
+  String Function(String) rewrite,
+) => mapMessageParts(parts, (part) {
+  if (part is ImagePart) {
+    final uri = rewrite(part.uri);
+    return uri == part.uri
+        ? part
+        : ImagePart(
             uri: uri,
             mime: part.mime,
             assetId: part.assetId,
             unavailable: part.unavailable,
-          ),
-        );
-      } else {
-        out.add(part);
-      }
-    } else if (part is FilePart) {
-      final uri =
-          SandboxPathResolver.tryRemapRestoredManagedAbsolute(part.uri) ??
-          part.uri;
-      if (uri != part.uri) {
-        changed = true;
-        out.add(
-          FilePart(
+          );
+  }
+  if (part is FilePart) {
+    final uri = rewrite(part.uri);
+    return uri == part.uri
+        ? part
+        : FilePart(
             uri: uri,
             name: part.name,
             mime: part.mime,
             assetId: part.assetId,
             unavailable: part.unavailable,
-          ),
-        );
-      } else {
-        out.add(part);
-      }
-    } else {
-      out.add(part);
-    }
+          );
   }
-  return changed ? out : parts;
-}
+  return part;
+});
 
 List<MessagePart> recomputeAttachmentAvailability(
   List<MessagePart> parts, {
   bool Function(String path)? fileExists,
 }) {
   final exists = fileExists ?? _attachmentExistsOnDisk;
-  final out = <MessagePart>[];
-  var changed = false;
-  for (final part in parts) {
+  return mapMessageParts(parts, (part) {
     if (part is ImagePart) {
       final unavailable = _unavailableForUri(part.uri, exists);
-      if (unavailable != part.unavailable) changed = true;
-      out.add(
-        ImagePart(
-          uri: part.uri,
-          mime: part.mime,
-          assetId: part.assetId,
-          unavailable: unavailable,
-        ),
-      );
-    } else if (part is FilePart) {
-      final unavailable = _unavailableForUri(part.uri, exists);
-      if (unavailable != part.unavailable) changed = true;
-      out.add(
-        FilePart(
-          uri: part.uri,
-          name: part.name,
-          mime: part.mime,
-          assetId: part.assetId,
-          unavailable: unavailable,
-        ),
-      );
-    } else {
-      out.add(part);
+      return unavailable == part.unavailable
+          ? part
+          : ImagePart(
+              uri: part.uri,
+              mime: part.mime,
+              assetId: part.assetId,
+              unavailable: unavailable,
+            );
     }
-  }
-  return changed ? out : parts;
+    if (part is FilePart) {
+      final unavailable = _unavailableForUri(part.uri, exists);
+      return unavailable == part.unavailable
+          ? part
+          : FilePart(
+              uri: part.uri,
+              name: part.name,
+              mime: part.mime,
+              assetId: part.assetId,
+              unavailable: unavailable,
+            );
+    }
+    return part;
+  });
 }
 
 bool _unavailableForUri(String uri, bool Function(String path) exists) {
@@ -3227,6 +3173,35 @@ class DataSync {
     final database = AppDatabase.open(file: file);
     try {
       await BackupPortability.sanitizeDatabase(database, scope: scope);
+      // Snapshot local paths while the source root is still known. This also
+      // covers forwarded records written after the startup path migration.
+      var cursor = 0;
+      while (true) {
+        final rows = await database
+            .customSelect(
+              'SELECT part_id, kind, payload FROM message_part_rows '
+              "WHERE kind IN ('image', 'file', 'forwarded_messages') "
+              'AND part_id > $cursor ORDER BY part_id LIMIT 256',
+            )
+            .get();
+        if (rows.isEmpty) break;
+        for (final row in rows) {
+          cursor = row.read<int>('part_id');
+          final kind = row.read<String>('kind');
+          final payload = row.read<String>('payload');
+          try {
+            final parts = [MessagePart.fromRow(kind, payload)];
+            final mapped = _normalizeAttachmentPartUris(parts);
+            if (identical(parts, mapped)) continue;
+            await database.customStatement(
+              'UPDATE message_part_rows SET payload = ? WHERE part_id = ?',
+              [mapped.single.encodePayload(), cursor],
+            );
+          } on FormatException {
+            // Preserve malformed persisted payloads for normal recovery.
+          }
+        }
+      }
       for (final sql in MessageTimelineIndex.discardStatements) {
         await database.customStatement(sql);
       }

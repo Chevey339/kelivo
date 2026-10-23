@@ -11,6 +11,7 @@ import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,31 @@ const _messageText = 'alpha bravo charlie';
 const _wordSelection = TextSelection(baseOffset: 6, extentOffset: 11);
 
 void main() {
+  testWidgets('required forwarded question is disabled and explained', (
+    tester,
+  ) async {
+    var toggles = 0;
+    await _pumpTimeline(
+      tester,
+      role: 'user',
+      selecting: true,
+      locked: true,
+      onToggleSelection: (_, __) => toggles++,
+    );
+    final checkbox = tester.widget<IosCheckbox>(find.byType(IosCheckbox));
+    expect(checkbox.value, isTrue);
+    expect(checkbox.onChanged, isNull);
+    expect(checkbox.semanticLabel, 'Included with its selected replies');
+    await tester.tap(find.byType(IosCheckbox));
+    final paragraph = renderParagraphs(
+      find.byType(MessageListView),
+    ).singleWhere((p) => p.text.toPlainText() == _messageText);
+    await tester.tapAt(
+      paragraph.localToGlobal(paragraph.size.center(Offset.zero)),
+    );
+    await tester.pump();
+    expect(toggles, 0);
+  });
   testWidgets(
     'selection edge scroll expresses user intent before auto-follow can pin the page',
     (tester) async {
@@ -198,6 +224,9 @@ Future<FocusNode> _pumpTimeline(
   String content = _messageText,
   ScrollController? controller,
   VoidCallback? onUserScrollIntent,
+  bool selecting = false,
+  bool locked = false,
+  void Function(String, bool)? onToggleSelection,
 }) async {
   final scrollController = controller ?? ScrollController();
   final listController = ListController();
@@ -259,8 +288,10 @@ Future<FocusNode> _pumpTimeline(
                   contentSplits: const {},
                   toolParts: const {},
                   translations: const {},
-                  selecting: false,
-                  selectedItems: const {},
+                  selecting: selecting,
+                  selectedItems: locked ? const {'message-1'} : const {},
+                  lockedSelectionIds: locked ? const {'message-1'} : const {},
+                  onToggleSelection: onToggleSelection,
                   dividerPadding: EdgeInsets.zero,
                   processingFilesMessageId: processingFilesMessageId,
                   showModelIcon: false,

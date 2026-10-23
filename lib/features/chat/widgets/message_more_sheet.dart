@@ -27,6 +27,7 @@ enum MessageMoreAction {
   deleteCurrentVersion,
   deleteAllVersions,
   share,
+  forward,
   selectMessages,
 }
 
@@ -118,6 +119,11 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         onTap: () {
           selected = MessageMoreAction.share;
         },
+      ),
+      DesktopContextMenuItem(
+        icon: Lucide.MessagesSquare,
+        label: l10n.forwardMessagesTitle,
+        onTap: () => selected = MessageMoreAction.forward,
       ),
       DesktopContextMenuItem(
         icon: Lucide.CheckSquare,
@@ -328,6 +334,12 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                       onTap: () {
                         Navigator.of(context).pop(MessageMoreAction.share);
                       },
+                    ),
+                    _actionItem(
+                      icon: Lucide.MessagesSquare,
+                      label: l10n.forwardMessagesTitle,
+                      onTap: () =>
+                          Navigator.of(context).pop(MessageMoreAction.forward),
                     ),
                     _actionItem(
                       icon: Lucide.CheckSquare,

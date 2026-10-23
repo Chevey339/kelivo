@@ -52,6 +52,14 @@ class ChatMessage extends HiveObject {
 
   String get content => _content;
 
+  /// Model-readable body, including explicitly shared historical snapshots.
+  /// The editable body stays separate so historical mentions remain inert.
+  String get contextContent => [
+    content,
+    for (final record in parts.whereType<ForwardedMessagesPart>())
+      '<forwarded_history>\n${record.transcript}\n</forwarded_history>',
+  ].where((text) => text.isNotEmpty).join('\n\n');
+
   @HiveField(3)
   final DateTime timestamp;
 

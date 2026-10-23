@@ -17,12 +17,14 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/reasoning_request.dart';
+import '../../chat/utils/thinking_tag_parser.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
@@ -63,9 +65,10 @@ import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
+import '../widgets/forward_messages_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
-enum ChatSelectionMode { share, delete }
+enum ChatSelectionMode { share, delete, forward }
 
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
@@ -215,6 +218,10 @@ class HomePageController extends ChangeNotifier {
   // Selection mode
   bool _selecting = false;
   ChatSelectionMode _selectionMode = ChatSelectionMode.share;
+  final Set<String> _forwardExplicitIds = {};
+  final Set<String> _forwardRequiredQuestionIds = {};
+  bool _forwardPreviewActive = false;
+  Future<void> _forwardSelectionPending = Future<void>.value();
   final Set<String> _selectedItems = <String>{};
 
   /// Selectable projection ids from the last full-history selection load.
@@ -635,6 +642,10 @@ class HomePageController extends ChangeNotifier {
   bool get selecting => _selecting;
   ChatSelectionMode get selectionMode => _selectionMode;
   Set<String> get selectedItems => _selectedItems;
+  Set<String> get lockedSelectionIds =>
+      _selectionMode == ChatSelectionMode.forward
+      ? Set.unmodifiable(_forwardRequiredQuestionIds)
+      : const {};
   int get selectedCount => _selectedItems.length;
   bool get showThinkingTools => _showThinkingTools;
   bool get showThinkingContent => _showThinkingContent;
@@ -2528,6 +2539,9 @@ class HomePageController extends ChangeNotifier {
     _selecting = true;
     _selectionMode = mode;
     _selectedItems.clear();
+    _forwardExplicitIds.clear();
+    _forwardRequiredQuestionIds.clear();
+    _forwardSelectionPending = Future<void>.value();
     _selectableProjectionIds = null;
     _showThinkingTools = false;
     _showThinkingContent = false;
@@ -2538,6 +2552,11 @@ class HomePageController extends ChangeNotifier {
     }
 
     final anchor = messageList[messageIndex];
+    if (mode == ChatSelectionMode.forward) {
+      toggleSelection(anchor.id, true);
+      notifyListeners();
+      return;
+    }
     const userRole = 'user';
     const assistantRole = 'assistant';
 
@@ -2656,7 +2675,11 @@ class HomePageController extends ChangeNotifier {
   }
 
   void selectAll() {
-    unawaited(_selectAllProjected());
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _queueForwardSelection(_selectAllProjected);
+    } else {
+      unawaited(_selectAllProjected());
+    }
   }
 
   Future<void> _selectAllProjected() async {
@@ -2674,11 +2697,19 @@ class HomePageController extends ChangeNotifier {
       }
     }
     _selectableProjectionIds = selectable;
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _forwardExplicitIds.addAll(selectable);
+      _restoreForwardDependencies(collapsed);
+    }
     notifyListeners();
   }
 
   void toggleSelectAll() {
-    unawaited(_toggleSelectAllProjected());
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _queueForwardSelection(_toggleSelectAllProjected);
+    } else {
+      unawaited(_toggleSelectAllProjected());
+    }
   }
 
   Future<void> _toggleSelectAllProjected() async {
@@ -2704,11 +2735,21 @@ class HomePageController extends ChangeNotifier {
         _selectedItems.add(m.id);
       }
     }
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _forwardExplicitIds
+        ..clear()
+        ..addAll(_selectedItems);
+      _restoreForwardDependencies(collapsed);
+    }
     notifyListeners();
   }
 
   void invertSelection() {
-    unawaited(_invertProjectedSelection());
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _queueForwardSelection(_invertProjectedSelection);
+    } else {
+      unawaited(_invertProjectedSelection());
+    }
   }
 
   Future<void> _invertProjectedSelection() async {
@@ -2729,6 +2770,12 @@ class HomePageController extends ChangeNotifier {
       }
     }
     _selectableProjectionIds = selectable;
+    if (_selectionMode == ChatSelectionMode.forward) {
+      _forwardExplicitIds
+        ..clear()
+        ..addAll(_selectedItems);
+      _restoreForwardDependencies(collapsed);
+    }
     notifyListeners();
   }
 
@@ -2856,6 +2903,157 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
+  List<MessagePart> _forwardVisibleParts(ChatMessage message) {
+    final parts = message.parts
+        .where(
+          (part) =>
+              part is TextPart ||
+              part is ImagePart ||
+              part is FilePart ||
+              part is ForwardedMessagesPart,
+        )
+        .toList();
+    if (message.role != 'assistant') return parts;
+
+    // Match MessageListView's native reasoning inputs. Full-history selection
+    // also includes unloaded messages, so restore their persisted inputs here.
+    final nativeText =
+        reasoning[message.id]?.text ?? message.reasoningText ?? '';
+    final nativeSegments =
+        reasoningSegments[message.id] ??
+        _streamController.deserializeReasoningSegments(
+          message.reasoningSegmentsJson,
+        );
+    if (nativeText.isNotEmpty || nativeSegments.isNotEmpty) return parts;
+    final parsed = ThinkingTagParser.parseLegacyInlineBlocks(message.content);
+    if (!parsed.hasThinking) return parts;
+    final ranges = ThinkingTagParser.parseWithRanges(
+      message.content,
+      includeUnclosed: false,
+    );
+    final visible = <MessagePart>[];
+    ThinkingTagParser.walkSlices(
+      parts,
+      message.content,
+      ranges,
+      onVisible: (text) => visible.add(TextPart(text)),
+      onThinking: (_, _) {},
+      onOther: visible.add,
+    );
+    // Legacy rendering trims the visible whole string, not each text span.
+    for (var i = 0; i < visible.length; i++) {
+      if (visible[i] case TextPart(:final text)) {
+        final trimmed = text.trimLeft();
+        visible[i] = TextPart(trimmed);
+        if (trimmed.isNotEmpty) break;
+      }
+    }
+    for (var i = visible.length - 1; i >= 0; i--) {
+      if (visible[i] case TextPart(:final text)) {
+        final trimmed = text.trimRight();
+        visible[i] = TextPart(trimmed);
+        if (trimmed.isNotEmpty) break;
+      }
+    }
+    return visible
+        .where((part) => part is! TextPart || part.text.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> forwardSelectedMessages() async {
+    if (_forwardPreviewActive) return;
+    _forwardPreviewActive = true;
+    try {
+      final conversation = currentConversation;
+      if (conversation == null || !_selecting) return;
+      final epoch = _selectionEpoch;
+      await _forwardSelectionPending;
+      if (!_selectionWriteStillValid(epoch, conversation.id)) return;
+      final messages = await _selectedCollapsedMessages();
+      if (!_context.mounted ||
+          !_selectionWriteStillValid(epoch, conversation.id) ||
+          messages.isEmpty) {
+        return;
+      }
+      final l10n = AppLocalizations.of(_context)!;
+      final assistants = _context.read<AssistantProvider>();
+      final assistant = assistants.getById(conversation.assistantId ?? '');
+      final userName = _context.read<UserProvider>().name;
+      final record = ForwardedMessagesPart(
+        messages: [
+          for (final message in messages)
+            ForwardedMessageSnapshot(
+              author: message.role == 'user'
+                  ? userName
+                  : message.senderId != null
+                  ? message.senderName ??
+                        assistants.getById(message.senderId!)?.name ??
+                        l10n.homePageDefaultAssistant
+                  : assistant?.name ?? l10n.homePageDefaultAssistant,
+              authorId: message.role == 'user'
+                  ? null
+                  : message.senderId ?? assistant?.id,
+              authorAvatar: message.role == 'user'
+                  ? _context.read<UserProvider>().avatarValue
+                  : message.senderId != null
+                  ? message.senderAvatar
+                  : assistant?.avatar,
+              role: message.role,
+              timestamp: message.timestamp,
+              parts: _forwardVisibleParts(message),
+            ),
+        ],
+      );
+      final request = await showForwardMessagesSheet(
+        _context,
+        conversations: _chatService
+            .getAllConversations()
+            .where((c) => c.id != conversation.id)
+            .toList(),
+        record: record,
+      );
+      if (request == null ||
+          !_context.mounted ||
+          !_selectionWriteStillValid(epoch, conversation.id)) {
+        return;
+      }
+      try {
+        await _chatService.addMessage(
+          conversationId: request.conversationId,
+          role: 'user',
+          parts: [
+            if (request.comment.isNotEmpty) TextPart(request.comment),
+            record,
+          ],
+        );
+        if (!_context.mounted ||
+            !_selectionWriteStillValid(epoch, conversation.id)) {
+          return;
+        }
+        cancelSelection();
+        await switchConversationAnimated(request.conversationId);
+      } catch (error) {
+        if (_context.mounted) {
+          showAppSnackBar(
+            _context,
+            message: error.toString(),
+            type: NotificationType.error,
+          );
+        }
+      }
+    } catch (error) {
+      if (_context.mounted) {
+        showAppSnackBar(
+          _context,
+          message: error.toString(),
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      _forwardPreviewActive = false;
+    }
+  }
+
   Future<void> confirmSelection() async {
     final convo = currentConversation;
     if (convo == null) return;
@@ -2885,6 +3083,9 @@ class HomePageController extends ChangeNotifier {
   }
 
   void cancelSelection() {
+    _forwardRequiredQuestionIds.clear();
+    _forwardSelectionPending = Future<void>.value();
+    _forwardExplicitIds.clear();
     _selectionEpoch++;
     _selecting = false;
     _selectionMode = ChatSelectionMode.share;
@@ -2893,13 +3094,85 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _queueForwardSelection(Future<void> Function() operation) {
+    final epoch = _selectionEpoch;
+    final conversationId = currentConversation?.id;
+    if (conversationId == null) return;
+    _forwardSelectionPending = _forwardSelectionPending
+        .then((_) async {
+          if (!_selectionWriteStillValid(epoch, conversationId)) return;
+          await operation();
+        })
+        .catchError((Object error) {
+          if (_context.mounted &&
+              _selectionWriteStillValid(epoch, conversationId)) {
+            showAppSnackBar(
+              _context,
+              message: error.toString(),
+              type: NotificationType.error,
+            );
+          }
+        });
+  }
+
   void toggleSelection(String messageId, bool selected) {
+    if (_selectionMode == ChatSelectionMode.forward) {
+      final epoch = _selectionEpoch;
+      final conversationId = currentConversation?.id;
+      if (conversationId == null) return;
+      _queueForwardSelection(() async {
+        final messages = await _chatController
+            .loadAllCollapsedMessagesForCurrentConversation();
+        if (!_selectionWriteStillValid(epoch, conversationId)) return;
+        final index = messages.indexWhere((m) => m.id == messageId);
+        if (index < 0) return;
+        final message = messages[index];
+        if (selected) {
+          if (message.role == 'user') {
+            _forwardExplicitIds.addAll(
+              messages
+                  .skip(index)
+                  .where((m) => m.role == 'user' || m.role == 'assistant')
+                  .map((m) => m.id),
+            );
+          } else if (message.role == 'assistant') {
+            _forwardExplicitIds.add(messageId);
+          }
+        } else {
+          _forwardExplicitIds.remove(messageId);
+        }
+        _restoreForwardDependencies(messages);
+        _selectableProjectionIds = messages
+            .where((m) => m.role == 'user' || m.role == 'assistant')
+            .map((m) => m.id)
+            .toSet();
+        notifyListeners();
+      });
+      return;
+    }
     if (selected) {
       _selectedItems.add(messageId);
     } else {
       _selectedItems.remove(messageId);
     }
     notifyListeners();
+  }
+
+  void _restoreForwardDependencies(List<ChatMessage> messages) {
+    _forwardRequiredQuestionIds.clear();
+    _selectedItems
+      ..clear()
+      ..addAll(_forwardExplicitIds);
+    String? questionId;
+    for (final message in messages) {
+      if (message.role == 'user') questionId = message.id;
+      if (message.role == 'assistant' &&
+          _forwardExplicitIds.contains(message.id) &&
+          questionId != null) {
+        _selectedItems.add(questionId);
+        _forwardRequiredQuestionIds.add(questionId);
+      }
+    }
   }
 
   // ============================================================================

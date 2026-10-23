@@ -3,6 +3,7 @@ import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import '../widgets/selection_toolbar.dart';
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
@@ -1289,6 +1290,17 @@ class _HomePageState extends State<HomePage>
       );
     }
 
+    if (_controller.selectionMode == ChatSelectionMode.forward) {
+      return Padding(
+        key: _selectionActionBarKey,
+        padding: const EdgeInsets.all(12),
+        child: SelectionToolbar(
+          onCancel: _controller.cancelSelection,
+          onConfirm: _controller.forwardSelectedMessages,
+        ),
+      );
+    }
+
     return ChatSelectionExportBar(
       key: _selectionActionBarKey,
       onExportMarkdown: _controller.exportSelectedAsMarkdown,
@@ -1435,6 +1447,7 @@ class _HomePageState extends State<HomePage>
       translations: _buildTranslationUiStates(),
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
+      lockedSelectionIds: _controller.lockedSelectionIds,
       suggestions: suggestionsEnabled
           ? (_controller.currentConversation?.chatSuggestions ??
                 const <String>[])
@@ -1492,6 +1505,11 @@ class _HomePageState extends State<HomePage>
       onForkConversation: _controller.isTemporaryConversation
           ? null
           : (message) => _controller.forkConversation(message),
+      onForwardMessage: (index, messages) => _controller.startMessageSelection(
+        messageIndex: index,
+        messageList: messages,
+        mode: ChatSelectionMode.forward,
+      ),
       onShareMessage: (index, messages) =>
           _controller.shareMessage(index, messages),
       onSelectMessages: (index, messages) => _controller.startMessageSelection(

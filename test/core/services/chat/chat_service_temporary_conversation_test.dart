@@ -1004,6 +1004,79 @@ void main() {
     expect(service.getMessageCount(first.id), 1);
   });
 
+  test('forwarded attachments survive source deletion, GC and restart', () async {
+    final service = createService();
+    await service.init();
+    final source = await service.createConversation(title: 'Source');
+    final target = await service.createConversation(title: 'Target');
+    final image = File('${tempDir.path}/images/shared.png');
+    final file = File('${tempDir.path}/upload/shared.txt');
+    await image.parent.create(recursive: true);
+    await file.parent.create(recursive: true);
+    final imageBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+    );
+    await image.writeAsBytes(imageBytes);
+    await file.writeAsString('shared document');
+    final original = await service.addMessage(
+      conversationId: source.id,
+      role: 'user',
+      parts: [
+        ImagePart(uri: image.path, mime: 'image/png'),
+        FilePart(uri: file.path, name: 'shared.txt', mime: 'text/plain'),
+      ],
+    );
+    await service.addMessage(
+      conversationId: target.id,
+      role: 'user',
+      parts: [
+        ForwardedMessagesPart(
+          messages: [
+            ForwardedMessageSnapshot(
+              author: 'User',
+              role: 'user',
+              timestamp: original.timestamp,
+              parts: [
+                ForwardedMessagesPart(
+                  messages: [
+                    ForwardedMessageSnapshot(
+                      author: 'User',
+                      role: 'user',
+                      timestamp: original.timestamp,
+                      parts: original.parts,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    await service.deleteMessage(original.id);
+    await service.deleteConversation(source.id);
+    await service.runAssetMaintenance(
+      now: DateTime.now().toUtc().add(const Duration(days: 8)),
+    );
+    expect(await image.exists(), isTrue);
+    expect(await file.readAsString(), 'shared document');
+    await service.close();
+    services.remove(service);
+    final restarted = createService();
+    await restarted.init();
+    final messages = await restarted.loadMessages(target.id);
+    final outer = messages.single.parts.single as ForwardedMessagesPart;
+    final inner = outer.messages.single.parts.single as ForwardedMessagesPart;
+    expect(
+      inner.messages.single.parts.whereType<ImagePart>().single.uri,
+      image.path,
+    );
+    expect(
+      inner.messages.single.parts.whereType<FilePart>().single.name,
+      'shared.txt',
+    );
+  });
+
   test(
     'persistent attachment uses delayed reference GC after message delete',
     () async {
@@ -1325,6 +1398,73 @@ void main() {
         verify.close();
       }
       expect(await upload.exists(), isTrue);
+    },
+  );
+
+  test(
+    'editing a corrupt forwarded record retains its registered attachment through GC',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createConversation(
+        title: 'Corrupt forward',
+      );
+      final upload = File('${tempDir.path}/upload/forwarded.txt');
+      await upload.parent.create(recursive: true);
+      await upload.writeAsString('retained forwarded bytes');
+      final message = await first.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [
+          ForwardedMessagesPart(
+            messages: [
+              ForwardedMessageSnapshot(
+                author: 'Reviewer',
+                role: 'assistant',
+                timestamp: DateTime.utc(2026),
+                parts: [FilePart(uri: upload.path, name: 'forwarded.txt')],
+              ),
+            ],
+          ),
+        ],
+      );
+      await first.close();
+      services.remove(first);
+      final raw = sqlite.sqlite3.open(
+        '${tempDir.path}/${AppDatabase.databaseFileName}',
+      );
+      try {
+        // The unreadable snapshot still owns its previously registered asset.
+        raw.execute(
+          "UPDATE message_part_rows SET payload = '{}' WHERE revision_id = ? AND kind = 'forwarded_messages'",
+          [message.id],
+        );
+      } finally {
+        raw.close();
+      }
+      final restarted = createService();
+      await restarted.init();
+      expect(
+        (await restarted.loadMessages(conversation.id)).single.parts.single,
+        isA<MalformedPart>(),
+      );
+      await restarted.updateMessage(message.id, content: 'edited');
+      await restarted.runAssetMaintenance(
+        now: DateTime.now().add(const Duration(days: 8)),
+      );
+      expect(
+        await restarted.chatRepositoryOrNull!.hasPendingAssetReferenceSync(),
+        isTrue,
+      );
+      await restarted.runAssetMaintenance(
+        now: DateTime.now().add(const Duration(days: 16)),
+      );
+      expect(await upload.readAsString(), 'retained forwarded bytes');
+      final persisted = (await restarted.loadMessages(conversation.id)).single;
+      expect(
+        persisted.parts.whereType<MalformedPart>().single.encodePayload(),
+        '{}',
+      );
     },
   );
 

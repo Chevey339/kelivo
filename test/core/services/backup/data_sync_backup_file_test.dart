@@ -459,6 +459,221 @@ void main() {
     });
 
     test(
+      'chat-only ZIP restore preserves corrupt parts and recovers valid attachments',
+      () async {
+        SandboxPathResolver.debugSetDirs(
+          docsDir: root.path,
+          supportDir: root.path,
+        );
+        addTearDown(
+          () =>
+              SandboxPathResolver.debugSetDirs(docsDir: null, supportDir: null),
+        );
+        final chat = ChatService();
+        await chat.init();
+        final conversation = await chat.createConversation(
+          title: 'Recover corrupt history',
+        );
+        final original = await chat.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          parts: const [
+            MalformedPart(
+              rawKind: 'image',
+              rawPayload: '{}',
+              parseError: 'missing_uri',
+            ),
+            MalformedPart(
+              rawKind: 'forwarded_messages',
+              rawPayload: '{"messages":{}}',
+              parseError: 'invalid_messages',
+            ),
+            ImagePart(uri: 'kelivo-file:///images/missing.png'),
+            TextPart('Good text survives'),
+          ],
+        );
+        final archiveFile = await DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        ).prepareBackupFile(const WebDavConfig());
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(archiveFile));
+        await chat.close();
+        final destination = await Directory.systemTemp.createTemp(
+          'kelivo_corrupt_forward_restore_',
+        );
+        addTearDown(() => destination.delete(recursive: true));
+        PathProviderPlatform.instance = _FakePathProviderPlatform(
+          destination.path,
+        );
+        SandboxPathResolver.debugSetDirs(
+          docsDir: destination.path,
+          supportDir: destination.path,
+        );
+        final restoreDb = AppDatabase.open(
+          file: File('${destination.path}/business_test.sqlite'),
+        );
+        try {
+          await DataSync(
+            businessRepository: BusinessRepository(restoreDb),
+            chatService: ChatService(),
+          ).restoreFromLocalFile(archiveFile, _withoutAssets);
+        } finally {
+          await restoreDb.close();
+        }
+        final terminal = await _recoverAcrossColdRestart(
+          appDataDirectory: destination,
+        );
+        expect(terminal?.state, RestoreReceiptState.committed);
+        final restored = ChatService();
+        await restored.init();
+        try {
+          final message = (await restored.loadMessages(conversation.id)).single;
+          expect(message.id, original.id);
+          expect(message.parts[0], isA<MalformedPart>());
+          expect(message.parts[0].encodePayload(), '{}');
+          expect(message.parts[1], isA<MalformedPart>());
+          expect(message.parts[1].encodePayload(), '{"messages":{}}');
+          expect((message.parts[2] as ImagePart).unavailable, isTrue);
+          expect(message.content, 'Good text survives');
+        } finally {
+          await restored.close();
+        }
+      },
+    );
+
+    for (final restoreFiles in [true, false]) {
+      test(
+        'forwarded image and file survive ZIP export and restore to a new root files=$restoreFiles',
+        () async {
+          SandboxPathResolver.debugSetDirs(
+            docsDir: root.path,
+            supportDir: root.path,
+          );
+          addTearDown(
+            () => SandboxPathResolver.debugSetDirs(
+              docsDir: null,
+              supportDir: null,
+            ),
+          );
+          final chat = ChatService();
+          await chat.init();
+          final conversation = await chat.createConversation(title: 'Forward');
+          final image = File('${root.path}/images/photo.png');
+          final document = File('${root.path}/upload/note.txt');
+          await image.parent.create(recursive: true);
+          await document.parent.create(recursive: true);
+          final imageBytes = base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+          );
+          await image.writeAsBytes(imageBytes);
+          await document.writeAsString('forwarded bytes');
+          await chat.addMessage(
+            conversationId: conversation.id,
+            role: 'user',
+            parts: [
+              ForwardedMessagesPart(
+                messages: [
+                  ForwardedMessageSnapshot(
+                    author: 'Reviewer',
+                    authorId: 'reviewer',
+                    role: 'assistant',
+                    timestamp: DateTime.utc(2026),
+                    parts: [
+                      TextPart('Historical @全部'),
+                      ForwardedMessagesPart(
+                        messages: [
+                          ForwardedMessageSnapshot(
+                            author: 'User',
+                            role: 'user',
+                            timestamp: DateTime.utc(2026),
+                            parts: [
+                              ImagePart(uri: image.path, mime: 'image/png'),
+                              FilePart(
+                                uri: document.path,
+                                name: 'note.txt',
+                                mime: 'text/plain',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+          final archiveFile = await DataSync(
+            businessRepository: businessRepository,
+            chatService: chat,
+          ).prepareBackupFile(const WebDavConfig());
+          addTearDown(() => DataSync.cleanupTemporaryBackupFile(archiveFile));
+          await chat.close();
+          final destination = await Directory.systemTemp.createTemp(
+            'kelivo_forward_restore_',
+          );
+          addTearDown(() => destination.delete(recursive: true));
+          PathProviderPlatform.instance = _FakePathProviderPlatform(
+            destination.path,
+          );
+          SandboxPathResolver.debugSetDirs(
+            docsDir: destination.path,
+            supportDir: destination.path,
+          );
+          await image.delete();
+          await document.delete();
+          final restoreDb = AppDatabase.open(
+            file: File('${destination.path}/business_test.sqlite'),
+          );
+          try {
+            await DataSync(
+              businessRepository: BusinessRepository(restoreDb),
+              chatService: ChatService(),
+            ).restoreFromLocalFile(
+              archiveFile,
+              restoreFiles ? const WebDavConfig() : _withoutAssets,
+            );
+          } finally {
+            await restoreDb.close();
+          }
+          final terminal = await _recoverAcrossColdRestart(
+            appDataDirectory: destination,
+          );
+          expect(terminal?.state, RestoreReceiptState.committed);
+          final restored = ChatService();
+          await restored.init();
+          try {
+            final message = (await restored.loadMessages(
+              conversation.id,
+            )).single;
+            final outer = message.parts.single as ForwardedMessagesPart;
+            expect(outer.messages.single.authorId, 'reviewer');
+            final nested =
+                outer.messages.single.parts.last as ForwardedMessagesPart;
+            final restoredImage =
+                nested.messages.single.parts.first as ImagePart;
+            final restoredFile = nested.messages.single.parts.last as FilePart;
+            expect(restoredImage.unavailable, !restoreFiles);
+            expect(restoredFile.unavailable, !restoreFiles);
+            if (!restoreFiles) return;
+            final imagePath = SandboxPathResolver.resolveForIo(
+              restoredImage.uri,
+            )!;
+            final filePath = SandboxPathResolver.resolveForIo(
+              restoredFile.uri,
+            )!;
+            expect(imagePath, startsWith(destination.path));
+            expect(filePath, startsWith(destination.path));
+            expect(await File(imagePath).readAsBytes(), imageBytes);
+            expect(await File(filePath).readAsString(), 'forwarded bytes');
+          } finally {
+            await restored.close();
+          }
+        },
+      );
+    }
+
+    test(
       'database export strips device state from both archive payloads',
       () async {
         final sourceFile = File(p.join(root.path, 'source.sqlite'));

@@ -1559,7 +1559,7 @@ class ChatDatabaseRepository {
             .customSelect(
               'SELECT part_id, revision_id, ordinal, kind, payload '
               'FROM message_part_rows '
-              "WHERE kind IN ('image', 'file') AND part_id > ? "
+              "WHERE kind IN ('image', 'file', 'forwarded_messages') AND part_id > ? "
               'ORDER BY part_id LIMIT ?;',
               variables: [Variable<int>(cursor), Variable<int>(batchSize)],
             )
@@ -1630,6 +1630,19 @@ class ChatDatabaseRepository {
         payload: payload,
         parseError: messagePartParseErrorCategory(error),
       );
+    }
+    if (part is ForwardedMessagesPart) {
+      final mapped = mapMessageParts([part], (leaf) {
+        final rewrite = _rewriteAttachmentPartUri(
+          kind: leaf.kind,
+          payload: leaf.encodePayload(),
+          rewriteUri: rewriteUri,
+        );
+        return rewrite.payload == leaf.encodePayload()
+            ? leaf
+            : MessagePart.fromRow(leaf.kind, rewrite.payload);
+      });
+      return (payload: mapped.single.encodePayload(), parseError: null);
     }
     if (part is ImagePart) {
       final nextUri = rewriteUri(part.uri);
@@ -1728,7 +1741,7 @@ class ChatDatabaseRepository {
               EXISTS (
                 SELECT 1 FROM message_part_rows p
                 WHERE p.revision_id = m.id
-                  AND p.kind IN ('image', 'file')
+                  AND p.kind IN ('image', 'file', 'forwarded_messages')
               ) OR
               EXISTS (
                 SELECT 1 FROM message_asset_rows a WHERE a.revision_id = m.id
@@ -3972,7 +3985,7 @@ class ChatDatabaseRepository {
             SELECT 1
             FROM asset_reference_dirty_rows d
             JOIN message_part_rows p ON p.revision_id = d.revision_id
-            WHERE p.kind IN ('text', 'image', 'file')
+            WHERE p.kind IN ('text', 'image', 'file', 'forwarded_messages')
               AND (
                 instr(p.payload, c.path_form) > 0
                 OR instr(p.payload, c.alt_form) > 0
@@ -4001,7 +4014,7 @@ class ChatDatabaseRepository {
             AND NOT EXISTS (
               SELECT 1 FROM asset_reference_dirty_rows d
               JOIN message_part_rows p ON p.revision_id = d.revision_id
-              WHERE p.kind IN ('text', 'image', 'file')
+              WHERE p.kind IN ('text', 'image', 'file', 'forwarded_messages')
                 AND (
                   instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
                   OR instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4047,7 +4060,7 @@ class ChatDatabaseRepository {
               AND NOT EXISTS (
                 SELECT 1 FROM asset_reference_dirty_rows d
                 JOIN message_part_rows p ON p.revision_id = d.revision_id
-                WHERE p.kind IN ('text', 'image', 'file')
+                WHERE p.kind IN ('text', 'image', 'file', 'forwarded_messages')
                   AND (
                     instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
                     OR instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4483,7 +4496,7 @@ class ChatDatabaseRepository {
       'SELECT revision_id FROM message_asset_rows WHERE conversation_id = ? '
       'UNION '
       'SELECT revision_id FROM message_part_rows '
-      "WHERE conversation_id = ? AND kind IN ('image', 'file');",
+      "WHERE conversation_id = ? AND kind IN ('image', 'file', 'forwarded_messages');",
       [targetConversationId, targetConversationId],
     );
   }
@@ -5480,43 +5493,39 @@ class ChatDatabaseRepository {
         limit: 100000,
       );
       for (final message in messages) {
-        final nextParts = <MessagePart>[];
-        var changed = false;
-        for (final part in message.parts) {
+        final nextParts = mapMessageParts(message.parts, (part) {
           if (part is ImagePart) {
-            final unavailable = await _unavailableForRestoredPart(
+            final unavailable = _unavailableForRestoredPart(
               uri: part.uri,
               filesRestored: filesRestored,
             );
-            if (unavailable != part.unavailable) changed = true;
-            nextParts.add(
-              ImagePart(
-                uri: part.uri,
-                mime: part.mime,
-                assetId: part.assetId,
-                unavailable: unavailable,
-              ),
-            );
-          } else if (part is FilePart) {
-            final unavailable = await _unavailableForRestoredPart(
-              uri: part.uri,
-              filesRestored: filesRestored,
-            );
-            if (unavailable != part.unavailable) changed = true;
-            nextParts.add(
-              FilePart(
-                uri: part.uri,
-                name: part.name,
-                mime: part.mime,
-                assetId: part.assetId,
-                unavailable: unavailable,
-              ),
-            );
-          } else {
-            nextParts.add(part);
+            return unavailable == part.unavailable
+                ? part
+                : ImagePart(
+                    uri: part.uri,
+                    mime: part.mime,
+                    assetId: part.assetId,
+                    unavailable: unavailable,
+                  );
           }
-        }
-        if (!changed) continue;
+          if (part is FilePart) {
+            final unavailable = _unavailableForRestoredPart(
+              uri: part.uri,
+              filesRestored: filesRestored,
+            );
+            return unavailable == part.unavailable
+                ? part
+                : FilePart(
+                    uri: part.uri,
+                    name: part.name,
+                    mime: part.mime,
+                    assetId: part.assetId,
+                    unavailable: unavailable,
+                  );
+          }
+          return part;
+        });
+        if (identical(nextParts, message.parts)) continue;
         await updateMessage(message.copyWith(parts: nextParts));
         updated += 1;
       }
@@ -5524,10 +5533,10 @@ class ChatDatabaseRepository {
     return updated;
   }
 
-  Future<bool> _unavailableForRestoredPart({
+  bool _unavailableForRestoredPart({
     required String uri,
     required bool filesRestored,
-  }) async {
+  }) {
     if (isRemoteOrDataUri(uri)) return false;
     if (filesRestored) {
       return !SandboxPathResolver.localFileExists(uri);
@@ -5564,7 +5573,7 @@ class ChatDatabaseRepository {
       try {
         final rows = db.select(
           "SELECT revision_id, ordinal, kind, payload "
-          "FROM message_part_rows WHERE kind IN ('image', 'file');",
+          "FROM message_part_rows WHERE kind IN ('image', 'file', 'forwarded_messages');",
         );
         final localRoot = localSnapshotAppDataDirectory?.absolute.path;
         final resolvedRoot = localSnapshotAppDataDirectory
@@ -5577,17 +5586,30 @@ class ChatDatabaseRepository {
         try {
           for (final row in rows) {
             final payload = row['payload'] as String;
-            final decoded = jsonDecode(payload);
-            if (decoded is! Map) continue;
-            final map = Map<String, dynamic>.from(decoded);
-            final uri = (map['uri'] ?? '').toString();
-            if (uri.isEmpty) continue;
-            var restoredUri = uri;
-            var unavailable = true;
-            if (localRoot != null) {
-              if (isRemoteOrDataUri(uri)) {
-                unavailable = false;
-              } else {
+            final MessagePart part;
+            try {
+              part = MessagePart.fromRow(row['kind'] as String, payload);
+            } on FormatException catch (error) {
+              debugPrint(
+                'Malformed attachment during availability recovery: '
+                'revisionId=${row['revision_id']} ordinal=${row['ordinal']} '
+                'kind=${row['kind']} '
+                'parseError=${messagePartParseErrorCategory(error)}',
+              );
+              // Preserve the payload and existing asset references for repair.
+              // One corrupt row must not block other attachments or restore.
+              continue;
+            }
+            final mapped = mapMessageParts([part], (leaf) {
+              final uri = switch (leaf) {
+                ImagePart() => leaf.uri,
+                FilePart() => leaf.uri,
+                _ => null,
+              };
+              if (uri == null || uri.isEmpty) return leaf;
+              var restoredUri = uri;
+              var unavailable = !isRemoteOrDataUri(uri);
+              if (localRoot != null && unavailable) {
                 final local = _localSnapshotAttachment(
                   uri,
                   appDataPath: localRoot,
@@ -5596,16 +5618,31 @@ class ChatDatabaseRepository {
                 restoredUri = local.uri;
                 unavailable = !local.available;
               }
-            } else if (isRemoteOrDataUri(uri)) {
-              continue;
-            }
-            if ((map['unavailable'] == true) == unavailable &&
-                restoredUri == uri) {
-              continue;
-            }
-            map['uri'] = restoredUri;
-            map['unavailable'] = unavailable;
-            stmt.execute([jsonEncode(map), row['revision_id'], row['ordinal']]);
+              if (leaf is ImagePart) {
+                return leaf.uri == restoredUri &&
+                        leaf.unavailable == unavailable
+                    ? leaf
+                    : ImagePart(
+                        uri: restoredUri,
+                        mime: leaf.mime,
+                        assetId: leaf.assetId,
+                        unavailable: unavailable,
+                      );
+              }
+              final file = leaf as FilePart;
+              return file.uri == restoredUri && file.unavailable == unavailable
+                  ? file
+                  : FilePart(
+                      uri: restoredUri,
+                      name: file.name,
+                      mime: file.mime,
+                      assetId: file.assetId,
+                      unavailable: unavailable,
+                    );
+            });
+            final nextPayload = mapped.single.encodePayload();
+            if (nextPayload == payload) continue;
+            stmt.execute([nextPayload, row['revision_id'], row['ordinal']]);
             updated += 1;
           }
         } finally {
@@ -5775,6 +5812,9 @@ class ChatDatabaseRepository {
         payloads?['text'],
         payloads?['reasoning'],
         payloads?['tool_call'],
+        payloads?['forwarded_messages']
+            ?.map(_fingerprintForwardedPayload)
+            .toList(),
         attachmentPayloads[messageId],
         signatures[messageId],
       ]);
@@ -5813,6 +5853,32 @@ class ChatDatabaseRepository {
       normalized['version_selections_json'] = selections;
     }
     return normalized;
+  }
+
+  String _fingerprintForwardedPayload(String payload) {
+    try {
+      final record = ForwardedMessagesPart.fromPayload(payload);
+      return mapMessageParts([record], (part) {
+        if (part is ImagePart && part.unavailable) {
+          return ImagePart(
+            uri: part.uri,
+            mime: part.mime,
+            assetId: part.assetId,
+          );
+        }
+        if (part is FilePart && part.unavailable) {
+          return FilePart(
+            uri: part.uri,
+            name: part.name,
+            mime: part.mime,
+            assetId: part.assetId,
+          );
+        }
+        return part;
+      }).single.encodePayload();
+    } on FormatException {
+      return payload;
+    }
   }
 
   /// Attachment identity for merge fingerprints. Drops environment-state
@@ -6017,7 +6083,7 @@ class ChatDatabaseRepository {
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT DISTINCT revision_id FROM main.message_part_rows '
-      "WHERE conversation_id = ? AND kind IN ('image', 'file');",
+      "WHERE conversation_id = ? AND kind IN ('image', 'file', 'forwarded_messages');",
       [targetId],
     );
   }
@@ -7272,7 +7338,7 @@ class ChatDatabaseRepository {
   }
 
   bool _messageHasAttachmentParts(ChatMessage message) {
-    return message.parts.any(
+    return walkMessageParts(message.parts).any(
       (part) =>
           part is ImagePart ||
           part is FilePart ||

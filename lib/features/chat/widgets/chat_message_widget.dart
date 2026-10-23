@@ -2,6 +2,7 @@ import 'package:markstream/markstream.dart' show SourceSpan;
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'forwarded_messages_card.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, visibleForTesting, mapEquals;
 import 'dart:ui' as ui;
@@ -1896,6 +1897,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (mediaPreview != null && textBubble != null)
                     const SizedBox(height: 8),
                   if (textBubble != null) textBubble,
+                  for (final record
+                      in widget.message.parts
+                          .whereType<ForwardedMessagesPart>())
+                    ForwardedMessagesCard(record: record),
                 ],
               ),
             ),

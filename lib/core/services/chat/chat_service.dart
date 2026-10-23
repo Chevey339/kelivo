@@ -2086,7 +2086,7 @@ class ChatService extends ChangeNotifier {
     ChatMessage message,
   ) {
     final fromParts = <String, ({String path, String kind})>{};
-    for (final part in message.parts) {
+    for (final part in walkMessageParts(message.parts)) {
       if (part is ImagePart) {
         // Unavailable placeholders stay in history for UI but must not enter
         // asset sync — missing files would otherwise dirty/throw forever.
@@ -2131,12 +2131,13 @@ class ChatService extends ChangeNotifier {
     return fromParts;
   }
 
-  bool _messageCanOwnAssets(ChatMessage message) => message.parts.any(
-    (part) =>
-        part is ImagePart ||
-        part is FilePart ||
-        (part is MalformedPart && part.isAttachmentKind),
-  );
+  bool _messageCanOwnAssets(ChatMessage message) =>
+      walkMessageParts(message.parts).any(
+        (part) =>
+            part is ImagePart ||
+            part is FilePart ||
+            (part is MalformedPart && part.isAttachmentKind),
+      );
 
   Future<void> _backfillAssetReferences(Directory appDataDir) async {
     final targetRoot = p.normalize(appDataDir.absolute.path);
@@ -2207,9 +2208,9 @@ class ChatService extends ChangeNotifier {
 
   Future<bool> _synchronizeMessageAssets(ChatMessage message) async {
     if (isTemporaryConversation(message.conversationId)) return true;
-    if (message.parts.any(
-      (part) => part is MalformedPart && part.isAttachmentKind,
-    )) {
+    if (walkMessageParts(
+      message.parts,
+    ).any((part) => part is MalformedPart && part.isAttachmentKind)) {
       // Parsing is insufficient to build an authoritative replacement set.
       // Preserve existing message_asset_rows and keep the revision retryable.
       await _repo.markMessageAssetReferencesDirty(message.id);
