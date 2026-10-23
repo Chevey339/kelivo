@@ -4958,5 +4958,113 @@
   "browserLiveViewLimit": "浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。",
   "browserAskAiInOwnerConversation": "让所属对话的 AI 处理",
   "displaySettingsPageShowBrowserPageCardsTitle": "显示网页卡片",
-  "browserObserverHint": "AI 正在操作此页面，点击“接管”后可以操作网页。"
+  "browserObserverHint": "AI 正在操作此页面，点击“接管”后可以操作网页。",
+  "genuiSurfaceTitle": "交互界面",
+  "genuiStatusStreaming": "生成中",
+  "genuiStatusInterrupted": "已中断",
+  "genuiStatusUnsaved": "尚未保存",
+  "genuiStatusUnsavedRetry": "点击重试保存",
+  "genuiReadOnlyUntilComplete": "生成完成后可操作",
+  "genuiReadOnlySnapshot": "只读快照",
+  "genuiPendingNode": "等待 {id}",
+  "@genuiPendingNode": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiViewSource": "查看源码",
+  "genuiCopySource": "复制源码",
+  "genuiExpand": "展开",
+  "genuiExpandedStub": "正在展开视图中操作",
+  "genuiMore": "更多",
+  "genuiReset": "重置为默认值",
+  "genuiRepair": "修复界面",
+  "genuiInvalidTitle": "这段界面无法渲染",
+  "genuiNodesFailed": "{count} 个节点无法显示",
+  "@genuiNodesFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiErrorLine": "第 {line} 行",
+  "@genuiErrorLine": {
+    "placeholders": {
+      "line": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiValueUnavailable": "无值",
+  "genuiFormulaInvalid": "这条公式无法显示",
+  "genuiNodeUnavailable": "此组件无法显示",
+  "genuiErrorHeader": "界面首行格式无效",
+  "genuiErrorVersion": "不支持此界面语言版本",
+  "genuiErrorCatalog": "不支持此组件目录",
+  "genuiErrorRoot": "根组件缺失或无效",
+  "genuiErrorSyntax": "声明格式不正确",
+  "genuiErrorDuplicateSymbol": "同一名称被重复定义",
+  "genuiErrorDuplicateProperty": "同一属性被重复定义",
+  "genuiErrorReservedName": "此名称是保留名称",
+  "genuiErrorUnknownComponent": "未知组件 {detail}",
+  "@genuiErrorUnknownComponent": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorUnknownProperty": "未知属性 {detail}",
+  "@genuiErrorUnknownProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorMissingProperty": "缺少必需属性 {detail}",
+  "@genuiErrorMissingProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorBinding": "输入绑定不是有效的可写状态",
+  "genuiErrorReference": "组件引用无效",
+  "genuiErrorMissingReference": "被引用的内容尚未定义",
+  "genuiErrorDependency": "依赖的内容无法显示",
+  "genuiErrorCycle": "不支持循环引用",
+  "genuiErrorDuplicateParent": "同一组件不能出现在两个位置",
+  "genuiErrorUnreachableNode": "此组件未包含在根组件中",
+  "genuiErrorType": "值的类型不匹配",
+  "genuiErrorValue": "值不在支持的选项或范围内",
+  "genuiErrorSourceBudget": "界面源码超过大小上限",
+  "genuiErrorDeclarationBudget": "单条声明超过大小上限",
+  "genuiErrorDeclarationCount": "声明数量超过上限",
+  "genuiErrorComponentCount": "组件数量超过上限",
+  "genuiErrorInputCount": "输入数量超过上限",
+  "genuiErrorComponentDepth": "组件嵌套过深",
+  "genuiErrorExpressionDepth": "计算嵌套过深",
+  "genuiErrorFunction": "计算函数不受支持",
+  "genuiErrorAction": "此操作不受支持",
+  "genuiErrorNestedSample": "不支持嵌套采样",
+  "genuiErrorSample": "采样区间或数量无效",
+  "genuiErrorDataBudget": "数据超过支持的大小",
+  "genuiErrorRowKey": "每行需要唯一且非空的标识",
+  "genuiErrorDomain": "该值不在函数定义域内",
+  "genuiErrorDivisionByZero": "不能除以零",
+  "genuiErrorNonFinite": "计算结果不是有限数值",
+  "genuiErrorOperationsBudget": "计算操作量超过上限",
+  "genuiMetricTrend": "变化 {value}",
+  "@genuiMetricTrend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  }
 }

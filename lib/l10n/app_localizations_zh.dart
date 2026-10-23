@@ -13286,6 +13286,197 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get genuiSurfaceTitle => '交互界面';
+
+  @override
+  String get genuiStatusStreaming => '生成中';
+
+  @override
+  String get genuiStatusInterrupted => '已中断';
+
+  @override
+  String get genuiStatusUnsaved => '尚未保存';
+
+  @override
+  String get genuiStatusUnsavedRetry => '点击重试保存';
+
+  @override
+  String get genuiReadOnlyUntilComplete => '生成完成后可操作';
+
+  @override
+  String get genuiReadOnlySnapshot => '只读快照';
+
+  @override
+  String genuiPendingNode(String id) {
+    return '等待 $id';
+  }
+
+  @override
+  String get genuiViewSource => '查看源码';
+
+  @override
+  String get genuiCopySource => '复制源码';
+
+  @override
+  String get genuiExpand => '展开';
+
+  @override
+  String get genuiExpandedStub => '正在展开视图中操作';
+
+  @override
+  String get genuiMore => '更多';
+
+  @override
+  String get genuiReset => '重置为默认值';
+
+  @override
+  String get genuiRepair => '修复界面';
+
+  @override
+  String get genuiInvalidTitle => '这段界面无法渲染';
+
+  @override
+  String genuiNodesFailed(int count) {
+    return '$count 个节点无法显示';
+  }
+
+  @override
+  String genuiErrorLine(int line) {
+    return '第 $line 行';
+  }
+
+  @override
+  String get genuiValueUnavailable => '无值';
+
+  @override
+  String get genuiFormulaInvalid => '这条公式无法显示';
+
+  @override
+  String get genuiNodeUnavailable => '此组件无法显示';
+
+  @override
+  String get genuiErrorHeader => '界面首行格式无效';
+
+  @override
+  String get genuiErrorVersion => '不支持此界面语言版本';
+
+  @override
+  String get genuiErrorCatalog => '不支持此组件目录';
+
+  @override
+  String get genuiErrorRoot => '根组件缺失或无效';
+
+  @override
+  String get genuiErrorSyntax => '声明格式不正确';
+
+  @override
+  String get genuiErrorDuplicateSymbol => '同一名称被重复定义';
+
+  @override
+  String get genuiErrorDuplicateProperty => '同一属性被重复定义';
+
+  @override
+  String get genuiErrorReservedName => '此名称是保留名称';
+
+  @override
+  String genuiErrorUnknownComponent(String detail) {
+    return '未知组件 $detail';
+  }
+
+  @override
+  String genuiErrorUnknownProperty(String detail) {
+    return '未知属性 $detail';
+  }
+
+  @override
+  String genuiErrorMissingProperty(String detail) {
+    return '缺少必需属性 $detail';
+  }
+
+  @override
+  String get genuiErrorBinding => '输入绑定不是有效的可写状态';
+
+  @override
+  String get genuiErrorReference => '组件引用无效';
+
+  @override
+  String get genuiErrorMissingReference => '被引用的内容尚未定义';
+
+  @override
+  String get genuiErrorDependency => '依赖的内容无法显示';
+
+  @override
+  String get genuiErrorCycle => '不支持循环引用';
+
+  @override
+  String get genuiErrorDuplicateParent => '同一组件不能出现在两个位置';
+
+  @override
+  String get genuiErrorUnreachableNode => '此组件未包含在根组件中';
+
+  @override
+  String get genuiErrorType => '值的类型不匹配';
+
+  @override
+  String get genuiErrorValue => '值不在支持的选项或范围内';
+
+  @override
+  String get genuiErrorSourceBudget => '界面源码超过大小上限';
+
+  @override
+  String get genuiErrorDeclarationBudget => '单条声明超过大小上限';
+
+  @override
+  String get genuiErrorDeclarationCount => '声明数量超过上限';
+
+  @override
+  String get genuiErrorComponentCount => '组件数量超过上限';
+
+  @override
+  String get genuiErrorInputCount => '输入数量超过上限';
+
+  @override
+  String get genuiErrorComponentDepth => '组件嵌套过深';
+
+  @override
+  String get genuiErrorExpressionDepth => '计算嵌套过深';
+
+  @override
+  String get genuiErrorFunction => '计算函数不受支持';
+
+  @override
+  String get genuiErrorAction => '此操作不受支持';
+
+  @override
+  String get genuiErrorNestedSample => '不支持嵌套采样';
+
+  @override
+  String get genuiErrorSample => '采样区间或数量无效';
+
+  @override
+  String get genuiErrorDataBudget => '数据超过支持的大小';
+
+  @override
+  String get genuiErrorRowKey => '每行需要唯一且非空的标识';
+
+  @override
+  String get genuiErrorDomain => '该值不在函数定义域内';
+
+  @override
+  String get genuiErrorDivisionByZero => '不能除以零';
+
+  @override
+  String get genuiErrorNonFinite => '计算结果不是有限数值';
+
+  @override
+  String get genuiErrorOperationsBudget => '计算操作量超过上限';
+
+  @override
+  String genuiMetricTrend(String value) {
+    return '变化 $value';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -26496,6 +26687,197 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get genuiSurfaceTitle => '交互界面';
+
+  @override
+  String get genuiStatusStreaming => '生成中';
+
+  @override
+  String get genuiStatusInterrupted => '已中断';
+
+  @override
+  String get genuiStatusUnsaved => '尚未保存';
+
+  @override
+  String get genuiStatusUnsavedRetry => '点击重试保存';
+
+  @override
+  String get genuiReadOnlyUntilComplete => '生成完成后可操作';
+
+  @override
+  String get genuiReadOnlySnapshot => '只读快照';
+
+  @override
+  String genuiPendingNode(String id) {
+    return '等待 $id';
+  }
+
+  @override
+  String get genuiViewSource => '查看源码';
+
+  @override
+  String get genuiCopySource => '复制源码';
+
+  @override
+  String get genuiExpand => '展开';
+
+  @override
+  String get genuiExpandedStub => '正在展开视图中操作';
+
+  @override
+  String get genuiMore => '更多';
+
+  @override
+  String get genuiReset => '重置为默认值';
+
+  @override
+  String get genuiRepair => '修复界面';
+
+  @override
+  String get genuiInvalidTitle => '这段界面无法渲染';
+
+  @override
+  String genuiNodesFailed(int count) {
+    return '$count 个节点无法显示';
+  }
+
+  @override
+  String genuiErrorLine(int line) {
+    return '第 $line 行';
+  }
+
+  @override
+  String get genuiValueUnavailable => '无值';
+
+  @override
+  String get genuiFormulaInvalid => '这条公式无法显示';
+
+  @override
+  String get genuiNodeUnavailable => '此组件无法显示';
+
+  @override
+  String get genuiErrorHeader => '界面首行格式无效';
+
+  @override
+  String get genuiErrorVersion => '不支持此界面语言版本';
+
+  @override
+  String get genuiErrorCatalog => '不支持此组件目录';
+
+  @override
+  String get genuiErrorRoot => '根组件缺失或无效';
+
+  @override
+  String get genuiErrorSyntax => '声明格式不正确';
+
+  @override
+  String get genuiErrorDuplicateSymbol => '同一名称被重复定义';
+
+  @override
+  String get genuiErrorDuplicateProperty => '同一属性被重复定义';
+
+  @override
+  String get genuiErrorReservedName => '此名称是保留名称';
+
+  @override
+  String genuiErrorUnknownComponent(String detail) {
+    return '未知组件 $detail';
+  }
+
+  @override
+  String genuiErrorUnknownProperty(String detail) {
+    return '未知属性 $detail';
+  }
+
+  @override
+  String genuiErrorMissingProperty(String detail) {
+    return '缺少必需属性 $detail';
+  }
+
+  @override
+  String get genuiErrorBinding => '输入绑定不是有效的可写状态';
+
+  @override
+  String get genuiErrorReference => '组件引用无效';
+
+  @override
+  String get genuiErrorMissingReference => '被引用的内容尚未定义';
+
+  @override
+  String get genuiErrorDependency => '依赖的内容无法显示';
+
+  @override
+  String get genuiErrorCycle => '不支持循环引用';
+
+  @override
+  String get genuiErrorDuplicateParent => '同一组件不能出现在两个位置';
+
+  @override
+  String get genuiErrorUnreachableNode => '此组件未包含在根组件中';
+
+  @override
+  String get genuiErrorType => '值的类型不匹配';
+
+  @override
+  String get genuiErrorValue => '值不在支持的选项或范围内';
+
+  @override
+  String get genuiErrorSourceBudget => '界面源码超过大小上限';
+
+  @override
+  String get genuiErrorDeclarationBudget => '单条声明超过大小上限';
+
+  @override
+  String get genuiErrorDeclarationCount => '声明数量超过上限';
+
+  @override
+  String get genuiErrorComponentCount => '组件数量超过上限';
+
+  @override
+  String get genuiErrorInputCount => '输入数量超过上限';
+
+  @override
+  String get genuiErrorComponentDepth => '组件嵌套过深';
+
+  @override
+  String get genuiErrorExpressionDepth => '计算嵌套过深';
+
+  @override
+  String get genuiErrorFunction => '计算函数不受支持';
+
+  @override
+  String get genuiErrorAction => '此操作不受支持';
+
+  @override
+  String get genuiErrorNestedSample => '不支持嵌套采样';
+
+  @override
+  String get genuiErrorSample => '采样区间或数量无效';
+
+  @override
+  String get genuiErrorDataBudget => '数据超过支持的大小';
+
+  @override
+  String get genuiErrorRowKey => '每行需要唯一且非空的标识';
+
+  @override
+  String get genuiErrorDomain => '该值不在函数定义域内';
+
+  @override
+  String get genuiErrorDivisionByZero => '不能除以零';
+
+  @override
+  String get genuiErrorNonFinite => '计算结果不是有限数值';
+
+  @override
+  String get genuiErrorOperationsBudget => '计算操作量超过上限';
+
+  @override
+  String genuiMetricTrend(String value) {
+    return '变化 $value';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -39786,4 +40168,195 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserObserverHint => 'AI 正在操作此頁面，點選「接管」後可以操作網頁。';
+
+  @override
+  String get genuiSurfaceTitle => '互動介面';
+
+  @override
+  String get genuiStatusStreaming => '生成中';
+
+  @override
+  String get genuiStatusInterrupted => '已中斷';
+
+  @override
+  String get genuiStatusUnsaved => '尚未儲存';
+
+  @override
+  String get genuiStatusUnsavedRetry => '點擊重試儲存';
+
+  @override
+  String get genuiReadOnlyUntilComplete => '生成完成後可操作';
+
+  @override
+  String get genuiReadOnlySnapshot => '唯讀快照';
+
+  @override
+  String genuiPendingNode(String id) {
+    return '等待 $id';
+  }
+
+  @override
+  String get genuiViewSource => '檢視原始碼';
+
+  @override
+  String get genuiCopySource => '複製原始碼';
+
+  @override
+  String get genuiExpand => '展開';
+
+  @override
+  String get genuiExpandedStub => '正在展開檢視中操作';
+
+  @override
+  String get genuiMore => '更多';
+
+  @override
+  String get genuiReset => '重設為預設值';
+
+  @override
+  String get genuiRepair => '修復介面';
+
+  @override
+  String get genuiInvalidTitle => '這段介面無法顯示';
+
+  @override
+  String genuiNodesFailed(int count) {
+    return '$count 個節點無法顯示';
+  }
+
+  @override
+  String genuiErrorLine(int line) {
+    return '第 $line 行';
+  }
+
+  @override
+  String get genuiValueUnavailable => '無值';
+
+  @override
+  String get genuiFormulaInvalid => '這條公式無法顯示';
+
+  @override
+  String get genuiNodeUnavailable => '此元件無法顯示';
+
+  @override
+  String get genuiErrorHeader => '介面首行格式無效';
+
+  @override
+  String get genuiErrorVersion => '不支援此介面語言版本';
+
+  @override
+  String get genuiErrorCatalog => '不支援此元件目錄';
+
+  @override
+  String get genuiErrorRoot => '根元件缺失或無效';
+
+  @override
+  String get genuiErrorSyntax => '宣告格式不正確';
+
+  @override
+  String get genuiErrorDuplicateSymbol => '同一名稱被重複定義';
+
+  @override
+  String get genuiErrorDuplicateProperty => '同一屬性被重複定義';
+
+  @override
+  String get genuiErrorReservedName => '此名稱是保留名稱';
+
+  @override
+  String genuiErrorUnknownComponent(String detail) {
+    return '未知元件 $detail';
+  }
+
+  @override
+  String genuiErrorUnknownProperty(String detail) {
+    return '未知屬性 $detail';
+  }
+
+  @override
+  String genuiErrorMissingProperty(String detail) {
+    return '缺少必要屬性 $detail';
+  }
+
+  @override
+  String get genuiErrorBinding => '輸入綁定不是有效的可寫狀態';
+
+  @override
+  String get genuiErrorReference => '元件參照無效';
+
+  @override
+  String get genuiErrorMissingReference => '被參照的內容尚未定義';
+
+  @override
+  String get genuiErrorDependency => '依賴的內容無法顯示';
+
+  @override
+  String get genuiErrorCycle => '不支援循環參照';
+
+  @override
+  String get genuiErrorDuplicateParent => '同一元件不能出現在兩個位置';
+
+  @override
+  String get genuiErrorUnreachableNode => '此元件未包含在根元件中';
+
+  @override
+  String get genuiErrorType => '值的類型不符';
+
+  @override
+  String get genuiErrorValue => '值不在支援的選項或範圍內';
+
+  @override
+  String get genuiErrorSourceBudget => '介面原始碼超過大小上限';
+
+  @override
+  String get genuiErrorDeclarationBudget => '單條宣告超過大小上限';
+
+  @override
+  String get genuiErrorDeclarationCount => '宣告數量超過上限';
+
+  @override
+  String get genuiErrorComponentCount => '元件數量超過上限';
+
+  @override
+  String get genuiErrorInputCount => '輸入數量超過上限';
+
+  @override
+  String get genuiErrorComponentDepth => '元件巢狀層級過深';
+
+  @override
+  String get genuiErrorExpressionDepth => '計算巢狀層級過深';
+
+  @override
+  String get genuiErrorFunction => '計算函數不受支援';
+
+  @override
+  String get genuiErrorAction => '此操作不受支援';
+
+  @override
+  String get genuiErrorNestedSample => '不支援巢狀取樣';
+
+  @override
+  String get genuiErrorSample => '取樣區間或數量無效';
+
+  @override
+  String get genuiErrorDataBudget => '資料超過支援的大小';
+
+  @override
+  String get genuiErrorRowKey => '每列需要唯一且非空的識別值';
+
+  @override
+  String get genuiErrorDomain => '此值不在函數定義域內';
+
+  @override
+  String get genuiErrorDivisionByZero => '不能除以零';
+
+  @override
+  String get genuiErrorNonFinite => '計算結果不是有限數值';
+
+  @override
+  String get genuiErrorOperationsBudget => '計算操作量超過上限';
+
+  @override
+  String genuiMetricTrend(String value) {
+    return '變化 $value';
+  }
 }

@@ -141,7 +141,7 @@ feature flag or conversion of user messages into trusted assistants.
 | Android | Local Android SDK/adb, no connected device | Build possible; physical runtime BLOCKED |
 | Windows | SSH verified; Windows 11 build 26100, x64, active console; isolated Flutter 3.47.6/Dart 3.13.5 and Visual Studio 2022 17.12.4 with C++ tools | Candidate builds available; actual GenUI build/plugin tests and C21 GUI pending |
 | Linux | No machine; user explicitly deferred acceptance | DEFERRED by user; not a delivery gate for this run |
-| Model evaluation | User supplied a test endpoint/key and named one model | C06 early/C25 final calls pending; credentials not in Git |
+| Model evaluation | User supplied a test endpoint/key and named one model | C06 early run 1/3 preserved; C25 final 30 pending; credentials not in Git |
 
 No external CI run or upload is claimed. Missing environments do not block
 independent local implementation, but corresponding platform commits require
@@ -177,7 +177,12 @@ environment variables, never read from the app's accounts or logged.
   independent review has no findings; root fatal-info analysis and 9,199 tests
   passed/2 skipped; markstream analysis and 296 tests passed; macOS debug build,
   formatting and diff checks passed. Early real calls follow this commit.
-- C07–C26: not implemented. No complete-delivery claim.
+- C07: native content and shell accepted by independent review; 151 focused
+  tests including 14 pixel goldens passed. Root fatal-info analysis and 9,230
+  tests passed/2 skipped; markstream analysis and 296 tests passed. macOS debug
+  build, formatting and diff checks passed. The native gallery built and launched;
+  interactive inspection is pending because the Mac is locked.
+- C08–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -306,3 +311,52 @@ disabled UI, fields escaping Form, extra Ask context, duplicated table keys and
 bad chart mapping. Failed checks stop at a bounded collector even for hundreds
 of aliased invalid tables. Actual early calls occur only after C06 is committed;
 they and the later C25 full run require separate recorded evidence.
+
+### Early live result (after C06)
+
+The manual three-task run completed on `66148048a16bf3cce98c9a4d66ebe24065296da0`.
+The four-field record is `evaluation-early.json`: **1/3**. The calculator passed
+deterministic probes and coding-agent semantic inspection. The function curve
+omitted its fence, and the conditional form used an unlabeled fence and renamed
+the requested `form` node to `root`. Original outputs, diagnostics and attributed
+review notes are retained under `test/fixtures/genui/real/early-c06/`.
+
+No output was repaired for scoring and no paid retry was made. The failures
+motivate a complete fenced few-shot and explicit task-ID preservation in the
+final generated guidance (C22); they do not justify activating bare DSL or
+unlabeled code. This early result is diagnostic, not the final 30-task acceptance.
+The no-credentials CLI check also exited explicitly without a model request.
+
+## C07 native layout and content
+
+`GenUiTheme.of(context)` maps the existing surface ladder, semantic containers,
+spacing/radii/shadows and Markdown fonts at one boundary. Cards remain opaque
+on wallpaper. The ten content/layout components use resolved values from the
+in-memory controller; they never parse source during build or own state lifetime.
+Narrow equal rows and large text stack; fit rows wrap without shrinking text.
+Nested Markdown has no feature extensions or image loader. Formula reuses the
+existing math engine, exposes its label and selectable TeX, and falls back to
+source for parse failures or presentation-changing commands.
+
+The Surface shell shows generation, interruption, node failures, invalid source,
+read-only snapshots and a retryable unsaved badge. Source and More dialogs reuse
+the app dialog and iOS controls; Escape restores the trigger focus. Reset is a
+local controller mutation. Expand/repair/save callbacks are supplied by the host
+when their later commits land. A 44-pixel minimum on IosIconButton now encloses
+the actual pointer target; icon/text buttons and app dialogs honor reduced
+motion. Restoring inputs that change the number of failed nodes also notifies
+shell observers, without producing a persistence write.
+
+Development entry: `flutter run -d macos --no-pub -t
+lib/features/intelligent_ui/widgets/gallery/main.dart`. `gallery/previews.dart`
+contains the isolated content previews; the native shell is intentionally kept
+out of the web preview import graph. Nothing registers a production builder or
+model skill yet. The 14 initial pixel baselines cover content and shell states
+in light/dark, mobile/desktop, wallpaper, RTL and 1.3x text. They use the existing
+wallpaper host and deterministic bundled test font. These are C07 baselines,
+not the full S1/S6/state matrix or device/performance acceptance required in C24.
+
+The macOS gallery debug build and VM launch succeeded. Computer use returned
+“Mac is locked”; foreground inspection and native clicks were not performed.
+The unlock request is pending while implementation and automated checks continue.
+Widget/golden evidence is not counted as native GUI acceptance.

@@ -13925,4 +13925,207 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browserObserverHint =>
       'AI is using this page. Select Take over to interact.';
+
+  @override
+  String get genuiSurfaceTitle => 'Interactive UI';
+
+  @override
+  String get genuiStatusStreaming => 'Generating';
+
+  @override
+  String get genuiStatusInterrupted => 'Interrupted';
+
+  @override
+  String get genuiStatusUnsaved => 'Not saved';
+
+  @override
+  String get genuiStatusUnsavedRetry => 'Tap to retry saving';
+
+  @override
+  String get genuiReadOnlyUntilComplete => 'Available when generation finishes';
+
+  @override
+  String get genuiReadOnlySnapshot => 'Read-only snapshot';
+
+  @override
+  String genuiPendingNode(String id) {
+    return 'Waiting for $id';
+  }
+
+  @override
+  String get genuiViewSource => 'View source';
+
+  @override
+  String get genuiCopySource => 'Copy source';
+
+  @override
+  String get genuiExpand => 'Expand';
+
+  @override
+  String get genuiExpandedStub => 'Being edited in expanded view';
+
+  @override
+  String get genuiMore => 'More';
+
+  @override
+  String get genuiReset => 'Reset to defaults';
+
+  @override
+  String get genuiRepair => 'Repair UI';
+
+  @override
+  String get genuiInvalidTitle => 'This UI can\'t be displayed';
+
+  @override
+  String genuiNodesFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nodes can\'t be displayed',
+      one: '1 node can\'t be displayed',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String genuiErrorLine(int line) {
+    return 'Line $line';
+  }
+
+  @override
+  String get genuiValueUnavailable => 'No value';
+
+  @override
+  String get genuiFormulaInvalid => 'This formula can\'t be displayed';
+
+  @override
+  String get genuiNodeUnavailable => 'This component is unavailable';
+
+  @override
+  String get genuiErrorHeader => 'Invalid UI header';
+
+  @override
+  String get genuiErrorVersion => 'Unsupported UI language version';
+
+  @override
+  String get genuiErrorCatalog => 'Unsupported component catalog';
+
+  @override
+  String get genuiErrorRoot => 'Missing or invalid root component';
+
+  @override
+  String get genuiErrorSyntax => 'Invalid declaration syntax';
+
+  @override
+  String get genuiErrorDuplicateSymbol => 'A name is defined more than once';
+
+  @override
+  String get genuiErrorDuplicateProperty =>
+      'A property is defined more than once';
+
+  @override
+  String get genuiErrorReservedName => 'This name is reserved';
+
+  @override
+  String genuiErrorUnknownComponent(String detail) {
+    return 'Unknown component $detail';
+  }
+
+  @override
+  String genuiErrorUnknownProperty(String detail) {
+    return 'Unknown property $detail';
+  }
+
+  @override
+  String genuiErrorMissingProperty(String detail) {
+    return 'Required property $detail is missing';
+  }
+
+  @override
+  String get genuiErrorBinding => 'Invalid writable input binding';
+
+  @override
+  String get genuiErrorReference => 'Invalid component reference';
+
+  @override
+  String get genuiErrorMissingReference =>
+      'Referenced content has not been defined';
+
+  @override
+  String get genuiErrorDependency => 'Required content cannot be displayed';
+
+  @override
+  String get genuiErrorCycle => 'Circular references are not supported';
+
+  @override
+  String get genuiErrorDuplicateParent => 'A component cannot have two parents';
+
+  @override
+  String get genuiErrorUnreachableNode =>
+      'This component is outside the root tree';
+
+  @override
+  String get genuiErrorType => 'Value has an incompatible type';
+
+  @override
+  String get genuiErrorValue =>
+      'Value is outside the supported options or range';
+
+  @override
+  String get genuiErrorSourceBudget => 'UI source exceeds the size limit';
+
+  @override
+  String get genuiErrorDeclarationBudget =>
+      'A declaration exceeds the size limit';
+
+  @override
+  String get genuiErrorDeclarationCount => 'Too many declarations';
+
+  @override
+  String get genuiErrorComponentCount => 'Too many components';
+
+  @override
+  String get genuiErrorInputCount => 'Too many inputs';
+
+  @override
+  String get genuiErrorComponentDepth => 'Components are nested too deeply';
+
+  @override
+  String get genuiErrorExpressionDepth => 'Calculation is nested too deeply';
+
+  @override
+  String get genuiErrorFunction => 'Unknown calculation function';
+
+  @override
+  String get genuiErrorAction => 'Unsupported action';
+
+  @override
+  String get genuiErrorNestedSample => 'Nested sampling is not supported';
+
+  @override
+  String get genuiErrorSample => 'Invalid sampling range or count';
+
+  @override
+  String get genuiErrorDataBudget => 'Data exceeds the supported size';
+
+  @override
+  String get genuiErrorRowKey => 'Rows need unique nonempty keys';
+
+  @override
+  String get genuiErrorDomain => 'The value is outside the function domain';
+
+  @override
+  String get genuiErrorDivisionByZero => 'Division by zero is undefined';
+
+  @override
+  String get genuiErrorNonFinite => 'Calculation produced a nonfinite number';
+
+  @override
+  String get genuiErrorOperationsBudget =>
+      'Calculation exceeded the operation limit';
+
+  @override
+  String genuiMetricTrend(String value) {
+    return 'Change $value';
+  }
 }

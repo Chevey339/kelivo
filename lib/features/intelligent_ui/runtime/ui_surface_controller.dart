@@ -345,7 +345,12 @@ final class UiSurfaceController {
     _nodes = Map.unmodifiable(nodes);
   }
 
-  (SurfacePhase, bool, bool) get _status => (phase, readOnly, saveFailed);
+  (SurfacePhase, bool, bool, int) get _status => (
+    phase,
+    readOnly,
+    saveFailed,
+    _nodes.values.where((node) => !node.valid && !node.pending).length,
+  );
   void _ensureAlive() {
     if (_disposed) throw StateError('Surface has been disposed');
   }

@@ -24839,6 +24839,360 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI is using this page. Select Take over to interact.'**
   String get browserObserverHint;
+
+  /// No description provided for @genuiSurfaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactive UI'**
+  String get genuiSurfaceTitle;
+
+  /// No description provided for @genuiStatusStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating'**
+  String get genuiStatusStreaming;
+
+  /// No description provided for @genuiStatusInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get genuiStatusInterrupted;
+
+  /// No description provided for @genuiStatusUnsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved'**
+  String get genuiStatusUnsaved;
+
+  /// No description provided for @genuiStatusUnsavedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to retry saving'**
+  String get genuiStatusUnsavedRetry;
+
+  /// No description provided for @genuiReadOnlyUntilComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Available when generation finishes'**
+  String get genuiReadOnlyUntilComplete;
+
+  /// No description provided for @genuiReadOnlySnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only snapshot'**
+  String get genuiReadOnlySnapshot;
+
+  /// No description provided for @genuiPendingNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for {id}'**
+  String genuiPendingNode(String id);
+
+  /// No description provided for @genuiViewSource.
+  ///
+  /// In en, this message translates to:
+  /// **'View source'**
+  String get genuiViewSource;
+
+  /// No description provided for @genuiCopySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy source'**
+  String get genuiCopySource;
+
+  /// No description provided for @genuiExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get genuiExpand;
+
+  /// No description provided for @genuiExpandedStub.
+  ///
+  /// In en, this message translates to:
+  /// **'Being edited in expanded view'**
+  String get genuiExpandedStub;
+
+  /// No description provided for @genuiMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get genuiMore;
+
+  /// No description provided for @genuiReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to defaults'**
+  String get genuiReset;
+
+  /// No description provided for @genuiRepair.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair UI'**
+  String get genuiRepair;
+
+  /// No description provided for @genuiInvalidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This UI can\'t be displayed'**
+  String get genuiInvalidTitle;
+
+  /// No description provided for @genuiNodesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 node can\'t be displayed} other{{count} nodes can\'t be displayed}}'**
+  String genuiNodesFailed(int count);
+
+  /// No description provided for @genuiErrorLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line {line}'**
+  String genuiErrorLine(int line);
+
+  /// No description provided for @genuiValueUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No value'**
+  String get genuiValueUnavailable;
+
+  /// No description provided for @genuiFormulaInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This formula can\'t be displayed'**
+  String get genuiFormulaInvalid;
+
+  /// No description provided for @genuiNodeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This component is unavailable'**
+  String get genuiNodeUnavailable;
+
+  /// No description provided for @genuiErrorHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid UI header'**
+  String get genuiErrorHeader;
+
+  /// No description provided for @genuiErrorVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported UI language version'**
+  String get genuiErrorVersion;
+
+  /// No description provided for @genuiErrorCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported component catalog'**
+  String get genuiErrorCatalog;
+
+  /// No description provided for @genuiErrorRoot.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing or invalid root component'**
+  String get genuiErrorRoot;
+
+  /// No description provided for @genuiErrorSyntax.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid declaration syntax'**
+  String get genuiErrorSyntax;
+
+  /// No description provided for @genuiErrorDuplicateSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'A name is defined more than once'**
+  String get genuiErrorDuplicateSymbol;
+
+  /// No description provided for @genuiErrorDuplicateProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'A property is defined more than once'**
+  String get genuiErrorDuplicateProperty;
+
+  /// No description provided for @genuiErrorReservedName.
+  ///
+  /// In en, this message translates to:
+  /// **'This name is reserved'**
+  String get genuiErrorReservedName;
+
+  /// No description provided for @genuiErrorUnknownComponent.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown component {detail}'**
+  String genuiErrorUnknownComponent(String detail);
+
+  /// No description provided for @genuiErrorUnknownProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown property {detail}'**
+  String genuiErrorUnknownProperty(String detail);
+
+  /// No description provided for @genuiErrorMissingProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'Required property {detail} is missing'**
+  String genuiErrorMissingProperty(String detail);
+
+  /// No description provided for @genuiErrorBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid writable input binding'**
+  String get genuiErrorBinding;
+
+  /// No description provided for @genuiErrorReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid component reference'**
+  String get genuiErrorReference;
+
+  /// No description provided for @genuiErrorMissingReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Referenced content has not been defined'**
+  String get genuiErrorMissingReference;
+
+  /// No description provided for @genuiErrorDependency.
+  ///
+  /// In en, this message translates to:
+  /// **'Required content cannot be displayed'**
+  String get genuiErrorDependency;
+
+  /// No description provided for @genuiErrorCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circular references are not supported'**
+  String get genuiErrorCycle;
+
+  /// No description provided for @genuiErrorDuplicateParent.
+  ///
+  /// In en, this message translates to:
+  /// **'A component cannot have two parents'**
+  String get genuiErrorDuplicateParent;
+
+  /// No description provided for @genuiErrorUnreachableNode.
+  ///
+  /// In en, this message translates to:
+  /// **'This component is outside the root tree'**
+  String get genuiErrorUnreachableNode;
+
+  /// No description provided for @genuiErrorType.
+  ///
+  /// In en, this message translates to:
+  /// **'Value has an incompatible type'**
+  String get genuiErrorType;
+
+  /// No description provided for @genuiErrorValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value is outside the supported options or range'**
+  String get genuiErrorValue;
+
+  /// No description provided for @genuiErrorSourceBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'UI source exceeds the size limit'**
+  String get genuiErrorSourceBudget;
+
+  /// No description provided for @genuiErrorDeclarationBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'A declaration exceeds the size limit'**
+  String get genuiErrorDeclarationBudget;
+
+  /// No description provided for @genuiErrorDeclarationCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many declarations'**
+  String get genuiErrorDeclarationCount;
+
+  /// No description provided for @genuiErrorComponentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many components'**
+  String get genuiErrorComponentCount;
+
+  /// No description provided for @genuiErrorInputCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many inputs'**
+  String get genuiErrorInputCount;
+
+  /// No description provided for @genuiErrorComponentDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Components are nested too deeply'**
+  String get genuiErrorComponentDepth;
+
+  /// No description provided for @genuiErrorExpressionDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation is nested too deeply'**
+  String get genuiErrorExpressionDepth;
+
+  /// No description provided for @genuiErrorFunction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown calculation function'**
+  String get genuiErrorFunction;
+
+  /// No description provided for @genuiErrorAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported action'**
+  String get genuiErrorAction;
+
+  /// No description provided for @genuiErrorNestedSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Nested sampling is not supported'**
+  String get genuiErrorNestedSample;
+
+  /// No description provided for @genuiErrorSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid sampling range or count'**
+  String get genuiErrorSample;
+
+  /// No description provided for @genuiErrorDataBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Data exceeds the supported size'**
+  String get genuiErrorDataBudget;
+
+  /// No description provided for @genuiErrorRowKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows need unique nonempty keys'**
+  String get genuiErrorRowKey;
+
+  /// No description provided for @genuiErrorDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'The value is outside the function domain'**
+  String get genuiErrorDomain;
+
+  /// No description provided for @genuiErrorDivisionByZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Division by zero is undefined'**
+  String get genuiErrorDivisionByZero;
+
+  /// No description provided for @genuiErrorNonFinite.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation produced a nonfinite number'**
+  String get genuiErrorNonFinite;
+
+  /// No description provided for @genuiErrorOperationsBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation exceeded the operation limit'**
+  String get genuiErrorOperationsBudget;
+
+  /// No description provided for @genuiMetricTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Change {value}'**
+  String genuiMetricTrend(String value);
 }
 
 class _AppLocalizationsDelegate

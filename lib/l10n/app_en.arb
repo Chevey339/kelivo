@@ -6318,5 +6318,113 @@
   "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
   "browserAskAiInOwnerConversation": "Ask AI in the owning chat",
   "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards",
-  "browserObserverHint": "AI is using this page. Select Take over to interact."
+  "browserObserverHint": "AI is using this page. Select Take over to interact.",
+  "genuiSurfaceTitle": "Interactive UI",
+  "genuiStatusStreaming": "Generating",
+  "genuiStatusInterrupted": "Interrupted",
+  "genuiStatusUnsaved": "Not saved",
+  "genuiStatusUnsavedRetry": "Tap to retry saving",
+  "genuiReadOnlyUntilComplete": "Available when generation finishes",
+  "genuiReadOnlySnapshot": "Read-only snapshot",
+  "genuiPendingNode": "Waiting for {id}",
+  "@genuiPendingNode": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiViewSource": "View source",
+  "genuiCopySource": "Copy source",
+  "genuiExpand": "Expand",
+  "genuiExpandedStub": "Being edited in expanded view",
+  "genuiMore": "More",
+  "genuiReset": "Reset to defaults",
+  "genuiRepair": "Repair UI",
+  "genuiInvalidTitle": "This UI can't be displayed",
+  "genuiNodesFailed": "{count, plural, =1{1 node can't be displayed} other{{count} nodes can't be displayed}}",
+  "@genuiNodesFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiErrorLine": "Line {line}",
+  "@genuiErrorLine": {
+    "placeholders": {
+      "line": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiValueUnavailable": "No value",
+  "genuiFormulaInvalid": "This formula can't be displayed",
+  "genuiNodeUnavailable": "This component is unavailable",
+  "genuiErrorHeader": "Invalid UI header",
+  "genuiErrorVersion": "Unsupported UI language version",
+  "genuiErrorCatalog": "Unsupported component catalog",
+  "genuiErrorRoot": "Missing or invalid root component",
+  "genuiErrorSyntax": "Invalid declaration syntax",
+  "genuiErrorDuplicateSymbol": "A name is defined more than once",
+  "genuiErrorDuplicateProperty": "A property is defined more than once",
+  "genuiErrorReservedName": "This name is reserved",
+  "genuiErrorUnknownComponent": "Unknown component {detail}",
+  "@genuiErrorUnknownComponent": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorUnknownProperty": "Unknown property {detail}",
+  "@genuiErrorUnknownProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorMissingProperty": "Required property {detail} is missing",
+  "@genuiErrorMissingProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorBinding": "Invalid writable input binding",
+  "genuiErrorReference": "Invalid component reference",
+  "genuiErrorMissingReference": "Referenced content has not been defined",
+  "genuiErrorDependency": "Required content cannot be displayed",
+  "genuiErrorCycle": "Circular references are not supported",
+  "genuiErrorDuplicateParent": "A component cannot have two parents",
+  "genuiErrorUnreachableNode": "This component is outside the root tree",
+  "genuiErrorType": "Value has an incompatible type",
+  "genuiErrorValue": "Value is outside the supported options or range",
+  "genuiErrorSourceBudget": "UI source exceeds the size limit",
+  "genuiErrorDeclarationBudget": "A declaration exceeds the size limit",
+  "genuiErrorDeclarationCount": "Too many declarations",
+  "genuiErrorComponentCount": "Too many components",
+  "genuiErrorInputCount": "Too many inputs",
+  "genuiErrorComponentDepth": "Components are nested too deeply",
+  "genuiErrorExpressionDepth": "Calculation is nested too deeply",
+  "genuiErrorFunction": "Unknown calculation function",
+  "genuiErrorAction": "Unsupported action",
+  "genuiErrorNestedSample": "Nested sampling is not supported",
+  "genuiErrorSample": "Invalid sampling range or count",
+  "genuiErrorDataBudget": "Data exceeds the supported size",
+  "genuiErrorRowKey": "Rows need unique nonempty keys",
+  "genuiErrorDomain": "The value is outside the function domain",
+  "genuiErrorDivisionByZero": "Division by zero is undefined",
+  "genuiErrorNonFinite": "Calculation produced a nonfinite number",
+  "genuiErrorOperationsBudget": "Calculation exceeded the operation limit",
+  "genuiMetricTrend": "Change {value}",
+  "@genuiMetricTrend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  }
 }

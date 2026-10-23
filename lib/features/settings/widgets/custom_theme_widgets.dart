@@ -41,6 +41,9 @@ Future<T?> showAppDialog<T>(
 }) {
   return showGeneralDialog<T>(
     context: context,
+    transitionDuration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200),
     barrierDismissible: dismissible,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),

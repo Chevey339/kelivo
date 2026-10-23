@@ -4982,5 +4982,113 @@
   "browserLiveViewLimit": "瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。",
   "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理",
   "displaySettingsPageShowBrowserPageCardsTitle": "顯示網頁卡片",
-  "browserObserverHint": "AI 正在操作此頁面，點選「接管」後可以操作網頁。"
+  "browserObserverHint": "AI 正在操作此頁面，點選「接管」後可以操作網頁。",
+  "genuiSurfaceTitle": "互動介面",
+  "genuiStatusStreaming": "生成中",
+  "genuiStatusInterrupted": "已中斷",
+  "genuiStatusUnsaved": "尚未儲存",
+  "genuiStatusUnsavedRetry": "點擊重試儲存",
+  "genuiReadOnlyUntilComplete": "生成完成後可操作",
+  "genuiReadOnlySnapshot": "唯讀快照",
+  "genuiPendingNode": "等待 {id}",
+  "@genuiPendingNode": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiViewSource": "檢視原始碼",
+  "genuiCopySource": "複製原始碼",
+  "genuiExpand": "展開",
+  "genuiExpandedStub": "正在展開檢視中操作",
+  "genuiMore": "更多",
+  "genuiReset": "重設為預設值",
+  "genuiRepair": "修復介面",
+  "genuiInvalidTitle": "這段介面無法顯示",
+  "genuiNodesFailed": "{count} 個節點無法顯示",
+  "@genuiNodesFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiErrorLine": "第 {line} 行",
+  "@genuiErrorLine": {
+    "placeholders": {
+      "line": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiValueUnavailable": "無值",
+  "genuiFormulaInvalid": "這條公式無法顯示",
+  "genuiNodeUnavailable": "此元件無法顯示",
+  "genuiErrorHeader": "介面首行格式無效",
+  "genuiErrorVersion": "不支援此介面語言版本",
+  "genuiErrorCatalog": "不支援此元件目錄",
+  "genuiErrorRoot": "根元件缺失或無效",
+  "genuiErrorSyntax": "宣告格式不正確",
+  "genuiErrorDuplicateSymbol": "同一名稱被重複定義",
+  "genuiErrorDuplicateProperty": "同一屬性被重複定義",
+  "genuiErrorReservedName": "此名稱是保留名稱",
+  "genuiErrorUnknownComponent": "未知元件 {detail}",
+  "@genuiErrorUnknownComponent": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorUnknownProperty": "未知屬性 {detail}",
+  "@genuiErrorUnknownProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorMissingProperty": "缺少必要屬性 {detail}",
+  "@genuiErrorMissingProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorBinding": "輸入綁定不是有效的可寫狀態",
+  "genuiErrorReference": "元件參照無效",
+  "genuiErrorMissingReference": "被參照的內容尚未定義",
+  "genuiErrorDependency": "依賴的內容無法顯示",
+  "genuiErrorCycle": "不支援循環參照",
+  "genuiErrorDuplicateParent": "同一元件不能出現在兩個位置",
+  "genuiErrorUnreachableNode": "此元件未包含在根元件中",
+  "genuiErrorType": "值的類型不符",
+  "genuiErrorValue": "值不在支援的選項或範圍內",
+  "genuiErrorSourceBudget": "介面原始碼超過大小上限",
+  "genuiErrorDeclarationBudget": "單條宣告超過大小上限",
+  "genuiErrorDeclarationCount": "宣告數量超過上限",
+  "genuiErrorComponentCount": "元件數量超過上限",
+  "genuiErrorInputCount": "輸入數量超過上限",
+  "genuiErrorComponentDepth": "元件巢狀層級過深",
+  "genuiErrorExpressionDepth": "計算巢狀層級過深",
+  "genuiErrorFunction": "計算函數不受支援",
+  "genuiErrorAction": "此操作不受支援",
+  "genuiErrorNestedSample": "不支援巢狀取樣",
+  "genuiErrorSample": "取樣區間或數量無效",
+  "genuiErrorDataBudget": "資料超過支援的大小",
+  "genuiErrorRowKey": "每列需要唯一且非空的識別值",
+  "genuiErrorDomain": "此值不在函數定義域內",
+  "genuiErrorDivisionByZero": "不能除以零",
+  "genuiErrorNonFinite": "計算結果不是有限數值",
+  "genuiErrorOperationsBudget": "計算操作量超過上限",
+  "genuiMetricTrend": "變化 {value}",
+  "@genuiMetricTrend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  }
 }

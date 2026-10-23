@@ -79,7 +79,9 @@ class _IosTextButtonState extends State<IosTextButton> {
               padding: widget.padding,
               child: TweenAnimationBuilder<Color?>(
                 tween: ColorTween(end: foreground),
-                duration: const Duration(milliseconds: 120),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 120),
                 builder: (context, color, _) => Row(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
