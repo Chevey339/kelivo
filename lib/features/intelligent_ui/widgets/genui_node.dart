@@ -1,3 +1,4 @@
+import 'genui_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:markstream/markstream.dart' as ms;
@@ -31,12 +32,54 @@ class GenUiNode extends StatefulWidget {
   State<GenUiNode> createState() => _GenUiNodeState();
 }
 
-class _GenUiNodeState extends State<GenUiNode> {
+class _GenUiNodeState extends State<GenUiNode>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _reveal;
+  final _contentKey = GlobalKey(debugLabel: 'GenUI node content');
+  bool _wasPending = false;
+  bool _reduceMotion = false;
+  bool get _pending {
+    final node = widget.controller.nodes[widget.id];
+    return node?.pending == true ||
+        (node == null &&
+            (widget.controller.parsed.program.pendingSymbols.contains(
+                  widget.id,
+                ) ||
+                widget.controller.phase == SurfacePhase.streaming ||
+                widget.controller.phase == SurfacePhase.interrupted));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion) _reveal?.value = 1;
+  }
+
   late void Function() _unsubscribe;
-  void _subscribe() =>
-      _unsubscribe = widget.controller.listenNode(widget.id, () {
-        if (mounted) setState(() {});
-      });
+  void _subscribe() {
+    _wasPending = _pending;
+    _unsubscribe = widget.controller.listenNode(widget.id, () {
+      if (!mounted) return;
+      final pending = _pending;
+      if (pending) _reveal?.stop();
+      if (_wasPending && !pending && !_reduceMotion) {
+        _reveal ??=
+            AnimationController(
+              vsync: this,
+              duration: const Duration(milliseconds: 160),
+            )..addStatusListener((status) {
+              if (mounted && status == AnimationStatus.completed) {
+                setState(() {});
+              }
+            });
+        _reveal!.forward(from: 0);
+      }
+      _wasPending = pending;
+      setState(() {});
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,18 +99,24 @@ class _GenUiNodeState extends State<GenUiNode> {
   @override
   void dispose() {
     _unsubscribe();
+    _reveal?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Reparent this same subtree when the short-lived transition disappears;
+    // field elements, focus nodes and active composing ranges stay alive.
+    final child = KeyedSubtree(key: _contentKey, child: _buildNode(context));
+    return !_reduceMotion && _reveal?.isAnimating == true
+        ? FadeTransition(opacity: _reveal!, child: child)
+        : child;
+  }
+
+  Widget _buildNode(BuildContext context) {
     final controller = widget.controller;
     final node = controller.nodes[widget.id];
-    if (node?.pending == true ||
-        (node == null &&
-            (controller.parsed.program.pendingSymbols.contains(widget.id) ||
-                controller.phase == SurfacePhase.streaming ||
-                controller.phase == SurfacePhase.interrupted))) {
+    if (_pending) {
       return GenUiPendingNode(
         id: widget.id,
         component: node?.declaration.component,
@@ -306,36 +355,87 @@ class GenUiPendingNode extends StatelessWidget {
       'Chart' => 200.0,
       'DataTable' => 160.0,
       'Button' => 36.0,
+      'Form' => 56.0,
       _ => 64.0,
     };
-    return Container(
-      constraints: BoxConstraints(minHeight: height),
-      padding: EdgeInsets.all(theme.sm),
-      decoration: BoxDecoration(
-        color: theme.cardFill,
-        border: Border.all(color: theme.hairlineStrong),
-        borderRadius: BorderRadius.circular(theme.controlRadius),
-      ),
-      child: Row(
-        children: [
-          ExcludeSemantics(
-            child: Icon(
-              LucideIcons.loaderCircle,
-              size: 14,
-              color: theme.captionInk,
+    return CustomPaint(
+      painter: _PendingPainter(GenUiMotion.of(context), theme),
+      child: Container(
+        constraints: BoxConstraints(minHeight: height),
+        padding: EdgeInsets.all(theme.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    LucideIcons.loaderCircle,
+                    size: 14,
+                    color: theme.captionInk,
+                  ),
+                ),
+                SizedBox(width: theme.xs),
+                Expanded(
+                  child: Text(
+                    '${AppLocalizations.of(context)!.genuiPendingNode(_displayId(id))}${component == null ? "" : " · $component"}',
+                    style: theme.caption,
+                  ),
+                ),
+              ],
             ),
-          ),
-          SizedBox(width: theme.xs),
-          Expanded(
-            child: Text(
-              AppLocalizations.of(context)!.genuiPendingNode(_displayId(id)),
-              style: theme.caption,
-            ),
-          ),
-        ],
+            if (height > 36)
+              const ExcludeSemantics(child: SizedBox(height: 20)),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _PendingPainter extends CustomPainter {
+  _PendingPainter(this.animation, this.theme) : super(repaint: animation);
+  final Animation<double> animation;
+  final GenUiTheme theme;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(theme.controlRadius),
+    );
+    canvas.drawRRect(rect, Paint()..color = theme.cardFill);
+    final outline = Path()..addRRect(rect.deflate(.5));
+    final stroke = Paint()
+      ..color = theme.hairlineStrong
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final metric in outline.computeMetrics()) {
+      for (var offset = 0.0; offset < metric.length; offset += 7) {
+        canvas.drawPath(
+          metric.extractPath(offset, (offset + 4).clamp(0, metric.length)),
+          stroke,
+        );
+      }
+    }
+    if (size.height > 48) {
+      // Alpha lives in Paint, with no Opacity widget or offscreen saveLayer.
+      final alpha = .55 + .35 * (1 - (animation.value * 2 - 1).abs());
+      final bar = Rect.fromLTWH(
+        theme.sm,
+        size.height - 16,
+        (size.width - 2 * theme.sm) * .7,
+        5,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bar, const Radius.circular(2)),
+        Paint()..color = theme.fill.withValues(alpha: alpha),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PendingPainter oldDelegate) =>
+      theme != oldDelegate.theme || animation != oldDelegate.animation;
 }
 
 class GenUiNodeError extends StatelessWidget {

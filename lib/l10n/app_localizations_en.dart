@@ -14207,4 +14207,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String genuiCharacterCount(int used, int max) {
     return '$used / $max characters';
   }
+
+  @override
+  String get genuiBlockLimit =>
+      'Up to 3 UI blocks per message; the rest are shown as source';
 }

@@ -1,3 +1,8 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_host_scope.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_generation_state.dart';
+import 'package:markstream/markstream_core.dart' show SourceSpan;
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -1359,6 +1364,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   // Memoized think-tag parse, keyed by source string equality. The parser is
   // a pure function of message content, so a single slot is enough.
   String? _inlineThinkMemoSource;
+  UiMessageSource? _inlineThinkMemoUiSource;
   ThinkingTagParseResult? _inlineThinkMemoResult;
   // Memoized assistant visual-regex results, keyed by scope + input string.
   // Cleared when the rule signature changes; skipped while streaming because
@@ -1398,10 +1404,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   @override
   void didUpdateWidget(covariant ChatMessageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _reconcileUiOwner();
     _syncTicker();
     // Auto-collapse when inline <think> transitions from loading -> finished
     _applyAutoCollapseInlineThinkIfFinished(oldWidget: oldWidget);
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reconcileUiOwner();
+  }
+
+  void _reconcileUiOwner() => UiRuntimeScope.maybeOf(context)?.reconcile(
+    widget.message,
+    hasProviderReasoning:
+        (widget.reasoningText?.isNotEmpty ?? false) ||
+        widget.reasoningLoading ||
+        (widget.reasoningSegments?.isNotEmpty ?? false),
+  );
 
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
     if (!mounted) return;
@@ -1482,8 +1503,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
     final source = widget.message.content;
     final memo = _inlineThinkMemoResult;
-    if (memo != null && _inlineThinkMemoSource == source) return memo;
-    final parsed = ThinkingTagParser.parseLegacyInlineBlocks(source);
+    final uiSource = UiMessageSource.of(widget.message.parts);
+    if (memo != null &&
+        _inlineThinkMemoSource == source &&
+        identical(uiSource, _inlineThinkMemoUiSource)) {
+      return memo;
+    }
+    final parsed = ThinkingTagParser.parseLegacyInlineBlocks(
+      source,
+      protectedRanges: uiSource.protectedJoinedRanges,
+      includeUnclosed: uiSource.hasFences,
+    );
+    _inlineThinkMemoUiSource = uiSource;
     _inlineThinkMemoSource = source;
     _inlineThinkMemoResult = parsed;
     return parsed;
@@ -2741,6 +2772,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    UiTextSlice? uiSource,
   }) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -2752,6 +2784,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (enableAssistantMarkdown) {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
+        uiHost: widget.message.role != 'assistant' || uiSource == null
+            ? null
+            : UiHostBinding(
+                conversationId: widget.message.conversationId,
+                revisionId: widget.message.id,
+                source: uiSource,
+                generation: uiGenerationStatus(widget.message),
+                onAsk: UiActionsScope.askOf(context),
+              ),
         onCitationTap: _handleCitationTap,
         citationIndexResolver: citationIndexResolver,
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
@@ -2844,18 +2885,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     required String blockKey,
+    UiTextSlice? uiSource,
   }) {
     final split = context.select<SettingsProvider, bool>(
       (s) => s.assistantBubbleSplitParagraphs,
     );
     final parts = split
-        ? splitAssistantParagraphs(visualContent)
-        : <String>[visualContent];
+        ? splitAssistantParagraphsWithSource(visualContent)
+        : <AssistantParagraph>[
+            AssistantParagraph(
+              visualContent,
+              SourceSpan(0, visualContent.length),
+            ),
+          ];
     return <Widget>[
       for (var i = 0; i < parts.length; i++)
         _buildAssistantTextBlock(
           context,
-          parts[i],
+          uiSource == null ? parts[i].text : parts[i].span.slice(visualContent),
+          uiSource: uiSource?.slice(parts[i].span.start, parts[i].span.end),
           enableAssistantMarkdown,
           citationIndexResolver,
           contentKey: parts.length == 1 ? '' : '$blockKey.$i',
@@ -2869,6 +2917,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    UiTextSlice? uiSource,
   }) {
     return _assistantBlockWidth(
       context,
@@ -2880,6 +2929,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           enableAssistantMarkdown,
           citationIndexResolver,
           contentKey: contentKey,
+          uiSource: uiSource,
         ),
       ),
     );
@@ -2943,6 +2993,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       contentSplitOffsets: widget.contentSplitOffsets,
       reasoningCountAtSplit: widget.reasoningCountAtSplit,
       toolCountAtSplit: widget.toolCountAtSplit,
+      transformProtectedText: (text) => applyAssistantRegexesProtected(
+        text,
+        assistant: assistant,
+        scope: AssistantRegexScope.assistant,
+        target: AssistantRegexTransformTarget.visual,
+      ),
       transformText: (text) => _applyVisualAssistantRegexes(
         text,
         assistant: assistant,
@@ -3324,6 +3380,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     enableAssistantMarkdown,
                     citationIndexResolver,
                     blockKey: 'text$blockIndex',
+                    uiSource: block.uiSource,
                   )) {
                     addVisible(bubble);
                   }

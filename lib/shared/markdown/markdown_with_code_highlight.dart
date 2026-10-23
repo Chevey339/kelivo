@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_host_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:markstream/markstream.dart';
 import 'package:provider/provider.dart';
@@ -24,8 +25,10 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     this.conversationId,
     this.highlightRanges = const [],
     this.highlightColor,
+    this.uiHost,
   });
   final String text;
+  final UiHostBinding? uiHost;
   final void Function(String id)? onCitationTap;
   final String? Function(String id)? citationIndexResolver;
   final TextStyle? baseStyle;
@@ -42,29 +45,37 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final exporting = ExportCaptureScope.of(context);
     final theme = mapMarkdownTheme(context, settings, baseStyle);
+    final view = MarkstreamView(
+      source: text,
+      highlightRanges: highlightRanges,
+      highlightColor: highlightColor,
+      streaming: streaming,
+      options: markdownParserOptions(settings),
+      theme: theme,
+      extensions: kelivoMarkdownExtensions,
+      codeHighlighter: KelivoCodeHighlighter.forTheme(theme),
+      mathRenderer: const KelivoMathRenderer(),
+      imageBuilder: const KelivoImageBuilder(),
+      linkHandler: const KelivoLinkHandler(),
+      codeOptions: markdownCodeOptions(settings),
+      labels: markdownLabels(context),
+      exporting: exporting,
+      cullToViewport: !exporting,
+    );
     return MarkdownLinkScope(
       source: text,
       conversationId: conversationId,
       child: CitationScope(
         onTap: onCitationTap,
         resolve: citationIndexResolver,
-        child: MarkstreamView(
-          source: text,
-          highlightRanges: highlightRanges,
-          highlightColor: highlightColor,
-          streaming: streaming,
-          options: markdownParserOptions(settings),
-          theme: theme,
-          extensions: kelivoMarkdownExtensions,
-          codeHighlighter: KelivoCodeHighlighter.forTheme(theme),
-          mathRenderer: const KelivoMathRenderer(),
-          imageBuilder: const KelivoImageBuilder(),
-          linkHandler: const KelivoLinkHandler(),
-          codeOptions: markdownCodeOptions(settings),
-          labels: markdownLabels(context),
-          exporting: exporting,
-          cullToViewport: !exporting,
-        ),
+        child: uiHost == null
+            ? view
+            : UiHostScope(
+                binding: uiHost!,
+                renderOwner: view,
+                exporting: exporting,
+                child: view,
+              ),
       ),
     );
   }

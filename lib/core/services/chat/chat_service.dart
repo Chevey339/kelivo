@@ -3411,13 +3411,18 @@ class ChatService extends ChangeNotifier {
     int? checkpointSeq,
     String? errorCode,
   }) async {
-    if (!_initialized) return null;
+    if (!_initialized) {
+      message.hydrateGenerationState(terminalState);
+      return null;
+    }
     if (isTemporaryConversation(message.conversationId)) {
       await updateStreamingCheckpointSilent(message, toolEvents);
+      message.hydrateGenerationState(terminalState);
       return null;
     }
     if (generationRunId == null) {
       await updateStreamingCheckpointSilent(message, toolEvents);
+      message.hydrateGenerationState(terminalState);
       _statisticsRevision++;
       notifyListeners();
       return null;
@@ -3435,6 +3440,7 @@ class ChatService extends ChangeNotifier {
       checkpointSeq: checkpointSeq,
       errorCode: errorCode,
     );
+    message.hydrateGenerationState(run.state);
     if (_messageCanOwnAssets(message)) {
       await _synchronizeMessageAssetsBestEffort(message);
     }

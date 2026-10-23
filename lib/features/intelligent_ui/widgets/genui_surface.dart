@@ -1,3 +1,6 @@
+import 'genui_diagnostic_source.dart';
+import 'genui_motion.dart';
+import 'genui_control_region.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:markstream/markstream.dart' as ms;
@@ -60,7 +63,12 @@ class _SurfaceBody extends StatefulWidget {
   State<_SurfaceBody> createState() => _SurfaceBodyState();
 }
 
-class _SurfaceBodyState extends State<_SurfaceBody> {
+class _SurfaceBodyState extends State<_SurfaceBody>
+    with SingleTickerProviderStateMixin {
+  late final _motion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
   final _sourceFocus = FocusNode(debugLabel: 'GenUI source');
   final _expandFocus = FocusNode(debugLabel: 'GenUI expand');
   final _moreFocus = FocusNode(debugLabel: 'GenUI more');
@@ -79,7 +87,27 @@ class _SurfaceBodyState extends State<_SurfaceBody> {
   );
   void _refresh() {
     final next = _chromeState();
-    if (mounted && next != _chrome) setState(() => _chrome = next);
+    if (mounted && next != _chrome) {
+      _syncMotion();
+      setState(() => _chrome = next);
+    }
+  }
+
+  void _syncMotion() {
+    if (controller.phase == SurfacePhase.streaming &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        !widget.surface.exporting) {
+      if (!_motion.isAnimating) _motion.repeat();
+    } else {
+      _motion.stop();
+      _motion.value = 0;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncMotion();
   }
 
   void _subscribe() {
@@ -112,11 +140,13 @@ class _SurfaceBodyState extends State<_SurfaceBody> {
       _unsubscribe();
       _subscribe();
     }
+    _syncMotion();
   }
 
   @override
   void dispose() {
     _unsubscribe();
+    _motion.dispose();
     _sourceFocus.dispose();
     _expandFocus.dispose();
     _moreFocus.dispose();
@@ -142,7 +172,16 @@ class _SurfaceBodyState extends State<_SurfaceBody> {
                 child: SelectionArea(
                   child: Padding(
                     padding: EdgeInsets.all(GenUiTheme.of(context).sm),
-                    child: GenUiSource(source: source),
+                    child: controller.phase == SurfacePhase.invalid
+                        ? GenUiDiagnosticSource(
+                            source: source,
+                            errorLines: {
+                              for (final d
+                                  in controller.parsed.program.diagnostics)
+                                d.line,
+                            },
+                          )
+                        : GenUiSource(source: source),
                   ),
                 ),
               ),
@@ -300,87 +339,101 @@ class _SurfaceBodyState extends State<_SurfaceBody> {
         text: l10n.genuiReadOnlySnapshot,
       );
     }
-    return Semantics(
-      container: true,
-      label: title,
-      child: FocusTraversalGroup(
-        policy: ReadingOrderTraversalPolicy(),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.card,
-            borderRadius: BorderRadius.circular(theme.cardRadius),
-            border: Border.all(color: theme.hairline),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(theme.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact =
-                        constraints.maxWidth < 480 ||
-                        MediaQuery.textScalerOf(context).scale(1) >= 1.3;
-                    if (compact) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: heading()),
-                              if (actions) buttons,
-                            ],
-                          ),
-                          if (status.isNotEmpty)
-                            Wrap(
-                              spacing: theme.xs,
-                              runSpacing: theme.xxs,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: status,
+    return GenUiMotion(
+      animation: _motion,
+      child: Semantics(
+        container: true,
+        label: title,
+        child: FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.card,
+              borderRadius: BorderRadius.circular(theme.cardRadius),
+              border: Border.all(color: theme.hairline),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(theme.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact =
+                          constraints.maxWidth < 480 ||
+                          MediaQuery.textScalerOf(context).scale(1) >= 1.3;
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(child: heading()),
+                                if (actions) GenUiControlRegion(child: buttons),
+                              ],
                             ),
+                            if (status.isNotEmpty)
+                              Wrap(
+                                spacing: theme.xs,
+                                runSpacing: theme.xxs,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: status,
+                              ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: heading()),
+                          ...status,
+                          if (actions) GenUiControlRegion(child: buttons),
                         ],
                       );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: heading()),
-                        ...status,
-                        if (actions) buttons,
-                      ],
-                    );
-                  },
-                ),
-                SizedBox(height: theme.sm),
-                if (invalid) ...[
-                  GenUiCallout(
-                    title: l10n.genuiInvalidTitle,
-                    text: diagnostic != null
-                        ? '${genUiDiagnosticMessage(l10n, diagnostic)} · ${l10n.genuiErrorLine(diagnostic.line)}'
-                        : l10n.genuiNodeUnavailable,
-                    tone: 'error',
+                    },
                   ),
                   SizedBox(height: theme.sm),
-                  GenUiSource(
-                    source: controller.parsed.source,
-                    exporting: surface.exporting,
-                  ),
-                  if (actions && surface.onRepair != null)
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: IosTextButton(
-                        label: l10n.genuiRepair,
-                        onPressed: surface.onRepair,
-                      ),
+                  if (invalid) ...[
+                    GenUiCallout(
+                      title: l10n.genuiInvalidTitle,
+                      text: diagnostic != null
+                          ? '${genUiDiagnosticMessage(l10n, diagnostic)} · ${l10n.genuiErrorLine(diagnostic.line)}'
+                          : l10n.genuiNodeUnavailable,
+                      tone: 'error',
                     ),
-                ] else
-                  GenUiNode(
-                    controller: controller,
-                    id: 'root',
-                    linkHandler: surface.linkHandler,
-                  ),
-                if (footer != null) ...[SizedBox(height: theme.sm), footer],
-              ],
+                    SizedBox(height: theme.sm),
+                    GenUiDiagnosticSource(
+                      source: controller.parsed.source,
+                      errorLines: {
+                        for (final d in controller.parsed.program.diagnostics)
+                          d.line,
+                      },
+                      exporting: surface.exporting,
+                    ),
+                    if (actions)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Tooltip(
+                          message: surface.onRepair == null
+                              ? l10n.genuiActionUnavailable
+                              : l10n.genuiRepair,
+                          child: GenUiControlRegion(
+                            child: IosTextButton(
+                              label: l10n.genuiRepair,
+                              onPressed: surface.onRepair,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ] else
+                    GenUiNode(
+                      controller: controller,
+                      id: 'root',
+                      linkHandler: surface.linkHandler,
+                    ),
+                  if (footer != null) ...[SizedBox(height: theme.sm), footer],
+                ],
+              ),
             ),
           ),
         ),
@@ -416,41 +469,15 @@ class _Footer extends StatelessWidget {
   }
 }
 
-class _GeneratingBadge extends StatefulWidget {
+class _GeneratingBadge extends StatelessWidget {
   const _GeneratingBadge({required this.text});
   final String text;
-  @override
-  State<_GeneratingBadge> createState() => _GeneratingBadgeState();
-}
-
-class _GeneratingBadgeState extends State<_GeneratingBadge>
-    with SingleTickerProviderStateMixin {
-  late final _animation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _animation.stop();
-    } else if (!_animation.isAnimating) {
-      _animation.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animation.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = GenUiTheme.of(context);
     return Semantics(
       liveRegion: true,
-      label: widget.text,
+      label: text,
       excludeSemantics: true,
       child: Container(
         padding: EdgeInsets.symmetric(
@@ -465,13 +492,13 @@ class _GeneratingBadgeState extends State<_GeneratingBadge>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.text,
+              text,
               style: theme.badge.copyWith(color: theme.onPrimaryContainer),
             ),
             SizedBox(width: theme.xxs),
             CustomPaint(
               size: const Size(18, 8),
-              painter: _Dots(_animation, theme),
+              painter: _Dots(GenUiMotion.of(context), theme),
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import 'genui_control_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_resolved_node.dart';
@@ -113,60 +114,64 @@ class _GenUiBooleanInputState extends State<GenUiBooleanInput> {
     return GenUiFieldFrame(
       label: '',
       error: error,
-      child: FocusableActionDetector(
-        focusNode: _focus,
-        enabled: interactive,
-        onFocusChange: (focused) {
-          if (focused) {
-            scope.controller.surface.noteInteraction(token: widget.token);
-          }
-        },
-        onShowFocusHighlight: (focused) => setState(() => _focused = focused),
-        shortcuts: const {
-          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-        },
-        actions: {
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              if (interactive) _toggle();
-              return null;
-            },
-          ),
-        },
-        child: Semantics(
-          label: label,
+      child: GenUiControlRegion(
+        child: FocusableActionDetector(
+          focusNode: _focus,
           enabled: interactive,
-          checked: isSwitch ? null : value,
-          toggled: isSwitch ? value : null,
-          hint: [
-            if (required) l10n.genuiFieldRequired,
-            if (error != null) error,
-          ].join('. '),
-          onTap: interactive ? _toggle : null,
-          child: ExcludeSemantics(
-            child: IgnorePointer(
-              ignoring: scope.readOnly,
-              child: MouseRegion(
-                cursor: interactive
-                    ? SystemMouseCursors.click
-                    : MouseCursor.defer,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: interactive ? _toggle : null,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 44),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(theme.controlRadius),
-                      border: Border.all(
-                        color: _focused ? theme.primary : theme.transparent,
-                        width: 2,
+          onFocusChange: (focused) {
+            if (focused) {
+              scope.controller.surface.noteInteraction(token: widget.token);
+            }
+          },
+          onShowFocusHighlight: (focused) => setState(() => _focused = focused),
+          shortcuts: const {
+            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+          },
+          actions: {
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                if (interactive) _toggle();
+                return null;
+              },
+            ),
+          },
+          child: Semantics(
+            label: label,
+            enabled: interactive,
+            checked: isSwitch ? null : value,
+            toggled: isSwitch ? value : null,
+            hint: [
+              if (required) l10n.genuiFieldRequired,
+              if (error != null) error,
+            ].join('. '),
+            onTap: interactive ? _toggle : null,
+            child: ExcludeSemantics(
+              child: IgnorePointer(
+                ignoring: scope.readOnly,
+                child: MouseRegion(
+                  cursor: interactive
+                      ? SystemMouseCursors.click
+                      : MouseCursor.defer,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: interactive ? _toggle : null,
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                          theme.controlRadius,
+                        ),
+                        border: Border.all(
+                          color: _focused ? theme.primary : theme.transparent,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: isSwitch
-                          ? [text, SizedBox(width: theme.xs), control]
-                          : [control, SizedBox(width: theme.xs), text],
+                      child: Row(
+                        children: isSwitch
+                            ? [text, SizedBox(width: theme.xs), control]
+                            : [control, SizedBox(width: theme.xs), text],
+                      ),
                     ),
                   ),
                 ),

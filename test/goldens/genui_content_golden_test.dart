@@ -47,6 +47,7 @@ void main() {
       'large',
       'wallpaper',
       'desktop',
+      'stream',
       'shell',
       'shell-wallpaper',
       'inputs',
@@ -57,7 +58,7 @@ void main() {
       'inputs-readonly',
     ]) {
       testWidgets('GenUI ${dark ? 'dark' : 'light'} $variant', (tester) async {
-        final shell = variant.startsWith('shell');
+        final shell = variant.startsWith('shell') || variant == 'stream';
         final inputs = variant.startsWith('inputs');
         final wallpaper = variant.contains('wallpaper');
         final rtl = variant.endsWith('rtl') || variant == 'shell-wallpaper';
@@ -106,6 +107,29 @@ void main() {
             addTearDown(c.dispose);
           }
         }
+        if (variant == 'stream') {
+          const prefix =
+              '${UiCatalog.header}\nroot = Column(children=[metric,chart])\n';
+          for (var i = 0; i < controllers.length; i++) {
+            controllers[i].updateSource(
+              i == 0
+                  ? '${UiCatalog.header}\n'
+                  : '$prefix${i >= 2 ? 'metric = Metric(label="Local result", value=42)\n' : ''}${i >= 3 && i != 5 ? 'chart = Text(text="All declarations arrived")\n' : ''}',
+              closed: i == 3 || i == 4,
+              generation: i == 4
+                  ? UiGenerationStatus.complete
+                  : i == 5
+                  ? UiGenerationStatus.interrupted
+                  : UiGenerationStatus.generating,
+            );
+            controllers[i].setReadOnly(false);
+            controllers[i].setSaveFailed(
+              false,
+              token: controllers[i].token,
+              sequence: controllers[i].sequence,
+            );
+          }
+        }
         final settings = SettingsProvider(createBusinessTestPreferences());
         await settings.loaded;
         addTearDown(settings.dispose);
@@ -134,15 +158,17 @@ void main() {
                                 for (var i = 0; i < controllers.length; i++)
                                   GenUiSurface(
                                     controller: controllers[i],
-                                    title: const [
-                                      'Streaming',
-                                      'Node errors',
-                                      'Interrupted',
-                                      'Invalid',
-                                      'Not saved',
-                                      'Read-only snapshot',
-                                    ][i],
-                                    exporting: i == 5,
+                                    title: variant == 'stream'
+                                        ? 'Streaming step ${i + 1}'
+                                        : const [
+                                            'Streaming',
+                                            'Node errors',
+                                            'Interrupted',
+                                            'Invalid',
+                                            'Not saved',
+                                            'Read-only snapshot',
+                                          ][i],
+                                    exporting: i == 5 && variant != 'stream',
                                     onRetrySave: i == 4 ? () {} : null,
                                   ),
                               ],

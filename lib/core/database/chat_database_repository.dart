@@ -7180,25 +7180,41 @@ class ChatDatabaseRepository {
     return (await _messagesFromRowsWithParts([row])).single;
   }
 
-  Future<List<ChatMessage>> _messagesFromRowsWithParts(
-    List<MessageRow> rows,
-  ) async {
-    if (rows.isEmpty) return const [];
-    final ids = rows.map((row) => row.id).toSet();
-    final parts =
-        await (_db.select(_db.messagePartRows)
-              ..where((part) => part.revisionId.isIn(ids))
-              ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
-            .get();
-    final byRevision = <String, List<MessagePartRow>>{};
-    for (final part in parts) {
-      byRevision.putIfAbsent(part.revisionId, () => []).add(part);
-    }
-    return [
-      for (final row in rows)
-        _messageFromRow(row, authoritativeParts: byRevision[row.id]),
-    ];
-  }
+  Future<List<ChatMessage>> _messagesFromRowsWithParts(List<MessageRow> rows) =>
+      _db.transaction(() async {
+        if (rows.isEmpty) return const [];
+        final ids = rows.map((row) => row.id).toSet();
+        final parts =
+            await (_db.select(_db.messagePartRows)
+                  ..where((part) => part.revisionId.isIn(ids))
+                  ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
+                .get();
+        final byRevision = <String, List<MessagePartRow>>{};
+        for (final part in parts) {
+          byRevision.putIfAbsent(part.revisionId, () => []).add(part);
+        }
+        final runs =
+            await (_db.select(_db.generationRunRows)
+                  ..where((run) => run.targetRevisionId.isIn(ids))
+                  ..orderBy([
+                    (run) => OrderingTerm.desc(run.createdAt),
+                    (run) => OrderingTerm.desc(run.updatedAt),
+                    (run) => OrderingTerm.desc(run.id),
+                  ]))
+                .get();
+        final generationStates = <String, GenerationRunState>{};
+        for (final run in runs) {
+          generationStates.putIfAbsent(
+            run.targetRevisionId,
+            () => GenerationRunState.fromDatabase(run.state),
+          );
+        }
+        return [
+          for (final row in rows)
+            _messageFromRow(row, authoritativeParts: byRevision[row.id])
+              ..hydrateGenerationState(generationStates[row.id]),
+        ];
+      });
 
   /// Parts come only from [authoritativeParts] in ordinal order. Missing or
   /// empty parts yield empty content via the derived [ChatMessage.content].

@@ -2505,6 +2505,44 @@ void main() {
     );
   });
 
+  for (final temporary in [false, true]) {
+    test(
+      'no-run terminal metadata is published on the caller message (temporary=$temporary)',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = temporary
+            ? await service.createDraftConversation(
+                title: 'Native fixture',
+                temporary: true,
+              )
+            : await service.createConversation(title: 'Native fixture');
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'source',
+          isStreaming: true,
+        );
+        for (final terminal in [
+          GenerationRunState.completed,
+          GenerationRunState.failed,
+          GenerationRunState.cancelled,
+        ]) {
+          final completed = original.copyWith(isStreaming: false);
+          await service.finalizeGenerationRunSilent(
+            message: completed,
+            toolEvents: const [],
+            generationRunId: null,
+            expectedState: null,
+            expectedStateRevision: null,
+            terminalState: terminal,
+          );
+          expect(completed.generationState, terminal);
+        }
+      },
+    );
+  }
+
   test('final generation commit publishes one statistics revision', () async {
     final service = createService();
     await service.init();
@@ -2549,6 +2587,7 @@ void main() {
       terminalState: GenerationRunState.completed,
     );
 
+    expect(completedMessage.generationState, GenerationRunState.completed);
     expect(service.statisticsRevision, revisionBefore + 1);
     expect(notifications, 1);
     final aggregate = await service.loadStatsAggregate(

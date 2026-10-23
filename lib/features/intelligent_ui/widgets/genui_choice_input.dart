@@ -1,3 +1,4 @@
+import 'genui_control_region.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -365,7 +366,7 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
       label: label,
       requiredField: _props['required'] == true,
       error: error,
-      child: control,
+      child: GenUiControlRegion(child: control),
     );
   }
 }

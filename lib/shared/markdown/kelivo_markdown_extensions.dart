@@ -7,6 +7,8 @@ import 'package:Kelivo/utils/svg_preview_html.dart';
 import 'package:Kelivo/shared/widgets/plantuml_block.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 
+import 'package:Kelivo/features/intelligent_ui/host/ui_markdown_builder.dart';
+
 import 'citation_syntax.dart';
 import 'diagram_code_blocks.dart';
 import 'highlight_adapter.dart';
@@ -18,6 +20,7 @@ final kelivoMarkdownExtensions = MarkstreamExtensions(
   inlineSyntaxes: const [CitationSyntax(), LocalImagePathSyntax()],
   namedInlineBuilders: {'kelivo-citation': buildCitation},
   codeBlockBuilders: {
+    'kelivo-ui': _nativeUi,
     'mermaid': _diagram,
     'svg': _diagram,
     'xml': _diagram,
@@ -31,6 +34,26 @@ final kelivoMarkdownExtensions = MarkstreamExtensions(
   codeExtraActions: markdownCodeActions,
   tableExtraActions: markdownTableActions,
   mobileTableToolbarBuilder: markdownMobileTableToolbar,
+);
+
+Widget _nativeUi(
+  BuildContext context,
+  CodeBlockNode node,
+  MarkstreamRenderContext rendering,
+) => UiMarkdownBlock(
+  node: node,
+  rendering: rendering,
+  linkHandler: const KelivoLinkHandler(),
+  sourceBuilder: (context) => MarkstreamCodeBlock(
+    node: node,
+    theme: rendering.theme,
+    extensions: kelivoMarkdownExtensions,
+    options: markdownCodeOptions(context.watch<SettingsProvider>()),
+    labels: markdownLabels(context),
+    highlighter: KelivoCodeHighlighter.forTheme(rendering.theme),
+    streaming: rendering.streaming,
+    exporting: ExportCaptureScope.of(context),
+  ),
 );
 
 Widget _diagram(

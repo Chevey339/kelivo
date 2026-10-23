@@ -25295,6 +25295,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{used} / {max} characters'**
   String genuiCharacterCount(int used, int max);
+
+  /// No description provided for @genuiBlockLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 3 UI blocks per message; the rest are shown as source'**
+  String get genuiBlockLimit;
 }
 
 class _AppLocalizationsDelegate

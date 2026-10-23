@@ -6519,5 +6519,6 @@
         "type": "int"
       }
     }
-  }
+  },
+  "genuiBlockLimit": "Up to 3 UI blocks per message; the rest are shown as source"
 }

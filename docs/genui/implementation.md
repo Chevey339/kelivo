@@ -190,7 +190,12 @@ environment variables, never read from the app's accounts or logged.
   diff checks. The first full run exposed a file-browser test waiting only 50 ms
   for real I/O; its reviewed fix awaits the rendered item without forcing a
   competing refresh. All filesystem and widget-action assertions remain.
-- C09–C26: not implemented. No complete-delivery claim.
+- C09: trusted Markdown/message host accepted by independent review; 301 focused
+  checks including 28 goldens and a further 20 bootstrap/host checks passed. Root
+  fatal-info analysis and 9,339 tests passed/2 skipped; markstream analysis and
+  296 tests passed. macOS main-app and isolated gallery debug builds, formatting
+  and diff checks passed. Native GUI inspection remains pending while locked.
+- C10–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -403,3 +408,91 @@ conditional fields, local Reset and an observable frozen Ask context. Twelve
 additional input goldens cover light/dark, RTL, 1.3x text, validation, disabled
 and read-only states. They extend C07's fourteen baselines; C24's full matrix,
 production-host focus chain and native-device acceptance are still separate.
+
+
+## C09 trusted message host
+
+The stable Markdown registry now dispatches `kelivo-ui` through a feature-owned
+adapter. Only assistant main-text Markdown constructs `UiHostBinding`; user,
+tool, system/unknown roles, quoted/list-nested blocks, internal Markdown, an
+identical nested renderer and an unscoped renderer keep ordinary code. The scope
+requires the exact nearest MarkstreamView instance plus original top-level fence
+coordinates. Completed Markdown prefixes cache widgets, so the native block's
+own element subscribes to host changes; it does not rely on another builder call
+or tail-block `rendering.streaming` to receive a terminal state.
+
+`UiMessageSource` caches by original parts identity. It groups only adjacent
+TextParts and carries original part ordinal, run fence ordinal and exact source
+spans through thinking extraction, historical contentSplits, visual regexes and
+paragraph bubbles. Every non-text part is a hard run boundary. The DSL adapter
+omits Markstream's synthetic trailing LF; source reduction stays in lifecycle
+hooks. `ProtectedText` matches regexes in complete run coordinates, retaining
+fences, adjacent line breaks and mapped historical split anchors. A visual
+replacement cannot create an authorized fence. Hidden native-looking code does
+not consume the visible three-block budget. The fourth visible block receives
+an explanation and ordinary source.
+
+The message list owns the in-memory registry and transient draft controller,
+so paragraph regrouping, scrolling out/in and theme rebuilds retain input state.
+Actual control hit areas mark the original pointer event; the list skips only
+its keyboard-focus request for these events and retains scroll/defer bookkeeping.
+Card prose still follows the existing selection path. A rewrite advances the
+controller epoch and rejects callbacks from the previous source.
+
+The existing generation-run state is hydrated alongside parts in a batched read
+transaction, without schema changes. Finalization publishes the terminal state
+on the caller's message, including temporary/no-run branches. Unknown historical
+outcome is interrupted, never inferred successful from `!isStreaming`. C12 must
+preserve completed provenance for copy/fork paths together with state ownership.
+
+A complete header starts the shell; forward references show dashed placeholders.
+One shared surface clock drives dots and skeleton paint and stops on completion,
+interruption, export or reduced motion. Node arrival fades for 160 ms; the
+FadeTransition is removed when the animation ends. A retained content subtree preserves focus and composing
+through removal, with no permanent per-node repaint boundary. Invalid
+source has a bounded line viewport with diagnostic bars/backgrounds and explicit
+copy. Repair is visibly unavailable until the C16 draft action is connected.
+
+Development target: `tool/genui_message_gallery.dart`. It uses
+the actual MessageListView and ChatMessageWidget, isolated in-memory preferences
+and DB, paired assistant/user/tool/quote fixtures, nine generation phases and an
+observable frozen Ask sink. It makes no model requests and is not imported by
+the production entry. The fixture is asserted complete and its actual button
+is exercised by a widget test. UI expansion remains C19; production Ask remains
+unavailable until C16, with no fake-success callback.
+
+Final verification: 301 focused language/runtime/widget/projection checks
+including all 28 light/dark pixel goldens passed. After moving the isolated
+bootstrap to tool/, the existing preference-access gate and actual host group
+passed all 20 checks; tool entry analysis also passed. Root fatal-info analysis
+and all 9,339 tests passed (2 existing skips). Markstream pub get, fatal-info
+analysis and all 296 tests passed. The main macOS app and separate message-gallery
+debug target both built. All 41 changed Dart files are formatted; diff checks
+passed. The final independent review has no findings.
+
+The four shell goldens changed for diagnostic source/disabled repair appearance;
+two new stream goldens cover forward references, closed-but-generating, complete
+and interrupted. Light streaming and dark wallpaper/RTL/1.3x shell images were
+inspected. The Mac is still locked, so native GUI operation remains unverified.
+The development entry uses isolated memory storage and makes no model requests.
+
+Review verified role gating, historical split order, whole-run regex anchors,
+source-revocation and current streaming notifier authority. Disappearance,
+changing fence info to ordinary code, or moving a block into thinking revokes the
+owner; viewport unmount does not. Reappearing source cannot reuse an old token.
+Raw source reconciliation does not impose a second three-block budget. A further
+516 pure Dart split/anchor probes were reported by the independent reviewer;
+these are separate from Flutter and native evidence.
+
+Two partial root runs were stopped for review/SDK corrections and are not
+counted as passing. The first completed root run caught the frozen preferences
+access gate: memory-only setup was moved from lib/ into the separate tool entry,
+with the production allowlist unchanged. The final complete run above is after
+all fixes, including the transient FadeTransition/editor identity regression.
+
+The before/after timeline_scroll_bench.dart runs use the same 40-round fixture.
+Render-object counts are unchanged (1,388 / 1,074 / 1,038 for 0 / 4 / 12 tools),
+and each case has one extra inherited element. Average widget-test scroll times
+were 10.56 / 13.94 / 17.51 ms before and 10.78 / 14.40 / 16.72 ms after. These
+stopwatch samples are diagnostic only; they do not establish device build/raster
+±3% or the C24 performance acceptance. Logs remain in ignored build/genui/logs/.

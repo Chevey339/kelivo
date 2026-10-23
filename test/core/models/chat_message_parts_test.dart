@@ -2,8 +2,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/database/generation_run.dart';
 
 void main() {
+  test(
+    'generation proof follows the same revision and is absent on a new revision',
+    () {
+      final message = ChatMessage(
+        id: 'one',
+        role: 'assistant',
+        conversationId: 'c1',
+      );
+      expect(message.generationState, isNull);
+      message.hydrateGenerationState(GenerationRunState.cancelled);
+      expect(
+        message.copyWith(content: 'updated').generationState,
+        GenerationRunState.cancelled,
+      );
+      expect(message.copyWith(id: 'two').generationState, isNull);
+      expect(
+        message.copyWith(isStreaming: true).generationState,
+        GenerationRunState.streaming,
+      );
+      expect(ChatMessage.fromJson(message.toJson()).generationState, isNull);
+    },
+  );
   group('ChatMessage.parts as source of truth', () {
     test('derived body is retained and copies derive from their own parts', () {
       final parts = <MessagePart>[

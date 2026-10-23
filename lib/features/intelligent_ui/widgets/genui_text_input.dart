@@ -1,3 +1,4 @@
+import 'genui_control_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -225,101 +226,103 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
           excluding: scope.readOnly || !enabled,
           child: IgnorePointer(
             ignoring: scope.readOnly,
-            child: IosFormTextField(
-              label: '',
-              controller: _text,
-              focusNode: _focus,
-              inlineLabel: false,
-              outerPadding: EdgeInsets.zero,
-              enabled: enabled,
-              readOnly: scope.readOnly,
-              maxLines: multiline ? 6 : 1,
-              minLines: multiline ? 2 : null,
-              hintText: props['placeholder'] as String?,
-              textStyle: theme.body.copyWith(
-                color: enabled ? theme.ink : theme.disabledInk,
-              ),
-              textDirection: _number ? TextDirection.ltr : null,
-              textAlign: _number ? TextAlign.end : TextAlign.start,
-              keyboardType: _number
-                  ? const TextInputType.numberWithOptions(
-                      signed: true,
-                      decimal: true,
-                    )
-                  : multiline
-                  ? TextInputType.multiline
-                  : TextInputType.text,
-              textInputAction: multiline
-                  ? TextInputAction.newline
-                  : TextInputAction.done,
-              autocorrect: !_number,
-              enableSuggestions: !_number,
-              inputFormatters: [
-                LengthLimitingTextInputFormatter(
-                  8192,
-                  maxLengthEnforcement:
-                      MaxLengthEnforcement.truncateAfterCompositionEnds,
+            child: GenUiControlRegion(
+              child: IosFormTextField(
+                label: '',
+                controller: _text,
+                focusNode: _focus,
+                inlineLabel: false,
+                outerPadding: EdgeInsets.zero,
+                enabled: enabled,
+                readOnly: scope.readOnly,
+                maxLines: multiline ? 6 : 1,
+                minLines: multiline ? 2 : null,
+                hintText: props['placeholder'] as String?,
+                textStyle: theme.body.copyWith(
+                  color: enabled ? theme.ink : theme.disabledInk,
                 ),
-              ],
-              fieldDecoration: BoxDecoration(
-                color: theme.fill,
-                borderRadius: BorderRadius.circular(theme.controlRadius),
-                border: Border.all(
-                  color: error != null
-                      ? theme.error
-                      : _focus.hasFocus
-                      ? theme.primary
-                      : theme.hairlineStrong,
-                  width: _focus.hasFocus || error != null ? 2 : 1,
+                textDirection: _number ? TextDirection.ltr : null,
+                textAlign: _number ? TextAlign.end : TextAlign.start,
+                keyboardType: _number
+                    ? const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      )
+                    : multiline
+                    ? TextInputType.multiline
+                    : TextInputType.text,
+                textInputAction: multiline
+                    ? TextInputAction.newline
+                    : TextInputAction.done,
+                autocorrect: !_number,
+                enableSuggestions: !_number,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(
+                    8192,
+                    maxLengthEnforcement:
+                        MaxLengthEnforcement.truncateAfterCompositionEnds,
+                  ),
+                ],
+                fieldDecoration: BoxDecoration(
+                  color: theme.fill,
+                  borderRadius: BorderRadius.circular(theme.controlRadius),
+                  border: Border.all(
+                    color: error != null
+                        ? theme.error
+                        : _focus.hasFocus
+                        ? theme.primary
+                        : theme.hairlineStrong,
+                    width: _focus.hasFocus || error != null ? 2 : 1,
+                  ),
                 ),
-              ),
-              onSubmitted: multiline
-                  ? null
-                  : (_) {
-                      scope.controller.blur(widget.id, token: widget.token);
-                      scope.submit(context, widget.id, token: widget.token);
-                    },
-              suffixIconConstraints: _number
-                  ? const BoxConstraints(maxWidth: 144)
-                  : null,
-              suffix: _number
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (props['unit'] case final String unit)
-                          Flexible(
-                            child: Text(
-                              unit,
-                              style: theme.caption,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                onSubmitted: multiline
+                    ? null
+                    : (_) {
+                        scope.controller.blur(widget.id, token: widget.token);
+                        scope.submit(context, widget.id, token: widget.token);
+                      },
+                suffixIconConstraints: _number
+                    ? const BoxConstraints(maxWidth: 144)
+                    : null,
+                suffix: _number
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (props['unit'] case final String unit)
+                            Flexible(
+                              child: Text(
+                                unit,
+                                style: theme.caption,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                          IosIconButton(
+                            icon: LucideIcons.minus,
+                            size: 16,
+                            minSize: 44,
+                            tooltip: l10n.genuiDecrease(label),
+                            color: theme.primary,
+                            enabled:
+                                enabled &&
+                                (value is! num || min == null || value > min),
+                            onTap: () => _step(-1),
                           ),
-                        IosIconButton(
-                          icon: LucideIcons.minus,
-                          size: 16,
-                          minSize: 44,
-                          tooltip: l10n.genuiDecrease(label),
-                          color: theme.primary,
-                          enabled:
-                              enabled &&
-                              (value is! num || min == null || value > min),
-                          onTap: () => _step(-1),
-                        ),
-                        IosIconButton(
-                          icon: LucideIcons.plus,
-                          size: 16,
-                          minSize: 44,
-                          tooltip: l10n.genuiIncrease(label),
-                          color: theme.primary,
-                          enabled:
-                              enabled &&
-                              (value is! num || max == null || value < max),
-                          onTap: () => _step(1),
-                        ),
-                      ],
-                    )
-                  : null,
+                          IosIconButton(
+                            icon: LucideIcons.plus,
+                            size: 16,
+                            minSize: 44,
+                            tooltip: l10n.genuiIncrease(label),
+                            color: theme.primary,
+                            enabled:
+                                enabled &&
+                                (value is! num || max == null || value < max),
+                            onTap: () => _step(1),
+                          ),
+                        ],
+                      )
+                    : null,
+              ),
             ),
           ),
         ),

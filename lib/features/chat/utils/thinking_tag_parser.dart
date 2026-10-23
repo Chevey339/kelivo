@@ -1,4 +1,5 @@
-import '../../../core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:markstream/markstream_core.dart';
 
 class ThinkingTagParseResult {
   const ThinkingTagParseResult({
@@ -62,6 +63,7 @@ class ThinkingTagParser {
   static ThinkingTagParseRanges parseWithRanges(
     String input, {
     bool includeUnclosed = true,
+    List<SourceSpan> protectedRanges = const [],
   }) {
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
@@ -69,19 +71,28 @@ class ThinkingTagParser {
     var cursor = 0;
 
     while (cursor < input.length) {
-      final openMatch = _legacyThinkOpenTagRe.firstMatch(
-        input.substring(cursor),
+      final openMatch = _nextOutside(
+        _legacyThinkOpenTagRe,
+        input,
+        cursor,
+        protectedRanges,
       );
       if (openMatch == null) {
         visible.write(input.substring(cursor));
         break;
       }
 
-      final openStart = cursor + openMatch.start;
-      final openEnd = cursor + openMatch.end;
+      final openStart = openMatch.start;
+      final openEnd = openMatch.end;
       final tagName = openMatch.group(1)?.toLowerCase();
       final closeTag = tagName == null ? '<channel|>' : '</$tagName>';
-      final closeStart = input.toLowerCase().indexOf(closeTag, openEnd);
+      final closeMatch = _nextOutside(
+        RegExp(RegExp.escape(closeTag), caseSensitive: false),
+        input,
+        openEnd,
+        protectedRanges,
+      );
+      final closeStart = closeMatch?.start ?? -1;
       visible.write(input.substring(cursor, openStart));
 
       if (closeStart < 0) {
@@ -127,7 +138,8 @@ class ThinkingTagParser {
     List<MessagePart> parts,
     String joined,
     ThinkingTagParseRanges ranges, {
-    required void Function(String text) onVisible,
+    required void Function(String text, int partOrdinal, SourceSpan partSpan)
+    onVisible,
     required void Function(int rangeIndex, String text) onThinking,
     required void Function(MessagePart part) onOther,
   }) {
@@ -146,7 +158,7 @@ class ThinkingTagParser {
       pendingRangeIndex = -1;
     }
 
-    for (final part in parts) {
+    for (final (partOrdinal, part) in parts.indexed) {
       if (part is! TextPart) {
         flushThinking();
         onOther(part);
@@ -181,7 +193,11 @@ class ThinkingTagParser {
         final sliceEnd = visibleEnd < end ? visibleEnd : end;
         if (sliceEnd > cursor) {
           flushThinking();
-          onVisible(joined.substring(cursor, sliceEnd));
+          onVisible(
+            joined.substring(cursor, sliceEnd),
+            partOrdinal,
+            SourceSpan(cursor - start, sliceEnd - start),
+          );
         }
         cursor = sliceEnd;
       }
@@ -215,43 +231,38 @@ class ThinkingTagParser {
     return out.toString();
   }
 
-  static ThinkingTagParseResult parseLegacyInlineBlocks(String input) {
+  static ThinkingTagParseResult parseLegacyInlineBlocks(
+    String input, {
+    List<SourceSpan> protectedRanges = const [],
+    bool includeUnclosed = false,
+  }) {
     debugParseCount++;
-    final visible = StringBuffer();
-    final thinkingTexts = <String>[];
-    var cursor = 0;
-
-    while (cursor < input.length) {
-      final openMatch = _legacyThinkOpenTagRe.firstMatch(
-        input.substring(cursor),
-      );
-      if (openMatch == null) {
-        visible.write(input.substring(cursor));
-        break;
-      }
-
-      final openStart = cursor + openMatch.start;
-      final openEnd = cursor + openMatch.end;
-      final tagName = openMatch.group(1)?.toLowerCase();
-      final closeTag = tagName == null ? '<channel|>' : '</$tagName>';
-      final closeStart = input.toLowerCase().indexOf(closeTag, openEnd);
-
-      if (closeStart == -1) {
-        visible.write(input.substring(cursor));
-        break;
-      }
-
-      visible.write(input.substring(cursor, openStart));
-      final thinking = input.substring(openEnd, closeStart).trim();
-      if (thinking.isNotEmpty) {
-        thinkingTexts.add(thinking);
-      }
-      cursor = closeStart + closeTag.length;
-    }
-
-    return ThinkingTagParseResult(
-      visibleContent: visible.toString().trim(),
-      thinkingTexts: List.unmodifiable(thinkingTexts),
+    final parsed = parseWithRanges(
+      input,
+      includeUnclosed: includeUnclosed,
+      protectedRanges: protectedRanges,
     );
+    return ThinkingTagParseResult(
+      visibleContent: parsed.visibleContent.trim(),
+      thinkingTexts: List.unmodifiable(
+        parsed.thinkingTexts.map((s) => s.trim()).where((s) => s.isNotEmpty),
+      ),
+    );
+  }
+
+  static RegExpMatch? _nextOutside(
+    RegExp expression,
+    String input,
+    int start,
+    List<SourceSpan> protectedRanges,
+  ) {
+    for (final match in expression.allMatches(input, start)) {
+      if (!protectedRanges.any(
+        (span) => span.start <= match.start && match.start < span.end,
+      )) {
+        return match;
+      }
+    }
+    return null;
   }
 }

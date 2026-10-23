@@ -1,3 +1,4 @@
+import 'genui_control_region.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -196,55 +197,60 @@ class _GenUiSliderState extends State<GenUiSlider> {
                     ),
                   ],
                 ),
-                LayoutBuilder(
-                  builder: (context, constraints) => RawGestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    excludeFromSemantics: true,
-                    gestures: _interactive
-                        ? {
-                            TapGestureRecognizer:
-                                GestureRecognizerFactoryWithHandlers<
-                                  TapGestureRecognizer
-                                >(
-                                  () => TapGestureRecognizer(),
-                                  (instance) =>
-                                      instance.onTapUp = (d) => _point(
-                                        d.localPosition.dx,
-                                        constraints.maxWidth,
-                                        rtl,
-                                      ),
-                                ),
-                            HorizontalDragGestureRecognizer:
-                                GestureRecognizerFactoryWithHandlers<
-                                  HorizontalDragGestureRecognizer
-                                >(() => HorizontalDragGestureRecognizer(), (
-                                  instance,
-                                ) {
-                                  instance.onlyAcceptDragOnThreshold = true;
-                                  instance.onStart = (d) => _point(
-                                    d.localPosition.dx,
-                                    constraints.maxWidth,
-                                    rtl,
-                                  );
-                                  instance.onUpdate = (d) => _point(
-                                    d.localPosition.dx,
-                                    constraints.maxWidth,
-                                    rtl,
-                                  );
-                                }),
-                          }
-                        : {},
-                    child: CustomPaint(
-                      painter: _SliderPainter(
-                        theme,
-                        fraction: fraction,
-                        rtl: rtl,
-                        enabled: _enabled,
-                        focused: _focused,
-                        tickCount: tickCount,
-                        tickFraction: span > 0 ? _step / span : 0,
+                GenUiControlRegion(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => RawGestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      excludeFromSemantics: true,
+                      gestures: _interactive
+                          ? {
+                              TapGestureRecognizer:
+                                  GestureRecognizerFactoryWithHandlers<
+                                    TapGestureRecognizer
+                                  >(
+                                    () => TapGestureRecognizer(),
+                                    (instance) =>
+                                        instance.onTapUp = (d) => _point(
+                                          d.localPosition.dx,
+                                          constraints.maxWidth,
+                                          rtl,
+                                        ),
+                                  ),
+                              HorizontalDragGestureRecognizer:
+                                  GestureRecognizerFactoryWithHandlers<
+                                    HorizontalDragGestureRecognizer
+                                  >(() => HorizontalDragGestureRecognizer(), (
+                                    instance,
+                                  ) {
+                                    instance.onlyAcceptDragOnThreshold = true;
+                                    instance.onStart = (d) => _point(
+                                      d.localPosition.dx,
+                                      constraints.maxWidth,
+                                      rtl,
+                                    );
+                                    instance.onUpdate = (d) => _point(
+                                      d.localPosition.dx,
+                                      constraints.maxWidth,
+                                      rtl,
+                                    );
+                                  }),
+                            }
+                          : {},
+                      child: CustomPaint(
+                        painter: _SliderPainter(
+                          theme,
+                          fraction: fraction,
+                          rtl: rtl,
+                          enabled: _enabled,
+                          focused: _focused,
+                          tickCount: tickCount,
+                          tickFraction: span > 0 ? _step / span : 0,
+                        ),
+                        child: const SizedBox(
+                          height: 44,
+                          width: double.infinity,
+                        ),
                       ),
-                      child: const SizedBox(height: 44, width: double.infinity),
                     ),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import 'protected_text.dart';
 import '../core/models/assistant.dart';
 import '../core/models/assistant_regex.dart';
 
@@ -25,7 +26,40 @@ String applyAssistantRegexes(
   if (assistant == null) return input;
   if (assistant.regexRules.isEmpty) return input;
 
-  String out = input;
+  var out = input;
+  for (final (regex, replacement) in _activeRules(assistant, scope, target)) {
+    out = out.replaceAllMapped(
+      regex,
+      (match) => _expandReplacement(replacement, match),
+    );
+  }
+  return out;
+}
+
+ProtectedText applyAssistantRegexesProtected(
+  ProtectedText input, {
+  required Assistant? assistant,
+  required AssistantRegexScope scope,
+  required AssistantRegexTransformTarget target,
+}) {
+  if (input.text.isEmpty || assistant == null || assistant.regexRules.isEmpty) {
+    return input;
+  }
+  var out = input;
+  for (final (regex, replacement) in _activeRules(assistant, scope, target)) {
+    out = out.replaceAllMapped(
+      regex,
+      (match) => _expandReplacement(replacement, match),
+    );
+  }
+  return out;
+}
+
+Iterable<(RegExp, String)> _activeRules(
+  Assistant assistant,
+  AssistantRegexScope scope,
+  AssistantRegexTransformTarget target,
+) sync* {
   for (final rule in assistant.regexRules) {
     if (!rule.enabled) continue;
     if (!rule.scopes.contains(scope)) continue;
@@ -50,11 +84,8 @@ String applyAssistantRegexes(
       }
     });
     if (regex == null) continue;
-    out = out.replaceAllMapped(regex, (match) {
-      return _expandReplacement(rule.replacement, match);
-    });
+    yield (regex, rule.replacement);
   }
-  return out;
 }
 
 /// Expands replacement string with capture group references ($0, $1, $2, etc.)

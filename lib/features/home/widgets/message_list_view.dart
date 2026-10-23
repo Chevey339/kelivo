@@ -1,3 +1,5 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
 import '../../browser/models/browser_tool_presentation.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -339,6 +341,7 @@ class _MessageListViewState extends State<MessageListView> {
       ToolExtentInvalidationQueue();
   var _awaitingAttachFlush = false;
   var _attachFlushScheduled = false;
+  final _uiRegistry = UiRuntimeRegistry();
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -372,6 +375,17 @@ class _MessageListViewState extends State<MessageListView> {
     }
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
+    for (final message in widget.messages) {
+      // StreamingContentNotifier supplies the current parts to the child;
+      // the list's backing row can still contain an earlier checkpoint.
+      if (message.isStreaming) continue;
+      _uiRegistry.reconcile(
+        message,
+        hasProviderReasoning:
+            (widget.reasoning[message.id]?.text.isNotEmpty ?? false) ||
+            (widget.reasoningSegments[message.id]?.isNotEmpty ?? false),
+      );
+    }
     _synchronizeExtentCache(oldWidget, oldRenderModels);
     _snapshotToolSignatures();
   }
@@ -886,6 +900,12 @@ class _MessageListViewState extends State<MessageListView> {
       reasoningCountAtSplit: reasoningCountAtSplit,
       toolCountAtSplit: toolCountAtSplit,
       transformText: _estimateVisualTransform,
+      transformProtectedText: (text) => applyAssistantRegexesProtected(
+        text,
+        assistant: widget.assistant,
+        scope: AssistantRegexScope.assistant,
+        target: AssistantRegexTransformTarget.visual,
+      ),
       partsArrivalOrdered: message.isStreaming,
       inlineThinkingExpanded: !settings.collapseThinking,
     );
@@ -1639,6 +1659,7 @@ class _MessageListViewState extends State<MessageListView> {
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
     _keyboardFocusNode.dispose();
+    _uiRegistry.dispose();
     super.dispose();
   }
 
@@ -1727,111 +1748,119 @@ class _MessageListViewState extends State<MessageListView> {
       showTokenStats: widget.showTokenStats,
       assistant: widget.assistant,
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final horizontalPad =
-            ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
-                .clamp(0.0, double.infinity);
+    return UiRuntimeScope(
+      registry: _uiRegistry,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPad =
+              ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
+                  .clamp(0.0, double.infinity);
 
-        return Builder(
-          builder: (context) {
-            final list = SuperListView.builder(
-              controller: widget.scrollController,
-              listController: widget.listController,
-              cacheExtent: 600,
-              delayPopulatingCacheArea: false,
-              addRepaintBoundaries: false,
-              findChildIndexCallback: _findMessageIndexByKey,
-              extentEstimation: _estimateItemExtent,
-              padding: EdgeInsets.fromLTRB(
-                horizontalPad,
-                widget.topContentPadding,
-                horizontalPad,
-                widget.bottomContentPadding +
-                    (widget.isPinnedIndicatorActive ? 12 : 0),
-              ),
-              itemCount: _effectiveRenderModels.isEmpty && _hasFooter
-                  ? 1
-                  : _effectiveRenderModels.length,
-              keyboardDismissBehavior: _keyboardDismissBehavior,
-              itemBuilder: (context, index) {
-                if (_effectiveRenderModels.isEmpty && _hasFooter) {
-                  return SizedBox(height: _footerExtent, child: widget.footer);
-                }
-                if (index < 0 || index >= _effectiveRenderModels.length) {
-                  return const SizedBox.shrink();
-                }
-                return _buildMessageItem(
-                  context,
-                  index: index,
-                  presentation: presentation,
-                );
-              },
-            );
+          return Builder(
+            builder: (context) {
+              final list = SuperListView.builder(
+                controller: widget.scrollController,
+                listController: widget.listController,
+                cacheExtent: 600,
+                delayPopulatingCacheArea: false,
+                addRepaintBoundaries: false,
+                findChildIndexCallback: _findMessageIndexByKey,
+                extentEstimation: _estimateItemExtent,
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPad,
+                  widget.topContentPadding,
+                  horizontalPad,
+                  widget.bottomContentPadding +
+                      (widget.isPinnedIndicatorActive ? 12 : 0),
+                ),
+                itemCount: _effectiveRenderModels.isEmpty && _hasFooter
+                    ? 1
+                    : _effectiveRenderModels.length,
+                keyboardDismissBehavior: _keyboardDismissBehavior,
+                itemBuilder: (context, index) {
+                  if (_effectiveRenderModels.isEmpty && _hasFooter) {
+                    return SizedBox(
+                      height: _footerExtent,
+                      child: widget.footer,
+                    );
+                  }
+                  if (index < 0 || index >= _effectiveRenderModels.length) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildMessageItem(
+                    context,
+                    index: index,
+                    presentation: presentation,
+                  );
+                },
+              );
 
-            final historyList =
-                NotificationListener<SelectionAutoScrollNotification>(
-                  onNotification: (_) {
-                    _handleUserScrollActivity();
-                    return false;
-                  },
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: _handleScrollNotification,
-                    child: list,
-                  ),
-                );
+              final historyList =
+                  NotificationListener<SelectionAutoScrollNotification>(
+                    onNotification: (_) {
+                      _handleUserScrollActivity();
+                      return false;
+                    },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _handleScrollNotification,
+                      child: list,
+                    ),
+                  );
 
-            final userScrollAwareList = Listener(
-              onPointerDown: (event) {
-                // Keep copy shortcuts on a focused text selection when the
-                // second click of a double-click reaches the list.
-                if (_isDesktopPlatform && !_keyboardFocusNode.hasFocus) {
-                  _keyboardFocusNode.requestFocus();
-                }
-                if (event.buttons != 0 &&
-                    event.buttons != kSecondaryMouseButton) {
-                  _pointerDragInProgress = true;
-                  _latestPointerDragMetrics = null;
-                  _setDeferStreamingMessageUpdates(true);
-                }
-              },
-              onPointerUp: (_) => _settlePointerDrag(),
-              onPointerCancel: (_) => _settlePointerDrag(),
-              onPointerSignal: (event) {
-                if (event is PointerScrollEvent) {
-                  _setDeferStreamingMessageUpdates(true);
-                  _schedulePointerScrollActivityCheck();
-                }
-              },
-              child: Focus(
-                key: const ValueKey('timeline-keyboard-scroll-region'),
-                focusNode: _keyboardFocusNode,
-                onKeyEvent: _handleTimelineKeyEvent,
-                child: historyList,
-              ),
-            );
+              final userScrollAwareList = Listener(
+                onPointerDown: (event) {
+                  // Keep copy shortcuts on a focused text selection when the
+                  // second click of a double-click reaches the list.
+                  if (_isDesktopPlatform &&
+                      !_keyboardFocusNode.hasFocus &&
+                      !GenUiControlPointer.contains(event)) {
+                    _keyboardFocusNode.requestFocus();
+                  }
+                  if (event.buttons != 0 &&
+                      event.buttons != kSecondaryMouseButton) {
+                    _pointerDragInProgress = true;
+                    _latestPointerDragMetrics = null;
+                    _setDeferStreamingMessageUpdates(true);
+                  }
+                },
+                onPointerUp: (_) => _settlePointerDrag(),
+                onPointerCancel: (_) => _settlePointerDrag(),
+                onPointerSignal: (event) {
+                  if (event is PointerScrollEvent) {
+                    _setDeferStreamingMessageUpdates(true);
+                    _schedulePointerScrollActivityCheck();
+                  }
+                },
+                child: Focus(
+                  key: const ValueKey('timeline-keyboard-scroll-region'),
+                  focusNode: _keyboardFocusNode,
+                  onKeyEvent: _handleTimelineKeyEvent,
+                  child: historyList,
+                ),
+              );
 
-            return Stack(
-              children: [
-                userScrollAwareList,
-                if (_effectiveRenderModels.isEmpty && widget.isLoadingWindow)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: _WindowLoadingSkeleton(
-                        key: MessageListView.windowSkeletonKey,
-                        horizontalPadding: horizontalPad,
-                        topPadding: widget.topContentPadding,
+              return Stack(
+                children: [
+                  userScrollAwareList,
+                  if (_effectiveRenderModels.isEmpty && widget.isLoadingWindow)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: _WindowLoadingSkeleton(
+                          key: MessageListView.windowSkeletonKey,
+                          horizontalPadding: horizontalPad,
+                          topPadding: widget.topContentPadding,
+                        ),
                       ),
                     ),
-                  ),
-                if (widget.isPinnedIndicatorActive &&
-                    widget.buildPinnedStreamingIndicator != null)
-                  widget.buildPinnedStreamingIndicator!(),
-              ],
-            );
-          },
-        );
-      },
+                  if (widget.isPinnedIndicatorActive &&
+                      widget.buildPinnedStreamingIndicator != null)
+                    widget.buildPinnedStreamingIndicator!(),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

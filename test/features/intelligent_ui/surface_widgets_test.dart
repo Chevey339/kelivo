@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_node.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -184,6 +185,60 @@ root = Metric(label="Value", value=$x)''');
       expect(find.byType(IosIconButton), findsNothing);
       expect(find.text('Not saved'), findsNothing);
       expect(find.text('Read-only snapshot'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'node reveal exists only during animation and preserves editor focus and composing',
+    (tester) async {
+      final c = _controller();
+      const prefix = '${UiCatalog.header}\nroot = Column(children=[field])\n';
+      c.updateSource(
+        prefix,
+        closed: false,
+        generation: UiGenerationStatus.generating,
+      );
+      await tester.pumpWidget(
+        _app(GenUiSurface(controller: c), reduceMotion: false),
+      );
+      final nodeFinder = find.byType(GenUiNode);
+      Finder fades() => find.descendant(
+        of: nodeFinder,
+        matching: find.byType(FadeTransition),
+      );
+      expect(fades(), findsNothing);
+      c.updateSource(
+        '$prefix\$value: string = "initial"\nfield = TextField(label="Name",bind=\$value)\n',
+        closed: true,
+        generation: UiGenerationStatus.complete,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(fades(), findsOneWidget);
+      final field = find.byType(EditableText);
+      await tester.tap(field);
+      await tester.pump();
+      final state = tester.state<EditableTextState>(field);
+      final editing = tester.widget<EditableText>(field);
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '组字',
+          selection: TextSelection.collapsed(offset: 2),
+          composing: TextRange(start: 0, end: 2),
+        ),
+      );
+      await tester.pump();
+      expect(editing.focusNode.hasFocus, isTrue);
+      await tester.pump(const Duration(milliseconds: 180));
+      await tester.pump();
+      expect(fades(), findsNothing);
+      expect(identical(state, tester.state<EditableTextState>(field)), isTrue);
+      expect(editing.focusNode.hasFocus, isTrue);
+      expect(
+        editing.controller.value.composing,
+        const TextRange(start: 0, end: 2),
+      );
+      expect(c.captureRead().inputs['value'], 'initial');
+      await tester.pumpWidget(const SizedBox());
     },
   );
 }

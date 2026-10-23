@@ -384,7 +384,7 @@ List<MessagePart> _partsWithVisibleThinkSlices(
     parts,
     joined,
     ranges,
-    onVisible: (text) => next.add(TextPart(text)),
+    onVisible: (text, _, _) => next.add(TextPart(text)),
     onThinking: (_, text) {
       if (insertReasoningParts && text.isNotEmpty) {
         next.add(ReasoningPart(text));
@@ -587,7 +587,7 @@ List<ReasoningSegment> _expandSegmentsByLegacyThinkFragments(
     message.parts,
     message.content,
     ranges,
-    onVisible: (_) {},
+    onVisible: (_, _, _) {},
     onThinking: (rangeIndex, text) {
       if (text.isNotEmpty) fragments.add((rangeIndex, text));
     },

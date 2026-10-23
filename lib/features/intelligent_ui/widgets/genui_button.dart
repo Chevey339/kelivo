@@ -1,3 +1,4 @@
+import 'genui_control_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_diagnostic.dart';
@@ -220,7 +221,7 @@ class _GenUiButtonState extends State<GenUiButton> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        button,
+        GenUiControlRegion(child: button),
         if (!scope.readOnly && (reason != null || _error != null)) ...[
           SizedBox(height: theme.xxs),
           if (reason != null)

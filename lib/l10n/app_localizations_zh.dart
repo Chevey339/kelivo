@@ -13548,6 +13548,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String genuiCharacterCount(int used, int max) {
     return '$used / $max 个字符';
   }
+
+  @override
+  String get genuiBlockLimit => '每条消息最多渲染 3 个界面，其余以源码显示';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27020,6 +27023,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String genuiCharacterCount(int used, int max) {
     return '$used / $max 个字符';
   }
+
+  @override
+  String get genuiBlockLimit => '每条消息最多渲染 3 个界面，其余以源码显示';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -40572,4 +40578,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String genuiCharacterCount(int used, int max) {
     return '$used / $max 個字元';
   }
+
+  @override
+  String get genuiBlockLimit => '每則訊息最多顯示 3 個介面，其餘以原始碼顯示';
 }

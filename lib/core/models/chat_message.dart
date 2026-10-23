@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../utils/utf16_safe_cut.dart';
 import 'message_part.dart';
 import 'token_usage.dart';
+import '../database/generation_run.dart';
 
 part 'chat_message.g.dart';
 
@@ -27,6 +28,14 @@ class ChatMessage extends HiveObject {
   int? _storageOrder;
   int? get storageOrder => _storageOrder;
   void hydrateStorageOrder(int? order) => _storageOrder = order;
+
+  /// Projection of the authoritative generation run, not another persisted
+  /// status field. A non-streaming revision can be cancelled or interrupted;
+  /// absence of a run does not prove successful completion.
+  GenerationRunState? _generationState;
+  GenerationRunState? get generationState => _generationState;
+  void hydrateGenerationState(GenerationRunState? state) =>
+      _generationState = state;
 
   // Hydrated request metadata belongs to this message snapshot. It is not a
   // second persisted representation: provider_artifact_rows owns storage.
@@ -348,6 +357,11 @@ class ChatMessage extends HiveObject {
         finishUsage: finishUsage ?? this.finishUsage,
       )
       .._storageOrder = (id == null || id == this.id) ? _storageOrder : null
+      .._generationState = (id == null || id == this.id)
+          ? isStreaming == true
+                ? GenerationRunState.streaming
+                : _generationState
+          : null
       .._providerArtifactSnapshot = (id == null || id == this.id)
           ? _providerArtifactSnapshot
           : null;
