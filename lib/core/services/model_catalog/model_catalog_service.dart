@@ -46,6 +46,7 @@ const Map<String, List<String>> kCatalogExactHostProviders =
       'gitlab.com': <String>['gitlab'],
       'cloud.gitlab.com': <String>['gitlab'],
       'ai.salad.cloud': <String>['salad-cloud'],
+      'api.sambanova.ai': <String>['sambanova'],
     };
 
 /// Slash-prefix on aggregator ids → first-party catalog provider id.
