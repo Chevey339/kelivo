@@ -172,7 +172,12 @@ environment variables, never read from the app's accounts or logged.
   root fatal-info analysis and 9,181 tests passed/2 skipped; markstream analysis
   and 296 tests passed; macOS debug build and diff check passed. Final independent
   review has no remaining findings.
-- C06–C26: not implemented. No complete-delivery claim.
+- C06: manual evaluator, frozen 30-task configuration and offline scorer
+  implemented; 120 focused tests and fatal-info tool analysis passed. Final
+  independent review has no findings; root fatal-info analysis and 9,199 tests
+  passed/2 skipped; markstream analysis and 296 tests passed; macOS debug build,
+  formatting and diff checks passed. Early real calls follow this commit.
+- C07–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -272,3 +277,32 @@ diagnostics exceeded the bounded list, and runtime errors propagating through
 FormRef to its button. Required/hidden-field validation and draft controls
 remain C08; repository/flush behavior remains C11. No database or widget
 dependency is introduced here.
+
+## C06 manual model evaluation and offline scoring
+
+`tool/genui_eval.dart` reads the test key and full completion endpoint only from
+environment variables. Its serial bounded HTTP client refuses redirects, does
+not log exception bodies or credentials, and never retries paid calls. An
+exclusive retained marker claims each fresh output directory before requests.
+The repository entrypoint and tracked, clean configuration are required so the
+recorded tested commit describes the actual input and interpretation code.
+Guards include the vendored Markstream parser and dependency manifests. Since
+the app lockfile is intentionally ignored, the tracked evaluator configuration
+also fixes the Dart SDK and the six hosted packages used by the pure runtime;
+both the active package resolution and lockfile must match before a run/summary.
+
+The user-selected single model has six scenes × five fixed variants. The early
+subset covers calculator, parameter curve and conditional form. Deterministic
+checks exercise actual controller updates, units/numbers, exact Ask contexts,
+Form membership, visibility/enabling, data mappings/keys and preserved null
+gaps. Semantic inspection is separate and attributed (including agent review
+when applicable); a parser-only or deterministic-only pass is insufficient.
+Final acceptance remains at least 29/30. The formal report contains only model,
+date, testedCommit and score. No model API enters ordinary tests or G.
+
+Eight clearly labeled synthetic outputs cover all six scenes plus domain gaps.
+Regression mutations cover wrong arithmetic/units, hardcoded results, hidden or
+disabled UI, fields escaping Form, extra Ask context, duplicated table keys and
+bad chart mapping. Failed checks stop at a bounded collector even for hundreds
+of aliased invalid tables. Actual early calls occur only after C06 is committed;
+they and the later C25 full run require separate recorded evidence.
