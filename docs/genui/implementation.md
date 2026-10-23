@@ -160,7 +160,11 @@ environment variables, never read from the app's accounts or logged.
 - C02: catalog/typed contracts accepted. Independent review found no actionable
   defects; fatal-info analysis passed; root 9,097 passed/2 skipped; markstream
   analysis and 296 tests passed; macOS debug build and diff check passed.
-- C03–C26: not implemented. No complete-delivery claim.
+- C03: parser/validation accepted. Final independent review has no actionable
+  findings; 61 focused tests passed; root fatal-info analysis and 9,140 tests
+  passed/2 skipped; markstream analysis and 296 tests passed; macOS debug build,
+  formatting and diff checks passed.
+- C04–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -185,3 +189,26 @@ Plain Dart smoke import of both the catalog and IR succeeded without Flutter,
 Drift or platform libraries. Contract tests cover deterministic reference
 generation, semantic coverage, unique example symbols, distinct reference
 types, immutable collection ownership and JSON-safe IR serialization.
+
+## C03 parser and validation
+
+Reuses PetitParser 6.1.0 from the existing dependency graph. Full physical
+records are reduced once; CRLF and pending CR are handled explicitly, and
+unterminated final records commit only on fence closure. A changed consumed
+prefix or reopening a closed document advances the runtime epoch. Identical
+updates reuse the snapshot; duplicate declarations remain errors even when
+their text is identical. Header/catalog/root failures are whole-surface
+failures; unknown components/properties and bad dependencies stay local.
+
+Typed binding/children/FormRef/action slots, declaration/UTF-8/depth budgets,
+forward references, static expression types and graph invariants are checked.
+Error codes map to fixed localization keys without importing Flutter.
+Derived types use iterative dependency postorder; AST recursion is bounded
+before records leave the parser. Rejected deep ASTs and nonfinite literals do
+not enter the serializable IR. Runtime arithmetic/domain checks are C04.
+
+Independent early review confirmed and then rechecked the fixes for a valid
+500-declaration chain overflowing recursive type inference, and invalid ASTs
+overflowing/failing diagnostic serialization. The reviewer also checked 2,205
+incremental rewrites against fresh parsing. Current review has no actionable
+findings. Regression tests include these cases and all catalog examples.
