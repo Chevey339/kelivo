@@ -486,6 +486,16 @@
   "providerDetailPageManageKeysButton": "Manage Keys",
   "multiKeyPageTitle": "Multi-Key Manager",
   "multiKeyPageDetect": "Detect",
+  "multiKeyPageQueryBalance": "Query Balances",
+  "multiKeyPageBalanceDisabled": "Enable balance query in Balance settings first",
+  "multiKeyPageBalanceQueriedSnackbar": "Queried balance for {n} keys",
+  "@multiKeyPageBalanceQueriedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "multiKeyPageAdd": "Add",
   "multiKeyPageAddHint": "Enter API keys, separated by comma or space",
   "multiKeyPageImportedSnackbar": "Imported {n} keys",
