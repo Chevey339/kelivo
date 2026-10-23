@@ -976,6 +976,111 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  for (final leaveMenu in [false, true]) {
+    testWidgets(
+      'desktop hover dismissal clears the submenu source highlight (outside: $leaveMenu)',
+      (tester) async {
+        final highlightStrategy = FocusManager.instance.highlightStrategy;
+        FocusManager.instance.highlightStrategy =
+            FocusHighlightStrategy.alwaysTraditional;
+        addTearDown(
+          () => FocusManager.instance.highlightStrategy = highlightStrategy,
+        );
+        await mount(
+          tester,
+          desktop: true,
+          anchor: const Rect.fromLTWH(720, 64, 32, 32),
+          style: BrowserSurfaceStyle.solid,
+        );
+        Color background(String label) {
+          final row = find.ancestor(
+            of: find.text(label),
+            matching: find.byType(FocusableActionDetector),
+          );
+          final box = tester.widget<DecoratedBox>(
+            find.descendant(of: row, matching: find.byType(DecoratedBox)).first,
+          );
+          return (box.decoration as BoxDecoration).color!;
+        }
+
+        final mouse = await tester.createGesture(
+          kind: ui.PointerDeviceKind.mouse,
+        );
+        await mouse.addPointer(location: const Offset(20, 580));
+        await mouse.moveTo(tester.getCenter(find.text('Page options')));
+        await mouse.down(tester.getCenter(find.text('Page options')));
+        await mouse.up();
+        await tester.pumpAndSettle();
+        await mouse.moveTo(tester.getCenter(find.text('Copy link')));
+        await tester.pump();
+        await mouse.moveTo(
+          leaveMenu
+              ? const Offset(20, 580)
+              : tester.getCenter(find.text('History')),
+        );
+        await tester.pump(const Duration(milliseconds: 330));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<BrowserGlass>(
+                find.byKey(const ValueKey('browserSubmenuSurface')),
+              )
+              .opacity,
+          0,
+        );
+        expect(background('Page options'), Colors.transparent);
+        expect(background('History').a, leaveMenu ? 0 : closeTo(.075, .001));
+        expect(fixture.results, isEmpty);
+        await mouse.removePointer();
+        await tester.sendKeyEvent(
+          leaveMenu ? LogicalKeyboardKey.escape : LogicalKeyboardKey.enter,
+        );
+        await tester.pumpAndSettle();
+        expect(fixture.results, [leaveMenu ? null : 'history']);
+        expect(surface, findsNothing);
+      },
+    );
+  }
+
+  testWidgets('keyboard submenu dismissal restores focus to its source', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      desktop: true,
+      anchor: const Rect.fromLTWH(720, 64, 32, 32),
+      style: BrowserSurfaceStyle.solid,
+    );
+    for (final key in [
+      LogicalKeyboardKey.arrowLeft,
+      LogicalKeyboardKey.escape,
+    ]) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      final source = tester.widget<FocusableActionDetector>(
+        find.ancestor(
+          of: find.text('Page options'),
+          matching: find.byType(FocusableActionDetector),
+        ),
+      );
+      expect(source.focusNode!.hasPrimaryFocus, isTrue);
+      expect(
+        tester
+            .widget<BrowserGlass>(
+              find.byKey(const ValueKey('browserSubmenuSurface')),
+            )
+            .opacity,
+        0,
+      );
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(surface, findsNothing);
+    expect(fixture.results, [null]);
+  });
+
   testWidgets('recessed parent stays legible outside the child footprint', (
     tester,
   ) async {

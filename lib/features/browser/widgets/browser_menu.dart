@@ -735,6 +735,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
   final _targets = <GlobalKey, _MenuTarget>{};
   final _backKey = Object();
   final _submenuKey = Object();
+  final _primaryFocus = FocusNode();
   final _submenuSourceFocus = FocusNode();
   final _surfaceKey = GlobalKey();
   final _selectionSpace = GlobalKey();
@@ -925,6 +926,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
     }
     _submenuMotion.dispose();
     _submenuAnimation.dispose();
+    _primaryFocus.dispose();
     _submenuSourceFocus.dispose();
     _submenuTimer?.cancel();
     _selectionContact?.dispose();
@@ -933,7 +935,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
     super.dispose();
   }
 
-  void _back() {
+  void _back({bool restoreSourceFocus = true}) {
     if (!_secondary || _disposing) return;
     _hoverOpenTimer?.cancel();
     _hoverCloseTimer?.cancel();
@@ -945,7 +947,13 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
       _selectionRect = null;
     });
     history?.remove();
-    _submenuSourceFocus.requestFocus();
+    if (restoreSourceFocus) {
+      _submenuSourceFocus.requestFocus();
+    } else if (_desktopHoverPrimary == null) {
+      // A pointer exit must not reselect the source row. Keep keyboard
+      // dismissal available on the menu when the pointer left both panels.
+      _primaryFocus.requestFocus();
+    }
     if (MediaQuery.disableAnimationsOf(context)) {
       _submenuAnimation.value = 0;
     } else {
@@ -1022,7 +1030,10 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
 
   void _scheduleHoverClose() {
     if (!_secondary || _hoverCloseTimer?.isActive == true) return;
-    _hoverCloseTimer = Timer(const Duration(milliseconds: 320), _back);
+    _hoverCloseTimer = Timer(
+      const Duration(milliseconds: 320),
+      () => _back(restoreSourceFocus: false),
+    );
   }
 
   void _trackHover(PointerEvent event) {
@@ -1291,6 +1302,7 @@ class _BrowserMenuPanelState<T> extends State<_BrowserMenuPanel<T>>
         const SingleActivator(LogicalKeyboardKey.arrowRight): _openSubmenu,
     },
     child: Focus(
+      focusNode: secondary ? null : _primaryFocus,
       autofocus: true,
       child: FocusTraversalGroup(
         child: Shortcuts(
