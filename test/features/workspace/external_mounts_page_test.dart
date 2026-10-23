@@ -255,7 +255,7 @@ void main() {
       final l10n = AppLocalizations.of(
         tester.element(find.byType(FileBrowser)),
       )!;
-      Future<void> createFile() async {
+      Future<void> createFile({required bool readOnly}) async {
         await tester.tap(find.byKey(FileBrowser.newKey));
         await settle(tester);
         await tester.tap(find.byKey(FileBrowser.newFileKey));
@@ -297,7 +297,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await createFile();
+      await createFile(readOnly: true);
       expect(File('${root.path}/new.txt').existsSync(), isFalse);
       expect(
         AppSnackBarManager().activeToasts.any(
@@ -327,7 +327,7 @@ void main() {
           readOnly: false,
         ),
       );
-      await createFile();
+      await createFile(readOnly: false);
       expect(File('${root.path}/new.txt').existsSync(), isTrue);
       debugDefaultTargetPlatformOverride = null;
       expect(tester.takeException(), isNull);

@@ -591,6 +591,7 @@ class ChatInputBar extends StatefulWidget {
     this.onPickCamera,
     this.onPickPhotos,
     this.onUploadFiles,
+    this.onOpenBrowser,
     this.onToggleLearningMode,
     this.onOpenWorldBook,
     this.onClearContext,
@@ -654,6 +655,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
+  final VoidCallback? onOpenBrowser;
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
@@ -3130,7 +3132,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Tools button (local tools and MCP servers)
+        // Tools menu also includes independent browser navigation on desktop.
         if (widget.showToolsButton) {
           actions.add(
             _OverflowAction(
@@ -3219,6 +3221,24 @@ class _ChatInputBarState extends State<ChatInputBar>
                 icon: Lucide.Paperclip,
                 label: l10n.bottomToolsSheetUpload,
                 onTap: lockTap(widget.onUploadFiles),
+              ),
+            ),
+          );
+        }
+
+        if (widget.onOpenBrowser != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.browserOpen,
+                icon: Lucide.AppWindow,
+                onTap: lockTap(widget.onOpenBrowser),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.AppWindow,
+                label: l10n.browserOpen,
+                onTap: lockTap(widget.onOpenBrowser),
               ),
             ),
           );

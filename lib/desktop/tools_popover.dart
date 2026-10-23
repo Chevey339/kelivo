@@ -23,6 +23,7 @@ Future<void> showDesktopToolsPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required String assistantId,
+  required bool supportsModelTools,
   String? conversationId,
 }) async {
   final overlay = Overlay.maybeOf(context);
@@ -47,6 +48,7 @@ Future<void> showDesktopToolsPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
+      supportsModelTools: supportsModelTools,
       conversationId: conversationId,
       onClose: () {
         try {
@@ -63,6 +65,7 @@ class _ToolsPopover extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
+    required this.supportsModelTools,
     required this.onClose,
     this.conversationId,
   });
@@ -70,6 +73,7 @@ class _ToolsPopover extends StatefulWidget {
   final Rect anchorRect;
   final double anchorWidth;
   final String assistantId;
+  final bool supportsModelTools;
   final String? conversationId;
   final VoidCallback onClose;
 
@@ -160,6 +164,7 @@ class _ToolsPopoverState extends State<_ToolsPopover>
                         ),
                         child: _ToolsContent(
                           assistantId: widget.assistantId,
+                          supportsModelTools: widget.supportsModelTools,
                           conversationId: widget.conversationId,
                           onDone: _close,
                         ),
@@ -219,11 +224,13 @@ class _GlassPanel extends StatelessWidget {
 class _ToolsContent extends StatefulWidget {
   const _ToolsContent({
     required this.assistantId,
+    required this.supportsModelTools,
     required this.onDone,
     this.conversationId,
   });
   final String? conversationId;
   final String assistantId;
+  final bool supportsModelTools;
   final VoidCallback onDone;
 
   @override
@@ -265,9 +272,11 @@ class _ToolsContentState extends State<_ToolsContent> {
     final a = ap.getById(widget.assistantId);
     if (a == null) return const SizedBox.shrink();
     final selected = a.mcpServerIds.toSet();
-    final groups = mcpToolGroups(mcp);
+    final groups = [if (widget.supportsModelTools) ...mcpToolGroups(mcp)];
 
-    final localToolIds = availableLocalToolIds();
+    final localToolIds = widget.supportsModelTools
+        ? availableLocalToolIds()
+        : const <String>[];
     final enabledLocalTools = a.localToolIds.toSet();
 
     final rows = <WidgetBuilder>[];

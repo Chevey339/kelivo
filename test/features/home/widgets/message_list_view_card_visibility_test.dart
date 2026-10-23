@@ -194,6 +194,41 @@ void main() {
     expect(askUserHidden, greaterThan(0));
   });
 
+  testWidgets(
+    'webpage card visibility changes estimated extent but keeps the group header',
+    (tester) async {
+      final message = ChatMessage(
+        id: 'browser',
+        role: 'assistant',
+        conversationId: 'conversation-1',
+      );
+      final tools = {
+        'browser': [
+          ToolUIPart(
+            id: 'open',
+            toolName: LocalToolNames.browser,
+            arguments: const {'action': 'open'},
+            content: '{"ok":true,"page":{"url":"https://example.com"}}',
+          ),
+        ],
+      };
+      final shown = await _estimateExtent(
+        tester,
+        message: message,
+        toolParts: tools,
+      );
+      final hidden = await _estimateExtent(
+        tester,
+        message: message,
+        toolParts: tools,
+        showBrowserPageCards: false,
+      );
+      final noTools = await _estimateExtent(tester, message: message);
+      expect(shown - hidden, closeTo(76, .1));
+      expect(hidden, greaterThan(noTools));
+    },
+  );
+
   testWidgets('height estimate includes collapsed inline tool cards', (
     tester,
   ) async {
@@ -1362,6 +1397,7 @@ Future<double> _estimateExtent(
   bool showToolCards = true,
   bool showToolResultSummary = false,
   bool hideToolResultImages = false,
+  bool showBrowserPageCards = true,
   bool collapseThinkingSteps = false,
   bool collapseThinking = true,
   bool wrapCodeBlocks = false,
@@ -1381,6 +1417,7 @@ Future<double> _estimateExtent(
       showToolCards: showToolCards,
       showToolResultSummary: showToolResultSummary,
       hideToolResultImages: hideToolResultImages,
+      showBrowserPageCards: showBrowserPageCards,
       collapseThinkingSteps: collapseThinkingSteps,
       wrapCodeBlocks: wrapCodeBlocks,
       collapsedCodeLines: collapsedCodeLines,
@@ -1402,6 +1439,7 @@ class _CardVisibilityHarness extends StatefulWidget {
     this.showToolCards = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
+    this.showBrowserPageCards = true,
     this.collapseThinkingSteps = false,
     this.wrapCodeBlocks = false,
     this.collapsedCodeLines,
@@ -1417,6 +1455,7 @@ class _CardVisibilityHarness extends StatefulWidget {
   final bool showToolCards;
   final bool showToolResultSummary;
   final bool hideToolResultImages;
+  final bool showBrowserPageCards;
   final bool collapseThinkingSteps;
   final bool wrapCodeBlocks;
   final int? collapsedCodeLines;
@@ -1500,6 +1539,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
             showToolCards: widget.showToolCards,
             showToolResultSummary: widget.showToolResultSummary,
             hideToolResultImages: widget.hideToolResultImages,
+            showBrowserPageCards: widget.showBrowserPageCards,
             collapseThinkingSteps: widget.collapseThinkingSteps,
             collapseThinking: widget.settings.autoCollapseThinking,
             wrapCodeBlocks: widget.wrapCodeBlocks,

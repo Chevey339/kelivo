@@ -216,6 +216,7 @@ void main() {
                               context,
                               anchorKey: anchor,
                               assistantId: assistantId,
+                              supportsModelTools: true,
                             ),
                             child: const Text('Open tools'),
                           ),
@@ -328,6 +329,11 @@ void main() {
       variant: TargetPlatformVariant.only(platform),
     );
   }
+
+  testWidgets('tool sheet has no standalone browser entry', (tester) async {
+    await pumpSheet(tester);
+    expect(find.byKey(const ValueKey('chat-tools-open-browser')), findsNothing);
+  });
 
   testWidgets('shows the local tools group folded with an enabled count', (
     tester,

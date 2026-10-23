@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../core/models/message_part.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_visibility.dart';
+import '../../home/services/local_tools_service.dart';
 
 /// A tool as the timeline projector sees it.
 ///
@@ -89,7 +90,9 @@ class TimelineProjectedStep {
     required this.reasoningCountAfter,
     required this.toolCountAfter,
     this.reasoningOverlayIndex,
-  }) : tool = null;
+  }) : tool = null,
+       browserTools = null,
+       browserLite = false;
 
   const TimelineProjectedStep.tool({
     required this.sourceOrdinal,
@@ -97,8 +100,24 @@ class TimelineProjectedStep {
     required this.reasoningCountAfter,
     required this.toolCountAfter,
   }) : reasoning = null,
+       browserTools = null,
+       browserLite = false,
        reasoningOverlayIndex = null;
 
+  TimelineProjectedStep.browserGroup(
+    List<TimelineProjectedStep> steps, {
+    required bool lite,
+  }) : sourceOrdinal = steps.first.sourceOrdinal,
+       reasoning = null,
+       reasoningOverlayIndex = null,
+       tool = steps.last.tool,
+       browserTools = List.unmodifiable(steps.map((step) => step.tool!)),
+       browserLite = lite,
+       reasoningCountAfter = steps.last.reasoningCountAfter,
+       toolCountAfter = steps.last.toolCountAfter;
+
+  final List<TimelineToolRef>? browserTools;
+  final bool browserLite;
   final int sourceOrdinal;
   final TimelineReasoningRef? reasoning;
   final TimelineToolRef? tool;
@@ -111,6 +130,44 @@ class TimelineProjectedStep {
   bool get isReasoning => reasoning != null;
   bool get isTool => tool != null;
 }
+
+/// The renderer and height estimator share exactly the same adjacency and
+/// approval boundaries. This operates after visibility filtering, before collapse.
+List<T> groupAdjacentBrowserSteps<T>(
+  List<T> steps, {
+  required bool Function(T step) eligible,
+  required T Function(List<T> steps, bool lite) group,
+}) {
+  final runs = <List<T>>[];
+  final browserRuns = <bool>[];
+  for (final step in steps) {
+    final browser = eligible(step);
+    if (browser && browserRuns.isNotEmpty && browserRuns.last) {
+      runs.last.add(step);
+    } else {
+      runs.add([step]);
+      browserRuns.add(browser);
+    }
+  }
+  final lastBrowser = browserRuns.lastIndexOf(true);
+  return [
+    for (var i = 0; i < runs.length; i++)
+      browserRuns[i]
+          ? group(List.unmodifiable(runs[i]), i != lastBrowser)
+          : runs[i].single,
+  ];
+}
+
+List<TimelineProjectedStep> groupBrowserTimelineSteps(
+  List<TimelineProjectedStep> steps, {
+  required bool Function(TimelineToolRef tool) isPendingApproval,
+}) => groupAdjacentBrowserSteps(
+  steps,
+  eligible: (step) =>
+      step.tool?.toolName == LocalToolNames.browser &&
+      !isPendingApproval(step.tool!),
+  group: (steps, lite) => TimelineProjectedStep.browserGroup(steps, lite: lite),
+);
 
 class TimelineProjectedBlock {
   const TimelineProjectedBlock.text(this.text)
@@ -824,7 +881,7 @@ VisibleTimelineBlock? _visibleThinkingFromProjected(
   );
   if (filtered.isEmpty) return null;
   final collapsed = collapseTimelineSteps(
-    filtered,
+    groupBrowserTimelineSteps(filtered, isPendingApproval: isPendingApproval),
     collapseThinkingSteps: collapseThinkingSteps,
   );
   return VisibleTimelineBlock(

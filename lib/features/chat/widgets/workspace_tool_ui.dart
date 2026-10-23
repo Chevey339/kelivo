@@ -278,12 +278,7 @@ String workspaceShellOutput({
   );
 }
 
-Color _workspaceQuietFill(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return Theme.of(
-    context,
-  ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
-}
+Color _workspaceQuietFill(BuildContext context) => chatQuietFill(context);
 
 String workspaceCodeFontFamily(BuildContext context) {
   try {

@@ -15,6 +15,12 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
+import '../../browser/browser_navigation.dart';
+import '../../browser/widgets/browser_page_card.dart';
+import '../../browser/widgets/browser_favicon.dart';
+import '../../../core/services/browser/browser_service.dart';
+import '../../browser/models/browser_tool_presentation.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -110,9 +116,13 @@ Uri? _tryNormalizeExternalUri(String raw) {
 }) => parseToolResultImages(content, metadata: metadata);
 
 @visibleForTesting
-const double kToolImageTimelineHeight = 120;
+const double kToolImageTimelineHeight = timelineToolImageHeight;
 @visibleForTesting
 const double kToolImageTimelineMaxWidth = 240;
+const double kBrowserStepImageHeight = 64;
+const double kBrowserStepImageMaxWidth = 120;
+const int _browserStepsFoldThreshold = 6;
+const int _browserStepsTail = 5;
 @visibleForTesting
 const double kToolImageCardHeight = 180;
 @visibleForTesting
@@ -489,6 +499,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
     LocalToolNames.phoneControl => Lucide.Smartphone,
+    LocalToolNames.browser => LucideIcons.appWindow,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -522,6 +533,10 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
     LocalToolNames.phoneControl => l10n.phoneControlTitle,
+    LocalToolNames.browser => browserActionLabel(
+      l10n,
+      args['action']?.toString() ?? '',
+    ),
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>
@@ -716,7 +731,184 @@ void _showToolFullImage(BuildContext context, String path) {
   );
 }
 
-void _showToolDetail(BuildContext context, ToolUIPart part) {
+void _showBrowserStepDetail(
+  BuildContext context,
+  ToolUIPart part, {
+  required String conversationId,
+}) {
+  final action = BrowserToolAction(
+    id: part.id,
+    arguments: part.arguments,
+    content: part.content,
+    metadata: part.metadata,
+    loading: part.loading,
+  );
+  // The detail route may outlive the source row as streaming/collapse or
+  // list virtualization removes it. Navigate through the route's stable host.
+  final navigator = Navigator.of(context, rootNavigator: true);
+  _showToolDetail(
+    context,
+    part,
+    header: _BrowserStepDetailHeader(
+      action: action,
+      onOpen: () {
+        if (!navigator.mounted) return;
+        unawaited(
+          openBrowserPage(
+            navigator.context,
+            conversationId: conversationId,
+            tabId: action.tabId,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _BrowserStepDetailHeader extends StatelessWidget {
+  const _BrowserStepDetailHeader({required this.action, required this.onOpen});
+  final BrowserToolAction action;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context)!;
+    // List/close-tab results also carry a page object, but no page identity.
+    final hasPage =
+        action.page['url'] is String || action.page['title'] is String;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (action.failed)
+          Container(
+            key: const ValueKey('browser-step-detail-error'),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            decoration: BoxDecoration(
+              color: cs.error.withValues(
+                alpha: theme.brightness == Brightness.dark ? .10 : .07,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(LucideIcons.circleAlert, size: 16, color: cs.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        browserErrorSummary(l, action.error),
+                        style: TextStyle(fontSize: 12.5, color: cs.error),
+                      ),
+                      if (action.error.isNotEmpty)
+                        Text(
+                          action.error,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: cs.error.withValues(alpha: .75),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (hasPage) ...[
+          if (action.failed) const SizedBox(height: 8),
+          Container(
+            key: const ValueKey('browser-step-detail-page'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: context.appColors.surfaceFill,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: .2),
+              ),
+            ),
+            child: Row(
+              children: [
+                BrowserFavicon(url: action.url, size: 16),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        action.title.isNotEmpty
+                            ? action.title
+                            : action.url == 'about:blank'
+                            ? l.browserCardBlankPage
+                            : browserUrlLabel(action.url),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: AppFontWeights.semibold,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      Text(
+                        action.url,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: cs.onSurface.withValues(alpha: .6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  fit: FlexFit.tight,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ListenableBuilder(
+                      listenable: BrowserService.instance,
+                      builder: (context, _) {
+                        final exists = BrowserService.instance.tabs.any(
+                          (tab) => tab.id == action.tabId,
+                        );
+                        return TextButton.icon(
+                          key: const ValueKey('browser-step-detail-open'),
+                          icon: const Icon(Lucide.AppWindow, size: 15),
+                          label: Text(
+                            exists
+                                ? l.browserOpenThisPage
+                                : l.browserErrTabClosed,
+                          ),
+                          onPressed: !exists
+                              ? null
+                              : () async {
+                                  final closed = await Navigator.of(
+                                    context,
+                                  ).maybePop();
+                                  if (closed) onOpen();
+                                },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+void _showToolDetail(BuildContext context, ToolUIPart part, {Widget? header}) {
   final l10n = AppLocalizations.of(context)!;
   final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
   final (cleanText, images) = parseToolResultImages(
@@ -760,6 +952,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           imagesLabel: l10n.chatMessageWidgetImages,
           screenTimeResult: useScreenTimeDetail ? screenTime : null,
           weatherAttribution: weatherAttribution,
+          header: header,
         ),
       ),
     );
@@ -787,6 +980,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
           weatherAttribution: weatherAttribution,
+          header: header,
         );
       },
     ),
@@ -805,6 +999,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
     required this.imagesLabel,
     this.screenTimeResult,
     this.weatherAttribution,
+    this.header,
   });
 
   static const dialogKey = ValueKey('tool_detail_desktop_dialog');
@@ -820,6 +1015,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
   final String imagesLabel;
   final ScreenTimeResult? screenTimeResult;
   final WeatherAttribution? weatherAttribution;
+  final Widget? header;
 
   @override
   State<_ToolDetailDesktopDialog> createState() =>
@@ -914,6 +1110,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
                             imagesLabel: widget.imagesLabel,
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                             weatherAttribution: widget.weatherAttribution,
+                            header: widget.header,
                           ),
                   ),
                 ),
@@ -937,6 +1134,7 @@ class _ToolDetailBody extends StatelessWidget {
     required this.imagesLabel,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
     this.weatherAttribution,
+    this.header,
   });
 
   final ScrollController scrollController;
@@ -948,6 +1146,7 @@ class _ToolDetailBody extends StatelessWidget {
   final String imagesLabel;
   final EdgeInsets padding;
   final WeatherAttribution? weatherAttribution;
+  final Widget? header;
 
   @override
   Widget build(BuildContext context) {
@@ -960,6 +1159,13 @@ class _ToolDetailBody extends StatelessWidget {
             padding: padding,
             sliver: SliverMainAxisGroup(
               slivers: [
+                if (header != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: header,
+                    ),
+                  ),
                 ToolDetailTextSection(label: argumentsLabel, text: argsPretty),
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
                 ToolDetailTextSection(label: resultLabel, text: resultText),
@@ -3133,6 +3339,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     conversationId: widget.message.conversationId,
                     showThinkingCards: showThinkingCards,
                     showToolCards: showToolCards,
+                    streaming:
+                        widget.message.isStreaming &&
+                        blockIndex == visibleBlocks.length - 1,
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
                   ),
                 );
@@ -4327,25 +4536,57 @@ class _TimelineStepData {
     required this.reasoningCountAfter,
     required this.toolCountAfter,
     this.sourceOrdinal = 0,
-  }) : tool = null;
-
+  }) : tool = null,
+       browserTools = null,
+       browserLite = false;
   const _TimelineStepData.tool({
     required this.tool,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
     this.sourceOrdinal = 0,
-  }) : reasoning = null;
-
+  }) : reasoning = null,
+       browserTools = null,
+       browserLite = false;
+  _TimelineStepData.browserGroup({
+    required List<ToolUIPart> tools,
+    required bool lite,
+    required this.sourceOrdinal,
+    required this.reasoningCountAfter,
+    required this.toolCountAfter,
+  }) : browserTools = tools,
+       browserLite = lite,
+       tool = tools.last,
+       reasoning = null;
   final ReasoningSegment? reasoning;
   final ToolUIPart? tool;
-  final int reasoningCountAfter;
-  final int toolCountAfter;
-  final int sourceOrdinal;
-
+  final List<ToolUIPart>? browserTools;
+  final bool browserLite;
+  final int reasoningCountAfter, toolCountAfter, sourceOrdinal;
   bool get isReasoning => reasoning != null;
   bool get isTool => tool != null;
-  bool get loading => reasoning?.loading ?? tool?.loading ?? false;
+  bool get loading =>
+      browserTools?.any((tool) => tool.loading) ??
+      reasoning?.loading ??
+      tool?.loading ??
+      false;
 }
+
+List<_TimelineStepData> _groupBrowserSteps(
+  List<_TimelineStepData> steps,
+  _IdSet pendingApprovalIds,
+) => groupAdjacentBrowserSteps(
+  steps,
+  eligible: (step) =>
+      step.tool?.toolName == LocalToolNames.browser &&
+      !pendingApprovalIds.contains(step.tool!.id),
+  group: (steps, lite) => _TimelineStepData.browserGroup(
+    tools: List.unmodifiable(steps.map((step) => step.tool!)),
+    lite: lite,
+    sourceOrdinal: steps.first.sourceOrdinal,
+    reasoningCountAfter: steps.last.reasoningCountAfter,
+    toolCountAfter: steps.last.toolCountAfter,
+  ),
+);
 
 /// Value-equal id set so [context.select] can ignore identical approval snapshots.
 class _IdSet {
@@ -4535,6 +4776,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
     required this.conversationId,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.streaming,
     this.onRecoveredAnswer,
   });
 
@@ -4542,6 +4784,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
   final String conversationId;
   final bool showThinkingCards;
   final bool showToolCards;
+  final bool streaming;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -4620,25 +4863,28 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     final hideToolResultImages = context.select<SettingsProvider, bool>(
       (s) => s.hideToolResultImages,
     );
+    final showBrowserPageCards = context.select<SettingsProvider, bool>(
+      (s) => s.showBrowserPageCards,
+    );
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
     );
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final filteredSteps = _visibleChatTimelineSteps(
+    final ungroupedSteps = _visibleChatTimelineSteps(
       context,
       widget.steps,
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
       conversationId: widget.conversationId,
     );
-    if (filteredSteps.isEmpty) {
+    if (ungroupedSteps.isEmpty) {
       return const SizedBox.shrink();
     }
     final pendingApprovalIds = context.select<ToolApprovalService, _IdSet>((
       approval,
     ) {
       return _IdSet({
-        for (final step in filteredSteps)
+        for (final step in ungroupedSteps)
           if (step.tool != null &&
               _matchingApprovalRequest(
                     approval: approval,
@@ -4649,6 +4895,10 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
             step.tool!.id,
       });
     });
+    final filteredSteps = _groupBrowserSteps(
+      ungroupedSteps,
+      pendingApprovalIds,
+    );
     final l10n = AppLocalizations.of(context)!;
     final enableAdaptiveWidth =
         filteredSteps.isNotEmpty &&
@@ -4721,9 +4971,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                           Text(
                             _showAllSteps
                                 ? l10n.chainOfThoughtCollapse
-                                : l10n.chainOfThoughtExpandSteps(
-                                    widget.steps.length - visibleSteps.length,
-                                  ),
+                                : l10n.chainOfThoughtExpandSteps(hiddenCount),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: AppFontWeights.semibold,
@@ -4764,6 +5012,50 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                       );
                     }
                     final part = step.tool!;
+                    if (step.browserTools case final tools?) {
+                      return _CachedTimelineStep(
+                        key: ValueKey(
+                          'browser-group-${tools.first.id}-${step.sourceOrdinal}',
+                        ),
+                        signature: (
+                          Object.hashAll(
+                            tools.map(
+                              (part) => (
+                                part.id,
+                                part.loading,
+                                part.content.hashCode,
+                                part.metadata.hashCode,
+                                Object.hashAll(
+                                  part.arguments.entries.map(
+                                    (entry) => (entry.key, entry.value),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          step.browserLite,
+                          isFirst,
+                          isLast,
+                          fg,
+                          theme.brightness,
+                          textScale,
+                          hideToolResultImages,
+                          showBrowserPageCards,
+                          widget.streaming,
+                          widget.conversationId,
+                        ),
+                        builder: () => _ChainOfThoughtBrowserGroup(
+                          tools: tools,
+                          lite: step.browserLite,
+                          conversationId: widget.conversationId,
+                          isFirst: isFirst,
+                          isLast: isLast,
+                          hideImages: hideToolResultImages,
+                          showPageCard: showBrowserPageCards,
+                          streaming: widget.streaming,
+                        ),
+                      );
+                    }
                     return _CachedTimelineStep(
                       key: ValueKey<String>(
                         timelineToolStepKey(
@@ -4821,6 +5113,8 @@ class _TimelineStepShell extends StatelessWidget {
     this.content,
     this.contentVisible = false,
     this.expectContent = false,
+    this.stableKey,
+    this.contentBottomPadding = 8,
   });
 
   final Widget icon;
@@ -4836,6 +5130,8 @@ class _TimelineStepShell extends StatelessWidget {
   /// Keep [AnimatedSize] mounted so a later result or expand can grow in.
   /// Finished steps with no body skip the slot entirely.
   final bool expectContent;
+  final Key? stableKey;
+  final double contentBottomPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -4885,50 +5181,86 @@ class _TimelineStepShell extends StatelessWidget {
     );
     if (content == null && !expectContent) {
       return KeyedSubtree(
-        key: ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
+        key:
+            stableKey ??
+            ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
         child: pressableHeader,
       );
     }
 
     return KeyedSubtree(
-      key: ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
+      key:
+          stableKey ??
+          ValueKey<String>('chatMessageTimelineStepShell:$isFirst:$isLast'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           pressableHeader,
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (!isLast)
-                Positioned(
-                  left: _timelineLineX,
-                  top: 0,
-                  bottom: 0,
-                  child: SizedBox(
-                    key: const ValueKey('chatMessageTimelineContentLine'),
-                    width: 1,
-                    child: ColoredBox(color: fg.divider),
-                  ),
-                ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                curve: const Cubic(0.2, 0.8, 0.2, 1),
-                alignment: Alignment.topLeft,
-                child: contentVisible
-                    ? Padding(
-                        padding: const EdgeInsets.only(
-                          left: _timelineIconColumnWidth + _timelineGap,
-                          top: 4,
-                          bottom: 8,
-                        ),
-                        child: content,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+          _TimelineStepBody(
+            isLast: isLast,
+            content: content,
+            visible: contentVisible,
+            bottomPadding: contentBottomPadding,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shared connector and inset for timeline content, including a group's
+/// persistent preview. Only the owner of changing content animates its height.
+class _TimelineStepBody extends StatelessWidget {
+  const _TimelineStepBody({
+    required this.isLast,
+    required this.content,
+    this.visible = true,
+    this.animate = true,
+    this.bottomPadding = 8,
+  });
+
+  final bool isLast, visible, animate;
+  final Widget? content;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = visible
+        ? Padding(
+            padding: EdgeInsets.only(
+              left: _timelineIconColumnWidth + _timelineGap,
+              top: 4,
+              bottom: bottomPadding,
+            ),
+            child: content,
+          )
+        : const SizedBox.shrink();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (!isLast)
+          Positioned(
+            left: _timelineLineX,
+            top: 0,
+            bottom: 0,
+            child: SizedBox(
+              key: const ValueKey('chatMessageTimelineContentLine'),
+              width: 1,
+              child: ColoredBox(
+                color: chatSurfaceForegroundPalette(context).divider,
+              ),
+            ),
+          ),
+        if (animate)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: const Cubic(0.2, 0.8, 0.2, 1),
+            alignment: Alignment.topLeft,
+            child: body,
+          )
+        else
+          body,
+      ],
     );
   }
 }
@@ -5242,6 +5574,496 @@ class _ChainOfThoughtReasoningStepState
       content: content,
       contentVisible: state != _ReasoningStepState.collapsed,
       expectContent: true,
+    );
+  }
+}
+
+class _ChainOfThoughtBrowserGroup extends StatefulWidget {
+  const _ChainOfThoughtBrowserGroup({
+    required this.tools,
+    required this.lite,
+    required this.conversationId,
+    required this.isFirst,
+    required this.isLast,
+    required this.hideImages,
+    required this.showPageCard,
+    required this.streaming,
+  });
+  final List<ToolUIPart> tools;
+  final bool lite, isFirst, isLast, hideImages, showPageCard, streaming;
+  final String conversationId;
+  @override
+  State<_ChainOfThoughtBrowserGroup> createState() =>
+      _ChainOfThoughtBrowserGroupState();
+}
+
+class _ChainOfThoughtBrowserGroupState
+    extends State<_ChainOfThoughtBrowserGroup> {
+  List<BrowserToolAction> _actions = const [];
+  List<Object> _inputs = const [];
+  List<List<String>> _images = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _parse();
+    _syncAction(immediate: true);
+    _keepSteps = _isExpanded;
+  }
+
+  @override
+  void didUpdateWidget(_ChainOfThoughtBrowserGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changedGroup =
+        oldWidget.tools.first.id != widget.tools.first.id ||
+        oldWidget.conversationId != widget.conversationId;
+    if (changedGroup) {
+      _expanded = null;
+      _userToggled = false;
+      _showAll = false;
+    }
+    _parse();
+    _syncAction(immediate: changedGroup);
+    if (changedGroup || MediaQuery.disableAnimationsOf(context)) {
+      _keepSteps = _isExpanded;
+      if (!_keepSteps) _showAll = false;
+    } else if (_isExpanded) {
+      _keepSteps = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context) && !_isExpanded) {
+      _keepSteps = false;
+      _showAll = false;
+    }
+  }
+
+  void _parse() {
+    final actions = <BrowserToolAction>[];
+    final inputs = <Object>[];
+    final images = <List<String>>[];
+    for (var i = 0; i < widget.tools.length; i++) {
+      final tool = widget.tools[i];
+      final input = (
+        tool.id,
+        tool.loading,
+        tool.content,
+        tool.metadata,
+        Object.hashAll(
+          tool.arguments.entries.map((entry) => (entry.key, entry.value)),
+        ),
+      );
+      inputs.add(input);
+      if (i < _inputs.length && input == _inputs[i]) {
+        actions.add(_actions[i]);
+        images.add(_images[i]);
+      } else {
+        actions.add(
+          BrowserToolAction(
+            id: tool.id,
+            arguments: tool.arguments,
+            content: tool.content,
+            metadata: tool.metadata,
+            loading: tool.loading,
+          ),
+        );
+        images.add(
+          parseToolResultImages(tool.content, metadata: tool.metadata).$2,
+        );
+      }
+    }
+    _actions = actions;
+    _inputs = inputs;
+    _images = images;
+  }
+
+  bool? _expanded;
+  bool _userToggled = false;
+  bool _showAll = false;
+  bool _keepSteps = false;
+
+  // Keep fast calls in one header. Coalesce updates instead of stacking
+  // transitions for steps that can finish within a single frame.
+  Timer? _actionTimer;
+  BrowserToolAction? _displayAction, _pendingAction;
+  bool get _executing =>
+      _actions.any((action) => action.loading) ||
+      (widget.streaming && widget.isLast && !widget.lite);
+
+  void _syncAction({bool immediate = false}) {
+    _pendingAction = _executing
+        ? _actions.lastWhere(
+            (action) => action.loading,
+            orElse: () => _actions.last,
+          )
+        : null;
+    if (immediate) {
+      _actionTimer?.cancel();
+      _actionTimer = null;
+      _displayAction = _pendingAction;
+    } else if (_displayAction?.id == _pendingAction?.id &&
+        _displayAction?.action == _pendingAction?.action) {
+      _actionTimer?.cancel();
+      _actionTimer = null;
+      _displayAction = _pendingAction;
+    } else {
+      _actionTimer ??= Timer(const Duration(milliseconds: 200), () {
+        _actionTimer = null;
+        setState(() {
+          _displayAction = _pendingAction;
+          if (_isExpanded) _keepSteps = true;
+        });
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _actionTimer?.cancel();
+    super.dispose();
+  }
+
+  bool get _isExpanded => _userToggled
+      ? _expanded!
+      : !widget.lite &&
+            !_executing &&
+            _displayAction == null &&
+            _actions.any((action) => action.failed);
+
+  void _finishStepsAnimation() {
+    if (!_isExpanded && _keepSteps) {
+      setState(() {
+        _keepSteps = false;
+        _showAll = false;
+      });
+    }
+  }
+
+  Widget _loadingIcon(Color color) =>
+      LoadingIndicator(height: 12, dotSize: 3, spacing: 2, color: color);
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = chatSurfaceForegroundPalette(context);
+    final cs = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context)!;
+    final running = _executing || _displayAction != null;
+    final failures = _actions.where((action) => action.failed).length;
+    final expanded = _isExpanded;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final firstVisible =
+        _keepSteps &&
+            !_showAll &&
+            widget.tools.length > _browserStepsFoldThreshold
+        ? widget.tools.length - _browserStepsTail
+        : 0;
+    final pageCard = BrowserStepGroupBody(
+      actions: _actions,
+      conversationId: widget.conversationId,
+      lite: widget.lite,
+      running: running,
+    );
+    final header = _TimelineStepShell(
+      stableKey: ValueKey('browser-group-header-${widget.tools.first.id}'),
+      icon: running
+          ? _loadingIcon(fg.strong)
+          : Icon(Lucide.AppWindow, size: 16, color: fg.strong),
+      label: Semantics(
+        button: true,
+        expanded: expanded,
+        label: l.browserGroupToggleSemantics,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: ThinkingSheen(
+                enabled: running,
+                color: fg.strong,
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 160),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: AlignmentDirectional.centerStart,
+                    children: [...previous, if (current != null) current],
+                  ),
+                  child: Text(
+                    _displayAction?.label(l) ?? l.browserStepGroupTitle,
+                    key: ValueKey(_displayAction?.action ?? 'browser-idle'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.semibold,
+                      color: fg.strong,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                running
+                    ? l.browserStepCurrent(_actions.length)
+                    : l.browserStepCount(_actions.length),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: fg.medium),
+              ),
+            ),
+            if (failures > 0) ...[
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  l.browserActionFailedCount(failures),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: cs.error),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      isFirst: widget.isFirst,
+      isLast: widget.isLast && !_keepSteps,
+      onTap: () => setState(() {
+        _expanded = !expanded;
+        _userToggled = true;
+        // Keep the current rows (including revealed earlier steps) until
+        // closing ends, so reversal starts at the same visual position.
+        _keepSteps = !reduceMotion || _expanded!;
+        if (!_keepSteps) _showAll = false;
+      }),
+      indicator: Icon(
+        expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+        size: 16,
+        color: fg.muted,
+      ),
+    );
+    final steps = <Widget>[];
+    if (_keepSteps) {
+      if (firstVisible > 0) {
+        steps.add(
+          KeyedSubtree(
+            key: ValueKey('browser-steps-earlier-${widget.tools.first.id}'),
+            child: _TimelineStepShell(
+              isFirst: false,
+              isLast: false,
+              icon: Icon(Lucide.Ellipsis, size: 16, color: fg.muted),
+              label: Text(
+                l.browserStepsShowEarlier(firstVisible),
+                style: TextStyle(fontSize: 13, color: fg.muted),
+              ),
+              indicator: Icon(Lucide.ChevronDown, size: 16, color: fg.muted),
+              onTap: () => setState(() => _showAll = true),
+            ),
+          ),
+        );
+      }
+      // Scan the complete prefix once so folded snapshots still resolve refs.
+      BrowserToolAction? snapshot;
+      String? previousUrl;
+      for (var i = 0; i < _actions.length; i++) {
+        final action = _actions[i];
+        if (i >= firstVisible) {
+          steps.add(
+            _step(context, i, snapshot: snapshot, previousUrl: previousUrl),
+          );
+        }
+        if (action.action == 'snapshot') snapshot = action;
+        if (action.hasPage && action.url.isNotEmpty) previousUrl = action.url;
+      }
+    }
+    final stepsContent = Align(
+      alignment: Alignment.topLeft,
+      heightFactor: expanded ? 1 : 0,
+      child: IgnorePointer(
+        ignoring: !expanded,
+        child: ExcludeSemantics(
+          excluding: !expanded,
+          child: TickerMode(
+            enabled: expanded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: steps,
+            ),
+          ),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        header,
+        // Align reports the target height while retaining the laid-out rows.
+        // The outer clip follows AnimatedSize in both directions; the footer
+        // stays mounted and is pushed by that single animated extent.
+        ClipRect(
+          child: reduceMotion
+              ? stepsContent
+              : AnimatedSize(
+                  key: ValueKey(
+                    'browser-steps-motion-${widget.tools.first.id}',
+                  ),
+                  duration: const Duration(milliseconds: 300),
+                  curve: const Cubic(0.2, 0.8, 0.2, 1),
+                  alignment: Alignment.topLeft,
+                  clipBehavior: Clip.none,
+                  onEnd: _finishStepsAnimation,
+                  child: stepsContent,
+                ),
+        ),
+        if (widget.showPageCard)
+          _TimelineStepBody(
+            isLast: widget.isLast,
+            animate: false,
+            content: pageCard,
+          ),
+      ],
+    );
+  }
+
+  Widget _step(
+    BuildContext context,
+    int index, {
+    required BrowserToolAction? snapshot,
+    required String? previousUrl,
+  }) {
+    final part = widget.tools[index];
+    final action = _actions[index];
+    final fg = chatSurfaceForegroundPalette(context);
+    final cs = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context)!;
+    final tab = action.action == 'switch_tab'
+        ? BrowserService.instance.tabs
+              .where((tab) => tab.id == action.tabId)
+              .firstOrNull
+        : null;
+    final target = tab == null
+        ? action.target(l, [if (snapshot != null) snapshot])
+        : browserUrlLabel(tab.url, includePath: true);
+    final content = <Widget>[
+      if (action.failed)
+        Text(
+          browserErrorSummary(l, action.error),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: cs.error.withValues(alpha: .9),
+          ),
+        ),
+      if (!widget.hideImages && _images[index].isNotEmpty)
+        SizedBox(
+          key: ValueKey('tool-image-thumbnails:${part.id}'),
+          height: kBrowserStepImageHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _images[index].length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, imageIndex) {
+              final path = _images[index][imageIndex];
+              return GestureDetector(
+                onTap: () => _showToolFullImage(context, path),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _buildToolImageFromPath(
+                    context,
+                    path,
+                    height: kBrowserStepImageHeight,
+                    maxLogicalWidth: kBrowserStepImageMaxWidth,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+    ];
+    return KeyedSubtree(
+      key: ValueKey('browser-step-${part.id}'),
+      child: _TimelineStepShell(
+        isFirst: false,
+        isLast: widget.isLast && index == widget.tools.length - 1,
+        icon: action.loading
+            ? _loadingIcon(fg.strong)
+            : Icon(
+                action.failed
+                    ? LucideIcons.circleAlert
+                    : browserActionIcon(action.action),
+                size: 16,
+                color: action.failed ? cs.error : fg.strong,
+              ),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: ThinkingSheen(
+                enabled: action.loading,
+                color: fg.strong,
+                child: Text(
+                  action.failed
+                      ? l.browserActionFailed(action.label(l))
+                      : action.label(l),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.medium,
+                    color: action.failed ? cs.error : fg.strong,
+                  ),
+                ),
+              ),
+            ),
+            if (target != null && target.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  target,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: fg.muted),
+                ),
+              ),
+            ],
+          ],
+        ),
+        extra:
+            action.hasPage && action.url.isNotEmpty && action.url != previousUrl
+            ? BrowserFavicon(url: action.url, size: 14)
+            : null,
+        indicator: Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
+        content: content.isEmpty
+            ? null
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < content.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    content[i],
+                  ],
+                ],
+              ),
+        contentVisible: content.isNotEmpty,
+        // This row's body and the persistent preview share an 8dp gap.
+        contentBottomPadding: index == widget.tools.length - 1 ? 4 : 8,
+        expectContent: part.loading || content.isNotEmpty,
+        onTap: () => _showBrowserStepDetail(
+          context,
+          part,
+          conversationId: widget.conversationId,
+        ),
+      ),
     );
   }
 }
@@ -5853,6 +6675,23 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 conversationId: widget.conversationId,
               ),
             ],
+            if (widget.part.toolName == LocalToolNames.browser)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(LucideIcons.appWindow, size: 16),
+                  label: Text(l10n.browserOpen),
+                  onPressed: () => openBrowserPage(
+                    context,
+                    conversationId: widget.conversationId,
+                    tabId: BrowserToolAction(
+                      id: widget.part.id,
+                      arguments: widget.part.arguments,
+                      metadata: widget.part.metadata,
+                    ).tabId,
+                  ),
+                ),
+              ),
             if (ttsText.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildTextToSpeechReplayRow(

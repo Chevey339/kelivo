@@ -23879,6 +23879,966 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete {count} selected servers?'**
   String mcpDeleteSelectedConfirm(int count);
+
+  /// No description provided for @browserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser'**
+  String get browserTitle;
+
+  /// No description provided for @browserSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search or enter website'**
+  String get browserSearchHint;
+
+  /// No description provided for @browserStartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Where to next?'**
+  String get browserStartTitle;
+
+  /// No description provided for @browserStartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse freely. Let your agent help when you need it.'**
+  String get browserStartSubtitle;
+
+  /// No description provided for @browserNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get browserNewTab;
+
+  /// No description provided for @browserTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabs'**
+  String get browserTabs;
+
+  /// No description provided for @browserCloseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get browserCloseTab;
+
+  /// No description provided for @browserClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close browser'**
+  String get browserClose;
+
+  /// No description provided for @browserBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get browserBack;
+
+  /// No description provided for @browserForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get browserForward;
+
+  /// No description provided for @browserReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get browserReload;
+
+  /// No description provided for @browserStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop loading'**
+  String get browserStop;
+
+  /// No description provided for @browserMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get browserMore;
+
+  /// No description provided for @browserBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get browserBookmarks;
+
+  /// No description provided for @browserHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get browserHistory;
+
+  /// No description provided for @browserSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser settings'**
+  String get browserSettings;
+
+  /// No description provided for @browserAddBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bookmark'**
+  String get browserAddBookmark;
+
+  /// No description provided for @browserRemoveBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get browserRemoveBookmark;
+
+  /// No description provided for @browserNoBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Your favorite places, all together.'**
+  String get browserNoBookmarks;
+
+  /// No description provided for @browserNoHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Your browsing history appears here.'**
+  String get browserNoHistory;
+
+  /// No description provided for @browserSearchLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Search saved pages'**
+  String get browserSearchLibrary;
+
+  /// No description provided for @browserClearHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear history'**
+  String get browserClearHistory;
+
+  /// No description provided for @browserClearHistoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all browsing history? Bookmarks will be kept.'**
+  String get browserClearHistoryConfirm;
+
+  /// No description provided for @browserToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get browserToday;
+
+  /// No description provided for @browserYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get browserYesterday;
+
+  /// No description provided for @browserDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get browserDelete;
+
+  /// No description provided for @browserCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get browserCancel;
+
+  /// No description provided for @browserDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get browserDone;
+
+  /// No description provided for @browserFind.
+  ///
+  /// In en, this message translates to:
+  /// **'Find on page'**
+  String get browserFind;
+
+  /// No description provided for @browserFindPreviousMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get browserFindPreviousMatch;
+
+  /// No description provided for @browserFindNextMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get browserFindNextMatch;
+
+  /// No description provided for @browserFindHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find text'**
+  String get browserFindHint;
+
+  /// No description provided for @browserSearchEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Search engine'**
+  String get browserSearchEngine;
+
+  /// No description provided for @browserDesktopMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Desktop website'**
+  String get browserDesktopMode;
+
+  /// No description provided for @browserDesktopModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload open pages with a desktop user agent.'**
+  String get browserDesktopModeDescription;
+
+  /// No description provided for @browserRestoreTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore tabs'**
+  String get browserRestoreTabs;
+
+  /// No description provided for @browserRestoreTabsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen your tabs when Kelivo starts.'**
+  String get browserRestoreTabsDescription;
+
+  /// No description provided for @browserSaveHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Save history'**
+  String get browserSaveHistory;
+
+  /// No description provided for @browserSaveHistoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep a local record of the pages you visit.'**
+  String get browserSaveHistoryDescription;
+
+  /// No description provided for @browserClearData.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear website data'**
+  String get browserClearData;
+
+  /// No description provided for @browserClearDataConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cookies, storage and cache, and close all tabs? You will be signed out of websites.'**
+  String get browserClearDataConfirm;
+
+  /// No description provided for @browserDataCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Website data cleared'**
+  String get browserDataCleared;
+
+  /// No description provided for @browserAgentControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent control'**
+  String get browserAgentControl;
+
+  /// No description provided for @browserAgentWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'AI is working'**
+  String get browserAgentWorking;
+
+  /// No description provided for @browserTakeOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Take over'**
+  String get browserTakeOver;
+
+  /// No description provided for @browserAgentPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'AI actions paused'**
+  String get browserAgentPaused;
+
+  /// No description provided for @browserAllowAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow to continue'**
+  String get browserAllowAgent;
+
+  /// No description provided for @browserAgentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.'**
+  String get browserAgentDescription;
+
+  /// No description provided for @browserOpenExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in default browser'**
+  String get browserOpenExternal;
+
+  /// No description provided for @browserCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get browserCopyLink;
+
+  /// No description provided for @browserLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get browserLinkCopied;
+
+  /// No description provided for @browserUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The embedded browser is not available on this platform.'**
+  String get browserUnsupported;
+
+  /// No description provided for @browserLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This page could not be loaded'**
+  String get browserLoadFailed;
+
+  /// No description provided for @browserRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get browserRetry;
+
+  /// No description provided for @browserFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get browserFavorites;
+
+  /// No description provided for @browserEditBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit bookmark'**
+  String get browserEditBookmark;
+
+  /// No description provided for @browserBookmarkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get browserBookmarkTitle;
+
+  /// No description provided for @browserBookmarkUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get browserBookmarkUrl;
+
+  /// No description provided for @browserSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get browserSave;
+
+  /// No description provided for @browserDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get browserDownloads;
+
+  /// No description provided for @browserNoDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded files appear here.'**
+  String get browserNoDownloads;
+
+  /// No description provided for @browserDownloadCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel download'**
+  String get browserDownloadCancel;
+
+  /// No description provided for @browserOpenDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Open file'**
+  String get browserOpenDownload;
+
+  /// No description provided for @browserDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get browserDownloadFailed;
+
+  /// No description provided for @browserAgentEnableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the Browser tool in chat tools, then allow control here.'**
+  String get browserAgentEnableHint;
+
+  /// No description provided for @browserSessionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the browser from a conversation to allow agent control.'**
+  String get browserSessionRequired;
+
+  /// No description provided for @browserDownloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get browserDownloadCancelled;
+
+  /// No description provided for @browserAgentEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow assistant browser access'**
+  String get browserAgentEnabled;
+
+  /// No description provided for @browserAgentEnabledDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled assistants can browse and interact with pages in this browser.'**
+  String get browserAgentEnabledDescription;
+
+  /// No description provided for @browserToolTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser control'**
+  String get browserToolTitle;
+
+  /// No description provided for @browserToolSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse and interact with signed-in pages. Enable Agent control in browser settings first.'**
+  String get browserToolSubtitle;
+
+  /// No description provided for @browserOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open browser'**
+  String get browserOpen;
+
+  /// No description provided for @browserInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid HTTP or HTTPS website address.'**
+  String get browserInvalidUrl;
+
+  /// No description provided for @browserClearDataUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Clearing all website data is not supported by the Windows browser engine.'**
+  String get browserClearDataUnavailable;
+
+  /// No description provided for @browserSurfaceStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Surface style'**
+  String get browserSurfaceStyle;
+
+  /// No description provided for @browserSurfaceLiquid.
+  ///
+  /// In en, this message translates to:
+  /// **'Liquid glass'**
+  String get browserSurfaceLiquid;
+
+  /// No description provided for @browserSurfaceFrosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Frosted'**
+  String get browserSurfaceFrosted;
+
+  /// No description provided for @browserSurfaceSolid.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid'**
+  String get browserSurfaceSolid;
+
+  /// No description provided for @browserPageOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Page options'**
+  String get browserPageOptions;
+
+  /// No description provided for @browserAskAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Let AI work on this page'**
+  String get browserAskAi;
+
+  /// No description provided for @browserAskAiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to chat, add your request, then send.'**
+  String get browserAskAiHint;
+
+  /// No description provided for @browserAskAiCurrentPage.
+  ///
+  /// In en, this message translates to:
+  /// **'the current browser page'**
+  String get browserAskAiCurrentPage;
+
+  /// No description provided for @browserAskAiUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat is unavailable. Open the browser from a chat first.'**
+  String get browserAskAiUnavailable;
+
+  /// No description provided for @browserAskAiEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish or cancel editing the current message before adding a page task.'**
+  String get browserAskAiEditing;
+
+  /// No description provided for @browserAskAiAssistantDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Browser control in this assistant’s tools first.'**
+  String get browserAskAiAssistantDisabled;
+
+  /// No description provided for @browserAskAiBrowserDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow assistants to use the browser in browser settings first.'**
+  String get browserAskAiBrowserDisabled;
+
+  /// No description provided for @browserAskAiDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Please use the browser to work on this page:\n{page}\n\nMy request: '**
+  String browserAskAiDraft(String page);
+
+  /// No description provided for @browserOpenFullPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in full page'**
+  String get browserOpenFullPage;
+
+  /// No description provided for @browserClosePanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Close browser panel'**
+  String get browserClosePanel;
+
+  /// No description provided for @browserSearchTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Search tabs'**
+  String get browserSearchTabs;
+
+  /// No description provided for @browserTabsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 tab} other{{count} tabs}}'**
+  String browserTabsCount(int count);
+
+  /// No description provided for @browserOpenInSidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in sidebar'**
+  String get browserOpenInSidebar;
+
+  /// No description provided for @browserUserAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'User agent'**
+  String get browserUserAgent;
+
+  /// No description provided for @browserUserAgentMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get browserUserAgentMobile;
+
+  /// No description provided for @browserUserAgentDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Desktop'**
+  String get browserUserAgentDesktop;
+
+  /// No description provided for @browserUserAgentCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get browserUserAgentCustom;
+
+  /// No description provided for @browserUserAgentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a custom User-Agent'**
+  String get browserUserAgentHint;
+
+  /// No description provided for @browserUserAgentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a single line of up to 2048 printable ASCII characters.'**
+  String get browserUserAgentInvalid;
+
+  /// No description provided for @browserUserAgentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes reload the current webpage.'**
+  String get browserUserAgentDescription;
+
+  /// No description provided for @browserStepsShowEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} earlier steps'**
+  String browserStepsShowEarlier(int count);
+
+  /// No description provided for @browserOpenThisPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get browserOpenThisPage;
+
+  /// No description provided for @browserGroupToggleSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide browser steps'**
+  String get browserGroupToggleSemantics;
+
+  /// No description provided for @browserStepGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browsing'**
+  String get browserStepGroupTitle;
+
+  /// Browser page card browserStepCount
+  ///
+  /// In en, this message translates to:
+  /// **'{count} steps'**
+  String browserStepCount(int count);
+
+  /// Browser page card browserStepCurrent
+  ///
+  /// In en, this message translates to:
+  /// **'step {count}'**
+  String browserStepCurrent(int count);
+
+  /// Browser page card browserActionFailedCount
+  ///
+  /// In en, this message translates to:
+  /// **'· {count} failed'**
+  String browserActionFailedCount(int count);
+
+  /// Browser page card browserActionFailed
+  ///
+  /// In en, this message translates to:
+  /// **'{action} failed'**
+  String browserActionFailed(String action);
+
+  /// No description provided for @browserCardOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get browserCardOpen;
+
+  /// No description provided for @browserCardEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get browserCardEnable;
+
+  /// Browser page card browserCardRunning
+  ///
+  /// In en, this message translates to:
+  /// **'{action}…'**
+  String browserCardRunning(String action);
+
+  /// No description provided for @browserCardLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get browserCardLive;
+
+  /// No description provided for @browserCardOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open page'**
+  String get browserCardOpenFailed;
+
+  /// No description provided for @browserCardBlankPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank page'**
+  String get browserCardBlankPage;
+
+  /// Browser page card browserCardTabCount
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tabs'**
+  String browserCardTabCount(int count);
+
+  /// No description provided for @browserActionOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open page'**
+  String get browserActionOpen;
+
+  /// No description provided for @browserActionNewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get browserActionNewTab;
+
+  /// No description provided for @browserActionRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Render page'**
+  String get browserActionRender;
+
+  /// No description provided for @browserActionExtract.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract text'**
+  String get browserActionExtract;
+
+  /// No description provided for @browserActionSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Read page structure'**
+  String get browserActionSnapshot;
+
+  /// No description provided for @browserActionClick.
+  ///
+  /// In en, this message translates to:
+  /// **'Click'**
+  String get browserActionClick;
+
+  /// No description provided for @browserActionType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get browserActionType;
+
+  /// No description provided for @browserActionPress.
+  ///
+  /// In en, this message translates to:
+  /// **'Press key'**
+  String get browserActionPress;
+
+  /// No description provided for @browserActionScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get browserActionScroll;
+
+  /// No description provided for @browserActionWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait'**
+  String get browserActionWait;
+
+  /// No description provided for @browserActionBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get browserActionBack;
+
+  /// No description provided for @browserActionForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get browserActionForward;
+
+  /// No description provided for @browserActionReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get browserActionReload;
+
+  /// No description provided for @browserActionEvaluate.
+  ///
+  /// In en, this message translates to:
+  /// **'Run script'**
+  String get browserActionEvaluate;
+
+  /// No description provided for @browserActionSwitchTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch tab'**
+  String get browserActionSwitchTab;
+
+  /// No description provided for @browserActionCloseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get browserActionCloseTab;
+
+  /// No description provided for @browserActionListTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'List tabs'**
+  String get browserActionListTabs;
+
+  /// No description provided for @browserActionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser action'**
+  String get browserActionUnknown;
+
+  /// Browser page card browserMetaChars
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chars'**
+  String browserMetaChars(String count);
+
+  /// Browser page card browserMetaElements
+  ///
+  /// In en, this message translates to:
+  /// **'{count} elements'**
+  String browserMetaElements(int count);
+
+  /// No description provided for @browserErrAgentDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser control is off'**
+  String get browserErrAgentDisabled;
+
+  /// No description provided for @browserErrStaleRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Element is stale; page needs re-reading'**
+  String get browserErrStaleRef;
+
+  /// No description provided for @browserErrNotVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Element hidden or covered'**
+  String get browserErrNotVisible;
+
+  /// No description provided for @browserErrNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Element not found'**
+  String get browserErrNotFound;
+
+  /// No description provided for @browserErrTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Page load timed out'**
+  String get browserErrTimeout;
+
+  /// No description provided for @browserErrHumanControl.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re controlling the browser'**
+  String get browserErrHumanControl;
+
+  /// No description provided for @browserErrTabClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab was closed'**
+  String get browserErrTabClosed;
+
+  /// No description provided for @browserErrGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Action failed'**
+  String get browserErrGeneric;
+
+  /// No description provided for @browserDirectionUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get browserDirectionUp;
+
+  /// No description provided for @browserDirectionDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Down'**
+  String get browserDirectionDown;
+
+  /// No description provided for @browserDirectionLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get browserDirectionLeft;
+
+  /// No description provided for @browserDirectionRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get browserDirectionRight;
+
+  /// Number of tabs returned by list_tabs
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tabs'**
+  String browserMetaTabs(int count);
+
+  /// No description provided for @browserTabsCurrentConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat'**
+  String get browserTabsCurrentConversation;
+
+  /// No description provided for @browserTabsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All tabs'**
+  String get browserTabsAll;
+
+  /// No description provided for @browserTabsUnassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal tabs'**
+  String get browserTabsUnassigned;
+
+  /// No description provided for @browserTabsUnknownConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Other chat'**
+  String get browserTabsUnknownConversation;
+
+  /// No description provided for @browserTabsEmptyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'No tabs here yet. Open a page or choose a tab from All tabs.'**
+  String get browserTabsEmptyConversation;
+
+  /// No description provided for @browserTabsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching tabs'**
+  String get browserTabsNoResults;
+
+  /// No description provided for @browserMoveToConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to this chat'**
+  String get browserMoveToConversation;
+
+  /// No description provided for @browserReopenInConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen in this chat'**
+  String get browserReopenInConversation;
+
+  /// No description provided for @browserTabBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'An assistant is still using this page. Wait for it to finish or stop the task before moving it.'**
+  String get browserTabBusy;
+
+  /// No description provided for @browserLiveViewLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'All browser resources are in use. Try again when a task finishes, or close an unused page.'**
+  String get browserLiveViewLimit;
+
+  /// No description provided for @browserAskAiInOwnerConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI in the owning chat'**
+  String get browserAskAiInOwnerConversation;
+
+  /// No description provided for @displaySettingsPageShowBrowserPageCardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show webpage cards'**
+  String get displaySettingsPageShowBrowserPageCardsTitle;
+
+  /// No description provided for @browserObserverHint.
+  ///
+  /// In en, this message translates to:
+  /// **'AI is using this page. Select Take over to interact.'**
+  String get browserObserverHint;
 }
 
 class _AppLocalizationsDelegate

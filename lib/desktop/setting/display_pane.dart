@@ -130,6 +130,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowHideToolResultImages(),
                   _RowDivider(),
+                  _ToggleRowShowBrowserPageCards(),
+                  _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
                   _CollapseLongUserMessagesSection(),
@@ -2701,6 +2703,21 @@ class _ToggleRowHideToolResultImages extends StatelessWidget {
       value: sp.hideToolResultImages,
       onChanged: (v) =>
           context.read<SettingsProvider>().setHideToolResultImages(v),
+    );
+  }
+}
+
+class _ToggleRowShowBrowserPageCards extends StatelessWidget {
+  const _ToggleRowShowBrowserPageCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+      value: sp.showBrowserPageCards,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowBrowserPageCards(v),
     );
   }
 }

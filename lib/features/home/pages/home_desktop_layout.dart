@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
@@ -20,11 +22,15 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../workspace/widgets/desktop_workspace_bar.dart';
+import '../../browser/browser_navigation.dart';
+import '../../browser/browser_panel_controller.dart';
+import '../../browser/pages/browser_page.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
+import '../../../desktop/sidebar_resize_capture.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../widgets/assistant_avatar.dart';
@@ -126,55 +132,91 @@ class HomeDesktopScaffold extends StatelessWidget {
     final topicsOnRight = sp.desktopTopicPosition == DesktopTopicPosition.right;
     final workspaceBound = _isDesktop && _hasBoundWorkspace(context);
 
-    return ChatFrostedBackdrop(
-      backdrop: buildAssistantBackground(context),
-      child: SizedBox.expand(
-        child: Row(
-          children: [
-            // Left sidebar
-            _buildLeftSidebar(context, cs, topicsOnRight),
-            // Left sidebar resize handle / divider
-            if (_isDesktop)
-              SidebarResizeHandle(
-                visible: tabletSidebarOpen,
-                onDrag: onSidebarWidthChanged,
-                onDragEnd: onSidebarWidthChangeEnd,
-              )
-            else
-              AnimatedContainer(
-                duration: _sidebarAnimDuration,
-                curve: _sidebarAnimCurve,
-                width: tabletSidebarOpen ? 0.6 : 0,
-                child: tabletSidebarOpen
-                    ? VerticalDivider(
-                        width: 0.6,
-                        thickness: 0.5,
-                        color: cs.outlineVariant.withValues(alpha: 0.20),
-                      )
-                    : const SizedBox.shrink(),
+    return ListenableBuilder(
+      listenable: BrowserPanelController.instance,
+      builder: (context, _) => ChatFrostedBackdrop(
+        backdrop: buildAssistantBackground(context),
+        child: SizedBox.expand(
+          child: Row(
+            children: [
+              // Left sidebar
+              _buildLeftSidebar(context, cs, topicsOnRight),
+              // Left sidebar resize handle / divider
+              if (_isDesktop)
+                SidebarResizeHandle(
+                  visible: tabletSidebarOpen,
+                  onDrag: onSidebarWidthChanged,
+                  onDragEnd: onSidebarWidthChangeEnd,
+                )
+              else
+                AnimatedContainer(
+                  duration: _sidebarAnimDuration,
+                  curve: _sidebarAnimCurve,
+                  width: tabletSidebarOpen ? 0.6 : 0,
+                  child: tabletSidebarOpen
+                      ? VerticalDivider(
+                          width: 0.6,
+                          thickness: 0.5,
+                          color: cs.outlineVariant.withValues(alpha: 0.20),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              // Main content
+              Expanded(
+                child: BrowserSidePanelHost(
+                  enabled: _isDesktop,
+                  panelBuilder: (context, conversationId, active, close) =>
+                      BrowserPage(
+                        key: ValueKey((
+                          conversationId,
+                          BrowserPanelController.instance.initialTabId,
+                        )),
+                        conversationId: conversationId,
+                        initialTabId:
+                            BrowserPanelController.instance.initialTabId,
+                        embedded: true,
+                        shortcutsEnabled: active,
+                        onClose: close,
+                        onExpand: () => unawaited(
+                          openBrowserPage(
+                            context,
+                            conversationId: conversationId,
+                            fullPage: true,
+                          ),
+                        ),
+                      ),
+                  child: Scaffold(
+                    key: scaffoldKey,
+                    resizeToAvoidBottomInset: true,
+                    extendBodyBehindAppBar: true,
+                    backgroundColor: Colors.transparent,
+                    appBar:
+                        appBarOverride ??
+                        _buildAppBar(
+                          context,
+                          cs,
+                          topicsOnRight,
+                          workspaceBound: workspaceBound,
+                        ),
+                    body: body,
+                  ),
+                ),
               ),
-            // Main content
-            Expanded(
-              child: Scaffold(
-                key: scaffoldKey,
-                resizeToAvoidBottomInset: true,
-                extendBodyBehindAppBar: true,
-                backgroundColor: Colors.transparent,
-                appBar:
-                    appBarOverride ??
-                    _buildAppBar(
-                      context,
-                      cs,
-                      topicsOnRight,
-                      workspaceBound: workspaceBound,
-                    ),
-                body: body,
+              Offstage(
+                offstage: BrowserPanelController.instance.isOpen,
+                child: _buildWorkspaceBar(
+                  context,
+                  cs,
+                  workspaceBound: workspaceBound,
+                ),
               ),
-            ),
-            _buildWorkspaceBar(context, cs, workspaceBound: workspaceBound),
-            // Right sidebar (desktop only with topics on right)
-            _buildRightSidebar(context, cs, topicsOnRight),
-          ],
+              // Right sidebar (desktop only with topics on right)
+              Offstage(
+                offstage: BrowserPanelController.instance.isOpen,
+                child: _buildRightSidebar(context, cs, topicsOnRight),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -689,6 +731,163 @@ class HomeDesktopScaffold extends StatelessWidget {
   }
 }
 
+/// A browser uses the same adjacent-pane and resize-handle arrangement as the
+/// desktop workspace/sidebar. Chat remains mounted while its width changes.
+class BrowserSidePanelHost extends StatefulWidget {
+  const BrowserSidePanelHost({
+    super.key,
+    required this.child,
+    required this.panelBuilder,
+    this.enabled = true,
+    this.controller,
+  });
+
+  final Widget child;
+  final bool enabled;
+  final BrowserPanelController? controller;
+  final Widget Function(BuildContext, String?, bool, VoidCallback) panelBuilder;
+
+  @override
+  State<BrowserSidePanelHost> createState() => _BrowserSidePanelHostState();
+}
+
+class _BrowserSidePanelHostState extends State<BrowserSidePanelHost> {
+  final _panelKey = GlobalKey();
+  late final _controller = widget.controller ?? BrowserPanelController.instance;
+  final _width = ValueNotifier<double>(520);
+  bool _active = false;
+  bool _visible = true;
+  bool _observingPointers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.enabled) _controller.attachHost();
+    _controller.addListener(_panelChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _visible = Visibility.of(context);
+    if (!_visible) _active = false;
+    _syncPointerObserver();
+  }
+
+  @override
+  void didUpdateWidget(BrowserSidePanelHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.enabled != oldWidget.enabled) {
+      if (widget.enabled) {
+        _controller.attachHost();
+      } else {
+        _controller.detachHost();
+      }
+      _syncPointerObserver();
+    }
+  }
+
+  void _panelChanged() {
+    if (!mounted) return;
+    _syncPointerObserver();
+    // Opening beside a focused chat input must not claim its shortcuts. Only
+    // a pointer inside the pane or actual focus entering it activates commands.
+    setState(() => _active = false);
+  }
+
+  void _syncPointerObserver() {
+    final observe = widget.enabled && _visible && _controller.isOpen;
+    if (_observingPointers == observe) return;
+    _observingPointers = observe;
+    final router = GestureBinding.instance.pointerRouter;
+    if (observe) {
+      router.addGlobalRoute(_pointerEvent);
+    } else {
+      router.removeGlobalRoute(_pointerEvent);
+    }
+  }
+
+  void _pointerEvent(PointerEvent event) {
+    if (event is! PointerDownEvent) return;
+    final box = _panelKey.currentContext?.findRenderObject();
+    final inside =
+        box is RenderBox &&
+        box.hasSize &&
+        (box.localToGlobal(Offset.zero) & box.size).contains(event.position);
+    _setActive(inside);
+  }
+
+  void _setActive(bool value) {
+    final active = widget.enabled && _visible && value;
+    if (mounted && _active != active) setState(() => _active = active);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_panelChanged);
+    if (_observingPointers) {
+      GestureBinding.instance.pointerRouter.removeGlobalRoute(_pointerEvent);
+    }
+    if (widget.enabled) _controller.detachHost();
+    _width.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final open = widget.enabled && _controller.isOpen;
+      final available = math.max(0.0, constraints.maxWidth - 6);
+      final minimum = math.min(320.0, available * .5);
+      final maximum = math.max(
+        minimum,
+        available - math.min(280.0, available * .5),
+      );
+      final panel = open
+          ? Focus(
+              onFocusChange: _setActive,
+              child: widget.panelBuilder(
+                context,
+                _controller.conversationId,
+                _active,
+                _controller.close,
+              ),
+            )
+          : null;
+      return ValueListenableBuilder<double>(
+        valueListenable: _width,
+        child: panel,
+        builder: (context, requestedWidth, panel) => Row(
+          children: [
+            Expanded(child: widget.child),
+            if (open) ...[
+              SidebarResizeHandle(
+                key: const ValueKey('browserPanelResizeHandle'),
+                visible: true,
+                // Several pointer updates can arrive before the next layout.
+                // Accumulate against current state rather than the width this
+                // build captured, otherwise earlier deltas in that frame vanish.
+                onDrag: (dx) =>
+                    _width.value = (_width.value.clamp(minimum, maximum) - dx)
+                        .clamp(minimum, maximum),
+              ),
+              SizedBox(
+                key: _panelKey,
+                width: requestedWidth.clamp(minimum, maximum),
+                // Native glass hosts include transparent shadow room beyond
+                // their control bounds. Keep that overflow within this pane as
+                // its divider moves. A hard rect clip adds no offscreen layer,
+                // so the WebView and material still share the live backdrop.
+                child: ClipRect(child: panel),
+              ),
+            ],
+          ],
+        ),
+      );
+    },
+  );
+}
+
 /// Sidebar resize handle widget for desktop
 class SidebarResizeHandle extends StatefulWidget {
   const SidebarResizeHandle({
@@ -706,25 +905,133 @@ class SidebarResizeHandle extends StatefulWidget {
   State<SidebarResizeHandle> createState() => _SidebarResizeHandleState();
 }
 
-class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
+class _SidebarResizeHandleState extends State<SidebarResizeHandle>
+    with WidgetsBindingObserver {
   bool _hovered = false;
+  bool _appActive = true;
+  int? _pointer;
+  double _lastX = 0;
+  late final _capture = SidebarResizeCapture(onEnd: _finish);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(SidebarResizeHandle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.visible) {
+      _finish();
+      _capture.updateCursor(null);
+    } else if (_hovered || _pointer != null) {
+      _scheduleCursorBounds();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    if (!_appActive) {
+      _finish();
+      _capture.updateCursor(null);
+    } else if (_hovered) {
+      _scheduleCursorBounds();
+    }
+  }
+
+  void _down(PointerDownEvent event) {
+    if (_pointer != null || event.buttons != kPrimaryButton) return;
+    _pointer = event.pointer;
+    _lastX = event.position.dx;
+    if (event.kind == PointerDeviceKind.mouse &&
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      // Capture only reroutes AppKit events back to Flutter's controller.
+      // The same pointer stream works before and after the async acknowledgement.
+      unawaited(_capture.begin(event.timeStamp));
+    }
+  }
+
+  void _pointerMove(PointerMoveEvent event) {
+    if (event.pointer != _pointer) return;
+    if (event.buttons & kPrimaryButton == 0) {
+      _finish();
+      return;
+    }
+    _move(event.position.dx);
+  }
+
+  void _move(double x) {
+    if (_pointer == null) return;
+    final delta = x - _lastX;
+    _lastX = x;
+    if (delta != 0) widget.onDrag(delta);
+  }
+
+  void _finish() {
+    if (_pointer == null) return;
+    _pointer = null;
+    _capture.cancel();
+    widget.onDragEnd?.call();
+    _scheduleCursorBounds();
+  }
+
+  void _scheduleCursorBounds() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      _capture.updateCursor(
+        widget.visible &&
+                _appActive &&
+                (_hovered || _pointer != null) &&
+                box is RenderBox &&
+                box.hasSize
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _capture.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (!widget.visible) return const SizedBox.shrink();
-    return GestureDetector(
+    return Listener(
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (details) => widget.onDrag(details.delta.dx),
-      onHorizontalDragEnd: (_) => widget.onDragEnd?.call(),
+      onPointerDown: _down,
+      onPointerMove: _pointerMove,
+      onPointerUp: (event) {
+        if (event.pointer == _pointer) _finish();
+      },
+      onPointerCancel: (event) {
+        if (event.pointer == _pointer) _finish();
+      },
+      onPointerHover: (_) => _finish(),
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) {
+          setState(() => _hovered = true);
+          _scheduleCursorBounds();
+        },
+        onExit: (_) {
+          setState(() => _hovered = false);
+          _scheduleCursorBounds();
+        },
         child: Container(
           width: 6,
           height: double.infinity,
-          color: Colors.transparent,
+          // Native overlay hit testing follows painted bounds, not Flutter's
+          // opaque listener. Paint the entire grip without a visible fill.
+          color: const Color(0x01000000),
           alignment: Alignment.center,
           child: Container(
             width: 1,

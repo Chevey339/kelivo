@@ -1924,6 +1924,15 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.AppWindow,
+                label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+                value: sp.showBrowserPageCards,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowBrowserPageCards(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.TextSelect,
                 label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
                 value: sp.insertSuggestionOnTapOnly,

@@ -447,9 +447,19 @@ void main() {
       fakePathProvider.completedAppDataRequests,
       greaterThan(completedRequestsBeforeDispose),
     );
-    final remainingPaths = await tester.runAsync(
-      () => uploadDir.list().map((entry) => entry.path).toSet(),
-    );
+    // Pump the continuation that removes a file written after disposal; a
+    // fixed real-clock delay does not drain the widget test's fake-clock work.
+    Set<String>? remainingPaths;
+    for (var attempt = 0; attempt < 400; attempt++) {
+      await tester.pump();
+      remainingPaths = await tester.runAsync(
+        () => uploadDir.list().map((entry) => entry.path).toSet(),
+      );
+      if (setEquals(remainingPaths, existingPaths)) break;
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
     expect(remainingPaths, existingPaths);
 
     controller.dispose();

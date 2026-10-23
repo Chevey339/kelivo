@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/health_data_type.dart';
+import '../../../core/services/browser/browser_tools_service.dart';
 import 'calculator_service.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
@@ -23,6 +24,7 @@ class LocalToolNames {
   static const String calendarCreate = 'calendar_create';
   static const String currentLocation = 'get_current_location';
   static const String phoneControl = 'phone_control';
+  static const String browser = BrowserToolsService.toolName;
   static const String weather = 'get_weather';
   static const String healthSummary = 'get_health_summary';
   static const String remindersQuery = 'reminders_query';
@@ -40,6 +42,7 @@ class LocalToolNames {
     calendarCreate,
     currentLocation,
     phoneControl,
+    browser,
     weather,
     healthSummary,
     remindersQuery,
@@ -405,6 +408,14 @@ class LocalToolsService {
   /// assistant "Local tools" tab.
   static bool isAvailableOnThisPlatform(String name) {
     switch (name) {
+      case LocalToolNames.browser:
+        return !kIsWeb &&
+            const {
+              TargetPlatform.android,
+              TargetPlatform.iOS,
+              TargetPlatform.macOS,
+              TargetPlatform.windows,
+            }.contains(defaultTargetPlatform);
       case LocalToolNames.phoneControl:
         return DeviceLocalTools.phoneControlSupported;
       case LocalToolNames.screenTime:
@@ -435,6 +446,8 @@ class LocalToolsService {
 
   static Map<String, dynamic> definitionFor(String name) {
     switch (name) {
+      case LocalToolNames.browser:
+        return BrowserToolsService.getToolDefinition();
       case LocalToolNames.phoneControl:
         return _phoneControlDefinition;
       case LocalToolNames.timeInfo:

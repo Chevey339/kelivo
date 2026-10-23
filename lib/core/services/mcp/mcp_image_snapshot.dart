@@ -24,9 +24,24 @@ class McpImageSnapshot {
       if (cleaned.length > ((ToolImage.maxFileBytes + 2) ~/ 3) * 4) {
         return null;
       }
-      final bytes = base64Decode(cleaned);
+      return (await saveBytes(base64Decode(cleaned)))?.uri;
+    } catch (_) {
+      cancellation?.throwIfCancelled();
+      return null;
+    }
+  }
+
+  /// Return the stored dimensions so screenshot coordinates describe the
+  /// bounded image sent to the model, rather than the original native bitmap.
+  static Future<({String uri, int width, int height})?> saveBytes(
+    Uint8List bytes,
+  ) async {
+    final cancellation = ToolCallCancellation.current;
+    cancellation?.throwIfCancelled();
+    try {
       final image = await ToolImage.fromBytes(bytes);
-      return await _store(image);
+      final uri = await _store(image);
+      return (uri: uri, width: image.width, height: image.height);
     } catch (_) {
       cancellation?.throwIfCancelled();
       return null;

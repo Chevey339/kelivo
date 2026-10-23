@@ -6,7 +6,13 @@
   "settingsSearchNoResults": "No settings found",
   "settingsSearchNoResultsHint": "Try a different name or a shorter keyword.",
   "settingsSearchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
-  "@settingsSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
+  "@settingsSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "helloWorld": "Hello World!",
   "settingsPageBackButton": "Back",
   "settingsPageTitle": "Settings",
@@ -840,8 +846,12 @@
   "backupPageForwardCompatBody": "This backup was created by a newer version of Kelivo (data format {backupVersion}; this version supports {currentVersion}), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating Kelivo first is the safer choice.",
   "@backupPageForwardCompatBody": {
     "placeholders": {
-      "backupVersion": { "type": "int" },
-      "currentVersion": { "type": "int" }
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
     }
   },
   "backupPageForwardCompatContinue": "Import anyway",
@@ -1173,7 +1183,9 @@
   "chatMessageWidgetWebFetch": "Read page: {target}",
   "@chatMessageWidgetWebFetch": {
     "placeholders": {
-      "target": { "type": "String" }
+      "target": {
+        "type": "String"
+      }
     }
   },
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
@@ -1620,8 +1632,12 @@
   "backgroundTaskFailed": "{task} failed: {error}",
   "@backgroundTaskFailed": {
     "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
     }
   },
   "defaultModelPageOcrModelSubtitle": "Used for extracting text and descriptions from images",
@@ -2092,13 +2108,17 @@
   "searchServicesPageWebFetchFollowValue": "Follow search · {name}",
   "@searchServicesPageWebFetchFollowValue": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchFollowSubtitle": "Currently {name}",
   "@searchServicesPageWebFetchFollowSubtitle": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchLocal": "Local",
@@ -2169,23 +2189,27 @@
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
   "searchApiKeysPageDescription": "Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.",
-
   "searchApiKeysPagePrimaryBadge": "Primary",
   "searchApiKeysPageBatchHint": "Paste one or more keys — one per line or comma-separated",
   "searchApiKeysPageBatchResult": "Added {added}, skipped {skipped} duplicate(s)",
   "@searchApiKeysPageBatchResult": {
     "placeholders": {
-      "added": { "type": "String" },
-      "skipped": { "type": "String" }
+      "added": {
+        "type": "String"
+      },
+      "skipped": {
+        "type": "String"
+      }
     }
   },
   "searchApiKeysPageAdd": "Add",
   "searchApiKeysPageEmpty": "No keys configured yet.",
   "searchServiceEditorMultiKeyCount": "{count} keys",
-
   "@searchServiceEditorMultiKeyCount": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageTitle": "Account usage",
@@ -2195,26 +2219,36 @@
   "searchServiceEditorUsageRemaining": "{remaining} credits remaining",
   "@searchServiceEditorUsageRemaining": {
     "placeholders": {
-      "remaining": { "type": "String" }
+      "remaining": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageBalance": "Balance: {balance}",
   "@searchServiceEditorUsageBalance": {
     "placeholders": {
-      "balance": { "type": "String" }
+      "balance": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageUsed": "{used} of {limit} credits used",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageFailed": "Could not query usage: {message}",
   "@searchServiceEditorUsageFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestTitle": "Test search",
@@ -2225,7 +2259,9 @@
   "searchServiceEditorTestFailed": "Search failed: {message}",
   "@searchServiceEditorTestFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestModeSearch": "Search",
@@ -2236,14 +2272,20 @@
   "searchServiceEditorTestFetchFailed": "Fetch failed: {message}",
   "@searchServiceEditorTestFetchFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestFetchStats": "{characters} characters · {seconds}s",
   "@searchServiceEditorTestFetchStats": {
     "placeholders": {
-      "characters": { "type": "String" },
-      "seconds": { "type": "String" }
+      "characters": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorResultOpenTooltip": "Open result",
@@ -2252,7 +2294,9 @@
   "searchServiceEditorDeleteMessage": "Delete {provider}? This cannot be undone.",
   "@searchServiceEditorDeleteMessage": {
     "placeholders": {
-      "provider": { "type": "String" }
+      "provider": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorDeleteConfirm": "Delete",
@@ -2515,14 +2559,26 @@
   "asrServicesModelDownloadingLabel": "Downloading…",
   "asrServicesModelNotDownloadedLabel": "Not downloaded",
   "asrServicesDownloadFailed": "Model download failed: {error}",
-  "@asrServicesDownloadFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@asrServicesDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "asrServicesSystemChecking": "Checking…",
   "asrServicesSystemAvailable": "Available",
   "asrServicesSystemCheckFailed": "System speech recognition is unavailable on this device.",
   "asrServicesMicrophonePermissionDenied": "Microphone permission was not granted.",
   "asrServicesNoSpeechDetected": "No speech was detected.",
   "asrServicesRecognitionFailed": "Speech recognition failed: {error}",
-  "@asrServicesRecognitionFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@asrServicesRecognitionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "ttsServicesPageAddNotImplemented": "Add TTS service not implemented",
   "ttsServicesPageSystemTtsTitle": "System TTS",
   "ttsServicesPageSystemTtsAvailableSubtitle": "Use system built-in TTS",
@@ -2593,8 +2649,12 @@
   "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
   "@ttsServicesValidationSampleRate": {
     "placeholders": {
-      "format": {"type": "String"},
-      "rates": {"type": "String"}
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
     }
   },
   "ttsServicesViewDetailsButton": "View details",
@@ -2842,14 +2902,14 @@
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditLocalToolCalculateTitle": "Calculator",
   "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.",
-   "assistantEditLocalToolScreenTimeTitle": "Screen Time",
-   "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
-   "chatMessageWidgetScreenTimeTotal": "Total screen time",
-   "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
-   "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
-   "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
-   "assistantEditLocalToolCalendarCreateTitle": "Create Event",
-   "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
+  "assistantEditLocalToolScreenTimeTitle": "Screen Time",
+  "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
+  "chatMessageWidgetScreenTimeTotal": "Total screen time",
+  "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
+  "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
+  "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
+  "assistantEditLocalToolCalendarCreateTitle": "Create Event",
+  "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
   "assistantEditLocalToolLocationTitle": "Current Location",
   "assistantEditLocalToolLocationSubtitle": "Read a one-shot location from this device, requires the location permission.",
   "assistantEditLocalToolWeatherTitle": "Weather",
@@ -2859,8 +2919,12 @@
   "assistantEditLocalToolHealthSelectedCount": "{selected}/{total} selected",
   "@assistantEditLocalToolHealthSelectedCount": {
     "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "healthDataSettingsTitle": "Health Data",
@@ -2868,8 +2932,12 @@
   "healthDataSettingsBadge": "{selected}/{total} on",
   "@healthDataSettingsBadge": {
     "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "healthDataSettingsIosReadTitle": "iOS Health Read",
@@ -3224,7 +3292,9 @@
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memorySettingsInjectionMaxItemsCustomButton": "Custom",
@@ -3275,7 +3345,9 @@
   "memoryEntryScopeAssistantNamed": "{name}",
   "@memoryEntryScopeAssistantNamed": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "memoryEntrySourceManual": "Manual",
@@ -3287,7 +3359,9 @@
   "memoryEntryUpdatedAt": "Updated {date}",
   "@memoryEntryUpdatedAt": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "memoryEntryActionEdit": "Edit",
@@ -3302,7 +3376,9 @@
   "memoryEntryBatchDeleteConfirmTitle": "Delete {count} memories?",
   "@memoryEntryBatchDeleteConfirmTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryEntryBatchDeleteConfirmContent": "Selected memories will be permanently deleted.",
@@ -3329,7 +3405,9 @@
   "memoryOrphanBanner": "{count} orphaned assistant memories (assistant deleted)",
   "@memoryOrphanBanner": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrphanCleanupButton": "Clean up",
@@ -3337,7 +3415,9 @@
   "memoryOrphanConfirmContent": "Permanently delete {count} memories whose assistant no longer exists.",
   "@memoryOrphanConfirmContent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeButton": "Organize",
@@ -3347,26 +3427,34 @@
   "memoryOrganizeStatusLast": "Last organized: {when}",
   "@memoryOrganizeStatusLast": {
     "placeholders": {
-      "when": {"type": "String"}
+      "when": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusExtracted": "extracted {count}",
   "@memoryOrganizeStatusExtracted": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeStatusSkipped": "nothing to remember",
   "memoryOrganizeStatusFailed": "Failed: {reason}",
   "@memoryOrganizeStatusFailed": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusSkippedReason": "skipped: {reason}",
   "@memoryOrganizeStatusSkippedReason": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOutcomeTemporaryConversation": "Temporary chats are not saved to memory",
@@ -3398,19 +3486,25 @@
   "memoryOrganizeMinutesAgo": "{n} min ago",
   "@memoryOrganizeMinutesAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeHoursAgo": "{n} h ago",
   "@memoryOrganizeHoursAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeDaysAgo": "{n} d ago",
   "@memoryOrganizeDaysAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryModelMissingNotice": "Select a memory processing model in Settings → Memory first.",
@@ -3443,7 +3537,9 @@
   "legacyMemoryAssistantHeader": "Assistant: {name}",
   "@legacyMemoryAssistantHeader": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "legacyMemorySearchHint": "Search legacy memories",
@@ -3452,7 +3548,9 @@
   "legacyMemoryMigrationSubtitle": "Use a model to classify and clean up {count} legacy memories. The originals stay unchanged.",
   "@legacyMemoryMigrationSubtitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationModel": "Migration model",
@@ -3470,16 +3568,24 @@
   "legacyMemoryMigrationProgress": "{current} of {total}",
   "@legacyMemoryMigrationProgress": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationComplete": "Migration complete",
   "legacyMemoryMigrationResult": "{created} migrated · {skipped} already existed",
   "@legacyMemoryMigrationResult": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationFailed": "Migration stopped. You can retry; memories already saved will be skipped.",
@@ -3494,9 +3600,15 @@
   "legacyMemoryMigrationPartial": "{created} migrated · {skipped} skipped · {failed} failed",
   "@legacyMemoryMigrationPartial": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"},
-      "failed": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationContinue": "Continue migration",
@@ -3506,7 +3618,9 @@
   "legacyMemoryMigrationErrorOther": "Migration failed: {message}",
   "@legacyMemoryMigrationErrorOther": {
     "placeholders": {
-      "message": {"type": "String"}
+      "message": {
+        "type": "String"
+      }
     }
   },
   "legacyMemoryModeTitle": "Use legacy memory",
@@ -3558,7 +3672,9 @@
   "assistantEditOrganizeFrequencyOption": "Every {n}",
   "@assistantEditOrganizeFrequencyOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "assistantEditOrganizeFrequencyCustomButton": "Custom",
@@ -3888,7 +4004,13 @@
   "migrationChatsExportDegradedNote": "The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.",
   "timelineJumpToLatest": "Jump to latest",
   "largeContentShowMore": "Show {count} more",
-  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "largeContentCollapse": "Collapse",
   "imageSettingsPageTitle": "Image Processing",
   "imageSettingsPageEditSectionTitle": "Editing",
@@ -4727,13 +4849,17 @@
   "workspaceBindingRememberedDefault": "Remembered as the default workspace for “{assistant}”. New conversations will use it.",
   "@workspaceBindingRememberedDefault": {
     "placeholders": {
-      "assistant": { "type": "String" }
+      "assistant": {
+        "type": "String"
+      }
     }
   },
   "workspaceBindingSuggestDefault": "Use this workspace for future conversations with “{assistant}” too?",
   "@workspaceBindingSuggestDefault": {
     "placeholders": {
-      "assistant": { "type": "String" }
+      "assistant": {
+        "type": "String"
+      }
     }
   },
   "workspaceBindingUndoDefault": "Undo",
@@ -5161,7 +5287,11 @@
   "incomingShareMoveFailed": "Could not switch conversations. Your draft has been kept.",
   "attachmentRequiresWorkspace": "To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.",
   "@attachmentRequiresWorkspace": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "storageSessionFilesUnlinked": "Unlinked conversation",
   "workspaceExternalMount": "Mount external folder",
@@ -5601,7 +5731,13 @@
   "oauthRequestFailed": "The provider could not complete the request.",
   "oauthQuotaAvailable": "Quota is available",
   "oauthSavedResets": "Available usage resets: {count}",
-  "@oauthSavedResets": { "placeholders": { "count": { "type": "String" } } },
+  "@oauthSavedResets": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "oauthPrimaryWindow": "Primary window",
   "oauthSecondaryWindow": "Secondary window",
   "oauthAuthorizationCode": "Authorization code or callback URL",
@@ -5648,8 +5784,20 @@
   "scheduledTasksShowPreviewTip": "Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.",
   "scheduledTasksHours": "{count, plural, =1{1 hour} other{{count} hours}}",
   "scheduledTasksMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
-  "@scheduledTasksHours": {"placeholders": {"count": {"type": "int"}}},
-  "@scheduledTasksMinutes": {"placeholders": {"count": {"type": "int"}}},
+  "@scheduledTasksHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "scheduledTasksPreparationOff": "Preparation off",
   "scheduledTasksPreparationQueued": "Queued",
   "scheduledTasksPreparationQueuedDetail": "Another task is being prepared. Eligible tasks continue in due-time order.",
@@ -5917,5 +6065,258 @@
         "type": "int"
       }
     }
-  }
+  },
+  "browserTitle": "Browser",
+  "browserSearchHint": "Search or enter website",
+  "browserStartTitle": "Where to next?",
+  "browserStartSubtitle": "Browse freely. Let your agent help when you need it.",
+  "browserNewTab": "New tab",
+  "browserTabs": "Tabs",
+  "browserCloseTab": "Close tab",
+  "browserClose": "Close browser",
+  "browserBack": "Back",
+  "browserForward": "Forward",
+  "browserReload": "Reload",
+  "browserStop": "Stop loading",
+  "browserMore": "More",
+  "browserBookmarks": "Bookmarks",
+  "browserHistory": "History",
+  "browserSettings": "Browser settings",
+  "browserAddBookmark": "Add bookmark",
+  "browserRemoveBookmark": "Remove bookmark",
+  "browserNoBookmarks": "Your favorite places, all together.",
+  "browserNoHistory": "Your browsing history appears here.",
+  "browserSearchLibrary": "Search saved pages",
+  "browserClearHistory": "Clear history",
+  "browserClearHistoryConfirm": "Delete all browsing history? Bookmarks will be kept.",
+  "browserToday": "Today",
+  "browserYesterday": "Yesterday",
+  "browserDelete": "Delete",
+  "browserCancel": "Cancel",
+  "browserDone": "Done",
+  "browserFind": "Find on page",
+  "browserFindPreviousMatch": "Previous match",
+  "browserFindNextMatch": "Next match",
+  "browserFindHint": "Find text",
+  "browserSearchEngine": "Search engine",
+  "browserDesktopMode": "Desktop website",
+  "browserDesktopModeDescription": "Reload open pages with a desktop user agent.",
+  "browserRestoreTabs": "Restore tabs",
+  "browserRestoreTabsDescription": "Reopen your tabs when Kelivo starts.",
+  "browserSaveHistory": "Save history",
+  "browserSaveHistoryDescription": "Keep a local record of the pages you visit.",
+  "browserClearData": "Clear website data",
+  "browserClearDataConfirm": "Clear cookies, storage and cache, and close all tabs? You will be signed out of websites.",
+  "browserDataCleared": "Website data cleared",
+  "browserAgentControl": "Agent control",
+  "browserAgentWorking": "AI is working",
+  "browserTakeOver": "Take over",
+  "browserAgentPaused": "AI actions paused",
+  "browserAllowAgent": "Allow to continue",
+  "browserAgentDescription": "Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.",
+  "browserOpenExternal": "Open in default browser",
+  "browserCopyLink": "Copy link",
+  "browserLinkCopied": "Link copied",
+  "browserUnsupported": "The embedded browser is not available on this platform.",
+  "browserLoadFailed": "This page could not be loaded",
+  "browserRetry": "Try again",
+  "browserFavorites": "Favorites",
+  "browserEditBookmark": "Edit bookmark",
+  "browserBookmarkTitle": "Title",
+  "browserBookmarkUrl": "Website",
+  "browserSave": "Save",
+  "browserDownloads": "Downloads",
+  "browserNoDownloads": "Downloaded files appear here.",
+  "browserDownloadCancel": "Cancel download",
+  "browserOpenDownload": "Open file",
+  "browserDownloadFailed": "Download failed",
+  "browserAgentEnableHint": "Enable the Browser tool in chat tools, then allow control here.",
+  "browserSessionRequired": "Open the browser from a conversation to allow agent control.",
+  "browserDownloadCancelled": "Cancelled",
+  "browserAgentEnabled": "Allow assistant browser access",
+  "browserAgentEnabledDescription": "Enabled assistants can browse and interact with pages in this browser.",
+  "browserToolTitle": "Browser control",
+  "browserToolSubtitle": "Browse and interact with signed-in pages. Enable Agent control in browser settings first.",
+  "browserOpen": "Open browser",
+  "browserInvalidUrl": "Enter a valid HTTP or HTTPS website address.",
+  "browserClearDataUnavailable": "Clearing all website data is not supported by the Windows browser engine.",
+  "browserSurfaceStyle": "Surface style",
+  "browserSurfaceLiquid": "Liquid glass",
+  "browserSurfaceFrosted": "Frosted",
+  "browserSurfaceSolid": "Solid",
+  "browserPageOptions": "Page options",
+  "browserAskAi": "Let AI work on this page",
+  "browserAskAiHint": "Return to chat, add your request, then send.",
+  "browserAskAiCurrentPage": "the current browser page",
+  "browserAskAiUnavailable": "This chat is unavailable. Open the browser from a chat first.",
+  "browserAskAiEditing": "Finish or cancel editing the current message before adding a page task.",
+  "browserAskAiAssistantDisabled": "Enable Browser control in this assistant’s tools first.",
+  "browserAskAiBrowserDisabled": "Allow assistants to use the browser in browser settings first.",
+  "browserAskAiDraft": "Please use the browser to work on this page:\n{page}\n\nMy request: ",
+  "@browserAskAiDraft": {
+    "placeholders": {
+      "page": {
+        "type": "String"
+      }
+    }
+  },
+  "browserOpenFullPage": "Open in full page",
+  "browserClosePanel": "Close browser panel",
+  "browserSearchTabs": "Search tabs",
+  "browserTabsCount": "{count, plural, =1{1 tab} other{{count} tabs}}",
+  "@browserTabsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserOpenInSidebar": "Open in sidebar",
+  "browserUserAgent": "User agent",
+  "browserUserAgentMobile": "Mobile",
+  "browserUserAgentDesktop": "Desktop",
+  "browserUserAgentCustom": "Custom",
+  "browserUserAgentHint": "Enter a custom User-Agent",
+  "browserUserAgentInvalid": "Use a single line of up to 2048 printable ASCII characters.",
+  "browserUserAgentDescription": "Changes reload the current webpage.",
+  "browserStepsShowEarlier": "{count} earlier steps",
+  "browserOpenThisPage": "Open in browser",
+  "browserGroupToggleSemantics": "Show or hide browser steps",
+  "@browserStepsShowEarlier": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserStepGroupTitle": "Browsing",
+  "browserStepCount": "{count} steps",
+  "@browserStepCount": {
+    "description": "Browser page card browserStepCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserStepCurrent": "step {count}",
+  "@browserStepCurrent": {
+    "description": "Browser page card browserStepCurrent",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailedCount": "· {count} failed",
+  "@browserActionFailedCount": {
+    "description": "Browser page card browserActionFailedCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailed": "{action} failed",
+  "@browserActionFailed": {
+    "description": "Browser page card browserActionFailed",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardOpen": "Open",
+  "browserCardEnable": "Enable",
+  "browserCardRunning": "{action}…",
+  "@browserCardRunning": {
+    "description": "Browser page card browserCardRunning",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardLive": "Live",
+  "browserCardOpenFailed": "Couldn't open page",
+  "browserCardBlankPage": "Blank page",
+  "browserCardTabCount": "{count} tabs",
+  "@browserCardTabCount": {
+    "description": "Browser page card browserCardTabCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionOpen": "Open page",
+  "browserActionNewTab": "New tab",
+  "browserActionRender": "Render page",
+  "browserActionExtract": "Extract text",
+  "browserActionSnapshot": "Read page structure",
+  "browserActionClick": "Click",
+  "browserActionType": "Type",
+  "browserActionPress": "Press key",
+  "browserActionScroll": "Scroll",
+  "browserActionWait": "Wait",
+  "browserActionBack": "Back",
+  "browserActionForward": "Forward",
+  "browserActionReload": "Reload",
+  "browserActionEvaluate": "Run script",
+  "browserActionSwitchTab": "Switch tab",
+  "browserActionCloseTab": "Close tab",
+  "browserActionListTabs": "List tabs",
+  "browserActionUnknown": "Browser action",
+  "browserMetaChars": "{count} chars",
+  "@browserMetaChars": {
+    "description": "Browser page card browserMetaChars",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "browserMetaElements": "{count} elements",
+  "@browserMetaElements": {
+    "description": "Browser page card browserMetaElements",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserErrAgentDisabled": "Browser control is off",
+  "browserErrStaleRef": "Element is stale; page needs re-reading",
+  "browserErrNotVisible": "Element hidden or covered",
+  "browserErrNotFound": "Element not found",
+  "browserErrTimeout": "Page load timed out",
+  "browserErrHumanControl": "You're controlling the browser",
+  "browserErrTabClosed": "Tab was closed",
+  "browserErrGeneric": "Action failed",
+  "browserDirectionUp": "Up",
+  "browserDirectionDown": "Down",
+  "browserDirectionLeft": "Left",
+  "browserDirectionRight": "Right",
+  "browserMetaTabs": "{count} tabs",
+  "@browserMetaTabs": {
+    "description": "Number of tabs returned by list_tabs",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserTabsCurrentConversation": "This chat",
+  "browserTabsAll": "All tabs",
+  "browserTabsUnassigned": "Personal tabs",
+  "browserTabsUnknownConversation": "Other chat",
+  "browserTabsEmptyConversation": "No tabs here yet. Open a page or choose a tab from All tabs.",
+  "browserTabsNoResults": "No matching tabs",
+  "browserMoveToConversation": "Move to this chat",
+  "browserReopenInConversation": "Reopen in this chat",
+  "browserTabBusy": "An assistant is still using this page. Wait for it to finish or stop the task before moving it.",
+  "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
+  "browserAskAiInOwnerConversation": "Ask AI in the owning chat",
+  "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards",
+  "browserObserverHint": "AI is using this page. Select Take over to interact."
 }

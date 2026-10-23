@@ -13390,4 +13390,539 @@ class AppLocalizationsEn extends AppLocalizations {
   String mcpDeleteSelectedConfirm(int count) {
     return 'Delete $count selected servers?';
   }
+
+  @override
+  String get browserTitle => 'Browser';
+
+  @override
+  String get browserSearchHint => 'Search or enter website';
+
+  @override
+  String get browserStartTitle => 'Where to next?';
+
+  @override
+  String get browserStartSubtitle =>
+      'Browse freely. Let your agent help when you need it.';
+
+  @override
+  String get browserNewTab => 'New tab';
+
+  @override
+  String get browserTabs => 'Tabs';
+
+  @override
+  String get browserCloseTab => 'Close tab';
+
+  @override
+  String get browserClose => 'Close browser';
+
+  @override
+  String get browserBack => 'Back';
+
+  @override
+  String get browserForward => 'Forward';
+
+  @override
+  String get browserReload => 'Reload';
+
+  @override
+  String get browserStop => 'Stop loading';
+
+  @override
+  String get browserMore => 'More';
+
+  @override
+  String get browserBookmarks => 'Bookmarks';
+
+  @override
+  String get browserHistory => 'History';
+
+  @override
+  String get browserSettings => 'Browser settings';
+
+  @override
+  String get browserAddBookmark => 'Add bookmark';
+
+  @override
+  String get browserRemoveBookmark => 'Remove bookmark';
+
+  @override
+  String get browserNoBookmarks => 'Your favorite places, all together.';
+
+  @override
+  String get browserNoHistory => 'Your browsing history appears here.';
+
+  @override
+  String get browserSearchLibrary => 'Search saved pages';
+
+  @override
+  String get browserClearHistory => 'Clear history';
+
+  @override
+  String get browserClearHistoryConfirm =>
+      'Delete all browsing history? Bookmarks will be kept.';
+
+  @override
+  String get browserToday => 'Today';
+
+  @override
+  String get browserYesterday => 'Yesterday';
+
+  @override
+  String get browserDelete => 'Delete';
+
+  @override
+  String get browserCancel => 'Cancel';
+
+  @override
+  String get browserDone => 'Done';
+
+  @override
+  String get browserFind => 'Find on page';
+
+  @override
+  String get browserFindPreviousMatch => 'Previous match';
+
+  @override
+  String get browserFindNextMatch => 'Next match';
+
+  @override
+  String get browserFindHint => 'Find text';
+
+  @override
+  String get browserSearchEngine => 'Search engine';
+
+  @override
+  String get browserDesktopMode => 'Desktop website';
+
+  @override
+  String get browserDesktopModeDescription =>
+      'Reload open pages with a desktop user agent.';
+
+  @override
+  String get browserRestoreTabs => 'Restore tabs';
+
+  @override
+  String get browserRestoreTabsDescription =>
+      'Reopen your tabs when Kelivo starts.';
+
+  @override
+  String get browserSaveHistory => 'Save history';
+
+  @override
+  String get browserSaveHistoryDescription =>
+      'Keep a local record of the pages you visit.';
+
+  @override
+  String get browserClearData => 'Clear website data';
+
+  @override
+  String get browserClearDataConfirm =>
+      'Clear cookies, storage and cache, and close all tabs? You will be signed out of websites.';
+
+  @override
+  String get browserDataCleared => 'Website data cleared';
+
+  @override
+  String get browserAgentControl => 'Agent control';
+
+  @override
+  String get browserAgentWorking => 'AI is working';
+
+  @override
+  String get browserTakeOver => 'Take over';
+
+  @override
+  String get browserAgentPaused => 'AI actions paused';
+
+  @override
+  String get browserAllowAgent => 'Allow to continue';
+
+  @override
+  String get browserAgentDescription =>
+      'Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.';
+
+  @override
+  String get browserOpenExternal => 'Open in default browser';
+
+  @override
+  String get browserCopyLink => 'Copy link';
+
+  @override
+  String get browserLinkCopied => 'Link copied';
+
+  @override
+  String get browserUnsupported =>
+      'The embedded browser is not available on this platform.';
+
+  @override
+  String get browserLoadFailed => 'This page could not be loaded';
+
+  @override
+  String get browserRetry => 'Try again';
+
+  @override
+  String get browserFavorites => 'Favorites';
+
+  @override
+  String get browserEditBookmark => 'Edit bookmark';
+
+  @override
+  String get browserBookmarkTitle => 'Title';
+
+  @override
+  String get browserBookmarkUrl => 'Website';
+
+  @override
+  String get browserSave => 'Save';
+
+  @override
+  String get browserDownloads => 'Downloads';
+
+  @override
+  String get browserNoDownloads => 'Downloaded files appear here.';
+
+  @override
+  String get browserDownloadCancel => 'Cancel download';
+
+  @override
+  String get browserOpenDownload => 'Open file';
+
+  @override
+  String get browserDownloadFailed => 'Download failed';
+
+  @override
+  String get browserAgentEnableHint =>
+      'Enable the Browser tool in chat tools, then allow control here.';
+
+  @override
+  String get browserSessionRequired =>
+      'Open the browser from a conversation to allow agent control.';
+
+  @override
+  String get browserDownloadCancelled => 'Cancelled';
+
+  @override
+  String get browserAgentEnabled => 'Allow assistant browser access';
+
+  @override
+  String get browserAgentEnabledDescription =>
+      'Enabled assistants can browse and interact with pages in this browser.';
+
+  @override
+  String get browserToolTitle => 'Browser control';
+
+  @override
+  String get browserToolSubtitle =>
+      'Browse and interact with signed-in pages. Enable Agent control in browser settings first.';
+
+  @override
+  String get browserOpen => 'Open browser';
+
+  @override
+  String get browserInvalidUrl =>
+      'Enter a valid HTTP or HTTPS website address.';
+
+  @override
+  String get browserClearDataUnavailable =>
+      'Clearing all website data is not supported by the Windows browser engine.';
+
+  @override
+  String get browserSurfaceStyle => 'Surface style';
+
+  @override
+  String get browserSurfaceLiquid => 'Liquid glass';
+
+  @override
+  String get browserSurfaceFrosted => 'Frosted';
+
+  @override
+  String get browserSurfaceSolid => 'Solid';
+
+  @override
+  String get browserPageOptions => 'Page options';
+
+  @override
+  String get browserAskAi => 'Let AI work on this page';
+
+  @override
+  String get browserAskAiHint => 'Return to chat, add your request, then send.';
+
+  @override
+  String get browserAskAiCurrentPage => 'the current browser page';
+
+  @override
+  String get browserAskAiUnavailable =>
+      'This chat is unavailable. Open the browser from a chat first.';
+
+  @override
+  String get browserAskAiEditing =>
+      'Finish or cancel editing the current message before adding a page task.';
+
+  @override
+  String get browserAskAiAssistantDisabled =>
+      'Enable Browser control in this assistant’s tools first.';
+
+  @override
+  String get browserAskAiBrowserDisabled =>
+      'Allow assistants to use the browser in browser settings first.';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return 'Please use the browser to work on this page:\n$page\n\nMy request: ';
+  }
+
+  @override
+  String get browserOpenFullPage => 'Open in full page';
+
+  @override
+  String get browserClosePanel => 'Close browser panel';
+
+  @override
+  String get browserSearchTabs => 'Search tabs';
+
+  @override
+  String browserTabsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get browserOpenInSidebar => 'Open in sidebar';
+
+  @override
+  String get browserUserAgent => 'User agent';
+
+  @override
+  String get browserUserAgentMobile => 'Mobile';
+
+  @override
+  String get browserUserAgentDesktop => 'Desktop';
+
+  @override
+  String get browserUserAgentCustom => 'Custom';
+
+  @override
+  String get browserUserAgentHint => 'Enter a custom User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'Use a single line of up to 2048 printable ASCII characters.';
+
+  @override
+  String get browserUserAgentDescription =>
+      'Changes reload the current webpage.';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '$count earlier steps';
+  }
+
+  @override
+  String get browserOpenThisPage => 'Open in browser';
+
+  @override
+  String get browserGroupToggleSemantics => 'Show or hide browser steps';
+
+  @override
+  String get browserStepGroupTitle => 'Browsing';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count steps';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return 'step $count';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count failed';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action failed';
+  }
+
+  @override
+  String get browserCardOpen => 'Open';
+
+  @override
+  String get browserCardEnable => 'Enable';
+
+  @override
+  String browserCardRunning(String action) {
+    return '$action…';
+  }
+
+  @override
+  String get browserCardLive => 'Live';
+
+  @override
+  String get browserCardOpenFailed => 'Couldn\'t open page';
+
+  @override
+  String get browserCardBlankPage => 'Blank page';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count tabs';
+  }
+
+  @override
+  String get browserActionOpen => 'Open page';
+
+  @override
+  String get browserActionNewTab => 'New tab';
+
+  @override
+  String get browserActionRender => 'Render page';
+
+  @override
+  String get browserActionExtract => 'Extract text';
+
+  @override
+  String get browserActionSnapshot => 'Read page structure';
+
+  @override
+  String get browserActionClick => 'Click';
+
+  @override
+  String get browserActionType => 'Type';
+
+  @override
+  String get browserActionPress => 'Press key';
+
+  @override
+  String get browserActionScroll => 'Scroll';
+
+  @override
+  String get browserActionWait => 'Wait';
+
+  @override
+  String get browserActionBack => 'Back';
+
+  @override
+  String get browserActionForward => 'Forward';
+
+  @override
+  String get browserActionReload => 'Reload';
+
+  @override
+  String get browserActionEvaluate => 'Run script';
+
+  @override
+  String get browserActionSwitchTab => 'Switch tab';
+
+  @override
+  String get browserActionCloseTab => 'Close tab';
+
+  @override
+  String get browserActionListTabs => 'List tabs';
+
+  @override
+  String get browserActionUnknown => 'Browser action';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count chars';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count elements';
+  }
+
+  @override
+  String get browserErrAgentDisabled => 'Browser control is off';
+
+  @override
+  String get browserErrStaleRef => 'Element is stale; page needs re-reading';
+
+  @override
+  String get browserErrNotVisible => 'Element hidden or covered';
+
+  @override
+  String get browserErrNotFound => 'Element not found';
+
+  @override
+  String get browserErrTimeout => 'Page load timed out';
+
+  @override
+  String get browserErrHumanControl => 'You\'re controlling the browser';
+
+  @override
+  String get browserErrTabClosed => 'Tab was closed';
+
+  @override
+  String get browserErrGeneric => 'Action failed';
+
+  @override
+  String get browserDirectionUp => 'Up';
+
+  @override
+  String get browserDirectionDown => 'Down';
+
+  @override
+  String get browserDirectionLeft => 'Left';
+
+  @override
+  String get browserDirectionRight => 'Right';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count tabs';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => 'This chat';
+
+  @override
+  String get browserTabsAll => 'All tabs';
+
+  @override
+  String get browserTabsUnassigned => 'Personal tabs';
+
+  @override
+  String get browserTabsUnknownConversation => 'Other chat';
+
+  @override
+  String get browserTabsEmptyConversation =>
+      'No tabs here yet. Open a page or choose a tab from All tabs.';
+
+  @override
+  String get browserTabsNoResults => 'No matching tabs';
+
+  @override
+  String get browserMoveToConversation => 'Move to this chat';
+
+  @override
+  String get browserReopenInConversation => 'Reopen in this chat';
+
+  @override
+  String get browserTabBusy =>
+      'An assistant is still using this page. Wait for it to finish or stop the task before moving it.';
+
+  @override
+  String get browserLiveViewLimit =>
+      'All browser resources are in use. Try again when a task finishes, or close an unused page.';
+
+  @override
+  String get browserAskAiInOwnerConversation => 'Ask AI in the owning chat';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle =>
+      'Show webpage cards';
+
+  @override
+  String get browserObserverHint =>
+      'AI is using this page. Select Take over to interact.';
 }

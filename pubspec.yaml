@@ -103,6 +103,9 @@ dependencies:
   animations: ^2.0.11
   flutter_animate: ^4.5.2
   webview_flutter: ^4.13.1
+  flutter_inappwebview: ^6.1.5
+  liquid_glass_widgets:
+    path: ./dependencies/liquid_glass_widgets
   webview_flutter_wkwebview: ^3.25.1
   webview_windows: ^0.4.0
   flutter_math_fork: # ^0.7.4
@@ -164,6 +167,18 @@ dev_dependencies:
   url_launcher_platform_interface: ^2.3.2
   vm_service: ^15.3.0
 dependency_overrides:
+  # Retained Android hosts switch composition and omit unsubscribed scroll events.
+  flutter_inappwebview_android:
+    path: dependencies/flutter_inappwebview_android
+  # Match each existing native iOS host without relying on shared popup scripts.
+  flutter_inappwebview_ios:
+    path: dependencies/flutter_inappwebview_ios
+  # Deterministic native bounds when fractional desktop pane widths change.
+  flutter_inappwebview_macos:
+    path: dependencies/flutter_inappwebview_macos
+  # Retain WebView2 documents across hosts and bound native screenshot sizes.
+  flutter_inappwebview_windows:
+    path: dependencies/flutter_inappwebview_windows
   # Prevent the location from being accessed continuously on Windows
   permission_handler_windows:
     path: ./dependencies/flutter-permission-handler/permission_handler_windows
@@ -190,6 +205,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  shaders:
+    - shaders/browser_switch_lens.frag
 
   # To add assets to your application, add an assets section, like this:
   assets:

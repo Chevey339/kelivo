@@ -1,4 +1,5 @@
  import Flutter
+ import flutter_inappwebview_ios
  import UIKit
  import AuthenticationServices
  import UserNotifications
@@ -15,16 +16,30 @@
    private let iosTranslationHandler = IosTranslationHandler()
    private let scheduledTaskNotifications = ScheduledTaskNotifications()
    private let incomingShareHandler = IosIncomingShareHandler()
+   private let browserViewportInsets = BrowserViewportInsetsBridge()
+   private let browserScroll = BrowserScrollBridge()
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    if let registrar = registrar(forPlugin: "BrowserGlass") {
+      registrar.register(
+        BrowserGlassViewFactory(messenger: registrar.messenger()),
+        withId: "app.browser_glass"
+      )
+    }
     // FlutterAppDelegate forwards foreground presentation and cold/warm taps
     // to flutter_local_notifications. Assigning a delegate requests no access.
     UNUserNotificationCenter.current().delegate = self
     if let controller = window?.rootViewController as? FlutterViewController {
+      browserViewportInsets.register(messenger: controller.binaryMessenger, window: window) {
+        ($0 as? InAppWebView)?.browserNativeViewId
+      }
+      browserScroll.register(messenger: controller.binaryMessenger, window: window) {
+        ($0 as? InAppWebView)?.browserNativeViewId
+      }
       incomingShareHandler.register(messenger: controller.binaryMessenger)
       let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
       clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
@@ -151,6 +166,8 @@
   }
 
   override func applicationWillTerminate(_ application: UIApplication) {
+    browserViewportInsets.dispose()
+    browserScroll.dispose()
     backgroundGenerationHandler.prepareForTermination()
     super.applicationWillTerminate(application)
   }

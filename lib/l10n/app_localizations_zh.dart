@@ -12779,6 +12779,513 @@ class AppLocalizationsZh extends AppLocalizations {
   String mcpDeleteSelectedConfirm(int count) {
     return '删除选中的 $count 个服务器？';
   }
+
+  @override
+  String get browserTitle => '浏览器';
+
+  @override
+  String get browserSearchHint => '搜索或输入网址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪里？';
+
+  @override
+  String get browserStartSubtitle => '自由浏览，也可以让 Agent 帮你探索。';
+
+  @override
+  String get browserNewTab => '新建标签页';
+
+  @override
+  String get browserTabs => '标签页';
+
+  @override
+  String get browserCloseTab => '关闭标签页';
+
+  @override
+  String get browserClose => '关闭浏览器';
+
+  @override
+  String get browserBack => '后退';
+
+  @override
+  String get browserForward => '前进';
+
+  @override
+  String get browserReload => '重新加载';
+
+  @override
+  String get browserStop => '停止加载';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '书签';
+
+  @override
+  String get browserHistory => '历史记录';
+
+  @override
+  String get browserSettings => '浏览器设置';
+
+  @override
+  String get browserAddBookmark => '添加书签';
+
+  @override
+  String get browserRemoveBookmark => '移除书签';
+
+  @override
+  String get browserNoBookmarks => '收藏的网站会显示在这里。';
+
+  @override
+  String get browserNoHistory => '浏览记录会显示在这里。';
+
+  @override
+  String get browserSearchLibrary => '搜索已保存的页面';
+
+  @override
+  String get browserClearHistory => '清空历史记录';
+
+  @override
+  String get browserClearHistoryConfirm => '删除全部浏览记录？书签会保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '删除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在页面中查找';
+
+  @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
+
+  @override
+  String get browserFindHint => '查找文字';
+
+  @override
+  String get browserSearchEngine => '搜索引擎';
+
+  @override
+  String get browserDesktopMode => '桌面版网站';
+
+  @override
+  String get browserDesktopModeDescription => '使用桌面版用户代理重新加载页面。';
+
+  @override
+  String get browserRestoreTabs => '恢复标签页';
+
+  @override
+  String get browserRestoreTabsDescription => '启动 Kelivo 时恢复上次的标签页。';
+
+  @override
+  String get browserSaveHistory => '保存浏览记录';
+
+  @override
+  String get browserSaveHistoryDescription => '在本地记录访问过的页面。';
+
+  @override
+  String get browserClearData => '清除网站数据';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、网站存储和缓存，并关闭全部标签页？网站登录状态也会清除。';
+
+  @override
+  String get browserDataCleared => '已清除网站数据';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暂停';
+
+  @override
+  String get browserAllowAgent => '允许继续';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中发送任务后，AI 才会操作浏览器。允许继续只解除暂停，不会自动发送消息或启动任务。';
+
+  @override
+  String get browserOpenExternal => '在默认浏览器打开';
+
+  @override
+  String get browserCopyLink => '复制链接';
+
+  @override
+  String get browserLinkCopied => '已复制链接';
+
+  @override
+  String get browserUnsupported => '此平台暂不支持内置浏览器。';
+
+  @override
+  String get browserLoadFailed => '无法加载此页面';
+
+  @override
+  String get browserRetry => '重试';
+
+  @override
+  String get browserFavorites => '个人收藏';
+
+  @override
+  String get browserEditBookmark => '编辑书签';
+
+  @override
+  String get browserBookmarkTitle => '标题';
+
+  @override
+  String get browserBookmarkUrl => '网址';
+
+  @override
+  String get browserSave => '保存';
+
+  @override
+  String get browserDownloads => '下载';
+
+  @override
+  String get browserNoDownloads => '下载的文件会显示在这里。';
+
+  @override
+  String get browserDownloadCancel => '取消下载';
+
+  @override
+  String get browserOpenDownload => '打开文件';
+
+  @override
+  String get browserDownloadFailed => '下载失败';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
+
+  @override
+  String get browserSessionRequired => '从一个对话中打开浏览器，即可允许 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允许助手使用浏览器';
+
+  @override
+  String get browserAgentEnabledDescription => '开启后，助手可以浏览并操作这个浏览器中的页面。';
+
+  @override
+  String get browserToolTitle => '浏览器控制';
+
+  @override
+  String get browserToolSubtitle => '浏览并操作浏览器中已登录的网页。请先在浏览器设置中开启 Agent 控制。';
+
+  @override
+  String get browserOpen => '打开浏览器';
+
+  @override
+  String get browserInvalidUrl => '请输入有效的 HTTP 或 HTTPS 网址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 浏览器引擎暂不支持清除全部网站数据。';
+
+  @override
+  String get browserSurfaceStyle => '表面样式';
+
+  @override
+  String get browserSurfaceLiquid => '液态玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '纯色';
+
+  @override
+  String get browserPageOptions => '页面选项';
+
+  @override
+  String get browserAskAi => '让 AI 处理此页';
+
+  @override
+  String get browserAskAiHint => '返回聊天，补充需求后发送。';
+
+  @override
+  String get browserAskAiCurrentPage => '浏览器当前页面';
+
+  @override
+  String get browserAskAiUnavailable => '当前会话不可用，请先从聊天中打开浏览器。';
+
+  @override
+  String get browserAskAiEditing => '请先完成或取消正在编辑的消息，再添加网页任务。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '请先在此助手的工具中开启“浏览器控制”。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '请先在浏览器设置中允许助手使用浏览器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '请使用浏览器处理这个页面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整页面打开';
+
+  @override
+  String get browserClosePanel => '关闭浏览器面板';
+
+  @override
+  String get browserSearchTabs => '搜索标签页';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25482,6 +25989,513 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String mcpDeleteSelectedConfirm(int count) {
     return '删除选中的 $count 个服务器？';
   }
+
+  @override
+  String get browserTitle => '浏览器';
+
+  @override
+  String get browserSearchHint => '搜索或输入网址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪里？';
+
+  @override
+  String get browserStartSubtitle => '自由浏览，也可以让 Agent 帮你探索。';
+
+  @override
+  String get browserNewTab => '新建标签页';
+
+  @override
+  String get browserTabs => '标签页';
+
+  @override
+  String get browserCloseTab => '关闭标签页';
+
+  @override
+  String get browserClose => '关闭浏览器';
+
+  @override
+  String get browserBack => '后退';
+
+  @override
+  String get browserForward => '前进';
+
+  @override
+  String get browserReload => '重新加载';
+
+  @override
+  String get browserStop => '停止加载';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '书签';
+
+  @override
+  String get browserHistory => '历史记录';
+
+  @override
+  String get browserSettings => '浏览器设置';
+
+  @override
+  String get browserAddBookmark => '添加书签';
+
+  @override
+  String get browserRemoveBookmark => '移除书签';
+
+  @override
+  String get browserNoBookmarks => '收藏的网站会显示在这里。';
+
+  @override
+  String get browserNoHistory => '浏览记录会显示在这里。';
+
+  @override
+  String get browserSearchLibrary => '搜索已保存的页面';
+
+  @override
+  String get browserClearHistory => '清空历史记录';
+
+  @override
+  String get browserClearHistoryConfirm => '删除全部浏览记录？书签会保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '删除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在页面中查找';
+
+  @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
+
+  @override
+  String get browserFindHint => '查找文字';
+
+  @override
+  String get browserSearchEngine => '搜索引擎';
+
+  @override
+  String get browserDesktopMode => '桌面版网站';
+
+  @override
+  String get browserDesktopModeDescription => '使用桌面版用户代理重新加载页面。';
+
+  @override
+  String get browserRestoreTabs => '恢复标签页';
+
+  @override
+  String get browserRestoreTabsDescription => '启动 Kelivo 时恢复上次的标签页。';
+
+  @override
+  String get browserSaveHistory => '保存浏览记录';
+
+  @override
+  String get browserSaveHistoryDescription => '在本地记录访问过的页面。';
+
+  @override
+  String get browserClearData => '清除网站数据';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、网站存储和缓存，并关闭全部标签页？网站登录状态也会清除。';
+
+  @override
+  String get browserDataCleared => '已清除网站数据';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暂停';
+
+  @override
+  String get browserAllowAgent => '允许继续';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中发送任务后，AI 才会操作浏览器。允许继续只解除暂停，不会自动发送消息或启动任务。';
+
+  @override
+  String get browserOpenExternal => '在默认浏览器打开';
+
+  @override
+  String get browserCopyLink => '复制链接';
+
+  @override
+  String get browserLinkCopied => '已复制链接';
+
+  @override
+  String get browserUnsupported => '此平台暂不支持内置浏览器。';
+
+  @override
+  String get browserLoadFailed => '无法加载此页面';
+
+  @override
+  String get browserRetry => '重试';
+
+  @override
+  String get browserFavorites => '个人收藏';
+
+  @override
+  String get browserEditBookmark => '编辑书签';
+
+  @override
+  String get browserBookmarkTitle => '标题';
+
+  @override
+  String get browserBookmarkUrl => '网址';
+
+  @override
+  String get browserSave => '保存';
+
+  @override
+  String get browserDownloads => '下载';
+
+  @override
+  String get browserNoDownloads => '下载的文件会显示在这里。';
+
+  @override
+  String get browserDownloadCancel => '取消下载';
+
+  @override
+  String get browserOpenDownload => '打开文件';
+
+  @override
+  String get browserDownloadFailed => '下载失败';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
+
+  @override
+  String get browserSessionRequired => '从一个对话中打开浏览器，即可允许 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允许助手使用浏览器';
+
+  @override
+  String get browserAgentEnabledDescription => '开启后，助手可以浏览并操作这个浏览器中的页面。';
+
+  @override
+  String get browserToolTitle => '浏览器控制';
+
+  @override
+  String get browserToolSubtitle => '浏览并操作浏览器中已登录的网页。请先在浏览器设置中开启 Agent 控制。';
+
+  @override
+  String get browserOpen => '打开浏览器';
+
+  @override
+  String get browserInvalidUrl => '请输入有效的 HTTP 或 HTTPS 网址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 浏览器引擎暂不支持清除全部网站数据。';
+
+  @override
+  String get browserSurfaceStyle => '表面样式';
+
+  @override
+  String get browserSurfaceLiquid => '液态玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '纯色';
+
+  @override
+  String get browserPageOptions => '页面选项';
+
+  @override
+  String get browserAskAi => '让 AI 处理此页';
+
+  @override
+  String get browserAskAiHint => '返回聊天，补充需求后发送。';
+
+  @override
+  String get browserAskAiCurrentPage => '浏览器当前页面';
+
+  @override
+  String get browserAskAiUnavailable => '当前会话不可用，请先从聊天中打开浏览器。';
+
+  @override
+  String get browserAskAiEditing => '请先完成或取消正在编辑的消息，再添加网页任务。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '请先在此助手的工具中开启“浏览器控制”。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '请先在浏览器设置中允许助手使用浏览器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '请使用浏览器处理这个页面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整页面打开';
+
+  @override
+  String get browserClosePanel => '关闭浏览器面板';
+
+  @override
+  String get browserSearchTabs => '搜索标签页';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38265,4 +39279,511 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String mcpDeleteSelectedConfirm(int count) {
     return '刪除選取的 $count 個伺服器？';
   }
+
+  @override
+  String get browserTitle => '瀏覽器';
+
+  @override
+  String get browserSearchHint => '搜尋或輸入網址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪裡？';
+
+  @override
+  String get browserStartSubtitle => '自由瀏覽，也可以讓 Agent 幫你探索。';
+
+  @override
+  String get browserNewTab => '新增分頁';
+
+  @override
+  String get browserTabs => '分頁';
+
+  @override
+  String get browserCloseTab => '關閉分頁';
+
+  @override
+  String get browserClose => '關閉瀏覽器';
+
+  @override
+  String get browserBack => '上一頁';
+
+  @override
+  String get browserForward => '下一頁';
+
+  @override
+  String get browserReload => '重新載入';
+
+  @override
+  String get browserStop => '停止載入';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '書籤';
+
+  @override
+  String get browserHistory => '歷史記錄';
+
+  @override
+  String get browserSettings => '瀏覽器設定';
+
+  @override
+  String get browserAddBookmark => '新增書籤';
+
+  @override
+  String get browserRemoveBookmark => '移除書籤';
+
+  @override
+  String get browserNoBookmarks => '收藏的網站會顯示在這裡。';
+
+  @override
+  String get browserNoHistory => '瀏覽記錄會顯示在這裡。';
+
+  @override
+  String get browserSearchLibrary => '搜尋已儲存的頁面';
+
+  @override
+  String get browserClearHistory => '清除歷史記錄';
+
+  @override
+  String get browserClearHistoryConfirm => '刪除全部瀏覽記錄？書籤會保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '刪除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在頁面中尋找';
+
+  @override
+  String get browserFindPreviousMatch => '上一個符合項目';
+
+  @override
+  String get browserFindNextMatch => '下一個符合項目';
+
+  @override
+  String get browserFindHint => '尋找文字';
+
+  @override
+  String get browserSearchEngine => '搜尋引擎';
+
+  @override
+  String get browserDesktopMode => '電腦版網站';
+
+  @override
+  String get browserDesktopModeDescription => '使用電腦版使用者代理重新載入頁面。';
+
+  @override
+  String get browserRestoreTabs => '還原分頁';
+
+  @override
+  String get browserRestoreTabsDescription => '啟動 Kelivo 時還原上次的分頁。';
+
+  @override
+  String get browserSaveHistory => '儲存瀏覽記錄';
+
+  @override
+  String get browserSaveHistoryDescription => '在本機記錄造訪過的頁面。';
+
+  @override
+  String get browserClearData => '清除網站資料';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、網站儲存空間和快取，並關閉全部分頁？網站登入狀態也會清除。';
+
+  @override
+  String get browserDataCleared => '已清除網站資料';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暫停';
+
+  @override
+  String get browserAllowAgent => '允許繼續';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中傳送任務後，AI 才會操作瀏覽器。允許繼續只解除暫停，不會自動傳送訊息或啟動任務。';
+
+  @override
+  String get browserOpenExternal => '在預設瀏覽器開啟';
+
+  @override
+  String get browserCopyLink => '複製連結';
+
+  @override
+  String get browserLinkCopied => '已複製連結';
+
+  @override
+  String get browserUnsupported => '此平台暫不支援內建瀏覽器。';
+
+  @override
+  String get browserLoadFailed => '無法載入此頁面';
+
+  @override
+  String get browserRetry => '重試';
+
+  @override
+  String get browserFavorites => '個人收藏';
+
+  @override
+  String get browserEditBookmark => '編輯書籤';
+
+  @override
+  String get browserBookmarkTitle => '標題';
+
+  @override
+  String get browserBookmarkUrl => '網址';
+
+  @override
+  String get browserSave => '儲存';
+
+  @override
+  String get browserDownloads => '下載';
+
+  @override
+  String get browserNoDownloads => '下載的檔案會顯示在這裡。';
+
+  @override
+  String get browserDownloadCancel => '取消下載';
+
+  @override
+  String get browserOpenDownload => '開啟檔案';
+
+  @override
+  String get browserDownloadFailed => '下載失敗';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中啟用瀏覽器工具，再在這裡允許控制。';
+
+  @override
+  String get browserSessionRequired => '從一個對話中開啟瀏覽器，即可允許 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允許助手使用瀏覽器';
+
+  @override
+  String get browserAgentEnabledDescription => '開啟後，助手可以瀏覽並操作這個瀏覽器中的頁面。';
+
+  @override
+  String get browserToolTitle => '瀏覽器控制';
+
+  @override
+  String get browserToolSubtitle => '瀏覽並操作瀏覽器中已登入的網頁。請先在瀏覽器設定中開啟 Agent 控制。';
+
+  @override
+  String get browserOpen => '開啟瀏覽器';
+
+  @override
+  String get browserInvalidUrl => '請輸入有效的 HTTP 或 HTTPS 網址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 瀏覽器引擎暫不支援清除全部網站資料。';
+
+  @override
+  String get browserSurfaceStyle => '表面樣式';
+
+  @override
+  String get browserSurfaceLiquid => '液態玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '純色';
+
+  @override
+  String get browserPageOptions => '頁面選項';
+
+  @override
+  String get browserAskAi => '讓 AI 處理此頁';
+
+  @override
+  String get browserAskAiHint => '返回聊天，補充需求後傳送。';
+
+  @override
+  String get browserAskAiCurrentPage => '瀏覽器目前頁面';
+
+  @override
+  String get browserAskAiUnavailable => '目前對話無法使用，請先從聊天中開啟瀏覽器。';
+
+  @override
+  String get browserAskAiEditing => '請先完成或取消正在編輯的訊息，再加入網頁任務。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '請先在此助理的工具中開啟「瀏覽器控制」。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '請先在瀏覽器設定中允許助理使用瀏覽器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '請使用瀏覽器處理這個頁面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整頁面開啟';
+
+  @override
+  String get browserClosePanel => '關閉瀏覽器面板';
+
+  @override
+  String get browserSearchTabs => '搜尋分頁';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 個分頁';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在側欄開啟';
+
+  @override
+  String get browserUserAgent => '使用者代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '行動版';
+
+  @override
+  String get browserUserAgentDesktop => '桌面版';
+
+  @override
+  String get browserUserAgentCustom => '自訂';
+
+  @override
+  String get browserUserAgentHint => '輸入自訂 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 僅支援可列印 ASCII 字元（英文字母、數字和英文符號），最多 2048 個字元。';
+
+  @override
+  String get browserUserAgentDescription => '變更後將重新載入目前網頁。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在瀏覽器中開啟';
+
+  @override
+  String get browserGroupToggleSemantics => '展開或收合瀏覽步驟';
+
+  @override
+  String get browserStepGroupTitle => '瀏覽網頁';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失敗';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失敗';
+  }
+
+  @override
+  String get browserCardOpen => '打開';
+
+  @override
+  String get browserCardEnable => '去開啟';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '即時';
+
+  @override
+  String get browserCardOpenFailed => '無法開啟頁面';
+
+  @override
+  String get browserCardBlankPage => '空白頁';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 個分頁';
+  }
+
+  @override
+  String get browserActionOpen => '開啟網頁';
+
+  @override
+  String get browserActionNewTab => '新增分頁';
+
+  @override
+  String get browserActionRender => '渲染頁面';
+
+  @override
+  String get browserActionExtract => '擷取正文';
+
+  @override
+  String get browserActionSnapshot => '讀取頁面結構';
+
+  @override
+  String get browserActionClick => '點擊';
+
+  @override
+  String get browserActionType => '輸入文字';
+
+  @override
+  String get browserActionPress => '按鍵';
+
+  @override
+  String get browserActionScroll => '捲動頁面';
+
+  @override
+  String get browserActionWait => '等待頁面';
+
+  @override
+  String get browserActionBack => '上一頁';
+
+  @override
+  String get browserActionForward => '下一頁';
+
+  @override
+  String get browserActionReload => '重新整理';
+
+  @override
+  String get browserActionEvaluate => '執行指令碼';
+
+  @override
+  String get browserActionSwitchTab => '切換分頁';
+
+  @override
+  String get browserActionCloseTab => '關閉分頁';
+
+  @override
+  String get browserActionListTabs => '檢視分頁';
+
+  @override
+  String get browserActionUnknown => '瀏覽器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 個元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '瀏覽器控制未開啟';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新讀取頁面';
+
+  @override
+  String get browserErrNotVisible => '元素不可見或被遮擋';
+
+  @override
+  String get browserErrNotFound => '找不到元素';
+
+  @override
+  String get browserErrTimeout => '頁面載入逾時';
+
+  @override
+  String get browserErrHumanControl => '你正在接管瀏覽器';
+
+  @override
+  String get browserErrTabClosed => '分頁已關閉';
+
+  @override
+  String get browserErrGeneric => '操作失敗';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 個';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '目前對話';
+
+  @override
+  String get browserTabsAll => '所有分頁';
+
+  @override
+  String get browserTabsUnassigned => '個人分頁';
+
+  @override
+  String get browserTabsUnknownConversation => '其他對話';
+
+  @override
+  String get browserTabsEmptyConversation => '這裡還沒有分頁。開啟網頁，或從「所有分頁」選擇現有頁面。';
+
+  @override
+  String get browserTabsNoResults => '沒有符合的分頁';
+
+  @override
+  String get browserMoveToConversation => '移到目前對話';
+
+  @override
+  String get browserReopenInConversation => '在目前對話重新開啟';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此頁面，請等待任務完成或停止任務後再移動。';
+
+  @override
+  String get browserLiveViewLimit => '瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '讓所屬對話的 AI 處理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '顯示網頁卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此頁面，點選「接管」後可以操作網頁。';
 }

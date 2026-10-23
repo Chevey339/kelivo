@@ -434,7 +434,7 @@ double estimateToolExtraHeight({
   }
 
   if (!hideToolResultImages && imagePaths.isNotEmpty) {
-    extra += _estimateToolImageHeight;
+    extra += timelineToolImageHeight;
     if (hasSummary) extra += _estimateToolImageSummaryGap;
   }
 
@@ -535,7 +535,7 @@ bool _workspaceEstimateEnvNotReady(Map<String, dynamic>? metadata) {
 }
 
 const double _estimateTtsReplayRowHeight = 36;
-const double _estimateToolImageHeight = 120;
+const double timelineToolImageHeight = 120;
 const double _estimateToolImageSummaryGap = 8;
 const double _estimateAskUserOptionHeight = 40;
 const double _estimateAskUserOptionGap = 7;

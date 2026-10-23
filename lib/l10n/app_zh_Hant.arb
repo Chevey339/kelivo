@@ -656,8 +656,12 @@
   "backupPageForwardCompatBody": "這份備份由更新版本的 Kelivo 建立（資料格式 {backupVersion}，目前版本支援 {currentVersion}），且未聲明舊版本能否讀取。\n\n你可以繼續匯入：目前版本不認識的內容會被略過，備份檔案本身不會被修改。但如果新版本改變了既有資料的儲存方式，部分內容可能會被錯誤匯入。\n\n更穩妥的做法是先升級 Kelivo。",
   "@backupPageForwardCompatBody": {
     "placeholders": {
-      "backupVersion": { "type": "int" },
-      "currentVersion": { "type": "int" }
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
     }
   },
   "backupPageForwardCompatContinue": "仍然匯入",
@@ -945,7 +949,9 @@
   "chatMessageWidgetWebFetch": "讀取網頁: {target}",
   "@chatMessageWidgetWebFetch": {
     "placeholders": {
-      "target": { "type": "String" }
+      "target": {
+        "type": "String"
+      }
     }
   },
   "chatMessageWidgetBuiltinSearch": "模型內建搜尋",
@@ -1251,8 +1257,12 @@
   "backgroundTaskFailed": "{task}失敗：{error}",
   "@backgroundTaskFailed": {
     "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
     }
   },
   "defaultModelPageOcrModelSubtitle": "用於對圖片執行文字辨識的模型",
@@ -1608,13 +1618,17 @@
   "searchServicesPageWebFetchFollowValue": "跟隨搜尋 · {name}",
   "@searchServicesPageWebFetchFollowValue": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchFollowSubtitle": "目前：{name}",
   "@searchServicesPageWebFetchFollowSubtitle": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchLocal": "本機抓取",
@@ -1673,14 +1687,12 @@
   "searchServiceEditorMultiKeyTitle": "多 Key 輪詢",
   "searchServiceEditorMultiKeyNone": "未設定",
   "searchApiKeysPageDescription": "列表中的 Key 依序輪詢使用，第一個為主 Key；不查額度，以防觸發服務商風控。",
-
   "searchApiKeysPagePrimaryBadge": "主",
   "searchApiKeysPageBatchHint": "可一次貼上多個 Key：每行一個，或以逗號分隔",
   "searchApiKeysPageBatchResult": "已新增 {added} 個，略過 {skipped} 個重複",
   "searchApiKeysPageAdd": "新增",
   "searchApiKeysPageEmpty": "尚未設定任何 Key。",
   "searchServiceEditorMultiKeyCount": "共 {count} 個 Key",
-
   "searchServiceEditorUsageTitle": "帳戶用量",
   "searchServiceEditorUsageNotQueried": "尚未查詢用量。",
   "searchServiceEditorUsageQuery": "查詢用量",
@@ -1688,26 +1700,36 @@
   "searchServiceEditorUsageRemaining": "剩餘 {remaining} 額度",
   "@searchServiceEditorUsageRemaining": {
     "placeholders": {
-      "remaining": { "type": "String" }
+      "remaining": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageBalance": "餘額 {balance}",
   "@searchServiceEditorUsageBalance": {
     "placeholders": {
-      "balance": { "type": "String" }
+      "balance": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 額度",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageFailed": "用量查詢失敗：{message}",
   "@searchServiceEditorUsageFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestTitle": "測試搜尋",
@@ -1718,7 +1740,9 @@
   "searchServiceEditorTestFailed": "搜尋失敗：{message}",
   "@searchServiceEditorTestFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestModeSearch": "搜尋",
@@ -1729,14 +1753,20 @@
   "searchServiceEditorTestFetchFailed": "抓取失敗：{message}",
   "@searchServiceEditorTestFetchFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestFetchStats": "{characters} 字元 · {seconds} 秒",
   "@searchServiceEditorTestFetchStats": {
     "placeholders": {
-      "characters": { "type": "String" },
-      "seconds": { "type": "String" }
+      "characters": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorResultOpenTooltip": "開啟結果",
@@ -1745,7 +1775,9 @@
   "searchServiceEditorDeleteMessage": "確定刪除 {provider} 嗎？此操作無法復原。",
   "@searchServiceEditorDeleteMessage": {
     "placeholders": {
-      "provider": { "type": "String" }
+      "provider": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorDeleteConfirm": "刪除",
@@ -2321,14 +2353,14 @@
   "assistantEditLocalToolAskUserSubtitle": "允許助手提出簡短問題，並在你回答後繼續生成。",
   "assistantEditLocalToolCalculateTitle": "計算機",
   "assistantEditLocalToolCalculateSubtitle": "計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。",
-   "assistantEditLocalToolScreenTimeTitle": "螢幕使用時間",
-   "assistantEditLocalToolScreenTimeSubtitle": "查詢本裝置的應用使用時長，需要授予使用情況存取權限。",
-   "chatMessageWidgetScreenTimeTotal": "總螢幕使用時間",
-   "chatMessageWidgetScreenTimePermissionRequired": "未授予使用記錄存取權限，請在系統設定中開啟後重試。",
-   "assistantEditLocalToolCalendarQueryTitle": "查詢日曆",
-   "assistantEditLocalToolCalendarQuerySubtitle": "讀取本裝置上的日曆行程，需要授予日曆權限。",
-   "assistantEditLocalToolCalendarCreateTitle": "建立行程",
-   "assistantEditLocalToolCalendarCreateSubtitle": "在你確認後於本裝置建立日曆行程，需要授予日曆權限。",
+  "assistantEditLocalToolScreenTimeTitle": "螢幕使用時間",
+  "assistantEditLocalToolScreenTimeSubtitle": "查詢本裝置的應用使用時長，需要授予使用情況存取權限。",
+  "chatMessageWidgetScreenTimeTotal": "總螢幕使用時間",
+  "chatMessageWidgetScreenTimePermissionRequired": "未授予使用記錄存取權限，請在系統設定中開啟後重試。",
+  "assistantEditLocalToolCalendarQueryTitle": "查詢日曆",
+  "assistantEditLocalToolCalendarQuerySubtitle": "讀取本裝置上的日曆行程，需要授予日曆權限。",
+  "assistantEditLocalToolCalendarCreateTitle": "建立行程",
+  "assistantEditLocalToolCalendarCreateSubtitle": "在你確認後於本裝置建立日曆行程，需要授予日曆權限。",
   "assistantEditLocalToolLocationTitle": "目前位置",
   "assistantEditLocalToolLocationSubtitle": "讀取本裝置的一次性位置，需要授予定位權限。",
   "assistantEditLocalToolWeatherTitle": "天氣",
@@ -2674,7 +2706,9 @@
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memorySettingsInjectionMaxItemsCustomButton": "自訂",
@@ -2725,7 +2759,9 @@
   "memoryEntryScopeAssistantNamed": "{name}",
   "@memoryEntryScopeAssistantNamed": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "memoryEntrySourceManual": "手動",
@@ -2737,7 +2773,9 @@
   "memoryEntryUpdatedAt": "更新於 {date}",
   "@memoryEntryUpdatedAt": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "memoryEntryActionEdit": "編輯",
@@ -2752,7 +2790,9 @@
   "memoryEntryBatchDeleteConfirmTitle": "刪除 {count} 條記憶？",
   "@memoryEntryBatchDeleteConfirmTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryEntryBatchDeleteConfirmContent": "所選記憶將被永久刪除。",
@@ -2779,7 +2819,9 @@
   "memoryOrphanBanner": "有 {count} 條孤兒助手記憶（助手已刪除）",
   "@memoryOrphanBanner": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrphanCleanupButton": "清理",
@@ -2787,7 +2829,9 @@
   "memoryOrphanConfirmContent": "將永久刪除 {count} 條所屬助手已不存在的記憶。",
   "@memoryOrphanConfirmContent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeButton": "整理記憶",
@@ -2797,26 +2841,34 @@
   "memoryOrganizeStatusLast": "上次整理：{when}",
   "@memoryOrganizeStatusLast": {
     "placeholders": {
-      "when": {"type": "String"}
+      "when": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusExtracted": "擷取 {count} 條",
   "@memoryOrganizeStatusExtracted": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeStatusSkipped": "無需記憶",
   "memoryOrganizeStatusFailed": "失敗：{reason}",
   "@memoryOrganizeStatusFailed": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusSkippedReason": "已跳過：{reason}",
   "@memoryOrganizeStatusSkippedReason": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOutcomeTemporaryConversation": "臨時對話不會寫入記憶",
@@ -2848,19 +2900,25 @@
   "memoryOrganizeMinutesAgo": "{n} 分鐘前",
   "@memoryOrganizeMinutesAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeHoursAgo": "{n} 小時前",
   "@memoryOrganizeHoursAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeDaysAgo": "{n} 天前",
   "@memoryOrganizeDaysAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryModelMissingNotice": "需要先在 設定 → 記憶 中選擇記憶處理模型。",
@@ -2893,7 +2951,9 @@
   "legacyMemoryAssistantHeader": "助手：{name}",
   "@legacyMemoryAssistantHeader": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "legacyMemorySearchHint": "搜尋舊版記憶",
@@ -2902,7 +2962,9 @@
   "legacyMemoryMigrationSubtitle": "使用模型整理並分類 {count} 條舊版記憶，原資料不會改變。",
   "@legacyMemoryMigrationSubtitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationModel": "遷移模型",
@@ -2920,16 +2982,24 @@
   "legacyMemoryMigrationProgress": "{current} / {total}",
   "@legacyMemoryMigrationProgress": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationComplete": "遷移完成",
   "legacyMemoryMigrationResult": "已遷移 {created} 條 · 略過已有 {skipped} 條",
   "@legacyMemoryMigrationResult": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationFailed": "遷移已停止。可以重試，已儲存的記憶會自動略過。",
@@ -2944,9 +3014,15 @@
   "legacyMemoryMigrationPartial": "已遷移 {created} · 略過 {skipped} · 失敗 {failed}",
   "@legacyMemoryMigrationPartial": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"},
-      "failed": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationContinue": "繼續遷移",
@@ -2956,7 +3032,9 @@
   "legacyMemoryMigrationErrorOther": "遷移失敗：{message}",
   "@legacyMemoryMigrationErrorOther": {
     "placeholders": {
-      "message": {"type": "String"}
+      "message": {
+        "type": "String"
+      }
     }
   },
   "legacyMemoryModeTitle": "使用舊版記憶",
@@ -3001,7 +3079,9 @@
   "assistantEditOrganizeFrequencyOption": "每 {n} 輪",
   "@assistantEditOrganizeFrequencyOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "assistantEditOrganizeFrequencyCustomButton": "自訂",
@@ -3244,7 +3324,13 @@
   "migrationChatsExportDegradedNote": "chats.json 匯出因出錯而被跳過。備份 ZIP 仍包含原始 Hive 檔案，完整聊天記錄未遺失。",
   "timelineJumpToLatest": "跳到最新",
   "largeContentShowMore": "再顯示 {count} 項",
-  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "largeContentCollapse": "收起",
   "imageSettingsPageTitle": "圖片處理",
   "imageSettingsPageEditSectionTitle": "編輯",
@@ -3333,13 +3419,43 @@
   "memoryTraceAfter": "變更後",
   "memoryTraceEmptyValue": "（空）",
   "memoryTraceStepsCount": "{count} 個步驟",
-  "@memoryTraceStepsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceStepsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceMutationsCount": "{count} 項變更",
-  "@memoryTraceMutationsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceMutationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceRepeatCount": "重複 {count} 次",
-  "@memoryTraceRepeatCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceRepeatCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceWindowValue": "{size} 則訊息 · #{start}–#{end}",
-  "@memoryTraceWindowValue": {"placeholders": {"size": {"type": "int"}, "start": {"type": "int"}, "end": {"type": "int"}}},
+  "@memoryTraceWindowValue": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      },
+      "start": {
+        "type": "int"
+      },
+      "end": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceShowMore": "展開全文",
   "memoryTraceShowLess": "收合",
   "messageStyleSettingsPageTitle": "訊息樣式",
@@ -4699,5 +4815,172 @@
   "mcpGroupNameInvalid": "請輸入非空且不重複的群組名稱。",
   "mcpEnableSelected": "啟用",
   "mcpDisableSelected": "停用",
-  "mcpDeleteSelectedConfirm": "刪除選取的 {count} 個伺服器？"
+  "mcpDeleteSelectedConfirm": "刪除選取的 {count} 個伺服器？",
+  "browserTitle": "瀏覽器",
+  "browserSearchHint": "搜尋或輸入網址",
+  "browserStartTitle": "下一站，去哪裡？",
+  "browserStartSubtitle": "自由瀏覽，也可以讓 Agent 幫你探索。",
+  "browserNewTab": "新增分頁",
+  "browserTabs": "分頁",
+  "browserCloseTab": "關閉分頁",
+  "browserClose": "關閉瀏覽器",
+  "browserBack": "上一頁",
+  "browserForward": "下一頁",
+  "browserReload": "重新載入",
+  "browserStop": "停止載入",
+  "browserMore": "更多",
+  "browserBookmarks": "書籤",
+  "browserHistory": "歷史記錄",
+  "browserSettings": "瀏覽器設定",
+  "browserAddBookmark": "新增書籤",
+  "browserRemoveBookmark": "移除書籤",
+  "browserNoBookmarks": "收藏的網站會顯示在這裡。",
+  "browserNoHistory": "瀏覽記錄會顯示在這裡。",
+  "browserSearchLibrary": "搜尋已儲存的頁面",
+  "browserClearHistory": "清除歷史記錄",
+  "browserClearHistoryConfirm": "刪除全部瀏覽記錄？書籤會保留。",
+  "browserToday": "今天",
+  "browserYesterday": "昨天",
+  "browserDelete": "刪除",
+  "browserCancel": "取消",
+  "browserDone": "完成",
+  "browserFind": "在頁面中尋找",
+  "browserFindPreviousMatch": "上一個符合項目",
+  "browserFindNextMatch": "下一個符合項目",
+  "browserFindHint": "尋找文字",
+  "browserSearchEngine": "搜尋引擎",
+  "browserDesktopMode": "電腦版網站",
+  "browserDesktopModeDescription": "使用電腦版使用者代理重新載入頁面。",
+  "browserRestoreTabs": "還原分頁",
+  "browserRestoreTabsDescription": "啟動 Kelivo 時還原上次的分頁。",
+  "browserSaveHistory": "儲存瀏覽記錄",
+  "browserSaveHistoryDescription": "在本機記錄造訪過的頁面。",
+  "browserClearData": "清除網站資料",
+  "browserClearDataConfirm": "清除 Cookie、網站儲存空間和快取，並關閉全部分頁？網站登入狀態也會清除。",
+  "browserDataCleared": "已清除網站資料",
+  "browserAgentControl": "Agent 控制",
+  "browserAgentWorking": "AI 正在操作",
+  "browserTakeOver": "接管",
+  "browserAgentPaused": "AI 操作已暫停",
+  "browserAllowAgent": "允許繼續",
+  "browserAgentDescription": "在聊天中傳送任務後，AI 才會操作瀏覽器。允許繼續只解除暫停，不會自動傳送訊息或啟動任務。",
+  "browserOpenExternal": "在預設瀏覽器開啟",
+  "browserCopyLink": "複製連結",
+  "browserLinkCopied": "已複製連結",
+  "browserUnsupported": "此平台暫不支援內建瀏覽器。",
+  "browserLoadFailed": "無法載入此頁面",
+  "browserRetry": "重試",
+  "browserFavorites": "個人收藏",
+  "browserEditBookmark": "編輯書籤",
+  "browserBookmarkTitle": "標題",
+  "browserBookmarkUrl": "網址",
+  "browserSave": "儲存",
+  "browserDownloads": "下載",
+  "browserNoDownloads": "下載的檔案會顯示在這裡。",
+  "browserDownloadCancel": "取消下載",
+  "browserOpenDownload": "開啟檔案",
+  "browserDownloadFailed": "下載失敗",
+  "browserAgentEnableHint": "在聊天工具中啟用瀏覽器工具，再在這裡允許控制。",
+  "browserSessionRequired": "從一個對話中開啟瀏覽器，即可允許 Agent 控制。",
+  "browserDownloadCancelled": "已取消",
+  "browserAgentEnabled": "允許助手使用瀏覽器",
+  "browserAgentEnabledDescription": "開啟後，助手可以瀏覽並操作這個瀏覽器中的頁面。",
+  "browserToolTitle": "瀏覽器控制",
+  "browserToolSubtitle": "瀏覽並操作瀏覽器中已登入的網頁。請先在瀏覽器設定中開啟 Agent 控制。",
+  "browserOpen": "開啟瀏覽器",
+  "browserInvalidUrl": "請輸入有效的 HTTP 或 HTTPS 網址。",
+  "browserClearDataUnavailable": "Windows 瀏覽器引擎暫不支援清除全部網站資料。",
+  "browserSurfaceStyle": "表面樣式",
+  "browserSurfaceLiquid": "液態玻璃",
+  "browserSurfaceFrosted": "磨砂",
+  "browserSurfaceSolid": "純色",
+  "browserPageOptions": "頁面選項",
+  "browserAskAi": "讓 AI 處理此頁",
+  "browserAskAiHint": "返回聊天，補充需求後傳送。",
+  "browserAskAiCurrentPage": "瀏覽器目前頁面",
+  "browserAskAiUnavailable": "目前對話無法使用，請先從聊天中開啟瀏覽器。",
+  "browserAskAiEditing": "請先完成或取消正在編輯的訊息，再加入網頁任務。",
+  "browserAskAiAssistantDisabled": "請先在此助理的工具中開啟「瀏覽器控制」。",
+  "browserAskAiBrowserDisabled": "請先在瀏覽器設定中允許助理使用瀏覽器。",
+  "browserAskAiDraft": "請使用瀏覽器處理這個頁面：\n{page}\n\n我的需求：",
+  "browserOpenFullPage": "完整頁面開啟",
+  "browserClosePanel": "關閉瀏覽器面板",
+  "browserSearchTabs": "搜尋分頁",
+  "browserTabsCount": "{count} 個分頁",
+  "@browserTabsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserOpenInSidebar": "在側欄開啟",
+  "browserUserAgent": "使用者代理（UA）",
+  "browserUserAgentMobile": "行動版",
+  "browserUserAgentDesktop": "桌面版",
+  "browserUserAgentCustom": "自訂",
+  "browserUserAgentHint": "輸入自訂 User-Agent",
+  "browserUserAgentInvalid": "UA 僅支援可列印 ASCII 字元（英文字母、數字和英文符號），最多 2048 個字元。",
+  "browserUserAgentDescription": "變更後將重新載入目前網頁。",
+  "browserStepsShowEarlier": "更早的 {count} 步",
+  "browserOpenThisPage": "在瀏覽器中開啟",
+  "browserGroupToggleSemantics": "展開或收合瀏覽步驟",
+  "browserStepGroupTitle": "瀏覽網頁",
+  "browserStepCount": "{count} 步",
+  "browserStepCurrent": "第 {count} 步",
+  "browserActionFailedCount": "· {count} 步失敗",
+  "browserActionFailed": "{action}失敗",
+  "browserCardOpen": "打開",
+  "browserCardEnable": "去開啟",
+  "browserCardRunning": "正在{action}…",
+  "browserCardLive": "即時",
+  "browserCardOpenFailed": "無法開啟頁面",
+  "browserCardBlankPage": "空白頁",
+  "browserCardTabCount": "{count} 個分頁",
+  "browserActionOpen": "開啟網頁",
+  "browserActionNewTab": "新增分頁",
+  "browserActionRender": "渲染頁面",
+  "browserActionExtract": "擷取正文",
+  "browserActionSnapshot": "讀取頁面結構",
+  "browserActionClick": "點擊",
+  "browserActionType": "輸入文字",
+  "browserActionPress": "按鍵",
+  "browserActionScroll": "捲動頁面",
+  "browserActionWait": "等待頁面",
+  "browserActionBack": "上一頁",
+  "browserActionForward": "下一頁",
+  "browserActionReload": "重新整理",
+  "browserActionEvaluate": "執行指令碼",
+  "browserActionSwitchTab": "切換分頁",
+  "browserActionCloseTab": "關閉分頁",
+  "browserActionListTabs": "檢視分頁",
+  "browserActionUnknown": "瀏覽器操作",
+  "browserMetaChars": "{count} 字",
+  "browserMetaElements": "{count} 個元素",
+  "browserErrAgentDisabled": "瀏覽器控制未開啟",
+  "browserErrStaleRef": "元素已失效，需重新讀取頁面",
+  "browserErrNotVisible": "元素不可見或被遮擋",
+  "browserErrNotFound": "找不到元素",
+  "browserErrTimeout": "頁面載入逾時",
+  "browserErrHumanControl": "你正在接管瀏覽器",
+  "browserErrTabClosed": "分頁已關閉",
+  "browserErrGeneric": "操作失敗",
+  "browserDirectionUp": "上",
+  "browserDirectionDown": "下",
+  "browserDirectionLeft": "左",
+  "browserDirectionRight": "右",
+  "browserMetaTabs": "{count} 個",
+  "browserTabsCurrentConversation": "目前對話",
+  "browserTabsAll": "所有分頁",
+  "browserTabsUnassigned": "個人分頁",
+  "browserTabsUnknownConversation": "其他對話",
+  "browserTabsEmptyConversation": "這裡還沒有分頁。開啟網頁，或從「所有分頁」選擇現有頁面。",
+  "browserTabsNoResults": "沒有符合的分頁",
+  "browserMoveToConversation": "移到目前對話",
+  "browserReopenInConversation": "在目前對話重新開啟",
+  "browserTabBusy": "助手仍在操作此頁面，請等待任務完成或停止任務後再移動。",
+  "browserLiveViewLimit": "瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。",
+  "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理",
+  "displaySettingsPageShowBrowserPageCardsTitle": "顯示網頁卡片",
+  "browserObserverHint": "AI 正在操作此頁面，點選「接管」後可以操作網頁。"
 }

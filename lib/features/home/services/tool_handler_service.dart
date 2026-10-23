@@ -19,6 +19,7 @@ import '../../../core/services/api/builtin_tools.dart' as native_tools;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/browser/browser_tools_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_tools.dart';
@@ -303,6 +304,11 @@ class ToolHandlerService {
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+      ).where(
+        (definition) =>
+            (definition['function'] as Map)['name'] !=
+                BrowserToolsService.toolName ||
+            conversationId != null,
       ),
     );
 
@@ -481,6 +487,22 @@ class ToolHandlerService {
 
     return (name, args, {toolCallId}) async {
       try {
+        if (name == BrowserToolsService.toolName) {
+          final current = assistant == null
+              ? null
+              : assistantProvider.getById(assistant.id);
+          if (current == null ||
+              !current.localToolIds.contains(LocalToolNames.browser) ||
+              conversationId == null) {
+            return _toolError(
+              error: 'permission_denied',
+              message:
+                  'Browser control is disabled for this assistant or conversation.',
+              tool: name,
+            );
+          }
+          return await BrowserToolsService().handle(conversationId, args);
+        }
         if (workspaceContext != null &&
             workspaceTools != null &&
             WorkspaceToolsService.toolNames.contains(name)) {
