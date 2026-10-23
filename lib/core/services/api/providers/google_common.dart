@@ -391,14 +391,7 @@ Stream<StreamChunk> sendGoogleStream(
       final meta = _geminiHistoryMeta(msg);
       final raw = meta.cleanedText;
       final seenSources = <String>{};
-      String normalizeSrc(String src) {
-        if (src.startsWith('http') || src.startsWith('data:')) return src;
-        try {
-          return SandboxPathResolver.fix(src);
-        } catch (_) {
-          return src;
-        }
-      }
+      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
       // Semantic media detection only - custom attachment markers are not
       // recognized. Attachments arrive via structured media-path keys /
@@ -889,14 +882,7 @@ Stream<StreamChunk> sendGoogleStream(
     final meta = _geminiHistoryMeta(msg);
     final raw = meta.cleanedText;
     final seenSources = <String>{};
-    String normalizeSrc(String src) {
-      if (src.startsWith('http') || src.startsWith('data:')) return src;
-      try {
-        return SandboxPathResolver.fix(src);
-      } catch (_) {
-        return src;
-      }
-    }
+    String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
     // Only parse images if there are images to process.
     // Semantic media detection only - custom attachment markers are not
