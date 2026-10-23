@@ -1136,7 +1136,7 @@ class ParallelOptions extends SearchServiceOptions {
 
   ParallelOptions({
     required super.id,
-    required this.apiKey,
+    this.apiKey = '',
     this.mode = defaultMode,
     super.extraApiKeys,
   });
