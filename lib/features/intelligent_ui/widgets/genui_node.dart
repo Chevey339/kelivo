@@ -8,6 +8,12 @@ import 'genui_content.dart';
 import 'genui_layout.dart';
 import 'genui_localizations.dart';
 import 'genui_theme.dart';
+import 'genui_text_input.dart';
+import 'genui_form.dart';
+import 'genui_button.dart';
+import 'genui_boolean_input.dart';
+import 'genui_choice_input.dart';
+import 'genui_slider.dart';
 
 /// One dependency subscription per node. The host owns the controller; widget
 /// disposal only removes this observer, so off-screen messages retain state.
@@ -67,6 +73,17 @@ class _GenUiNodeState extends State<GenUiNode> {
         component: node?.declaration.component,
       );
     }
+    if (node != null &&
+        node.declaration.component == 'Button' &&
+        node.properties['label'] is String) {
+      if (!node.visible) return const SizedBox.shrink();
+      return GenUiButton(
+        key: ValueKey((controller, widget.id, controller.token.epoch)),
+        id: widget.id,
+        node: node,
+        token: controller.token,
+      );
+    }
     if (node == null || !node.valid) {
       final diagnostics =
           node?.diagnostics ??
@@ -95,6 +112,13 @@ class _GenUiNodeState extends State<GenUiNode> {
       builder: builder,
     );
     return switch (node.declaration.component) {
+      'Form' => children(
+        (items) => GenUiForm(
+          id: widget.id,
+          title: props['title'] as String?,
+          children: items,
+        ),
+      ),
       'Column' => children(
         (items) => GenUiColumn(gap: props['gap'] as String, children: items),
       ),
@@ -112,6 +136,30 @@ class _GenUiNodeState extends State<GenUiNode> {
           tone: props['tone'] as String,
           children: items,
         ),
+      ),
+      'Switch' || 'Checkbox' => GenUiBooleanInput(
+        key: key,
+        id: widget.id,
+        node: node,
+        token: controller.token,
+      ),
+      'Slider' => GenUiSlider(
+        key: key,
+        id: widget.id,
+        node: node,
+        token: controller.token,
+      ),
+      'Select' || 'RadioGroup' => GenUiChoiceInput(
+        key: key,
+        id: widget.id,
+        node: node,
+        token: controller.token,
+      ),
+      'TextField' || 'NumberField' => GenUiTextInput(
+        key: key,
+        id: widget.id,
+        node: node,
+        token: controller.token,
       ),
       'Divider' => GenUiDivider(key: key, label: props['label'] as String?),
       'Text' => GenUiText(

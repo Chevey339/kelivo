@@ -81,6 +81,7 @@ final class UiSurfaceController {
   String? _sourceHash;
   final _statusListeners = <Object, void Function()>{};
   final _stateListeners = <Object, void Function()>{};
+  final _resetListeners = <Object, void Function()>{};
   final _nodeListeners = <String, Map<Object, void Function()>>{};
 
   UiParseSnapshot get parsed => _parse;
@@ -219,7 +220,9 @@ final class UiSurfaceController {
     if (!accepts(token)) return UiMutationResult.stale;
     if (readOnly) return UiMutationResult.readOnly;
     _interaction++;
-    return _acceptState(UiSurfaceState.normalize(_parse.program));
+    final result = _acceptState(UiSurfaceState.normalize(_parse.program));
+    _notify(_resetListeners);
+    return result;
   }
 
   void noteInteraction({required UiRuntimeToken token}) {
@@ -285,6 +288,8 @@ final class UiSurfaceController {
       _listen(_statusListeners, listener);
   void Function() listenState(void Function() listener) =>
       _listen(_stateListeners, listener);
+  void Function() listenReset(void Function() listener) =>
+      _listen(_resetListeners, listener);
   void Function() listenNode(String name, void Function() listener) =>
       _listen(_nodeListeners.putIfAbsent(name, () => {}), listener);
 
@@ -384,6 +389,7 @@ final class UiSurfaceController {
     _epoch++;
     _nodeListeners.clear();
     _stateListeners.clear();
+    _resetListeners.clear();
     _statusListeners.clear();
   }
 }

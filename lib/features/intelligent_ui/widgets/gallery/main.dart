@@ -9,6 +9,7 @@ import '../genui_layout.dart';
 import '../genui_surface.dart';
 import '../genui_theme.dart';
 import 'content_gallery.dart';
+import 'input_gallery.dart';
 
 /// Development entry point: flutter run -d macos -t
 /// lib/features/intelligent_ui/widgets/gallery/main.dart
@@ -108,6 +109,7 @@ class _GenUiGalleryAppState extends State<GenUiGalleryApp> {
                               child: GenUiThemeScope(
                                 child: GenUiColumn(
                                   children: [
+                                    const GenUiInputGallery(),
                                     const GenUiContentGallery(),
                                     for (
                                       var i = 0;

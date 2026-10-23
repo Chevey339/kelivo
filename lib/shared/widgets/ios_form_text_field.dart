@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -28,6 +29,13 @@ class IosFormTextField extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
     this.autocorrect = true,
     this.enableSuggestions = true,
+    this.focusNode,
+    this.readOnly = false,
+    this.textStyle,
+    this.textDirection,
+    this.fieldDecoration,
+    this.suffixIconConstraints,
+    this.inputFormatters,
   });
 
   final String label;
@@ -53,6 +61,13 @@ class IosFormTextField extends StatelessWidget {
   final TextCapitalization textCapitalization;
   final bool autocorrect;
   final bool enableSuggestions;
+  final FocusNode? focusNode;
+  final bool readOnly;
+  final TextStyle? textStyle;
+  final TextDirection? textDirection;
+  final BoxDecoration? fieldDecoration;
+  final BoxConstraints? suffixIconConstraints;
+  final List<TextInputFormatter>? inputFormatters;
 
   bool get _useInlineLabel => inlineLabel ?? (maxLines == 1);
 
@@ -91,6 +106,9 @@ class IosFormTextField extends StatelessWidget {
 
     Widget field = TextField(
       controller: controller,
+      focusNode: focusNode,
+      readOnly: readOnly,
+      inputFormatters: inputFormatters,
       maxLines: maxLines,
       minLines: minLines,
       autofocus: autofocus,
@@ -98,6 +116,7 @@ class IosFormTextField extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboardType,
       textAlign: textAlign ?? _defaultTextAlign(),
+      textDirection: textDirection,
       textAlignVertical: maxLines == 1
           ? TextAlignVertical.center
           : TextAlignVertical.top,
@@ -118,13 +137,15 @@ class IosFormTextField extends StatelessWidget {
               });
             }
           : null,
-      style: TextStyle(
-        fontSize: 15,
-        fontWeight: AppFontWeights.medium,
-        color: valueColor,
-        height: maxLines > 1 ? 1.25 : 1.0,
-      ),
-      strutStyle: maxLines == 1
+      style:
+          textStyle ??
+          TextStyle(
+            fontSize: 15,
+            fontWeight: AppFontWeights.medium,
+            color: valueColor,
+            height: maxLines > 1 ? 1.25 : 1.0,
+          ),
+      strutStyle: maxLines == 1 && textStyle == null
           ? const StrutStyle(
               fontSize: 15,
               height: 1.0,
@@ -139,7 +160,8 @@ class IosFormTextField extends StatelessWidget {
         suffixIcon: suffix,
         suffixIconConstraints: suffix == null
             ? null
-            : const BoxConstraints.tightFor(width: 36, height: 36),
+            : suffixIconConstraints ??
+                  const BoxConstraints.tightFor(width: 36, height: 36),
         hintStyle: TextStyle(
           fontSize: 15,
           fontWeight: AppFontWeights.medium,
@@ -185,10 +207,12 @@ class IosFormTextField extends StatelessWidget {
       final fieldWidget = Container(
         constraints: const BoxConstraints(minHeight: 40),
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration:
+            fieldDecoration ??
+            BoxDecoration(
+              color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(10),
+            ),
         padding: EdgeInsets.symmetric(horizontal: fieldHorizontalPadding),
         child: field,
       );
@@ -213,10 +237,12 @@ class IosFormTextField extends StatelessWidget {
     final fieldBox = Container(
       constraints: maxLines == 1 ? const BoxConstraints(minHeight: 40) : null,
       alignment: maxLines == 1 ? Alignment.centerLeft : Alignment.topLeft,
-      decoration: BoxDecoration(
-        color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration:
+          fieldDecoration ??
+          BoxDecoration(
+            color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(12),
+          ),
       padding: EdgeInsets.symmetric(
         horizontal: 12,
         vertical: maxLines > 1 ? 12 : 0,

@@ -182,7 +182,15 @@ environment variables, never read from the app's accounts or logged.
   tests passed/2 skipped; markstream analysis and 296 tests passed. macOS debug
   build, formatting and diff checks passed. The native gallery built and launched;
   interactive inspection is pending because the Mac is locked.
-- C08–C26: not implemented. No complete-delivery claim.
+- C08: seven native inputs, Form validation and local actions implemented;
+  220 focused checks (including 26 goldens and two shared-control tests) passed.
+  Final independent review has no findings. Root fatal-info analysis and 9,297
+  tests passed/2 skipped; markstream analysis and all 296 tests passed. macOS
+  main-app and native input-gallery debug builds passed, as did formatting and
+  diff checks. The first full run exposed a file-browser test waiting only 50 ms
+  for real I/O; its reviewed fix awaits the rendered item without forcing a
+  competing refresh. All filesystem and widget-action assertions remain.
+- C09–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -360,3 +368,38 @@ The macOS gallery debug build and VM launch succeeded. Computer use returned
 “Mac is locked”; foreground inspection and native clicks were not performed.
 The unlock request is pending while implementation and automated checks continue.
 Widget/golden evidence is not counted as native GUI acceptance.
+
+## C08 inputs and local actions
+
+`UiInteractionController` keeps text/composition drafts, validation visibility
+and submitted Forms separate from persisted input state. Incomplete numbers
+never substitute the last committed value during Ask. Hidden fields retain
+their values and drafts without validation; disabled inputs do not write state.
+Ending IME composition while a field is disabled or unmounted preserves the
+finished draft, which a later active edit or explicit submit can commit. Submit
+validates visible active fields, settles pending drafts to a bounded fixed point,
+then captures one immutable intent. Newly revealed errors are focused after
+their controls mount. Reset clears transient editing even when persisted state
+was already at its defaults.
+Controls bound to the same logical input share one current draft: starting a
+new edit supersedes older alias drafts, including hidden ones. This keeps the
+submit bound tied to input count and prevents old aliases overwriting newer
+edits. Row keeps keyed child Elements when width or text scale changes, so the
+focused editor, selection and active composition survive reflow.
+
+The seven controls reuse iOS fields, switches, checkboxes and segmented tabs.
+Slider uses a native canvas with bounded ticks, finite-range interpolation,
+RTL pointer/key direction and accessible value/increase/decrease actions.
+Select uses the existing mobile FormSheet and desktop dropdown; keyboard
+navigation, visible focus, Escape, focus return, large menus and open-menu
+theme changes are supported. RadioGroup uses segments only when short labels
+fit; large text and long labels use vertical rows. Source epochs reject old
+editor/gesture callbacks, including a node changing component type.
+
+Buttons remain keyboard focusable when disabled and explain the reason. Ask
+requires a connected observer and only emits a frozen `UiAskIntent`: no request,
+composer mutation or sent-state claim. The native gallery now has all inputs,
+conditional fields, local Reset and an observable frozen Ask context. Twelve
+additional input goldens cover light/dark, RTL, 1.3x text, validation, disabled
+and read-only states. They extend C07's fourteen baselines; C24's full matrix,
+production-host focus chain and native-device acceptance are still separate.

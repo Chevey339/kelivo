@@ -106,20 +106,28 @@ class _IosCheckboxState extends State<IosCheckbox> {
           child: Center(
             child: AnimatedScale(
               scale: pressScale,
-              duration: const Duration(milliseconds: 100),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 100),
               curve: Curves.easeOut,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
                 width: visualSize,
                 height: visualSize,
                 decoration: BoxDecoration(
-                  color: enabled ? bgColor : bgColor.withValues(alpha: 0.5),
+                  color: enabled
+                      ? bgColor
+                      : bgColor.withValues(alpha: bgColor.a * 0.5),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: enabled
                         ? effectiveBorderColor
-                        : effectiveBorderColor.withValues(alpha: 0.5),
+                        : effectiveBorderColor.withValues(
+                            alpha: effectiveBorderColor.a * 0.5,
+                          ),
                     width: widget.borderWidth,
                   ),
                 ),
@@ -158,7 +166,9 @@ class _AnimatedCheck extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 220),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
       curve: Curves.easeOutBack,
       tween: Tween<double>(begin: 0, end: show ? 1 : 0),
       builder: (context, t, child) {

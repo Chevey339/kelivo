@@ -25193,6 +25193,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change {value}'**
   String genuiMetricTrend(String value);
+
+  /// No description provided for @genuiFormErrorsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 field needs attention} other{{count} fields need attention}}'**
+  String genuiFormErrorsLeft(int count);
+
+  /// No description provided for @genuiFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get genuiFieldRequired;
+
+  /// No description provided for @genuiNumberRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Range {min}–{max}'**
+  String genuiNumberRange(String min, String max);
+
+  /// No description provided for @genuiNumberMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum {min}'**
+  String genuiNumberMinimum(String min);
+
+  /// No description provided for @genuiNumberMaximum.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {max}'**
+  String genuiNumberMaximum(String max);
+
+  /// No description provided for @genuiFieldTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'At least {min} characters'**
+  String genuiFieldTooShort(int min);
+
+  /// No description provided for @genuiFieldTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String genuiFieldTooLong(int max);
+
+  /// No description provided for @genuiInvalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a complete finite number'**
+  String get genuiInvalidNumber;
+
+  /// No description provided for @genuiChooseOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an option'**
+  String get genuiChooseOption;
+
+  /// No description provided for @genuiFinishComposing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish composing before continuing'**
+  String get genuiFinishComposing;
+
+  /// No description provided for @genuiActionDisabledDep.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: depends on {id}, which can\'t be displayed'**
+  String genuiActionDisabledDep(String id);
+
+  /// No description provided for @genuiActionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This action isn\'t available in this view'**
+  String get genuiActionUnavailable;
+
+  /// No description provided for @genuiActionDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled by this UI'**
+  String get genuiActionDisabled;
+
+  /// No description provided for @genuiFormUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This form contains content that can\'t be displayed'**
+  String get genuiFormUnavailable;
+
+  /// No description provided for @genuiDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease {label}'**
+  String genuiDecrease(String label);
+
+  /// No description provided for @genuiIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase {label}'**
+  String genuiIncrease(String label);
+
+  /// No description provided for @genuiCharacterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} / {max} characters'**
+  String genuiCharacterCount(int used, int max);
 }
 
 class _AppLocalizationsDelegate

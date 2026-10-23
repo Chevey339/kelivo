@@ -42,34 +42,33 @@ class GenUiRow extends StatelessWidget {
     final scale = MediaQuery.textScalerOf(context).scale(14.5) / 14.5;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        if (distribution == 'fit' && constraints.hasBoundedWidth) {
-          return Wrap(
-            spacing: spacing,
-            runSpacing: spacing,
-            children: [
-              for (final child in children)
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: width),
-                  child: child,
+        final width = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final columns = width < 360 || scale >= 1.3
+            ? 1
+            : math.min(
+                children.length,
+                math.max(
+                  1,
+                  ((width + spacing) / (theme.md * 10 + spacing)).floor(),
                 ),
-            ],
-          );
-        }
-        if (!constraints.hasBoundedWidth || width < 360 || scale >= 1.3) {
-          return GenUiColumn(gap: gap, children: children);
-        }
-        final columns = math.min(
-          children.length,
-          math.max(1, ((width + spacing) / (theme.md * 10 + spacing)).floor()),
-        );
+              );
         final childWidth = (width - (columns - 1) * spacing) / columns;
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
           children: [
             for (final child in children)
-              SizedBox(width: childWidth, child: child),
+              // Keep the same keyed parent and child Elements across width,
+              // text-scale and sibling-visibility changes: inputs own focus/IME.
+              ConstrainedBox(
+                key: child.key,
+                constraints: distribution == 'fit'
+                    ? BoxConstraints(maxWidth: width)
+                    : BoxConstraints.tightFor(width: childWidth),
+                child: child,
+              ),
           ],
         );
       },

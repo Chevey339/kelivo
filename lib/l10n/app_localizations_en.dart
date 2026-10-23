@@ -14128,4 +14128,83 @@ class AppLocalizationsEn extends AppLocalizations {
   String genuiMetricTrend(String value) {
     return 'Change $value';
   }
+
+  @override
+  String genuiFormErrorsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fields need attention',
+      one: '1 field needs attention',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get genuiFieldRequired => 'Required';
+
+  @override
+  String genuiNumberRange(String min, String max) {
+    return 'Range $min–$max';
+  }
+
+  @override
+  String genuiNumberMinimum(String min) {
+    return 'Minimum $min';
+  }
+
+  @override
+  String genuiNumberMaximum(String max) {
+    return 'Maximum $max';
+  }
+
+  @override
+  String genuiFieldTooShort(int min) {
+    return 'At least $min characters';
+  }
+
+  @override
+  String genuiFieldTooLong(int max) {
+    return 'At most $max characters';
+  }
+
+  @override
+  String get genuiInvalidNumber => 'Enter a complete finite number';
+
+  @override
+  String get genuiChooseOption => 'Choose an option';
+
+  @override
+  String get genuiFinishComposing => 'Finish composing before continuing';
+
+  @override
+  String genuiActionDisabledDep(String id) {
+    return 'Disabled: depends on $id, which can\'t be displayed';
+  }
+
+  @override
+  String get genuiActionUnavailable =>
+      'This action isn\'t available in this view';
+
+  @override
+  String get genuiActionDisabled => 'Disabled by this UI';
+
+  @override
+  String get genuiFormUnavailable =>
+      'This form contains content that can\'t be displayed';
+
+  @override
+  String genuiDecrease(String label) {
+    return 'Decrease $label';
+  }
+
+  @override
+  String genuiIncrease(String label) {
+    return 'Increase $label';
+  }
+
+  @override
+  String genuiCharacterCount(int used, int max) {
+    return '$used / $max characters';
+  }
 }

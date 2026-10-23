@@ -38,8 +38,12 @@ final class GenUiTheme {
     warningContainer = semantic.warningContainer;
     onWarningContainer = semantic.onWarningContainer;
     searchHighlight = semantic.searchHighlight;
-    popover = AppOverlayColors.desktopPopoverSurface(cs);
+    popover = Color.alphaBlend(
+      AppOverlayColors.desktopPopoverSurface(cs),
+      card,
+    );
     transparent = card.withValues(alpha: 0);
+    sliderThumb = ink.computeLuminance() > card.computeLuminance() ? ink : card;
     errorWash = Color.alphaBlend(errorContainer.withValues(alpha: .20), card);
     final base =
         inheritedMarkdown?.body ??
@@ -116,6 +120,7 @@ final class GenUiTheme {
 
   late final Color page, card, fill, cardFill, hairline, hairlineStrong;
   late final Color ink, secondaryInk, captionInk, disabledInk, transparent;
+  late final Color sliderThumb;
   late final Color primary, onPrimary, primaryContainer, onPrimaryContainer;
   late final Color error, errorContainer, onErrorContainer, errorWash;
   late final Color successContainer, onSuccessContainer;

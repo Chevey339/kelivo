@@ -20,6 +20,9 @@ Future<T?> showFormSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
+    sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : null,
     backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),

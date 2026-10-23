@@ -162,6 +162,64 @@ UiResolvedNode uiResolveNode(
       }
     }
   }
+  if (!pending &&
+      (node.component == 'Select' || node.component == 'RadioGroup')) {
+    final binding = node.arguments['bind'];
+    final state = binding is UiInputBinding
+        ? program.declarations[binding.name]
+        : null;
+    final options = properties['options'];
+    final seen = <Object?>{};
+    bool validOption(Object? option) {
+      if (option is! Map<String, Object?> ||
+          option.length != 2 ||
+          !option.containsKey('value') ||
+          option['label'] is! String ||
+          (option['label'] as String).trim().isEmpty ||
+          state is! UiStateDeclaration) {
+        return false;
+      }
+      final value = option['value'];
+      final typeMatches = value == null
+          ? state.nullable
+          : switch (state.type) {
+              UiScalarType.number => value is num && value.isFinite,
+              UiScalarType.string => value is String,
+              UiScalarType.boolean => value is bool,
+            };
+      return typeMatches && seen.add(value);
+    }
+
+    if (options is! List || !options.every(validOption)) {
+      diagnostics.add(
+        UiDiagnostic(
+          UiDiagnosticCode.invalidValue,
+          line: node.location.line,
+          symbol: node.name,
+          detail: 'options',
+        ),
+      );
+    }
+  }
+  if (!pending) {
+    final min = properties['min'];
+    final max = properties['max'];
+    final step = properties['step'];
+    final minLength = properties['minLength'];
+    final maxLength = properties['maxLength'];
+    if ((min is num && max is num && min > max) ||
+        (step is num && step <= 0) ||
+        (minLength is num && maxLength is num && minLength > maxLength)) {
+      diagnostics.add(
+        UiDiagnostic(
+          UiDiagnosticCode.invalidValue,
+          line: node.location.line,
+          symbol: node.name,
+          detail: 'range',
+        ),
+      );
+    }
+  }
   return UiResolvedNode(
     declaration: node,
     properties: properties,

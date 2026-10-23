@@ -6426,5 +6426,98 @@
         "type": "String"
       }
     }
+  },
+  "genuiFormErrorsLeft": "{count, plural, =1{1 field needs attention} other{{count} fields need attention}}",
+  "@genuiFormErrorsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldRequired": "Required",
+  "genuiNumberRange": "Range {min}–{max}",
+  "@genuiNumberRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMinimum": "Minimum {min}",
+  "@genuiNumberMinimum": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMaximum": "Maximum {max}",
+  "@genuiNumberMaximum": {
+    "placeholders": {
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiFieldTooShort": "At least {min} characters",
+  "@genuiFieldTooShort": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldTooLong": "At most {max} characters",
+  "@genuiFieldTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiInvalidNumber": "Enter a complete finite number",
+  "genuiChooseOption": "Choose an option",
+  "genuiFinishComposing": "Finish composing before continuing",
+  "genuiActionDisabledDep": "Disabled: depends on {id}, which can't be displayed",
+  "@genuiActionDisabledDep": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiActionUnavailable": "This action isn't available in this view",
+  "genuiActionDisabled": "Disabled by this UI",
+  "genuiFormUnavailable": "This form contains content that can't be displayed",
+  "genuiDecrease": "Decrease {label}",
+  "@genuiDecrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiIncrease": "Increase {label}",
+  "@genuiIncrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiCharacterCount": "{used} / {max} characters",
+  "@genuiCharacterCount": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
   }
 }

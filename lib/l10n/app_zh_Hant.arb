@@ -5090,5 +5090,98 @@
         "type": "String"
       }
     }
+  },
+  "genuiFormErrorsLeft": "還有 {count} 項需要修改",
+  "@genuiFormErrorsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldRequired": "必填",
+  "genuiNumberRange": "範圍 {min}–{max}",
+  "@genuiNumberRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMinimum": "最小值 {min}",
+  "@genuiNumberMinimum": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMaximum": "最大值 {max}",
+  "@genuiNumberMaximum": {
+    "placeholders": {
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiFieldTooShort": "至少 {min} 個字元",
+  "@genuiFieldTooShort": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldTooLong": "最多 {max} 個字元",
+  "@genuiFieldTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiInvalidNumber": "請輸入完整的有限數值",
+  "genuiChooseOption": "請選擇一項",
+  "genuiFinishComposing": "請先完成輸入法組字",
+  "genuiActionDisabledDep": "已停用：依賴的 {id} 無法顯示",
+  "@genuiActionDisabledDep": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiActionUnavailable": "此檢視暫不支援這項操作",
+  "genuiActionDisabled": "此介面已停用該操作",
+  "genuiFormUnavailable": "此表單包含無法顯示的內容",
+  "genuiDecrease": "減少 {label}",
+  "@genuiDecrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiIncrease": "增加 {label}",
+  "@genuiIncrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiCharacterCount": "{used} / {max} 個字元",
+  "@genuiCharacterCount": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
   }
 }

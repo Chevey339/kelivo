@@ -10,6 +10,7 @@ import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/gallery/content_gallery.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/gallery/input_gallery.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_layout.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
@@ -48,16 +49,25 @@ void main() {
       'desktop',
       'shell',
       'shell-wallpaper',
+      'inputs',
+      'inputs-rtl',
+      'inputs-large',
+      'inputs-errors',
+      'inputs-disabled',
+      'inputs-readonly',
     ]) {
       testWidgets('GenUI ${dark ? 'dark' : 'light'} $variant', (tester) async {
         final shell = variant.startsWith('shell');
+        final inputs = variant.startsWith('inputs');
         final wallpaper = variant.contains('wallpaper');
-        final rtl = variant == 'rtl' || variant == 'shell-wallpaper';
-        final large = variant == 'large' || variant == 'shell-wallpaper';
+        final rtl = variant.endsWith('rtl') || variant == 'shell-wallpaper';
+        final large = variant.endsWith('large') || variant == 'shell-wallpaper';
         final width = variant == 'desktop' || variant == 'shell-wallpaper'
             ? 900.0
             : 390.0;
-        final height = shell
+        final height = inputs
+            ? (large ? 1500.0 : 1350.0)
+            : shell
             ? 2100.0
             : large
             ? 2200.0
@@ -111,7 +121,14 @@ void main() {
                   padding: const EdgeInsets.all(16),
                   child: SelectionArea(
                     child: GenUiThemeScope(
-                      child: shell
+                      child: inputs
+                          ? GenUiInputGallery(
+                              validation: variant == 'inputs-errors',
+                              enabled: variant != 'inputs-disabled',
+                              readOnly: variant == 'inputs-readonly',
+                              showIntent: false,
+                            )
+                          : shell
                           ? GenUiColumn(
                               children: [
                                 for (var i = 0; i < controllers.length; i++)

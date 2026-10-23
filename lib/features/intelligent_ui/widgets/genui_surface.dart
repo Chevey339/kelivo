@@ -7,6 +7,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'genui_content.dart';
+import 'genui_interactions.dart';
+import 'package:Kelivo/features/intelligent_ui/runtime/ui_interaction_controller.dart';
 import 'genui_localizations.dart';
 import 'genui_node.dart';
 import 'genui_theme.dart';
@@ -24,6 +26,8 @@ class GenUiSurface extends StatelessWidget {
     this.onRepair,
     this.onRetrySave,
     this.exporting = false,
+    this.interactions,
+    this.onAsk,
   });
   final UiSurfaceController controller;
   final String? title;
@@ -33,11 +37,19 @@ class GenUiSurface extends StatelessWidget {
   final VoidCallback? onRepair;
   final VoidCallback? onRetrySave;
   final bool exporting;
+  final UiInteractionController? interactions;
+  final GenUiAskHandler? onAsk;
 
   @override
   Widget build(BuildContext context) => GenUiThemeScope(
     markdownTheme: markdownTheme,
-    child: _SurfaceBody(surface: this),
+    child: GenUiInteractionHost(
+      surface: controller,
+      interactions: interactions,
+      onAsk: onAsk,
+      exporting: exporting,
+      child: _SurfaceBody(surface: this),
+    ),
   );
 }
 

@@ -13477,6 +13477,77 @@ class AppLocalizationsZh extends AppLocalizations {
   String genuiMetricTrend(String value) {
     return '变化 $value';
   }
+
+  @override
+  String genuiFormErrorsLeft(int count) {
+    return '还有 $count 项需要修改';
+  }
+
+  @override
+  String get genuiFieldRequired => '必填';
+
+  @override
+  String genuiNumberRange(String min, String max) {
+    return '范围 $min–$max';
+  }
+
+  @override
+  String genuiNumberMinimum(String min) {
+    return '最小值 $min';
+  }
+
+  @override
+  String genuiNumberMaximum(String max) {
+    return '最大值 $max';
+  }
+
+  @override
+  String genuiFieldTooShort(int min) {
+    return '至少 $min 个字符';
+  }
+
+  @override
+  String genuiFieldTooLong(int max) {
+    return '最多 $max 个字符';
+  }
+
+  @override
+  String get genuiInvalidNumber => '请输入完整的有限数值';
+
+  @override
+  String get genuiChooseOption => '请选择一项';
+
+  @override
+  String get genuiFinishComposing => '请先完成输入法组字';
+
+  @override
+  String genuiActionDisabledDep(String id) {
+    return '已停用：依赖的 $id 无法显示';
+  }
+
+  @override
+  String get genuiActionUnavailable => '此视图暂不支持这项操作';
+
+  @override
+  String get genuiActionDisabled => '此界面已停用该操作';
+
+  @override
+  String get genuiFormUnavailable => '此表单包含无法显示的内容';
+
+  @override
+  String genuiDecrease(String label) {
+    return '减少 $label';
+  }
+
+  @override
+  String genuiIncrease(String label) {
+    return '增加 $label';
+  }
+
+  @override
+  String genuiCharacterCount(int used, int max) {
+    return '$used / $max 个字符';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -26877,6 +26948,77 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String genuiMetricTrend(String value) {
     return '变化 $value';
+  }
+
+  @override
+  String genuiFormErrorsLeft(int count) {
+    return '还有 $count 项需要修改';
+  }
+
+  @override
+  String get genuiFieldRequired => '必填';
+
+  @override
+  String genuiNumberRange(String min, String max) {
+    return '范围 $min–$max';
+  }
+
+  @override
+  String genuiNumberMinimum(String min) {
+    return '最小值 $min';
+  }
+
+  @override
+  String genuiNumberMaximum(String max) {
+    return '最大值 $max';
+  }
+
+  @override
+  String genuiFieldTooShort(int min) {
+    return '至少 $min 个字符';
+  }
+
+  @override
+  String genuiFieldTooLong(int max) {
+    return '最多 $max 个字符';
+  }
+
+  @override
+  String get genuiInvalidNumber => '请输入完整的有限数值';
+
+  @override
+  String get genuiChooseOption => '请选择一项';
+
+  @override
+  String get genuiFinishComposing => '请先完成输入法组字';
+
+  @override
+  String genuiActionDisabledDep(String id) {
+    return '已停用：依赖的 $id 无法显示';
+  }
+
+  @override
+  String get genuiActionUnavailable => '此视图暂不支持这项操作';
+
+  @override
+  String get genuiActionDisabled => '此界面已停用该操作';
+
+  @override
+  String get genuiFormUnavailable => '此表单包含无法显示的内容';
+
+  @override
+  String genuiDecrease(String label) {
+    return '减少 $label';
+  }
+
+  @override
+  String genuiIncrease(String label) {
+    return '增加 $label';
+  }
+
+  @override
+  String genuiCharacterCount(int used, int max) {
+    return '$used / $max 个字符';
   }
 }
 
@@ -40358,5 +40500,76 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String genuiMetricTrend(String value) {
     return '變化 $value';
+  }
+
+  @override
+  String genuiFormErrorsLeft(int count) {
+    return '還有 $count 項需要修改';
+  }
+
+  @override
+  String get genuiFieldRequired => '必填';
+
+  @override
+  String genuiNumberRange(String min, String max) {
+    return '範圍 $min–$max';
+  }
+
+  @override
+  String genuiNumberMinimum(String min) {
+    return '最小值 $min';
+  }
+
+  @override
+  String genuiNumberMaximum(String max) {
+    return '最大值 $max';
+  }
+
+  @override
+  String genuiFieldTooShort(int min) {
+    return '至少 $min 個字元';
+  }
+
+  @override
+  String genuiFieldTooLong(int max) {
+    return '最多 $max 個字元';
+  }
+
+  @override
+  String get genuiInvalidNumber => '請輸入完整的有限數值';
+
+  @override
+  String get genuiChooseOption => '請選擇一項';
+
+  @override
+  String get genuiFinishComposing => '請先完成輸入法組字';
+
+  @override
+  String genuiActionDisabledDep(String id) {
+    return '已停用：依賴的 $id 無法顯示';
+  }
+
+  @override
+  String get genuiActionUnavailable => '此檢視暫不支援這項操作';
+
+  @override
+  String get genuiActionDisabled => '此介面已停用該操作';
+
+  @override
+  String get genuiFormUnavailable => '此表單包含無法顯示的內容';
+
+  @override
+  String genuiDecrease(String label) {
+    return '減少 $label';
+  }
+
+  @override
+  String genuiIncrease(String label) {
+    return '增加 $label';
+  }
+
+  @override
+  String genuiCharacterCount(int used, int max) {
+    return '$used / $max 個字元';
   }
 }

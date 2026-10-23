@@ -19,6 +19,13 @@ class SegmentedTabs extends StatelessWidget {
     required this.onChanged,
     this.expand = true,
     this.height = 40,
+    this.enabled = true,
+    this.radioGroup = false,
+    this.enableHaptics = true,
+    this.backgroundColor,
+    this.selectedColor,
+    this.foregroundColor,
+    this.selectedForegroundColor,
   });
 
   final List<SegmentedTab> tabs;
@@ -26,6 +33,11 @@ class SegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool expand;
   final double height;
+  final bool enabled, radioGroup, enableHaptics;
+  final Color? backgroundColor,
+      selectedColor,
+      foregroundColor,
+      selectedForegroundColor;
 
   static const double _innerPadding = 4;
   static const double _gap = 6;
@@ -44,9 +56,10 @@ class SegmentedTabs extends StatelessWidget {
         tab: tabs[i],
         selected: i == index,
         innerRadius: innerRadius,
+        reducedMotion: MediaQuery.disableAnimationsOf(context),
         onTap: () {
-          if (i == index) return;
-          Haptics.light();
+          if (!enabled || i == index) return;
+          if (enableHaptics) Haptics.light();
           onChanged(i);
         },
       );
@@ -61,7 +74,7 @@ class SegmentedTabs extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
+        color: backgroundColor ?? context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(_shellRadius),
       ),
       clipBehavior: Clip.hardEdge,
@@ -84,8 +97,11 @@ class SegmentedTabs extends StatelessWidget {
     required bool selected,
     required double innerRadius,
     required VoidCallback onTap,
+    required bool reducedMotion,
   }) {
-    final color = selected ? cs.primary : cs.onSurface.withValues(alpha: 0.82);
+    final color = selected
+        ? (selectedForegroundColor ?? cs.primary)
+        : (foregroundColor ?? cs.onSurface.withValues(alpha: 0.82));
     final label = Text(
       tab.label,
       textAlign: TextAlign.center,
@@ -110,24 +126,30 @@ class SegmentedTabs extends StatelessWidget {
     );
 
     return Semantics(
-      button: true,
-      selected: selected,
+      button: !radioGroup,
+      selected: radioGroup ? null : selected,
+      checked: radioGroup ? selected : null,
+      inMutuallyExclusiveGroup: radioGroup,
+      enabled: enabled,
       label: tab.label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: _animDuration,
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: selected
-                ? cs.primary.withValues(alpha: 0.14)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(innerRadius),
+      onTap: enabled ? onTap : null,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? onTap : null,
+          child: AnimatedContainer(
+            duration: reducedMotion ? Duration.zero : _animDuration,
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: selected
+                  ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(innerRadius),
+            ),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Center(child: content),
           ),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Center(child: content),
         ),
       ),
     );

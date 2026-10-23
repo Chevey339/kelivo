@@ -1,4 +1,6 @@
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/features/intelligent_ui/runtime/ui_form_validation.dart';
+import 'genui_content.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_diagnostic.dart';
 
 String genUiDiagnosticMessage(AppLocalizations l10n, UiDiagnostic diagnostic) =>
@@ -46,4 +48,24 @@ String genUiDiagnosticMessage(AppLocalizations l10n, UiDiagnostic diagnostic) =>
       UiDiagnosticCode.divisionByZero => l10n.genuiErrorDivisionByZero,
       UiDiagnosticCode.nonFinite => l10n.genuiErrorNonFinite,
       UiDiagnosticCode.operationsBudget => l10n.genuiErrorOperationsBudget,
+    };
+
+String genUiFieldIssueMessage(AppLocalizations l10n, UiFieldIssue issue) =>
+    switch (issue.error) {
+      UiFieldError.required => l10n.genuiFieldRequired,
+      UiFieldError.tooShort => l10n.genuiFieldTooShort(issue.min!.toInt()),
+      UiFieldError.tooLong => l10n.genuiFieldTooLong(issue.max!.toInt()),
+      UiFieldError.number => l10n.genuiInvalidNumber,
+      UiFieldError.option => l10n.genuiChooseOption,
+      UiFieldError.composing => l10n.genuiFinishComposing,
+      UiFieldError.stateBudget => l10n.genuiErrorDataBudget,
+      UiFieldError.range =>
+        issue.min == null
+            ? l10n.genuiNumberMaximum(genUiNumber(issue.max))
+            : issue.max == null
+            ? l10n.genuiNumberMinimum(genUiNumber(issue.min))
+            : l10n.genuiNumberRange(
+                genUiNumber(issue.min),
+                genUiNumber(issue.max),
+              ),
     };
