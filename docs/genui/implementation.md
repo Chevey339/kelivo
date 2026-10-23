@@ -168,7 +168,11 @@ environment variables, never read from the app's accounts or logged.
   analysis and 9,156 tests passed/2 skipped; markstream analysis and 296 tests
   passed; macOS debug build and diff check passed. Independent review has no
   remaining findings after sampling and signed-zero cache fixes.
-- C05–C26: not implemented. No complete-delivery claim.
+- C05: in-memory controller and normalized state accepted; 102 focused tests,
+  root fatal-info analysis and 9,181 tests passed/2 skipped; markstream analysis
+  and 296 tests passed; macOS debug build and diff check passed. Final independent
+  review has no remaining findings.
+- C06–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -237,3 +241,34 @@ the batch operation budget, and result depth at most the expression depth.
 This prevents tiny repeated-array programs from producing enormous serialized
 results, without expanding the shared object graph during validation. These
 checks supplement the catalog's later chart/table-specific data limits.
+
+## C05 in-memory controller and state version 1
+
+The host owns `UiSurfaceController` outside widget lifetimes. A synchronous
+batch resolves inputs, derived values, node properties and Ask descriptions
+before notifying subscribers. Nodes subscribe independently; unchanged sibling
+results retain identity and ordinary input changes do not notify the shell.
+Real fence closure and successful host completion are both required to unlock
+interaction. Interrupted/invalid and explicit export modes stay read-only.
+
+`UiSurfaceState` serializes only scalar overrides and bounded view settings.
+It removes values equal to source defaults, sorts keys and rejects unknown
+fields, invalid types, unsupported versions and UTF-8 states over 32 KiB.
+Table settings are sortKey/descending/filter/page (filter up to 256 code units,
+sort key up to 128, page within the row budget); Chart settings are dataView
+and sorted unique hidden-series indices within the pie-series limit. Missing
+settings mean host defaults. No derived values, owner IDs or runtime epochs
+enter state_json. Saved snapshots pair it with revision/surface identity and
+the SHA-256 of normalized source plus catalog version.
+
+Runtime callbacks use controller identity and source epoch. Pending restores
+also capture a separate user-interaction epoch: even a no-op Reset or an IME
+draft invalidates an older restore without causing a redundant state write.
+Save completions are checked against the actual state sequence. Source changes
+reset overrides, while equivalent LF/CRLF sources preserve values.
+
+Review regressions cover the no-op Reset/restore race, failed nodes whose
+diagnostics exceeded the bounded list, and runtime errors propagating through
+FormRef to its button. Required/hidden-field validation and draft controls
+remain C08; repository/flush behavior remains C11. No database or widget
+dependency is introduced here.
