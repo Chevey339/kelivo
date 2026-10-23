@@ -1894,7 +1894,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       },
     );
     if (selected != null) {
-      setState(() => _kind = selected);
+      setState(() {
+        _kind = selected;
+        final base = ProviderConfig.aihubmixBaseUrlForKind(
+          _baseCtrl.text,
+          selected,
+        );
+        if (base != null) _baseCtrl.text = base;
+      });
       await _save();
     }
   }

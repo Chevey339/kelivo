@@ -157,6 +157,49 @@ void main() {
     },
   );
 
+  test('moves Gemini-type AIhubmix providers to the Gemini endpoint', () async {
+    final gemini = ProviderConfig.defaultsFor(
+      'AIhubmix',
+    ).copyWith(providerType: ProviderKind.google);
+    final openai = ProviderConfig.defaultsFor('AIhubmix - 2');
+    final custom = ProviderConfig.defaultsFor('AIhubmix - 3').copyWith(
+      providerType: ProviderKind.google,
+      baseUrl: 'https://aihubmix.com/custom/v1beta',
+    );
+    await repository.replaceSnapshot(
+      BusinessSettingsRouter.normalizeAndRoute({
+        'provider_configs_v1': jsonEncode({
+          'AIhubmix': gemini.toJson(),
+          'AIhubmix - 2': openai.toJson(),
+          'AIhubmix - 3': custom.toJson(),
+        }),
+      }),
+    );
+
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+    expect(
+      settings.getProviderConfig('AIhubmix').baseUrl,
+      'https://aihubmix.com/gemini/v1beta',
+    );
+    expect(
+      settings.getProviderConfig('AIhubmix - 2').baseUrl,
+      'https://aihubmix.com/v1',
+    );
+    expect(
+      settings.getProviderConfig('AIhubmix - 3').baseUrl,
+      'https://aihubmix.com/custom/v1beta',
+    );
+
+    final saved = BusinessPreferences(repository);
+    await saved.load();
+    final configs = jsonDecode(saved.getString('provider_configs_v1')!) as Map;
+    expect(
+      (configs['AIhubmix'] as Map)['baseUrl'],
+      'https://aihubmix.com/gemini/v1beta',
+    );
+  });
+
   test(
     'keeps current KelivoIN customizations and other custom endpoints',
     () async {

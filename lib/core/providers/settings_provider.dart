@@ -1482,6 +1482,22 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setString(_providerConfigsKey, jsonEncode(seededConfigs));
     }
 
+    // Gemini-type AIhubmix providers saved with the OpenAI-compatible base
+    // (or without /v1beta) cannot reach the Gemini-native endpoint.
+    for (final entry in _providerConfigs.entries.toList()) {
+      final cfg = entry.value;
+      if (cfg.vertexAI == true) continue;
+      final kind = ProviderConfig.classify(
+        entry.key,
+        explicitType: cfg.providerType,
+      );
+      if (kind != ProviderKind.google) continue;
+      final fixed = ProviderConfig.aihubmixBaseUrlForKind(cfg.baseUrl, kind);
+      if (fixed != null) {
+        await setProviderConfig(entry.key, cfg.copyWith(baseUrl: fixed));
+      }
+    }
+
     final kelivo = _providerConfigs['KelivoIN'];
     final kelivoHost = Uri.tryParse(kelivo?.baseUrl ?? '')?.host.toLowerCase();
     if (kelivo != null &&
@@ -6511,6 +6527,34 @@ class ProviderConfig {
       return ProviderKind.claude;
     }
     return ProviderKind.openai;
+  }
+
+  static const String aihubmixOpenAIBaseUrl = 'https://aihubmix.com/v1';
+  static const String aihubmixGeminiBaseUrl =
+      'https://aihubmix.com/gemini/v1beta';
+
+  /// AIhubmix serves Gemini-native requests under `/gemini/v1beta` and
+  /// OpenAI/Claude-compatible requests under `/v1`. Returns the matching base
+  /// when [baseUrl] is one of the AIhubmix defaults for another protocol,
+  /// otherwise null (custom URLs are left untouched).
+  static String? aihubmixBaseUrlForKind(String baseUrl, ProviderKind kind) {
+    var base = baseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    final lower = base.toLowerCase();
+    if (kind == ProviderKind.google) {
+      if (lower == aihubmixOpenAIBaseUrl ||
+          lower == 'https://aihubmix.com/gemini') {
+        return aihubmixGeminiBaseUrl;
+      }
+      return null;
+    }
+    if (lower == aihubmixGeminiBaseUrl ||
+        lower == 'https://aihubmix.com/gemini') {
+      return aihubmixOpenAIBaseUrl;
+    }
+    return null;
   }
 
   static String _defaultBase(String key) {

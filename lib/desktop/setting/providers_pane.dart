@@ -2988,7 +2988,14 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                     );
                                     await spWatch.setProviderConfig(
                                       widget.providerKey,
-                                      old.copyWith(providerType: k),
+                                      old.copyWith(
+                                        providerType: k,
+                                        baseUrl:
+                                            ProviderConfig.aihubmixBaseUrlForKind(
+                                              old.baseUrl,
+                                              k,
+                                            ),
+                                      ),
                                     );
                                   },
                                 ),
