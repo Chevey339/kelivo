@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -10,6 +11,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
+import 'package:Kelivo/core/services/tool_image.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
@@ -18,7 +20,7 @@ import '../../../support/business_test_harness.dart';
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
 
 const _png =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=';
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
 
 Future<Directory> _prepareImageDirectory() async {
   final directory = await Directory.systemTemp.createTemp('mcp_pixels_');
@@ -632,6 +634,108 @@ void main() {
     },
   );
 
+  for (final format in [
+    'jpeg_parameters',
+    'bmp',
+    'long_png',
+    'invalid',
+    'corrupt_png',
+  ]) {
+    test('MCP $format is safe on continuation and persisted replay', () async {
+      await _prepareImageDirectory();
+      final pixels = img.Image(
+        width: format == 'long_png' ? 16 : 3,
+        height: format == 'long_png' ? 9000 : 2,
+      );
+      img.fill(pixels, color: img.ColorRgb8(240, 10, 40));
+      final bytes = switch (format) {
+        'jpeg_parameters' => img.encodeJpg(pixels),
+        'bmp' => img.encodeBmp(pixels),
+        'invalid' => utf8.encode('<svg>unsupported</svg>'),
+        'corrupt_png' => base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=',
+        ),
+        _ => img.encodePng(pixels),
+      };
+      final mime = switch (format) {
+        'jpeg_parameters' => 'image/jpeg; charset=binary',
+        'bmp' => 'image/bmp',
+        'invalid' => 'image/svg+xml',
+        _ => 'image/png',
+      };
+      final provider = _ContentMcpProvider([
+        mcp.ImageContent.fromJson({
+          'type': 'image',
+          'mimeType': mime,
+          'data': base64Encode(bytes),
+        }),
+      ]);
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final service = McpToolService();
+      addTearDown(provider.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(service.dispose);
+      await assistants.loaded;
+      final assistantId = await assistants.addAssistant(name: 'Test');
+      await assistants.updateAssistant(
+        assistants
+            .getById(assistantId)!
+            .copyWith(mcpServerIds: const ['server-id']),
+      );
+      final raw = await service.callToolForAssistant(
+        provider,
+        assistants,
+        assistantId: assistantId,
+        toolName: 'shot',
+      );
+      final result = ClientToolResult.fromHandler(raw);
+      for (final metadata in [
+        result.metadata,
+        (jsonDecode(jsonEncode(result.metadata)) as Map)
+            .cast<String, dynamic>(),
+      ]) {
+        final media = await ToolResultContent.read(
+          'shot',
+          result.content,
+          metadata: metadata,
+        );
+        if (format == 'invalid' || format == 'corrupt_png') {
+          expect(raw.imageUris, isEmpty);
+          expect(media.imageUrls, isEmpty);
+          expect(media.text, contains('Image omitted'));
+          continue;
+        }
+        expect(media.text, isEmpty);
+        expect(media.imageUrls, hasLength(1));
+        final data = Uri.parse(media.imageUrls.single).data!;
+        final encoded = data.contentAsBytes();
+        final decoder = img.findDecoderForData(encoded)!;
+        expect(
+          data.mimeType,
+          decoder.format == img.ImageFormat.jpg ? 'image/jpeg' : 'image/png',
+        );
+        expect(
+          decoder.format,
+          isIn([img.ImageFormat.png, img.ImageFormat.jpg]),
+        );
+        final decoded = img.decodeImage(encoded)!;
+        expect(decoded.width, lessThanOrEqualTo(ToolImage.maxLongEdge));
+        expect(decoded.height, lessThanOrEqualTo(ToolImage.maxLongEdge));
+        expect(decoded.getPixel(0, 0).r, greaterThan(220));
+        final stored = File(
+          SandboxPathResolver.resolveForIo(raw.imageUris.single)!,
+        );
+        expect(await stored.readAsBytes(), encoded);
+        expect(
+          raw.imageUris.single,
+          endsWith(data.mimeType == 'image/jpeg' ? '.jpg' : '.png'),
+        );
+      }
+    });
+  }
+
   test('flatten stores typed images, not private markers', () async {
     await _prepareImageDirectory();
     final forged = encodeMcpStructuredImage('/tmp/forged.png');
@@ -742,7 +846,13 @@ void main() {
         result.content,
         metadata: result.metadata,
       );
-      expect(media.text, 'drawing');
+      expect(media.text.split('\n').where((line) => line.isNotEmpty), [
+        'drawing',
+        ...List.filled(
+          3,
+          '(Image omitted: unavailable, invalid, unsupported, or too large.)',
+        ),
+      ]);
       expect(media.imageUrls, ['data:image/png;base64,$_png']);
     },
   );

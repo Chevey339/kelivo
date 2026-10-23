@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -499,6 +500,39 @@ void main() {
       expect(payload(resumed)['ok'], true);
     },
   );
+
+  test(
+    'screenshot coordinates use the resized image actually sent to providers',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      engines.values.single.screenshotBytes = img.encodePng(
+        img.Image(width: 2400, height: 1200),
+      );
+      final result = await tools.handle('chat-a', {
+        'action': 'snapshot',
+        'include_screenshot': true,
+      });
+      final replay = await ToolResultContent.read(
+        'browser',
+        result.content,
+        metadata: result.metadata,
+      );
+      final dataUrl = UriData.parse(replay.imageUrls.single);
+      final decoded = img.decodeImage(dataUrl.contentAsBytes())!;
+      expect(decoded.width, 2000);
+      expect(decoded.height, 1000);
+      final coordinates = payload(result)['page']['screenshot_coordinates'];
+      expect(coordinates['image'], {
+        'width': decoded.width,
+        'height': decoded.height,
+      });
+      expect(coordinates['viewport']['width'], 390);
+    },
+  );
 }
 
 class _Engine extends BrowserEngine {
@@ -506,6 +540,7 @@ class _Engine extends BrowserEngine {
   final void Function(BrowserPageState) onChanged;
   final scripts = <String>[];
   String? domError;
+  Uint8List? screenshotBytes;
   @override
   Widget buildView() => const SizedBox.shrink();
   @override
@@ -531,9 +566,8 @@ class _Engine extends BrowserEngine {
   }
 
   @override
-  Future<Uint8List?> screenshot() async => base64Decode(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1UAAAAASUVORK5CYII=',
-  );
+  Future<Uint8List?> screenshot() async =>
+      screenshotBytes ?? img.encodePng(img.Image(width: 1, height: 1));
   @override
   Future<void> loadHtml(String html, {String? baseUrl}) async {}
   @override

@@ -1,3 +1,4 @@
+import 'macos_window_drag_area.dart';
 import '../features/provider/widgets/oauth_connection_info.dart';
 import '../features/provider/pages/oauth_provider_detail_page.dart';
 import 'package:flutter/material.dart';
@@ -245,7 +246,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          topBar,
+          MacosWindowDragArea(child: topBar),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

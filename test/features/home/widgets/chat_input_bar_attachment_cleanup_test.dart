@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:irondash_message_channel/irondash_message_channel.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages, implementation_imports
@@ -55,6 +56,48 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$path/tmp';
+}
+
+class _DeletionObservedFile extends Fake implements File {
+  _DeletionObservedFile(this.delegate, this.deleted);
+
+  final File delegate;
+  final Completer<String> deleted;
+
+  @override
+  String get path => delegate.path;
+
+  @override
+  Future<File> create({bool recursive = false, bool exclusive = false}) async {
+    await delegate.create(recursive: recursive, exclusive: exclusive);
+    return this;
+  }
+
+  @override
+  Future<File> writeAsString(
+    String contents, {
+    Encoding encoding = utf8,
+    FileMode mode = FileMode.write,
+    bool flush = false,
+  }) async {
+    await delegate.writeAsString(
+      contents,
+      encoding: encoding,
+      mode: mode,
+      flush: flush,
+    );
+    return this;
+  }
+
+  @override
+  Future<bool> exists() => delegate.exists();
+
+  @override
+  Future<File> delete({bool recursive = false}) async {
+    await delegate.delete(recursive: recursive);
+    if (!deleted.isCompleted) deleted.complete(path);
+    return this;
+  }
 }
 
 const _config = ImageCompressConfig(
@@ -361,23 +404,45 @@ void main() {
     );
 
     final uploadDir = Directory('${appSupportDir.path}/upload');
-    final existingPaths = await tester.runAsync(
+    final existingPaths = (await tester.runAsync(
       () => uploadDir.list().map((entry) => entry.path).toSet(),
-    );
+    ))!;
 
-    final disposeGate = Completer<void>();
+    // These notifications are awaited inside runAsync, so create them in its
+    // real async zone instead of queuing completion in the test's fake clock.
+    final disposeGate = (await tester.runAsync(() async => Completer<void>()))!;
+    final deleted = (await tester.runAsync(() async => Completer<String>()))!;
     fakePathProvider.appDataGate = disposeGate;
     final completedRequestsBeforeDispose =
         fakePathProvider.completedAppDataRequests;
     clipboardText = List.filled(5001, 'd').join();
-    await _invokePasteShortcut(tester, focusNode);
-    expect(mediaController.hasUnreadyImages, isTrue);
+    final filesystemZone = Zone.current;
+    String? discardedPath;
+    await IOOverrides.runZoned(
+      () async {
+        await _invokePasteShortcut(tester, focusNode);
+        expect(mediaController.hasUnreadyImages, isTrue);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(() async {
-      disposeGate.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+        await tester.pumpWidget(const SizedBox.shrink());
+        discardedPath = await tester.runAsync(() async {
+          disposeGate.complete();
+          // A path lookup is followed by file creation, a flushed write and
+          // cleanup. Wait for the real deletion instead of guessing its time.
+          return deleted.future.timeout(const Duration(seconds: 10));
+        });
+      },
+      createFile: (path) {
+        final file = filesystemZone.run(() => File(path));
+        if (p.equals(p.dirname(path), uploadDir.path) &&
+            p.basename(path).startsWith('pasted_') &&
+            !existingPaths.contains(path)) {
+          return _DeletionObservedFile(file, deleted);
+        }
+        return file;
+      },
+    );
+    expect(discardedPath, isNotNull);
+    expect(existingPaths, isNot(contains(discardedPath)));
     expect(
       fakePathProvider.completedAppDataRequests,
       greaterThan(completedRequestsBeforeDispose),

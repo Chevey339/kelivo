@@ -3343,7 +3343,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryRepairFailed.
   ///
   /// In en, this message translates to:
-  /// **'Repair could not fix this. Export a copy of your data, then reset.'**
+  /// **'Repair could not complete. Your data is preserved; choose a validated copy or export your data for further diagnosis.'**
   String get startupRecoveryRepairFailed;
 
   /// No description provided for @startupRecoveryResetFailed.
@@ -3361,7 +3361,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetDialogContent.
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.'**
+  /// **'Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.'**
   String get startupRecoveryResetDialogContent;
 
   /// No description provided for @startupRecoveryResetDialogConfirm.
@@ -3559,13 +3559,13 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryDangerBody.
   ///
   /// In en, this message translates to:
-  /// **'Resetting permanently deletes Kelivo\'s database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.'**
+  /// **'A fresh start removes the current data from view. Kelivo will preserve the old database and existing copies for recovery. Export a data copy first if possible.'**
   String get startupRecoveryDangerBody;
 
   /// No description provided for @startupRecoveryResetAcknowledge.
   ///
   /// In en, this message translates to:
-  /// **'I exported a copy, or I do not need this data.'**
+  /// **'I want to start with a new empty database.'**
   String get startupRecoveryResetAcknowledge;
 
   /// No description provided for @startupDatabaseUpdateRequiredTitle.
@@ -11455,6 +11455,12 @@ abstract class AppLocalizations {
   /// **'Ollama web search API. Augments models with up-to-date information.'**
   String get searchProviderOllamaDescription;
 
+  /// No description provided for @searchProviderDeepSeekDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek official web search and page fetch APIs. Uses a DeepSeek API key.'**
+  String get searchProviderDeepSeekDescription;
+
   /// No description provided for @searchProviderJinaDescription.
   ///
   /// In en, this message translates to:
@@ -11526,6 +11532,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ollama'**
   String get searchServiceNameOllama;
+
+  /// No description provided for @searchServiceNameDeepSeek.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek'**
+  String get searchServiceNameDeepSeek;
 
   /// No description provided for @searchServiceNameJina.
   ///
@@ -13780,8 +13792,20 @@ abstract class AppLocalizations {
   /// No description provided for @memorySettingsInjectionMaxItemsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.'**
+  /// **'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.'**
   String get memorySettingsInjectionMaxItemsSubtitle;
+
+  /// No description provided for @memorySettingsFullInjectionTypesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Always inject these types'**
+  String get memorySettingsFullInjectionTypesTitle;
+
+  /// No description provided for @memorySettingsFullInjectionTypesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.'**
+  String get memorySettingsFullInjectionTypesSubtitle;
 
   /// No description provided for @memorySettingsInjectionMaxItemsOption.
   ///
@@ -23309,6 +23333,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Completing sign-in…'**
   String get mcpOAuthExchangingToken;
+
+  /// No description provided for @markdownPlaygroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown Playground'**
+  String get markdownPlaygroundTitle;
+
+  /// No description provided for @markdownPlaygroundSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown source'**
+  String get markdownPlaygroundSource;
+
+  /// No description provided for @markdownPlaygroundPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get markdownPlaygroundPreview;
+
+  /// No description provided for @markdownPlaygroundAst.
+  ///
+  /// In en, this message translates to:
+  /// **'AST'**
+  String get markdownPlaygroundAst;
+
+  /// No description provided for @markdownPlaygroundPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream characters'**
+  String get markdownPlaygroundPlay;
+
+  /// No description provided for @markdownPlaygroundPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get markdownPlaygroundPause;
+
+  /// No description provided for @markdownPlaygroundResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get markdownPlaygroundResume;
+
+  /// No description provided for @markdownPlaygroundShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show complete'**
+  String get markdownPlaygroundShowAll;
+
+  /// No description provided for @markdownPlaygroundWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview width'**
+  String get markdownPlaygroundWidth;
+
+  /// No description provided for @markdownPlaygroundTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview theme'**
+  String get markdownPlaygroundTheme;
+
+  /// No description provided for @markdownPlaygroundPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected plain text'**
+  String get markdownPlaygroundPlain;
+
+  /// No description provided for @markdownPlaygroundMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Markdown'**
+  String get markdownPlaygroundMarkdown;
+
+  /// No description provided for @markdownPlaygroundSelectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text in the preview to inspect copied content.'**
+  String get markdownPlaygroundSelectionHint;
+
+  /// No description provided for @markdownPlaygroundEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Markdown to preview it.'**
+  String get markdownPlaygroundEmpty;
+
+  /// No description provided for @markdownPlaygroundProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Input {shown} / {total}'**
+  String markdownPlaygroundProgress(int shown, int total);
+
+  /// No description provided for @markdownCopyMarkdownAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Markdown'**
+  String get markdownCopyMarkdownAction;
+
+  /// No description provided for @markdownCopyCsvAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy CSV'**
+  String get markdownCopyCsvAction;
+
+  /// No description provided for @markdownCopyImageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy image'**
+  String get markdownCopyImageAction;
+
+  /// No description provided for @markdownCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get markdownCodeLabel;
+
+  /// No description provided for @markdownDetailsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get markdownDetailsLabel;
+
+  /// No description provided for @markdownMoreRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more rows'**
+  String markdownMoreRows(int count);
+
+  /// No description provided for @markdownNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get markdownNoteLabel;
+
+  /// No description provided for @markdownTipLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip'**
+  String get markdownTipLabel;
+
+  /// No description provided for @markdownImportantLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get markdownImportantLabel;
+
+  /// No description provided for @markdownWarningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get markdownWarningLabel;
+
+  /// No description provided for @markdownCautionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Caution'**
+  String get markdownCautionLabel;
+
+  /// No description provided for @markdownDangerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger'**
+  String get markdownDangerLabel;
+
+  /// No description provided for @markdownCopyRichTextAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy rich text'**
+  String get markdownCopyRichTextAction;
+
+  /// No description provided for @markdownCopySelectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the selected text.'**
+  String get markdownCopySelectionFailed;
+
+  /// No description provided for @recoveryMissingDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous data detected'**
+  String get recoveryMissingDataTitle;
+
+  /// No description provided for @recoveryMissingDataBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.'**
+  String get recoveryMissingDataBody;
+
+  /// No description provided for @recoveryEmptyDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current chat history is empty'**
+  String get recoveryEmptyDataTitle;
+
+  /// No description provided for @recoveryEmptyDataBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.'**
+  String get recoveryEmptyDataBody;
+
+  /// No description provided for @recoveryKeepCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current data and continue'**
+  String get recoveryKeepCurrent;
+
+  /// No description provided for @recoveryKeepCurrentConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with the current empty database? Previous copies will remain available for recovery later.'**
+  String get recoveryKeepCurrentConfirm;
+
+  /// No description provided for @recoverySearchingCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding and validating local data copies…'**
+  String get recoverySearchingCopies;
+
+  /// No description provided for @recoveryFoundCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Found {count} validated copies. Choose one to recover your chats and settings. The original files will be kept.'**
+  String recoveryFoundCopies(int count);
+
+  /// No description provided for @recoveryInvalidCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: validation failed. The original file has been kept.'**
+  String recoveryInvalidCopy(String name);
+
+  /// No description provided for @recoverySearchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some data locations could not be read. Your files have been kept; export a data copy before trying other recovery actions.'**
+  String get recoverySearchFailed;
+
+  /// No description provided for @recoveryDiscoveredCopyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.'**
+  String get recoveryDiscoveredCopyBody;
+
+  /// No description provided for @recoveryStorageFailureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data storage needs attention'**
+  String get recoveryStorageFailureTitle;
+
+  /// No description provided for @recoveryStorageFailureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.'**
+  String get recoveryStorageFailureBody;
+
+  /// No description provided for @recoveryProtectingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protecting the chat database'**
+  String get recoveryProtectingTitle;
+
+  /// No description provided for @recoveryProtectingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.'**
+  String get recoveryProtectingData;
+
+  /// No description provided for @recoveryStorageReadyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat database moved to internal storage'**
+  String get recoveryStorageReadyTitle;
+
+  /// No description provided for @recoveryStorageReadyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.'**
+  String get recoveryStorageReadyBody;
+
+  /// No description provided for @recoveryRetainedData.
+  ///
+  /// In en, this message translates to:
+  /// **'Retained original data'**
+  String get recoveryRetainedData;
+
+  /// No description provided for @recoveryNoValidCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.'**
+  String get recoveryNoValidCopies;
+
+  /// No description provided for @recoveryStorageInsufficientSpaceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.'**
+  String get recoveryStorageInsufficientSpaceBody;
+
+  /// No description provided for @migrationFreshStartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh start is ready'**
+  String get migrationFreshStartTitle;
+
+  /// No description provided for @migrationFreshStartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A new empty database is ready, and your previous data has been retained. Restart the app to continue.'**
+  String get migrationFreshStartSubtitle;
+
+  /// No description provided for @migrationFreshStartFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh start could not be completed'**
+  String get migrationFreshStartFailedTitle;
+
+  /// No description provided for @migrationFreshStartFailedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your previous data has been retained. Retry starting fresh, or close and reopen the app.'**
+  String get migrationFreshStartFailedSubtitle;
+
+  /// No description provided for @imageExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing image…'**
+  String get imageExportPreparing;
+
+  /// No description provided for @imageExportDiagrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing diagrams {completed}/{total}…'**
+  String imageExportDiagrams(int completed, int total);
+
+  /// No description provided for @imageExportCapturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Capturing image {completed}/{total}…'**
+  String imageExportCapturing(int completed, int total);
+
+  /// No description provided for @imageExportProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Combining image and preparing preview…'**
+  String get imageExportProcessing;
+
+  /// No description provided for @imageExportSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving image…'**
+  String get imageExportSaving;
+
+  /// No description provided for @backupEncryptionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt backups'**
+  String get backupEncryptionTitle;
+
+  /// No description provided for @backupEncryptionOffHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unencrypted backups can be read by anyone with the file.'**
+  String get backupEncryptionOffHint;
+
+  /// No description provided for @backupEncryptionOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups are encrypted while this page stays open.'**
+  String get backupEncryptionOnHint;
+
+  /// No description provided for @backupEncryptionPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.'**
+  String get backupEncryptionPasswordHint;
+
+  /// No description provided for @backupEncryptionPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get backupEncryptionPassword;
+
+  /// No description provided for @backupEncryptionConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get backupEncryptionConfirmPassword;
+
+  /// No description provided for @backupEncryptionMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match.'**
+  String get backupEncryptionMismatch;
+
+  /// No description provided for @backupEncryptionShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get backupEncryptionShowPassword;
+
+  /// No description provided for @backupEncryptionHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get backupEncryptionHidePassword;
+
+  /// No description provided for @backupEncryptionUnlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted backup'**
+  String get backupEncryptionUnlockTitle;
+
+  /// No description provided for @backupEncryptionUnlockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the password used to create this backup.'**
+  String get backupEncryptionUnlockHint;
+
+  /// No description provided for @backupEncryptionUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get backupEncryptionUnlock;
+
+  /// No description provided for @backupEncryptionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The password is incorrect, or the backup is damaged. Try again or cancel.'**
+  String get backupEncryptionFailed;
+
+  /// No description provided for @backupEncryptionInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The encrypted backup is incomplete or invalid.'**
+  String get backupEncryptionInvalid;
+
+  /// No description provided for @backupEncryptionUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This encrypted backup requires a newer version of Kelivo.'**
+  String get backupEncryptionUnsupported;
+
+  /// No description provided for @backupProgressEncrypting.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypting backup'**
+  String get backupProgressEncrypting;
+
+  /// No description provided for @backupProgressDecrypting.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting backup'**
+  String get backupProgressDecrypting;
 
   /// No description provided for @browserTitle.
   ///

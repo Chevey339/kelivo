@@ -12,6 +12,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+// Exercise the Windows implementation resolved by flutter_inappwebview itself.
+// ignore: depend_on_referenced_packages
+import 'package:flutter_inappwebview_windows/flutter_inappwebview_windows.dart';
 
 const _androidDataUrl = 'data:text/html;charset=utf-8;base64,';
 
@@ -23,6 +26,7 @@ void main() {
   InAppWebViewPlatform? previousPlatform;
 
   setUp(() {
+    _CookieManager.cookies = [];
     previousPlatform = InAppWebViewPlatform.instance;
     platform = _BrowserPlatform();
     InAppWebViewPlatform.instance = platform;
@@ -48,6 +52,111 @@ void main() {
 
   const faviconPng =
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==';
+
+  test(
+    'Windows opens a page without the unsupported native find factory',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      platform.useWindowsFindFactory = true;
+      final engine = await NativeBrowserEngine.create(
+        tab: const BrowserTab(id: 'windows', url: 'https://example.com'),
+        settings: const BrowserSettings(),
+        onChanged: (_) {},
+        onDownload: (_, __) {},
+        onNewWindow: (_, __) async => false,
+        isAgentActive: () => false,
+      );
+      try {
+        final native = platform.views.single;
+        expect(native.params.findInteractionController, isNull);
+        await native.start('https://example.com');
+        await native.stop('https://example.com');
+        await engine.waitForLoad(const Duration(seconds: 1));
+        const query = 'a"b\\c\n';
+        await engine.find(query);
+        expect(
+          native.document.evaluations.last,
+          'window.find(${jsonEncode(query)}, false, false, true)',
+        );
+        await engine.findNext(false);
+        expect(
+          native.document.evaluations.last,
+          'window.find(${jsonEncode(query)}, false, true, true)',
+        );
+        await engine.clearFind();
+        final afterClear = native.document.evaluations.length;
+        await engine.findNext(true);
+        expect(native.document.evaluations.length, afterClear);
+      } finally {
+        await engine.dispose();
+      }
+    },
+  );
+
+  for (final doubleSequence in [false, true]) {
+    for (final sameUrl in [true, false]) {
+      test(
+        'same-document back/forward settles loading (same URL: $sameUrl, Float64: $doubleSequence)',
+        () async {
+          const url = 'https://history.example/spa';
+          final tab = await service.createTab(url: url);
+          await service.evaluateJavascript('1', tabId: tab.id);
+          final native = platform.views.single;
+          native.document.doubleHistoryNumbers = doubleSequence;
+          await native.start(url);
+          native.document.historyIndex = 1;
+          native.document.historyLength = 2;
+          await native.stop(url);
+          for (final forward in [false, true]) {
+            var loaded = false;
+            await (forward
+                ? service.forward(tabId: tab.id)
+                : service.back(tabId: tab.id));
+            final wait = service
+                .waitForLoad(tabId: tab.id, timeout: const Duration(seconds: 1))
+                .then((_) => loaded = true);
+            native.document.historyIndex = forward ? 1 : 0;
+            // KVO/list movement can precede the actual document's popstate event.
+            await native.history(sameUrl ? url : '$url#${forward ? 1 : 0}');
+            expect(loaded, isFalse);
+            native.document.historyTraversal++;
+            await native.document.handlers[browserHistoryHandlerName]!([]);
+            await wait;
+            expect(loaded, isTrue);
+            expect(service.requireTab(tab.id).isLoading, isFalse);
+          }
+        },
+      );
+    }
+  }
+  test(
+    'a different document history event still waits for native load-stop',
+    () async {
+      const url = 'https://history.example/previous';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      native.document.historyIndex = 1;
+      native.document.historyLength = 2;
+      await native.stop(url);
+      await service.back(tabId: tab.id);
+      var loaded = false;
+      final wait = service
+          .waitForLoad(tabId: tab.id)
+          .then((_) => loaded = true);
+      native.document.historyIndex = 0;
+      native.document.documentId = 'different-document';
+      native.document.historyTraversal++;
+      await native.start('https://history.example/new');
+      await native.document.handlers[browserHistoryHandlerName]!([]);
+      expect(loaded, isFalse);
+      await native.stop('https://history.example/new');
+      await wait;
+      expect(loaded, isTrue);
+    },
+  );
 
   test(
     'page commit refreshes forward availability before load completes',
@@ -123,6 +232,74 @@ void main() {
       },
     );
   }
+
+  test(
+    'same-document agent back does not time out or pause the session',
+    () async {
+      const url = 'https://history.example/spa';
+      final tab = await service.createTab(url: url, ownerSessionId: 'chat');
+      await service.updateSettings(
+        service.settings.copyWith(agentEnabled: true),
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      native.document.historyIndex = 1;
+      native.document.historyLength = 2;
+      await native.stop(url);
+      final issued = Completer<void>();
+      final action = service.runAgentAction(
+        sessionId: 'chat',
+        tabId: tab.id,
+        label: 'back',
+        action: () async {
+          await service.back(tabId: tab.id);
+          issued.complete();
+          await service.waitForLoad(
+            tabId: tab.id,
+            timeout: const Duration(seconds: 1),
+          );
+        },
+      );
+      await issued.future;
+      native.document.historyIndex = 0;
+      native.document.historyTraversal++;
+      await native.document.handlers[browserHistoryHandlerName]!([]);
+      await action;
+      expect(service.agentPaused, isFalse);
+    },
+  );
+
+  test(
+    'late same-document acknowledgement cannot finish a newer navigation',
+    () async {
+      const url = 'https://history.example/spa';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      native.document.historyIndex = 1;
+      native.document.historyLength = 2;
+      await native.stop(url);
+      await service.back(tabId: tab.id);
+      native.document.historyIndex = 0;
+      final read = native.document.historyDocumentRead = Completer<Object?>();
+      final callback = native.document.handlers[browserHistoryHandlerName]!([]);
+      await Future<void>.delayed(Duration.zero);
+      await service.navigate('https://next.example', tabId: tab.id);
+      var loaded = false;
+      final waiting = service
+          .waitForLoad(tabId: tab.id)
+          .then((_) => loaded = true);
+      read.complete({'id': native.document.documentId, 'traversal': 1});
+      await callback;
+      expect(loaded, isFalse);
+      native.document.historyDocumentRead = null;
+      await native.start('https://next.example');
+      await native.stop('https://next.example');
+      await waiting;
+    },
+  );
 
   test(
     'rejected stale load-stop does not suppress a valid history response',
@@ -594,6 +771,46 @@ void main() {
   });
 
   test(
+    'download headers exclude cross-host, insecure and wrong-path credentials',
+    () async {
+      final engine = await NativeBrowserEngine.create(
+        tab: const BrowserTab(id: 'cookies'),
+        settings: const BrowserSettings(),
+        onChanged: (_) {},
+        onDownload: (_, __) {},
+        onNewWindow: (_, __) async => false,
+        isAgentActive: () => false,
+      );
+      try {
+        _CookieManager.cookies = [
+          Cookie(
+            name: 'session',
+            value: 'fake-token',
+            domain: 'example.com',
+            path: '/account',
+            isSecure: true,
+          ),
+        ];
+        expect(
+          (await engine.downloadHeaders(
+            'https://example.com/account/file',
+          ))['Cookie'],
+          'session=fake-token',
+        );
+        for (final destination in [
+          'https://evilexample.com/account/file',
+          'http://example.com/account/file',
+          'https://example.com/file',
+        ]) {
+          expect((await engine.downloadHeaders(destination))['Cookie'], isNull);
+        }
+      } finally {
+        await engine.dispose();
+      }
+    },
+  );
+
+  test(
     'tab thumbnails are small JPEGs while agent screenshots retain their PNG contract',
     () async {
       final engine = await NativeBrowserEngine.create(
@@ -608,7 +825,20 @@ void main() {
         await engine.thumbnail();
         await engine.screenshot();
         final configurations = platform.views.single.document.screenshots;
-        expect(configurations[0]!.snapshotWidth, 440);
+        final dpr = WidgetsBinding
+            .instance
+            .platformDispatcher
+            .views
+            .first
+            .devicePixelRatio;
+        // Native screenshot dimensions use logical pixels on these platforms.
+        expect(
+          configurations[0]!.snapshotWidth! *
+              (Platform.isAndroid || Platform.isIOS || Platform.isMacOS
+                  ? dpr
+                  : 1),
+          440,
+        );
         expect(configurations[0]!.compressFormat, CompressFormat.JPEG);
         expect(configurations[0]!.quality, 70);
         expect(configurations[0]!.afterScreenUpdates, isFalse);
@@ -1281,6 +1511,7 @@ class _MemoryStore extends BrowserStore {
 }
 
 class _BrowserPlatform extends InAppWebViewPlatform {
+  bool useWindowsFindFactory = false;
   final List<_HeadlessView> views = [];
   final Map<Object, _Document> documents = {};
   final List<_WidgetView> widgets = [];
@@ -1314,7 +1545,11 @@ class _BrowserPlatform extends InAppWebViewPlatform {
   @override
   PlatformFindInteractionController createPlatformFindInteractionController(
     PlatformFindInteractionControllerCreationParams params,
-  ) => _FindController(params);
+  ) => useWindowsFindFactory
+      ? WindowsInAppWebViewPlatform().createPlatformFindInteractionController(
+          params,
+        )
+      : _FindController(params);
 
   @override
   PlatformInAppWebViewController createPlatformInAppWebViewController(
@@ -1371,6 +1606,9 @@ class _WidgetView extends PlatformInAppWebViewWidget {
 }
 
 class _Document {
+  int historyTraversal = 0;
+  bool doubleHistoryNumbers = false;
+  Completer<Object?>? historyDocumentRead;
   String userAgent = 'Default/1';
   final List<InAppWebViewSettings> appliedSettings = [];
   int reloads = 0;
@@ -1591,6 +1829,17 @@ class _Controller extends PlatformInAppWebViewController {
     document.evaluations.add(source);
     if (source == 'navigator.userAgent') return document.userAgent;
     if (source == browserScrollIdentityScript) return document.documentId;
+    if (source == browserHistoryDocumentScript) {
+      if (document.historyDocumentRead != null) {
+        return document.historyDocumentRead!.future;
+      }
+      return {
+        'id': document.documentId,
+        'traversal': document.doubleHistoryNumbers
+            ? document.historyTraversal.toDouble()
+            : document.historyTraversal,
+      };
+    }
     return source == 'document.readyState' ? document.readiness : 1;
   }
 
@@ -1619,13 +1868,14 @@ class _Controller extends PlatformInAppWebViewController {
 }
 
 class _CookieManager extends PlatformCookieManager {
+  static List<Cookie> cookies = [];
   _CookieManager(super.params) : super.implementation();
   @override
   Future<List<Cookie>> getCookies({
     required WebUri url,
     PlatformInAppWebViewController? iosBelow11WebViewController,
     PlatformInAppWebViewController? webViewController,
-  }) async => [];
+  }) async => cookies;
 }
 
 class _FindController extends PlatformFindInteractionController {

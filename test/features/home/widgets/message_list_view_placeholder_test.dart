@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -118,7 +119,10 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(MessageListView.windowSkeletonKey), findsNothing);
-    expect(find.text('loaded message content'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('loaded message content', exact: true),
+      hasLength(1),
+    );
   });
 
   testWidgets('快路径命中已有消息时不显示骨架', (tester) async {
@@ -131,7 +135,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 60));
       expect(find.byKey(MessageListView.windowSkeletonKey), findsNothing);
     }
-    expect(find.text('loaded message content'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('loaded message content', exact: true),
+      hasLength(1),
+    );
   });
 }
 

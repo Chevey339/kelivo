@@ -1697,7 +1697,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryExportFailed => '无法导出数据副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+  String get startupRecoveryRepairFailed =>
+      '修复未能完成。数据已保留，可以选择通过校验的副本恢复，或导出数据进一步排查。';
 
   @override
   String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
@@ -1707,7 +1708,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '开始使用新的空数据库？当前数据库及其日志文件、已有副本都会保留，供之后恢复。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -1819,10 +1820,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+      '重新开始后，当前数据将不再显示。Kelivo 会保留旧数据库和已有副本以供恢复，建议先导出一份数据副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+  String get startupRecoveryResetAcknowledge => '我确认开始使用新的空数据库。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
@@ -6037,6 +6038,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'Ollama 网络搜索 API。为模型补充最新信息，减少幻觉并提升准确性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方网页搜索与抓取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription => '适合开发者和企业用于 AI 搜索应用。支持多语言与多模态。';
 
   @override
@@ -6071,6 +6076,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -7272,7 +7280,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -12466,6 +12481,251 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpOAuthExchangingToken => '正在完成登录…';
 
   @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 源码';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染预览';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 语法树';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字输入';
+
+  @override
+  String get markdownPlaygroundPause => '暂停';
+
+  @override
+  String get markdownPlaygroundResume => '继续';
+
+  @override
+  String get markdownPlaygroundShowAll => '显示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '预览宽度';
+
+  @override
+  String get markdownPlaygroundTheme => '预览主题';
+
+  @override
+  String get markdownPlaygroundPlain => '选区纯文本';
+
+  @override
+  String get markdownPlaygroundMarkdown => '选区 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在预览中选择文本，查看复制结果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '输入 Markdown 开始预览。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已输入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
+
+  @override
+  String get recoveryMissingDataTitle => '检测到已有数据';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '当前数据库缺失，但设备上仍有旧数据。Kelivo 已暂停启动，没有新建空数据库，并保留现有文件和副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '当前聊天记录为空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '当前数据库没有对话，但发现了历史副本。Kelivo 已暂停启动，你可以恢复副本，也可以明确选择保留当前数据。应用不会自动覆盖数据。';
+
+  @override
+  String get recoveryKeepCurrent => '保留当前数据并继续';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '继续使用当前空数据库？历史副本仍会保留，可以稍后恢复。';
+
+  @override
+  String get recoverySearchingCopies => '正在查找并校验本机数据副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通过校验的副本。可以选择恢复聊天与设置，原文件会保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：校验未通过，原文件已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分数据位置无法读取。现有文件已保留，请先导出数据副本再尝试其他恢复操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原存储目录或其他位置发现的副本。原文件会保留，恢复前会进行完整校验。';
+
+  @override
+  String get recoveryStorageFailureTitle => '数据存储需要检查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原数据';
+
+  @override
+  String get recoveryNoValidCopies => '找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
+
+  @override
   String get browserTitle => '浏览器';
 
   @override
@@ -14666,7 +14926,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryExportFailed => '无法导出数据副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+  String get startupRecoveryRepairFailed =>
+      '修复未能完成。数据已保留，可以选择通过校验的副本恢复，或导出数据进一步排查。';
 
   @override
   String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
@@ -14676,7 +14937,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '开始使用新的空数据库？当前数据库及其日志文件、已有副本都会保留，供之后恢复。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -14788,10 +15049,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+      '重新开始后，当前数据将不再显示。Kelivo 会保留旧数据库和已有副本以供恢复，建议先导出一份数据副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+  String get startupRecoveryResetAcknowledge => '我确认开始使用新的空数据库。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
@@ -18932,6 +19193,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Ollama 网络搜索 API。为模型补充最新信息，减少幻觉并提升准确性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方网页搜索与抓取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription => '适合开发者和企业用于 AI 搜索应用。支持多语言与多模态。';
 
   @override
@@ -18966,6 +19231,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -20167,7 +20435,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -25361,6 +25636,251 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpOAuthExchangingToken => '正在完成登录…';
 
   @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 源码';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染预览';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 语法树';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字输入';
+
+  @override
+  String get markdownPlaygroundPause => '暂停';
+
+  @override
+  String get markdownPlaygroundResume => '继续';
+
+  @override
+  String get markdownPlaygroundShowAll => '显示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '预览宽度';
+
+  @override
+  String get markdownPlaygroundTheme => '预览主题';
+
+  @override
+  String get markdownPlaygroundPlain => '选区纯文本';
+
+  @override
+  String get markdownPlaygroundMarkdown => '选区 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在预览中选择文本，查看复制结果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '输入 Markdown 开始预览。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已输入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
+
+  @override
+  String get recoveryMissingDataTitle => '检测到已有数据';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '当前数据库缺失，但设备上仍有旧数据。Kelivo 已暂停启动，没有新建空数据库，并保留现有文件和副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '当前聊天记录为空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '当前数据库没有对话，但发现了历史副本。Kelivo 已暂停启动，你可以恢复副本，也可以明确选择保留当前数据。应用不会自动覆盖数据。';
+
+  @override
+  String get recoveryKeepCurrent => '保留当前数据并继续';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '继续使用当前空数据库？历史副本仍会保留，可以稍后恢复。';
+
+  @override
+  String get recoverySearchingCopies => '正在查找并校验本机数据副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通过校验的副本。可以选择恢复聊天与设置，原文件会保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：校验未通过，原文件已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分数据位置无法读取。现有文件已保留，请先导出数据副本再尝试其他恢复操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原存储目录或其他位置发现的副本。原文件会保留，恢复前会进行完整校验。';
+
+  @override
+  String get recoveryStorageFailureTitle => '数据存储需要检查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原数据';
+
+  @override
+  String get recoveryNoValidCopies => '找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
+
+  @override
   String get browserTitle => '浏览器';
 
   @override
@@ -27562,7 +28082,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryExportFailed => '無法匯出資料副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修復未能解決問題。請先匯出資料副本，然後重設。';
+  String get startupRecoveryRepairFailed =>
+      '修復未能完成。資料已保留，可選擇通過驗證的副本還原，或匯出資料進一步檢查。';
 
   @override
   String get startupRecoveryResetFailed => '重設失敗。請完全關閉 Kelivo 後再重新開啟。';
@@ -27572,7 +28093,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。';
+      '開始使用新的空資料庫？目前資料庫及其日誌檔案、既有副本都會保留，以供日後還原。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重設並重新啟動';
@@ -27684,10 +28205,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。';
+      '重新開始後，目前資料將不再顯示。Kelivo 會保留舊資料庫與既有副本以供還原，建議先匯出一份資料副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已匯出副本，或不需要這些資料。';
+  String get startupRecoveryResetAcknowledge => '我確認開始使用新的空資料庫。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
@@ -31900,6 +32421,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Ollama 網路搜尋 API。為模型補充最新資訊，降低幻覺並提升準確性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方網頁搜尋與擷取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription =>
       'AI 搜尋基礎設施：提供 Embeddings、重排序、Web Reader、DeepSearch 與小語言模型。支援多語言與多模態。';
 
@@ -31935,6 +32460,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -33137,7 +33665,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+      '此限制僅適用於未選擇全量注入的類型。某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入類型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多選。選中類型會注入全域及目前助手的全部有效記憶，不受條數限制，會增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -38333,6 +38868,252 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登入…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 原始碼';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染預覽';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 語法樹';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字輸入';
+
+  @override
+  String get markdownPlaygroundPause => '暫停';
+
+  @override
+  String get markdownPlaygroundResume => '繼續';
+
+  @override
+  String get markdownPlaygroundShowAll => '顯示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '預覽寬度';
+
+  @override
+  String get markdownPlaygroundTheme => '預覽主題';
+
+  @override
+  String get markdownPlaygroundPlain => '選取範圍純文字';
+
+  @override
+  String get markdownPlaygroundMarkdown => '選取範圍 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在預覽中選取文字，檢視複製結果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '輸入 Markdown 開始預覽。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已輸入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '複製為 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '複製 CSV';
+
+  @override
+  String get markdownCopyImageAction => '複製圖片';
+
+  @override
+  String get markdownCodeLabel => '程式碼';
+
+  @override
+  String get markdownDetailsLabel => '詳情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再顯示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '備註';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危險';
+
+  @override
+  String get markdownCopyRichTextAction => '複製富文字';
+
+  @override
+  String get markdownCopySelectionFailed => '複製所選內容失敗。';
+
+  @override
+  String get recoveryMissingDataTitle => '偵測到既有資料';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '目前資料庫遺失，但裝置上仍有舊資料。Kelivo 已暫停啟動，沒有建立空資料庫，並保留現有檔案與副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '目前聊天記錄為空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '目前資料庫沒有對話，但發現了歷史副本。Kelivo 已暫停啟動，你可以還原副本，也可以明確選擇保留目前資料。應用程式不會自動覆寫資料。';
+
+  @override
+  String get recoveryKeepCurrent => '保留目前資料並繼續';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '繼續使用目前的空資料庫？歷史副本仍會保留，可稍後還原。';
+
+  @override
+  String get recoverySearchingCopies => '正在尋找並驗證本機資料副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通過驗證的副本。可選擇還原聊天與設定，原始檔案會保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：驗證未通過，原始檔案已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分資料位置無法讀取。現有檔案已保留，請先匯出資料副本再嘗試其他還原操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原儲存目錄或其他位置發現的副本。原始檔案會保留，還原前會進行完整驗證。';
+
+  @override
+  String get recoveryStorageFailureTitle => '資料儲存需要檢查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保護聊天資料庫';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在複製並驗證資料庫。圖片、附件和快照留在 Documents，不會重複複製；原資料庫也會保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天資料庫已轉存至 App 內部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原資料';
+
+  @override
+  String get recoveryNoValidCopies => '找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新開始';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      '已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新開始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '舊資料已保留。請重試重新開始，或關閉並重新開啟 App。';
+
+  @override
+  String get imageExportPreparing => '正在準備圖片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在準備圖表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在擷取圖片 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成圖片並準備預覽…';
+
+  @override
+  String get imageExportSaving => '正在儲存圖片…';
+
+  @override
+  String get backupEncryptionTitle => '加密備份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的備份可被直接讀取。';
+
+  @override
+  String get backupEncryptionOnHint => '目前頁面內的備份均會加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '確認口令';
+
+  @override
+  String get backupEncryptionMismatch => '兩次輸入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '顯示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隱藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密備份';
+
+  @override
+  String get backupEncryptionUnlockHint => '請輸入建立這份備份時使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解鎖';
+
+  @override
+  String get backupEncryptionFailed => '口令錯誤或備份已損壞，請重試或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密備份不完整或格式無效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密備份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密備份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密備份';
 
   @override
   String get browserTitle => '瀏覽器';

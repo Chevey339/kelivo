@@ -2,6 +2,7 @@ import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
@@ -1221,6 +1222,79 @@ void main() {
 
         chatScrollController.dispose();
         scrollController.dispose();
+      },
+    );
+
+    testWidgets(
+      'theme visibility changes cancel indexed scrolling without blocking input',
+      (tester) async {
+        final messages = [
+          for (var i = 0; i < 40; i++)
+            _NavMessage(
+              id: 'message-$i',
+              role: i % 5 == 0 ? 'user' : 'assistant',
+            ),
+        ];
+        final scroll = ChatAutoFollowScrollController();
+        final chat = ChatScrollController(
+          scrollController: scroll,
+          onStateChanged: () {},
+          getAutoScrollEnabled: () => false,
+          getAutoScrollIdleSeconds: () => 8,
+        );
+        final visible = ValueNotifier(true);
+        var taps = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ValueListenableBuilder<bool>(
+              valueListenable: visible,
+              builder: (_, enabled, _) => TickerMode(
+                enabled: enabled,
+                child: VisibleRouteTheme(
+                  child: SuperListView.builder(
+                    controller: scroll,
+                    listController: chat.messageListController,
+                    itemCount: messages.length,
+                    itemBuilder: (_, index) => SizedBox(
+                      height: 80,
+                      child: TextButton(
+                        onPressed: () => taps++,
+                        child: Text(messages[index].id),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final enabled in [false, true]) {
+          scroll.jumpTo(1500);
+          final navigation = chat.jumpToPreviousQuestion(
+            messages: messages,
+            indexOfId: (id) => messages.indexWhere((m) => m.id == id),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 50));
+          expect(scroll.position.isScrollingNotifier.value, isTrue);
+          visible.value = enabled;
+          await tester.pumpAndSettle();
+          await navigation;
+          expect(scroll.position.isScrollingNotifier.value, isFalse);
+        }
+        await tester.tap(find.byType(TextButton).hitTestable().first);
+        await tester.pumpAndSettle();
+        expect(taps, 1);
+        final beforeDrag = scroll.offset;
+        await tester.drag(find.byType(SuperListView), const Offset(0, -160));
+        await tester.pumpAndSettle();
+        expect(scroll.offset, greaterThan(beforeDrag));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        chat.dispose();
+        scroll.dispose();
+        visible.dispose();
       },
     );
 

@@ -166,7 +166,8 @@ class _LocalSnapshotsPageState extends State<LocalSnapshotsPage> {
                   onRestore: () => _restore(context, vm, copy),
                   onExport: () => _export(context, vm, copy),
                   onDelete: () => _delete(context, vm, copy),
-                  onTogglePin: copy.kind == LocalCopyKind.snapshot
+                  onTogglePin:
+                      copy.kind == LocalCopyKind.snapshot && !copy.discovered
                       ? () => vm.setPinned(copy, !copy.pinned)
                       : null,
                 ),
@@ -648,6 +649,14 @@ class _CopyCard extends StatelessWidget {
                   color: cs.onSurface.withValues(alpha: 0.6),
                 ),
               ),
+              if (copy.discovered) ...[
+                const SizedBox(height: 8),
+                Text(l10n.recoveryDiscoveredCopyBody),
+                Text(
+                  copy.file.path,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 2),
               Text(
                 conversations == null || messages == null
@@ -678,16 +687,17 @@ class _CopyCard extends StatelessWidget {
                       onTap: onExport,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IosTileButton(
-                      icon: Lucide.Trash2,
-                      label: l10n.localSnapshotActionDelete,
-                      fontSize: 13,
-                      backgroundColor: cs.error,
-                      onTap: onDelete,
+                  if (!copy.discovered) const SizedBox(width: 8),
+                  if (!copy.discovered)
+                    Expanded(
+                      child: IosTileButton(
+                        icon: Lucide.Trash2,
+                        label: l10n.localSnapshotActionDelete,
+                        fontSize: 13,
+                        backgroundColor: cs.error,
+                        onTap: onDelete,
+                      ),
                     ),
-                  ),
                 ],
               ),
               if (onTogglePin != null)

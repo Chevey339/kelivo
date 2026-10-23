@@ -211,6 +211,8 @@ class _DelayedComposerDrafts extends ChangeNotifier
   @override
   ComposerDraft? peek(String id) => entries[id];
   @override
+  int inputEpoch(String id, {required String? editMessageId}) => 0;
+  @override
   void setInput(String id, ComposerDraftInput input) {
     entries[id]!.compose = input;
   }

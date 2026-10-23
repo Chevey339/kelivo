@@ -4,7 +4,8 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/diagram_exporter.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/widgets/mermaid_bridge.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,15 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  test('diagram extraction respects container indentation and info words', () {
+    expect(
+      extractDiagramCodes(
+        '> ~~~mermaid title\n> graph TD; A-->B\n> ~~~\n\n- ```svg caption\n  <svg/>\n  ```',
+      ),
+      [(code: 'graph TD; A-->B', isSvg: false), (code: '<svg/>', isSvg: true)],
+    );
+  });
+
   test('extracts Mermaid, SVG and XML SVG while respecting outer fences', () {
     const markdown = '''
 ```mermaid
@@ -140,7 +150,7 @@ graph TD; A-->B
           showExport.value = true;
           await tester.pumpAndSettle();
           expect(find.byType(Image), findsOneWidget);
-          expect(find.byType(SelectableHighlightView), findsNothing);
+          expect(find.byType(MarkstreamCodeContent), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );

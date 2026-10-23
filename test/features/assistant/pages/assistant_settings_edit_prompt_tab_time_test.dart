@@ -215,7 +215,7 @@ void main() {
   setUpAll(() async {
     if (Platform.environment['KELIVO_TIME_SCREENSHOTS'] == null) return;
     final bytes = await File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytes();
     await (FontLoader(
       'PromptTimePreview',

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:uuid/uuid.dart';
 
@@ -391,24 +390,17 @@ class BrowserToolsService {
             tabId: tabId,
           ),
         );
-        data['screenshot_coordinates'] = {
-          'viewport': viewport,
-          if (bytes.length >= 24 && bytes[0] == 137 && bytes[1] == 80)
-            'image': {
-              'width': ByteData.sublistView(bytes).getUint32(16),
-              'height': ByteData.sublistView(bytes).getUint32(20),
-            },
-          'units':
-              'Actions use viewport CSS pixels. Scale screenshot coordinates by viewport.width / image.width.',
-        };
-        final saved = await McpImageSnapshot.save(
-          'image/png',
-          base64Encode(bytes),
-        );
+        final saved = await McpImageSnapshot.saveBytes(bytes);
         if (saved == null) {
           data['screenshot_error'] = 'Could not save screenshot.';
         } else {
-          images.add(saved);
+          data['screenshot_coordinates'] = {
+            'viewport': viewport,
+            'image': {'width': saved.width, 'height': saved.height},
+            'units':
+                'Actions use viewport CSS pixels. Scale screenshot coordinates by viewport.width / image.width.',
+          };
+          images.add(saved.uri);
         }
       }
     }

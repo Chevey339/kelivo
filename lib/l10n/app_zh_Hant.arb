@@ -585,10 +585,10 @@
   "startupRecoveryBusy": "處理中…",
   "startupRecoveryExportSucceeded": "已儲存一份資料副本。",
   "startupRecoveryExportFailed": "無法匯出資料副本。",
-  "startupRecoveryRepairFailed": "修復未能解決問題。請先匯出資料副本，然後重設。",
+  "startupRecoveryRepairFailed": "修復未能完成。資料已保留，可選擇通過驗證的副本還原，或匯出資料進一步檢查。",
   "startupRecoveryResetFailed": "重設失敗。請完全關閉 Kelivo 後再重新開啟。",
   "startupRecoveryResetDialogTitle": "重設全部資料？",
-  "startupRecoveryResetDialogContent": "這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。",
+  "startupRecoveryResetDialogContent": "開始使用新的空資料庫？目前資料庫及其日誌檔案、既有副本都會保留，以供日後還原。",
   "startupRecoveryResetDialogConfirm": "重設並重新啟動",
   "startupRecoveryResetDialogCancel": "取消",
   "startupRecoveryWhatFailed": "失敗原因",
@@ -621,8 +621,8 @@
   "startupRecoveryIntegrityMissing": "資料目錄中找不到資料庫檔案。",
   "startupRecoveryIntegrityFailed": "完整性檢查無法執行。",
   "startupRecoveryDangerZone": "危險操作",
-  "startupRecoveryDangerBody": "重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。",
-  "startupRecoveryResetAcknowledge": "我已匯出副本，或不需要這些資料。",
+  "startupRecoveryDangerBody": "重新開始後，目前資料將不再顯示。Kelivo 會保留舊資料庫與既有副本以供還原，建議先匯出一份資料副本。",
+  "startupRecoveryResetAcknowledge": "我確認開始使用新的空資料庫。",
   "startupDatabaseUpdateRequiredTitle": "請更新 Kelivo 以繼續",
   "startupDatabaseUpdateRequiredContent": "本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。",
   "startupDatabaseUpdateRequiredDowngradeTitle": "若要改用舊版",
@@ -2165,6 +2165,7 @@
   "searchProviderTavilyDescription": "為大型語言模型（LLM）優化的 AI 搜尋 API，提供高品質、相關的搜尋結果。",
   "searchProviderZhipuDescription": "智譜 AI 旗下中文 AI 搜尋服務，針對中文內容與查詢進行優化。",
   "searchProviderOllamaDescription": "Ollama 網路搜尋 API。為模型補充最新資訊，降低幻覺並提升準確性。",
+  "searchProviderDeepSeekDescription": "DeepSeek 官方網頁搜尋與擷取 API，使用 DeepSeek API Key。",
   "searchProviderJinaDescription": "AI 搜尋基礎設施：提供 Embeddings、重排序、Web Reader、DeepSearch 與小語言模型。支援多語言與多模態。",
   "searchServiceNameBingLocal": "Bing（本機）",
   "searchServiceNameDuckDuckGo": "DuckDuckGo",
@@ -2177,6 +2178,7 @@
   "searchServiceNameBrave": "Brave 搜尋",
   "searchServiceNameMetaso": "Metaso（秘塔）",
   "searchServiceNameOllama": "Ollama",
+  "searchServiceNameDeepSeek": "DeepSeek",
   "searchServiceNameJina": "Jina",
   "searchServiceNamePerplexity": "Perplexity",
   "searchProviderPerplexityDescription": "Perplexity 搜尋 API。提供排序的網頁結果，支援地區與網域過濾。",
@@ -2663,7 +2665,9 @@
   "memorySettingsThinkingSubtitle": "在模型支援時允許記憶模型使用推理",
   "memorySettingsInjectionSection": "記憶注入",
   "memorySettingsInjectionMaxItemsTitle": "每類注入條數",
-  "memorySettingsInjectionMaxItemsSubtitle": "某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。",
+  "memorySettingsInjectionMaxItemsSubtitle": "此限制僅適用於未選擇全量注入的類型。某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。",
+  "memorySettingsFullInjectionTypesTitle": "全量注入類型",
+  "memorySettingsFullInjectionTypesSubtitle": "可多選。選中類型會注入全域及目前助手的全部有效記憶，不受條數限制，會增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
@@ -4571,6 +4575,115 @@
   "mcpOAuthRegistering": "正在準備授權…",
   "mcpOAuthWaitingBrowser": "等待瀏覽器授權…",
   "mcpOAuthExchangingToken": "正在完成登入…",
+  "markdownPlaygroundTitle": "Markdown Playground",
+  "markdownPlaygroundSource": "Markdown 原始碼",
+  "markdownPlaygroundPreview": "渲染預覽",
+  "markdownPlaygroundAst": "AST 語法樹",
+  "markdownPlaygroundPlay": "逐字輸入",
+  "markdownPlaygroundPause": "暫停",
+  "markdownPlaygroundResume": "繼續",
+  "markdownPlaygroundShowAll": "顯示全文",
+  "markdownPlaygroundWidth": "預覽寬度",
+  "markdownPlaygroundTheme": "預覽主題",
+  "markdownPlaygroundPlain": "選取範圍純文字",
+  "markdownPlaygroundMarkdown": "選取範圍 Markdown",
+  "markdownPlaygroundSelectionHint": "在預覽中選取文字，檢視複製結果。",
+  "markdownPlaygroundEmpty": "輸入 Markdown 開始預覽。",
+  "markdownPlaygroundProgress": "已輸入 {shown} / {total}",
+  "markdownCopyMarkdownAction": "複製為 Markdown",
+  "markdownCopyCsvAction": "複製 CSV",
+  "markdownCopyImageAction": "複製圖片",
+  "markdownCodeLabel": "程式碼",
+  "markdownDetailsLabel": "詳情",
+  "markdownMoreRows": "再顯示 {count} 行",
+  "markdownNoteLabel": "備註",
+  "markdownTipLabel": "提示",
+  "markdownImportantLabel": "重要",
+  "markdownWarningLabel": "警告",
+  "markdownCautionLabel": "注意",
+  "markdownDangerLabel": "危險",
+  "markdownCopyRichTextAction": "複製富文字",
+  "markdownCopySelectionFailed": "複製所選內容失敗。",
+  "recoveryMissingDataTitle": "偵測到既有資料",
+  "recoveryMissingDataBody": "目前資料庫遺失，但裝置上仍有舊資料。Kelivo 已暫停啟動，沒有建立空資料庫，並保留現有檔案與副本。",
+  "recoveryEmptyDataTitle": "目前聊天記錄為空",
+  "recoveryEmptyDataBody": "目前資料庫沒有對話，但發現了歷史副本。Kelivo 已暫停啟動，你可以還原副本，也可以明確選擇保留目前資料。應用程式不會自動覆寫資料。",
+  "recoveryKeepCurrent": "保留目前資料並繼續",
+  "recoveryKeepCurrentConfirm": "繼續使用目前的空資料庫？歷史副本仍會保留，可稍後還原。",
+  "recoverySearchingCopies": "正在尋找並驗證本機資料副本…",
+  "recoveryFoundCopies": "找到 {count} 份通過驗證的副本。可選擇還原聊天與設定，原始檔案會保留。",
+  "@recoveryFoundCopies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryInvalidCopy": "{name}：驗證未通過，原始檔案已保留。",
+  "@recoveryInvalidCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverySearchFailed": "部分資料位置無法讀取。現有檔案已保留，請先匯出資料副本再嘗試其他還原操作。",
+  "recoveryDiscoveredCopyBody": "在原儲存目錄或其他位置發現的副本。原始檔案會保留，還原前會進行完整驗證。",
+  "recoveryStorageFailureTitle": "資料儲存需要檢查",
+  "recoveryStorageFailureBody": "Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。",
+  "recoveryProtectingTitle": "正在保護聊天資料庫",
+  "recoveryProtectingData": "正在複製並驗證資料庫。圖片、附件和快照留在 Documents，不會重複複製；原資料庫也會保留。",
+  "recoveryStorageReadyTitle": "聊天資料庫已轉存至 App 內部",
+  "recoveryStorageReadyBody": "存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。",
+  "recoveryRetainedData": "保留的原資料",
+  "recoveryNoValidCopies": "找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。",
+  "recoveryStorageInsufficientSpaceBody": "剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。",
+  "migrationFreshStartTitle": "已重新開始",
+  "migrationFreshStartSubtitle": "已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。",
+  "migrationFreshStartFailedTitle": "重新開始未完成",
+  "migrationFreshStartFailedSubtitle": "舊資料已保留。請重試重新開始，或關閉並重新開啟 App。",
+  "imageExportPreparing": "正在準備圖片…",
+  "imageExportDiagrams": "正在準備圖表 {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "正在擷取圖片 {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "正在合成圖片並準備預覽…",
+  "imageExportSaving": "正在儲存圖片…",
+  "backupEncryptionTitle": "加密備份",
+  "backupEncryptionOffHint": "未加密的備份可被直接讀取。",
+  "backupEncryptionOnHint": "目前頁面內的備份均會加密。",
+  "backupEncryptionPasswordHint": "請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。",
+  "backupEncryptionPassword": "口令",
+  "backupEncryptionConfirmPassword": "確認口令",
+  "backupEncryptionMismatch": "兩次輸入的口令不一致。",
+  "backupEncryptionShowPassword": "顯示口令",
+  "backupEncryptionHidePassword": "隱藏口令",
+  "backupEncryptionUnlockTitle": "加密備份",
+  "backupEncryptionUnlockHint": "請輸入建立這份備份時使用的口令。",
+  "backupEncryptionUnlock": "解鎖",
+  "backupEncryptionFailed": "口令錯誤或備份已損壞，請重試或取消。",
+  "backupEncryptionInvalid": "加密備份不完整或格式無效。",
+  "backupEncryptionUnsupported": "此加密備份需要更新版本的 Kelivo。",
+  "backupProgressEncrypting": "正在加密備份",
+  "backupProgressDecrypting": "正在解密備份",
   "browserTitle": "瀏覽器",
   "browserSearchHint": "搜尋或輸入網址",
   "browserStartTitle": "下一站，去哪裡？",

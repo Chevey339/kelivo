@@ -4,6 +4,8 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/startup_failure_report.dart';
 import 'package:Kelivo/core/database/startup_recovery_service.dart';
+import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
+import 'package:Kelivo/core/services/backup/restore_diagnostic_exception.dart';
 import 'package:drift/isolate.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -116,6 +118,72 @@ void main() {
   });
 
   group('environment snapshot', () {
+    test(
+      'keeps captured restore context when adding the environment',
+      () async {
+        final context = {
+          'run id': 'run-one',
+          'last observed receipt state': 'prepared',
+        };
+        final report = StartupFailureReport.capture(
+          stage: StartupFailureStage.restoreGate,
+          error: RestoreFormatException('restore_staging_candidate_directory', {
+            'unexpected directory': 'upload/extra',
+          }),
+          capturedAt: DateTime.utc(2026, 10, 21, 0, 33),
+          restoreDetails: context,
+        );
+        context['run id'] = 'run-two';
+        final enriched = report.withEnvironment(
+          await StartupFailureEnvironment.collect(appDataDirectory: directory),
+        );
+        final text = enriched.toText();
+        expect(text, contains('captured UTC: 2026-10-21T00:33:00.000Z'));
+        expect(text, contains('run id: run-one'));
+        expect(text, isNot(contains('run-two')));
+        expect(text, contains('last observed receipt state: prepared'));
+        expect(text, contains('unexpected directory: upload/extra'));
+        expect(enriched.diagnosticCode, 'restore_staging_candidate_directory');
+      },
+    );
+
+    test('keeps Windows move evidence through a failed rollback', () {
+      const source = r'C:\data\workspaces';
+      const target =
+          r'C:\data\.kelivo_restore\run_test\previous.pending\workspaces';
+      final move = RestoreFileSystemException(
+        const FileSystemException(
+          'restore_durability_rename:32:$target',
+          source,
+        ),
+        const {
+          'operation': 'MoveFileExW',
+          'Windows error code': '32',
+          'source path': source,
+          'target path': target,
+        },
+      );
+      expect(restoreFailureDiagnosticCode(move), 'filesystem');
+      final report = StartupFailureReport.capture(
+        stage: StartupFailureStage.restoreGate,
+        error: RestoreCutoverRollbackException(
+          cutoverError: move,
+          cutoverStackTrace: StackTrace.fromString('original move stack'),
+          rollbackError: StateError('restore_mover_asset_position:workspaces'),
+          rollbackStackTrace: StackTrace.fromString('rollback stack'),
+        ),
+      );
+      expect(report.diagnosticCode, 'restore_cutover_rollback');
+      final text = report.toText();
+      expect(text, contains('operation: MoveFileExW'));
+      expect(text, contains('Windows error code: 32'));
+      expect(text, contains('source path: $source'));
+      expect(text, contains('target path: $target'));
+      expect(text, contains('original move stack'));
+      expect(text, contains('rollback stack'));
+      expect(report.causes, hasLength(3));
+    });
+
     test('reports an installed schema that is behind this build', () async {
       await createDatabaseAtVersion(directory, 1);
 

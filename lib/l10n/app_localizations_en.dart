@@ -1763,7 +1763,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryRepairFailed =>
-      'Repair could not fix this. Export a copy of your data, then reset.';
+      'Repair could not complete. Your data is preserved; choose a validated copy or export your data for further diagnosis.';
 
   @override
   String get startupRecoveryResetFailed =>
@@ -1774,7 +1774,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      'This permanently deletes Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
+      'Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.';
 
   @override
   String get startupRecoveryResetDialogConfirm => 'Reset and restart';
@@ -1889,11 +1889,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryDangerBody =>
-      'Resetting permanently deletes Kelivo\'s database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.';
+      'A fresh start removes the current data from view. Kelivo will preserve the old database and existing copies for recovery. Export a data copy first if possible.';
 
   @override
   String get startupRecoveryResetAcknowledge =>
-      'I exported a copy, or I do not need this data.';
+      'I want to start with a new empty database.';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => 'Update Kelivo to continue';
@@ -6283,6 +6283,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Ollama web search API. Augments models with up-to-date information.';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek official web search and page fetch APIs. Uses a DeepSeek API key.';
+
+  @override
   String get searchProviderJinaDescription =>
       'AI search foundation with embeddings, rerankers, web reader, deepsearch, and small language models. Multilingual and multimodal.';
 
@@ -6318,6 +6322,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -7562,7 +7569,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+      'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle =>
+      'Always inject these types';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -13057,6 +13072,266 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => 'Completing sign-in…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown source';
+
+  @override
+  String get markdownPlaygroundPreview => 'Preview';
+
+  @override
+  String get markdownPlaygroundAst => 'AST';
+
+  @override
+  String get markdownPlaygroundPlay => 'Stream characters';
+
+  @override
+  String get markdownPlaygroundPause => 'Pause';
+
+  @override
+  String get markdownPlaygroundResume => 'Resume';
+
+  @override
+  String get markdownPlaygroundShowAll => 'Show complete';
+
+  @override
+  String get markdownPlaygroundWidth => 'Preview width';
+
+  @override
+  String get markdownPlaygroundTheme => 'Preview theme';
+
+  @override
+  String get markdownPlaygroundPlain => 'Selected plain text';
+
+  @override
+  String get markdownPlaygroundMarkdown => 'Selected Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint =>
+      'Select text in the preview to inspect copied content.';
+
+  @override
+  String get markdownPlaygroundEmpty => 'Enter Markdown to preview it.';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return 'Input $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => 'Copy Markdown';
+
+  @override
+  String get markdownCopyCsvAction => 'Copy CSV';
+
+  @override
+  String get markdownCopyImageAction => 'Copy image';
+
+  @override
+  String get markdownCodeLabel => 'Code';
+
+  @override
+  String get markdownDetailsLabel => 'Details';
+
+  @override
+  String markdownMoreRows(int count) {
+    return 'Show $count more rows';
+  }
+
+  @override
+  String get markdownNoteLabel => 'Note';
+
+  @override
+  String get markdownTipLabel => 'Tip';
+
+  @override
+  String get markdownImportantLabel => 'Important';
+
+  @override
+  String get markdownWarningLabel => 'Warning';
+
+  @override
+  String get markdownCautionLabel => 'Caution';
+
+  @override
+  String get markdownDangerLabel => 'Danger';
+
+  @override
+  String get markdownCopyRichTextAction => 'Copy rich text';
+
+  @override
+  String get markdownCopySelectionFailed => 'Could not copy the selected text.';
+
+  @override
+  String get recoveryMissingDataTitle => 'Previous data detected';
+
+  @override
+  String get recoveryMissingDataBody =>
+      'The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.';
+
+  @override
+  String get recoveryEmptyDataTitle => 'Current chat history is empty';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      'The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.';
+
+  @override
+  String get recoveryKeepCurrent => 'Keep current data and continue';
+
+  @override
+  String get recoveryKeepCurrentConfirm =>
+      'Continue with the current empty database? Previous copies will remain available for recovery later.';
+
+  @override
+  String get recoverySearchingCopies =>
+      'Finding and validating local data copies…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return 'Found $count validated copies. Choose one to recover your chats and settings. The original files will be kept.';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name: validation failed. The original file has been kept.';
+  }
+
+  @override
+  String get recoverySearchFailed =>
+      'Some data locations could not be read. Your files have been kept; export a data copy before trying other recovery actions.';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      'Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.';
+
+  @override
+  String get recoveryStorageFailureTitle => 'Data storage needs attention';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.';
+
+  @override
+  String get recoveryProtectingTitle => 'Protecting the chat database';
+
+  @override
+  String get recoveryProtectingData =>
+      'Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.';
+
+  @override
+  String get recoveryStorageReadyTitle =>
+      'Chat database moved to internal storage';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      'The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.';
+
+  @override
+  String get recoveryRetainedData => 'Retained original data';
+
+  @override
+  String get recoveryNoValidCopies =>
+      'Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.';
+
+  @override
+  String get migrationFreshStartTitle => 'Fresh start is ready';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      'A new empty database is ready, and your previous data has been retained. Restart the app to continue.';
+
+  @override
+  String get migrationFreshStartFailedTitle =>
+      'Fresh start could not be completed';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      'Your previous data has been retained. Retry starting fresh, or close and reopen the app.';
+
+  @override
+  String get imageExportPreparing => 'Preparing image…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return 'Preparing diagrams $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return 'Capturing image $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => 'Combining image and preparing preview…';
+
+  @override
+  String get imageExportSaving => 'Saving image…';
+
+  @override
+  String get backupEncryptionTitle => 'Encrypt backups';
+
+  @override
+  String get backupEncryptionOffHint =>
+      'Unencrypted backups can be read by anyone with the file.';
+
+  @override
+  String get backupEncryptionOnHint =>
+      'Backups are encrypted while this page stays open.';
+
+  @override
+  String get backupEncryptionPasswordHint =>
+      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.';
+
+  @override
+  String get backupEncryptionPassword => 'Password';
+
+  @override
+  String get backupEncryptionConfirmPassword => 'Confirm password';
+
+  @override
+  String get backupEncryptionMismatch => 'Passwords do not match.';
+
+  @override
+  String get backupEncryptionShowPassword => 'Show password';
+
+  @override
+  String get backupEncryptionHidePassword => 'Hide password';
+
+  @override
+  String get backupEncryptionUnlockTitle => 'Encrypted backup';
+
+  @override
+  String get backupEncryptionUnlockHint =>
+      'Enter the password used to create this backup.';
+
+  @override
+  String get backupEncryptionUnlock => 'Unlock';
+
+  @override
+  String get backupEncryptionFailed =>
+      'The password is incorrect, or the backup is damaged. Try again or cancel.';
+
+  @override
+  String get backupEncryptionInvalid =>
+      'The encrypted backup is incomplete or invalid.';
+
+  @override
+  String get backupEncryptionUnsupported =>
+      'This encrypted backup requires a newer version of Kelivo.';
+
+  @override
+  String get backupProgressEncrypting => 'Encrypting backup';
+
+  @override
+  String get backupProgressDecrypting => 'Decrypting backup';
 
   @override
   String get browserTitle => 'Browser';

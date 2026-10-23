@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -17,16 +18,16 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/markdown_render_helpers.dart';
 
 const _pngBytes = <int>[
   0x89,
@@ -356,25 +357,40 @@ void main() {
         await tester.pumpAndSettle();
 
         for (var round = 0; round < 2; round++) {
-          final parsedChunks = tester.widgetList<GptMarkdown>(
-            find.byType(GptMarkdown),
-          );
-          expect(parsedChunks, isNotEmpty);
-          // Guard against handing the full document to one parser again.
+          // The full document is parsed to one AST and rendered as bounded
+          // groups, rather than one giant rich-text layout.
           expect(
-            parsedChunks.map((chunk) => chunk.data.length),
-            everyElement(lessThan(source.length ~/ 2)),
+            tester
+                .widgetList<BlockList>(find.byType(BlockList))
+                .first
+                .blocks
+                .length,
+            greaterThan(2),
+          );
+          expect(
+            tester.widget<MarkstreamView>(find.byType(MarkstreamView)).source,
+            source,
           );
           // Static previews must retain rows beyond the streaming row limit.
-          final showMore = find.byKey(
-            const ValueKey('markdown-table-show-more'),
+          final showMore = find.byWidgetPredicate(
+            (widget) =>
+                widget is MarkstreamActionButton &&
+                widget.action.kind == MarkstreamActionKind.showMore,
           );
           await tester.ensureVisible(showMore);
           await tester.tap(showMore);
           await tester.pumpAndSettle();
           expect(find.text('row 39', findRichText: true), findsOneWidget);
-          await tester.ensureVisible(
-            find.text('Final paragraph.', findRichText: true),
+          final scroll = tester.state<ScrollableState>(
+            find
+                .ancestor(
+                  of: find.byType(MarkstreamView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await scroll.position.ensureVisible(
+            markdownParagraph(tester, 'Final paragraph.'),
           );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
@@ -749,9 +765,7 @@ void main() {
       ),
     );
     await tester.pump();
-    final link = find.text('foo');
-    final richLink = find.textContaining('foo', findRichText: true);
-    await tester.tap(link.evaluate().isNotEmpty ? link : richLink.first);
+    await tester.tapAt(markdownGlyphCenter(tester, 'foo'));
     await _pumpAsyncUi(tester);
     if (find.byType(CodeFilePreview).evaluate().isNotEmpty) {
       await _loadCodePreview(tester);

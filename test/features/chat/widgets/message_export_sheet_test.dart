@@ -145,22 +145,24 @@ void main() {
     );
   });
 
-  test('export capture downscales very long whole captures before slicing', () {
-    final pixelRatio = exportFullCapturePixelRatioForTesting(
-      logicalSize: const Size(480, 7537),
-      requestedPixelRatio: 3,
-    );
+  test(
+    'export capture keeps requested quality by slicing medium-long images',
+    () {
+      final pixelRatio = exportFullCapturePixelRatioForTesting(
+        logicalSize: const Size(480, 7537),
+        requestedPixelRatio: 3,
+      );
 
-    expect(pixelRatio, isNotNull);
-    expect(pixelRatio!, closeTo(15360 / 7537, 0.0001));
-    expect(
-      shouldUseFullExportCaptureForTesting(
-        logicalSize: const Size(480, 8000),
-        pixelRatio: 3,
-      ),
-      isFalse,
-    );
-  });
+      expect(pixelRatio, isNull);
+      expect(
+        shouldUseFullExportCaptureForTesting(
+          logicalSize: const Size(480, 8000),
+          pixelRatio: 3,
+        ),
+        isFalse,
+      );
+    },
+  );
 
   test('export capture slice height stays on logical pixel boundaries', () {
     final logicalHeight = exportCaptureSliceLogicalHeightForTesting(

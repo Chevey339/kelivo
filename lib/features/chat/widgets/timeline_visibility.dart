@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
-import '../../../shared/widgets/markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
@@ -75,9 +75,9 @@ class PendingApprovalKey {
   final images = <String>[];
   final seen = <String>{};
   final kept = <String>[];
-  final lexer = MarkdownLineLexer();
 
-  for (final line in _toolResultLogicalLines(content)) {
+  for (final entry in MarkdownStructure(content).lines) {
+    final line = entry.line.text;
     // Old saved rows only. Typed ImageContent is never a private marker now.
     final structured = decodeMcpStructuredImageLine(line);
     if (structured != null) {
@@ -88,7 +88,7 @@ class PendingApprovalKey {
       kept.add(line);
       continue;
     }
-    if (lexer.consumeFence(line)) {
+    if (entry.code) {
       kept.add(line);
       continue;
     }
@@ -109,9 +109,9 @@ class PendingApprovalKey {
 
 String _stripStandaloneToolImages(String content) {
   final kept = <String>[];
-  final lexer = MarkdownLineLexer();
-  for (final line in _toolResultLogicalLines(content)) {
-    if (_isIndentedCodeLine(line) || lexer.consumeFence(line)) {
+  for (final entry in MarkdownStructure(content).lines) {
+    final line = entry.line.text;
+    if (_isIndentedCodeLine(line) || entry.code) {
       kept.add(line);
       continue;
     }
@@ -147,27 +147,6 @@ int _leadingIndentColumns(String line) {
     }
   }
   return columns;
-}
-
-Iterable<String> _toolResultLogicalLines(String content) sync* {
-  var i = 0;
-  final end = content.length;
-  while (i < end) {
-    var lineEnd = i;
-    while (lineEnd < end &&
-        !markdownIsLogicalLineBreak(content.codeUnitAt(lineEnd))) {
-      lineEnd++;
-    }
-    yield content.substring(i, lineEnd);
-    if (lineEnd >= end) return;
-    if (content.codeUnitAt(lineEnd) == 0x0D &&
-        lineEnd + 1 < end &&
-        content.codeUnitAt(lineEnd + 1) == 0x0A) {
-      i = lineEnd + 2;
-    } else {
-      i = lineEnd + 1;
-    }
-  }
 }
 
 @visibleForTesting

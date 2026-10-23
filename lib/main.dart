@@ -65,13 +65,14 @@ import 'core/services/workspace/workspace_runtime_bootstrap.dart';
 import 'features/workspace/terminal/terminal_session_manager.dart';
 import 'core/database/extension_entity_store.dart';
 import 'core/database/database_installation_gate.dart';
+import 'core/database/empty_database_recovery_guard.dart';
+import 'core/database/private_data_storage.dart';
 import 'core/database/app_database.dart';
 import 'core/database/business_migration_engine.dart';
 import 'core/database/business_preferences.dart';
 import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
-import 'core/database/startup_failure_report.dart';
 import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
@@ -84,7 +85,6 @@ import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
-import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
@@ -102,7 +102,6 @@ import 'dart:io'
     show
         Directory,
         File,
-        FileMode,
         Platform,
         stderr; // kept for global override usage inside provider
 import 'core/services/mobile_background.dart';
@@ -172,7 +171,38 @@ Future<void> main() async {
         await _initDesktopWindow();
       }
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
+      final retained = await AppDirectories.documentsDirectoryFor(
+        appDataDirectory,
+      );
+      if (retained != null) {
+        try {
+          await PrivateDataStorage.prepare(
+            source: retained,
+            target: appDataDirectory,
+            onCopying: () => runApp(
+              _RestoreProgressApp(
+                stage: ValueNotifier(RestoreStartupStage.protectingData),
+              ),
+            ),
+          );
+        } catch (error, stackTrace) {
+          runApp(
+            _RestoreFailureApp(
+              report: StartupFailureReport.capture(
+                stage: StartupFailureStage.databaseAdmission,
+                error: error,
+                step: 'private_storage_activation',
+                stackTrace: stackTrace,
+              ),
+              appDataDirectory: appDataDirectory,
+              privateStorageSource: retained,
+            ),
+          );
+          return;
+        }
+      }
       final RestoreReceipt? restoreOutcome;
+      final restoreDiagnostics = RestoreStartupDiagnostics();
       RestoreBusinessLease? businessLease;
       // A restore large enough to take seconds would otherwise spend all of
       // them before the first frame, which is indistinguishable from a hang.
@@ -197,6 +227,7 @@ Future<void> main() async {
             await RestoreStartupGate.recoverAndRequireBusinessReady(
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
+              diagnostics: restoreDiagnostics,
               onStage: restoreStage == null
                   ? null
                   : (stage) => restoreStage.value = stage,
@@ -211,6 +242,7 @@ Future<void> main() async {
               error: error,
               step: 'recover_and_require_business_ready',
               stackTrace: stackTrace,
+              restoreDetails: restoreDiagnostics.details,
             ),
             appDataDirectory: appDataDirectory,
             businessLease: businessLease,
@@ -256,21 +288,37 @@ Future<void> main() async {
           if (migrationDecision.needsMigration) {
             runApp(
               MigrationApp(
-                service: HiveToSqliteMigrationService(migrationDecision),
+                service: HiveToSqliteMigrationService(
+                  migrationDecision,
+                  businessLease: businessLease,
+                ),
                 restoreOutcome: restoreOutcome?.state,
               ),
             );
             return;
           }
           admissionStep = 'installation_gate';
-          await DatabaseInstallationGate.ensureReady(
-            appDataDirectory: appDataDirectory,
-            allowDatabaseIdentityChange:
-                restoreOutcome?.selectedComponents.contains(
-                  RestoreComponent.database,
-                ) ??
-                false,
-          );
+          final installationReceipt =
+              await DatabaseInstallationGate.ensureReady(
+                appDataDirectory: appDataDirectory,
+                allowDatabaseIdentityChange:
+                    restoreOutcome?.selectedComponents.contains(
+                      RestoreComponent.database,
+                    ) ??
+                    false,
+              );
+          admissionStep = 'empty_database_recovery_check';
+          if (restoreOutcome?.state == RestoreReceiptState.committed &&
+              restoreOutcome!.selectedComponents.contains(
+                RestoreComponent.database,
+              )) {
+            await EmptyDatabaseRecoveryGuard.acknowledge(appDataDirectory);
+          } else {
+            await EmptyDatabaseRecoveryGuard.check(
+              appDataDirectory: appDataDirectory,
+              databaseId: installationReceipt.databaseId,
+            );
+          }
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
@@ -307,14 +355,12 @@ Future<void> main() async {
                 MigrationApp(
                   service: HiveToSqliteMigrationService(
                     _legacyMigrationDecision(appDataDirectory),
+                    businessLease: businessLease,
                   ),
                   restoreOutcome: restoreOutcome?.state,
                 ),
               );
               return;
-            }
-            if (recovery == _AdmissionRecovery.rebuilt) {
-              continue;
             }
           }
           await _initRestoreFailureWindow();
@@ -360,7 +406,7 @@ Future<void> main() async {
   );
 }
 
-enum _AdmissionRecovery { none, rebuilt, remigrate }
+enum _AdmissionRecovery { none, remigrate }
 
 /// Names must mirror HiveToSqliteMigrationService.check().
 const _legacyHiveSourceNames = <String>[
@@ -384,62 +430,12 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
     legacyHiveDataPresent: _legacyHiveSourcesExist(appDataDirectory),
   );
   switch (action) {
-    case DatabaseRecoveryAction.rebuildAutomatically:
-      try {
-        // The only route that destroys state without anyone confirming it, so
-        // it is the only one that has to leave a record of itself. A user who
-        // finds the app empty otherwise has nothing to report but the symptom.
-        await _recordAutomaticRebuild(appDataDirectory, error);
-        await DatabaseInstallationGate.rebuildFresh(
-          appDataDirectory: appDataDirectory,
-        );
-        return _AdmissionRecovery.rebuilt;
-      } catch (rebuildError, rebuildStack) {
-        stderr.writeln(
-          '[DatabaseAdmission] rebuild failed: $rebuildError\n$rebuildStack',
-        );
-        return _AdmissionRecovery.none;
-      }
     case DatabaseRecoveryAction.promptRemigration:
       return _AdmissionRecovery.remigrate;
     case DatabaseRecoveryAction.promptUpgrade:
     case DatabaseRecoveryAction.none:
       return _AdmissionRecovery.none;
   }
-}
-
-/// Appends a record of an unattended rebuild to `logs/`.
-///
-/// Deliberately independent of the Flutter log capture toggle, which is off by
-/// default: this is the one startup outcome that silently destroys state, and
-/// a user who finds the app empty has nothing else to report. The listing is
-/// taken before the rebuild, so it still describes the files it is about to
-/// clear. Best-effort throughout — a rebuild must not fail for want of a note.
-Future<void> _recordAutomaticRebuild(
-  Directory appDataDirectory,
-  Object error,
-) async {
-  try {
-    var report = StartupFailureReport.capture(
-      stage: StartupFailureStage.databaseAdmission,
-      error: error,
-      step: 'automatic_rebuild',
-    );
-    try {
-      report = report.withEnvironment(
-        await StartupFailureEnvironment.collect(
-          appDataDirectory: appDataDirectory,
-        ),
-      );
-    } catch (_) {}
-    final logs = Directory('${appDataDirectory.path}/logs');
-    await logs.create(recursive: true);
-    await File('${logs.path}/$startupRecoveryLogFileName').writeAsString(
-      '${report.toText()}\n\n',
-      mode: FileMode.append,
-      flush: true,
-    );
-  } catch (_) {}
 }
 
 HiveToSqliteMigrationDecision _legacyMigrationDecision(
@@ -515,10 +511,12 @@ class _RestoreFailureApp extends StatelessWidget {
     required this.report,
     this.appDataDirectory,
     this.businessLease,
+    this.privateStorageSource,
   });
 
   final StartupFailureReport report;
   final Directory? appDataDirectory;
+  final Directory? privateStorageSource;
   final RestoreBusinessLease? businessLease;
 
   @override
@@ -537,6 +535,7 @@ class _RestoreFailureApp extends StatelessWidget {
               report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
+              privateStorageSource: privateStorageSource,
               businessLease: businessLease,
             ),
     );

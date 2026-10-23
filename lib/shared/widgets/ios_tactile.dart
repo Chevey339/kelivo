@@ -18,6 +18,7 @@ class IosIconButton extends StatefulWidget {
     this.color,
     this.pressedColor,
     this.minSize,
+    this.borderRadius = 8,
     this.semanticLabel,
     this.tooltip,
     this.enabled = true,
@@ -36,6 +37,7 @@ class IosIconButton extends StatefulWidget {
   final Color? color; // base color; defaults to theme onSurface
   final Color?
   pressedColor; // override pressed color; defaults to blend with primary
+  final double borderRadius;
   final double? minSize; // min tap target (e.g., 44 for AppBar)
   final String? semanticLabel;
   final String? tooltip;
@@ -141,7 +143,7 @@ class _IosIconButtonState extends State<IosIconButton> {
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 color: bgTarget,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(widget.borderRadius),
               ),
               child: Padding(padding: widget.padding, child: child),
             ),

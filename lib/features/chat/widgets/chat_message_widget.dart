@@ -2,7 +2,7 @@ import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform, visibleForTesting;
+    show defaultTargetPlatform, TargetPlatform, visibleForTesting, mapEquals;
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
@@ -37,7 +37,8 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
-import '../../../shared/widgets/markdown_with_highlight.dart';
+import '../../../shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -61,6 +62,7 @@ import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
+import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_surface.dart';
@@ -1149,7 +1151,7 @@ class _ToolDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return SelectionArea(
+    return AppSelectionArea(
       child: CustomScrollView(
         controller: scrollController,
         slivers: [
@@ -1366,6 +1368,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   // Search-result extraction is keyed by tool-part list identity.
   List<ToolUIPart>? _searchItemsParts;
   List<Map<String, dynamic>>? _searchItemsCache;
+  Map<String, String> _citationIndexLookup = const {};
+  String? Function(String) _citationIndexResolver = (_) => null;
 
   @override
   void initState() {
@@ -1401,13 +1405,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
     if (!mounted) return;
-    final newExtracted = _legacyInlineThinkingFor(
-      widget,
-    ).thinkingTexts.join('\n\n');
-    final usingInlineThinkNew =
-        (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
-        newExtracted.isNotEmpty;
-
     bool usingInlineThinkOld = false;
     if (oldWidget != null) {
       final oldExtracted = _legacyInlineThinkingFor(
@@ -1418,6 +1415,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               oldWidget.reasoningText!.isEmpty) &&
           oldExtracted.isNotEmpty;
     }
+
+    // Read the old memo before parsing the new source so the build can reuse
+    // the new result instead of alternating the single-slot cache.
+    final newExtracted = _legacyInlineThinkingFor(
+      widget,
+    ).thinkingTexts.join('\n\n');
+    final usingInlineThinkNew =
+        (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
+        newExtracted.isNotEmpty;
 
     final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
 
@@ -1652,7 +1658,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final safeBottom = insets.bottom + 12;
 
     const double menuWidth = 220; // compact width
-    const double estMenuHeight = 140; // ~ 3 rows
+    final double estMenuHeight = widget.onEdit == null ? 140 : 184;
     const double gap = 10; // space between bubble and menu
 
     // Horizontal placement: align menu's right edge to bubble's right edge,
@@ -1760,6 +1766,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                       );
                                     }
                                   }
+                                },
+                              ),
+                              _MenuItem(
+                                icon: Lucide.TextSelect,
+                                label: l10n.messageMoreSheetSelectCopy,
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (!mounted) return;
+                                    unawaited(
+                                      showSelectCopySheet(
+                                        context,
+                                        message: widget.message,
+                                      ),
+                                    );
+                                  });
                                 },
                               ),
                               if (widget.onEdit != null)
@@ -2290,7 +2314,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     if (isDesktop) {
-      content = SelectionArea(
+      content = AppSelectionArea(
         key: ValueKey('user_${widget.message.id}'),
         child: content,
       );
@@ -2715,7 +2739,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup, {
+    String? Function(String) citationIndexResolver, {
     String contentKey = '',
   }) {
     final bool isDesktop =
@@ -2728,9 +2752,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (enableAssistantMarkdown) {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
-        onCitationTap: (id) => _handleCitationTap(id),
-        citationIndexResolver: (id) =>
-            _resolveCitationIndex(id, citationIndexLookup),
+        onCitationTap: _handleCitationTap,
+        citationIndexResolver: citationIndexResolver,
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
         streaming: widget.message.isStreaming,
         conversationId: widget.message.conversationId,
@@ -2760,7 +2783,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
 
     return RepaintBoundary(
-      child: SelectionArea(
+      child: AppSelectionArea(
         key: ValueKey(
           contentKey.isEmpty
               ? 'assistant_${widget.message.id}'
@@ -2819,7 +2842,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup, {
+    String? Function(String) citationIndexResolver, {
     required String blockKey,
   }) {
     final split = context.select<SettingsProvider, bool>(
@@ -2834,7 +2857,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           context,
           parts[i],
           enableAssistantMarkdown,
-          citationIndexLookup,
+          citationIndexResolver,
           contentKey: parts.length == 1 ? '' : '$blockKey.$i',
         ),
     ];
@@ -2844,7 +2867,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup, {
+    String? Function(String) citationIndexResolver, {
     String contentKey = '',
   }) {
     return _assistantBlockWidth(
@@ -2855,7 +2878,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           context,
           visualContent,
           enableAssistantMarkdown,
-          citationIndexLookup,
+          citationIndexResolver,
           contentKey: contentKey,
         ),
       ),
@@ -3081,7 +3104,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final bool isTranslating =
         translationText == l10n.chatMessageWidgetTranslating;
     final searchItems = _allSearchItems();
-    final citationIndexLookup = _buildCitationIndexLookup(searchItems);
+    final citationIndexResolver = _buildCitationIndexResolver(searchItems);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final effectiveReasoningSegments = _effectiveReasoningSegments(
       extractedThinking,
@@ -3249,7 +3272,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       context,
                       visualContent,
                       enableAssistantMarkdown,
-                      citationIndexLookup,
+                      citationIndexResolver,
                       blockKey: 'body',
                     ),
                   ),
@@ -3299,7 +3322,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     context,
                     block.text!,
                     enableAssistantMarkdown,
-                    citationIndexLookup,
+                    citationIndexResolver,
                     blockKey: 'text$blockIndex',
                   )) {
                     addVisible(bubble);
@@ -3439,7 +3462,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
                               child: RepaintBoundary(
-                                child: SelectionArea(
+                                child: AppSelectionArea(
                                   key: ValueKey(
                                     'translation_${widget.message.id}',
                                   ),
@@ -3460,13 +3483,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                         translationContent =
                                             MarkdownWithCodeHighlight(
                                               text: translationText,
-                                              onCitationTap: (id) =>
-                                                  _handleCitationTap(id),
-                                              citationIndexResolver: (id) =>
-                                                  _resolveCitationIndex(
-                                                    id,
-                                                    citationIndexLookup,
-                                                  ),
+                                              onCitationTap: _handleCitationTap,
+                                              citationIndexResolver:
+                                                  citationIndexResolver,
                                               baseStyle: TextStyle(
                                                 fontSize: baseTranslation,
                                                 height: 1.4,
@@ -3774,12 +3793,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
-  // Build once per message so each citation marker only performs a map lookup.
-  // Insert IDs first so an exact ID match wins over a legacy numeric index.
-  Map<String, String> _buildCitationIndexLookup(
+  // Keep callbacks stable while only the streamed text changes. A new lookup
+  // changes the resolver identity so cached citation widgets refresh their labels.
+  String? Function(String) _buildCitationIndexResolver(
     List<Map<String, dynamic>> items,
   ) {
     final lookup = <String, String>{};
+    // An exact ID match wins over a legacy numeric index.
     for (final item in items) {
       final id = item['id']?.toString() ?? '';
       final index = item['index']?.toString() ?? '';
@@ -3789,19 +3809,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       final index = item['index']?.toString() ?? '';
       if (index.isNotEmpty) lookup[index] ??= index;
     }
-    return lookup;
-  }
-
-  String? _resolveCitationIndex(
-    String id,
-    Map<String, String> citationIndexLookup,
-  ) {
-    final key = id.trim();
-    if (key.isEmpty) return null;
-    final direct = citationIndexLookup[key];
-    if (direct != null) return direct;
-    final asIndex = int.tryParse(key);
-    return asIndex == null ? null : citationIndexLookup[asIndex.toString()];
+    if (!mapEquals(lookup, _citationIndexLookup)) {
+      _citationIndexLookup = lookup;
+      _citationIndexResolver = (id) {
+        final key = id.trim();
+        if (key.isEmpty) return null;
+        final direct = lookup[key];
+        if (direct != null) return direct;
+        final asIndex = int.tryParse(key);
+        return asIndex == null ? null : lookup[asIndex.toString()];
+      };
+    }
+    return _citationIndexResolver;
   }
 
   // Try resolve citation id -> url from the latest search_web tool results of this assistant message
@@ -5519,12 +5538,12 @@ class _ChainOfThoughtReasoningStepState
             // Bouncing physics already declines drags when content fits.
             // Keeping it stable also retains ScrollPosition on overflow.
             physics: const BouncingScrollPhysics(),
-            child: SelectionArea(child: reasoningContent(display)),
+            child: AppSelectionArea(child: reasoningContent(display)),
           ),
         ),
       );
     } else if (state == _ReasoningStepState.expanded) {
-      content = SelectionArea(child: reasoningContent(display));
+      content = AppSelectionArea(child: reasoningContent(display));
     }
 
     return _TimelineStepShell(
@@ -8070,7 +8089,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     }
 
     // Enable long-press text selection in reasoning body
-    body = SelectionArea(child: body);
+    body = AppSelectionArea(child: body);
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),

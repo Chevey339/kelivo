@@ -272,22 +272,29 @@ void main() {
             .last;
         await tester.ensureVisible(confirm);
         await tester.tap(confirm);
-        // Path resolution and writes use real I/O. Wait for the observable
-        // outcome instead of assuming the fixed animation delay finished it.
-        for (var i = 0; i < 400; i++) {
-          final completed = readOnly
-              ? AppSnackBarManager().activeToasts.any(
-                  (toast) => toast.notification.message.contains(
-                    l10n.workspaceMountReadOnly,
-                  ),
-                )
-              : File('${root.path}/new.txt').existsSync();
-          if (completed) break;
-          await tester.pump(const Duration(milliseconds: 10));
+        // Permission checks resolve real filesystem paths. Fixed pump counts
+        // can finish before that I/O under suite load, while advancing the
+        // fake clock can also expire the toast before it is inspected.
+        bool completed() =>
+            File('${root.path}/new.txt').existsSync() ||
+            AppSnackBarManager().activeToasts.any(
+              (toast) => toast.notification.message.contains(
+                l10n.workspaceMountReadOnly,
+              ),
+            );
+        final wait = Stopwatch()..start();
+        while (!completed() && wait.elapsed < const Duration(seconds: 10)) {
           await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
           );
+          await tester.pump();
         }
+        expect(
+          completed(),
+          isTrue,
+          reason: 'File creation must finish or report read-only access.',
+        );
+        await tester.pumpAndSettle();
       }
 
       await createFile(readOnly: true);

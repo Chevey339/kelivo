@@ -36,9 +36,9 @@ class _FakePathProvider extends PathProviderPlatform {
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
-  // Filesystem scans run on the real clock, not the pumped frame clock.
-  // Keep the same UI assertion while allowing for full-suite I/O contention.
-  for (var attempt = 0; attempt < 400 && finder.evaluate().isEmpty; attempt++) {
+  // The disk report runs in real time; give loaded parallel test hosts up to
+  // five seconds while returning as soon as the requested UI is available.
+  for (var attempt = 0; attempt < 500 && finder.evaluate().isEmpty; attempt++) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );

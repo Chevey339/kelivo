@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
+import '../../../desktop/macos_window_drag_area.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/native_file_save.dart';
@@ -214,6 +215,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryFonts;
       case 'local_models':
         return l10n.storageSpaceCategoryLocalModels;
+      case 'retained_data':
+        return l10n.recoveryRetainedData;
+      case 'app_documents':
       case 'app':
         return l10n.storageSpaceSubOtherApp;
       case 'avatars':
@@ -839,7 +843,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          topBar,
+          MacosWindowDragArea(child: topBar),
           Expanded(child: content),
         ],
       );

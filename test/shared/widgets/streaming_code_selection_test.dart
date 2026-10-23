@@ -1,6 +1,6 @@
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
-import 'package:flutter/foundation.dart';
+import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,8 +9,6 @@ void main() {
   testWidgets('long code keeps cross-chunk copying and iOS translation', (
     tester,
   ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     const translation = MethodChannel('app.ios_translation');
     final calls = <MethodCall>[];
     final messenger =
@@ -38,15 +36,28 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SingleChildScrollView(
+          body: AppSelectionArea(
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ValueListenableBuilder<String>(
-                valueListenable: source,
-                builder: (_, value, _) => SelectableHighlightView(
-                  value,
-                  language: 'dart',
-                  textStyle: const TextStyle(fontSize: 13, height: 1.5),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ValueListenableBuilder<String>(
+                  valueListenable: source,
+                  builder: (_, value, _) => MarkstreamCodeContent(
+                    wrap: false,
+                    node: CodeBlockNode(
+                      span: SourceSpan(0, value.length),
+                      children: [
+                        TextNode(
+                          span: SourceSpan(0, value.length),
+                          text: value,
+                        ),
+                      ],
+                      info: 'dart',
+                    ),
+                    theme: MarkstreamTheme.fromColorScheme(
+                      ThemeData.light().colorScheme,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -92,6 +103,5 @@ void main() {
     }
     await tester.pumpWidget(const SizedBox.shrink());
     source.dispose();
-    debugDefaultTargetPlatformOverride = null;
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 }

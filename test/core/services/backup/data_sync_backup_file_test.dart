@@ -29,6 +29,8 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
+import 'package:Kelivo/core/providers/s3_backup_provider.dart';
+import 'package:Kelivo/core/services/backup/backup_encryption.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
@@ -577,7 +579,7 @@ void main() {
             isA<StateError>().having(
               (e) => e.message,
               'message',
-              'database_missing',
+              'database_missing_with_prior_data',
             ),
           ),
         );
@@ -617,11 +619,20 @@ void main() {
         }
         expect(await asset.readAsString(), 'keep attachment');
         expect(await _fileSha256(snapshot), originalHash);
-        final preservedWal = root.listSync().whereType<File>().singleWhere(
-          (file) =>
-              file.path.contains('.displaced-') && file.path.endsWith('-wal'),
+        final preserved = root.listSync().whereType<Directory>().singleWhere(
+          (directory) =>
+              p.basename(directory.path).startsWith('kelivo.db.displaced-'),
         );
-        expect(await preservedWal.readAsString(), 'orphan WAL evidence');
+        expect(
+          await File(p.join(preserved.path, 'kelivo.db-wal')).readAsString(),
+          'orphan WAL evidence',
+        );
+        expect(
+          await File(
+            p.join(preserved.path, 'original-kelivo.db-wal'),
+          ).readAsString(),
+          'orphan WAL evidence',
+        );
       },
     );
 
@@ -2029,6 +2040,342 @@ void main() {
     });
 
     test(
+      'encrypted export retries before restoring and cleans plaintext',
+      () async {
+        final service = BusinessRestoreService(businessRepository);
+        await service.overwrite({'global_proxy_password_v1': 'backup-secret'});
+        final chat = ChatService();
+        addTearDown(chat.dispose);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        );
+        final backup = await sync.exportToFile(
+          _withoutChatsOrAssets,
+          password: 'my backup password',
+        );
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+        expect(backup.path, endsWith('.kbackup'));
+        expect(await BackupEncryption.isEncrypted(backup), isTrue);
+        expect(
+          (await backup.parent.list().toList()).map((e) => p.basename(e.path)),
+          [p.basename(backup.path)],
+        );
+        final original = await backup.readAsBytes();
+        expect(
+          _containsContiguousBytes(original, utf8.encode('backup-secret')),
+          isFalse,
+        );
+        expect(
+          _containsContiguousBytes(original, utf8.encode('settings.json')),
+          isFalse,
+        );
+        await service.overwrite({'global_proxy_password_v1': 'live-secret'});
+        final retries = <bool>[];
+        await sync.restoreFromLocalFile(
+          backup,
+          _withoutChatsOrAssets,
+          onPassword: ({required retry}) async {
+            retries.add(retry);
+            expect(
+              (await service.exportSettings())['global_proxy_password_v1'],
+              'live-secret',
+            );
+            expect(
+              await RestoreStartupGate.inspect(appDataDirectory: root),
+              isNull,
+            );
+            return retry ? 'my backup password' : 'wrong password';
+          },
+        );
+        expect(retries, [false, true]);
+        expect(
+          (await service.exportSettings())['global_proxy_password_v1'],
+          'backup-secret',
+        );
+        expect(await backup.readAsBytes(), original);
+        expect(
+          (await Directory('${root.path}/tmp').list().toList()).where(
+            (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
+          ),
+          isEmpty,
+        );
+
+        await service.overwrite({'global_proxy_password_v1': 'keep-on-cancel'});
+        await expectLater(
+          sync.restoreFromLocalFile(
+            backup,
+            _withoutChatsOrAssets,
+            onPassword: ({required retry}) async => null,
+          ),
+          throwsA(isA<BackupCancelledException>()),
+        );
+        expect(
+          (await service.exportSettings())['global_proxy_password_v1'],
+          'keep-on-cancel',
+        );
+        expect(
+          (await Directory('${root.path}/tmp').list().toList()).where(
+            (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'rejects a plaintext ZIP substituted for a local encrypted backup',
+      () async {
+        final zip = File('${root.path}/substituted.kbackup');
+        final encoder = ZipFileEncoder()..create(zip.path);
+        encoder.addFileSync(validSettingsFile, 'settings.json');
+        encoder.closeSync();
+        final service = BusinessRestoreService(businessRepository);
+        await service.overwrite({'global_proxy_password_v1': 'keep-secret'});
+        final chat = ChatService();
+        addTearDown(chat.dispose);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        );
+        await expectLater(
+          sync.restoreFromLocalFile(zip, _withoutChatsOrAssets),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'reason',
+              'backup_encryption_header',
+            ),
+          ),
+        );
+        expect(
+          (await service.exportSettings())['global_proxy_password_v1'],
+          'keep-secret',
+        );
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'encrypted backup asks schema consent only after authentication',
+      () async {
+        final zip = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'encrypted_future',
+          settings: const {},
+          schemaVersionOverride: AppDatabase.currentSchemaVersion + 1,
+        );
+        final encrypted = File('${root.path}/future.kbackup');
+        await BackupEncryption.encryptFile(
+          source: zip,
+          destination: encrypted,
+          password: 'future password',
+        );
+        expect(await DataSync.inspectBackupCompatibility(encrypted), isNull);
+        final chat = ChatService();
+        addTearDown(chat.dispose);
+        final order = <String>[];
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chat,
+          ).restoreFromLocalFile(
+            encrypted,
+            _withoutAssets,
+            onPassword: ({required retry}) async {
+              order.add('password');
+              return 'future password';
+            },
+            onForwardCompatibility: (compatibility) async {
+              order.add('schema');
+              expect(
+                compatibility.verdict,
+                BackupSchemaVerdict.forwardUndeclared,
+              );
+              return ForwardCompatibilityAnswer.refuse;
+            },
+          ),
+          throwsA(isA<BackupCancelledException>()),
+        );
+        expect(order, ['password', 'schema']);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+        expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+      },
+    );
+
+    for (final useS3 in [false, true]) {
+      test(
+        '${useS3 ? 'S3' : 'WebDAV'} uploads, lists and restores encrypted backups',
+        () async {
+          HttpOverrides.global = null;
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          final objects = <String, List<int>>{};
+          final mimeTypes = <String, String?>{};
+          var denyBucketListing = false;
+          server.listen((request) async {
+            final path = request.uri.path;
+            if (request.method == 'PUT') {
+              objects[path] = await request.fold<List<int>>(
+                [],
+                (all, chunk) => all..addAll(chunk),
+              );
+              mimeTypes[path] = request.headers.value('content-type');
+              request.response.statusCode = 200;
+            } else if (request.method == 'PROPFIND') {
+              await request.drain<void>();
+              request.response.statusCode = 207;
+              request.response.write(
+                '<d:multistatus xmlns:d="DAV:">${objects.entries.map((e) => '<d:response><d:href>${e.key}</d:href><d:propstat><d:prop><d:getcontentlength>${e.value.length}</d:getcontentlength></d:prop></d:propstat></d:response>').join()}</d:multistatus>',
+              );
+            } else if (request.uri.queryParameters['list-type'] == '2') {
+              if (denyBucketListing) {
+                request.response.statusCode = 403;
+                request.response.write(
+                  '<Error><Code>AccessDenied</Code></Error>',
+                );
+              } else {
+                request.response.write(
+                  '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${objects.entries.where((e) => e.key.endsWith('.kbackup')).map((e) => '<Contents><Key>${e.key.substring('/backup-bucket/'.length)}</Key><Size>${e.value.length}</Size></Contents>').join()}</ListBucketResult>',
+                );
+              }
+            } else if (request.method == 'GET') {
+              if (objects.containsKey(path)) {
+                request.response.add(objects[path]!);
+              } else {
+                request.response.statusCode = 404;
+              }
+            } else {
+              await request.drain<void>();
+              request.response.statusCode = 201;
+            }
+            await request.response.close();
+          });
+          final service = BusinessRestoreService(businessRepository);
+          await service.overwrite({
+            'global_proxy_password_v1': 'remote-secret',
+          });
+          final chat = ChatService();
+          addTearDown(chat.dispose);
+          final preferences = BusinessPreferences(businessRepository);
+          final endpoint = 'http://${server.address.address}:${server.port}';
+          final dav = BackupProvider(
+            chatService: chat,
+            businessRepository: businessRepository,
+            businessPreferences: preferences,
+            initialConfig: WebDavConfig(
+              url: endpoint,
+              scope: _withoutChatsOrAssets.scope,
+            ),
+          );
+          final s3 = S3BackupProvider(
+            chatService: chat,
+            businessRepository: businessRepository,
+            businessPreferences: preferences,
+            initialConfig: S3Config(
+              endpoint: endpoint,
+              bucket: 'backup-bucket',
+              accessKeyId: 'test',
+              secretAccessKey: 'test-secret',
+              scope: _withoutChatsOrAssets.scope,
+            ),
+          );
+          addTearDown(dav.dispose);
+          addTearDown(s3.dispose);
+          expect(
+            useS3
+                ? await s3.backup(password: 'remote password')
+                : await dav.backup(password: 'remote password'),
+            isTrue,
+            reason: useS3 ? s3.message : dav.message,
+          );
+          final archivePath = objects.keys.singleWhere(
+            (key) => key.endsWith('.kbackup'),
+          );
+          expect(
+            ascii.decode(objects[archivePath]!.take(8).toList()),
+            'KELIVENC',
+          );
+          expect(mimeTypes[archivePath], 'application/octet-stream');
+          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+          final items = useS3 ? await s3.listRemote() : await dav.listRemote();
+          expect(
+            items.map((item) => item.displayName),
+            contains(p.basename(archivePath)),
+          );
+          if (useS3) {
+            denyBucketListing = true;
+            final manifestItems = await s3.listRemote();
+            expect(
+              manifestItems.map((item) => item.displayName),
+              contains(p.basename(archivePath)),
+            );
+          }
+          await service.overwrite({'global_proxy_password_v1': 'live-secret'});
+          final item = items.singleWhere(
+            (item) => item.displayName.endsWith('.kbackup'),
+          );
+          var prompts = 0;
+          Future<String?> password({required bool retry}) async {
+            prompts++;
+            return 'remote password';
+          }
+
+          if (useS3) {
+            await s3.restoreFromItem(item, onPassword: password);
+          } else {
+            await dav.restoreFromItem(item, onPassword: password);
+          }
+          expect(prompts, 1);
+          expect(
+            (await service.exportSettings())['global_proxy_password_v1'],
+            'remote-secret',
+          );
+          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+
+          // A compromised endpoint must not downgrade the selected .kbackup
+          // to an ordinary ZIP when the downloaded file has a temporary name.
+          final replacement = File('${root.path}/replacement.zip');
+          final encoder = ZipFileEncoder()..create(replacement.path);
+          encoder.addFileSync(validSettingsFile, 'settings.json');
+          encoder.closeSync();
+          objects[archivePath] = await replacement.readAsBytes();
+          final substituted = BackupFileItem(
+            href: item.href,
+            displayName: item.displayName,
+            size: objects[archivePath]!.length,
+            lastModified: item.lastModified,
+          );
+          await service.overwrite({'global_proxy_password_v1': 'keep-secret'});
+          await expectLater(
+            useS3
+                ? s3.restoreFromItem(substituted, onPassword: password)
+                : dav.restoreFromItem(substituted, onPassword: password),
+            throwsA(
+              isA<FormatException>().having(
+                (e) => e.message,
+                'reason',
+                'backup_encryption_header',
+              ),
+            ),
+          );
+          expect(prompts, 1);
+          expect(
+            (await service.exportSettings())['global_proxy_password_v1'],
+            'keep-secret',
+          );
+          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+        },
+      );
+    }
+
+    test(
       'normal backup includes credentials and declares that in manifest',
       () async {
         await BusinessRestoreService(businessRepository).overwrite({
@@ -2543,6 +2890,8 @@ void main() {
         zipFile,
         _withoutAssets,
         allowUnverifiedForwardCompatible: true,
+        onForwardCompatibility: (_) async =>
+            throw StateError('consent was already granted'),
       );
 
       // Dropped from the staged candidate rather than carried into app data:
@@ -4532,6 +4881,9 @@ void main() {
     );
 
     test('chat-only overwrite preserves live uploaded files', () async {
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
       final uploadDir = Directory('${root.path}/upload');
       await uploadDir.create(recursive: true);
       final uploadFile = File('${uploadDir.path}/preserved.txt');
@@ -4551,9 +4903,6 @@ void main() {
       encoder.addFileSync(chatsFile, 'chats.json');
       encoder.closeSync();
 
-      final chatService = ChatService();
-      await chatService.init();
-      addTearDown(chatService.close);
       final sync = DataSync(
         businessRepository: businessRepository,
         chatService: chatService,

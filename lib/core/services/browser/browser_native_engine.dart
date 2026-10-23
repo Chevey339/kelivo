@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
@@ -8,11 +9,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../features/browser/models/browser_models.dart';
 import 'browser_engine.dart';
+import 'browser_download_cookies.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
 import 'browser_scroll_observer.dart';
 
 const browserHistoryHandlerName = 'kelivoBrowserHistory';
+const browserHistoryDocumentScript =
+    'window.__kelivoBrowserHistoryDocument ?? null';
 
 /// URL KVO precedes WebKit's same-document list update, and same-URL states do
 /// not trigger it at all. Signal once after the History API/event task finishes;
@@ -21,6 +25,10 @@ const browserHistoryObserverScript = r'''
 (() => {
   if (window.__kelivoBrowserHistoryInstalled) return;
   window.__kelivoBrowserHistoryInstalled = true;
+  const state = window.__kelivoBrowserHistoryDocument = {
+    id: String(performance.timeOrigin) + ':' + Math.random().toString(36).slice(2),
+    traversal: 0
+  };
   let scheduled = false;
   const notify = () => {
     if (scheduled) return;
@@ -33,7 +41,13 @@ const browserHistoryObserverScript = r'''
       }
     }, 0);
   };
-  addEventListener('popstate', notify);
+  const traversed = (event) => {
+    if (!event.isTrusted) return;
+    state.traversal++;
+    notify();
+  };
+  addEventListener('popstate', traversed);
+  addEventListener('hashchange', traversed);
   addEventListener('flutterInAppWebViewPlatformReady', notify, {once: true});
   for (const name of ['pushState', 'replaceState']) {
     const original = history[name];
@@ -64,7 +78,13 @@ class NativeBrowserEngine implements BrowserEngine {
   final Future<bool> Function(String?, int) onNewWindow;
   final bool Function() isAgentActive;
   final InAppWebViewKeepAlive _keepAlive = InAppWebViewKeepAlive();
-  final FindInteractionController _findController = FindInteractionController();
+  // WebView2's plugin does not implement the native find controller/channel.
+  // Use Chromium's find operation there without preventing WebView creation.
+  final FindInteractionController? _findController =
+      defaultTargetPlatform == TargetPlatform.windows
+      ? null
+      : FindInteractionController();
+  String _findText = '';
   final Completer<InAppWebViewController> _created = Completer();
   HeadlessInAppWebView? _headless;
   InAppWebViewController? _controller;
@@ -96,6 +116,8 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<void> _historyCommands = Future<void>.value();
   ({int generation, int index, int length, Completer<void> done})?
   _historyTraversal;
+  ({int generation, int index, int length, String id, int traversal})?
+  _historyDocument;
   ({int generation, String document})? _faviconRequest;
   late final _scrollObserver = BrowserScrollObserver(
     readDocumentId: () =>
@@ -129,6 +151,7 @@ class NativeBrowserEngine implements BrowserEngine {
   void _beginNavigation({bool fromHistory = false}) {
     if (!fromHistory) _historyCommandEpoch++;
     _finishHistoryTraversal();
+    _historyDocument = null;
     _navigationGeneration++;
     if (Platform.isIOS) {
       _nativeScrollObserver.reset();
@@ -404,6 +427,7 @@ class NativeBrowserEngine implements BrowserEngine {
       ),
     );
     if (!(navigation?.isCompleted ?? true)) navigation!.complete();
+    _historyDocument = null;
     if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
     unawaited(_installScrollObserver());
     unawaited(_loadFavicon());
@@ -569,6 +593,64 @@ class NativeBrowserEngine implements BrowserEngine {
         canGoForward: history.index + 1 < history.length,
       ),
     );
+    await _completeDocumentHistory(controller, history);
+  }
+
+  Future<({String id, int traversal})?> _readHistoryDocument(
+    InAppWebViewController controller,
+  ) async {
+    Object? state;
+    try {
+      state = await controller.evaluateJavascript(
+        source: browserHistoryDocumentScript,
+      );
+    } on PlatformException {
+      // A renderer being replaced may not accept JavaScript yet. Native
+      // history navigation must remain usable and can complete via load-stop.
+      return null;
+    }
+    if (state is! Map || state['id'] is! String) {
+      return null;
+    }
+    // WKWebView boxes JavaScript numbers as Float64, including whole numbers.
+    final traversal = state['traversal'];
+    if (traversal is! num ||
+        !traversal.isFinite ||
+        traversal < 0 ||
+        traversal != traversal.truncateToDouble()) {
+      return null;
+    }
+    return (id: state['id'] as String, traversal: traversal.toInt());
+  }
+
+  Future<void> _completeDocumentHistory(
+    InAppWebViewController controller,
+    ({int index, int length}) history,
+  ) async {
+    final pending = _historyDocument;
+    if (pending == null ||
+        pending.generation != _navigationGeneration ||
+        (pending.index == history.index && pending.length == history.length)) {
+      return;
+    }
+    final document = await _readHistoryDocument(controller);
+    if (_disposed ||
+        pending != _historyDocument ||
+        document?.id != pending.id ||
+        document!.traversal <= pending.traversal) {
+      return;
+    }
+    // An actual popstate/hashchange in the original document confirms a
+    // same-document traversal. URL KVO/commit alone may precede a full load.
+    _historyDocument = null;
+    if (!(_navigation?.isCompleted ?? true)) _navigation!.complete();
+    _emit(
+      const BrowserPageState(
+        isLoading: false,
+        progress: 1,
+        completedNavigation: true,
+      ),
+    );
   }
 
   void _onTitle(InAppWebViewController controller, String? title) {
@@ -590,6 +672,7 @@ class NativeBrowserEngine implements BrowserEngine {
     // an explicit stop() already settles its own loading state below.
     if (error.type == WebResourceErrorType.CANCELLED) return;
     if (request.isForMainFrame == true) {
+      _historyDocument = null;
       _emit(BrowserPageState(isLoading: false, error: error.description));
       if (!(_navigation?.isCompleted ?? true)) {
         _navigation!.completeError(StateError(error.description));
@@ -693,6 +776,7 @@ class NativeBrowserEngine implements BrowserEngine {
         )
       : null;
   void _onCrash() {
+    _historyDocument = null;
     _historyCommandEpoch++;
     _finishHistoryTraversal();
     if (Platform.isIOS) {
@@ -739,6 +823,7 @@ class NativeBrowserEngine implements BrowserEngine {
       initialUserScripts: _userScripts,
       keepAlive: _keepAlive,
       headlessWebView: _headless,
+      findInteractionController: _findController,
       onWebViewCreated: (controller) {
         _converted = true;
         _headless = null;
@@ -815,8 +900,19 @@ class NativeBrowserEngine implements BrowserEngine {
       }
       final target = before.index + direction;
       if (target < 0 || target >= before.length) return;
+      final document = await _readHistoryDocument(controller);
+      if (_disposed || commandEpoch != _historyCommandEpoch) return;
       _replacingRenderedDocument = _renderedDocumentUrl != null;
       _beginNavigation(fromHistory: true);
+      if (document != null) {
+        _historyDocument = (
+          generation: _navigationGeneration,
+          index: before.index,
+          length: before.length,
+          id: document.id,
+          traversal: document.traversal,
+        );
+      }
       final pending = (
         generation: _navigationGeneration,
         index: before.index,
@@ -877,6 +973,7 @@ class NativeBrowserEngine implements BrowserEngine {
   @override
   Future<void> stop() async {
     if (!_disposed) {
+      _historyDocument = null;
       _historyCommandEpoch++;
       _finishHistoryTraversal();
       await _controller?.stopLoading();
@@ -977,15 +1074,44 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   @override
-  Future<void> find(String text) => _findController.findAll(find: text);
+  Future<void> find(String text) async {
+    if (_findController != null) return _findController.findAll(find: text);
+    _findText = text;
+    await _webView.evaluateJavascript(
+      source: 'window.getSelection()?.removeAllRanges()',
+    );
+    if (text.isNotEmpty) await findNext(true);
+  }
+
   @override
-  Future<void> findNext(bool forward) =>
-      _findController.findNext(forward: forward);
+  Future<void> findNext(bool forward) async {
+    if (_findController != null) {
+      return _findController.findNext(forward: forward);
+    }
+    if (_findText.isEmpty) return;
+    await _webView.evaluateJavascript(
+      source: 'window.find(${jsonEncode(_findText)}, false, ${!forward}, true)',
+    );
+  }
+
   @override
-  Future<void> clearFind() => _findController.clearMatches();
+  Future<void> clearFind() async {
+    if (_findController != null) return _findController.clearMatches();
+    _findText = '';
+    await _webView.evaluateJavascript(
+      source: 'window.getSelection()?.removeAllRanges()',
+    );
+  }
+
   @override
   Future<Map<String, String>> downloadHeaders(String url) async {
-    final cookies = await CookieManager.instance().getCookies(url: WebUri(url));
+    final destination = Uri.parse(url);
+    final cookies =
+        (await CookieManager.instance().getCookies(url: WebUri(url)))
+            .where(
+              (cookie) => browserDownloadCookieMatches(cookie, destination),
+            )
+            .toList();
     // A download may outlive the originating tab and still follow redirects.
     // Cookies are fetched for each destination, while its UA stays stable.
     if (_downloadUserAgent == null && !_disposed) {

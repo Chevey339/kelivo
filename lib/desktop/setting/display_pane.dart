@@ -2842,7 +2842,7 @@ class _ToggleRowRequestLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);
@@ -2899,7 +2899,7 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);
