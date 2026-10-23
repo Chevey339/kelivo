@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:sqlite3/common.dart' show AllowedArgumentCount, CommonDatabase;
 
+import '../../features/intelligent_ui/catalog/ui_budgets.dart';
 import '../../utils/app_directories.dart';
 import 'schema_versions.dart';
 
@@ -722,7 +723,55 @@ class ExtensionEntityRows extends Table {
   Set<Column<Object>> get primaryKey => {kind, id};
 }
 
+/// Per-revision UI overrides; the composite primary-key index also serves
+/// owner lookups. The FTS rowid is derived and never part of durable identity.
+class GenUiSurfaceStateRows extends Table {
+  TextColumn get revisionId =>
+      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get surfaceKey =>
+      text()
+      // ignore: recursive_getters
+      .check(surfaceKey.isNotValue(''))();
+  TextColumn get sourceHash =>
+      text()
+      // ignore: recursive_getters
+      .check(sourceHash.isNotValue(''))();
+  IntColumn get stateVersion => integer()
+      .check(
+        const CustomExpression<bool>(
+          "typeof(state_version) = 'integer' AND state_version > 0",
+        ),
+      )
+      .withDefault(const Constant(1))();
+  TextColumn get stateJson => text()
+      // IS rejects missing keys instead of NULL, which SQLite CHECK accepts.
+      // CASE prevents JSON functions from inspecting malformed input.
+      .check(
+        const CustomExpression<bool>(
+          'length(CAST(state_json AS BLOB)) <= ${UiBudgets.stateBytes} AND '
+          'CASE WHEN json_valid(state_json) THEN '
+          "json_type(state_json) IS 'object' AND "
+          "json_type(state_json, '\$.inputs') IS 'object' AND "
+          "json_type(state_json, '\$.view') IS 'object' ELSE 0 END",
+        ),
+      )
+      .withDefault(const Constant('{"inputs":{},"view":{}}'))();
+  TextColumn get searchText => text()
+      .check(
+        const CustomExpression<bool>(
+          'length(CAST(search_text AS BLOB)) <= ${UiBudgets.searchTextBytes}',
+        ),
+      )
+      .withDefault(const Constant(''))();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {revisionId, surfaceKey};
+}
+
 @DriftDatabase(
+  include: {'gen_ui_search.drift'},
   tables: [
     ConversationRows,
     MessageRows,
@@ -753,6 +802,7 @@ class ExtensionEntityRows extends Table {
     MessagePromptRows,
     TombstoneRows,
     ExtensionEntityRows,
+    GenUiSurfaceStateRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -764,13 +814,15 @@ class AppDatabase extends _$AppDatabase {
   // per-conversation model override; schema 3 lays the extension groundwork
   // (extras_json columns, message updated_at/sender_id, tombstone_rows,
   // extension_entity_rows) so later features can ship without further
-  // migrations. Every version outside [publishedSchemaVersions] belongs to an
-  // unpublished or future format and is rejected.
-  static const currentSchemaVersion = 3;
+  // migrations. Schema 5 adds isolated GenUI state and its derived search index;
+  // schema 4 was never published. Every version outside
+  // [publishedSchemaVersions] belongs to an unpublished or future format and
+  // is rejected.
+  static const currentSchemaVersion = 5;
 
   /// Every schema that has ever shipped. A file at any of these can be
   /// upgraded by `SchemaMigrations`; anything else is rejected outright.
-  static const publishedSchemaVersions = <int>{1, 2, 3};
+  static const publishedSchemaVersions = <int>{1, 2, 3, 5};
 
   /// Whether a live application connection may use a file as-is: either freshly
   /// created (0) or already at the current schema.
@@ -956,6 +1008,15 @@ FROM probe;
         await m.createTable(schema.extensionEntityRows);
         // stepByStep does not create new indexes automatically.
         await m.create(schema.idxExtensionEntitiesKindOrder);
+      },
+      // v4 was never published: migrate directly between the frozen snapshots.
+      from3To5: (m, schema) async {
+        await m.createTable(schema.genUiSurfaceStateRows);
+        // The composite PK creates the ordinary owner index with the table.
+        await m.create(schema.genUiSurfaceSearch);
+        await m.create(schema.genUiStateSearchInsert);
+        await m.create(schema.genUiStateSearchUpdate);
+        await m.create(schema.genUiStateSearchDelete);
       },
     ),
     beforeOpen: (details) async {

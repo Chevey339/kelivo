@@ -6,6 +6,7 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -30,6 +31,7 @@ import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
 import 'schema_migrations.dart';
+import 'gen_ui_derived_schema.dart';
 import '../services/api/stream/stream_chunk_handler.dart';
 import '../services/api/providers/claude/claude_thinking_recovery.dart';
 import '../services/api/providers/claude/claude_history.dart';
@@ -278,6 +280,7 @@ class ChatDatabaseRepository {
         for (final sql in MessageTimelineIndex.discardStatements) {
           database.execute(sql);
         }
+        GenUiDerivedSchema.discard(database);
         final presentTables = database
             .select("SELECT name FROM sqlite_master WHERE type = 'table';")
             .map((row) => row['name'])
@@ -323,18 +326,33 @@ class ChatDatabaseRepository {
           }
         }
 
+        // This wraps the same raw connection without opening/migrating a new
+        // database. All generated DDL and backfill stay inside this raw BEGIN.
+        final schemaDatabase = AppDatabase(
+          NativeDatabase.opened(
+            database,
+            enableMigrations: false,
+            closeUnderlyingOnClose: false,
+          ),
+        );
+        try {
+          await GenUiDerivedSchema.rebuild(schemaDatabase);
+        } finally {
+          await schemaDatabase.close();
+        }
+        _validateRawSchema(database);
+        if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
+          throw StateError('database_forward_compat_foreign_keys');
+        }
+        // Version and all derived objects commit together. A failed rebuild
+        // leaves the staged snapshot at its original version and structure.
+        database.userVersion = AppDatabase.currentSchemaVersion;
         database.execute('COMMIT;');
       } catch (_) {
         database.execute('ROLLBACK;');
         rethrow;
       }
-      // Only after the structure matches, so a crash mid-rewrite leaves a file
-      // still stamped with its original (rejected) version rather than a lie.
-      database.userVersion = AppDatabase.currentSchemaVersion;
       database.execute('PRAGMA foreign_keys = ON;');
-      if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
-        throw StateError('database_forward_compat_foreign_keys');
-      }
     } on sqlite.SqliteException {
       throw StateError('database_forward_compat_failed');
     } finally {
@@ -832,6 +850,8 @@ class ChatDatabaseRepository {
       'message_prompt_rows',
       'tombstone_rows',
       'extension_entity_rows',
+      'gen_ui_surface_state_rows',
+      'gen_ui_surface_search',
     };
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
@@ -1006,6 +1026,15 @@ class ChatDatabaseRepository {
       'payload',
       'updated_at',
     ],
+    'gen_ui_surface_state_rows': [
+      'revision_id',
+      'surface_key',
+      'source_hash',
+      'state_version',
+      'state_json',
+      'search_text',
+      'updated_at',
+    ],
   };
 
   static void _validateRawSchema(sqlite.Database database) {
@@ -1044,6 +1073,7 @@ class ChatDatabaseRepository {
       'message_prompt_rows': ['revision_id'],
       'tombstone_rows': ['scope', 'entity_id'],
       'extension_entity_rows': ['kind', 'id'],
+      'gen_ui_surface_state_rows': ['revision_id', 'surface_key'],
     };
     const sortOrderTables = {
       'assistant_rows',
@@ -1237,6 +1267,7 @@ class ChatDatabaseRepository {
       'message_prompt_rows': {'revision_id->message_rows.id:CASCADE'},
       'tombstone_rows': <String>{},
       'extension_entity_rows': <String>{},
+      'gen_ui_surface_state_rows': {'revision_id->message_rows.id:CASCADE'},
     };
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
@@ -1252,6 +1283,7 @@ class ChatDatabaseRepository {
         throw StateError('foreign_key_schema:${entry.key}');
       }
     }
+    GenUiDerivedSchema.validate(database);
   }
 
   static bool _sameOrderedStrings(List<String> actual, List<String> expected) {

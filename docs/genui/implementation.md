@@ -195,7 +195,9 @@ environment variables, never read from the app's accounts or logged.
   fatal-info analysis and 9,339 tests passed/2 skipped; markstream analysis and
   296 tests passed. macOS main-app and isolated gallery debug builds, formatting
   and diff checks passed. Native GUI inspection remains pending while locked.
-- C10–C26: not implemented. No complete-delivery claim.
+- C10: schema generation and 43 focused migration/normalization checks passed;
+  independent review has no remaining findings. Full G/native build is running.
+- C11–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -496,3 +498,48 @@ and each case has one extra inherited element. Average widget-test scroll times
 were 10.56 / 13.94 / 17.51 ms before and 10.78 / 14.40 / 16.72 ms after. These
 stopwatch samples are diagnostic only; they do not establish device build/raster
 ±3% or the C24 performance acceptance. Logs remain in ignored build/genui/logs/.
+
+## C10 complete schema v5
+
+The schema advances directly from published v3 to v5; v4 remains unpublished,
+and minimumReadableSchemaVersion stays 2. The new state table owns only the
+revision/surface key, source hash, state format version, bounded JSON overrides,
+bounded semantic search text and save timestamp. The composite primary-key
+B-tree is the ordinary owner lookup index. Existing columns and meanings stay
+at their published contracts.
+
+FTS5 stores search_text only and joins by the state row's internal rowid. It is
+a disposable content-bearing index, separate from the existing body index. Three
+triggers belong exclusively to the new state table; an input/view-only update
+or unchanged search text does not retokenize. Revision/conversation cascades
+remove search rows through the state table's delete trigger. No GenUI view or
+trigger is added to existing tables.
+
+The generator-visible .drift include supplies the FTS and trigger definitions
+for fresh databases, the direct from3To5 migration and strict inspection.
+Inspection reads the generated versioned metadata through a definition-only
+owner with no executor/connection, and compares actual SQL without rewriting
+body literals. During normalization of a staged future backup, owned triggers
+are removed before the derived table/unknown columns; the generated definitions
+and index data are then rebuilt on the same raw SQLite transaction. The
+normalizer never rewrites user overrides or save times.
+
+All generation commands completed without static-fallback warnings. Frozen
+v1/v2/v3 JSON hashes are unchanged and no v4 files exist. Trigger names use the
+state prefix: Drift's SQL reader classifies every FTS-name-plus-underscore object
+as a shadow, so using the search-table prefix would silently omit real triggers
+from versioned snapshots. All three are verified in the live generated schema,
+v5 JSON, Schema5 and test schema_v5.dart.
+
+Fatal-info analysis and all 43 focused schema/migration/normalization checks
+passed. They include byte-preserving v4 refusal, direct v1/v2/v3 upgrades,
+unchanged v3 table definitions, state-only writes without retokenization,
+revision/conversation cascade cleanup, UTF-8/JSON limits, invalid trigger/table
+rejection, failed-upgrade rollback and future-normalizer rollback. Forged state
+tables with missing CHECKs, altered JSON path literals or WITHOUT ROWID retain
+the same PRAGMA shape but are rejected by complete generated-definition checks.
+Final independent review has no findings. Full G passed: root fatal-info
+analysis, 9,380 root tests (two existing skips), markstream pub get and fatal-info
+analysis, all 296 markstream tests, the macOS debug host build and diff checks.
+All ten changed Dart files are formatted. This is build/test evidence; native
+GUI acceptance remains pending while the Mac is locked.

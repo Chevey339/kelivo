@@ -39,8 +39,8 @@ typedef DatabaseUpgradeOutcome = ({
 ///    - `dart run drift_dev schema steps drift_schemas/app_database/ lib/core/database/schema_versions.dart`
 ///    Already-published `drift_schema_vN.json` files are frozen: never re-dump
 ///    one in place, or the migration it anchors stops describing what shipped.
-/// 4. Add the `fromNToN+1` callback to the `stepByStep` call in
-///    `AppDatabase.migration`.
+/// 4. Add the callback between adjacent published snapshot versions to the
+///    `stepByStep` call in `AppDatabase.migration`.
 /// 5. Append the new column names to the matching list in
 ///    `ChatDatabaseRepository._validateRawSchema`.
 ///
