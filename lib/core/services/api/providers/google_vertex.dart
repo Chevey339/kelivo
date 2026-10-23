@@ -161,7 +161,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final proj = (config.projectId ?? '').trim();
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
   final url = Uri.parse(
-    '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
+    '${vertexModelsUrl(config, location: loc, project: proj, publisher: 'anthropic')}/$upstreamId:$endpoint',
   );
 
   final requestHeaders = <String, String>{'Content-Type': 'application/json'};
@@ -729,6 +729,15 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     usageOf: () => totalUsage,
   );
 }
+
+/// The model collection URL of [publisher] (`google`, `anthropic`) on Vertex.
+String vertexModelsUrl(
+  ProviderConfig config, {
+  required String location,
+  required String project,
+  required String publisher,
+}) =>
+    '${vertexOrigin(config, location)}/v1/projects/$project/locations/$location/publishers/$publisher/models';
 
 /// Official Vertex hosts follow [location] (global, the `us` / `eu`
 /// multi-regions, or a single region); a custom [ProviderConfig.baseUrl]

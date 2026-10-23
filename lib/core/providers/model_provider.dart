@@ -11,6 +11,7 @@ import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
+import '../services/api/providers/google_vertex.dart';
 import '../models/model_spec.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_catalog/model_catalog_service.dart';
@@ -109,9 +110,12 @@ class GoogleProvider extends BaseProvider {
     if (cfg.vertexAI == true &&
         (cfg.location?.isNotEmpty == true) &&
         (cfg.projectId?.isNotEmpty == true)) {
-      final loc = cfg.location!;
-      final proj = cfg.projectId!;
-      return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
+      return vertexModelsUrl(
+        cfg,
+        location: cfg.location!.trim(),
+        project: cfg.projectId!.trim(),
+        publisher: 'google',
+      );
     }
     final base = cfg.baseUrl.endsWith('/')
         ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
@@ -425,16 +429,16 @@ class ProviderManager {
         final bool isVertexClaude =
             isVertex && upstreamId.toLowerCase().startsWith('claude-');
         if (isVertex) {
-          final loc = cfg.location!;
-          final proj = cfg.projectId!;
-          if (isVertexClaude) {
-            final ep = useStream ? 'streamRawPredict' : 'rawPredict';
-            url =
-                'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$ep';
-          } else {
-            url =
-                'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
-          }
+          final models = vertexModelsUrl(
+            cfg,
+            location: cfg.location!.trim(),
+            project: cfg.projectId!.trim(),
+            publisher: isVertexClaude ? 'anthropic' : 'google',
+          );
+          final method = isVertexClaude
+              ? (useStream ? 'streamRawPredict' : 'rawPredict')
+              : endpoint;
+          url = '$models/$upstreamId:$method';
         } else {
           final base = cfg.baseUrl.endsWith('/')
               ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
