@@ -48,6 +48,7 @@ import 'package:re_editor/re_editor.dart' show CodeEditorTapRegion;
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/long_message_editor.dart';
+import '../../../shared/widgets/app_text_selection_toolbar.dart';
 import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../core/models/composer_draft.dart';
@@ -2278,10 +2279,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
       } catch (_) {}
-      return AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: anchors,
-        buttonItems: items,
-      );
+      return AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
     }
 
     final items = defaultItems
@@ -2295,10 +2293,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         })
         .toList(growable: false);
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: anchors,
-      buttonItems: items,
-    );
+    return AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {

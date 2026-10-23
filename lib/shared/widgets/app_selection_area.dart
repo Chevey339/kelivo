@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart' show ClipboardWriter;
 import '../markdown/rich_clipboard.dart';
+import 'app_text_selection_toolbar.dart';
 import 'snackbar.dart';
 import 'selection_scroll_container.dart';
 
@@ -91,7 +92,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   Widget _buildMenu(BuildContext context, SelectableRegionState region) {
     final text = _selectedText;
     final anchors = region.contextMenuAnchors;
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    return AppTextSelectionToolbar(
       anchors: anchors,
       buttonItems: [
         ...region.contextMenuButtonItems,

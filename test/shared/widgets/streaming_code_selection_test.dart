@@ -1,4 +1,5 @@
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'package:Kelivo/shared/widgets/app_text_selection_toolbar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
@@ -78,8 +79,8 @@ void main() {
                 tester.element(find.byType(SelectionArea)),
                 region,
               )
-              as AdaptiveTextSelectionToolbar;
-      menu.buttonItems!
+              as AppTextSelectionToolbar;
+      menu.buttonItems
           .singleWhere((item) => item.type == ContextMenuButtonType.copy)
           .onPressed!();
       await tester.pump();
@@ -92,8 +93,8 @@ void main() {
                 tester.element(find.byType(SelectionArea)),
                 region,
               )
-              as AdaptiveTextSelectionToolbar;
-      translationMenu.buttonItems!
+              as AppTextSelectionToolbar;
+      translationMenu.buttonItems
           .singleWhere((item) => item.label == 'Translate')
           .onPressed!();
       await tester.pump();

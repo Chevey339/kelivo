@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
 import 'dart:async';
 import '../text_input/message_editing_controller.dart';
+import 'app_text_selection_toolbar.dart';
 
 typedef LongMessageContextMenuBuilder =
     Widget Function(
@@ -703,10 +704,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
           items,
           onDismiss,
         ) ??
-        AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: anchors,
-          buttonItems: items,
-        );
+        AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
   }
 
   void _retireInputForModeChange() {
@@ -841,7 +839,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
                   items,
                   state.hideToolbar,
                 ) ??
-                AdaptiveTextSelectionToolbar.buttonItems(
+                AppTextSelectionToolbar(
                   anchors: state.contextMenuAnchors,
                   buttonItems: items,
                 );
