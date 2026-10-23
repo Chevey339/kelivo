@@ -165,6 +165,95 @@ void main() {
       );
     }
 
+    for (final stream in [true, false]) {
+      test(
+        'replays a historical parallel batch as one response turn (stream=$stream)',
+        () async {
+          Map<String, dynamic>? requestBody;
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            requestBody =
+                jsonDecode(await utf8.decoder.bind(request).join())
+                    as Map<String, dynamic>;
+            final done = _streamChunk([
+              {'text': 'ok'},
+            ], finishReason: 'STOP');
+            request.response.write(
+              stream ? 'data: ${jsonEncode(done)}\n\n' : jsonEncode(done),
+            );
+            await request.response.close();
+          });
+
+          Map<String, dynamic> call(String id) => {
+            'id': id,
+            'type': 'function',
+            'function': {'name': 'lookup', 'arguments': '{}'},
+            'metadata': {
+              'google': {
+                'part': {
+                  'functionCall': {
+                    'id': id,
+                    'name': 'lookup',
+                    'args': <String, dynamic>{},
+                  },
+                  'thoughtSignature': 'sig-$id',
+                },
+              },
+            },
+          };
+          Map<String, dynamic> response(String id) => {
+            'role': 'tool',
+            'name': 'lookup',
+            'tool_call_id': id,
+            'content': '{"result":"$id"}',
+            'metadata': {
+              'google': {
+                'part': {
+                  'functionCall': {'id': id},
+                },
+              },
+            },
+          };
+
+          await ChatApiService.sendMessageStream(
+            config: _geminiConfig(
+              'http://${server.address.address}:${server.port}/v1beta',
+            ),
+            modelId: 'gemini-4-argon',
+            messages: [
+              {'role': 'user', 'content': 'Look both up.'},
+              {
+                'role': 'assistant',
+                'content': '',
+                'tool_calls': [call('call_a'), call('call_b')],
+              },
+              response('call_a'),
+              response('call_b'),
+              {'role': 'assistant', 'content': 'Both found.'},
+              {'role': 'user', 'content': 'Continue.'},
+            ],
+            stream: stream,
+          ).toList();
+
+          final contents = (requestBody!['contents'] as List).cast<Map>();
+          expect(contents.map((c) => c['role']), [
+            'user',
+            'model',
+            'user',
+            'model',
+            'user',
+          ]);
+          expect(
+            (contents[2]['parts'] as List).map(
+              (p) => p['functionResponse']['id'],
+            ),
+            ['call_a', 'call_b'],
+          );
+        },
+      );
+    }
+
     test('strips internal ids from historical function parts', () async {
       Map<String, dynamic>? requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
