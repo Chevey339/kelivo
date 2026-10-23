@@ -12673,6 +12673,57 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25270,6 +25321,57 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37947,4 +38049,55 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get imageExportSaving => '正在儲存圖片…';
+
+  @override
+  String get backupEncryptionTitle => '加密備份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的備份可被直接讀取。';
+
+  @override
+  String get backupEncryptionOnHint => '目前頁面內的備份均會加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '確認口令';
+
+  @override
+  String get backupEncryptionMismatch => '兩次輸入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '顯示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隱藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密備份';
+
+  @override
+  String get backupEncryptionUnlockHint => '請輸入建立這份備份時使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解鎖';
+
+  @override
+  String get backupEncryptionFailed => '口令錯誤或備份已損壞，請重試或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密備份不完整或格式無效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密備份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密備份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密備份';
 }

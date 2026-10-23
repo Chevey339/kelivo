@@ -4666,5 +4666,22 @@
     }
   },
   "imageExportProcessing": "正在合成圖片並準備預覽…",
-  "imageExportSaving": "正在儲存圖片…"
+  "imageExportSaving": "正在儲存圖片…",
+  "backupEncryptionTitle": "加密備份",
+  "backupEncryptionOffHint": "未加密的備份可被直接讀取。",
+  "backupEncryptionOnHint": "目前頁面內的備份均會加密。",
+  "backupEncryptionPasswordHint": "請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。",
+  "backupEncryptionPassword": "口令",
+  "backupEncryptionConfirmPassword": "確認口令",
+  "backupEncryptionMismatch": "兩次輸入的口令不一致。",
+  "backupEncryptionShowPassword": "顯示口令",
+  "backupEncryptionHidePassword": "隱藏口令",
+  "backupEncryptionUnlockTitle": "加密備份",
+  "backupEncryptionUnlockHint": "請輸入建立這份備份時使用的口令。",
+  "backupEncryptionUnlock": "解鎖",
+  "backupEncryptionFailed": "口令錯誤或備份已損壞，請重試或取消。",
+  "backupEncryptionInvalid": "加密備份不完整或格式無效。",
+  "backupEncryptionUnsupported": "此加密備份需要更新版本的 Kelivo。",
+  "backupProgressEncrypting": "正在加密備份",
+  "backupProgressDecrypting": "正在解密備份"
 }

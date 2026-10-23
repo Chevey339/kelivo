@@ -5860,5 +5860,22 @@
     }
   },
   "imageExportProcessing": "Combining image and preparing preview…",
-  "imageExportSaving": "Saving image…"
+  "imageExportSaving": "Saving image…",
+  "backupEncryptionTitle": "Encrypt backups",
+  "backupEncryptionOffHint": "Unencrypted backups can be read by anyone with the file.",
+  "backupEncryptionOnHint": "Backups are encrypted while this page stays open.",
+  "backupEncryptionPasswordHint": "Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.",
+  "backupEncryptionPassword": "Password",
+  "backupEncryptionConfirmPassword": "Confirm password",
+  "backupEncryptionMismatch": "Passwords do not match.",
+  "backupEncryptionShowPassword": "Show password",
+  "backupEncryptionHidePassword": "Hide password",
+  "backupEncryptionUnlockTitle": "Encrypted backup",
+  "backupEncryptionUnlockHint": "Enter the password used to create this backup.",
+  "backupEncryptionUnlock": "Unlock",
+  "backupEncryptionFailed": "The password is incorrect, or the backup is damaged. Try again or cancel.",
+  "backupEncryptionInvalid": "The encrypted backup is incomplete or invalid.",
+  "backupEncryptionUnsupported": "This encrypted backup requires a newer version of Kelivo.",
+  "backupProgressEncrypting": "Encrypting backup",
+  "backupProgressDecrypting": "Decrypting backup"
 }

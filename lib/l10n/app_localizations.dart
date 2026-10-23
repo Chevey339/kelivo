@@ -23681,6 +23681,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving image…'**
   String get imageExportSaving;
+
+  /// No description provided for @backupEncryptionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt backups'**
+  String get backupEncryptionTitle;
+
+  /// No description provided for @backupEncryptionOffHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unencrypted backups can be read by anyone with the file.'**
+  String get backupEncryptionOffHint;
+
+  /// No description provided for @backupEncryptionOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups are encrypted while this page stays open.'**
+  String get backupEncryptionOnHint;
+
+  /// No description provided for @backupEncryptionPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.'**
+  String get backupEncryptionPasswordHint;
+
+  /// No description provided for @backupEncryptionPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get backupEncryptionPassword;
+
+  /// No description provided for @backupEncryptionConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get backupEncryptionConfirmPassword;
+
+  /// No description provided for @backupEncryptionMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match.'**
+  String get backupEncryptionMismatch;
+
+  /// No description provided for @backupEncryptionShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get backupEncryptionShowPassword;
+
+  /// No description provided for @backupEncryptionHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get backupEncryptionHidePassword;
+
+  /// No description provided for @backupEncryptionUnlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted backup'**
+  String get backupEncryptionUnlockTitle;
+
+  /// No description provided for @backupEncryptionUnlockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the password used to create this backup.'**
+  String get backupEncryptionUnlockHint;
+
+  /// No description provided for @backupEncryptionUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get backupEncryptionUnlock;
+
+  /// No description provided for @backupEncryptionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The password is incorrect, or the backup is damaged. Try again or cancel.'**
+  String get backupEncryptionFailed;
+
+  /// No description provided for @backupEncryptionInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The encrypted backup is incomplete or invalid.'**
+  String get backupEncryptionInvalid;
+
+  /// No description provided for @backupEncryptionUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This encrypted backup requires a newer version of Kelivo.'**
+  String get backupEncryptionUnsupported;
+
+  /// No description provided for @backupProgressEncrypting.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypting backup'**
+  String get backupProgressEncrypting;
+
+  /// No description provided for @backupProgressDecrypting.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting backup'**
+  String get backupProgressDecrypting;
 }
 
 class _AppLocalizationsDelegate

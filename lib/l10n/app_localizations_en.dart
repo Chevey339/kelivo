@@ -13274,4 +13274,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageExportSaving => 'Saving image…';
+
+  @override
+  String get backupEncryptionTitle => 'Encrypt backups';
+
+  @override
+  String get backupEncryptionOffHint =>
+      'Unencrypted backups can be read by anyone with the file.';
+
+  @override
+  String get backupEncryptionOnHint =>
+      'Backups are encrypted while this page stays open.';
+
+  @override
+  String get backupEncryptionPasswordHint =>
+      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.';
+
+  @override
+  String get backupEncryptionPassword => 'Password';
+
+  @override
+  String get backupEncryptionConfirmPassword => 'Confirm password';
+
+  @override
+  String get backupEncryptionMismatch => 'Passwords do not match.';
+
+  @override
+  String get backupEncryptionShowPassword => 'Show password';
+
+  @override
+  String get backupEncryptionHidePassword => 'Hide password';
+
+  @override
+  String get backupEncryptionUnlockTitle => 'Encrypted backup';
+
+  @override
+  String get backupEncryptionUnlockHint =>
+      'Enter the password used to create this backup.';
+
+  @override
+  String get backupEncryptionUnlock => 'Unlock';
+
+  @override
+  String get backupEncryptionFailed =>
+      'The password is incorrect, or the backup is damaged. Try again or cancel.';
+
+  @override
+  String get backupEncryptionInvalid =>
+      'The encrypted backup is incomplete or invalid.';
+
+  @override
+  String get backupEncryptionUnsupported =>
+      'This encrypted backup requires a newer version of Kelivo.';
+
+  @override
+  String get backupProgressEncrypting => 'Encrypting backup';
+
+  @override
+  String get backupProgressDecrypting => 'Decrypting backup';
 }
