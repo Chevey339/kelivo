@@ -164,7 +164,11 @@ environment variables, never read from the app's accounts or logged.
   findings; 61 focused tests passed; root fatal-info analysis and 9,140 tests
   passed/2 skipped; markstream analysis and 296 tests passed; macOS debug build,
   formatting and diff checks passed.
-- C04–C26: not implemented. No complete-delivery claim.
+- C04: bounded evaluator accepted; 77 focused tests passed, root fatal-info
+  analysis and 9,156 tests passed/2 skipped; markstream analysis and 296 tests
+  passed; macOS debug build and diff check passed. Independent review has no
+  remaining findings after sampling and signed-zero cache fixes.
+- C05–C26: not implemented. No complete-delivery claim.
 
 ## C02 contracts
 
@@ -212,3 +216,24 @@ Independent early review confirmed and then rechecked the fixes for a valid
 overflowing/failing diagnostic serialization. The reviewer also checked 2,205
 incremental rewrites against fresh parsing. Current review has no actionable
 findings. Regression tests include these cases and all catalog examples.
+
+## C04 bounded evaluation
+
+`runtime/ui_evaluator.dart` executes only catalog expressions and functions,
+with strict scalar types, finite doubles, short-circuit branches, immutable
+collections and one shared operation budget. Derived declarations resolve in
+iterative dependency order. Accepted input batches reuse valid unaffected
+results; failed calculations retry with the next batch's fresh budget.
+
+Samples include both endpoints, preserve null domain gaps and reject partial
+results on budget failure. Interpolation stays inside the requested interval
+and is nondecreasing even when adjacent requested points round to the same
+representable double. Zero has one representation so cached formatting agrees
+with fresh evaluation. No expression performs IO or invokes actions.
+
+Result shape checks reuse immutable value identities to bound alias expansion:
+logical UTF-8 JSON size is at most the source budget, logical values at most
+the batch operation budget, and result depth at most the expression depth.
+This prevents tiny repeated-array programs from producing enormous serialized
+results, without expanding the shared object graph during validation. These
+checks supplement the catalog's later chart/table-specific data limits.
