@@ -1590,6 +1590,7 @@ class _HomePageState extends State<HomePage>
             context,
             anchorKey: _inputBarKey,
             assistantId: a.id,
+            conversationId: _controller.currentConversation?.id,
           );
         } else {
           _controller.dismissKeyboard();

@@ -13332,4 +13332,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupProgressDecrypting => 'Decrypting backup';
+
+  @override
+  String toolsSheetEnabledCount(int count) {
+    return '$count on';
+  }
+
+  @override
+  String get toolsSheetWorkspaceUnbound => 'Not linked';
+
+  @override
+  String get toolsSheetManage => 'Manage';
+
+  @override
+  String toolsSheetServerToolsCount(int enabled, int total) {
+    return '$enabled/$total tools';
+  }
+
+  @override
+  String get mcpPageStatusFailed => 'Connection failed';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return 'Tools $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return 'Select $name';
+  }
+
+  @override
+  String get mcpIconTitle => 'Server icon';
+
+  @override
+  String get mcpIconInvalid =>
+      'Unable to use this image. Choose a valid image up to 10 MB.';
+
+  @override
+  String get mcpSelectServers => 'Select servers';
+
+  @override
+  String get mcpMoveToGroup => 'Move to group';
+
+  @override
+  String get mcpRenameGroup => 'Rename group';
+
+  @override
+  String get mcpDeleteGroupConfirm =>
+      'Servers in this group will be moved to Other. The servers will not be deleted.';
+
+  @override
+  String get mcpGroupNameInvalid => 'Use a nonempty, unique group name.';
+
+  @override
+  String get mcpEnableSelected => 'Enable';
+
+  @override
+  String get mcpDisableSelected => 'Disable';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return 'Delete $count selected servers?';
+  }
 }

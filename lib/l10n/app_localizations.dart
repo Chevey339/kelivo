@@ -23783,6 +23783,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decrypting backup'**
   String get backupProgressDecrypting;
+
+  /// No description provided for @toolsSheetEnabledCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} on'**
+  String toolsSheetEnabledCount(int count);
+
+  /// No description provided for @toolsSheetWorkspaceUnbound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not linked'**
+  String get toolsSheetWorkspaceUnbound;
+
+  /// No description provided for @toolsSheetManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get toolsSheetManage;
+
+  /// No description provided for @toolsSheetServerToolsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled}/{total} tools'**
+  String toolsSheetServerToolsCount(int enabled, int total);
+
+  /// No description provided for @mcpPageStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get mcpPageStatusFailed;
+
+  /// No description provided for @mcpPageCardToolsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools {enabled}/{total}'**
+  String mcpPageCardToolsShort(int enabled, int total);
+
+  /// No description provided for @mcpPageSelectServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Select {name}'**
+  String mcpPageSelectServer(String name);
+
+  /// No description provided for @mcpIconTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server icon'**
+  String get mcpIconTitle;
+
+  /// No description provided for @mcpIconInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to use this image. Choose a valid image up to 10 MB.'**
+  String get mcpIconInvalid;
+
+  /// No description provided for @mcpSelectServers.
+  ///
+  /// In en, this message translates to:
+  /// **'Select servers'**
+  String get mcpSelectServers;
+
+  /// No description provided for @mcpMoveToGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to group'**
+  String get mcpMoveToGroup;
+
+  /// No description provided for @mcpRenameGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename group'**
+  String get mcpRenameGroup;
+
+  /// No description provided for @mcpDeleteGroupConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers in this group will be moved to Other. The servers will not be deleted.'**
+  String get mcpDeleteGroupConfirm;
+
+  /// No description provided for @mcpGroupNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a nonempty, unique group name.'**
+  String get mcpGroupNameInvalid;
+
+  /// No description provided for @mcpEnableSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get mcpEnableSelected;
+
+  /// No description provided for @mcpDisableSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get mcpDisableSelected;
+
+  /// No description provided for @mcpDeleteSelectedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected servers?'**
+  String mcpDeleteSelectedConfirm(int count);
 }
 
 class _AppLocalizationsDelegate

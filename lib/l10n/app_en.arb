@@ -5877,5 +5877,63 @@
   "backupEncryptionInvalid": "The encrypted backup is incomplete or invalid.",
   "backupEncryptionUnsupported": "This encrypted backup requires a newer version of Kelivo.",
   "backupProgressEncrypting": "Encrypting backup",
-  "backupProgressDecrypting": "Decrypting backup"
+  "backupProgressDecrypting": "Decrypting backup",
+  "toolsSheetEnabledCount": "{count} on",
+  "toolsSheetWorkspaceUnbound": "Not linked",
+  "toolsSheetManage": "Manage",
+  "toolsSheetServerToolsCount": "{enabled}/{total} tools",
+  "mcpPageStatusFailed": "Connection failed",
+  "mcpPageCardToolsShort": "Tools {enabled}/{total}",
+  "mcpPageSelectServer": "Select {name}",
+  "@toolsSheetEnabledCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@toolsSheetServerToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@mcpPageCardToolsShort": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@mcpPageSelectServer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "mcpIconTitle": "Server icon",
+  "mcpIconInvalid": "Unable to use this image. Choose a valid image up to 10 MB.",
+  "mcpSelectServers": "Select servers",
+  "mcpMoveToGroup": "Move to group",
+  "mcpRenameGroup": "Rename group",
+  "mcpDeleteGroupConfirm": "Servers in this group will be moved to Other. The servers will not be deleted.",
+  "mcpGroupNameInvalid": "Use a nonempty, unique group name.",
+  "mcpEnableSelected": "Enable",
+  "mcpDisableSelected": "Disable",
+  "mcpDeleteSelectedConfirm": "Delete {count} selected servers?",
+  "@mcpDeleteSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

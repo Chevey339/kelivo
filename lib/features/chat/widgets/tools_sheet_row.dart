@@ -15,7 +15,8 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 class ToolsSheetRow extends StatelessWidget {
   const ToolsSheetRow({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.label,
     this.subtitle,
     this.detail,
@@ -23,9 +24,13 @@ class ToolsSheetRow extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.trailing,
-  });
+    this.minHeight,
+    this.borderRadius,
+    this.backgroundColor,
+  }) : assert(icon != null || leading != null);
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String label;
   final String? subtitle;
   final String? detail;
@@ -33,6 +38,9 @@ class ToolsSheetRow extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? trailing;
+  final double? minHeight;
+  final BorderRadius? borderRadius;
+  final Color? backgroundColor;
 
   static Widget chevron(BuildContext context) {
     return Icon(
@@ -47,76 +55,90 @@ class ToolsSheetRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final onColor = selected ? cs.primary : cs.onSurface;
     final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
-    return SizedBox(
-      height: hasSubtitle ? 56 : 48,
-      child: IosCardPress(
-        borderRadius: BorderRadius.circular(14),
-        baseColor: sheetTileColor(context),
-        duration: const Duration(milliseconds: 260),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: onColor),
-            const SizedBox(width: 10),
-            Expanded(
-              child: hasSubtitle
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: AppFontWeights.medium,
-                            color: onColor,
-                          ),
-                        ),
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: AppFontWeights.medium,
-                        color: onColor,
-                      ),
-                    ),
-            ),
-            if (detail != null && detail!.isNotEmpty) ...[
-              Text(
-                detail!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: cs.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            trailing ??
-                (selected
-                    ? Icon(Lucide.Check, size: 18, color: cs.primary)
-                    : const SizedBox(width: 18)),
-          ],
-        ),
+    final row = IosCardPress(
+      borderRadius: borderRadius ?? BorderRadius.circular(14),
+      baseColor: backgroundColor ?? sheetTileColor(context),
+      duration: const Duration(milliseconds: 260),
+      onTap: onTap,
+      onLongPress: onLongPress,
+      padding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: minHeight == null ? 0 : 4,
       ),
+      child: Row(
+        children: [
+          leading ?? Icon(icon, size: 20, color: onColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: hasSubtitle
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: AppFontWeights.medium,
+                          color: leading == null ? onColor : cs.onSurface,
+                        ),
+                      ),
+                      Text(
+                        subtitle!,
+                        maxLines: leading == null ? 1 : null,
+                        overflow: leading == null
+                            ? TextOverflow.ellipsis
+                            : null,
+                        style: TextStyle(
+                          fontSize: leading == null ? 13 : 12,
+                          color: cs.onSurface.withValues(
+                            alpha: leading == null ? .6 : .5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.medium,
+                      color: onColor,
+                    ),
+                  ),
+          ),
+          if (detail != null && detail!.isNotEmpty) ...[
+            Text(
+              detail!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          trailing ??
+              (selected
+                  ? Icon(Lucide.Check, size: 18, color: cs.primary)
+                  : const SizedBox(width: 18)),
+        ],
+      ),
+    );
+    if (leading == null) {
+      return SizedBox(height: minHeight ?? (hasSubtitle ? 56 : 48), child: row);
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: minHeight ?? (hasSubtitle ? 56 : 48),
+      ),
+      child: row,
     );
   }
 }

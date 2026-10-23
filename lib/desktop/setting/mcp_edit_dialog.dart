@@ -1,3 +1,4 @@
+import '../../features/mcp/widgets/mcp_icon_picker.dart';
 import 'dart:math' as math;
 import '../../core/services/mcp/stdio_arguments.dart';
 import '../../features/mcp/widgets/mcp_environment_picker.dart';
@@ -332,6 +333,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             ],
           ),
         ),
+        if (isEdit) McpServerIconField(serverId: widget.serverId!),
         const SizedBox(height: 10),
         // Name row: read-only text for builtin, editable for others
         if (isBuiltin) ...[

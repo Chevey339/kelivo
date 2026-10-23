@@ -1,3 +1,4 @@
+import 'mcp_icon_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/mcp/stdio_arguments.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
@@ -212,6 +213,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             ),
           ],
         ),
+        if (isEdit) McpServerIconField(serverId: widget.serverId!),
         const SizedBox(height: 10),
         if (isBuiltin)
           SectionCard(

@@ -16,7 +16,6 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/chat_tools_sheet.dart';
-import 'package:Kelivo/features/home/services/local_tool_labels.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
@@ -259,7 +258,7 @@ void main() {
 
     expect(find.byKey(ChatToolsSheet.localGroupKey), findsOneWidget);
     expect(
-      find.text('0/${availableLocalToolIds().length}'),
+      find.text(l10n.toolsSheetEnabledCount(0)),
       findsOneWidget,
       reason: 'the folded header still reports how many tools are on',
     );
@@ -271,11 +270,11 @@ void main() {
     expect(find.text(l10n.assistantEditPageLocalToolsTab), findsOneWidget);
   });
 
-  testWidgets('unfolding a group swaps its summary for the rows', (
+  testWidgets('unfolding a group retains its summary above the rows', (
     tester,
   ) async {
     final l10n = await pumpSheet(tester);
-    final count = '0/${availableLocalToolIds().length}';
+    final count = l10n.toolsSheetEnabledCount(0);
     expect(find.text(count), findsOneWidget);
 
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
@@ -283,8 +282,8 @@ void main() {
 
     expect(
       find.text(count),
-      findsNothing,
-      reason: 'an open group shows its rows instead of a summary',
+      findsOneWidget,
+      reason: 'the enabled count remains visible when a group is open',
     );
     expect(
       find.byKey(ChatToolsSheet.localToolKey(LocalToolNames.timeInfo)),
@@ -349,7 +348,7 @@ void main() {
     // The count is the folded header's summary, so fold the group to read it.
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
     await tester.pumpAndSettle();
-    expect(find.text('1/${availableLocalToolIds().length}'), findsOneWidget);
+    expect(find.text(l10n.toolsSheetEnabledCount(1)), findsOneWidget);
   });
 
   testWidgets('hides the MCP group when nothing is connected', (tester) async {

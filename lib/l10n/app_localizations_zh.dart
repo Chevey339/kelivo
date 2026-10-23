@@ -3267,7 +3267,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpPageStatusAuthorizing => '授权中…';
 
   @override
-  String get mcpPageStatusDisabled => '已禁用';
+  String get mcpPageStatusDisabled => '已停用';
 
   @override
   String get mcpPageOAuthRequired => '需要 OAuth 登录';
@@ -12724,6 +12724,67 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupProgressDecrypting => '正在解密备份';
+
+  @override
+  String toolsSheetEnabledCount(int count) {
+    return '$count 已开';
+  }
+
+  @override
+  String get toolsSheetWorkspaceUnbound => '未绑定';
+
+  @override
+  String get toolsSheetManage => '管理';
+
+  @override
+  String toolsSheetServerToolsCount(int enabled, int total) {
+    return '$enabled/$total 个工具';
+  }
+
+  @override
+  String get mcpPageStatusFailed => '连接失败';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '选择 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '服务器图标';
+
+  @override
+  String get mcpIconInvalid => '无法使用此图片，请选择不超过 10 MB 的有效图片。';
+
+  @override
+  String get mcpSelectServers => '选择服务器';
+
+  @override
+  String get mcpMoveToGroup => '移到分组';
+
+  @override
+  String get mcpRenameGroup => '重命名分组';
+
+  @override
+  String get mcpDeleteGroupConfirm => '组内服务器将移至「其他」，不会删除服务器。';
+
+  @override
+  String get mcpGroupNameInvalid => '请输入非空且不重复的分组名称。';
+
+  @override
+  String get mcpEnableSelected => '启用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '删除选中的 $count 个服务器？';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15989,7 +16050,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpPageStatusAuthorizing => '授权中…';
 
   @override
-  String get mcpPageStatusDisabled => '已禁用';
+  String get mcpPageStatusDisabled => '已停用';
 
   @override
   String get mcpPageOAuthRequired => '需要 OAuth 登录';
@@ -25372,6 +25433,67 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupProgressDecrypting => '正在解密备份';
+
+  @override
+  String toolsSheetEnabledCount(int count) {
+    return '$count 已开';
+  }
+
+  @override
+  String get toolsSheetWorkspaceUnbound => '未绑定';
+
+  @override
+  String get toolsSheetManage => '管理';
+
+  @override
+  String toolsSheetServerToolsCount(int enabled, int total) {
+    return '$enabled/$total 个工具';
+  }
+
+  @override
+  String get mcpPageStatusFailed => '连接失败';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '选择 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '服务器图标';
+
+  @override
+  String get mcpIconInvalid => '无法使用此图片，请选择不超过 10 MB 的有效图片。';
+
+  @override
+  String get mcpSelectServers => '选择服务器';
+
+  @override
+  String get mcpMoveToGroup => '移到分组';
+
+  @override
+  String get mcpRenameGroup => '重命名分组';
+
+  @override
+  String get mcpDeleteGroupConfirm => '组内服务器将移至「其他」，不会删除服务器。';
+
+  @override
+  String get mcpGroupNameInvalid => '请输入非空且不重复的分组名称。';
+
+  @override
+  String get mcpEnableSelected => '启用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '删除选中的 $count 个服务器？';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38100,4 +38222,65 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupProgressDecrypting => '正在解密備份';
+
+  @override
+  String toolsSheetEnabledCount(int count) {
+    return '$count 已開';
+  }
+
+  @override
+  String get toolsSheetWorkspaceUnbound => '未綁定';
+
+  @override
+  String get toolsSheetManage => '管理';
+
+  @override
+  String toolsSheetServerToolsCount(int enabled, int total) {
+    return '$enabled/$total 個工具';
+  }
+
+  @override
+  String get mcpPageStatusFailed => '連線失敗';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '選擇 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '伺服器圖示';
+
+  @override
+  String get mcpIconInvalid => '無法使用此圖片，請選擇不超過 10 MB 的有效圖片。';
+
+  @override
+  String get mcpSelectServers => '選擇伺服器';
+
+  @override
+  String get mcpMoveToGroup => '移到群組';
+
+  @override
+  String get mcpRenameGroup => '重新命名群組';
+
+  @override
+  String get mcpDeleteGroupConfirm => '群組內的伺服器將移至「其他」，不會刪除伺服器。';
+
+  @override
+  String get mcpGroupNameInvalid => '請輸入非空且不重複的群組名稱。';
+
+  @override
+  String get mcpEnableSelected => '啟用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '刪除選取的 $count 個伺服器？';
+  }
 }

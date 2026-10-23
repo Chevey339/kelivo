@@ -4683,5 +4683,22 @@
   "backupEncryptionInvalid": "加密備份不完整或格式無效。",
   "backupEncryptionUnsupported": "此加密備份需要更新版本的 Kelivo。",
   "backupProgressEncrypting": "正在加密備份",
-  "backupProgressDecrypting": "正在解密備份"
+  "backupProgressDecrypting": "正在解密備份",
+  "toolsSheetEnabledCount": "{count} 已開",
+  "toolsSheetWorkspaceUnbound": "未綁定",
+  "toolsSheetManage": "管理",
+  "toolsSheetServerToolsCount": "{enabled}/{total} 個工具",
+  "mcpPageStatusFailed": "連線失敗",
+  "mcpPageCardToolsShort": "工具 {enabled}/{total}",
+  "mcpPageSelectServer": "選擇 {name}",
+  "mcpIconTitle": "伺服器圖示",
+  "mcpIconInvalid": "無法使用此圖片，請選擇不超過 10 MB 的有效圖片。",
+  "mcpSelectServers": "選擇伺服器",
+  "mcpMoveToGroup": "移到群組",
+  "mcpRenameGroup": "重新命名群組",
+  "mcpDeleteGroupConfirm": "群組內的伺服器將移至「其他」，不會刪除伺服器。",
+  "mcpGroupNameInvalid": "請輸入非空且不重複的群組名稱。",
+  "mcpEnableSelected": "啟用",
+  "mcpDisableSelected": "停用",
+  "mcpDeleteSelectedConfirm": "刪除選取的 {count} 個伺服器？"
 }
