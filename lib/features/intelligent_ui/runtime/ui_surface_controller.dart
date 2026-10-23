@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
-import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
+import '../protocol/ui_source_hash.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_expression_walk.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_ir.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_stream_parser.dart';
@@ -75,12 +75,14 @@ final class UiSurfaceController {
   bool _forcedReadOnly;
   bool _saveFailed = false;
   bool _disposed = false;
+  Future<void> Function()? _flush;
   int _epoch = 0;
   int _sequence = 0;
   int _interaction = 0;
   String? _sourceHash;
   final _statusListeners = <Object, void Function()>{};
   final _stateListeners = <Object, void Function()>{};
+  final _acceptedStateListeners = <Object, void Function()>{};
   final _resetListeners = <Object, void Function()>{};
   final _nodeListeners = <String, Map<Object, void Function()>>{};
 
@@ -143,11 +145,7 @@ final class UiSurfaceController {
       final sameSource =
           parsed.closed && _parse.closed && parsed.source == _parse.source;
       _parse = parsed;
-      _sourceHash = parsed.closed
-          ? sha256
-                .convert(utf8.encode('${UiCatalog.version}\n${parsed.source}'))
-                .toString()
-          : null;
+      _sourceHash = parsed.closed ? uiSourceHash(parsed.source) : null;
       if (reset) {
         _epoch++;
         if (!sameSource) {
@@ -284,17 +282,44 @@ final class UiSurfaceController {
     return true;
   }
 
+  /// Storage is supplied by the host; this controller remains pure Dart.
+  void Function() bindFlush(Future<void> Function() flush) {
+    _flush = flush;
+    return () {
+      if (identical(_flush, flush)) _flush = null;
+    };
+  }
+
+  Future<void> flush() => _flush?.call() ?? Future.value();
+
+  void flushQuietly() {
+    unawaited(
+      flush().catchError((Object _) {
+        // The persistence binding owns the visible failure and retry state.
+      }),
+    );
+  }
+
   void Function() listenStatus(void Function() listener) =>
       _listen(_statusListeners, listener);
   void Function() listenState(void Function() listener) =>
       _listen(_stateListeners, listener);
+
+  /// Includes an explicit no-op choice/Reset while a restore is pending. Such
+  /// a choice must replace the stored value even when the provisional default
+  /// on screen already equals the value the user chose.
+  void Function() listenAcceptedState(void Function() listener) =>
+      _listen(_acceptedStateListeners, listener);
   void Function() listenReset(void Function() listener) =>
       _listen(_resetListeners, listener);
   void Function() listenNode(String name, void Function() listener) =>
       _listen(_nodeListeners.putIfAbsent(name, () => {}), listener);
 
   UiMutationResult _acceptState(UiSurfaceState next, {bool restored = false}) {
-    if (next.json == _state.json) return UiMutationResult.unchanged;
+    if (next.json == _state.json) {
+      if (!restored) _notify(_acceptedStateListeners);
+      return UiMutationResult.unchanged;
+    }
     final before = _status;
     final oldView = _state.view;
     _state = next;
@@ -311,7 +336,10 @@ final class UiSurfaceController {
     }
     _notifyNodes(changed);
     if (_status != before) _notify(_statusListeners);
-    if (!restored) _notify(_stateListeners);
+    if (!restored) {
+      _notify(_stateListeners);
+      _notify(_acceptedStateListeners);
+    }
     return UiMutationResult.accepted;
   }
 
@@ -386,9 +414,11 @@ final class UiSurfaceController {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _flush = null;
     _epoch++;
     _nodeListeners.clear();
     _stateListeners.clear();
+    _acceptedStateListeners.clear();
     _resetListeners.clear();
     _statusListeners.clear();
   }

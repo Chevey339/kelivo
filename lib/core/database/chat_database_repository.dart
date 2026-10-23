@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../features/intelligent_ui/storage/ui_state_repository.dart';
+import '../../features/intelligent_ui/host/ui_source_map.dart';
 import '../models/composer_draft.dart';
 import 'composer_draft_store.dart';
 import 'dart:convert';
@@ -163,7 +166,19 @@ class ChatDatabaseRepository {
 
   final AppDatabase _db;
   late final _timelineIndex = MessageTimelineIndex(_db);
-  late final ComposerDraftStore composerDrafts = ComposerDraftStore(_db);
+  final Zone _lifetimeZone = Zone.current;
+  late final UiStateRepository genUiStates = UiStateRepository(
+    _db,
+    getMessage,
+    lifetimeZone: _lifetimeZone,
+  );
+  late final ComposerDraftStore composerDrafts = ComposerDraftStore(
+    _db,
+    writeTransaction: _writeTransaction,
+  );
+
+  Future<T> _writeTransaction<T>(Future<T> Function() action) =>
+      genUiStates.transaction(action);
   final File? _databaseFile;
   final ChatDatabaseObserver _observer;
   bool _messageSearchFtsReady = false;
@@ -234,7 +249,7 @@ class ChatDatabaseRepository {
     }
     return _observer.measure(
       ChatDatabaseOperation.commandFinalCheckpoint,
-      () => _db.transaction(() async {
+      () => _writeTransaction(() async {
         await _updateStreamingCheckpoint(
           message,
           toolEvents,
@@ -1456,7 +1471,9 @@ class ChatDatabaseRepository {
 
   Future<void> close() async {
     await composerDrafts.flush();
+    await genUiStates.pauseAndDrain();
     composerDrafts.dispose();
+    genUiStates.discardAfterCutover();
     await _db.close();
   }
 
@@ -1985,7 +2002,7 @@ class ChatDatabaseRepository {
     required ChatMessage response,
     required bool createConversation,
     String? expectedContextRevision,
-  }) => _db.transaction(() async {
+  }) => _writeTransaction(() async {
     final existing = await getMessage(response.id);
     if (existing != null) {
       return (await getConversation(existing.conversationId))!;
@@ -4384,7 +4401,7 @@ class ChatDatabaseRepository {
   }
 
   Future<Conversation?> duplicateConversation(String sourceId) {
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final sourceRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(sourceId))).getSingleOrNull();
@@ -4525,7 +4542,7 @@ class ChatDatabaseRepository {
     required String title,
     String? assistantId,
   }) {
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final sourceRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(sourceId))).getSingleOrNull();
@@ -4647,7 +4664,7 @@ class ChatDatabaseRepository {
     required String assistantId,
     required DateTime updatedAt,
   }) {
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final activeRun =
           await (_db.select(_db.generationRunRows)
                 ..where(
@@ -4686,7 +4703,7 @@ class ChatDatabaseRepository {
   Future<void> putMessage(ChatMessage message, {int? messageOrder}) async {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       await _invalidateEmptyAcknowledgement();
       // An upsert may be an update in disguise, so it bumps updated_at; a
       // fresh insert getting "updated_at = now ≈ timestamp" is harmless.
@@ -4739,7 +4756,7 @@ class ChatDatabaseRepository {
     );
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
-      () => _db.transaction(() async {
+      () => _writeTransaction(() async {
         final afterUser = await _appendLinearMessageToConversation(
           conversation: conversation,
           message: userMessage,
@@ -4789,7 +4806,7 @@ class ChatDatabaseRepository {
     }
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
-      () => _db.transaction(() async {
+      () => _writeTransaction(() async {
         var current = conversation;
         if (truncateFuture) {
           current = await _truncateLinearMessageGroupsAfter(
@@ -4832,7 +4849,7 @@ class ChatDatabaseRepository {
     );
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
-      () => _db.transaction(() async {
+      () => _writeTransaction(() async {
         var current = conversation;
         if (truncateFuture) {
           current = await _truncateLinearMessageGroupsAfter(
@@ -4935,7 +4952,7 @@ class ChatDatabaseRepository {
         'Message and conversation IDs must match.',
       );
     }
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       await _invalidateEmptyAcknowledgement();
       final existingRow = await (_db.select(
         _db.conversationRows,
@@ -4974,6 +4991,7 @@ class ChatDatabaseRepository {
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
   }) async {
+    final originalMessage = message;
     if (_messageHasAttachmentParts(message)) {
       await markMessageAssetReferencesDirty(message.id);
     }
@@ -4998,6 +5016,13 @@ class ChatDatabaseRepository {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
     final parts = _partsForPersistence(message, toolEvents);
+    final canonical = message.copyWith(parts: parts);
+    await genUiStates.reconcileSource(canonical);
+    if (UiMessageSource.of(parts).hasCandidate) {
+      // Validate/copy before COMMIT. Publishing cannot throw after durability.
+      final publishParts = originalMessage.prepareStorageParts(parts);
+      genUiStates.afterCommit(publishParts);
+    }
     await (_db.delete(_db.messagePartRows)..where(
           (row) =>
               row.revisionId.equals(message.id) &
@@ -5066,7 +5091,7 @@ class ChatDatabaseRepository {
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
   }) async {
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final originalRow = await (_db.select(
         _db.messageRows,
       )..where((row) => row.id.equals(messageId))).getSingleOrNull();
@@ -5244,7 +5269,7 @@ class ChatDatabaseRepository {
       return;
     }
 
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       await _writeBackupData(
         conversations: conversations,
         messages: messages,
@@ -5292,7 +5317,7 @@ class ChatDatabaseRepository {
       }
     }
 
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       if (overwrite) await _clearChatRows();
 
       final conversations = <Conversation>[];
@@ -5346,7 +5371,7 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       await _clearChatRows();
       await _writeBackupData(
         conversations: conversations,
@@ -5373,7 +5398,7 @@ class ChatDatabaseRepository {
         snapshotFile.absolute.path,
       ]);
       attached = true;
-      return await _db.transaction(() async {
+      return await _writeTransaction(() async {
         // These rows own the workspace references carried by imported chats.
         // Device-local external folder grants are deliberately excluded.
         await _db.customStatement(
@@ -6053,6 +6078,12 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
+    genUiStates.invalidateAfterCommit(
+      conversations: {
+        for (final conversation in conversations) conversation.id,
+      },
+      revisions: {for (final entry in messages) entry.message.id},
+    );
     if (conversations.isNotEmpty || messages.isNotEmpty) {
       await _invalidateEmptyAcknowledgement();
     }
@@ -6112,7 +6143,7 @@ class ChatDatabaseRepository {
   }
 
   Future<void> updateMessage(ChatMessage message) async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       await _updateMessageRow(message);
       await _replaceMessageParts(message);
     });
@@ -6196,7 +6227,7 @@ class ChatDatabaseRepository {
           : const Value.absent(),
       durationMs: durationMs != null ? Value(durationMs) : const Value.absent(),
     );
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       var write = companion;
       final current = await (_db.select(
         _db.messageRows,
@@ -6220,6 +6251,9 @@ class ChatDatabaseRepository {
       final updated = await getMessage(messageId);
       if (updated == null) return null;
       if (content == null && reasoningText == null && parts == null) {
+        if (reasoningSegmentsJson != null) {
+          await genUiStates.reconcileSource(updated);
+        }
         return updated;
       }
       var nextParts = updated.parts;
@@ -6271,7 +6305,7 @@ class ChatDatabaseRepository {
     String? generationRunId,
     int? checkpointSeq,
   }) async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       // Guard against a late flush resurrecting an already-finalized message.
       // A streaming snapshot (is_streaming = true) that arrives after the
       // terminal write has committed (row is_streaming = 0) must not overwrite
@@ -6341,6 +6375,7 @@ class ChatDatabaseRepository {
     await composerDrafts.delete(
       id,
       deleteConversation: () async {
+        genUiStates.invalidateAfterCommit(conversations: {id});
         final deleted = await (_db.delete(
           _db.conversationRows,
         )..where((t) => t.id.equals(id))).go();
@@ -6418,7 +6453,7 @@ class ChatDatabaseRepository {
         );
       }
     }
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final conversationRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
@@ -6480,6 +6515,7 @@ class ChatDatabaseRepository {
       final deletedIds = deletedRows
           .map((row) => row.id)
           .toList(growable: false);
+      genUiStates.invalidateAfterCommit(revisions: deletedIds.toSet());
       await (_db.delete(
         _db.generationRunRows,
       )..where((row) => row.targetRevisionId.isIn(deletedIds))).go();
@@ -6564,13 +6600,14 @@ class ChatDatabaseRepository {
   }
 
   Future<void> clearAllData() async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       await _clearChatRows();
       await _acknowledgeIntentionalEmptyState();
     });
   }
 
   Future<void> _clearChatRows() async {
+    genUiStates.invalidateAfterCommit(all: true);
     await _db.customStatement(
       "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile')",
     );
@@ -6619,7 +6656,7 @@ class ChatDatabaseRepository {
     String messageId,
     List<Map<String, dynamic>> events,
   ) async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       final message = await getMessage(messageId);
       if (message == null) throw StateError('tool_event_message_missing');
       await _replaceMessageParts(message, toolEvents: events);
@@ -6627,7 +6664,7 @@ class ChatDatabaseRepository {
   }
 
   Future<void> deleteToolEvents(String messageId) async {
-    await _db.transaction(() async {
+    await _writeTransaction(() async {
       final message = await getMessage(messageId);
       if (message != null) {
         await _replaceMessageParts(
@@ -6921,7 +6958,7 @@ class ChatDatabaseRepository {
 
   /// Atomically terminalizes every generation abandoned by a prior process.
   Future<int> resetStaleStreamingState() async {
-    return _db.transaction(() async {
+    return _writeTransaction(() async {
       final activeStates = const [
         'preparing',
         'requesting',

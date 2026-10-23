@@ -226,6 +226,7 @@ final class UiInteractionController {
     }
     _notify(id);
     _notifyFormsFor(id);
+    if (finish) surface.flushQuietly();
     return result;
   }
 
@@ -236,6 +237,7 @@ final class UiInteractionController {
     } else if (_canEdit(id, token)) {
       _touched.add(id);
       _notify(id);
+      surface.flushQuietly();
     }
   }
 
@@ -266,6 +268,7 @@ final class UiInteractionController {
     String id,
     Object? value, {
     required UiRuntimeToken token,
+    bool flush = true,
   }) {
     if (!surface.accepts(token) || _disposed) return UiMutationResult.stale;
     if (!_canEdit(id, token)) return UiMutationResult.readOnly;
@@ -295,6 +298,7 @@ final class UiInteractionController {
       _supersedeDrafts(binding.name);
     }
     _notify(id);
+    if (flush) surface.flushQuietly();
     return result;
   }
 
@@ -329,6 +333,7 @@ final class UiInteractionController {
     final action = node.declaration.arguments['action'];
     if (action is UiReset) {
       surface.reset(token: token);
+      surface.flushQuietly();
       return const UiActionResult();
     }
     if (action is! UiAsk || node.askText == null || node.askContext == null) {
@@ -433,6 +438,7 @@ final class UiInteractionController {
         UiBudgets.modelContentBytes) {
       return const UiActionResult(block: UiActionBlock.contextBudget);
     }
+    surface.flushQuietly();
     // Everything below comes from one synchronous completed batch.
     final read = surface.captureRead();
     final current = read.nodes[id]!;

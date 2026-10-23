@@ -1,3 +1,10 @@
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
+import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/native.dart';
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
 import 'package:Kelivo/features/intelligent_ui/host/gallery/message_gallery.dart'
     show genUiMessageFixture;
@@ -70,6 +77,125 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+  desktopTest(
+    'repository replacement rebinds a cached native block with the same child',
+    (tester) async {
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+      Future<(ChatDatabaseRepository, ChatService, ChatMessage)> seed(
+        String name,
+      ) async {
+        final repo = ChatDatabaseRepository(
+          AppDatabase(NativeDatabase.memory()),
+        );
+        await repo.putConversation(
+          Conversation(id: 'native-conversation', title: 'Test'),
+        );
+        await repo.putMessage(message(fence));
+        var run = await repo.createGenerationRun(
+          id: 'run',
+          conversationId: 'native-conversation',
+          targetRevisionId: 'native-revision',
+          createdAt: DateTime.now().toUtc(),
+        );
+        for (final next in [
+          GenerationRunState.requesting,
+          GenerationRunState.streaming,
+          GenerationRunState.completed,
+        ]) {
+          run = await repo.transitionGenerationRun(
+            id: run.id,
+            expectedState: run.state,
+            expectedStateRevision: run.stateRevision,
+            nextState: next,
+            updatedAt: DateTime.now().toUtc(),
+          );
+        }
+        final controller =
+            UiSurfaceController(
+              owner: const UiSurfaceOwner(
+                revisionId: 'native-revision',
+                surfaceKey: '0:0',
+              ),
+            )..updateSource(
+              body,
+              closed: true,
+              generation: UiGenerationStatus.complete,
+            );
+        controller.setInputs({'name': name}, token: controller.token);
+        final lease = repo.genUiStates.attach(
+          'native-conversation',
+          controller.owner,
+          controller.sourceHash!,
+        )!;
+        repo.genUiStates.accept(lease, controller.captureSnapshot());
+        await repo.genUiStates.flush();
+        controller.dispose();
+        return (
+          repo,
+          ChatService(existingRepository: repo),
+          (await repo.getMessage('native-revision'))!,
+        );
+      }
+
+      final first = (await tester.runAsync(() => seed('first database')))!;
+      final second = (await tester.runAsync(() => seed('second database')))!;
+      addTearDown(() async {
+        first.$2.dispose();
+        second.$2.dispose();
+        await first.$1.close();
+        await second.$1.close();
+      });
+      final sameChild = _MessageListHarness(messages: [first.$3]);
+      Widget app(ChatService service) =>
+          ChangeNotifierProvider.value(value: service, child: sameChild);
+      await tester.pumpWidget(app(first.$2));
+      await tester.pumpAndSettle();
+      await tester.runAsync(first.$1.genUiStates.flush);
+      await tester.pumpAndSettle();
+      final old = tester
+          .widget<GenUiSurface>(find.byType(GenUiSurface))
+          .controller;
+      final registry = tester
+          .widget<UiRuntimeScope>(find.byType(UiRuntimeScope))
+          .registry;
+      expect(old.state.inputs['name'], 'first database');
+      await tester.pumpWidget(app(second.$2));
+      await tester.pumpAndSettle();
+      await tester.runAsync(second.$1.genUiStates.flush);
+      await tester.pumpAndSettle();
+      final current = tester
+          .widget<GenUiSurface>(find.byType(GenUiSurface))
+          .controller;
+      expect(identical(current, old), isFalse);
+      expect(
+        tester.widget<UiRuntimeScope>(find.byType(UiRuntimeScope)).registry,
+        same(registry),
+      );
+      expect(current.state.inputs['name'], 'second database');
+      await tester.enterText(find.byType(EditableText).first, 'new value');
+      await tester.pump();
+      await tester.runAsync(current.flush);
+      final oldLease = first.$1.genUiStates.attach(
+        'native-conversation',
+        current.owner,
+        current.sourceHash!,
+      )!;
+      final oldSaved = await tester.runAsync(
+        () => first.$1.genUiStates.load(oldLease),
+      );
+      expect(oldSaved!.snapshot!.state.inputs['name'], 'first database');
+      final newLease = second.$1.genUiStates.attach(
+        'native-conversation',
+        current.owner,
+        current.sourceHash!,
+      )!;
+      final newSaved = await tester.runAsync(
+        () => second.$1.genUiStates.load(newLease),
+      );
+      expect(newSaved!.snapshot!.state.inputs['name'], 'new value');
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   desktopTest(
     'trusted assistant works inside actual list; field pointer retains keyboard focus',
     (tester) async {

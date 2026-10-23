@@ -77,13 +77,14 @@ class _GenUiSliderState extends State<GenUiSlider> {
     return snapped.isFinite ? snapped.clamp(_min, _max) : value;
   }
 
-  void _set(double value) {
+  void _set(double value, {bool flush = true}) {
     if (!_interactive) return;
     _focus.requestFocus();
     _scope!.controller.setValue(
       widget.id,
       _snapped(value),
       token: widget.token,
+      flush: flush,
     );
   }
 
@@ -101,6 +102,7 @@ class _GenUiSliderState extends State<GenUiSlider> {
           : (_min >= 0 && _max >= 0) || (_min <= 0 && _max <= 0)
           ? _min + (_max - _min) * ratio
           : (1 - ratio) * _min + ratio * _max,
+      flush: false,
     );
   }
 
@@ -209,12 +211,14 @@ class _GenUiSliderState extends State<GenUiSlider> {
                                     TapGestureRecognizer
                                   >(
                                     () => TapGestureRecognizer(),
-                                    (instance) =>
-                                        instance.onTapUp = (d) => _point(
-                                          d.localPosition.dx,
-                                          constraints.maxWidth,
-                                          rtl,
-                                        ),
+                                    (instance) => instance.onTapUp = (d) {
+                                      _point(
+                                        d.localPosition.dx,
+                                        constraints.maxWidth,
+                                        rtl,
+                                      );
+                                      _scope!.controller.surface.flushQuietly();
+                                    },
                                   ),
                               HorizontalDragGestureRecognizer:
                                   GestureRecognizerFactoryWithHandlers<
@@ -223,6 +227,14 @@ class _GenUiSliderState extends State<GenUiSlider> {
                                     instance,
                                   ) {
                                     instance.onlyAcceptDragOnThreshold = true;
+                                    instance.onEnd = (_) => _scope!
+                                        .controller
+                                        .surface
+                                        .flushQuietly();
+                                    instance.onCancel = () => _scope!
+                                        .controller
+                                        .surface
+                                        .flushQuietly();
                                     instance.onStart = (d) => _point(
                                       d.localPosition.dx,
                                       constraints.maxWidth,

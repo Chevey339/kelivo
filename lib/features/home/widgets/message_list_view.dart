@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_persistence_host.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
 import '../../browser/models/browser_tool_presentation.dart';
@@ -1748,8 +1749,9 @@ class _MessageListViewState extends State<MessageListView> {
       showTokenStats: widget.showTokenStats,
       assistant: widget.assistant,
     );
-    return UiRuntimeScope(
+    return UiPersistenceHost(
       registry: _uiRegistry,
+      conversationId: widget.messages.firstOrNull?.conversationId,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final horizontalPad =

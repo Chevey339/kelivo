@@ -67,5 +67,6 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
           linkHandler: widget.linkHandler,
           exporting: widget.host.exporting,
           onAsk: widget.host.binding.onAsk,
+          onRetrySave: _entry.controller.flushQuietly,
         );
 }

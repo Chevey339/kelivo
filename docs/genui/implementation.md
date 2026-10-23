@@ -543,3 +543,64 @@ analysis, 9,380 root tests (two existing skips), markstream pub get and fatal-in
 analysis, all 296 markstream tests, the macOS debug host build and diff checks.
 All ten changed Dart files are formatted. This is build/test evidence; native
 GUI acceptance remains pending while the Mac is locked.
+
+## C11 reliable state persistence
+
+The repository now owns the debounce queue and snapshot lifetime. Accepted
+input/view choices update memory immediately; only normalized overrides are
+written. A save validates the actual revision, conversation, assistant role,
+ordered source parts, completed generation, closed fence and source hash inside
+its transaction. Upserts preserve the state rowid and semantic search cache;
+unchanged normalized state does not change the save time. No v5 DDL is added.
+
+Source-changing commands, replacement imports and deletion enter the same
+writer before opening their transaction. Composer operations keep the order
+composer queue -> GenUI writer -> database. Nested commands retain savepoints,
+and publish invalidations only after their outer commit succeeds. The active
+transaction context expires when its body ends, including the asynchronous
+COMMIT window. Queue continuations preserve repository lifetime zone values and
+error handling but dispatch IO microtasks independently of a page clock; debounce
+timers keep the lifetime clock. Results bridge back to the caller's error zone.
+A stale source attachment remains a candidate until database validation, so it
+cannot evict a valid pending value.
+
+Bindings restore once per runtime/source and retain the controller's user-input
+guard. Explicit no-op choices and Reset are accepted snapshots, so choosing the
+provisional default while restore is pending still replaces the durable value.
+IME metadata and incomplete numeric drafts are not accepted snapshots. Reopening
+while a save is pending or failed reads the latest accepted value. Failed loads
+can be retried without saving defaults over the unread state. Save failures
+appear only as the header retry badge.
+
+Field commit/blur, slider release, owner departure, backgrounding and service
+close flush accepted state. Temporary conversations stay in memory. Pause/drain
+blocks new edits and drains issued SQL; resume reattaches cards mounted during
+the pause. Source invalidation, deletion and successful cutover revoke old
+leases. Repository replacement publishes a scope revision so cached Markdown
+blocks obtain a new controller even when the child widget instance is unchanged.
+
+Canonical ordered parts (including persisted reasoning/tool overlays) are
+prepared before commit and published to the original message only afterwards,
+without changing its text body. Final streaming publication reads this canonical
+message; earlier notifier snapshots remain read-only. Storage and host source
+eligibility share the same selector, including legacy/v2 reasoning metadata.
+
+The focused run passed 336 checks including all 28 current GenUI goldens,
+repository/controller/widget cases, generation commands and composer regression
+tests. A separate slider release/keyboard flush regression passed. Real SQLite
+cases cover reopen, issued SQL/deletion ordering, source A->B->A, savepoint and
+finalize rollback, failed restore/save retry, pause/resume, replacement imports
+and tool-boundary changes. Actual message-host tests cover replacing the
+repository under the same cached child. Independent review returned no findings
+after fixes; four separate pure Dart/SQLite probes were also reported passing.
+The first full root run was stopped when the scheduled-task widget harness
+exposed a queue captured by a paused creator clock; it is not passing evidence.
+After the IO-zone correction, the original scheduled-task suite plus all GenUI
+tests passed (283 checks). A separate regression with a stopped creator
+microtask clock also passed while retaining zone values. The IO-zone change
+passed a further independent FakeAsync/SQLite review probe. Final G passed:
+root fatal-info analysis, all 9,426 root tests (two existing skips), independent
+markstream dependency resolution, fatal-info analysis and all 296 tests, the
+macOS debug host build and diff checks. All 20 changed Dart files are formatted.
+The tested source hashes remained unchanged through staging. Native GUI
+acceptance remains separate and pending while the Mac is locked.

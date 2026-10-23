@@ -238,6 +238,31 @@ toggle = Switch(label="Enable",bind=$on)''');
     },
   );
   testWidgets(
+    'slider coalesces a drag and flushes on release or keyboard commit',
+    (tester) async {
+      final c = _controller(r'''$n: number = 5
+root = Slider(label="Amount",bind=$n,min=0,max=10)''');
+      var flushes = 0;
+      c.bindFlush(() async {
+        flushes++;
+      });
+      await tester.pumpWidget(_app(c));
+      final drag = await tester.startGesture(tester.getCenter(_track()));
+      await drag.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await drag.moveBy(const Offset(25, 0));
+      await tester.pump();
+      expect(c.captureRead().inputs['n'], greaterThan(5));
+      expect(flushes, 0);
+      await drag.up();
+      await tester.pump();
+      expect(flushes, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(flushes, 2);
+    },
+  );
+  testWidgets(
     'slider keyboard and semantics change bounded state without a Material slider',
     (tester) async {
       final c = _controller(r'''$n: number = 5

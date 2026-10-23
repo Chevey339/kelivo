@@ -18,8 +18,15 @@ import 'app_database.dart';
 /// Device-local editor state. All mutations have an owner, including writes
 /// completing after navigation. Files live outside the portable backup roots.
 class ComposerDraftStore extends ChangeNotifier {
-  ComposerDraftStore(this._db, {Future<Directory> Function()? directory})
-    : _directory = directory ?? _defaultDirectory;
+  ComposerDraftStore(
+    this._db, {
+    Future<Directory> Function()? directory,
+    Future<T> Function<T>(Future<T> Function())? writeTransaction,
+  }) : _directory = directory ?? _defaultDirectory,
+       _writeTransaction = writeTransaction ?? _db.transaction;
+
+  // Acquire the repository writer only inside the composer queue, before DB.
+  final Future<T> Function<T>(Future<T> Function()) _writeTransaction;
 
   static const kind = 'composerDraft';
   static const entryKind = 'composerNewEntry';
@@ -352,7 +359,7 @@ class ComposerDraftStore extends ChangeNotifier {
           }
           if (!isCurrent(id, generation)) continue;
           var committed = false;
-          await _db.transaction(() async {
+          await _writeTransaction(() async {
             committed =
                 snapshot.submissionId != null &&
                 await wasSubmitted(snapshot.submissionId!);
@@ -868,7 +875,7 @@ class ComposerDraftStore extends ChangeNotifier {
         } else {
           from.compose = const ComposerDraftInput();
         }
-        await _db.transaction(() async {
+        await _writeTransaction(() async {
           await persist(to);
           await persist(from);
           check();
@@ -883,7 +890,7 @@ class ComposerDraftStore extends ChangeNotifier {
           // The database already committed, but live inputs are untouched.
           // Restore both together before reporting a conflict; queued deletes
           // still own removal of a conversation deleted during the commit.
-          await _db.transaction(() async {
+          await _writeTransaction(() async {
             if (!_deleted.contains(sourceId)) await persist(source);
             if (!_deleted.contains(targetId)) await persist(target);
           });
@@ -956,7 +963,7 @@ class ComposerDraftStore extends ChangeNotifier {
           .toList();
       final snapshot = ComposerDraft.fromJson(draft.toJson())
         ..assistantId = assistantId;
-      final moved = await _db.transaction(() async {
+      final moved = await _writeTransaction(() async {
         if (moveConversation != null && !await moveConversation()) return false;
         if (snapshot.hasContent) {
           await _put(kind, id, snapshot.toJson(), ownerId: assistantId);
@@ -997,7 +1004,7 @@ class ComposerDraftStore extends ChangeNotifier {
     invalidateOperations(id);
     try {
       await _serialize(
-        () => _db.transaction(() async {
+        () => _writeTransaction(() async {
           if (deleteConversation != null) await deleteConversation();
           await _deleteRow(kind, id);
           await _db.customStatement(

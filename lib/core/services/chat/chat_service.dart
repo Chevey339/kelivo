@@ -395,6 +395,7 @@ class ChatService extends ChangeNotifier {
       } catch (_) {}
     }
     await _repo.composerDrafts.flush();
+    await _repo.genUiStates.flush();
     _repo.composerDrafts.removeListener(notifyListeners);
     _initialized = false;
     for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {

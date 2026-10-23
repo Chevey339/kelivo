@@ -215,7 +215,10 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       ),
     );
     if (!mounted) return;
-    if (reset == true) controller.reset(token: token);
+    if (reset == true) {
+      controller.reset(token: token);
+      controller.flushQuietly();
+    }
     _moreFocus.requestFocus();
   }
 

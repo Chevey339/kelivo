@@ -21,7 +21,21 @@ class ChatMessage extends HiveObject {
   /// Hive field 2 (legacy content string) is intentionally not a stored field
   /// here. [ChatMessageAdapter] still reads field 2 for migration only;
   /// [content] is derived from [TextPart]s.
-  final List<MessagePart> parts;
+  final List<MessagePart> _parts;
+  List<MessagePart>? _storageParts;
+  List<MessagePart> get parts => _storageParts ?? _parts;
+
+  /// Canonical ordered storage parts may add reasoning/tool overlays, never
+  /// rewrite the body. Prepare before commit; invoke the assignment afterwards.
+  /// Existing copied/notifier snapshots remain snapshots of their own parts.
+  void Function() prepareStorageParts(List<MessagePart> value) {
+    final frozen = List<MessagePart>.unmodifiable(value);
+    if (frozen.whereType<TextPart>().map((part) => part.text).join() !=
+        content) {
+      throw StateError('Storage parts changed the message body');
+    }
+    return () => _storageParts = frozen;
+  }
 
   // SQLite order metadata for sorting a bounded cache without loading every
   // message id. Not serialized: message_rows remains the ordering authority.
@@ -164,7 +178,7 @@ class ChatMessage extends HiveObject {
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.finishUsage,
-  }) : parts = List<MessagePart>.unmodifiable(
+  }) : _parts = List<MessagePart>.unmodifiable(
          parts ?? <MessagePart>[TextPart(content ?? '')],
        ),
        id = id ?? const Uuid().v4(),
