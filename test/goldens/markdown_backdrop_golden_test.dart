@@ -1,3 +1,4 @@
+import 'dart:ffi' show Abi;
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -15,9 +16,20 @@ import '../support/business_test_harness.dart';
 import '../support/markdown_backdrop_host.dart';
 
 void main() {
+  late String goldenEnvironment;
   late Uint8List wallpaper;
   final diagrams = <bool, Uint8List>{};
   setUpAll(() async {
+    goldenEnvironment = switch (Abi.current()) {
+      Abi.macosArm64 => 'macos_arm64',
+      Abi.linuxArm64 => 'linux_arm64',
+      Abi.linuxX64 => 'linux_x64',
+      final abi => throw UnsupportedError(
+        'Markdown backdrop goldens have no baseline for $abi. '
+        'Generate and review an environment baseline using the same Flutter '
+        'version documented in baselines/markdown_backdrop/README.md.',
+      ),
+    };
     final fonts =
         jsonDecode(await rootBundle.loadString('FontManifest.json')) as List;
     for (final font in fonts.cast<Map<String, dynamic>>()) {
@@ -186,7 +198,7 @@ void main() {
         await expectLater(
           find.byKey(key),
           matchesGoldenFile(
-            'baselines/markdown_backdrop/${dark ? "dark" : "light"}_${entry.key}.png',
+            'baselines/markdown_backdrop/$goldenEnvironment/${dark ? "dark" : "light"}_${entry.key}.png',
           ),
         );
       });

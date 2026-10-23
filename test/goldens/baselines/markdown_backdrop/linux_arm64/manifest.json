@@ -1,0 +1,37 @@
+{
+  "flutter_tag": "3.47.6",
+  "framework_revision": "5fc346839b5d0eef006ed8404392afb4dfae428d",
+  "engine_revision": "692136cb6582dbfc5af3fb33c2515a069f2f66d0",
+  "dart_version": "3.13.5",
+  "os": "Ubuntu 24.04.3 LTS",
+  "abi": "linuxArm64",
+  "execution": "Linux arm64 container on OrbStack; not GitHub-hosted CI",
+  "source_base_commit": "58d9badfb0912bb01739a71d2dc26ed7deded90b",
+  "source_changes": "Only ABI-specific golden path selection; rendering and fixtures unchanged.",
+  "source_fixture_sha256": {
+    "test/goldens/markdown_backdrop_golden_test.dart": "14d26c469e5c87f105d0aadb8cda7a8f6f6449aa5e3ba2a3199c463d9a47bf6f",
+    "test/support/markdown_backdrop_host.dart": "7bb6e98af48f5722ee5a7480b46e3a40bab46d6c99d9214555760195c406b481",
+    "test/support/business_test_harness.dart": "29f234931d086412eee9699f72e6e5d36bf7117b77282130b5d71ad74c9dc7ec",
+    "test/fixtures/images/markdown_wallpaper.jpg": "7bba84934d23a70d7e567b8b04323e592199476a248db0a8777d7030cd665be7",
+    "test/fixtures/fonts/JetBrainsMono-Regular.ttf": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f",
+    "pubspec.lock": "925cb88e39439548e8a38f09b15cbc31fbc9e8b0133690ca9bf9e7d83f4bb666"
+  },
+  "image_sha256": {
+    "dark_code.png": "5ea8cfb4e74a9ea345da9dab39a35b1ad053921c83d2074684e02caf49d80c93",
+    "dark_details.png": "4748e93b82ffc14163cfc7734b13dd09dbd9580a6efb025724a20bab872edd02",
+    "dark_diagram.png": "6861b6b4155b7f811e128ca24b4a4d4988a769e8fe7813de561f647dabb7ff30",
+    "dark_table.png": "651268a30d0f7784921096d667609e6ea1b389892261ef502b007147622d6287",
+    "light_code.png": "44a9e010c4856dea616388bd3d18aba605d83a2a21a4ee3d3dfaee6413c18fcc",
+    "light_details.png": "7bc434e3c1087797f05d84c65723c294b273403661a298dc797a55ead62190eb",
+    "light_diagram.png": "1f124d794ee273624297772ca7ea3e88d308d495df92cdf2f9d6ed88fc4f7906",
+    "light_table.png": "57a83c10c6e3ccc3d84b00093bb40d64fb7e41768595a57c128121a1f051571d"
+  },
+  "verification": {
+    "command": "flutter test test/goldens/markdown_backdrop_golden_test.dart --reporter expanded",
+    "missing_assets_exit_code": 1,
+    "comparison_exit_code": 0,
+    "tests_passed": 8,
+    "comparator": "Flutter default LocalFileComparator; zero tolerance"
+  },
+  "provenance": "Copied prior actual rendered images in this environment; verified by rendering all eight tests again against them."
+}
