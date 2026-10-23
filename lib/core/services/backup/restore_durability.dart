@@ -510,7 +510,13 @@ final class _WindowsRestoreDurability implements RestoreDurability {
             'restore_durability_rename:$errorCode:$target',
             sourcePath,
           ),
-          {'operation': 'MoveFileExW', 'Windows error code': '$errorCode'},
+          {
+            'operation': 'MoveFileExW',
+            'Windows error code': '$errorCode',
+            'source type': sourceType == FileSystemEntityType.directory
+                ? 'directory'
+                : 'file',
+          },
         );
       }
     } finally {

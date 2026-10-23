@@ -16,6 +16,7 @@ import 'package:Kelivo/core/database/empty_database_recovery_guard.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
+import 'package:Kelivo/core/services/backup/restore_diagnostic_exception.dart';
 import 'package:Kelivo/shared/widgets/restore_failure_screen.dart';
 
 /// Stands in for the platform channel, which never answers under `flutter
@@ -144,6 +145,68 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets(
+    'blocked directory continues the same restore without restarting',
+    (tester) async {
+      useTallSurface(tester);
+      var retries = 0;
+      var restarts = 0;
+      final directory = await tester.runAsync(
+        () => Directory.systemTemp.createTemp('restore-blocked-ui-'),
+      );
+      addTearDown(() => directory!.delete(recursive: true));
+      final report = StartupFailureReport.capture(
+        stage: StartupFailureStage.restoreGate,
+        error: RestoreFileSystemException(
+          const FileSystemException(
+            'restore_durability_rename:5',
+            r'C:\app\workspaces',
+          ),
+          const {
+            'operation': 'MoveFileExW',
+            'source type': 'directory',
+            'Windows error code': '5',
+            'source path': r'C:\app\workspaces',
+          },
+        ),
+        restoreDetails: const {
+          'restore stage': 'preservingCurrentData',
+          'last observed receipt state': 'prepared',
+        },
+      );
+      await tester.pumpWidget(
+        wrap(
+          RestoreFailureScreen(
+            report: report,
+            restart: () async => restarts++,
+            retryRestore: () async => retries++,
+            appDataDirectory: directory,
+            appVersionLoader: stubVersion,
+          ),
+        ),
+      );
+      await settleDiagnostics(tester);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(RestoreFailureScreen)),
+      )!;
+      expect(
+        find.text(l10n.backupRestoreDirectoryBlockedTitle),
+        findsOneWidget,
+      );
+      expect(find.text(r'C:\app\workspaces'), findsOneWidget);
+      expect(find.text(l10n.backupRestoreFailureRestartButton), findsNothing);
+      expect(find.text(l10n.startupRecoverySnapshotTitle), findsNothing);
+      expect(find.text(l10n.startupRecoverySectionDataTitle), findsNothing);
+      await tester.tap(find.text(l10n.backupRestoreContinueButton));
+      await tester.pump();
+      expect(retries, 1);
+      expect(restarts, 0);
+      await tester.tap(find.text(l10n.backupRestoreContinueButton));
+      expect(retries, 1);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('explains fail-closed startup without opening business UI', (
     tester,
   ) async {

@@ -1685,6 +1685,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'The restore could not be completed. Kelivo verified and kept your previous data.';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle =>
+      'Restore is waiting for a folder';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows could not move the folder below. Close terminals, editors, or other programs using it, then continue restoring. If it is still blocked, check that your account can move the folder. Your restore progress has been kept.';
+
+  @override
+  String get backupRestoreContinueButton => 'Continue restore';
+
+  @override
   String get backupRestoreFailureTitle => 'Restore requires attention';
 
   @override

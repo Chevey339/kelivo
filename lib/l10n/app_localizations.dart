@@ -3202,6 +3202,24 @@ abstract class AppLocalizations {
   /// **'The restore could not be completed. Kelivo verified and kept your previous data.'**
   String get backupRestoreRolledBackContent;
 
+  /// No description provided for @backupRestoreDirectoryBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore is waiting for a folder'**
+  String get backupRestoreDirectoryBlockedTitle;
+
+  /// No description provided for @backupRestoreDirectoryBlockedContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows could not move the folder below. Close terminals, editors, or other programs using it, then continue restoring. If it is still blocked, check that your account can move the folder. Your restore progress has been kept.'**
+  String get backupRestoreDirectoryBlockedContent;
+
+  /// No description provided for @backupRestoreContinueButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue restore'**
+  String get backupRestoreContinueButton;
+
   /// No description provided for @backupRestoreFailureTitle.
   ///
   /// In en, this message translates to:

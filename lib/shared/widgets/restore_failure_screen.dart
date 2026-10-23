@@ -41,6 +41,7 @@ class RestoreFailureScreen extends StatefulWidget {
     super.key,
     required this.report,
     required this.restart,
+    this.retryRestore,
     this.appDataDirectory,
     this.appVersionLoader,
     this.businessLease,
@@ -50,6 +51,7 @@ class RestoreFailureScreen extends StatefulWidget {
   final StartupFailureReport report;
   final RestoreBusinessLease? businessLease;
   final Future<void> Function() restart;
+  final Future<void> Function()? retryRestore;
 
   /// Overridable so widget tests do not have to wait on a platform channel.
   final StartupAppVersionLoader? appVersionLoader;
@@ -101,6 +103,11 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   bool get _isLeaseUnavailable =>
       _report.diagnosticCode == 'RestoreBusinessLeaseUnavailable';
 
+  String? get _blockedDirectory => _report.blockedRestoreDirectory;
+
+  bool get _canContinueRestore =>
+      _blockedDirectory != null && widget.retryRestore != null;
+
   bool get _busy => _restarting || _recoveryBusy || _validatingCopies;
 
   @override
@@ -122,7 +129,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           appDataDirectory: widget.appDataDirectory,
           appVersion: version,
           buildNumber: build,
-          inspectDatabase: !_isStorageActivationFailure,
+          inspectDatabase:
+              !_isStorageActivationFailure && _blockedDirectory == null,
         );
         report = _report.withEnvironment(environment);
       } catch (_) {
@@ -141,7 +149,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       // Listing only reads names and sizes; nothing here opens a database,
       // which is exactly what this screen cannot assume is safe to do.
       var copies = const <LocalCopy>[];
-      if (directory != null) {
+      if (directory != null && _blockedDirectory == null) {
         try {
           final catalog = LocalCopyCatalog(
             appDataDirectory: directory,
@@ -218,7 +226,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _restartFailed = false;
     });
     try {
-      await widget.restart();
+      await (_canContinueRestore ? widget.retryRestore! : widget.restart)();
     } catch (error, stackTrace) {
       _reportError(error, stackTrace, 'while restarting after restore failure');
       if (!mounted) return;
@@ -603,7 +611,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final showRecoveryActions =
-        widget.appDataDirectory != null && !_isLeaseUnavailable;
+        widget.appDataDirectory != null &&
+        !_isLeaseUnavailable &&
+        _blockedDirectory == null;
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -615,7 +625,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
               children: [
                 _Header(
-                  title: _isLeaseUnavailable
+                  title: _blockedDirectory != null
+                      ? l10n.backupRestoreDirectoryBlockedTitle
+                      : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableTitle
                       : _isStorageActivationFailure
                       ? l10n.recoveryStorageFailureTitle
@@ -624,7 +636,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       : _isEmptyDatabase
                       ? l10n.recoveryEmptyDataTitle
                       : l10n.backupRestoreFailureTitle,
-                  body: _isLeaseUnavailable
+                  body: _blockedDirectory != null
+                      ? l10n.backupRestoreDirectoryBlockedContent
+                      : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableContent
                       : _isStorageActivationFailure
                       ? (_report.diagnosticCode ==
@@ -637,6 +651,10 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       ? l10n.recoveryEmptyDataBody
                       : l10n.backupRestoreFailureContent,
                 ),
+                if (_blockedDirectory != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(_blockedDirectory!),
+                ],
                 const SizedBox(height: 24),
                 if (showRecoveryActions) ...[
                   _Section(
@@ -717,7 +735,11 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                             ),
                           )
                         : const Icon(Lucide.RefreshCw, size: 18),
-                    label: Text(l10n.backupRestoreFailureRestartButton),
+                    label: Text(
+                      _canContinueRestore
+                          ? l10n.backupRestoreContinueButton
+                          : l10n.backupRestoreFailureRestartButton,
+                    ),
                   ),
                 ),
                 if (_restartFailed) ...[
