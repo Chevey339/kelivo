@@ -113,7 +113,9 @@ class _DiagramTab extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           splashFactory: NoSplash.splashFactory,
-          backgroundColor: selected ? theme.colors.surface : Colors.transparent,
+          backgroundColor: selected
+              ? theme.colors.fillRaised
+              : Colors.transparent,
           foregroundColor: selected ? theme.colors.ink : theme.colors.ink2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
           textStyle: theme.chrome.label,

@@ -1,6 +1,7 @@
 import 'dart:ui' show PointerDeviceKind;
 import 'package:markstream/markstream.dart';
 import '../markdown/diagram_chrome.dart';
+import '../markdown/markdown_surface_scope.dart';
 
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -72,6 +73,26 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
     final l10n = AppLocalizations.of(context)!;
     final exporting = ExportCaptureScope.of(context);
     final colors = widget.theme.colors;
+    final preserveImageSurface =
+        _selectedTab == _PlantUMLTab.image &&
+        widget.theme.backdrop != MarkstreamBackdrop.plain &&
+        MarkdownSurfaceScope.maybeOf(context)?.customBackground != null;
+    var imageColors = colors;
+    if (preserveImageSurface) {
+      // Remote SVGs can be transparent and keep their own line/text colors.
+      // Preserve the original canvas behind them when a custom bubble changes
+      // the local syntax palette; source colors must not be interpreted as ink.
+      final scheme = Theme.of(context).colorScheme;
+      final dark = scheme.brightness == Brightness.dark;
+      imageColors = colors.copyWith(
+        fillBlock: Color.alphaBlend(
+          Colors.white.withValues(alpha: dark ? .04 : .70),
+          scheme.surface,
+        ),
+        ink2: scheme.onSurface.withValues(alpha: dark ? .70 : .72),
+        ink3: scheme.onSurface.withValues(alpha: dark ? .48 : .50),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -116,7 +137,9 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
             width: double.infinity,
             height: _previewHeight,
             child: ColoredBox(
-              color: colors.fillBlock,
+              color: preserveImageSurface
+                  ? imageColors.fillBlock
+                  : Colors.transparent,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 switchInCurve: Curves.easeOutCubic,
@@ -126,7 +149,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
                 },
                 child: _selectedTab == _PlantUMLTab.code
                     ? _buildCodeView(context, colors)
-                    : _buildImageView(colors),
+                    : _buildImageView(imageColors),
               ),
             ),
           ),

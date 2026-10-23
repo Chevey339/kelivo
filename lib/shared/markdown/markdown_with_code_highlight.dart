@@ -41,6 +41,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final exporting = ExportCaptureScope.of(context);
+    final theme = mapMarkdownTheme(context, settings, baseStyle);
     return MarkdownLinkScope(
       source: text,
       conversationId: conversationId,
@@ -53,9 +54,9 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           highlightColor: highlightColor,
           streaming: streaming,
           options: markdownParserOptions(settings),
-          theme: mapMarkdownTheme(context, settings, baseStyle),
+          theme: theme,
           extensions: kelivoMarkdownExtensions,
-          codeHighlighter: const KelivoCodeHighlighter(),
+          codeHighlighter: KelivoCodeHighlighter.forTheme(theme),
           mathRenderer: const KelivoMathRenderer(),
           imageBuilder: const KelivoImageBuilder(),
           linkHandler: const KelivoLinkHandler(),

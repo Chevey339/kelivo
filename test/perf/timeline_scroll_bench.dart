@@ -1,3 +1,4 @@
+import '../support/markdown_backdrop_host.dart';
 import "../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -199,23 +200,29 @@ class _HState extends State<_H> {
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: MessageListView(
-            key: ValueKey(tick == -1),
-            scrollController: scrollController,
-            listController: scrollCtrl.messageListController,
-            messages: messages,
-            byGroup: const {},
-            versionSelections: const {},
-            reasoning: const {},
-            reasoningSegments: const {},
-            contentSplits: const {},
-            toolParts: toolParts,
-            translations: const {},
-            selecting: false,
-            selectedItems: const {},
-            dividerPadding: EdgeInsets.zero,
-            processingFilesMessageId: processingFilesMessageId,
+        home: markdownBenchmarkBackdrop(
+          Scaffold(
+            backgroundColor:
+                const bool.fromEnvironment('MARKSTREAM_BENCH_WALLPAPER')
+                ? Colors.transparent
+                : null,
+            body: MessageListView(
+              key: ValueKey(tick == -1),
+              scrollController: scrollController,
+              listController: scrollCtrl.messageListController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: toolParts,
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              processingFilesMessageId: processingFilesMessageId,
+            ),
           ),
         ),
       ),

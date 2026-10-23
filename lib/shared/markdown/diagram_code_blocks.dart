@@ -150,7 +150,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
         extensions: const MarkstreamExtensions.empty(),
         options: const CodeBlockOptions(),
         labels: MarkstreamLabels(unnamedCode: l10n.markdownCodeLabel),
-        highlighter: const KelivoCodeHighlighter(),
+        highlighter: KelivoCodeHighlighter.forTheme(widget.theme),
         exporting: true,
       );
     }
@@ -221,7 +221,8 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
             width: double.infinity,
             height: _previewHeight,
             child: ColoredBox(
-              color: mermaidColors.fillBlock,
+              // The enclosing surface already paints this tint once.
+              color: Colors.transparent,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 switchInCurve: Curves.easeOutCubic,
@@ -297,7 +298,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     final codeView = MarkstreamCodeContent(
       node: widget.node,
       theme: widget.theme,
-      highlighter: const KelivoCodeHighlighter(),
+      highlighter: KelivoCodeHighlighter.forTheme(widget.theme),
       streaming: widget.streaming,
       wrap: false,
     );

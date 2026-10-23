@@ -131,7 +131,9 @@ class InlineSpanBuilder {
             : SystemMouseCursors.click,
         style: theme.inlineCode.text,
         backgroundColor: keyboard
-            ? theme.colors.fillBlock
+            ? (theme.backdrop == MarkstreamBackdrop.plain
+                  ? theme.colors.fillBlock
+                  : theme.colors.fillRaised)
             : theme.inlineCode.backgroundColor,
         borderColor: theme.inlineCode.borderColor,
         padding: theme.inlineCode.padding,

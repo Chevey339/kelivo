@@ -31,7 +31,14 @@ void debugResetHighlightNodeCache() {
 }
 
 class KelivoCodeHighlighter implements CodeHighlighter {
-  const KelivoCodeHighlighter();
+  const KelivoCodeHighlighter({this.wallpaper = false});
+  final bool wallpaper;
+
+  factory KelivoCodeHighlighter.forTheme(MarkstreamTheme theme) =>
+      theme.backdrop == MarkstreamBackdrop.wallpaper ||
+          theme.backdrop == MarkstreamBackdrop.frostedBubble
+      ? const KelivoCodeHighlighter(wallpaper: true)
+      : const KelivoCodeHighlighter();
   @override
   TextSpan highlight(
     String source, {
@@ -44,6 +51,9 @@ class KelivoCodeHighlighter implements CodeHighlighter {
     final theme = brightness == Brightness.dark
         ? atomOneDarkReasonableTheme
         : githubTheme;
+    final mutedStyles = brightness == Brightness.dark
+        ? (wallpaper ? _wallpaperDarkMuted : _plainDarkMuted)
+        : (wallpaper ? _wallpaperLightMuted : _plainLightMuted);
     try {
       var nodes = _nodes.get(key);
       if (nodes == null) {
@@ -58,7 +68,7 @@ class KelivoCodeHighlighter implements CodeHighlighter {
             children: node.value == null && node.children != null
                 ? convert(node.children!)
                 : null,
-            style: theme[node.className],
+            style: mutedStyles[node.className] ?? theme[node.className],
           ),
       ];
       final span = TextSpan(
@@ -73,6 +83,29 @@ class KelivoCodeHighlighter implements CodeHighlighter {
     }
   }
 }
+
+// Canonical styles preserve each upstream class's weight/italics. Choosing a
+// backdrop only selects constants; syntax-tree caching and parsing are unchanged.
+const _plainLightMuted = <String, TextStyle>{
+  'comment': TextStyle(color: Color(0xff57606a), fontStyle: FontStyle.italic),
+  'quote': TextStyle(color: Color(0xff57606a), fontStyle: FontStyle.italic),
+  'meta': TextStyle(color: Color(0xff57606a), fontWeight: FontWeight.bold),
+};
+const _plainDarkMuted = <String, TextStyle>{
+  'comment': TextStyle(color: Color(0xff9da5b0), fontStyle: FontStyle.italic),
+  'quote': TextStyle(color: Color(0xff9da5b0), fontStyle: FontStyle.italic),
+  'meta': TextStyle(color: Color(0xff9da5b0)),
+};
+const _wallpaperLightMuted = <String, TextStyle>{
+  'comment': TextStyle(color: Color(0xff4a525c), fontStyle: FontStyle.italic),
+  'quote': TextStyle(color: Color(0xff4a525c), fontStyle: FontStyle.italic),
+  'meta': TextStyle(color: Color(0xff4a525c), fontWeight: FontWeight.bold),
+};
+const _wallpaperDarkMuted = <String, TextStyle>{
+  'comment': TextStyle(color: Color(0xffbdc5d0), fontStyle: FontStyle.italic),
+  'quote': TextStyle(color: Color(0xffbdc5d0), fontStyle: FontStyle.italic),
+  'meta': TextStyle(color: Color(0xffbdc5d0)),
+};
 
 // Keep this separate from the interface method of the same name.
 List<Node> _parse(String source, String language) =>

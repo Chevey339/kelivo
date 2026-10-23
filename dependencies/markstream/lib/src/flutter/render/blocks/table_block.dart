@@ -161,11 +161,11 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         final header = _capturing
             ? Color.alphaBlend(
                 theme.headerBackgroundColor,
-                theme.bodyBackgroundColor,
+                widget.theme.colors.fillBlockOpaque,
               )
             : theme.headerBackgroundColor;
         final body = _capturing
-            ? theme.bodyBackgroundColor.withValues(alpha: 1)
+            ? widget.theme.colors.fillBlockOpaque
             : theme.bodyBackgroundColor;
         Widget table = Table(
           defaultColumnWidth: scroll
