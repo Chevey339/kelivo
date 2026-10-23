@@ -23,6 +23,9 @@ import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/composer_mention.dart';
+import 'package:flutter/scheduler.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
@@ -346,6 +349,8 @@ class ChatInputBarController {
     final draft = snapshotDraft(text);
     return ChatInputData(
       text: text.trim(),
+      recipientAssistantId: draft.recipientAssistantId,
+      mention: draft.mention?.afterEdit(text, text.trim()),
       imagePaths: [
         for (final image in draft.images)
           if (!image.processing && !image.failed) image.path,
@@ -692,6 +697,15 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   late TextEditingController _controller;
+  String? _recipientAssistantId;
+  ComposerMention? _mention;
+  bool _mentionRefreshPending = false;
+  String? _visibleMentionQuery;
+  TextEditingValue _mentionValue = TextEditingValue.empty;
+  final _mentionOverlay = OverlayPortalController();
+  final _mentionLink = LayerLink();
+  int _mentionIndex = 0;
+  String? _dismissedMentionQuery;
 
   // Expanding grows the whole composer to fill the height its host allows,
   // so attachments, tools and send stay in reach while editing long text.
@@ -896,9 +910,21 @@ class _ChatInputBarState extends State<ChatInputBar>
     owner.longPasteAsFile = settings.longPasteAsFile;
     owner.longPasteThreshold = settings.longPasteAsFileThreshold;
     owner.submit = (snapshot) {
-      unawaited(_handleSend(orderedValue: snapshot));
+      final candidates = _mentionCandidates();
+      if (candidates.isNotEmpty) {
+        _chooseMention(
+          candidates[_mentionIndex.clamp(0, candidates.length - 1)],
+        );
+      } else {
+        unawaited(_handleSend(orderedValue: snapshot));
+      }
     };
     owner.escape = () {
+      if (_mentionCandidates().isNotEmpty) {
+        setState(() => _dismissedMentionQuery = _controller.text);
+        _mentionOverlay.hide();
+        return;
+      }
       if (mounted && _isExpanded && _controller.value.composing.isCollapsed) {
         _setExpanded(false);
       }
@@ -918,6 +944,196 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
+
+  RegExpMatch? get _mentionQuery {
+    final value = _controller.value;
+    if (!value.selection.isValid ||
+        !value.selection.isCollapsed ||
+        _composerLocked) {
+      return null;
+    }
+    if (!value.composing.isCollapsed) return null;
+    final caret = value.selection.start;
+    if (_mention != null && caret > _mention!.start && caret <= _mention!.end) {
+      return null;
+    }
+    return RegExp(
+      r'(?:^|\s)@([^\s@]*)$',
+    ).firstMatch(value.text.substring(0, caret));
+  }
+
+  List<Assistant> _mentionCandidates() {
+    final query = _mentionQuery;
+    if (query == null || _dismissedMentionQuery == _controller.text) return [];
+    return context
+        .read<AssistantProvider>()
+        .assistants
+        .where(
+          (a) => a.name.toLowerCase().contains(query.group(1)!.toLowerCase()),
+        )
+        .toList();
+  }
+
+  void _syncMention() {
+    final restoring =
+        _controller is MessageEditingController &&
+        (_controller as MessageEditingController).isRestoringHistory;
+    if (!restoring && _mentionValue == _controller.value) return;
+    final text = _controller.text;
+    final previousMention = _mention;
+    if (restoring || _mentionValue != _controller.value) {
+      _mention = restoring
+          ? (_controller as MessageEditingController).restoredHistoryMetadata
+                as ComposerMention?
+          : _mention?.afterEditingValue(_mentionValue, _controller.value);
+      if (_mention != null && !_mention!.matches(text)) _mention = null;
+      _recipientAssistantId = _mention?.assistantId;
+      _mentionIndex = 0;
+      _dismissedMentionQuery = null;
+    }
+    _mentionValue = _controller.value;
+    _decorateMention();
+    final query = _mentionQuery?.group(0);
+    final needsRefresh =
+        previousMention != _mention || query != _visibleMentionQuery;
+    _visibleMentionQuery = query;
+    if (!mounted || !needsRefresh) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_mentionRefreshPending) return;
+      _mentionRefreshPending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mentionRefreshPending = false;
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controller case final MessageEditingController document) {
+      document.mentionColor = Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  void _decorateMention() {
+    if (_controller case final MessageEditingController document) {
+      document.mentionRange = _mention == null
+          ? TextRange.empty
+          : TextRange(start: _mention!.start, end: _mention!.end);
+    }
+  }
+
+  void _restoreMention(ComposerMention? mention, String? recipientId) {
+    _mentionValue = _controller.value;
+    _mention = mention != null && mention.matches(_controller.text)
+        ? mention
+        : null;
+    _recipientAssistantId =
+        _mention?.assistantId ?? (mention == null ? recipientId : null);
+    _decorateMention();
+  }
+
+  void _chooseMention(Assistant assistant) {
+    final query = _mentionQuery;
+    if (query == null) return;
+    final value = _controller.value;
+    final caret = value.selection.start;
+    final start = caret - query.group(1)!.length - 1;
+    final token = '@${assistant.name}';
+    final next = TextEditingValue(
+      text: value.text.replaceRange(start, caret, '$token '),
+      selection: TextSelection.collapsed(offset: start + token.length + 1),
+    );
+    final document = _controller is MessageEditingController
+        ? _controller as MessageEditingController
+        : null;
+    document?.history?.checkpoint();
+    setState(() {
+      _mention = ComposerMention(
+        assistantId: assistant.id,
+        label: assistant.name,
+        start: start,
+      );
+      _recipientAssistantId = assistant.id;
+      _mentionValue = next;
+      _controller.value = next;
+      _decorateMention();
+    });
+    document?.history?.checkpoint();
+    _mentionOverlay.hide();
+    widget.mediaController?.onDraftChanged?.call();
+  }
+
+  Widget _buildMentionPicker() {
+    context.watch<AssistantProvider>();
+    final candidates = _mentionCandidates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_mentionCandidates().isEmpty) {
+        _mentionOverlay.hide();
+      } else {
+        _mentionOverlay.show();
+      }
+    });
+    return CompositedTransformTarget(
+      link: _mentionLink,
+      child: OverlayPortal(
+        controller: _mentionOverlay,
+        overlayChildBuilder: (context) => Positioned(
+          width: math.min(320, MediaQuery.sizeOf(context).width - 32),
+          child: CompositedTransformFollower(
+            link: _mentionLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topLeft,
+            followerAnchor: Alignment.bottomLeft,
+            offset: const Offset(0, -8),
+            child: TextFieldTapRegion(
+              child: Material(
+                elevation: 6,
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: candidates.length,
+                    itemBuilder: (context, index) {
+                      final assistant = candidates[index];
+                      return ListTile(
+                        dense: true,
+                        selected: index == _mentionIndex,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          child: Text(
+                            assistant.name.isEmpty
+                                ? '@'
+                                : assistant.name.characters.first,
+                          ),
+                        ),
+                        title: Text(
+                          assistant.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _chooseMention(assistant),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        child: const SizedBox(width: double.infinity, height: 0),
+      ),
+    );
+  }
 
   String? _usageDraftConversationId;
   String? _usageDraftText;
@@ -1091,6 +1307,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _restoreInput(ChatInputData input) {
     setState(() {
+      _restoreMention(input.mention, input.recipientAssistantId);
       _draftReplacementRevision++;
       _abandonVoiceSession();
       _pendingImagePasteIds.clear();
@@ -1117,6 +1334,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   ChatInputData _snapshotInput(String text) {
     return ChatInputData(
       text: text.trim(),
+      recipientAssistantId: _recipientAssistantId,
+      mention: _mention?.afterEdit(text, text.trim()),
       imagePaths: [
         for (final image in _images)
           if (!_processingImageIds.contains(image.id) &&
@@ -1130,6 +1349,8 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   ComposerDraftInput _snapshotDraft(String text) => ComposerDraftInput(
     text: text,
+    recipientAssistantId: _recipientAssistantId,
+    mention: _mention,
     selectionBase: _controller.selection.baseOffset,
     selectionExtent: _controller.selection.extentOffset,
     images: [
@@ -1145,6 +1366,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   );
 
   void _restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+    _restoreMention(input.mention, input.recipientAssistantId);
     if (resetHistory) _resetInputHistory();
     final config = context
         .read<SettingsProvider>()
@@ -1206,6 +1428,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _clearDraft() {
+    _recipientAssistantId = null;
     widget.mediaController?.sharedDraftAction.value = null;
     setState(() {
       _draftReplacementRevision++;
@@ -1234,6 +1457,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   void initState() {
     super.initState();
     _controller = widget.controller ?? MessageEditingController();
+    _mentionValue = _controller.value;
+    if (_controller case final MessageEditingController document) {
+      document.historyMetadataBuilder = (value) =>
+          _mention?.afterEditingValue(_mentionValue, value);
+    }
+    _controller.addListener(_syncMention);
     _controller.addListener(_syncUsageDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
     widget.mediaController?._bind(this);
@@ -1273,6 +1502,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (widget.mediaController == null) _ownedNativeMedia._unbind(this);
     _nativeOwner?.detachView();
     _nativeOwner?.removeListener(_onNativeOwnerChanged);
+    if (_controller case final MessageEditingController document) {
+      document.historyMetadataBuilder = null;
+    }
+    _controller.removeListener(_syncMention);
     _controller.removeListener(_syncUsageDraft);
     WidgetsBinding.instance.removeObserver(this);
     _stopVoiceLevelSampling();
@@ -1998,6 +2231,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     // depend on it at all. A rejected send puts everything back below.
     setState(() {
       _resetInputHistory();
+      _recipientAssistantId = null;
       _controller.clear();
       _images.removeWhere((image) => submittedImageIds.contains(image.id));
       for (final document in submittedDocuments) {
@@ -2018,13 +2252,20 @@ class _ChatInputBarState extends State<ChatInputBar>
           !identical(controller, _controller)) {
         return;
       }
-      setState(
-        () => _restoreSubmittedDraft(
+      setState(() {
+        _restoreSubmittedDraft(
           submittedValue,
           submittedImages,
           submittedDocuments,
-        ),
-      );
+        );
+        _restoreMention(
+          submittedDraft.mention?.afterEdit(
+            submittedValue.text,
+            _controller.text,
+          ),
+          submittedDraft.recipientAssistantId,
+        );
+      });
     }
 
     try {
@@ -2035,6 +2276,11 @@ class _ChatInputBarState extends State<ChatInputBar>
             await send?.call(
               ChatInputData(
                 text: text,
+                recipientAssistantId: submittedDraft.recipientAssistantId,
+                mention: submittedDraft.mention?.afterEdit(
+                  submittedDraft.text,
+                  text,
+                ),
                 imagePaths: submittedImages.map((image) => image.path).toList(),
                 documents: List<DocumentAttachment>.of(submittedDocuments),
                 allowImagesApiRouting: submittedDraft.allowImagesApiRouting,
@@ -2300,6 +2546,31 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    final candidates = _mentionCandidates();
+    if (candidates.isNotEmpty && event is KeyDownEvent) {
+      final key = event.logicalKey;
+      if (key == LogicalKeyboardKey.escape) {
+        setState(() => _dismissedMentionQuery = _controller.text);
+        _mentionOverlay.hide();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown ||
+          key == LogicalKeyboardKey.arrowUp) {
+        setState(
+          () => _mentionIndex =
+              (_mentionIndex + (key == LogicalKeyboardKey.arrowDown ? 1 : -1)) %
+              candidates.length,
+        );
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.numpadEnter) {
+        _chooseMention(
+          candidates[_mentionIndex.clamp(0, candidates.length - 1)],
+        );
+        return KeyEventResult.handled;
+      }
+    }
     // Enhance hardware keyboard behavior
     final w = MediaQuery.sizeOf(node.context!).width;
     final isTabletOrDesktop = w >= AppBreakpoints.tablet;
@@ -3749,6 +4020,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _buildMentionPicker(),
               if (_docs.any((doc) => _missingDocumentPaths.contains(doc.path)))
                 Padding(
                   padding: const EdgeInsets.all(4),

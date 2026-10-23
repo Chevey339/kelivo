@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../utils/utf16_safe_cut.dart';
 import 'message_part.dart';
 import 'token_usage.dart';
+import 'composer_mention.dart';
 
 part 'chat_message.g.dart';
 
@@ -120,6 +121,16 @@ class ChatMessage extends HiveObject {
   /// Latest API request only; the scalar token fields contain the whole turn.
   final TokenUsage? finishUsage;
 
+  /// Actual author, independent of the conversation's default assistant.
+  final String? senderId;
+  final String? senderName;
+  final String? senderAvatar;
+
+  /// Explicit recipient selected for this user message, not parsed from text.
+  final String? recipientAssistantId;
+  final String? recipientAssistantName;
+  final ComposerMention? mention;
+
   TokenUsage get tokenUsage => TokenUsage(
     promptTokens: promptTokens,
     completionTokens: completionTokens,
@@ -155,6 +166,12 @@ class ChatMessage extends HiveObject {
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.finishUsage,
+    this.senderId,
+    this.senderName,
+    this.senderAvatar,
+    this.recipientAssistantId,
+    this.recipientAssistantName,
+    this.mention,
   }) : parts = List<MessagePart>.unmodifiable(
          parts ?? <MessagePart>[TextPart(content ?? '')],
        ),
@@ -311,6 +328,12 @@ class ChatMessage extends HiveObject {
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
+    String? recipientAssistantId,
+    String? recipientAssistantName,
+    ComposerMention? mention,
   }) {
     final List<MessagePart>? nextParts;
     if (parts != null) {
@@ -346,6 +369,13 @@ class ChatMessage extends HiveObject {
         reasoningTokens: reasoningTokens ?? this.reasoningTokens,
         cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
         finishUsage: finishUsage ?? this.finishUsage,
+        senderId: senderId ?? this.senderId,
+        senderName: senderName ?? this.senderName,
+        senderAvatar: senderAvatar ?? this.senderAvatar,
+        recipientAssistantId: recipientAssistantId ?? this.recipientAssistantId,
+        mention: mention ?? this.mention,
+        recipientAssistantName:
+            recipientAssistantName ?? this.recipientAssistantName,
       )
       .._storageOrder = (id == null || id == this.id) ? _storageOrder : null
       .._providerArtifactSnapshot = (id == null || id == this.id)
@@ -357,6 +387,12 @@ class ChatMessage extends HiveObject {
     return {
       'id': id,
       'role': role,
+      'senderId': senderId,
+      'senderName': senderName,
+      'senderAvatar': senderAvatar,
+      'recipientAssistantId': recipientAssistantId,
+      'recipientAssistantName': recipientAssistantName,
+      'mention': mention?.toJson(),
       // Derived text for older readers; structured attachments live in [parts].
       'content': content,
       'parts': [
@@ -411,6 +447,16 @@ class ChatMessage extends HiveObject {
     return ChatMessage(
       id: json['id'] as String,
       role: json['role'] as String,
+      senderId: json['senderId'] as String?,
+      senderName: json['senderName'] as String?,
+      senderAvatar: json['senderAvatar'] as String?,
+      recipientAssistantId: json['recipientAssistantId'] as String?,
+      recipientAssistantName: json['recipientAssistantName'] as String?,
+      mention: json['mention'] == null
+          ? null
+          : ComposerMention.fromJson(
+              Map<String, dynamic>.from(json['mention'] as Map),
+            ),
       // Prefer structured parts when present. Legacy backups that only carry
       // marker-bearing [content] keep that string here; import boundaries run
       // decodeLegacyContent to promote markers into parts.

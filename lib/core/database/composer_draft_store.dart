@@ -702,6 +702,8 @@ class ComposerDraftStore extends ChangeNotifier {
     checkOwner();
     return ChatInputData(
       text: input.text,
+      recipientAssistantId: input.recipientAssistantId,
+      mention: input.mention,
       imagePaths: [for (final path in input.imagePaths) paths[path]!],
       documents: [
         for (final doc in input.documents)

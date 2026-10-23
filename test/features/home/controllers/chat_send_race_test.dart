@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/composer_mention.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -20,6 +21,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/preset_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -28,7 +30,7 @@ import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_emit.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
-    show ToolUIPart;
+    show ToolUIPart, ChatMessageWidget;
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
@@ -38,6 +40,7 @@ import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/search/services/global_session_search_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 class _GatedChatService extends ChatService {
   _GatedChatService({required super.existingRepository});
@@ -93,6 +96,12 @@ class _GatedChatService extends ChatService {
     int? version,
     bool selectVersion = false,
     String? temporaryAfterGroupId,
+    String? recipientAssistantId,
+    String? recipientAssistantName,
+    ComposerMention? mention,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
   }) async {
     if (content == 'preset question' && presetHold != null) {
       presetConversationId = conversationId;
@@ -114,6 +123,12 @@ class _GatedChatService extends ChatService {
       version: version,
       selectVersion: selectVersion,
       temporaryAfterGroupId: temporaryAfterGroupId,
+      recipientAssistantId: recipientAssistantId,
+      recipientAssistantName: recipientAssistantName,
+      mention: mention,
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
     );
   }
 
@@ -124,6 +139,9 @@ class _GatedChatService extends ChatService {
     required String providerId,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
   }) async {
     regenerationEntered = true;
     await regenerationHold?.future;
@@ -133,6 +151,9 @@ class _GatedChatService extends ChatService {
       providerId: providerId,
       anchorGroupId: anchorGroupId,
       truncateFuture: truncateFuture,
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
     );
   }
 
@@ -401,6 +422,10 @@ void main() {
             value: questions,
           ),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<AssistantProvider>.value(
             value: assistantProvider,
@@ -472,6 +497,164 @@ void main() {
     await waitForWidget(tester, () => done, 'asynchronous operation');
     if (failure != null) throw failure!;
   }
+
+  testWidgets('explicit recipient uses its model and persists actual author', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    late ChatMessage restoredQuestion;
+    await tester.runAsync(() async {
+      await settings.disableTitleGeneration();
+      await settings.disableSuggestionGeneration();
+      final recipientId = await assistantProvider.addAssistant(
+        name: 'Reviewer',
+      );
+      await assistantProvider.updateAssistant(
+        assistantProvider
+            .getById(recipientId)!
+            .copyWith(
+              chatModelProvider: 'SiliconFlow',
+              chatModelId: 'review-model',
+              systemPrompt: 'Review carefully.',
+            ),
+      );
+      final conversation = await openConversation(controller);
+      await settings.setPerChatModelEnabled(true);
+      await controller.setConversationModel(
+        providerKey: 'SiliconFlow',
+        modelId: 'conversation-model',
+      );
+      final result = await controller.sendMessage(
+        ChatInputData(
+          text: 'Review @Reviewer this',
+          recipientAssistantId: recipientId,
+          mention: ComposerMention(
+            assistantId: recipientId,
+            label: 'Reviewer',
+            start: 7,
+          ),
+        ),
+      );
+      expect(result, ChatInputSubmissionResult.sent);
+      await waitFor(() => streamRequestCount == 1, 'recipient request');
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'reply',
+      );
+      expect(
+        streamRequests,
+        hasLength(1),
+        reason: controller.chatController.messages.last.content,
+      );
+      expect(streamRequests.single['model'], 'review-model');
+      expect(
+        streamRequests.single['messages'].toString(),
+        contains('Review carefully.'),
+      );
+      final reply = controller.chatController.messages.last;
+      expect(reply.senderId, recipientId);
+      expect(reply.senderName, 'Reviewer');
+      expect((await repository.getMessage(reply.id))!.senderId, recipientId);
+      expect(
+        service.getConversation(conversation.id)!.assistantId,
+        isNot(recipientId),
+      );
+      await controller.regenerateAtMessage(reply);
+      await waitFor(() => streamRequestCount == 2, 'recipient regeneration');
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'regenerated reply',
+      );
+      expect(streamRequests.last['model'], 'review-model');
+      expect(controller.chatController.messages.last.senderId, recipientId);
+      final question = (await service.loadMessages(conversation.id)).first;
+      final reopened = ChatDatabaseRepository.open(
+        file: File('${directory.path}/kelivo.db'),
+      );
+      await reopened.ensureReady();
+      restoredQuestion = (await reopened.getMessage(question.id))!;
+      await reopened.close();
+      expect(restoredQuestion.recipientAssistantId, recipientId);
+      expect(restoredQuestion.recipientAssistantName, 'Reviewer');
+      await settings.setEnableUserMarkdown(false);
+      final latestReply = controller.chatController.messages.last;
+      final beforeDelete = (await service.loadMessages(conversation.id)).length;
+      await assistantProvider.deleteAssistant(recipientId);
+      await controller.regenerateAtMessage(latestReply);
+      expect(
+        (await service.loadMessages(conversation.id)).length,
+        beforeDelete,
+      );
+      expect(streamRequestCount, 2);
+      await controller.regenerateAtMessage(restoredQuestion);
+      expect(
+        (await service.loadMessages(conversation.id)).length,
+        beforeDelete,
+      );
+      expect(streamRequestCount, 2);
+    });
+    await tester.pumpAndSettle();
+    AppSnackBarManager().dismissAll();
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: ChatMessageWidget(message: restoredQuestion)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(restoredQuestion.mention?.start, 7);
+    expect(find.text('@Reviewer'), findsNothing);
+    expect(
+      find.textContaining('Review @Reviewer this', findRichText: true),
+      findsWidgets,
+    );
+  });
+
+  testWidgets(
+    'plain mention text keeps current assistant and missing explicit recipient is rejected',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        await settings.disableTitleGeneration();
+        await settings.disableSuggestionGeneration();
+        final conversation = await openConversation(controller);
+        final currentId = assistantProvider.currentAssistant!.id;
+        await controller.sendMessage(
+          const ChatInputData(text: '@Reviewer quoted text'),
+        );
+        await waitFor(() => streamRequestCount == 1, 'default request');
+        await waitFor(
+          () =>
+              !controller.chatController.isConversationLoading(conversation.id),
+          'default reply',
+        );
+        expect(controller.chatController.messages.last.senderId, currentId);
+        final result = await controller.sendMessage(
+          const ChatInputData(
+            text: 'Review',
+            recipientAssistantId: 'deleted-assistant',
+          ),
+        );
+        expect(result, ChatInputSubmissionResult.rejected);
+        expect(streamRequestCount, 1);
+        expect((await service.loadMessages(conversation.id)), hasLength(2));
+      });
+      await tester.pumpAndSettle();
+      AppSnackBarManager().dismissAll();
+      await tester.pumpAndSettle();
+    },
+  );
 
   Future<ProviderConfig> configureNative({
     required bool claude,

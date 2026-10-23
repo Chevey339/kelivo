@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/composer_mention.dart';
 import '../../models/composer_draft.dart';
 import '../../database/composer_draft_store.dart';
 import '../../models/conversation_prompt_settings.dart';
@@ -2901,6 +2902,12 @@ class ChatService extends ChangeNotifier {
     int? version,
     bool selectVersion = false,
     String? temporaryAfterGroupId,
+    String? recipientAssistantId,
+    String? recipientAssistantName,
+    ComposerMention? mention,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
   }) async {
     if (!_initialized) await init();
 
@@ -2926,6 +2933,12 @@ class ChatService extends ChangeNotifier {
 
     final message = ChatMessage(
       role: role,
+      recipientAssistantId: recipientAssistantId,
+      recipientAssistantName: recipientAssistantName,
+      mention: mention,
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
       content: parts == null ? content : null,
       parts: parts,
       conversationId: conversationId,
@@ -3010,8 +3023,14 @@ class ChatService extends ChangeNotifier {
   Future<GenerationBeginResult> beginSendGeneration({
     required String conversationId,
     required List<MessagePart> userParts,
+    String? recipientAssistantId,
+    String? recipientAssistantName,
+    ComposerMention? mention,
     required String modelId,
     required String providerId,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
     DraftSubmission? draftSubmission,
   }) async {
     if (!_initialized) await init();
@@ -3028,11 +3047,17 @@ class ChatService extends ChangeNotifier {
     final userMessage = ChatMessage(
       id: draftSubmission?.id,
       role: 'user',
+      recipientAssistantId: recipientAssistantId,
+      recipientAssistantName: recipientAssistantName,
+      mention: mention,
       parts: userParts,
       conversationId: conversationId,
     );
     final assistantMessage = ChatMessage(
       role: 'assistant',
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
       content: '',
       conversationId: conversationId,
       modelId: modelId,
@@ -3057,6 +3082,9 @@ class ChatService extends ChangeNotifier {
     required String groupId,
     required int version,
     required bool truncateFuture,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -3066,6 +3094,9 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) throw StateError('conversation_missing');
     final assistantMessage = ChatMessage(
       role: 'assistant',
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
       content: '',
       conversationId: conversationId,
       modelId: modelId,
@@ -3095,6 +3126,9 @@ class ChatService extends ChangeNotifier {
     required String providerId,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? senderId,
+    String? senderName,
+    String? senderAvatar,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -3104,6 +3138,9 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) throw StateError('conversation_missing');
     final assistantMessage = ChatMessage(
       role: 'assistant',
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatar: senderAvatar,
       content: '',
       conversationId: conversationId,
       modelId: modelId,
@@ -3793,6 +3830,12 @@ class ChatService extends ChangeNotifier {
     for (final message in sourceMessages) {
       final forked = ChatMessage(
         role: message.role,
+        senderId: message.senderId,
+        senderName: message.senderName,
+        senderAvatar: message.senderAvatar,
+        recipientAssistantId: message.recipientAssistantId,
+        recipientAssistantName: message.recipientAssistantName,
+        mention: message.mention,
         parts: message.parts,
         timestamp: message.timestamp,
         modelId: message.modelId,
@@ -3879,6 +3922,12 @@ class ChatService extends ChangeNotifier {
           );
       final newMsg = ChatMessage(
         role: temporaryOriginal.role,
+        senderId: temporaryOriginal.senderId,
+        senderName: temporaryOriginal.senderName,
+        senderAvatar: temporaryOriginal.senderAvatar,
+        recipientAssistantId: temporaryOriginal.recipientAssistantId,
+        recipientAssistantName: temporaryOriginal.recipientAssistantName,
+        mention: temporaryOriginal.mention,
         parts: resolvedParts,
         conversationId: conversationId,
         modelId: temporaryOriginal.modelId,

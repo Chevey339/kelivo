@@ -145,6 +145,20 @@ class LongMessageEditorState extends State<LongMessageEditor>
             required style,
           }) {
             final composing = _lineController?.composing ?? TextRange.empty;
+            // A retiring line renderer can still lay out its old snapshot
+            // after the document has switched to a short draft. Its offsets
+            // must not index the new document or paint that draft's mention.
+            if (_document case final document? when _long && _lineInputActive) {
+              return document.decoratedSpan(
+                text: codeLine.text,
+                style: _scaledStyle(context),
+                mentionColor: Theme.of(context).colorScheme.primary,
+                documentOffset: _starts[index],
+                composing: index == _lineController?.selection.extentIndex
+                    ? composing
+                    : TextRange.empty,
+              );
+            }
             if (index == _lineController?.selection.extentIndex &&
                 composing.isValid &&
                 !composing.isCollapsed &&
@@ -617,10 +631,17 @@ class LongMessageEditorState extends State<LongMessageEditor>
         return previous.text != next.text ||
             previous.composing != next.composing;
       },
-      undoStackModifier: (value) => value.copyWith(composing: TextRange.empty),
+      undoStackModifier: (value) {
+        final plain = value.copyWith(composing: TextRange.empty);
+        return _document?.captureHistoryValue(plain) ?? plain;
+      },
       onTriggered: (value) {
         final changed = widget.controller.text != value.text;
-        widget.controller.value = value;
+        if (_document case final document?) {
+          document.restoreHistoryValue(value);
+        } else {
+          widget.controller.value = value;
+        }
         if (changed) widget.onChanged?.call(value.text);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) ensureCaretVisible();

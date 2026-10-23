@@ -65,6 +65,27 @@ void main() {
     expect((await store.load('b')).active.text, 'B');
   });
 
+  test(
+    'explicit recipient survives draft reopen and submission snapshot',
+    () async {
+      await store.load('a');
+      store.setInput(
+        'a',
+        const ComposerDraftInput(
+          text: 'Review',
+          recipientAssistantId: 'reviewer',
+        ),
+      );
+      await store.flush();
+      await reopen();
+      final draft = (await store.load('a')).active;
+      expect(draft.recipientAssistantId, 'reviewer');
+      final submission = await store.beginSubmission('a', draft);
+      final prepared = draft.toInput(submission: submission);
+      expect(prepared.recipientAssistantId, 'reviewer');
+    },
+  );
+
   test('new entry preserves identity and seed with the draft', () async {
     final conversation = Conversation(
       id: 'new-id',

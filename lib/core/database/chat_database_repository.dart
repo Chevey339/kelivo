@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/composer_mention.dart';
 import '../models/composer_draft.dart';
 import 'composer_draft_store.dart';
 import 'dart:convert';
@@ -5080,6 +5081,12 @@ class ChatDatabaseRepository {
       final message = ChatMessage(
         id: draftSubmission?.id,
         role: original.role,
+        senderId: original.senderId,
+        senderName: original.senderName,
+        senderAvatar: original.senderAvatar,
+        recipientAssistantId: original.recipientAssistantId,
+        recipientAssistantName: original.recipientAssistantName,
+        mention: original.mention,
         parts: resolvedParts,
         conversationId: original.conversationId,
         modelId: original.modelId,
@@ -7223,6 +7230,16 @@ class ChatDatabaseRepository {
     return ChatMessage(
       id: row.id,
       role: row.role,
+      senderId: row.senderId,
+      senderName: extras['sender.name'] as String?,
+      senderAvatar: extras['sender.avatar'] as String?,
+      recipientAssistantId: extras['recipient.id'] as String?,
+      recipientAssistantName: extras['recipient.name'] as String?,
+      mention: extras['recipient.mention'] == null
+          ? null
+          : ComposerMention.fromJson(
+              Map<String, dynamic>.from(extras['recipient.mention'] as Map),
+            ),
       parts: parts,
       timestamp: row.timestamp,
       modelId: row.modelId,
@@ -7481,6 +7498,7 @@ class ChatDatabaseRepository {
       id: message.id,
       conversationId: message.conversationId,
       role: message.role,
+      senderId: Value(message.senderId),
       timestamp: message.timestamp,
       modelId: Value(message.modelId),
       providerId: Value(message.providerId),
@@ -7498,7 +7516,17 @@ class ChatDatabaseRepository {
       durationMs: Value(message.durationMs),
       extrasJson: Value(
         _encodeTokenExtras(
-          '{}',
+          jsonEncode({
+            if (message.recipientAssistantId != null)
+              'recipient.id': message.recipientAssistantId,
+            if (message.mention != null)
+              'recipient.mention': message.mention!.toJson(),
+            if (message.recipientAssistantName != null)
+              'recipient.name': message.recipientAssistantName,
+            if (message.senderName != null) 'sender.name': message.senderName,
+            if (message.senderAvatar != null)
+              'sender.avatar': message.senderAvatar,
+          }),
           reasoningTokens: message.reasoningTokens,
           cacheWriteTokens: message.cacheWriteTokens,
           finishUsage: message.finishUsage,

@@ -599,12 +599,18 @@ class MessageGenerationService {
       final userMessage = await chatService.addMessage(
         conversationId: conversationId,
         role: 'user',
+        recipientAssistantId: input.recipientAssistantId,
+        mention: input.mention,
+        recipientAssistantName: input.recipientAssistantId == null
+            ? null
+            : assistant?.name,
         parts: userParts,
       );
       final assistantMessage = await createAssistantPlaceholder(
         conversationId: conversationId,
         modelId: modelId,
         providerKey: providerKey,
+        assistant: assistant,
       );
       return (
         userMessage: userMessage,
@@ -615,9 +621,17 @@ class MessageGenerationService {
     final result = await chatService.beginSendGeneration(
       conversationId: conversationId,
       userParts: userParts,
+      recipientAssistantId: input.recipientAssistantId,
+      mention: input.mention,
+      recipientAssistantName: input.recipientAssistantId == null
+          ? null
+          : assistant?.name,
       modelId: modelId,
       providerId: providerKey,
       draftSubmission: input.draftSubmission,
+      senderId: assistant?.id,
+      senderName: assistant?.name,
+      senderAvatar: assistant?.avatar,
     );
     return (
       userMessage: result.userMessage!,
@@ -633,12 +647,14 @@ class MessageGenerationService {
     required String groupId,
     required int version,
     required bool truncateFuture,
+    Assistant? assistant,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
         conversationId: conversationId,
         modelId: modelId,
         providerKey: providerKey,
+        assistant: assistant,
         groupId: groupId,
         version: version,
       );
@@ -648,6 +664,9 @@ class MessageGenerationService {
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerKey,
+      senderId: assistant?.id,
+      senderName: assistant?.name,
+      senderAvatar: assistant?.avatar,
       groupId: groupId,
       version: version,
       truncateFuture: truncateFuture,
@@ -662,12 +681,14 @@ class MessageGenerationService {
     required String providerKey,
     required String anchorGroupId,
     required bool truncateFuture,
+    Assistant? assistant,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
         conversationId: conversationId,
         modelId: modelId,
         providerKey: providerKey,
+        assistant: assistant,
         temporaryAfterGroupId: anchorGroupId,
       );
       return (assistantMessage: assistantMessage, runId: null);
@@ -676,6 +697,9 @@ class MessageGenerationService {
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerKey,
+      senderId: assistant?.id,
+      senderName: assistant?.name,
+      senderAvatar: assistant?.avatar,
       anchorGroupId: anchorGroupId,
       truncateFuture: truncateFuture,
     );
@@ -742,6 +766,7 @@ class MessageGenerationService {
     String? groupId,
     int version = 0,
     String? temporaryAfterGroupId,
+    Assistant? assistant,
   }) async {
     return chatService.addMessage(
       conversationId: conversationId,
@@ -754,6 +779,9 @@ class MessageGenerationService {
       version: version,
       selectVersion: groupId != null,
       temporaryAfterGroupId: temporaryAfterGroupId,
+      senderId: assistant?.id,
+      senderName: assistant?.name,
+      senderAvatar: assistant?.avatar,
     );
   }
 

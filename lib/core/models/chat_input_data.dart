@@ -1,4 +1,5 @@
 import 'composer_draft.dart' show DraftSubmission;
+import 'composer_mention.dart';
 
 class DocumentAttachment {
   final String path; // absolute file path
@@ -14,6 +15,10 @@ class DocumentAttachment {
 
 class ChatInputData {
   final String text;
+
+  /// Explicit composer selection; message text never determines routing.
+  final String? recipientAssistantId;
+  final ComposerMention? mention;
   final List<String> imagePaths; // absolute file paths or data URLs
   final List<DocumentAttachment> documents; // selected files
   final bool allowImagesApiRouting;
@@ -21,6 +26,8 @@ class ChatInputData {
 
   const ChatInputData({
     required this.text,
+    this.recipientAssistantId,
+    this.mention,
     this.imagePaths = const [],
     this.documents = const [],
     this.allowImagesApiRouting = true,

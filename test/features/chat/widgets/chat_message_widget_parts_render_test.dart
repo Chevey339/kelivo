@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
@@ -22,10 +23,12 @@ Widget _buildHarness({
   required Widget child,
   Brightness brightness = Brightness.light,
   SettingsProvider? settings,
+  AssistantProvider? assistants,
 }) {
   SharedPreferences.setMockInitialValues(const {});
   return MultiProvider(
     providers: [
+      if (assistants != null) ChangeNotifierProvider.value(value: assistants),
       ChangeNotifierProvider(
         create: (_) =>
             settings ?? SettingsProvider(createBusinessTestPreferences()),
@@ -63,6 +66,69 @@ void expectAbove(WidgetTester tester, Object upper, Object lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'reply shows its saved author instead of conversation overrides',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildHarness(
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              conversationId: 'c',
+              content: 'Reviewed',
+              senderId: 'b',
+              senderName: 'Reviewer',
+              senderAvatar: 'R',
+            ),
+            assistantName: 'Default assistant',
+            assistantAvatar: 'A',
+            useAssistantName: true,
+            useAssistantAvatar: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Reviewer'), findsOneWidget);
+      expect(find.text('R'), findsOneWidget);
+      expect(find.text('Default assistant'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'default assistant preserves hidden avatar and model-name preference',
+    (tester) async {
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'Default assistant');
+      await assistants.setCurrentAssistant(id);
+      await tester.pumpWidget(
+        _buildHarness(
+          assistants: assistants,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              conversationId: 'c',
+              modelId: 'display-model',
+              content: 'Answered',
+              senderId: id,
+              senderName: 'Default assistant',
+              senderAvatar: 'R',
+            ),
+            showModelIcon: false,
+            useAssistantName: false,
+            useAssistantAvatar: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('display-model'), findsOneWidget);
+      expect(find.text('Default assistant'), findsNothing);
+      expect(find.text('R'), findsNothing);
+    },
+  );
 
   testWidgets('token footer switches between finish and total usage', (
     tester,

@@ -1,3 +1,4 @@
+import 'package:markstream/markstream.dart' show SourceSpan;
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -1330,10 +1331,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   String _assistantNameFallback() {
+    if (widget.message.senderName?.trim().isNotEmpty == true) {
+      return widget.message.senderName!.trim();
+    }
     try {
       final chat = context.read<ChatService>();
       final convo = chat.getConversation(widget.message.conversationId);
-      final aId = convo?.assistantId;
+      final aId = widget.message.senderId ?? convo?.assistantId;
       if (aId != null && aId.isNotEmpty) {
         final ap = context.read<AssistantProvider>();
         final a = ap.getById(aId);
@@ -1344,8 +1348,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return 'AI Assistant';
   }
 
+  bool get _isGuestAssistant {
+    final senderId = widget.message.senderId;
+    if (senderId == null) return false;
+    final chat = context.watch<ChatService?>();
+    final assistants = context.watch<AssistantProvider?>();
+    final conversation = chat?.getConversation(widget.message.conversationId);
+    final defaultId =
+        conversation?.assistantId ?? assistants?.currentAssistant?.id;
+    return senderId != defaultId;
+  }
+
   Assistant? _assistantForMessage() {
     try {
+      final senderId = widget.message.senderId;
+      if (senderId != null) {
+        return context.watch<AssistantProvider>().getById(senderId);
+      }
       final chat = context.read<ChatService>();
       final convo = chat.getConversation(widget.message.conversationId);
       final aId = convo?.assistantId;
@@ -2086,6 +2105,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseUser = isDesktop ? 14.0 : 15.5;
 
+    final mention = widget.message.mention;
+    final hasMention = mention != null && mention.matches(visualText);
     Widget content;
     if (enableUserMarkdown) {
       content = DefaultTextStyle.merge(
@@ -2094,6 +2115,30 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           text: visualText,
           baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
           conversationId: widget.message.conversationId,
+          highlightRanges: hasMention
+              ? [SourceSpan(mention.start, mention.end)]
+              : const [],
+          highlightColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.12),
+        ),
+      );
+    } else if (hasMention) {
+      content = Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: visualText.substring(0, mention.start)),
+            TextSpan(
+              text: mention.token,
+              style: TextStyle(color: Theme.of(context).colorScheme.primary),
+            ),
+            TextSpan(text: visualText.substring(mention.end)),
+          ],
+        ),
+        style: TextStyle(
+          fontSize: baseUser,
+          height: 1.4,
+          color: chatSurfacePlainTextColor(context, isUser: true),
         ),
       );
     } else {
@@ -2949,9 +2994,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (showModelName)
+                      if (showModelName || _isGuestAssistant)
                         Text(
-                          widget.useAssistantName
+                          _isGuestAssistant
+                              ? _assistantNameFallback()
+                              : widget.useAssistantName
                               ? (widget.assistantName?.trim().isNotEmpty == true
                                     ? widget.assistantName!.trim()
                                     : _assistantNameFallback())
@@ -3776,7 +3823,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildAssistantAvatar(ColorScheme cs) {
-    final av = (widget.assistantAvatar ?? '').trim();
+    final av =
+        (widget.message.senderId != null
+                ? widget.message.senderAvatar ?? ''
+                : widget.assistantAvatar ?? '')
+            .trim();
     if (av.isNotEmpty) {
       if (av.startsWith('http')) {
         return FutureBuilder<String?>(
@@ -3839,7 +3890,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _assistantInitial(ColorScheme cs) {
-    final name = (widget.assistantName ?? '').trim();
+    final name =
+        (widget.message.senderId != null
+                ? _assistantNameFallback()
+                : widget.assistantName ?? '')
+            .trim();
     final ch = name.isNotEmpty ? name.characters.first.toUpperCase() : 'A';
     return Container(
       width: 32,

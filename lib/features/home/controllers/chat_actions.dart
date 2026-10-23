@@ -1180,6 +1180,9 @@ class ChatActions {
 
     final settings = contextProvider.read<SettingsProvider>();
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    final assistantMissingMessage = AppLocalizations.of(
+      contextProvider,
+    )!.assistantEditPageNotFound;
     // Capture approval service reference before async gap
     ToolApprovalService? approvalService;
     AskUserInteractionService? askUserService;
@@ -1194,18 +1197,30 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
+    final recipient = input.recipientAssistantId == null
+        ? null
+        : assistantProvider.getById(input.recipientAssistantId!);
+    if (input.recipientAssistantId != null && recipient == null) {
+      return ChatActionResult.error(assistantMissingMessage);
+    }
     final assistant =
+        recipient ??
         assistantOverride ??
         assistantProvider.resolveConversationAssistant(
           conversation.assistantId,
         );
     final assistantId = assistant?.id;
+    final isConversationAssistant =
+        assistantId ==
+        assistantProvider
+            .resolveConversationAssistant(conversation.assistantId)
+            ?.id;
     final modelConfig =
         modelOverride ??
         messageGenerationService.getModelConfig(
           settings,
           assistant,
-          conversation: conversation,
+          conversation: isConversationAssistant ? conversation : null,
         );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1562,6 +1577,9 @@ class ChatActions {
     final truncateFuture =
         !preserveFollowingMessages && settings.regenerateDeleteTrailingMessages;
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    final assistantMissingMessage = AppLocalizations.of(
+      contextProvider,
+    )!.assistantEditPageNotFound;
     // Capture approval service reference before async gap
     ToolApprovalService? regenApprovalService;
     AskUserInteractionService? regenAskUserService;
@@ -1576,8 +1594,18 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
+    final targetId = message.role == 'user'
+        ? message.recipientAssistantId
+        : message.senderId;
+    final sender = targetId == null
+        ? null
+        : assistantProvider.getById(targetId);
+    if (targetId != null && sender == null) {
+      return ChatActionResult.error(assistantMissingMessage);
+    }
     final assistant =
         assistantOverride ??
+        sender ??
         assistantProvider.resolveConversationAssistant(
           conversation.assistantId,
         );
@@ -1612,12 +1640,17 @@ class ChatActions {
 
     // Get model config
     final assistantId = assistant?.id;
+    final isConversationAssistant =
+        assistantId ==
+        assistantProvider
+            .resolveConversationAssistant(conversation.assistantId)
+            ?.id;
     final modelConfig =
         modelOverride ??
         messageGenerationService.getModelConfig(
           settings,
           assistant,
-          conversation: conversation,
+          conversation: isConversationAssistant ? conversation : null,
         );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1652,6 +1685,7 @@ class ChatActions {
       assistantAsNewReply: assistantAsNewReply,
     )) {
       begin = await messageGenerationService.beginAssistantGeneration(
+        assistant: assistant,
         conversationId: conversation.id,
         modelId: modelId,
         providerKey: providerKey,
@@ -1670,6 +1704,7 @@ class ChatActions {
                 ) +
                 1;
       begin = await messageGenerationService.beginRegeneration(
+        assistant: assistant,
         conversationId: conversation.id,
         modelId: modelId,
         providerKey: providerKey,

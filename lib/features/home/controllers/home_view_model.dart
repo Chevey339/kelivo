@@ -531,6 +531,8 @@ class HomeViewModel extends ChangeNotifier {
   ChatInputData _cloneInput(ChatInputData input) {
     return ChatInputData(
       text: input.text,
+      recipientAssistantId: input.recipientAssistantId,
+      mention: input.mention,
       imagePaths: List<String>.of(input.imagePaths),
       documents: List<DocumentAttachment>.of(input.documents),
       allowImagesApiRouting: input.allowImagesApiRouting,
@@ -594,9 +596,15 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
 
     onHapticFeedback?.call();
-    final assistant = _contextProvider
-        .read<AssistantProvider>()
-        .resolveConversationAssistant(conversation.assistantId);
+    final assistantProvider = _contextProvider.read<AssistantProvider>();
+    final targetId = message.role == 'user'
+        ? message.recipientAssistantId
+        : message.senderId;
+    final assistant = targetId == null
+        ? assistantProvider.resolveConversationAssistant(
+            conversation.assistantId,
+          )
+        : assistantProvider.getById(targetId);
     await _clearSuggestionsFor(conversation.id);
 
     final result = await _chatActions.regenerateAtMessage(

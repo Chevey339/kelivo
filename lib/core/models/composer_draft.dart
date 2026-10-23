@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'chat_input_data.dart';
+import 'composer_mention.dart';
 
 /// The editor value, before the send path trims text or filters attachments.
 class ComposerDraftInput {
   const ComposerDraftInput({
     this.text = '',
+    this.recipientAssistantId,
+    this.mention,
     this.selectionBase = -1,
     this.selectionExtent = -1,
     this.images = const [],
@@ -13,12 +16,18 @@ class ComposerDraftInput {
   });
 
   final String text;
+  final String? recipientAssistantId;
+  final ComposerMention? mention;
   final int selectionBase;
   final int selectionExtent;
   final List<DraftImage> images;
   final List<DocumentAttachment> documents;
   final bool allowImagesApiRouting;
-  bool get isEmpty => text.isEmpty && images.isEmpty && documents.isEmpty;
+  bool get isEmpty =>
+      text.isEmpty &&
+      images.isEmpty &&
+      documents.isEmpty &&
+      recipientAssistantId == null;
   Iterable<String> get paths sync* {
     yield* images.map((image) => image.path);
     yield* documents.map((document) => document.path);
@@ -26,21 +35,37 @@ class ComposerDraftInput {
 
   ComposerDraftInput copyWith({
     String? text,
+    String? recipientAssistantId,
+    ComposerMention? mention,
+    bool clearRecipient = false,
     int? selectionBase,
     int? selectionExtent,
     List<DraftImage>? images,
     List<DocumentAttachment>? documents,
-  }) => ComposerDraftInput(
-    text: text ?? this.text,
-    selectionBase: selectionBase ?? this.selectionBase,
-    selectionExtent: selectionExtent ?? this.selectionExtent,
-    images: images ?? this.images,
-    documents: documents ?? this.documents,
-    allowImagesApiRouting: allowImagesApiRouting,
-  );
+  }) {
+    final updatedMention = clearRecipient
+        ? null
+        : (mention ?? this.mention?.afterEdit(this.text, text ?? this.text));
+    final removed =
+        clearRecipient || (this.mention != null && updatedMention == null);
+    return ComposerDraftInput(
+      text: text ?? this.text,
+      recipientAssistantId: removed
+          ? null
+          : (recipientAssistantId ?? this.recipientAssistantId),
+      mention: updatedMention,
+      selectionBase: selectionBase ?? this.selectionBase,
+      selectionExtent: selectionExtent ?? this.selectionExtent,
+      images: images ?? this.images,
+      documents: documents ?? this.documents,
+      allowImagesApiRouting: allowImagesApiRouting,
+    );
+  }
 
   ChatInputData toInput({DraftSubmission? submission}) => ChatInputData(
     text: text,
+    recipientAssistantId: recipientAssistantId,
+    mention: mention,
     imagePaths: images.map((image) => image.path).toList(),
     documents: documents,
     allowImagesApiRouting: allowImagesApiRouting,
@@ -50,6 +75,8 @@ class ComposerDraftInput {
   factory ComposerDraftInput.fromInput(ChatInputData input) =>
       ComposerDraftInput(
         text: input.text,
+        recipientAssistantId: input.recipientAssistantId,
+        mention: input.mention,
         images: [for (final path in input.imagePaths) DraftImage(path: path)],
         documents: List.of(input.documents),
         allowImagesApiRouting: input.allowImagesApiRouting,
@@ -57,6 +84,8 @@ class ComposerDraftInput {
 
   Map<String, dynamic> toJson() => {
     'text': text,
+    'recipientAssistantId': recipientAssistantId,
+    'mention': mention?.toJson(),
     'selectionBase': selectionBase,
     'selectionExtent': selectionExtent,
     'images': images.map((image) => image.toJson()).toList(),
@@ -70,6 +99,12 @@ class ComposerDraftInput {
   factory ComposerDraftInput.fromJson(Map<String, dynamic> json) =>
       ComposerDraftInput(
         text: json['text'] as String,
+        recipientAssistantId: json['recipientAssistantId'] as String?,
+        mention: json['mention'] == null
+            ? null
+            : ComposerMention.fromJson(
+                Map<String, dynamic>.from(json['mention'] as Map),
+              ),
         selectionBase: json['selectionBase'] as int,
         selectionExtent: json['selectionExtent'] as int,
         images: [
@@ -89,6 +124,10 @@ class ComposerDraftInput {
 
   bool sameValue(ComposerDraftInput other) =>
       text == other.text &&
+      recipientAssistantId == other.recipientAssistantId &&
+      mention?.assistantId == other.mention?.assistantId &&
+      mention?.start == other.mention?.start &&
+      mention?.label == other.mention?.label &&
       selectionBase == other.selectionBase &&
       selectionExtent == other.selectionExtent &&
       allowImagesApiRouting == other.allowImagesApiRouting &&

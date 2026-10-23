@@ -20,13 +20,100 @@ class MessageEditingController extends TextEditingController {
     bool? nativeInputEnabled,
     this.inputChannel = const MethodChannel('kelivo/native_message_input'),
   }) : nativeInputEnabled = nativeInputEnabled ?? Platform.isAndroid {
-    if (this.nativeInputEnabled) {
-      history = MessageUndoHistory(
-        this,
-        onTriggered: userEdits.notifyListeners,
-      );
+    if (this.nativeInputEnabled) _ensureHistory();
+  }
+
+  /// Decorations are supplied by the composer, never inferred from text.
+  TextRange mentionRange = TextRange.empty;
+  Color mentionColor = const Color(0xff3478f6);
+
+  /// Opaque composer metadata travels with each undo entry, not a text lookup.
+  Object? Function(TextEditingValue)? _historyMetadataBuilder;
+  Object? Function(TextEditingValue)? get historyMetadataBuilder =>
+      _historyMetadataBuilder;
+  set historyMetadataBuilder(Object? Function(TextEditingValue)? builder) {
+    _historyMetadataBuilder = builder;
+    if (builder != null) {
+      _ensureHistory();
+    } else if (!nativeInputEnabled) {
+      history?.dispose();
+      history = null;
     }
   }
+
+  void _ensureHistory() {
+    history ??= MessageUndoHistory(
+      this,
+      onTriggered: userEdits.notifyListeners,
+      captureValue: captureHistoryValue,
+    );
+  }
+
+  Object? restoredHistoryMetadata;
+  TextEditingValue captureHistoryValue(TextEditingValue value) =>
+      _MessageHistoryValue(value, historyMetadataBuilder?.call(value));
+
+  bool _restoringHistory = false;
+  bool get isRestoringHistory =>
+      _restoringHistory || (history?.isRestoring ?? false);
+
+  void restoreHistoryValue(TextEditingValue next) {
+    _restoringHistory = true;
+    try {
+      value = next;
+    } finally {
+      _restoringHistory = false;
+    }
+  }
+
+  TextSpan decoratedSpan({
+    required String text,
+    required TextStyle? style,
+    required Color mentionColor,
+    TextRange composing = TextRange.empty,
+    int documentOffset = 0,
+  }) {
+    final points = <int>{0, text.length};
+    final start = mentionRange.start - documentOffset;
+    final end = mentionRange.end - documentOffset;
+    for (final point in [start, end, composing.start, composing.end]) {
+      if (point > 0 && point < text.length) points.add(point);
+    }
+    final sorted = points.toList()..sort();
+    return TextSpan(
+      style: style,
+      children: [
+        for (var i = 0; i < sorted.length - 1; i++)
+          TextSpan(
+            text: text.substring(sorted[i], sorted[i + 1]),
+            style: TextStyle(
+              color:
+                  mentionRange.isValid && sorted[i] >= start && sorted[i] < end
+                  ? mentionColor
+                  : null,
+              decoration:
+                  composing.isValid &&
+                      sorted[i] >= composing.start &&
+                      sorted[i] < composing.end
+                  ? TextDecoration.underline
+                  : null,
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) => decoratedSpan(
+    text: text,
+    style: style,
+    mentionColor: mentionColor,
+    composing: withComposing ? value.composing : TextRange.empty,
+  );
 
   final bool nativeInputEnabled;
   @visibleForTesting
@@ -267,7 +354,21 @@ class MessageEditingController extends TextEditingController {
     if (_input?.acceptsModelWrite == false && !_insideWork) {
       throw StateError('Wait for accepted input before replacing the document');
     }
-    super.value = next;
+    if (isRestoringHistory) {
+      restoredHistoryMetadata = next is _MessageHistoryValue
+          ? next.metadata
+          : null;
+    }
+    // Metadata belongs to history entries, not the platform editing value.
+    // Native input compares plain values while draining accepted edits.
+    final plain = TextEditingValue(
+      text: next.text,
+      selection: next.selection,
+      composing: next.composing,
+    );
+    final unchanged = super.value == plain;
+    super.value = plain;
+    if (isRestoringHistory && unchanged) notifyListeners();
   }
 
   /// Includes the last accepted native edits. Callers that save on teardown
@@ -278,6 +379,7 @@ class MessageEditingController extends TextEditingController {
     _disposing = true;
     await retireInput();
     history?.dispose();
+    history = null;
     userEdits.dispose();
     super.dispose();
   }
@@ -287,6 +389,7 @@ class MessageEditingController extends TextEditingController {
     if (_input == null && _work.isEmpty && !_disposing) {
       _disposing = true;
       history?.dispose();
+      history = null;
       userEdits.dispose();
       super.dispose();
       _disposal = Future.value();
@@ -312,6 +415,35 @@ extension MessageInputLifecycle on TextEditingController {
   Future<void> retireMessageInput() => this is MessageEditingController
       ? (this as MessageEditingController).retireInput()
       : Future.value();
+}
+
+class _MessageHistoryValue extends TextEditingValue {
+  _MessageHistoryValue(TextEditingValue value, this.metadata)
+    : super(
+        text: value.text,
+        selection: value.selection,
+        composing: value.composing,
+      );
+  final Object? metadata;
+
+  @override
+  TextEditingValue copyWith({
+    String? text,
+    TextSelection? selection,
+    TextRange? composing,
+  }) => _MessageHistoryValue(
+    super.copyWith(text: text, selection: selection, composing: composing),
+    metadata,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is _MessageHistoryValue &&
+      super == other &&
+      metadata == other.metadata;
+
+  @override
+  int get hashCode => Object.hash(super.hashCode, metadata);
 }
 
 class _DocumentWork {
