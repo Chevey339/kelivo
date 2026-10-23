@@ -13,6 +13,7 @@ import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/utils/ensure_conversation.dart';
 import 'package:Kelivo/features/chat/utils/sheet_navigation.dart';
+import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
@@ -227,13 +228,14 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
 
   Future<void> _setAllowAll(WorkspaceBinding binding, bool value) async {
     if (!binding.isBound) return;
-    await _writeBinding(
-      WorkspaceBinding(
-        workspaceId: binding.workspaceId,
-        cwd: binding.cwd,
-        toolsUsed: binding.toolsUsed,
-        allowAll: value,
-      ),
+    final id = await _ensureConversationId();
+    if (id == null || !mounted) return;
+    await setConversationWorkspaceAllowAll(
+      context.read<ChatService>(),
+      conversationId: id,
+      workspaceId: binding.workspaceId!,
+      allowAll: value,
+      approvals: context.read<ToolApprovalService?>(),
     );
   }
 

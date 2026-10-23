@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -30,6 +31,7 @@ class _RecordingApproval extends ToolApprovalService {
     required String toolName,
     required Map<String, dynamic> arguments,
     String? conversationId,
+    String? workspaceId,
   }) async {
     calls++;
     lastName = toolName;
@@ -143,6 +145,7 @@ void main() {
     bool registerRuntime = true,
     Future<void> Function()? onShellCompleted,
     Future<EnvironmentExecutionConfig> Function()? loadEnvironment,
+    WorkspaceBinding? Function(String)? readWorkspaceBinding,
   }) {
     final provider = WorkspaceRuntimeProvider();
     if (registerRuntime && runtime != null) {
@@ -153,6 +156,7 @@ void main() {
       runtimeProvider: provider,
       onShellCompleted: onShellCompleted,
       loadEnvironment: loadEnvironment,
+      readWorkspaceBinding: readWorkspaceBinding,
       updateConversationExtras: (id, update) async {
         extrasById[id] = update(extrasById[id] ?? <String, dynamic>{});
       },
@@ -833,6 +837,91 @@ void main() {
   });
 
   group('approval', () {
+    test(
+      'shell reads grants and revocations during the same generation',
+      () async {
+        var binding = const WorkspaceBinding(workspaceId: 'ws1');
+        final approval = _RecordingApproval();
+        final tools = service(
+          runtime: FakeWorkspaceRuntime(),
+          readWorkspaceBinding: (id) {
+            expect(id, 'conv-1');
+            return binding;
+          },
+        );
+        final context = ctx(allowAll: false);
+        Future<void> run(String id) async {
+          final result = await tools.handle(
+            context,
+            'shell',
+            {'command': 'printf ok'},
+            toolCallId: id,
+            approvalService: approval,
+          );
+          expect(jsonOf(result)['exit_code'], 0);
+        }
+
+        await run('before-grant');
+        expect(approval.calls, 1);
+        binding = const WorkspaceBinding(workspaceId: 'ws1', allowAll: true);
+        await run('after-grant');
+        await run('next-command');
+        expect(approval.calls, 1);
+        binding = const WorkspaceBinding(workspaceId: 'ws1');
+        await run('after-revoke');
+        expect(approval.calls, 2);
+      },
+    );
+
+    test(
+      'shell never reuses a stale grant after revocation or rebinding',
+      () async {
+        for (final binding in <WorkspaceBinding?>[
+          null,
+          const WorkspaceBinding(),
+          const WorkspaceBinding(workspaceId: 'ws1'),
+          const WorkspaceBinding(workspaceId: 'other', allowAll: true),
+        ]) {
+          final approval = _RecordingApproval();
+          final tools = service(
+            runtime: FakeWorkspaceRuntime(),
+            readWorkspaceBinding: (_) => binding,
+          );
+          await tools.handle(
+            ctx(allowAll: true),
+            'shell',
+            {'command': 'printf ok'},
+            toolCallId: 'stale-grant',
+            approvalService: approval,
+          );
+          expect(approval.calls, 1);
+        }
+      },
+    );
+
+    test('pending shell carries its workspace for session approval', () async {
+      final approval = ToolApprovalService();
+      addTearDown(approval.dispose);
+      final pending = Completer<void>();
+      approval.addListener(() {
+        if (approval.hasPending && !pending.isCompleted) pending.complete();
+      });
+      final result = service(runtime: FakeWorkspaceRuntime()).handle(
+        ctx(allowAll: false),
+        'shell',
+        {'command': 'printf ok'},
+        toolCallId: 'pending-shell',
+        approvalService: approval,
+      );
+      await pending.future;
+      expect(approval.pendingRequests.single.workspaceId, 'ws1');
+      approval.approveWorkspaceShells(
+        conversationId: 'conv-1',
+        workspaceId: 'ws1',
+      );
+      expect(jsonOf(await result)['exit_code'], 0);
+    });
+
     test('shell asks when shellNeedsApproval', () async {
       final approval = _RecordingApproval();
       final runtime = _SandboxedRuntime();

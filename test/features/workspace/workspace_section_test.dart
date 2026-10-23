@@ -16,6 +16,7 @@ import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
+import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
@@ -188,6 +189,7 @@ void main() {
     WidgetTester tester, {
     required _FakeChatService chat,
     AssistantProvider? assistants,
+    ToolApprovalService? approvals,
   }) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -199,6 +201,8 @@ void main() {
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
           ChangeNotifierProvider<ChatService>.value(value: chat),
+          if (approvals != null)
+            ChangeNotifierProvider<ToolApprovalService>.value(value: approvals),
           ChangeNotifierProvider<WorkspaceRuntimeProvider>(
             create: (_) => WorkspaceRuntimeProvider(),
           ),
@@ -468,7 +472,19 @@ void main() {
         extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
       ),
     );
-    await pumpSection(tester, chat: chat);
+    final approvals = ToolApprovalService();
+    addTearDown(approvals.dispose);
+    final pending = [
+      for (final id in ['first', 'second'])
+        approvals.requestApproval(
+          toolCallId: id,
+          toolName: 'shell',
+          arguments: const {'command': 'ls'},
+          conversationId: chat.conversation!.id,
+          workspaceId: workspace.id,
+        ),
+    ];
+    await pumpSection(tester, chat: chat, approvals: approvals);
     expect(
       WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
       isFalse,
@@ -480,6 +496,10 @@ void main() {
       WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
       isTrue,
     );
+    expect(approvals.hasPending, isFalse);
+    for (final request in pending) {
+      expect((await request).approved, isTrue);
+    }
   });
 
   testWidgets('cwd folder picker sets a relative path', (tester) async {

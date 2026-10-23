@@ -8,6 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
@@ -25,6 +28,28 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
+
+class _FakeChatService extends ChatService {
+  Conversation conversation = Conversation(
+    id: 'c1',
+    title: 'Chat',
+    extras: const WorkspaceBinding(workspaceId: 'ws1').applyTo({}),
+  );
+
+  @override
+  Conversation? getConversation(String id) =>
+      id == conversation.id ? conversation : null;
+
+  @override
+  Future<void> updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic>) update,
+  ) async {
+    expect(conversationId, conversation.id);
+    conversation = conversation.copyWith(extras: update(conversation.extras));
+    notifyListeners();
+  }
+}
 
 ToolUIPart _uiPart({
   required String tool,
@@ -51,9 +76,11 @@ Widget _harness({
   required List<ToolUIPart> toolParts,
   ToolRunRegistry? registry,
   ToolApprovalService? approval,
+  ChatService? chat,
 }) {
   return MultiProvider(
     providers: [
+      if (chat != null) ChangeNotifierProvider<ChatService>.value(value: chat),
       ChangeNotifierProvider(
         create: (_) => SettingsProvider(createBusinessTestPreferences()),
       ),
@@ -568,6 +595,48 @@ void main() {
     expect(find.text('Allow all this session'), findsOneWidget);
     expect(find.text('ls'), findsWidgets);
     expect(find.byIcon(Lucide.Terminal), findsWidgets);
+  });
+
+  testWidgets('card allow-all saves grant and releases all pending shells', (
+    tester,
+  ) async {
+    final chat = _FakeChatService();
+    addTearDown(chat.dispose);
+    final approval = ToolApprovalService();
+    final pending = [
+      for (final id in ['pending-1', 'pending-2'])
+        approval.requestApproval(
+          toolCallId: id,
+          toolName: 'shell',
+          arguments: const {'command': 'ls'},
+          conversationId: 'c1',
+          workspaceId: 'ws1',
+        ),
+    ];
+    await tester.pumpWidget(
+      _harness(
+        chat: chat,
+        approval: approval,
+        toolParts: [
+          const ToolUIPart(
+            id: 'pending-1',
+            toolName: 'shell',
+            arguments: {'command': 'ls'},
+            loading: true,
+          ),
+        ],
+      ),
+    );
+    await tester.tap(find.byKey(WorkspaceToolCardBody.allowAllKey));
+    await tester.pump();
+    expect(
+      WorkspaceBinding.fromExtras(chat.conversation.extras).allowAll,
+      isTrue,
+    );
+    expect(approval.hasPending, isFalse);
+    for (final result in pending) {
+      expect((await result).approved, isTrue);
+    }
   });
 
   testWidgets('deny dialog contains IosFormTextField', (tester) async {

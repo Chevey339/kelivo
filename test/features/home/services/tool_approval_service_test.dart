@@ -12,6 +12,45 @@ Future<void> expectStillPending(Future<dynamic> future) async {
 
 void main() {
   test(
+    'session grant releases only matching workspace shell requests',
+    () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final requests = [
+        for (final (chat, workspace, tool, id)
+            in <(String?, String?, String, String)>[
+              ('a', 'ws1', 'shell', 'first'),
+              ('a', 'ws1', 'shell', 'second'),
+              ('b', 'ws1', 'shell', 'first'),
+              ('a', 'ws2', 'shell', 'other-workspace'),
+              ('a', 'ws1', 'write_file', 'outside-write'),
+              ('a', null, 'mcp_tool', 'mcp'),
+              (null, 'ws1', 'shell', 'unscoped'),
+            ])
+          service.requestApproval(
+            toolCallId: id,
+            toolName: tool,
+            arguments: const {},
+            conversationId: chat,
+            workspaceId: workspace,
+          ),
+      ];
+
+      service.approveWorkspaceShells(conversationId: 'a', workspaceId: 'ws1');
+      expect((await requests[0]).approved, isTrue);
+      expect((await requests[1]).approved, isTrue);
+      expect(service.pendingRequests, hasLength(5));
+      for (final request in requests.skip(2)) {
+        await expectStillPending(request);
+      }
+      service.cancelAll();
+      for (final request in requests.skip(2)) {
+        expect((await request).approved, isFalse);
+      }
+    },
+  );
+
+  test(
     'two conversations sharing a placeholder id keep both Completers',
     () async {
       final service = ToolApprovalService();

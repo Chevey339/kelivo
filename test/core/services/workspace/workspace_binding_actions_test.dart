@@ -16,6 +16,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
+import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -121,6 +122,93 @@ void main() {
     expect(binding.cwd, 'src');
     expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
   });
+
+  test(
+    'session grant preserves latest binding and releases pending shells',
+    () async {
+      final conversation = await chat.createConversation(title: 'Chat');
+      await chat.updateConversationExtras(
+        conversation.id,
+        const WorkspaceBinding(
+          workspaceId: 'ws1',
+          cwd: 'src',
+          toolsUsed: true,
+        ).applyTo,
+      );
+      final approvals = ToolApprovalService();
+      addTearDown(approvals.dispose);
+      final pending = approvals.requestApproval(
+        toolCallId: 'shell-1',
+        toolName: 'shell',
+        arguments: const {'command': 'ls'},
+        conversationId: conversation.id,
+        workspaceId: 'ws1',
+      );
+      await setConversationWorkspaceAllowAll(
+        chat,
+        conversationId: conversation.id,
+        workspaceId: 'ws1',
+        allowAll: true,
+        approvals: approvals,
+      );
+      expect((await pending).approved, isTrue);
+      final binding = WorkspaceBinding.fromExtras(
+        chat.getConversation(conversation.id)!.extras,
+      );
+      expect(binding.allowAll, isTrue);
+      expect(binding.cwd, 'src');
+      expect(binding.toolsUsed, isTrue);
+
+      await setConversationWorkspaceAllowAll(
+        chat,
+        conversationId: conversation.id,
+        workspaceId: 'ws1',
+        allowAll: false,
+        approvals: approvals,
+      );
+      expect(
+        WorkspaceBinding.fromExtras(
+          chat.getConversation(conversation.id)!.extras,
+        ).allowAll,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'obsolete workspace grant cannot rebind or approve a different workspace',
+    () async {
+      final conversation = await chat.createConversation(title: 'Chat');
+      await chat.updateConversationExtras(
+        conversation.id,
+        const WorkspaceBinding(workspaceId: 'ws2').applyTo,
+      );
+      final approvals = ToolApprovalService();
+      addTearDown(approvals.dispose);
+      final pending = approvals.requestApproval(
+        toolCallId: 'old-shell',
+        toolName: 'shell',
+        arguments: const {'command': 'ls'},
+        conversationId: conversation.id,
+        workspaceId: 'ws1',
+      );
+      await setConversationWorkspaceAllowAll(
+        chat,
+        conversationId: conversation.id,
+        workspaceId: 'ws1',
+        allowAll: true,
+        approvals: approvals,
+      );
+      final binding = WorkspaceBinding.fromExtras(
+        chat.getConversation(conversation.id)!.extras,
+      );
+      expect(binding.workspaceId, 'ws2');
+      expect(binding.allowAll, isFalse);
+      expect(approvals.hasPending, isTrue);
+      approvals.cancelAll();
+      expect((await pending).approved, isFalse);
+    },
+  );
 
   test(
     'first binding remembers only the conversation assistant default',
