@@ -13472,7 +13472,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserAgentWorking => 'AI is working';
 
   @override
-  String get browserTakeOver => 'Pause AI actions';
+  String get browserTakeOver => 'Take over';
 
   @override
   String get browserAgentPaused => 'AI actions paused';
@@ -13583,9 +13583,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserPageOptions => 'Page options';
-
-  @override
-  String get browserPauseAi => 'Pause';
 
   @override
   String get browserAskAi => 'Let AI work on this page';
@@ -13866,4 +13863,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowBrowserPageCardsTitle =>
       'Show webpage cards';
+
+  @override
+  String get browserObserverHint =>
+      'AI is using this page. Select Take over to interact.';
 }

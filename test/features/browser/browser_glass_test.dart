@@ -1,3 +1,4 @@
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'dart:ui' as ui;
 
 import 'package:Kelivo/features/browser/models/browser_models.dart';
@@ -12,6 +13,49 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets('solid glass uses app surface tokens: $brightness', (
+      tester,
+    ) async {
+      final colors = ColorScheme.fromSeed(
+        seedColor: const Color(0xff94622a),
+        brightness: brightness,
+      );
+      final tokens =
+          (brightness == Brightness.dark
+                  ? AppSemanticColors.dark(colors)
+                  : AppSemanticColors.light(colors))
+              .copyWith(
+                surfaceCard: const Color(0xff345c68),
+                hairline: const Color(0x665c789a),
+              );
+      for (final clear in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(colorScheme: colors, extensions: [tokens]),
+            home: Center(
+              child: BrowserGlass(
+                clear: clear,
+                child: const SizedBox(width: 200, height: 48),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final cover =
+            tester
+                    .widget<DecoratedBox>(
+                      find.byKey(const ValueKey('browserMaterialCover')),
+                    )
+                    .decoration
+                as BoxDecoration;
+        expect(cover.color, clear ? colors.surface : tokens.surfaceCard);
+        expect((cover.border! as Border).top.color, tokens.hairline);
+        expect(find.byType(BackdropFilter), findsNothing);
+      }
+    });
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     VoidCallback? onTap,

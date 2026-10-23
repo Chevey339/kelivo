@@ -4728,7 +4728,7 @@
   "browserDataCleared": "已清除網站資料",
   "browserAgentControl": "Agent 控制",
   "browserAgentWorking": "AI 正在操作",
-  "browserTakeOver": "暫停 AI 操作",
+  "browserTakeOver": "接管",
   "browserAgentPaused": "AI 操作已暫停",
   "browserAllowAgent": "允許繼續",
   "browserAgentDescription": "在聊天中傳送任務後，AI 才會操作瀏覽器。允許繼續只解除暫停，不會自動傳送訊息或啟動任務。",
@@ -4763,7 +4763,6 @@
   "browserSurfaceFrosted": "磨砂",
   "browserSurfaceSolid": "純色",
   "browserPageOptions": "頁面選項",
-  "browserPauseAi": "暫停",
   "browserAskAi": "讓 AI 處理此頁",
   "browserAskAiHint": "返回聊天，補充需求後傳送。",
   "browserAskAiCurrentPage": "瀏覽器目前頁面",
@@ -4850,5 +4849,6 @@
   "browserTabBusy": "助手仍在操作此頁面，請等待任務完成或停止任務後再移動。",
   "browserLiveViewLimit": "瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。",
   "browserAskAiInOwnerConversation": "讓所屬對話的 AI 處理",
-  "displaySettingsPageShowBrowserPageCardsTitle": "顯示網頁卡片"
+  "displaySettingsPageShowBrowserPageCardsTitle": "顯示網頁卡片",
+  "browserObserverHint": "AI 正在操作此頁面，點選「接管」後可以操作網頁。"
 }

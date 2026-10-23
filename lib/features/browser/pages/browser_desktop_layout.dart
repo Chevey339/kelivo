@@ -94,28 +94,35 @@ class BrowserDesktopLayout extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (agentStatus != null)
+                if (agentStatus != null || findBar != null)
                   Positioned(
                     top: headerHeight + 12,
                     left: 14,
-                    width: math.min(
-                      320,
-                      math.max(0, constraints.maxWidth - 28),
-                    ),
-                    child: agentStatus!,
-                  ),
-                if (findBar != null)
-                  Positioned(
-                    top: headerHeight + 12,
                     right: 14,
-                    width: math.min(
-                      360,
-                      math.max(0, constraints.maxWidth - 28),
-                    ),
-                    child: BrowserGlass(
-                      key: const ValueKey('browserDesktopFindSurface'),
-                      radius: 12,
-                      child: findBar!,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (agentStatus != null) agentStatus!,
+                        if (agentStatus != null && findBar != null)
+                          const SizedBox(height: 8),
+                        if (findBar != null)
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: SizedBox(
+                              width: math.min(
+                                360,
+                                math.max(0, constraints.maxWidth - 28),
+                              ),
+                              child: BrowserGlass(
+                                key: const ValueKey(
+                                  'browserDesktopFindSurface',
+                                ),
+                                radius: 12,
+                                child: findBar!,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
               ],

@@ -12859,7 +12859,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserAgentWorking => 'AI 正在操作';
 
   @override
-  String get browserTakeOver => '暂停 AI 操作';
+  String get browserTakeOver => '接管';
 
   @override
   String get browserAgentPaused => 'AI 操作已暂停';
@@ -12963,9 +12963,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserPageOptions => '页面选项';
-
-  @override
-  String get browserPauseAi => '暂停';
 
   @override
   String get browserAskAi => '让 AI 处理此页';
@@ -13231,6 +13228,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -26014,7 +26014,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get browserAgentWorking => 'AI 正在操作';
 
   @override
-  String get browserTakeOver => '暂停 AI 操作';
+  String get browserTakeOver => '接管';
 
   @override
   String get browserAgentPaused => 'AI 操作已暂停';
@@ -26118,9 +26118,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserPageOptions => '页面选项';
-
-  @override
-  String get browserPauseAi => '暂停';
 
   @override
   String get browserAskAi => '让 AI 处理此页';
@@ -26386,6 +26383,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -39249,7 +39249,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get browserAgentWorking => 'AI 正在操作';
 
   @override
-  String get browserTakeOver => '暫停 AI 操作';
+  String get browserTakeOver => '接管';
 
   @override
   String get browserAgentPaused => 'AI 操作已暫停';
@@ -39353,9 +39353,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserPageOptions => '頁面選項';
-
-  @override
-  String get browserPauseAi => '暫停';
 
   @override
   String get browserAskAi => '讓 AI 處理此頁';
@@ -39621,4 +39618,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowBrowserPageCardsTitle => '顯示網頁卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此頁面，點選「接管」後可以操作網頁。';
 }

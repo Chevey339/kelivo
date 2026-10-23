@@ -96,8 +96,10 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
       BrowserTextButton(
         onPressed: _save,
         filled: !mobile,
-        backgroundColor: mobile ? const Color(0xff007aff) : null,
-        foregroundColor: mobile ? Colors.white : null,
+        backgroundColor: mobile ? Theme.of(context).colorScheme.primary : null,
+        foregroundColor: mobile
+            ? Theme.of(context).colorScheme.onPrimary
+            : null,
         child: Text(
           AppLocalizations.of(context)!.browserSave,
           maxLines: 1,

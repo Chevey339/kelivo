@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/browser/widgets/browser_agent_status_chip.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,6 +54,44 @@ void main() {
     ),
     compactActions: SizedBox(key: ValueKey('actions'), width: 32, height: 32),
   );
+
+  desktopTest('agent pill centers within the pane and find stays below it', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      Align(
+        alignment: Alignment.centerRight,
+        child: SizedBox(
+          key: const ValueKey('pane'),
+          width: 480,
+          child: BrowserDesktopLayout(
+            embedded: true,
+            tabBar: const SizedBox(),
+            toolbar: toolbar,
+            content: const SizedBox.expand(),
+            agentStatus: BrowserAgentStatusChip(
+              activity: BrowserAgentActivity.running,
+              onPause: () {},
+              onResume: () {},
+            ),
+            findBar: const SizedBox(height: 36),
+          ),
+        ),
+      ),
+    );
+    final pane = tester.getRect(find.byKey(const ValueKey('pane')));
+    final pill = tester.getRect(
+      find.byKey(const ValueKey('browserAgentStatusChip')),
+    );
+    final findBar = tester.getRect(
+      find.byKey(const ValueKey('browserDesktopFindSurface')),
+    );
+    expect(pill.center.dx, closeTo(pane.center.dx, .01));
+    expect(findBar.top, greaterThanOrEqualTo(pill.bottom + 8));
+    expect(findBar.right, lessThanOrEqualTo(pane.right));
+    expect(tester.takeException(), isNull);
+  });
 
   desktopTest(
     'blank title row moves window while tabs and toolbar stay interactive',

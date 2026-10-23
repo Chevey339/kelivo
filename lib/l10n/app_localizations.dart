@@ -24051,7 +24051,7 @@ abstract class AppLocalizations {
   /// No description provided for @browserTakeOver.
   ///
   /// In en, this message translates to:
-  /// **'Pause AI actions'**
+  /// **'Take over'**
   String get browserTakeOver;
 
   /// No description provided for @browserAgentPaused.
@@ -24257,12 +24257,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Page options'**
   String get browserPageOptions;
-
-  /// No description provided for @browserPauseAi.
-  ///
-  /// In en, this message translates to:
-  /// **'Pause'**
-  String get browserPauseAi;
 
   /// No description provided for @browserAskAi.
   ///
@@ -24743,6 +24737,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show webpage cards'**
   String get displaySettingsPageShowBrowserPageCardsTitle;
+
+  /// No description provided for @browserObserverHint.
+  ///
+  /// In en, this message translates to:
+  /// **'AI is using this page. Select Take over to interact.'**
+  String get browserObserverHint;
 }
 
 class _AppLocalizationsDelegate

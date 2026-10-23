@@ -167,6 +167,42 @@ void main() {
   });
 
   test(
+    'appearance settings preserve agent work; a UA reload hands control over',
+    () async {
+      await service.initialize();
+      final tab = await service.createTab(
+        url: 'https://example.com',
+        ownerSessionId: 'chat-a',
+      );
+      final pending = Completer<void>();
+      final started = Completer<void>();
+      final outcome = service
+          .runAgentAction<void>(
+            sessionId: 'chat-a',
+            tabId: tab.id,
+            label: 'click',
+            action: () {
+              started.complete();
+              return pending.future;
+            },
+          )
+          .then<Object?>((_) => null, onError: (Object e) => e);
+      await started.future;
+      await service.updateSettings(
+        service.settings.copyWith(surfaceStyle: BrowserSurfaceStyle.frosted),
+      );
+      expect(service.agentPaused, isFalse);
+      await service.updateSettings(
+        service.settings.copyWith(customUserAgent: 'Browser test UA'),
+      );
+      expect(service.agentPaused, isTrue);
+      expect(service.pausedAgentSessionId, 'chat-a');
+      pending.complete();
+      expect(await outcome, isA<StateError>());
+    },
+  );
+
+  test(
     'initial content mode follows the host OS and retains explicit choice',
     () async {
       expect(

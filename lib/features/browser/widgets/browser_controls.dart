@@ -1,3 +1,4 @@
+import '../../../theme/app_semantic_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'browser_text_field.dart';
@@ -299,7 +300,7 @@ class BrowserAddressBar extends StatelessWidget {
             key: const ValueKey('browserDesktopAddressSurface'),
             decoration: BoxDecoration(
               color: solid
-                  ? (dark ? const Color(0xff303236) : const Color(0xfff5f6f8))
+                  ? context.appColors.surfaceFill
                   : Colors.white.withValues(alpha: dark ? .08 : .38),
               borderRadius: BorderRadius.circular(1000),
               border: Border.all(

@@ -749,8 +749,12 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                           icon: LucideIcons.check,
                           size: 52,
                           iconSize: 25,
-                          backgroundColor: const Color(0xff007aff),
-                          foregroundColor: Colors.white,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimary,
                           onPressed:
                               widget.onDone ??
                               () => Navigator.of(context).pop(),

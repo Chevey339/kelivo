@@ -400,16 +400,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     if (_addressFocus.hasFocus) {
       _addressKeyboardSession = true;
       _chromeMotion.value = (progress: 0, animate: false);
-      if (_service.agentActivityFor(
-            sessionId: _visibleConversationId,
-            tabId: _service.activeTabId,
-          ) ==
-          BrowserAgentActivity.running) {
-        _service.takeOver(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        );
-      }
       _address.selection = TextSelection(
         baseOffset: 0,
         extentOffset: _address.text.length,
@@ -636,16 +626,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _focusAddress() {
-    if (_service.agentActivityFor(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        ) ==
-        BrowserAgentActivity.running) {
-      _service.takeOver(
-        sessionId: _visibleConversationId,
-        tabId: _service.activeTabId,
-      );
-    }
     setState(() {
       _editingAddress = true;
       _showDesktopTabs = false;
@@ -709,26 +689,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _service,
     builder: (context, _) {
-      final dark = Theme.of(context).brightness == Brightness.dark;
-      final colors = dark
-          ? const ColorScheme.dark(
-              primary: Color(0xff6baaff),
-              surface: Color(0xff171719),
-              onSurface: Color(0xfff5f5f7),
-              onSurfaceVariant: Color(0xffb7b7bd),
-            )
-          : const ColorScheme.light(
-              primary: Color(0xff007aff),
-              surface: Color(0xfff5f5f7),
-              onSurface: Color(0xff161618),
-              onSurfaceVariant: Color(0xff66666b),
-            );
       return BrowserScrollConfiguration(
         child: BrowserGlassScope(
           style: _service.settings.surfaceStyle,
           child: Theme(
             data: Theme.of(context).copyWith(
-              colorScheme: colors,
               splashFactory: NoSplash.splashFactory,
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
@@ -1461,33 +1426,40 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       );
     }
     final tab = _service.activeTab;
+    final observing =
+        _service.agentActivityFor(
+          sessionId: _visibleConversationId,
+          tabId: tab?.id,
+        ) ==
+        BrowserAgentActivity.running;
     return Stack(
       children: [
         Positioned.fill(
           child: Listener(
             onPointerDown: (event) {
-              _viewportPointerDown(event);
+              if (!observing) _viewportPointerDown(event);
               // A tap outside the address field starts keyboard dismissal.
               // Keep its full-height viewport until the final zero-inset
               // frame; changing avoidance here briefly shrinks the webpage.
-              if (_service.agentActivityFor(
-                    sessionId: _visibleConversationId,
-                    tabId: _service.activeTabId,
-                  ) ==
-                  BrowserAgentActivity.running) {
-                _service.takeOver(
-                  sessionId: _visibleConversationId,
-                  tabId: _service.activeTabId,
-                );
-              }
               _addressFocus.unfocus();
             },
-            onPointerMove: _androidPointerMove,
+            onPointerMove: observing ? null : _androidPointerMove,
             onPointerUp: _viewportPointerEnd,
             onPointerCancel: _viewportPointerEnd,
-            child: _service.buildViewport(
-              deferNewViews: _deferNativeViews,
-              previewTopInset: previewTopInset,
+            child: Semantics(
+              readOnly: observing,
+              label: observing ? l.browserObserverHint : null,
+              child: ExcludeFocus(
+                excluding: observing,
+                child: AbsorbPointer(
+                  key: const ValueKey('browserObserverInputShield'),
+                  absorbing: observing,
+                  child: _service.buildViewport(
+                    deferNewViews: _deferNativeViews,
+                    previewTopInset: previewTopInset,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1517,6 +1489,18 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                   onPressed: () => unawaited(_userRun(() => _service.reload())),
                 ),
               ),
+            ),
+          ),
+        if (observing && defaultTargetPlatform == TargetPlatform.macOS)
+          Positioned.fill(
+            // AppKit embeds a real NSView: an input-only Flutter render object
+            // does not occlude it. Match the menu's painted hit-test surface,
+            // without a dimming layer or a captured copy of the webpage.
+            child: Listener(
+              key: const ValueKey('browserNativeObserverSurface'),
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) => _addressFocus.unfocus(),
+              child: const ColoredBox(color: Color(0x01000000)),
             ),
           ),
       ],
@@ -1656,16 +1640,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   void _toggleFind() {
     if (_blank) return;
-    if (_service.agentActivityFor(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        ) ==
-        BrowserAgentActivity.running) {
-      _service.takeOver(
-        sessionId: _visibleConversationId,
-        tabId: _service.activeTabId,
-      );
-    }
+
     if (_showFind) {
       _findDebounce?.cancel();
       unawaited(_run(() => _service.clearFind(tabId: _findTabId)));
@@ -1687,12 +1662,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _findDebounce?.cancel();
       final tabId = _findTabId;
       _findDebounce = Timer(const Duration(milliseconds: 180), () {
-        unawaited(_run(() => _service.findInPage(text, tabId: tabId)));
+        unawaited(_userRun(() => _service.findInPage(text, tabId: tabId)));
       });
     },
-    onSubmitted: (_) => unawaited(_run(() => _service.findNext())),
-    onPrevious: () => unawaited(_run(() => _service.findNext(forward: false))),
-    onNext: () => unawaited(_run(() => _service.findNext())),
+    onSubmitted: (_) => unawaited(_userRun(() => _service.findNext())),
+    onPrevious: () =>
+        unawaited(_userRun(() => _service.findNext(forward: false))),
+    onNext: () => unawaited(_userRun(() => _service.findNext())),
     onDone: _toggleFind,
   );
 
@@ -1745,16 +1721,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     bool mobileHeader = true,
     bool mobileOwnsPage = false,
   }) async {
-    if (_service.agentActivityFor(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        ) ==
-        BrowserAgentActivity.running) {
-      _service.takeOver(
-        sessionId: _visibleConversationId,
-        tabId: _service.activeTabId,
-      );
-    }
     _addressFocus.unfocus();
     final desktop = _desktop;
     if (!desktop) {
@@ -1925,12 +1891,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     if (_desktop) {
       if (_showFind) _toggleFind();
       _addressFocus.unfocus();
-      unawaited(
-        _userRun(() async {
-          setState(() => _showDesktopTabs = !_showDesktopTabs);
-          _pageFocus.requestFocus();
-        }),
-      );
+      setState(() => _showDesktopTabs = !_showDesktopTabs);
+      _pageFocus.requestFocus();
       return;
     }
     unawaited(_showMobileTabs());
@@ -2014,16 +1976,6 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         precacheImage(MemoryImage(bytes), context, onError: (_, _) {}),
     ]);
     if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
-    if (_service.agentActivityFor(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        ) ==
-        BrowserAgentActivity.running) {
-      _service.takeOver(
-        sessionId: _visibleConversationId,
-        tabId: _service.activeTabId,
-      );
-    }
     _addressFocus.unfocus();
     final openingId = _service.activeTabId;
     ui.Image? startPageSnapshot;
@@ -2201,16 +2153,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   Future<void> _openMenu({int? heldPointer, Offset? pressPosition}) async {
     if (_menuOpen) return;
     _previewIdleTimer?.cancel();
-    if (_service.agentActivityFor(
-          sessionId: _visibleConversationId,
-          tabId: _service.activeTabId,
-        ) ==
-        BrowserAgentActivity.running) {
-      _service.takeOver(
-        sessionId: _visibleConversationId,
-        tabId: _service.activeTabId,
-      );
-    }
+
     final l = AppLocalizations.of(context)!;
     if (!_desktop) setState(() => _menuOpen = true);
     final action = await showBrowserMenu<_BrowserMenu>(

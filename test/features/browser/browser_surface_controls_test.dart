@@ -72,6 +72,23 @@ void main() {
     });
   }
 
+  browserTest('enabled browser switch uses the application accent', (
+    tester,
+  ) async {
+    final colors = ColorScheme.fromSeed(seedColor: const Color(0xff98532b));
+    await mount(
+      tester,
+      Theme(
+        data: ThemeData(colorScheme: colors),
+        child: Center(child: BrowserSwitch(value: true, onChanged: (_) {})),
+      ),
+    );
+    final track = tester.widget<Container>(
+      find.byKey(const ValueKey('browserSwitchTrack')),
+    );
+    expect((track.decoration as BoxDecoration).color, colors.primary);
+  });
+
   browserTest('UA editor saves custom text and restores both presets', (
     tester,
   ) async {
@@ -1118,10 +1135,17 @@ void main() {
                   child: Center(
                     child: BrowserGlassScope(
                       style: BrowserSurfaceStyle.liquid,
-                      child: BrowserSwitch(
-                        key: ValueKey(value),
-                        value: value,
-                        onChanged: (_) {},
+                      child: Theme(
+                        data: ThemeData(
+                          colorScheme: const ColorScheme.light(
+                            primary: Color(0xff34c759),
+                          ),
+                        ),
+                        child: BrowserSwitch(
+                          key: ValueKey(value),
+                          value: value,
+                          onChanged: (_) {},
+                        ),
                       ),
                     ),
                   ),

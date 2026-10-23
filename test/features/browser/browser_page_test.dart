@@ -1709,44 +1709,56 @@ void main() {
     },
   );
 
-  browserTestWidgets('touching the shared viewport interrupts agent control', (
-    tester,
-  ) async {
-    await service.initialize();
-    await service.updateSettings(service.settings.copyWith(agentEnabled: true));
-    final tab = await service.createTab(
-      url: 'https://example.com',
-      ownerSessionId: 'chat-a',
-    );
-    await mount(tester, conversationId: 'chat-a');
-    final pending = Completer<void>();
-    final action = service.runAgentAction<void>(
-      sessionId: 'chat-a',
-      tabId: tab.id,
-      label: 'click',
-      action: () => pending.future,
-    );
-    final outcome = action.then<Object?>(
-      (_) => null,
-      onError: (Object error) => error,
-    );
-    try {
-      await tester.pumpAndSettle();
-      expect(find.text('AI is working'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('fakeNativeView')));
-      await tester.pumpAndSettle();
-      expect(service.agentPaused, isTrue);
-      expect(find.text('AI actions paused'), findsOneWidget);
-      pending.complete();
-      expect(await outcome, isA<StateError>());
-      await tester.pumpAndSettle();
-    } finally {
-      if (!pending.isCompleted) pending.complete();
-    }
-  });
+  browserTestWidgets(
+    'observing absorbs page input and only explicit takeover interrupts the agent',
+    (tester) async {
+      await service.initialize();
+      await service.updateSettings(
+        service.settings.copyWith(agentEnabled: true),
+      );
+      final tab = await service.createTab(
+        url: 'https://example.com',
+        ownerSessionId: 'chat-a',
+      );
+      await mount(tester, conversationId: 'chat-a');
+      final pending = Completer<void>();
+      final action = service.runAgentAction<void>(
+        sessionId: 'chat-a',
+        tabId: tab.id,
+        label: 'click',
+        action: () => pending.future,
+      );
+      final outcome = action.then<Object?>(
+        (_) => null,
+        onError: (Object error) => error,
+      );
+      try {
+        await tester.pumpAndSettle();
+        expect(find.text('AI is working'), findsOneWidget);
+        final page = find.byKey(const ValueKey('fakeNativeView'));
+        final mounts = engines[tab.id]!.viewMounts;
+        await tester.tapAt(tester.getCenter(page));
+        await tester.dragFrom(tester.getCenter(page), const Offset(0, -90));
+        await tester.tap(find.text('AI is working'));
+        await tester.pumpAndSettle();
+        expect(service.agentPaused, isFalse);
+        expect(engines[tab.id]!.humanPointerDowns, 0);
+        expect(engines[tab.id]!.viewMounts, mounts);
+        await tester.tap(find.text('Take over'));
+        await tester.pumpAndSettle();
+        expect(service.agentPaused, isTrue);
+        expect(find.text('AI actions paused'), findsOneWidget);
+        pending.complete();
+        expect(await outcome, isA<StateError>());
+        await tester.pumpAndSettle();
+      } finally {
+        if (!pending.isCompleted) pending.complete();
+      }
+    },
+  );
 
   browserTestWidgets(
-    'touch interrupts the agent owning the visible tab after switching chats',
+    'explicit takeover targets the agent owning the visible tab after switching chats',
     (tester) async {
       await service.initialize();
       await service.updateSettings(
@@ -1776,11 +1788,7 @@ void main() {
       try {
         await tester.pumpAndSettle();
         expect(find.text('AI is working'), findsOneWidget);
-        final visibleView = find
-            .byKey(const ValueKey('fakeNativeView'))
-            .hitTestable();
-        expect(visibleView, findsOneWidget);
-        await tester.tap(visibleView);
+        await tester.tap(find.text('Take over'));
         await tester.pumpAndSettle();
         expect(service.pausedAgentSessionId, 'chat-b');
         expect(find.text('AI actions paused'), findsOneWidget);
@@ -1791,6 +1799,206 @@ void main() {
       }
     },
   );
+
+  browserTestWidgets(
+    'opening browser chrome observes; submitting a URL takes over',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(
+        url: 'https://example.com',
+        ownerSessionId: 'chat-a',
+      );
+      await mount(tester, conversationId: 'chat-a');
+      final pending = Completer<void>();
+      final outcome = service
+          .runAgentAction<void>(
+            sessionId: 'chat-a',
+            tabId: tab.id,
+            label: 'extract',
+            action: () => pending.future,
+          )
+          .then<Object?>((_) => null, onError: (Object e) => e);
+      try {
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('More').last);
+        await tester.pumpAndSettle();
+        expect(service.agentPaused, isFalse);
+        await tester.tapAt(const Offset(8, 80));
+        await tester.pumpAndSettle();
+        final address = tester.widget<BrowserAddressBar>(
+          find.byType(BrowserAddressBar),
+        );
+        address.onEdit!();
+        await tester.pumpAndSettle();
+        expect(service.agentPaused, isFalse);
+        address.onSubmitted('https://next.example');
+        await tester.pumpAndSettle();
+        expect(service.agentPaused, isTrue);
+        expect(service.activeTab!.url, 'https://next.example');
+        pending.complete();
+        expect(await outcome, isA<StateError>());
+      } finally {
+        if (!pending.isCompleted) pending.complete();
+      }
+    },
+  );
+
+  for (final platform in [
+    TargetPlatform.iOS,
+    TargetPlatform.android,
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  ]) {
+    for (final brightness in Brightness.values) {
+      browserTestWidgets(
+        'browser inherits app colors on $platform / $brightness',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = platform;
+          final colors = ColorScheme.fromSeed(
+            seedColor: const Color(0xff9b6234),
+            brightness: brightness,
+          );
+          final desktop = [
+            TargetPlatform.macOS,
+            TargetPlatform.windows,
+            TargetPlatform.linux,
+          ].contains(platform);
+          await mount(
+            tester,
+            theme: ThemeData(colorScheme: colors),
+            size: desktop ? const Size(1100, 800) : const Size(390, 844),
+            embedded: desktop,
+            shortcutsEnabled: false,
+          );
+          final address = find.byType(BrowserAddressBar);
+          final actual = Theme.of(tester.element(address)).colorScheme;
+          expect(actual.primary, colors.primary);
+          expect(actual.surface, colors.surface);
+          expect(actual.onSurface, colors.onSurface);
+          if (desktop) {
+            final header = find.byKey(const ValueKey('browserDesktopHeader'));
+            final cover = tester.widget<DecoratedBox>(
+              find
+                  .descendant(
+                    of: header,
+                    matching: find.byKey(
+                      const ValueKey('browserMaterialCover'),
+                    ),
+                  )
+                  .first,
+            );
+            expect((cover.decoration as BoxDecoration).color, colors.surface);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  browserTestWidgets(
+    'settings and tab overview stay observational and completion releases input',
+    (tester) async {
+      await service.initialize();
+      final tab = await service.createTab(
+        url: 'https://example.com',
+        ownerSessionId: 'chat-a',
+      );
+      await mount(tester, conversationId: 'chat-a');
+      final pending = Completer<void>();
+      final action = service.runAgentAction<void>(
+        sessionId: 'chat-a',
+        tabId: tab.id,
+        label: 'extract',
+        action: () => pending.future,
+      );
+      try {
+        await tester.pumpAndSettle();
+        await openMobileMenuItem(tester, 'Browser settings');
+        expect(service.agentPaused, isFalse);
+        Navigator.of(tester.element(find.byType(BrowserSettingsPanel))).pop();
+        await tester.pumpAndSettle();
+        await openMobileMenuItem(tester, 'Tabs (1)');
+        expect(service.agentPaused, isFalse);
+        await tester.tap(find.byTooltip('Done').last);
+        await tester.pumpAndSettle();
+        pending.complete();
+        await action;
+        await tester.pumpAndSettle();
+        expect(find.text('AI is working'), findsNothing);
+        expect(
+          tester
+              .widget<AbsorbPointer>(
+                find.byKey(const ValueKey('browserObserverInputShield')),
+              )
+              .absorbing,
+          isFalse,
+        );
+        await tester.tapAt(
+          tester.getCenter(find.byKey(const ValueKey('fakeNativeView'))),
+        );
+        expect(engines[tab.id]!.humanPointerDowns, 1);
+      } finally {
+        if (!pending.isCompleted) pending.complete();
+      }
+    },
+  );
+
+  for (final platform in [
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  ]) {
+    browserTestWidgets(
+      'desktop tab overview remains observational on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        final tab = await service.createTab(
+          url: 'https://example.com',
+          ownerSessionId: 'chat-a',
+        );
+        await mount(
+          tester,
+          conversationId: 'chat-a',
+          size: const Size(1100, 800),
+          embedded: true,
+        );
+        final pending = Completer<void>();
+        final outcome = service
+            .runAgentAction<void>(
+              sessionId: 'chat-a',
+              tabId: tab.id,
+              label: 'extract',
+              action: () => pending.future,
+            )
+            .then<Object?>((_) => null, onError: (Object error) => error);
+        try {
+          await tester.pumpAndSettle();
+          final mounts = engines[tab.id]!.viewMounts;
+          await tester.tap(find.byTooltip('All tabs'));
+          await tester.pumpAndSettle();
+          expect(find.byType(BrowserTabOverview), findsOneWidget);
+          expect(service.agentPaused, isFalse);
+          await tester.tap(find.byTooltip('All tabs'));
+          await tester.pumpAndSettle();
+          expect(find.byType(BrowserTabOverview), findsNothing);
+          expect(service.agentPaused, isFalse);
+          await tester.tap(find.byTooltip('More').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Tabs (1)'));
+          await tester.pumpAndSettle();
+          expect(find.byType(BrowserTabOverview), findsOneWidget);
+          expect(service.agentPaused, isFalse);
+          expect(engines[tab.id]!.viewMounts, mounts);
+          pending.complete();
+          expect(await outcome, isNull);
+          expect(tester.takeException(), isNull);
+        } finally {
+          if (!pending.isCompleted) pending.complete();
+        }
+      },
+    );
+  }
 
   browserTestWidgets('large-text agent controls fit a narrow mobile viewport', (
     tester,
@@ -3493,6 +3701,7 @@ class _Engine extends BrowserEngine {
   int forwardCalls = 0;
   int reloadCalls = 0;
   int viewMounts = 0;
+  int humanPointerDowns = 0;
   int viewBuilds = 0;
   int viewDisposals = 0;
   Uint8List? previewBytes;
@@ -3588,10 +3797,13 @@ class _EngineViewState extends State<_EngineView> {
   @override
   Widget build(BuildContext context) {
     widget.engine.viewBuilds++;
-    return ColoredBox(
-      key: const ValueKey('fakeNativeView'),
-      color: widget.engine.backgroundColor,
-      child: const Center(child: Text('Native website content')),
+    return Listener(
+      onPointerDown: (_) => widget.engine.humanPointerDowns++,
+      child: ColoredBox(
+        key: const ValueKey('fakeNativeView'),
+        color: widget.engine.backgroundColor,
+        child: const Center(child: Text('Native website content')),
+      ),
     );
   }
 }

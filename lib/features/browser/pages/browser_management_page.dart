@@ -40,9 +40,7 @@ class BrowserManagementPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final background = theme.brightness == Brightness.dark
-        ? const Color(0xff1c1c1e)
-        : const Color(0xfff2f2f7);
+    final background = theme.colorScheme.surface;
     return BrowserScrollConfiguration(
       child: Theme(
         data: theme.copyWith(

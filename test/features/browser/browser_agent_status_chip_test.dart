@@ -55,7 +55,7 @@ void main() {
     expect(find.text('Allow to continue'), findsNothing);
   });
 
-  testWidgets('running is a compact action pill and pauses only on tap', (
+  testWidgets('running status is passive and only Take over pauses', (
     tester,
   ) async {
     var paused = 0;
@@ -70,7 +70,10 @@ void main() {
     final chip = find.byKey(const ValueKey('browserAgentStatusChip'));
     expect(tester.getSize(chip).height, lessThan(50));
     expect(paused, 0);
-    await tester.tap(find.text('Pause'));
+    await tester.tap(find.text('AI is working'));
+    await tester.pumpAndSettle();
+    expect(paused, 0);
+    await tester.tap(find.text('Take over'));
     await tester.pumpAndSettle();
     expect(paused, 1);
     expect(resumed, 0);

@@ -1,3 +1,4 @@
+import '../../../theme/app_semantic_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -500,7 +501,6 @@ class BrowserSurfaceGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final desktop = _desktopControls(context);
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final contrast = MediaQuery.highContrastOf(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
@@ -510,7 +510,7 @@ class BrowserSurfaceGroup extends StatelessWidget {
               ? Colors.transparent
               : desktop
               ? colors.onSurface.withValues(alpha: .035)
-              : (dark ? Colors.white.withValues(alpha: .065) : Colors.white),
+              : context.appColors.surfaceCard,
           borderRadius: BorderRadius.circular(26),
           border: filled && (desktop || contrast)
               ? Border.all(
@@ -901,7 +901,7 @@ class _BrowserSwitchState extends State<BrowserSwitch>
                             decoration: BoxDecoration(
                               color: Color.lerp(
                                 colors.onSurface.withValues(alpha: .22),
-                                const Color(0xff34c759),
+                                colors.primary,
                                 _position.value,
                               ),
                               borderRadius: BorderRadius.circular(20),

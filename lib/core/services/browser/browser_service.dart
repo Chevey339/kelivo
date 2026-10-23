@@ -1280,6 +1280,11 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     final userAgentChanged =
         settings.desktopMode != old.desktopMode ||
         settings.customUserAgent != old.customUserAgent;
+    // Merely opening settings is observation. Applying a different UA reloads
+    // the document, so hand control over before changing a running task's page.
+    if (userAgentChanged && _isRunningAgentAction) {
+      takeOver(sessionId: _agentSessionId, tabId: _agentTabId);
+    }
     if (userAgentChanged || settings.surfaceStyle != old.surfaceStyle) {
       for (final engine in _engines.values.toList()) {
         await engine.updateSettings(settings);

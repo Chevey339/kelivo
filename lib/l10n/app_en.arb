@@ -5922,7 +5922,7 @@
   "browserDataCleared": "Website data cleared",
   "browserAgentControl": "Agent control",
   "browserAgentWorking": "AI is working",
-  "browserTakeOver": "Pause AI actions",
+  "browserTakeOver": "Take over",
   "browserAgentPaused": "AI actions paused",
   "browserAllowAgent": "Allow to continue",
   "browserAgentDescription": "Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.",
@@ -5957,7 +5957,6 @@
   "browserSurfaceFrosted": "Frosted",
   "browserSurfaceSolid": "Solid",
   "browserPageOptions": "Page options",
-  "browserPauseAi": "Pause",
   "browserAskAi": "Let AI work on this page",
   "browserAskAiHint": "Return to chat, add your request, then send.",
   "browserAskAiCurrentPage": "the current browser page",
@@ -6130,5 +6129,6 @@
   "browserTabBusy": "An assistant is still using this page. Wait for it to finish or stop the task before moving it.",
   "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
   "browserAskAiInOwnerConversation": "Ask AI in the owning chat",
-  "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards"
+  "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards",
+  "browserObserverHint": "AI is using this page. Select Take over to interact."
 }

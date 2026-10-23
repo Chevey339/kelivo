@@ -1,3 +1,4 @@
+import '../../../theme/app_semantic_colors.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -400,17 +401,23 @@ class _BrowserGlassState extends State<BrowserGlass>
       );
     }
 
+    final solidColor = widget.clear
+        ? Theme.of(context).colorScheme.surface
+        : context.appColors.surfaceCard;
+    final solidBorder = contrast
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .6)
+        : context.appColors.hairline;
     final cover = AnimatedBuilder(
       animation: _cover,
       builder: (context, _) => DecoratedBox(
         key: const ValueKey('browserMaterialCover'),
         decoration: BoxDecoration(
-          color: (dark ? const Color(0xFF292D32) : const Color(0xFFF8F9FB))
-              .withValues(alpha: opacity * _cover.value),
+          color: solidColor.withValues(alpha: opacity * _cover.value),
           borderRadius: corners,
           border: Border.all(
-            color: (dark ? const Color(0xFF494F56) : const Color(0xFFD8DDE2))
-                .withValues(alpha: opacity * _cover.value),
+            color: solidBorder.withValues(
+              alpha: solidBorder.a * opacity * _cover.value,
+            ),
             width: contrast ? 1.25 : .5,
           ),
         ),
@@ -469,8 +476,9 @@ class _BrowserGlassState extends State<BrowserGlass>
                   decoration: BoxDecoration(
                     borderRadius: corners,
                     border: Border.all(
-                      color: (dark ? Colors.white : const Color(0xFF26384B))
-                          .withValues(alpha: opacity),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: opacity),
                       width: 2,
                     ),
                   ),
@@ -575,7 +583,7 @@ class BrowserControlFeedback extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(radius),
                   border: Border.all(
-                    color: dark ? Colors.white : const Color(0xFF26384B),
+                    color: Theme.of(context).colorScheme.primary,
                     width: 2,
                   ),
                 ),
@@ -1206,7 +1214,7 @@ class BrowserWallpaper extends StatelessWidget {
   Widget build(BuildContext context) => RepaintBoundary(
     child: CustomPaint(
       painter: _WallpaperPainter(
-        dark: Theme.of(context).brightness == Brightness.dark,
+        colors: Theme.of(context).colorScheme,
         highContrast: MediaQuery.highContrastOf(context),
       ),
       child: child,
@@ -1215,9 +1223,10 @@ class BrowserWallpaper extends StatelessWidget {
 }
 
 class _WallpaperPainter extends CustomPainter {
-  const _WallpaperPainter({required this.dark, required this.highContrast});
+  const _WallpaperPainter({required this.colors, required this.highContrast});
 
-  final bool dark;
+  final ColorScheme colors;
+  bool get dark => colors.brightness == Brightness.dark;
   final bool highContrast;
 
   @override
@@ -1229,9 +1238,11 @@ class _WallpaperPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF202832), Color(0xFF11161D), Color(0xFF343B46)]
-              : const [Color(0xFFFAFAFC), Color(0xFFF2F3F6), Color(0xFFE9ECF1)],
+          colors: [
+            colors.surface,
+            colors.surfaceContainerLow,
+            colors.surfaceContainer,
+          ],
         ).createShader(rect),
     );
     if (highContrast) return;
@@ -1268,12 +1279,9 @@ class _WallpaperPainter extends CustomPainter {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              (dark ? const Color(0xFF718296) : Colors.white).withValues(
-                alpha: dark ? .22 : .26,
-              ),
-              (dark ? const Color(0xFF0A0D12) : const Color(0xFF7C8EA3))
-                  .withValues(alpha: dark ? .12 : .045),
-              Colors.white.withValues(alpha: dark ? .07 : .34),
+              colors.onSurface.withValues(alpha: dark ? .05 : .025),
+              colors.onSurfaceVariant.withValues(alpha: dark ? .04 : .02),
+              colors.surfaceContainerHigh.withValues(alpha: .34),
             ],
           ).createShader(rect),
       );
@@ -1295,7 +1303,7 @@ class _WallpaperPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WallpaperPainter oldDelegate) =>
-      oldDelegate.dark != dark || oldDelegate.highContrast != highContrast;
+      oldDelegate.colors != colors || oldDelegate.highContrast != highContrast;
 }
 
 class _BrowserSurfaceShadow extends CustomPainter {

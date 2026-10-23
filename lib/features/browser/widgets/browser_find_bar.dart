@@ -90,8 +90,8 @@ class BrowserFindBar extends StatelessWidget {
       icon: LucideIcons.check,
       size: targetSize,
       iconSize: 23,
-      backgroundColor: const Color(0xff007aff),
-      foregroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      foregroundColor: Theme.of(context).colorScheme.onPrimary,
       onPressed: onDone,
     );
     final search = BrowserGlass(

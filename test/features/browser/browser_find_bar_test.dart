@@ -110,8 +110,11 @@ void main() {
       keyed('browserFindDone'),
     );
     expect(action.icon, LucideIcons.check);
-    expect(action.backgroundColor, const Color(0xff007aff));
-    expect(action.foregroundColor, Colors.white);
+    final colors = Theme.of(
+      tester.element(keyed('browserFindDone')),
+    ).colorScheme;
+    expect(action.backgroundColor, colors.primary);
+    expect(action.foregroundColor, colors.onPrimary);
     expect(find.byType(BrowserSurfaceIconGroup), findsOneWidget);
     expect(find.byType(BrowserGlass), findsNWidgets(2));
     expect(find.byIcon(LucideIcons.search), findsOneWidget);
