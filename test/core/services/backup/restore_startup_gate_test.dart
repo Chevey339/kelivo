@@ -11,6 +11,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/startup_failure_report.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_diagnostic_exception.dart';
@@ -18,6 +19,7 @@ import 'package:Kelivo/core/services/backup/restore_previous_store.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
+import '../../../support/windows_directory_holder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +39,136 @@ void main() {
     tearDown(() async {
       if (await root.exists()) await root.delete(recursive: true);
     });
+
+    test(
+      'Windows occupied workspace resumes the same partially preserved restore',
+      () async {
+        final database = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(database, conversationId: 'old');
+        final oldSkill = File(p.join(appData.path, 'skills', 'old.txt'));
+        final oldWorkspace = File(
+          p.join(appData.path, 'workspaces', 'project', 'files', 'old.txt'),
+        );
+        for (final file in [oldSkill, oldWorkspace]) {
+          await file.parent.create(recursive: true);
+          await file.writeAsString(
+            'retained ${p.basename(p.dirname(file.path))}',
+            flush: true,
+          );
+        }
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'windows_occupied_source',
+          includeFiles: true,
+        );
+        final holder = await WindowsDirectoryHolder.start(
+          directory: oldWorkspace.parent,
+          controls: Directory(p.join(root.path, 'holder')),
+        );
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
+        try {
+          final diagnostics = RestoreStartupDiagnostics();
+          final pending = Directory(
+            p.join(prepared.workspace.path, 'previous.pending'),
+          );
+          final plan = File(p.join(pending.path, 'manifest.json'));
+          List<int>? originalPlan;
+          for (var attempt = 0; attempt < 2; attempt++) {
+            try {
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appData,
+                businessLease: lease,
+                diagnostics: diagnostics,
+              );
+              fail('A real occupied directory must block the move');
+            } on FileSystemException catch (error, stack) {
+              final report = StartupFailureReport.capture(
+                stage: StartupFailureStage.restoreGate,
+                error: error,
+                stackTrace: stack,
+                restoreDetails: diagnostics.details,
+              );
+              expect(
+                report.blockedRestoreDirectory,
+                p.join(appData.path, 'workspaces'),
+              );
+              expect(report.restoreDetails['run id'], prepared.runId);
+              expect(report.toText(), contains('Windows error code: 5'));
+            }
+            final bytes = await plan.readAsBytes();
+            originalPlan ??= bytes;
+            expect(bytes, originalPlan);
+            expect(await _conversationIds(database), ['old']);
+            expect(await oldWorkspace.readAsString(), 'retained files');
+            expect(
+              await File(
+                p.join(pending.path, 'skills', 'old.txt'),
+              ).readAsString(),
+              'retained skills',
+            );
+            expect(
+              await Directory(p.join(pending.path, 'workspaces')).exists(),
+              isFalse,
+            );
+            expect(
+              (await RestoreReceiptStore(
+                appDataDirectory: appData,
+                runId: prepared.runId,
+              ).readLatest())!.checksum,
+              prepared.receipt.checksum,
+            );
+          }
+          await holder.close();
+          final result =
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appData,
+                businessLease: lease,
+                diagnostics: diagnostics,
+              );
+          expect(result!.runId, prepared.runId);
+          expect(result.state, RestoreReceiptState.committed);
+          expect(await _conversationIds(database), ['new']);
+          expect(
+            await File(
+              p.join(appData.path, 'upload', 'new.txt'),
+            ).readAsString(),
+            'new asset',
+          );
+          final previous = Directory(
+            p.join(
+              appData.path,
+              RestoreWorkspaceLock.workspaceRootName,
+              RestoreWorkspaceLock.completedRunsDirectoryName,
+              'run_${prepared.runId}',
+              'previous',
+            ),
+          );
+          expect(
+            await File(p.join(previous.path, 'manifest.json')).readAsBytes(),
+            originalPlan,
+          );
+          expect(
+            await File(
+              p.join(
+                previous.path,
+                'workspaces',
+                'project',
+                'files',
+                'old.txt',
+              ),
+            ).readAsString(),
+            'retained files',
+          );
+        } finally {
+          await holder.close();
+          await lease.close();
+        }
+      },
+      skip: !Platform.isWindows,
+    );
 
     test('allows startup when no restore run exists', () async {
       expect(

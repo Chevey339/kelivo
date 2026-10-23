@@ -332,6 +332,26 @@ final class StartupFailureReport {
   final StartupFailureEnvironment? environment;
   final Map<String, String> restoreDetails;
 
+  /// A blocked old-directory move can resume the same prepared transaction.
+  /// Do not offer this shortcut for installation/rollback or unrelated I/O.
+  String? get blockedRestoreDirectory {
+    if (stage != StartupFailureStage.restoreGate ||
+        restoreDetails['restore stage'] != 'preservingCurrentData' ||
+        restoreDetails['last observed receipt state'] != 'prepared') {
+      return null;
+    }
+    for (final cause in causes) {
+      final details = cause.details;
+      if (details['operation'] == 'MoveFileExW' &&
+          details['source type'] == 'directory' &&
+          const {'5', '32', '33'}.contains(details['Windows error code'])) {
+        final path = details['source path'];
+        if (path != null && path.isNotEmpty) return path;
+      }
+    }
+    return null;
+  }
+
   StartupFailureReport withEnvironment(StartupFailureEnvironment value) =>
       StartupFailureReport(
         stage: stage,

@@ -1624,6 +1624,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle => '还原正在等待目录释放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 无法移动下方目录。请关闭正在使用该目录的终端、编辑器或其他程序，然后继续还原。如果仍然受阻，请检查当前账户是否有移动该目录的权限。此前的还原进度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '继续还原';
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -14346,6 +14356,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle => '还原正在等待目录释放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 无法移动下方目录。请关闭正在使用该目录的终端、编辑器或其他程序，然后继续还原。如果仍然受阻，请检查当前账户是否有移动该目录的权限。此前的还原进度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '继续还原';
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -26992,6 +27012,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
+
+  @override
+  String get backupRestoreDirectoryBlockedTitle => '還原正在等待資料夾釋放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 無法移動下方資料夾。請關閉正在使用該資料夾的終端機、編輯器或其他程式，然後繼續還原。如果仍然受阻，請檢查目前帳戶是否有移動該資料夾的權限。先前的還原進度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '繼續還原';
 
   @override
   String get backupRestoreFailureTitle => '還原需要處理';
