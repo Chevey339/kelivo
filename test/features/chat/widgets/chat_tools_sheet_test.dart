@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Tristate;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
@@ -16,6 +17,8 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/chat_tools_sheet.dart';
+import 'package:Kelivo/desktop/tools_popover.dart';
+import 'package:Kelivo/features/home/services/local_tool_labels.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
@@ -24,6 +27,7 @@ import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
@@ -169,12 +173,14 @@ void main() {
     WidgetTester tester, {
     List<McpServerConfig> servers = const [],
     Conversation? conversation,
+    bool desktop = false,
   }) async {
     mcp.fakeServers = servers;
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final anchor = GlobalKey();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -197,17 +203,89 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: AppSnackBarOverlay(
             child: Scaffold(
-              body: ChatToolsSheet(
-                assistantId: assistantId,
-                conversationId: conversation?.id,
-              ),
+              body: desktop
+                  ? Builder(
+                      builder: (context) => Align(
+                        alignment: Alignment.bottomCenter,
+                        child: SizedBox(
+                          key: anchor,
+                          width: 400,
+                          height: 44,
+                          child: TextButton(
+                            onPressed: () => showDesktopToolsPopover(
+                              context,
+                              anchorKey: anchor,
+                              assistantId: assistantId,
+                            ),
+                            child: const Text('Open tools'),
+                          ),
+                        ),
+                      ),
+                    )
+                  : ChatToolsSheet(
+                      assistantId: assistantId,
+                      conversationId: conversation?.id,
+                    ),
             ),
           ),
         ),
       ),
     );
+    if (desktop) await tester.tap(find.text('Open tools'));
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'keyboard folds workspace and announces state desktop=$desktop',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.runAsync(
+          () => uiPreferences.setStringList(
+            'display_chat_tools_expanded_groups_v1',
+            ['mcp'],
+          ),
+        );
+        final l10n = await pumpSheet(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        final title = find.text(l10n.workspacesTitle);
+        await tester.scrollUntilVisible(
+          title,
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final header = find.ancestor(
+          of: title,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics && widget.properties.expanded != null,
+          ),
+        );
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isFalse,
+        );
+        Focus.of(tester.element(title)).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isTrue,
+        );
+        expect(find.byType(WorkspaceSection), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isFalse,
+        );
+        expect(find.byType(WorkspaceSection), findsNothing);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
   }
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
@@ -258,7 +336,7 @@ void main() {
 
     expect(find.byKey(ChatToolsSheet.localGroupKey), findsOneWidget);
     expect(
-      find.text(l10n.toolsSheetEnabledCount(0)),
+      find.text('0/${availableLocalToolIds().length}'),
       findsOneWidget,
       reason: 'the folded header still reports how many tools are on',
     );
@@ -270,11 +348,11 @@ void main() {
     expect(find.text(l10n.assistantEditPageLocalToolsTab), findsOneWidget);
   });
 
-  testWidgets('unfolding a group retains its summary above the rows', (
+  testWidgets('unfolding a group swaps its summary for the rows', (
     tester,
   ) async {
     final l10n = await pumpSheet(tester);
-    final count = l10n.toolsSheetEnabledCount(0);
+    final count = '0/${availableLocalToolIds().length}';
     expect(find.text(count), findsOneWidget);
 
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
@@ -282,8 +360,8 @@ void main() {
 
     expect(
       find.text(count),
-      findsOneWidget,
-      reason: 'the enabled count remains visible when a group is open',
+      findsNothing,
+      reason: 'an open group shows its rows instead of a summary',
     );
     expect(
       find.byKey(ChatToolsSheet.localToolKey(LocalToolNames.timeInfo)),
@@ -348,7 +426,7 @@ void main() {
     // The count is the folded header's summary, so fold the group to read it.
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
     await tester.pumpAndSettle();
-    expect(find.text(l10n.toolsSheetEnabledCount(1)), findsOneWidget);
+    expect(find.text('1/${availableLocalToolIds().length}'), findsOneWidget);
   });
 
   testWidgets('hides the MCP group when nothing is connected', (tester) async {

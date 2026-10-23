@@ -19,7 +19,18 @@ class PresentationMcpProvider extends McpProvider {
   List<McpServerConfig> items = [];
   bool rejectRemoval = false;
   Future<void>? reconnectWait;
+  Future<void>? reorderWait;
+  Future<String>? groupCreation;
+  int groupCreationStarted = 0;
+  int reorderStarted = 0;
+  int? groupReorderTarget;
   final restoredPresentations = <String, McpServerPresentation>{};
+
+  @override
+  Future<String> createGroup(String name) {
+    groupCreationStarted++;
+    return groupCreation ?? super.createGroup(name);
+  }
 
   @override
   Future<bool> reconnect(String id) async {
@@ -69,9 +80,19 @@ class PresentationMcpProvider extends McpProvider {
 
   @override
   Future<void> reorderServers(int oldIndex, int newIndex) async {
+    reorderStarted++;
+    await reorderWait;
     final moved = items.removeAt(oldIndex);
     items.insert(newIndex, moved);
     notifyListeners();
+  }
+
+  @override
+  Future<void> reorderGroup(String id, int newIndex) async {
+    reorderStarted++;
+    groupReorderTarget = newIndex;
+    await reorderWait;
+    await super.reorderGroup(id, newIndex);
   }
 
   @override

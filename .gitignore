@@ -75,3 +75,7 @@ internationalization.md
 
 # Local Markdown visual baselines and comparison reports
 /test_goldens/out/
+
+# MCP/tools UI screenshots stay local, outside the tracked test suite.
+/test/goldens/baselines/mcp_*.png
+/test/goldens/baselines/tools_*.png

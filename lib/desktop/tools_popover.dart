@@ -1,26 +1,23 @@
-import 'dart:async';
 import 'dart:ui' as ui;
+import 'dart:async';
+import '../core/database/business_preferences.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../features/mcp/widgets/mcp_server_avatar.dart';
+import '../features/mcp/utils/mcp_tool_groups.dart';
+import '../features/workspace/widgets/workspace_section.dart';
 import 'package:provider/provider.dart';
 
+import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/mcp_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
-import '../core/database/business_preferences.dart';
-import '../core/models/workspace_binding.dart';
-import '../core/providers/workspace_provider.dart';
-import '../core/services/chat/chat_service.dart';
-import '../features/chat/widgets/tools_section_header.dart';
-import '../features/mcp/widgets/mcp_server_avatar.dart';
-import '../features/workspace/widgets/workspace_section.dart';
-import '../shared/widgets/ios_switch.dart';
-import '../theme/app_semantic_colors.dart';
-import 'desktop_settings_navigation_bus.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import '../shared/widgets/ios_tactile.dart';
 
 Future<void> showDesktopToolsPopover(
   BuildContext context, {
@@ -225,8 +222,8 @@ class _ToolsContent extends StatefulWidget {
     required this.onDone,
     this.conversationId,
   });
-  final String assistantId;
   final String? conversationId;
+  final String assistantId;
   final VoidCallback onDone;
 
   @override
@@ -234,33 +231,29 @@ class _ToolsContent extends StatefulWidget {
 }
 
 class _ToolsContentState extends State<_ToolsContent> {
-  late final preferences = context.read<BusinessPreferences>();
-  late final expanded =
-      (preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
+  late final _preferences = context.read<BusinessPreferences>();
+  late bool _workspaceExpanded =
+      (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
               ['mcp', 'workspace'])
-          .toSet();
+          .contains('workspace');
 
-  void toggle(String group) {
-    setState(() {
-      if (!expanded.remove(group)) expanded.add(group);
-    });
+  void _toggleWorkspace() {
+    setState(() => _workspaceExpanded = !_workspaceExpanded);
+    final expanded =
+        (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
+                ['mcp', 'workspace'])
+            .toSet();
+    if (_workspaceExpanded) {
+      expanded.add('workspace');
+    } else {
+      expanded.remove('workspace');
+    }
     unawaited(
-      preferences.setStringList(
+      _preferences.setStringList(
         'display_chat_tools_expanded_groups_v1',
         expanded.toList(),
       ),
     );
-  }
-
-  String? workspaceName() {
-    final id = widget.conversationId;
-    if (id == null) return null;
-    final extras =
-        context.watch<ChatService>().getConversation(id)?.extras ?? {};
-    final binding = WorkspaceBinding.fromExtras(extras);
-    return binding.isBound
-        ? context.watch<WorkspaceProvider>().byId(binding.workspaceId!)?.name
-        : null;
   }
 
   @override
@@ -272,94 +265,149 @@ class _ToolsContentState extends State<_ToolsContent> {
     final a = ap.getById(widget.assistantId);
     if (a == null) return const SizedBox.shrink();
     final selected = a.mcpServerIds.toSet();
-    final servers = mcp.servers
-        .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
-        .toList();
+    final groups = mcpToolGroups(mcp);
+
     final localToolIds = availableLocalToolIds();
     final enabledLocalTools = a.localToolIds.toSet();
 
-    void selectServer(String id, bool value) {
-      final next = {...a.mcpServerIds};
-      if (value) {
-        next.add(id);
-      } else {
-        next.remove(id);
+    final rows = <WidgetBuilder>[];
+    if (localToolIds.isNotEmpty) {
+      rows.add(
+        (context) => _SectionLabel(text: l10n.assistantEditPageLocalToolsTab),
+      );
+      for (final id in localToolIds) {
+        final isEnabled = enabledLocalTools.contains(id);
+        rows.add(
+          (context) => _RowItem(
+            leading: Icon(
+              localToolIcon(id),
+              size: 16,
+              color: isEnabled ? cs.primary : cs.onSurface,
+            ),
+            label: localToolTitle(l10n, id),
+            selected: isEnabled,
+            onTap: () async {
+              await setLocalToolEnabled(
+                context,
+                assistant: a,
+                toolId: id,
+                value: !isEnabled,
+              );
+              // Do not close; allow multi-select
+            },
+          ),
+        );
       }
-      unawaited(ap.updateAssistant(a.copyWith(mcpServerIds: next.toList())));
     }
 
-    final workspaceSummary = workspaceName() ?? l10n.toolsSheetWorkspaceUnbound;
-    final rows = <WidgetBuilder>[
-      if (localToolIds.isNotEmpty) ...[
-        (context) => _SectionLabel(
-          text: l10n.assistantEditPageLocalToolsTab,
-          summary: l10n.toolsSheetEnabledCount(
-            localToolIds.where(enabledLocalTools.contains).length,
-          ),
-          expanded: expanded.contains('local'),
-          onToggle: () => toggle('local'),
-        ),
-        if (expanded.contains('local'))
-          for (final id in localToolIds)
-            (context) => _RowItem(
-              leading: Icon(
-                localToolIcon(id),
-                size: 16,
-                color: cs.onSurface.withValues(alpha: .55),
-              ),
-              label: localToolTitle(l10n, id),
-              selected: enabledLocalTools.contains(id),
-              onTap: () => unawaited(
-                setLocalToolEnabled(
-                  context,
-                  assistant: a,
-                  toolId: id,
-                  value: !enabledLocalTools.contains(id),
-                ),
-              ),
-            ),
-      ],
-      if (servers.isNotEmpty) ...[
-        (context) => const SizedBox(height: 6),
-        (context) => _SectionLabel(
-          text: l10n.mcpAssistantSheetTitle,
-          summary: l10n.toolsSheetEnabledCount(
-            servers.where((s) => selected.contains(s.id)).length,
-          ),
-          expanded: expanded.contains('mcp'),
-          onToggle: () => toggle('mcp'),
-          onManage: () {
+    if (groups.isNotEmpty) {
+      rows.add((context) => _SectionLabel(text: l10n.mcpAssistantSheetTitle));
+      rows.add(
+        (context) => _RowItem(
+          leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
+          label: l10n.mcpAssistantSheetClearAll,
+          onTap: () async {
+            await context.read<AssistantProvider>().updateAssistant(
+              a.copyWith(mcpServerIds: const <String>[]),
+            );
             widget.onDone();
-            DesktopSettingsNavigationBus.instance.openMcp();
           },
         ),
-        if (expanded.contains('mcp'))
-          for (final server in servers)
-            (context) => _RowItem(
-              key: ValueKey('desktop-tools-mcp-${server.id}'),
-              leading: McpServerAvatar(server: server, size: 24, radius: 7),
-              label: server.name,
-              count:
-                  '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
-              selected: selected.contains(server.id),
-              onTap: () =>
-                  selectServer(server.id, !selected.contains(server.id)),
+      );
+    }
+
+    for (final group in groups) {
+      if (mcp.groups.isNotEmpty) {
+        rows.add(
+          (context) => _SectionLabel(
+            text: group.group?.name ?? l10n.providerGroupsOther,
+            subgroup: true,
+          ),
+        );
+      }
+      for (final s in group.servers) {
+        final isSelected = selected.contains(s.id);
+        rows.add(
+          (context) => _RowItem(
+            key: ValueKey('desktop-tools-mcp-${s.id}'),
+            leading: McpServerAvatar(
+              server: s,
+              size: 16,
+              radius: 7,
+              showBackground: false,
             ),
-      ],
-      (context) => const SizedBox(height: 6),
-      (context) => _SectionLabel(
-        text: l10n.workspacesTitle,
-        summary: workspaceSummary,
-        expanded: expanded.contains('workspace'),
-        onToggle: () => toggle('workspace'),
+            detail:
+                '${s.tools.where((t) => t.enabled).length}/${s.tools.length}',
+            label: s.name,
+            selected: isSelected,
+            onTap: () async {
+              final set = a.mcpServerIds.toSet();
+              if (isSelected) {
+                set.remove(s.id);
+              } else {
+                set.add(s.id);
+              }
+              await context.read<AssistantProvider>().updateAssistant(
+                a.copyWith(mcpServerIds: set.toList()),
+              );
+              // Do not close; allow multi-select
+            },
+          ),
+        );
+      }
+    }
+
+    rows.add(
+      (context) => Semantics(
+        button: true,
+        expanded: _workspaceExpanded,
+        child: IosCardPress(
+          focusable: true,
+          haptics: false,
+          baseColor: Colors.transparent,
+          pressedBlendStrength: 0,
+          onTap: _toggleWorkspace,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: SizedBox(
+              height: 32,
+              child: Row(
+                children: [
+                  AnimatedRotation(
+                    turns: _workspaceExpanded ? .25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Lucide.ChevronRight,
+                      size: 12,
+                      color: cs.onSurface.withValues(alpha: .5),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.workspacesTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: AppFontWeights.semibold,
+                      color: cs.onSurface.withValues(alpha: .5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      if (expanded.contains('workspace'))
+    );
+    if (_workspaceExpanded) {
+      rows.add(
         (context) => WorkspaceSection(
           assistantId: widget.assistantId,
           conversationId: widget.conversationId,
           onClose: widget.onDone,
         ),
-    ];
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
@@ -369,7 +417,10 @@ class _ToolsContentState extends State<_ToolsContent> {
           addRepaintBoundaries: false,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           itemCount: rows.length,
-          itemBuilder: (context, index) => rows[index](context),
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 1),
+            child: rows[index](context),
+          ),
         ),
       ),
     );
@@ -377,46 +428,44 @@ class _ToolsContentState extends State<_ToolsContent> {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({
-    required this.text,
-    required this.summary,
-    required this.expanded,
-    required this.onToggle,
-    this.onManage,
-  });
+  const _SectionLabel({required this.text, this.subgroup = false});
+  final bool subgroup;
+
   final String text;
-  final String summary;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final VoidCallback? onManage;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-    child: ToolsSectionHeader(
-      title: text,
-      summary: summary,
-      expanded: expanded,
-      onToggle: onToggle,
-      onManage: onManage,
-      compact: true,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: subgroup
+              ? AppFontWeights.regular
+              : AppFontWeights.semibold,
+          decoration: TextDecoration.none,
+          color: cs.onSurface.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
 }
 
 class _RowItem extends StatefulWidget {
   const _RowItem({
     super.key,
     required this.leading,
+    this.detail,
     required this.label,
-    required this.selected,
+    this.selected,
     required this.onTap,
-    this.count,
   });
   final Widget leading;
+  final String? detail;
   final String label;
-  final String? count;
-  final bool selected;
+  final bool? selected;
   final VoidCallback onTap;
 
   @override
@@ -429,82 +478,86 @@ class _RowItemState extends State<_RowItem> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return MergeSemantics(
-      child: Semantics(
-        button: true,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: FocusableActionDetector(
-            onShowFocusHighlight: (value) => setState(() => _focused = value),
-            shortcuts: const {
-              SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-              SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-            },
-            actions: {
-              ActivateIntent: CallbackAction<ActivateIntent>(
-                onInvoke: (_) {
-                  widget.onTap();
-                  return null;
-                },
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final onColor = widget.selected == true ? cs.primary : cs.onSurface;
+    final baseBg = Colors.transparent;
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
+    return Semantics(
+      button: true,
+      toggled: widget.selected,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: FocusableActionDetector(
+          onShowFocusHighlight: (value) => setState(() => _focused = value),
+          shortcuts: const {
+            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+          },
+          actions: {
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                widget.onTap();
+                return null;
+              },
+            ),
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: _hovered || _focused ? hoverBg : baseBg,
+                borderRadius: BorderRadius.circular(12),
               ),
-            },
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.onTap,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Center(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    constraints: const BoxConstraints(minHeight: 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: _hovered || _focused
-                          ? context.appColors.surfaceFill
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Center(child: widget.leading),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            widget.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 14, color: cs.onSurface),
-                          ),
-                        ),
-                        if (widget.count != null) ...[
-                          Text(
-                            widget.count!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: cs.onSurface.withValues(alpha: .5),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        IosSwitch(
-                          value: widget.selected,
-                          onChanged: (_) => widget.onTap(),
-                          semanticLabel: widget.label,
-                          width: 32,
-                          height: 20,
-                          hitTestSize: 38,
-                        ),
-                      ],
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: Center(child: widget.leading),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.regular,
+                        decoration: TextDecoration.none,
+                      ).copyWith(color: onColor),
                     ),
                   ),
-                ),
+                  if (widget.detail != null) ...[
+                    Text(
+                      widget.detail!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: .5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    child: widget.selected == true
+                        ? Icon(
+                            Lucide.Check,
+                            key: const ValueKey('check'),
+                            size: 16,
+                            color: cs.primary,
+                          )
+                        : const SizedBox(width: 16, key: ValueKey('space')),
+                  ),
+                ],
               ),
             ),
           ),

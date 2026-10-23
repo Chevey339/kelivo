@@ -1,4 +1,5 @@
-import 'mcp_icon_picker.dart';
+import 'mcp_presentation_fields.dart';
+import '../../../core/models/mcp_presentation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/mcp/stdio_arguments.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
@@ -60,6 +61,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   late final McpOAuthFormController _oauth;
   bool _enabled = true;
+  McpServerIcon? _icon;
+  String? _groupId;
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
@@ -83,6 +86,11 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _tab = TabController(length: 2, vsync: this);
       _tab!.addListener(_onTabChanged);
       final server = context.read<McpProvider>().getById(widget.serverId!)!;
+      final presentation = context.read<McpProvider>().presentationFor(
+        server.id,
+      );
+      _icon = presentation.icon;
+      _groupId = presentation.groupId;
       _enabled = server.enabled;
       _nameCtrl.text = server.name;
       _transport = server.transport;
@@ -213,7 +221,16 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             ),
           ],
         ),
-        if (isEdit) McpServerIconField(serverId: widget.serverId!),
+        const SizedBox(height: 10),
+        McpPresentationFields(
+          server: isEdit
+              ? context.read<McpProvider>().getById(widget.serverId!)
+              : null,
+          icon: _icon,
+          groupId: _groupId,
+          onIconChanged: (value) => setState(() => _icon = value),
+          onGroupChanged: (value) => setState(() => _groupId = value),
+        ),
         const SizedBox(height: 10),
         if (isBuiltin)
           SectionCard(
@@ -440,12 +457,20 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     );
   }
 
+  Future<void> _savePresentation(McpProvider mcp, String id) async {
+    await mcp.setServerIcon(id, _icon);
+    final groupId = mcp.groups.any((g) => g.id == _groupId) ? _groupId : null;
+    await mcp.moveServersToGroup({id}, groupId);
+  }
+
   Future<void> _onSave() async {
+    var savedId = widget.serverId;
     final mcp = context.read<McpProvider>();
     // Built-in: only toggle enabled
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
+      await _savePresentation(mcp, savedId!);
       if (mounted) Navigator.of(context).pop();
       return;
     }
@@ -505,7 +530,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           ),
         );
       } else {
-        await mcp.addServer(
+        savedId = await mcp.addServer(
           enabled: _enabled,
           name: name,
           transport: McpTransportType.stdio,
@@ -516,6 +541,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           workspaceId: _workspaceId,
         );
       }
+      await _savePresentation(mcp, savedId!);
       if (mounted) Navigator.of(context).pop();
       return;
     }
@@ -565,7 +591,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         replaceOAuthSettings: true,
       );
     } else {
-      await mcp.addServer(
+      savedId = await mcp.addServer(
         enabled: _enabled,
         name: name,
         transport: _transport,
@@ -575,6 +601,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         oauthRedirectUri: _oauth.redirectUri,
       );
     }
+    await _savePresentation(mcp, savedId!);
     if (mounted) Navigator.of(context).pop();
   }
 

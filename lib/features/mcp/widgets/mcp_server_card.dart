@@ -8,6 +8,8 @@ import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_text_button.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'mcp_server_avatar.dart';
@@ -29,7 +31,7 @@ class McpServerCard extends StatelessWidget {
     this.selected = false,
     this.actions = const [],
     this.onLongPress,
-    this.avatarBuilder,
+    this.onMore,
   });
 
   final McpServerConfig server;
@@ -43,7 +45,7 @@ class McpServerCard extends StatelessWidget {
   final bool selected;
   final List<Widget> actions;
   final VoidCallback? onLongPress;
-  final Widget Function(Widget avatar)? avatarBuilder;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +108,7 @@ class McpServerCard extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       button: true,
+      enabled: true,
       checked: selectionMode ? selected : null,
       label:
           '${selectionMode ? l10n.mcpPageSelectServer(server.name) : server.name}, $summary',
@@ -124,220 +127,282 @@ class McpServerCard extends StatelessWidget {
               border: Border.all(
                 color: selectionMode && selected || focused
                     ? cs.primary.withValues(alpha: .45)
-                    : colors.hairline,
+                    : Colors.transparent,
                 width: .6,
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOutCubic,
-                  child: selectionMode
-                      ? SizedBox(
-                          width: 34,
-                          height: 44,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: selected
-                                    ? cs.primary
-                                    : Colors.transparent,
-                                border: selected
-                                    ? null
-                                    : Border.all(
-                                        width: 1.6,
-                                        color: cs.onSurface.withValues(
-                                          alpha: .3,
-                                        ),
-                                      ),
+                Row(
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOutCubic,
+                      child: selectionMode
+                          ? SizedBox(
+                              width: 34,
+                              height: 44,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: selected
+                                        ? cs.primary
+                                        : Colors.transparent,
+                                    border: selected
+                                        ? null
+                                        : Border.all(
+                                            width: 1.6,
+                                            color: cs.onSurface.withValues(
+                                              alpha: .3,
+                                            ),
+                                          ),
+                                  ),
+                                  child: selected
+                                      ? Icon(
+                                          Lucide.Check,
+                                          size: 14,
+                                          color: cs.onPrimary,
+                                        )
+                                      : null,
+                                ),
                               ),
-                              child: selected
-                                  ? Icon(
-                                      Lucide.Check,
-                                      size: 14,
-                                      color: cs.onPrimary,
-                                    )
-                                  : null,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      child: McpServerAvatar(
+                        server: server,
+                        size: 36,
+                        radius: 10,
+                        status: status,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ExcludeSemantics(
+                              child: Text(
+                                server.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  height: 1.2,
+                                  fontWeight: AppFontWeights.medium,
+                                  color: foreground,
+                                ),
+                              ),
                             ),
+                            const SizedBox(height: 2),
+                            ExcludeSemantics(
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: statusText,
+                                      style: TextStyle(color: stateColor),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          ' · $transport${connecting ? '' : ' · $tools'}',
+                                    ),
+                                  ],
+                                ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.2,
+                                  color: secondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (!selectionMode) ...[
+                      const SizedBox(width: 8),
+                      ...actions,
+                      if (onMore != null)
+                        IosIconButton(
+                          icon: Lucide.Ellipsis,
+                          size: 18,
+                          minSize: 44,
+                          color: secondary,
+                          tooltip: l10n.chatMessageWidgetMoreTooltip,
+                          onTap: onMore,
+                        ),
+                      if (onEnabledChanged != null)
+                        FocusableActionDetector(
+                          mouseCursor: SystemMouseCursors.click,
+                          shortcuts: const {
+                            SingleActivator(LogicalKeyboardKey.space):
+                                ActivateIntent(),
+                            SingleActivator(LogicalKeyboardKey.enter):
+                                ActivateIntent(),
+                          },
+                          actions: {
+                            ActivateIntent: CallbackAction<ActivateIntent>(
+                              onInvoke: (_) {
+                                onEnabledChanged!(!server.enabled);
+                                return null;
+                              },
+                            ),
+                          },
+                          child: IosSwitch(
+                            value: server.enabled,
+                            onChanged: onEnabledChanged,
+                            semanticLabel: server.name,
+                            width: 36,
+                            height: 22,
                           ),
                         )
-                      : const SizedBox.shrink(),
+                      else if (onMore == null)
+                        ExcludeSemantics(
+                          child: Icon(
+                            Lucide.ChevronRight,
+                            size: 16,
+                            color: cs.onSurface.withValues(
+                              alpha: server.enabled ? .4 : .22,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  child: (avatarBuilder ?? (avatar) => avatar)(
-                    McpServerAvatar(
-                      server: server,
-                      size: 36,
-                      radius: 10,
-                      status: status,
+                if (showError ||
+                    (server.enabled && status == McpStatus.needsAuthorization))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: _McpErrorLine(
+                      error: showError ? error!.trim().split('\n').first : null,
+                      secondary: secondary,
+                      warning: status == McpStatus.needsAuthorization,
+                      onDetails: onDetails,
+                      onAuthorize: status == McpStatus.needsAuthorization
+                          ? onAuthorize
+                          : null,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ExcludeSemantics(
-                          child: Text(
-                            server.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.2,
-                              fontWeight: AppFontWeights.emphasis,
-                              color: foreground,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        ExcludeSemantics(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: statusText,
-                                  style: TextStyle(color: stateColor),
-                                ),
-                                TextSpan(
-                                  text:
-                                      ' · $transport${connecting ? '' : ' · $tools'}',
-                                ),
-                              ],
-                            ),
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.2,
-                              color: secondary,
-                            ),
-                          ),
-                        ),
-                        if (showError) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(
-                                Lucide.MessageCircleWarning,
-                                size: 13,
-                                color: cs.error,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  error!.trim().split('\n').first,
-                                  maxLines:
-                                      MediaQuery.textScalerOf(
-                                            context,
-                                          ).scale(12) >
-                                          12
-                                      ? null
-                                      : 1,
-                                  overflow:
-                                      MediaQuery.textScalerOf(
-                                            context,
-                                          ).scale(12) >
-                                          12
-                                      ? null
-                                      : TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.error,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: onDetails,
-                                style: TextButton.styleFrom(
-                                  minimumSize: const Size(44, 44),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  foregroundColor: cs.primary,
-                                  textStyle: Theme.of(context)
-                                      .textTheme
-                                      .labelLarge
-                                      ?.copyWith(fontSize: 12),
-                                ),
-                                child: Text(l10n.mcpPageDetails),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (server.enabled)
-                          McpOAuthProgress(serverId: server.id),
-                        if (server.enabled &&
-                            status == McpStatus.needsAuthorization &&
-                            onAuthorize != null)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: onAuthorize,
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(44, 44),
-                              ),
-                              icon: const Icon(Lucide.KeyRound, size: 14),
-                              label: Text(l10n.mcpPageOAuthSignIn),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (!selectionMode) ...[
-                  const SizedBox(width: 8),
-                  ...actions,
-                  if (onEnabledChanged != null)
-                    FocusableActionDetector(
-                      mouseCursor: SystemMouseCursors.click,
-                      shortcuts: const {
-                        SingleActivator(LogicalKeyboardKey.space):
-                            ActivateIntent(),
-                        SingleActivator(LogicalKeyboardKey.enter):
-                            ActivateIntent(),
-                      },
-                      actions: {
-                        ActivateIntent: CallbackAction<ActivateIntent>(
-                          onInvoke: (_) {
-                            onEnabledChanged!(!server.enabled);
-                            return null;
-                          },
-                        ),
-                      },
-                      child: IosSwitch(
-                        value: server.enabled,
-                        onChanged: onEnabledChanged,
-                        semanticLabel: server.name,
-                        width: 36,
-                        height: 22,
-                      ),
-                    )
-                  else
-                    ExcludeSemantics(
-                      child: Icon(
-                        Lucide.ChevronRight,
-                        size: 16,
-                        color: cs.onSurface.withValues(
-                          alpha: server.enabled ? .4 : .22,
-                        ),
-                      ),
-                    ),
-                ],
+                if (server.enabled) McpOAuthProgress(serverId: server.id),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A flat footer. Only narrow, enlarged-text layouts wrap the actions.
+class _McpErrorLine extends StatelessWidget {
+  const _McpErrorLine({
+    required this.error,
+    required this.secondary,
+    required this.warning,
+    this.onDetails,
+    this.onAuthorize,
+  });
+  final String? error;
+  final Color secondary;
+  final bool warning;
+  final VoidCallback? onDetails;
+  final VoidCallback? onAuthorize;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final scaler = MediaQuery.textScalerOf(context);
+    final style = DefaultTextStyle.of(
+      context,
+    ).style.merge(TextStyle(fontSize: 12, fontWeight: AppFontWeights.medium));
+    double labelWidth(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final actionWidth =
+        (error == null
+            ? 0
+            : (labelWidth(l10n.mcpPageDetails) + 16).clamp(
+                44,
+                double.infinity,
+              )) +
+        (onAuthorize == null
+            ? 0
+            : (labelWidth(l10n.mcpPageOAuthSignIn) + 31).clamp(
+                44,
+                double.infinity,
+              ));
+    final actions = <Widget>[
+      if (error != null)
+        IosTextButton(
+          label: l10n.mcpPageDetails,
+          fontSize: 12,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          onPressed: onDetails,
+        ),
+      if (onAuthorize != null)
+        IosTextButton(
+          label: l10n.mcpPageOAuthSignIn,
+          icon: Lucide.KeyRound,
+          fontSize: 12,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          onPressed: onAuthorize,
+        ),
+    ];
+    final summary = <Widget>[
+      Icon(
+        Lucide.MessageCircleWarning,
+        size: 13,
+        color: warning ? context.appColors.warning : cs.error,
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          error ?? '',
+          maxLines: scaler.scale(12) > 12 ? 2 : 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 12, height: 1.4, color: secondary),
+        ),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (actionWidth + (error == null ? 0 : 100) > constraints.maxWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (error != null) Row(children: summary),
+              Wrap(alignment: WrapAlignment.end, children: actions),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            if (error != null) ...summary else const Spacer(),
+            ...actions,
+          ],
+        );
+      },
     );
   }
 }

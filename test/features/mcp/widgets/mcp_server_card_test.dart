@@ -1,5 +1,6 @@
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui' show CheckedState;
+import 'dart:ui' show CheckedState, Tristate;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -143,6 +144,7 @@ void main() {
           expect(find.byType(IosSwitch), findsNothing);
           final node = tester.getSemantics(find.byType(McpServerCard));
           expect(node.flagsCollection.isChecked, isNot(CheckedState.none));
+          expect(node.flagsCollection.isEnabled, Tristate.isTrue);
           expect(
             node.flagsCollection.isChecked,
             selected ? CheckedState.isTrue : CheckedState.isFalse,
@@ -186,6 +188,45 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 1.3, 2.0]) {
+    testWidgets('authorization footer fits 320px at scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final harness = await McpPresentationHarness.create();
+      var authorized = false;
+      await tester.pumpWidget(
+        harness.app(
+          Scaffold(
+            body: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: McpServerCard(
+                  server: harness.mcp.items.first,
+                  status: McpStatus.needsAuthorization,
+                  error: 'McpError: HTTP 401: Unauthorized',
+                  onTap: () {},
+                  onDetails: () {},
+                  onAuthorize: () => authorized = true,
+                ),
+              ),
+            ),
+          ),
+          textScale: scale,
+          fontFamily: 'mcp-golden',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(InkWell), findsNothing);
+      await tester.tap(find.text('Sign in with OAuth'));
+      expect(authorized, isTrue);
+    });
+  }
+
   testWidgets('disabled card overrides a stale connection status', (
     tester,
   ) async {
@@ -226,7 +267,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('401 Unauthorized'), findsOneWidget);
       expect(
-        tester.getSize(find.widgetWithText(TextButton, 'Details')).height,
+        tester.getSize(find.widgetWithText(IosTextButton, 'Details')).height,
         greaterThanOrEqualTo(44),
       );
       await tester.tap(find.text('Details'));

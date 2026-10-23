@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/haptics.dart';
@@ -50,6 +51,7 @@ class IosIconButton extends StatefulWidget {
 class _IosIconButtonState extends State<IosIconButton> {
   bool _pressed = false;
   bool _hovered = false;
+  bool _focused = false;
 
   bool get _interactive =>
       widget.enabled && (widget.onTap != null || widget.onLongPress != null);
@@ -90,12 +92,7 @@ class _IosIconButtonState extends State<IosIconButton> {
         if (widget.builder != null) {
           return widget.builder!(c);
         }
-        return Icon(
-          widget.icon,
-          size: widget.size,
-          color: c,
-          semanticLabel: widget.semanticLabel,
-        );
+        return Icon(widget.icon, size: widget.size, color: c);
       },
     );
 
@@ -104,7 +101,7 @@ class _IosIconButtonState extends State<IosIconButton> {
         ? (Theme.of(
             context,
           ).colorScheme.onSurface.withValues(alpha: isDark ? 0.12 : 0.08))
-        : (_hovered
+        : (_hovered || _focused
               ? (Theme.of(
                   context,
                 ).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06))
@@ -116,7 +113,7 @@ class _IosIconButtonState extends State<IosIconButton> {
     Widget content = Semantics(
       button: true,
       enabled: widget.enabled,
-      label: widget.semanticLabel,
+      label: widget.semanticLabel ?? widget.tooltip,
       child: MouseRegion(
         cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
         onEnter: (_) => setState(() => _hovered = true),
@@ -166,6 +163,7 @@ class _IosIconButtonState extends State<IosIconButton> {
     if (tooltip != null && tooltip.isNotEmpty) {
       content = Tooltip(
         message: tooltip,
+        excludeFromSemantics: true,
         preferBelow: true,
         verticalOffset: 20,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -175,7 +173,23 @@ class _IosIconButtonState extends State<IosIconButton> {
         child: content,
       );
     }
-    return content;
+    return FocusableActionDetector(
+      enabled: _interactive,
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
+      child: content,
+    );
   }
 }
 
@@ -195,6 +209,7 @@ class IosCardPress extends StatefulWidget {
     this.pressedScale,
     this.duration,
     this.haptics = true,
+    this.focusable = false,
   });
 
   final Widget child;
@@ -213,6 +228,7 @@ class IosCardPress extends StatefulWidget {
   final Duration? duration;
   // Whether to perform a soft haptic on tap (also gated by settings/global toggles)
   final bool haptics;
+  final bool focusable;
 
   @override
   State<IosCardPress> createState() => _IosCardPressState();
@@ -221,6 +237,7 @@ class IosCardPress extends StatefulWidget {
 class _IosCardPressState extends State<IosCardPress> {
   bool _pressed = false;
   bool _hovered = false;
+  bool _focused = false;
   late Map<Type, GestureRecognizerFactory> _gestures;
 
   @override
@@ -326,7 +343,7 @@ class _IosCardPressState extends State<IosCardPress> {
     );
     final Color target = _pressed
         ? pressTarget
-        : (_hovered ? hoverTarget : base);
+        : (_hovered || _focused ? hoverTarget : base);
     final double scale = _pressed ? (widget.pressedScale ?? 1.0) : 1.0;
     final Duration dur = widget.duration ?? const Duration(milliseconds: 200);
     final omitScale = (widget.pressedScale ?? 1.0) == 1.0;
@@ -368,7 +385,7 @@ class _IosCardPressState extends State<IosCardPress> {
       );
     }
 
-    return MouseRegion(
+    final interactiveContent = MouseRegion(
       cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
       onEnter: (_) {
         if (!_interactive) return;
@@ -383,6 +400,24 @@ class _IosCardPressState extends State<IosCardPress> {
         gestures: _gestures,
         child: painted,
       ),
+    );
+    if (!widget.focusable) return interactiveContent;
+    return FocusableActionDetector(
+      enabled: widget.onTap != null,
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _handleTap();
+            return null;
+          },
+        ),
+      },
+      child: interactiveContent,
     );
   }
 

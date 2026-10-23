@@ -7,6 +7,11 @@ import 'package:provider/provider.dart';
 import '../../../core/models/mcp_presentation.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../desktop/setting/mcp_edit_dialog.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_text_button.dart';
+import 'mcp_form.dart';
+import 'mcp_group_picker.dart';
 import '../../../desktop/setting/mcp_json_edit_dialog.dart';
 import '../../../desktop/setting/mcp_timeout_dialog.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -15,6 +20,7 @@ import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../utils/provider_grouping_logic.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'mcp_error_details_sheet.dart';
 import 'mcp_icon_picker.dart';
@@ -46,6 +52,54 @@ class McpManagementView extends StatefulWidget {
 class _McpManagementViewState extends State<McpManagementView> {
   Set<String>? _selected;
   bool _busy = false;
+  List<_Row>? _pendingRows;
+  final Map<String, bool> _pendingCollapsed = {};
+  bool _temporarilyCollapsed = false;
+  int _groupDragGeneration = 0;
+  int? _mountedGroupProxyGeneration;
+  bool _collapsed(McpProvider mcp, String id) =>
+      _temporarilyCollapsed ||
+      (_pendingCollapsed[id] ?? mcp.groupCollapsed(id));
+
+  void _onDragStart(List<_Row> rows, int index) {
+    if (rows[index].server != null) return;
+    _groupDragGeneration++;
+    setState(() => _temporarilyCollapsed = true);
+  }
+
+  void _restoreAfterGroupDrag(int generation) {
+    // The overlay has actually gone away. Waiting for its disposal avoids
+    // expanding children under a still-landing header during a slow frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _temporarilyCollapsed &&
+          generation == _groupDragGeneration) {
+        setState(() => _temporarilyCollapsed = false);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _onDragEnd() {
+    final generation = _groupDragGeneration;
+    // A very fast mouse drag can finish before Flutter ever builds its proxy.
+    // Give the overlay this frame to mount; if it did not, there is no landing
+    // animation to wait for. Mounted proxies restore through their disposal.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_mountedGroupProxyGeneration != generation) {
+        _restoreAfterGroupDrag(generation);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _toggleGroup(McpProvider mcp, String id) async {
+    if (_busy || _temporarilyCollapsed) return;
+    final collapsed = !_collapsed(mcp, id);
+    setState(() => _pendingCollapsed[id] = collapsed);
+    await _run(() => mcp.setGroupCollapsed(id, collapsed));
+    if (mounted) setState(() => _pendingCollapsed.remove(id));
+  }
 
   Future<bool> _run(Future<void> Function() action) async {
     if (_busy || !mounted) return false;
@@ -90,11 +144,11 @@ class _McpManagementViewState extends State<McpManagementView> {
       );
       if (groupId == _other && servers.isEmpty) continue;
       result.add((groupId: groupId, server: null));
-      if (!mcp.groupCollapsed(groupId)) {
-        result.addAll(
-          servers.map((server) => (groupId: groupId, server: server)),
-        );
-      }
+      // Keep stable keyed slots through collapse and group dragging, like the
+      // providers list. AnimatedSize hides their contents without reindexing.
+      result.addAll(
+        servers.map((server) => (groupId: groupId, server: server)),
+      );
     }
     return result;
   }
@@ -106,58 +160,101 @@ class _McpManagementViewState extends State<McpManagementView> {
     int newIndex,
   ) async {
     final moved = rows[oldIndex];
-    final reordered = [...rows]..removeAt(oldIndex);
-    reordered.insert(newIndex.clamp(0, reordered.length), moved);
+    final logicRows = <ProviderGroupingRowVM>[
+      for (final row in rows)
+        if (row.server == null)
+          ProviderGroupingHeaderVM(groupKey: row.groupId)
+        else
+          ProviderGroupingProviderVM(
+            providerKey: row.server!.id,
+            groupKey: row.groupId,
+          ),
+    ];
+    late List<_Row> next;
+    late Future<void> Function() persist;
     if (moved.server == null) {
-      final groups = reordered
-          .where((row) => row.server == null && row.groupId != _other)
-          .map((row) => row.groupId)
+      final intent = analyzeProviderGroupingHeaderReorder(
+        rows: logicRows,
+        oldIndex: oldIndex,
+        newIndex: newIndex,
+      );
+      if (intent == null) return;
+      final groupIds = rows
+          .where((r) => r.server == null)
+          .map((r) => r.groupId)
           .toList();
-      await mcp.reorderGroup(moved.groupId, groups.indexOf(moved.groupId));
-      return;
-    }
-    if (mcp.groups.isEmpty) {
-      final position = reordered.indexOf(moved);
-      await mcp.moveServerBefore(
+      groupIds.remove(moved.groupId);
+      groupIds.insert(
+        intent.targetDisplayIndex.clamp(0, groupIds.length),
+        moved.groupId,
+      );
+      // MCP's ungrouped section stays last; it has no reorder handle.
+      if (groupIds.remove(_other)) groupIds.add(_other);
+      next = [for (final id in groupIds) ...rows.where((r) => r.groupId == id)];
+      persist = () =>
+          mcp.reorderGroup(moved.groupId, groupIds.indexOf(moved.groupId));
+    } else if (mcp.groups.isEmpty) {
+      next = [...rows]..removeAt(oldIndex);
+      next.insert(newIndex.clamp(0, next.length), moved);
+      final position = next.indexOf(moved);
+      persist = () => mcp.moveServerBefore(
         moved.server!.id,
         null,
-        position + 1 < reordered.length
-            ? reordered[position + 1].server?.id
-            : null,
+        position + 1 < next.length ? next[position + 1].server?.id : null,
       );
-      return;
-    }
-    final position = reordered.indexOf(moved);
-    // A drop above the first header belongs at the start of that group.
-    String groupId = reordered.where((row) => row.server == null).first.groupId;
-    for (var i = position - 1; i >= 0; i--) {
-      if (reordered[i].server == null) {
-        groupId = reordered[i].groupId;
-        break;
-      }
-    }
-    if (mcp.groupCollapsed(groupId)) {
-      if (mounted) {
+    } else {
+      final analysis = analyzeProviderGroupingReorder(
+        rows: logicRows,
+        oldIndex: oldIndex,
+        newIndex: newIndex,
+        isGroupCollapsed: mcp.groupCollapsed,
+      );
+      if (analysis.isBlocked) {
         showAppSnackBar(
           context,
           message: AppLocalizations.of(
             context,
           )!.providerGroupsExpandToMoveToast,
         );
+        return;
       }
-      return;
+      final intent = analysis.intent;
+      if (intent == null) return;
+      final target = rows
+          .where(
+            (r) =>
+                r.server != null &&
+                r.server!.id != moved.server!.id &&
+                r.groupId == intent.targetGroupKey,
+          )
+          .toList();
+      final position = intent.targetPos.clamp(0, target.length);
+      final beforeId = position < target.length
+          ? target[position].server!.id
+          : null;
+      next = rows.where((r) => r.server?.id != moved.server!.id).toList();
+      final insertionIndex = beforeId != null
+          ? next.indexWhere((r) => r.server?.id == beforeId)
+          : next.lastIndexWhere((r) => r.groupId == intent.targetGroupKey) + 1;
+      next.insert(insertionIndex, (
+        groupId: intent.targetGroupKey,
+        server: moved.server,
+      ));
+      persist = () => mcp.moveServerBefore(
+        moved.server!.id,
+        intent.targetGroupKey == _other ? null : intent.targetGroupKey,
+        beforeId,
+      );
     }
-    final before = reordered
-        .skip(position + 1)
-        .where((row) => row.server != null && row.groupId == groupId)
-        .firstOrNull
-        ?.server
-        ?.id;
-    await mcp.moveServerBefore(
-      moved.server!.id,
-      groupId == _other ? null : groupId,
-      before,
-    );
+    // Publish the entire display order in the drop callback, before any I/O.
+    // Storage remains authoritative on success; on failure _run reports it and
+    // the old order is restored. A delayed write must never flash the old slot.
+    setState(() => _pendingRows = next);
+    try {
+      await persist();
+    } finally {
+      if (mounted) setState(() => _pendingRows = null);
+    }
   }
 
   Future<void> _groupName({McpGroup? group}) async {
@@ -197,80 +294,29 @@ class _McpManagementViewState extends State<McpManagementView> {
 
   Future<void> _move(Set<String> ids) async {
     final mcp = context.read<McpProvider>();
-    final l10n = AppLocalizations.of(context)!;
-    final groupId = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        backgroundColor: context.overlaySurface,
-        title: Text(l10n.mcpMoveToGroup),
-        children: [
-          for (final group in mcp.groups)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(ctx).pop(group.id),
-              child: SizedBox(
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(group.name),
-                ),
-              ),
-            ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.of(ctx).pop(_other),
-            child: SizedBox(
-              height: 44,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(l10n.providerGroupsOther),
-              ),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.of(ctx).pop('__new__'),
-            child: SizedBox(
-              height: 44,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(l10n.providerGroupsCreateNewGroupAction),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || groupId == null) return;
-    if (groupId == '__new__') {
-      await _groupName();
-      if (mounted) await _move(ids);
-      return;
-    }
-    final moved = await _run(
-      () => mcp.moveServersToGroup(ids, groupId == _other ? null : groupId),
-    );
+    final result = await showMcpGroupPicker(context, desktop: widget.desktop);
+    if (!mounted || result == null) return;
+    final groupId = result.groupId;
+    final moved = await _run(() => mcp.moveServersToGroup(ids, groupId));
     if (moved && mounted) setState(() => _selected = null);
   }
 
   Future<bool> _confirm(String title, String message) async {
     final l10n = AppLocalizations.of(context)!;
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: context.overlaySurface,
-            title: Text(title),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: Text(l10n.mcpPageCancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: Text(
-                  l10n.mcpPageDelete,
-                  style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-                ),
-              ),
-            ],
+    return await showMcpForm<bool>(
+          context,
+          desktop: widget.desktop,
+          builder: (ctx) => McpForm(
+            desktop: widget.desktop,
+            title: title,
+            actions: FormSheetActions(
+              cancelLabel: l10n.mcpPageCancel,
+              confirmLabel: l10n.mcpPageDelete,
+              destructive: true,
+              onCancel: () => Navigator.of(ctx).pop(false),
+              onConfirm: () => Navigator.of(ctx).pop(true),
+            ),
+            children: [Text(message)],
           ),
         ) ??
         false;
@@ -356,8 +402,8 @@ class _McpManagementViewState extends State<McpManagementView> {
     final l10n = AppLocalizations.of(context)!;
     final box = rowContext.findRenderObject() as RenderBox;
     unawaited(
-      showAdaptiveActionMenu(
-        context,
+      _showMenu(
+        rowContext,
         anchor: anchor ?? box.localToGlobal(box.size.center(Offset.zero)),
         title: server.name,
         items: [
@@ -369,7 +415,16 @@ class _McpManagementViewState extends State<McpManagementView> {
           ActionSheetItem(
             icon: Lucide.Image,
             label: l10n.mcpIconTitle,
-            onTap: () => showMcpIconPicker(context, server.id),
+            onTap: () => showMcpIconPicker(
+              rowContext,
+              desktop: widget.desktop,
+              currentIcon: context
+                  .read<McpProvider>()
+                  .presentationFor(server.id)
+                  .icon,
+              onSelected: (icon) =>
+                  context.read<McpProvider>().setServerIcon(server.id, icon),
+            ),
           ),
           ActionSheetItem(
             icon: Lucide.Folder,
@@ -393,64 +448,121 @@ class _McpManagementViewState extends State<McpManagementView> {
     );
   }
 
+  Future<void> _showMenu(
+    BuildContext anchorContext, {
+    String? title,
+    Offset? anchor,
+    required List<ActionSheetItem> items,
+  }) {
+    if (!widget.desktop) {
+      return showMobileActionSheet(context, title: title, items: items);
+    }
+    final box = anchorContext.findRenderObject() as RenderBox;
+    return showDesktopContextMenuAt(
+      context,
+      backgroundColor: context.appColors.surfaceCard.withValues(alpha: .96),
+      globalPosition:
+          anchor ??
+          box.localToGlobal(Offset(box.size.width - 220, box.size.height)),
+      items: [
+        for (final item in items)
+          DesktopContextMenuItem(
+            icon: item.icon,
+            label: item.label,
+            danger: item.destructive,
+            onTap: item.onTap,
+          ),
+      ],
+    );
+  }
+
+  Widget _menuButton({
+    required String tooltip,
+    required List<ActionSheetItem> items,
+    Key? key,
+  }) => Builder(
+    builder: (ctx) => IosIconButton(
+      key: key,
+      icon: Lucide.Ellipsis,
+      size: 20,
+      minSize: 44,
+      tooltip: tooltip,
+      semanticLabel: tooltip,
+      enabled: !_busy,
+      onTap: () => _showMenu(ctx, items: items),
+    ),
+  );
+
   Widget _groupHeader(McpProvider mcp, String id, int index) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final group = mcp.groups.where((group) => group.id == id).firstOrNull;
-    final members = mcp.servers
-        .where(
-          (server) => (mcp.presentationFor(server.id).groupId ?? _other) == id,
-        )
-        .map((server) => server.id)
+    final members = (_pendingRows ?? _rows(mcp))
+        .where((row) => row.server != null && row.groupId == id)
+        .map((row) => row.server!.id)
         .toSet();
     final all =
         members.isNotEmpty &&
         members.every((id) => _selected?.contains(id) ?? false);
-    return SizedBox(
-      height: 44,
+    Widget header = SizedBox(
+      height: 48,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: InkWell(
-              onTap: () => _run(
-                () => mcp.setGroupCollapsed(id, !mcp.groupCollapsed(id)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    mcp.groupCollapsed(id)
-                        ? Lucide.ChevronRight
-                        : Lucide.ChevronDown,
-                    size: 16,
-                    color: cs.onSurface.withValues(alpha: .5),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      group?.name ?? l10n.providerGroupsOther,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: AppFontWeights.emphasis,
+            child: IosCardPress(
+              focusable: true,
+              haptics: false,
+              baseColor: Colors.transparent,
+              pressedBlendStrength: 0,
+              borderRadius: BorderRadius.circular(10),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              onTap: () => _toggleGroup(mcp, id),
+              child: SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    AnimatedRotation(
+                      turns: _collapsed(mcp, id) ? 0 : .25,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        Lucide.ChevronRight,
+                        size: 14,
+                        color: cs.onSurface.withValues(alpha: .45),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${members.length}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: .5),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        group?.name ?? l10n.providerGroupsOther,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: AppFontWeights.medium,
+                          color: cs.onSurface.withValues(alpha: .65),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      '${members.length}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: .4),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
           if (_selected != null)
-            TextButton(
+            IosTextButton(
+              label: all
+                  ? l10n.sideDrawerSelectionDeselectAll
+                  : l10n.sideDrawerSelectionSelectAll,
+              fontSize: 12,
               onPressed: () => setState(() {
                 if (all) {
                   _selected!.removeAll(members);
@@ -458,105 +570,163 @@ class _McpManagementViewState extends State<McpManagementView> {
                   _selected!.addAll(members);
                 }
               }),
-              child: Text(
-                all
-                    ? l10n.sideDrawerSelectionDeselectAll
-                    : l10n.sideDrawerSelectionSelectAll,
-              ),
             )
           else if (group != null) ...[
-            ReorderableDragStartListener(
-              index: index,
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Icon(
-                  Lucide.GripVertical,
-                  size: 16,
-                  color: cs.onSurface.withValues(alpha: .4),
+            if (widget.desktop)
+              ReorderableDragStartListener(
+                index: index,
+                enabled: !_busy,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: SizedBox(
+                    width: 32,
+                    height: 44,
+                    child: Icon(
+                      Lucide.GripVertical,
+                      size: 15,
+                      color: cs.onSurface.withValues(alpha: .3),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            PopupMenuButton<String>(
+            _menuButton(
               tooltip: l10n.providerGroupsManageAction,
-              icon: const Icon(Lucide.Ellipsis, size: 18),
-              onSelected: (action) async {
-                if (action == 'rename') {
-                  await _groupName(group: group);
-                } else if (await _confirm(
-                      l10n.providerGroupsDeleteConfirmTitle,
-                      l10n.mcpDeleteGroupConfirm,
-                    ) &&
-                    mounted) {
-                  await _run(() => mcp.deleteGroup(group.id));
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'rename',
-                  child: Text(l10n.mcpRenameGroup),
+              key: ValueKey('mcp-group-menu-$id'),
+              items: [
+                ActionSheetItem(
+                  icon: Lucide.Pencil,
+                  label: l10n.mcpRenameGroup,
+                  onTap: () => _groupName(group: group),
                 ),
-                PopupMenuItem(value: 'delete', child: Text(l10n.mcpPageDelete)),
+                ActionSheetItem(
+                  icon: Lucide.Trash2,
+                  label: l10n.mcpPageDelete,
+                  destructive: true,
+                  onTap: () async {
+                    if (await _confirm(
+                          l10n.providerGroupsDeleteConfirmTitle,
+                          l10n.mcpDeleteGroupConfirm,
+                        ) &&
+                        mounted) {
+                      await _run(() => mcp.deleteGroup(group.id));
+                    }
+                  },
+                ),
               ],
             ),
           ],
         ],
       ),
     );
+    if (!widget.desktop && _selected == null && group != null) {
+      header = ReorderableDelayedDragStartListener(
+        index: index,
+        enabled: !_busy,
+        child: header,
+      );
+    }
+    return header;
   }
 
   List<Widget> _actions(McpProvider mcp) {
     final l10n = AppLocalizations.of(context)!;
     return [
-      IconButton(
+      IosIconButton(
         key: const ValueKey('mcp-selection-start'),
         tooltip: l10n.mcpSelectServers,
-        onPressed: _busy ? null : () => setState(() => _selected = {}),
-        icon: const Icon(Lucide.ListChecks, size: 21),
+        semanticLabel: l10n.mcpSelectServers,
+        enabled: !_busy,
+        onTap: () => setState(() => _selected = {}),
+        icon: Lucide.ListChecks,
+        size: 20,
+        minSize: 44,
       ),
-      PopupMenuButton<String>(
+      _menuButton(
         tooltip: l10n.providerGroupsManageAction,
-        icon: const Icon(Lucide.Ellipsis, size: 21),
-        onSelected: (action) {
-          switch (action) {
-            case 'group':
-              _groupName();
-            case 'timeout':
-              widget.desktop
-                  ? showDesktopMcpTimeoutDialog(context)
-                  : showMcpTimeoutSheet(context);
-            case 'import':
-              showMcpJsonImport(context, desktop: widget.desktop);
-            case 'json':
-              widget.desktop
-                  ? showDesktopMcpJsonEditDialog(context)
-                  : showMcpJsonEditSheet(context);
-          }
-        },
-        itemBuilder: (_) => [
-          PopupMenuItem(
+        items: [
+          ActionSheetItem(
             key: const ValueKey('mcp-create-group'),
-            value: 'group',
-            child: Text(l10n.providerGroupsCreateNewGroupAction),
+            icon: Lucide.FolderPlus,
+            label: l10n.providerGroupsCreateNewGroupAction,
+            onTap: () => _groupName(),
           ),
-          PopupMenuItem(
-            value: 'timeout',
-            child: Text(l10n.mcpTimeoutSettingsTooltip),
+          ActionSheetItem(
+            icon: Lucide.Timer,
+            label: l10n.mcpTimeoutSettingsTooltip,
+            onTap: () => widget.desktop
+                ? showDesktopMcpTimeoutDialog(context)
+                : showMcpTimeoutSheet(context),
           ),
-          PopupMenuItem(value: 'import', child: Text(l10n.mcpImportJson)),
-          PopupMenuItem(
-            value: 'json',
-            child: Text(l10n.mcpJsonEditButtonTooltip),
+          ActionSheetItem(
+            icon: Lucide.Download,
+            label: l10n.mcpImportJson,
+            onTap: () => showMcpJsonImport(context, desktop: widget.desktop),
+          ),
+          ActionSheetItem(
+            icon: Lucide.Code,
+            label: l10n.mcpJsonEditButtonTooltip,
+            onTap: () => widget.desktop
+                ? showDesktopMcpJsonEditDialog(context)
+                : showMcpJsonEditSheet(context),
           ),
         ],
       ),
-      IconButton(
+      IosIconButton(
         tooltip: l10n.mcpPageAddMcpTooltip,
-        onPressed: _busy ? null : () => _edit(null),
-        icon: const Icon(Lucide.Plus, size: 22),
+        semanticLabel: l10n.mcpPageAddMcpTooltip,
+        enabled: !_busy,
+        onTap: () => _edit(null),
+        icon: Lucide.Plus,
+        size: 22,
+        minSize: 44,
       ),
     ];
   }
+
+  Widget _swipeAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) => Expanded(
+    child: Builder(
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: IosCardPress(
+          focusable: true,
+          haptics: false,
+          baseColor: color,
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Slidable.of(ctx)?.close();
+            onTap();
+          },
+          child: SizedBox.expand(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: Theme.of(ctx).colorScheme.onPrimary,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(ctx).colorScheme.onPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
   Widget _selectionBar(McpProvider mcp, Set<String> selected) {
     final l10n = AppLocalizations.of(context)!;
@@ -568,39 +738,36 @@ class _McpManagementViewState extends State<McpManagementView> {
         child: Row(
           children: [
             Expanded(
-              child: TextButton.icon(
+              child: IosTextButton(
                 key: const ValueKey('mcp-selection-enable'),
                 onPressed: selected.isEmpty || _busy
                     ? null
                     : () => _run(() => mcp.setServersEnabled(selected, enable)),
-                icon: const Icon(Lucide.Power, size: 20),
-                label: Text(
-                  enable ? l10n.mcpEnableSelected : l10n.mcpDisableSelected,
-                ),
+                icon: Lucide.Power,
+                label: enable
+                    ? l10n.mcpEnableSelected
+                    : l10n.mcpDisableSelected,
               ),
             ),
             Expanded(
-              child: TextButton.icon(
+              child: IosTextButton(
                 key: const ValueKey('mcp-selection-move'),
                 onPressed: selected.isEmpty || _busy
                     ? null
                     : () => _move(selected),
-                icon: const Icon(Lucide.Folder, size: 20),
-                label: Text(l10n.mcpMoveToGroup),
+                icon: Lucide.Folder,
+                label: l10n.mcpMoveToGroup,
               ),
             ),
             Expanded(
-              child: TextButton.icon(
+              child: IosTextButton(
                 key: const ValueKey('mcp-selection-delete'),
                 onPressed: selected.isEmpty || _busy
                     ? null
                     : () => _delete(selected),
-                icon: Icon(
-                  Lucide.Trash2,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                label: Text(l10n.mcpPageDelete),
+                icon: Lucide.Trash2,
+                color: Theme.of(context).colorScheme.error,
+                label: l10n.mcpPageDelete,
               ),
             ),
           ],
@@ -613,7 +780,11 @@ class _McpManagementViewState extends State<McpManagementView> {
   Widget build(BuildContext context) {
     final mcp = context.watch<McpProvider>();
     final l10n = AppLocalizations.of(context)!;
-    final rows = _rows(mcp);
+    final rows = (_pendingRows ?? _rows(mcp))
+        .where(
+          (row) => row.server == null || mcp.getById(row.server!.id) != null,
+        )
+        .toList();
     final ids = mcp.servers.map((server) => server.id).toSet();
     final selected = _selected?.intersection(ids);
     final all =
@@ -626,151 +797,177 @@ class _McpManagementViewState extends State<McpManagementView> {
     final actions = selected == null
         ? _actions(mcp)
         : <Widget>[
-            TextButton(
+            IosTextButton(
               onPressed: _busy
                   ? null
                   : () => setState(() => _selected = all ? {} : ids),
-              child: Text(
-                all
-                    ? l10n.sideDrawerSelectionDeselectAll
-                    : l10n.sideDrawerSelectionSelectAll,
-              ),
+              label: all
+                  ? l10n.sideDrawerSelectionDeselectAll
+                  : l10n.sideDrawerSelectionSelectAll,
             ),
           ];
     final cancel = selected == null
         ? null
-        : TextButton(
+        : IosTextButton(
             onPressed: _busy ? null : () => setState(() => _selected = null),
-            child: Text(l10n.mcpPageCancel),
+            label: l10n.mcpPageCancel,
           );
     final list = rows.isEmpty
         ? Center(child: Text(l10n.mcpPageNoServers))
-        : CustomScrollView(
-            slivers: [
-              SliverReorderableList(
-                itemCount: rows.length,
-                onReorderItem: (oldIndex, newIndex) =>
-                    _run(() => _reorder(mcp, rows, oldIndex, newIndex)),
-                itemBuilder: (context, index) {
-                  final row = rows[index];
-                  final server = row.server;
-                  if (server == null) {
+        : Listener(
+            // A cancellation may arrive before the overlay gets its first frame.
+            onPointerCancel: (_) =>
+                _restoreAfterGroupDrag(_groupDragGeneration),
+            child: CustomScrollView(
+              slivers: [
+                SliverReorderableList(
+                  itemCount: rows.length,
+                  onReorderStart: (index) => _onDragStart(rows, index),
+                  onReorderEnd: (_) => _onDragEnd(),
+                  // Preserve the header's transparent surface while dragging.
+                  proxyDecorator: (child, index, animation) {
+                    final generation = _groupDragGeneration;
+                    final proxy = Transform.scale(scale: .98, child: child);
+                    return rows[index].server == null
+                        ? _GroupDragProxy(
+                            onMounted: () =>
+                                _mountedGroupProxyGeneration = generation,
+                            onRemoved: () => _restoreAfterGroupDrag(generation),
+                            child: proxy,
+                          )
+                        : proxy;
+                  },
+                  onReorderItem: (oldIndex, newIndex) =>
+                      _run(() => _reorder(mcp, rows, oldIndex, newIndex)),
+                  itemBuilder: (context, index) {
+                    final row = rows[index];
+                    final server = row.server == null
+                        ? null
+                        : mcp.getById(row.server!.id);
+                    if (server == null) {
+                      return KeyedSubtree(
+                        key: ValueKey('mcp-group-${row.groupId}'),
+                        child: _groupHeader(mcp, row.groupId, index),
+                      );
+                    }
+                    Widget card = Builder(
+                      builder: (rowContext) => GestureDetector(
+                        onSecondaryTapDown: (details) => _serverMenu(
+                          rowContext,
+                          server,
+                          anchor: details.globalPosition,
+                        ),
+                        child: McpServerCard(
+                          server: server,
+                          status: mcp.statusFor(server.id),
+                          error: mcp.errorFor(server.id),
+                          selectionMode: selected != null,
+                          selected: selected?.contains(server.id) ?? false,
+                          onTap: () {
+                            if (selected != null) {
+                              _toggle(server.id);
+                            } else {
+                              _edit(server.id);
+                            }
+                          },
+                          onMore: () => _serverMenu(rowContext, server),
+                          onEnabledChanged: widget.desktop
+                              ? (value) => _run(
+                                  () => mcp.updateServerMetadata(
+                                    server.copyWith(enabled: value),
+                                  ),
+                                )
+                              : null,
+                          onDetails: () => _details(server),
+                          onAuthorize: () => mcp.authorize(server.id),
+                        ),
+                      ),
+                    );
+                    if (selected == null && widget.desktop) {
+                      card = ReorderableDragStartListener(
+                        index: index,
+                        enabled: !_busy,
+                        child: card,
+                      );
+                    }
+                    if (!widget.desktop && selected == null) {
+                      card = ReorderableDelayedDragStartListener(
+                        index: index,
+                        enabled: !_busy,
+                        child: card,
+                      );
+                      card = Slidable(
+                        endActionPane: ActionPane(
+                          motion: const StretchMotion(),
+                          extentRatio: .42,
+                          children: [
+                            _swipeAction(
+                              icon: Lucide.RefreshCw,
+                              label: l10n.mcpPageReconnect,
+                              color: Theme.of(context).colorScheme.primary,
+                              onTap: () => _run(() => mcp.reconnect(server.id)),
+                            ),
+                            _swipeAction(
+                              icon: Lucide.Trash2,
+                              label: l10n.mcpPageDelete,
+                              color: Theme.of(context).colorScheme.error,
+                              onTap: () => _delete({server.id}),
+                            ),
+                          ],
+                        ),
+                        child: card,
+                      );
+                    }
                     return KeyedSubtree(
-                      key: ValueKey('mcp-group-${row.groupId}'),
-                      child: _groupHeader(mcp, row.groupId, index),
-                    );
-                  }
-                  Widget card = Builder(
-                    builder: (rowContext) => GestureDetector(
-                      onSecondaryTapDown: (details) => _serverMenu(
-                        rowContext,
-                        server,
-                        anchor: details.globalPosition,
+                      key: ValueKey(
+                        '${widget.desktop ? 'desktop-mcp' : 'mcp'}-${server.id}',
                       ),
-                      child: McpServerCard(
-                        server: server,
-                        status: mcp.statusFor(server.id),
-                        error: mcp.errorFor(server.id),
-                        selectionMode: selected != null,
-                        selected: selected?.contains(server.id) ?? false,
-                        onTap: () {
-                          if (selected != null) {
-                            _toggle(server.id);
-                          } else {
-                            _edit(server.id);
-                          }
-                        },
-                        onLongPress: () => _serverMenu(rowContext, server),
-                        avatarBuilder: widget.desktop || selected != null
-                            ? null
-                            : (avatar) => ReorderableDelayedDragStartListener(
-                                index: index,
-                                child: avatar,
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeInOutCubic,
+                        alignment: Alignment.topCenter,
+                        child:
+                            mcp.groups.isNotEmpty &&
+                                _collapsed(mcp, row.groupId)
+                            ? const SizedBox(width: double.infinity, height: 0)
+                            : Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: card,
                               ),
-                        onEnabledChanged: widget.desktop
-                            ? (value) => _run(
-                                () => mcp.updateServerMetadata(
-                                  server.copyWith(enabled: value),
-                                ),
-                              )
-                            : null,
-                        onDetails: () => _details(server),
-                        onAuthorize: () => mcp.authorize(server.id),
-                        actions: widget.desktop
-                            ? [
-                                IconButton(
-                                  tooltip: l10n.mcpPageReconnect,
-                                  onPressed: () =>
-                                      _run(() => mcp.reconnect(server.id)),
-                                  icon: const Icon(Lucide.RefreshCw, size: 18),
-                                ),
-                                IconButton(
-                                  tooltip: l10n.mcpPageDelete,
-                                  onPressed: () => _delete({server.id}),
-                                  icon: const Icon(Lucide.Trash2, size: 18),
-                                ),
-                              ]
-                            : const [],
                       ),
-                    ),
-                  );
-                  if (selected == null && widget.desktop) {
-                    card = ReorderableDragStartListener(
-                      index: index,
-                      child: card,
                     );
-                  }
-                  if (!widget.desktop && selected == null) {
-                    card = Slidable(
-                      endActionPane: ActionPane(
-                        motion: const StretchMotion(),
-                        extentRatio: .42,
-                        children: [
-                          SlidableAction(
-                            onPressed: (_) =>
-                                _run(() => mcp.reconnect(server.id)),
-                            icon: Lucide.RefreshCw,
-                            label: l10n.mcpPageReconnect,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primary,
-                          ),
-                          SlidableAction(
-                            onPressed: (_) => _delete({server.id}),
-                            icon: Lucide.Trash2,
-                            label: l10n.mcpPageDelete,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.error,
-                          ),
-                        ],
-                      ),
-                      child: card,
-                    );
-                  }
-                  return Padding(
-                    key: ValueKey(
-                      '${widget.desktop ? 'desktop-mcp' : 'mcp'}-${server.id}',
-                    ),
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: card,
-                  );
-                },
-              ),
-            ],
+                  },
+                ),
+              ],
+            ),
           );
     final body = Column(
       children: [
         if (widget.embedded)
           SizedBox(
             height: 48,
-            child: Row(
-              children: [
-                if (cancel != null) cancel,
-                Expanded(child: title),
-                ...actions,
-              ],
-            ),
+            child: selected != null
+                ? Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      title,
+                      Align(alignment: Alignment.centerLeft, child: cancel),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: actions,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      if (cancel != null) cancel,
+                      Expanded(child: title),
+                      ...actions,
+                    ],
+                  ),
           ),
         Expanded(child: list),
         if (selected != null) _selectionBar(mcp, selected),
@@ -790,13 +987,16 @@ class _McpManagementViewState extends State<McpManagementView> {
     }
     return Scaffold(
       appBar: AppBar(
+        centerTitle: selected != null,
         leadingWidth: selected == null ? null : 76,
         leading:
             cancel ??
-            IconButton(
+            IosIconButton(
               tooltip: l10n.mcpPageBackTooltip,
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Lucide.ArrowLeft),
+              semanticLabel: l10n.mcpPageBackTooltip,
+              onTap: () => Navigator.of(context).maybePop(),
+              icon: Lucide.ArrowLeft,
+              minSize: 44,
             ),
         title: title,
         actions: actions,
@@ -807,4 +1007,36 @@ class _McpManagementViewState extends State<McpManagementView> {
       ),
     );
   }
+}
+
+/// Restore group contents only after Flutter removes the drag overlay, whether
+/// the user drops at a new slot, drops in place, or cancels the gesture.
+class _GroupDragProxy extends StatefulWidget {
+  const _GroupDragProxy({
+    required this.child,
+    required this.onMounted,
+    required this.onRemoved,
+  });
+  final Widget child;
+  final VoidCallback onMounted;
+  final VoidCallback onRemoved;
+  @override
+  State<_GroupDragProxy> createState() => _GroupDragProxyState();
+}
+
+class _GroupDragProxyState extends State<_GroupDragProxy> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onMounted();
+  }
+
+  @override
+  void dispose() {
+    widget.onRemoved();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

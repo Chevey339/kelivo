@@ -1,26 +1,48 @@
 import 'package:flutter/material.dart';
+import '../../desktop/widgets/desktop_form_dialog.dart';
 import '../../l10n/app_localizations.dart';
+import '../../theme/app_semantic_colors.dart';
 import 'emoji_text.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'ios_form_text_field.dart';
+import 'ios_tactile.dart';
+import 'ios_text_button.dart';
 
-/// A reusable emoji picker dialog used by both mobile and desktop.
-/// Returns the chosen emoji (single grapheme) or null if cancelled.
+/// Shared by avatar editors on mobile and desktop.
 Future<String?> showEmojiPickerDialog(
   BuildContext context, {
   String? title,
   String? hintText,
-}) async {
-  final l10n = AppLocalizations.of(context)!;
-  final controller = TextEditingController();
-  String value = '';
+}) => showDialog<String>(
+  context: context,
+  builder: (_) => _EmojiPickerDialog(title: title, hintText: hintText),
+);
 
-  bool validGrapheme(String s) {
-    final trimmed = s.characters.take(1).toString().trim();
-    return trimmed.isNotEmpty && trimmed == s.trim();
+class _EmojiPickerDialog extends StatefulWidget {
+  const _EmojiPickerDialog({this.title, this.hintText});
+  final String? title;
+  final String? hintText;
+  @override
+  State<_EmojiPickerDialog> createState() => _EmojiPickerDialogState();
+}
+
+class _EmojiPickerDialogState extends State<_EmojiPickerDialog> {
+  final controller = TextEditingController();
+  bool get valid {
+    final value = controller.text.trim();
+    return value.isNotEmpty && value.characters.length == 1;
   }
 
-  const List<String> quick = <String>[
+  void submit() {
+    if (valid) Navigator.of(context).pop(controller.text.trim());
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  static const List<String> quick = <String>[
     '😀',
     '😁',
     '😂',
@@ -135,140 +157,123 @@ Future<String?> showEmojiPickerDialog(
     '🐵',
   ];
 
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      return StatefulBuilder(
-        builder: (ctx, setLocal) {
-          final media = MediaQuery.of(ctx);
-          final avail = media.size.height - media.viewInsets.bottom;
-          final double gridHeight = (avail * 0.28).clamp(120.0, 220.0);
-          return AlertDialog(
-            scrollable: true,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            backgroundColor: context.overlaySurface,
-            title: Text(title ?? l10n.assistantEditEmojiDialogTitle),
-            content: SizedBox(
-              width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.08),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: EmojiText(
-                      value.isEmpty
-                          ? '🙂'
-                          : value.characters.take(1).toString(),
-                      fontSize: 40,
-                      optimizeEmojiAlign: true,
-                      nudge: Offset.zero, // picker preview: no extra nudge
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 150),
+      padding: MediaQuery.viewInsetsOf(context) + const EdgeInsets.all(24),
+      child: DesktopFormDialog(
+        constraints: BoxConstraints(
+          maxWidth: 380,
+          maxHeight: MediaQuery.sizeOf(context).height * .7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: CustomScrollView(
+                shrinkWrap: true,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: DesktopFormDialogHeader(
+                      title: widget.title ?? l10n.assistantEditEmojiDialogTitle,
+                      onClose: () => Navigator.of(context).pop(),
+                      closeTooltip: l10n.assistantEditEmojiDialogCancel,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    onChanged: (v) => setLocal(() => value = v),
-                    onSubmitted: (_) {
-                      if (validGrapheme(value)) {
-                        Navigator.of(
-                          ctx,
-                        ).pop(value.characters.take(1).toString());
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: hintText ?? l10n.assistantEditEmojiDialogHint,
-                      filled: true,
-                      fillColor: ctx.appColors.surfaceFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: cs.primary.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: gridHeight,
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      padding: EdgeInsets.zero,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 8,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                          ),
-                      itemCount: quick.length,
-                      itemBuilder: (c, i) {
-                        final e = quick[i];
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () => Navigator.of(ctx).pop(e),
-                          child: Container(
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
                             decoration: BoxDecoration(
-                              color: cs.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
+                              color: context.appColors.surfaceFill,
+                              shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
                             child: EmojiText(
-                              e,
-                              fontSize: 20,
+                              controller.text.isEmpty
+                                  ? '🙂'
+                                  : controller.text.characters.first,
+                              fontSize: 28,
                               optimizeEmojiAlign: true,
-                              nudge: Offset.zero, // picker grid: no extra nudge
+                              nudge: Offset.zero,
                             ),
                           ),
-                        );
-                      },
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: IosFormTextField(
+                              label: '',
+                              inlineLabel: false,
+                              outerPadding: EdgeInsets.zero,
+                              controller: controller,
+                              autofocus: true,
+                              hintText:
+                                  widget.hintText ??
+                                  l10n.assistantEditEmojiDialogHint,
+                              onChanged: (_) => setState(() {}),
+                              onSubmitted: (_) => submit(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverGrid.builder(
+                      itemCount: quick.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 60,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                          ),
+                      itemBuilder: (context, index) => IosCardPress(
+                        focusable: true,
+                        haptics: false,
+                        pressedBlendStrength: .04,
+                        baseColor: cs.primary.withValues(alpha: .06),
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => Navigator.of(context).pop(quick[index]),
+                        child: Center(
+                          child: EmojiText(
+                            quick[index],
+                            fontSize: 22,
+                            optimizeEmojiAlign: true,
+                            nudge: Offset.zero,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(l10n.assistantEditEmojiDialogCancel),
-              ),
-              TextButton(
-                onPressed: validGrapheme(value)
-                    ? () => Navigator.of(
-                        ctx,
-                      ).pop(value.characters.take(1).toString())
-                    : null,
-                child: Text(
-                  l10n.assistantEditEmojiDialogSave,
-                  style: TextStyle(
-                    color: validGrapheme(value)
-                        ? cs.primary
-                        : cs.onSurface.withValues(alpha: 0.38),
-                    fontWeight: AppFontWeights.semibold,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IosTextButton(
+                    label: l10n.assistantEditEmojiDialogCancel,
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
-                ),
+                  IosTextButton(
+                    label: l10n.assistantEditEmojiDialogSave,
+                    onPressed: valid ? submit : null,
+                  ),
+                ],
               ),
-            ],
-          );
-        },
-      );
-    },
-  ).then((result) => result);
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

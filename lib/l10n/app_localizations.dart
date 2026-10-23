@@ -23802,30 +23802,6 @@ abstract class AppLocalizations {
   /// **'Decrypting backup'**
   String get backupProgressDecrypting;
 
-  /// No description provided for @toolsSheetEnabledCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} on'**
-  String toolsSheetEnabledCount(int count);
-
-  /// No description provided for @toolsSheetWorkspaceUnbound.
-  ///
-  /// In en, this message translates to:
-  /// **'Not linked'**
-  String get toolsSheetWorkspaceUnbound;
-
-  /// No description provided for @toolsSheetManage.
-  ///
-  /// In en, this message translates to:
-  /// **'Manage'**
-  String get toolsSheetManage;
-
-  /// No description provided for @toolsSheetServerToolsCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{enabled}/{total} tools'**
-  String toolsSheetServerToolsCount(int enabled, int total);
-
   /// No description provided for @mcpPageStatusFailed.
   ///
   /// In en, this message translates to:

@@ -5881,30 +5881,9 @@
   "backupEncryptionUnsupported": "This encrypted backup requires a newer version of Kelivo.",
   "backupProgressEncrypting": "Encrypting backup",
   "backupProgressDecrypting": "Decrypting backup",
-  "toolsSheetEnabledCount": "{count} on",
-  "toolsSheetWorkspaceUnbound": "Not linked",
-  "toolsSheetManage": "Manage",
-  "toolsSheetServerToolsCount": "{enabled}/{total} tools",
   "mcpPageStatusFailed": "Connection failed",
   "mcpPageCardToolsShort": "Tools {enabled}/{total}",
   "mcpPageSelectServer": "Select {name}",
-  "@toolsSheetEnabledCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@toolsSheetServerToolsCount": {
-    "placeholders": {
-      "enabled": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "@mcpPageCardToolsShort": {
     "placeholders": {
       "enabled": {

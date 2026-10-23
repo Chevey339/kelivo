@@ -13345,22 +13345,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressDecrypting => 'Decrypting backup';
 
   @override
-  String toolsSheetEnabledCount(int count) {
-    return '$count on';
-  }
-
-  @override
-  String get toolsSheetWorkspaceUnbound => 'Not linked';
-
-  @override
-  String get toolsSheetManage => 'Manage';
-
-  @override
-  String toolsSheetServerToolsCount(int enabled, int total) {
-    return '$enabled/$total tools';
-  }
-
-  @override
   String get mcpPageStatusFailed => 'Connection failed';
 
   @override

@@ -12736,22 +12736,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupProgressDecrypting => '正在解密备份';
 
   @override
-  String toolsSheetEnabledCount(int count) {
-    return '$count 已开';
-  }
-
-  @override
-  String get toolsSheetWorkspaceUnbound => '未绑定';
-
-  @override
-  String get toolsSheetManage => '管理';
-
-  @override
-  String toolsSheetServerToolsCount(int enabled, int total) {
-    return '$enabled/$total 个工具';
-  }
-
-  @override
   String get mcpPageStatusFailed => '连接失败';
 
   @override
@@ -25453,22 +25437,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupProgressDecrypting => '正在解密备份';
-
-  @override
-  String toolsSheetEnabledCount(int count) {
-    return '$count 已开';
-  }
-
-  @override
-  String get toolsSheetWorkspaceUnbound => '未绑定';
-
-  @override
-  String get toolsSheetManage => '管理';
-
-  @override
-  String toolsSheetServerToolsCount(int enabled, int total) {
-    return '$enabled/$total 个工具';
-  }
 
   @override
   String get mcpPageStatusFailed => '连接失败';
@@ -38252,22 +38220,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupProgressDecrypting => '正在解密備份';
-
-  @override
-  String toolsSheetEnabledCount(int count) {
-    return '$count 已開';
-  }
-
-  @override
-  String get toolsSheetWorkspaceUnbound => '未綁定';
-
-  @override
-  String get toolsSheetManage => '管理';
-
-  @override
-  String toolsSheetServerToolsCount(int enabled, int total) {
-    return '$enabled/$total 個工具';
-  }
 
   @override
   String get mcpPageStatusFailed => '連線失敗';

@@ -1,3 +1,9 @@
+import 'package:flutter/services.dart';
+import 'package:Kelivo/features/mcp/widgets/mcp_text_dialog.dart';
+import 'package:Kelivo/features/mcp/widgets/mcp_form.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/form_sheet.dart';
+import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -18,6 +24,7 @@ Future<void> _settleWrites(
   WidgetTester tester,
   McpPresentationHarness harness,
 ) async {
+  await tester.pumpAndSettle();
   // Provider and preference writes each have a serialized async tail. Let
   // their continuations advance between real SQLite turns.
   for (var i = 0; i < 5; i++) {
@@ -41,8 +48,8 @@ Future<void> _deleteFirst(
   await tester.pumpAndSettle();
   await tester.tap(
     find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.widgetWithText(TextButton, 'Delete'),
+      of: find.byType(FormSheetActions),
+      matching: find.text('Delete'),
     ),
   );
   await _settleWrites(tester, harness);
@@ -50,7 +57,171 @@ Future<void> _deleteFirst(
 }
 
 void main() {
+  testWidgets(
+    'icon changes remain saved while another server is reconnecting',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final harness = (await tester.runAsync(McpPresentationHarness.create))!;
+      final reconnect = Completer<void>();
+      harness.mcp.reconnectWait = reconnect.future;
+      await tester.pumpWidget(
+        harness.app(const Scaffold(body: DesktopMcpPane())),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reconnect'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More').at(1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Server icon'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose Emoji'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '🌿');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await _settleWrites(tester, harness);
+      expect(harness.mcp.presentationFor('server-1').icon!.value, '🌿');
+      reconnect.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets('desktop toolbar, menu and group form work with Tab and Enter', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = (await tester.runAsync(McpPresentationHarness.create))!;
+    await tester.pumpWidget(
+      harness.app(const Scaffold(body: DesktopMcpPane())),
+    );
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('New group…'), findsOneWidget);
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byType(McpTextDialog), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Keyboard group');
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await _settleWrites(tester, harness);
+    expect(harness.mcp.groups.single.name, 'Keyboard group');
+    expect(find.byType(McpTextDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'group drag proxy remains valid desktop=$desktop',
+      (tester) async {
+        tester.view.physicalSize = Size(desktop ? 1280 : 430, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final harness = (await tester.runAsync(McpPresentationHarness.create))!;
+        final first = (await tester.runAsync(
+          () => harness.mcp.createGroup('First'),
+        ))!;
+        final second = (await tester.runAsync(
+          () => harness.mcp.createGroup('Second'),
+        ))!;
+        await tester.runAsync(
+          () => harness.mcp.moveServersToGroup({'server-0'}, first),
+        );
+        await tester.runAsync(
+          () =>
+              harness.mcp.moveServersToGroup({'server-1', 'server-2'}, second),
+        );
+        await tester.pumpWidget(
+          harness.app(
+            desktop ? const Scaffold(body: DesktopMcpPane()) : const McpPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final target =
+            tester.getBottomLeft(
+              find.byKey(
+                ValueKey('${desktop ? 'desktop-mcp' : 'mcp'}-server-2'),
+              ),
+            ) +
+            const Offset(90, 30);
+        final header = find.byKey(ValueKey('mcp-group-$first'));
+        final dragHandle = desktop
+            ? find.descendant(
+                of: header,
+                matching: find.byType(ReorderableDragStartListener),
+              )
+            : find.text('First');
+        final gesture = await tester.startGesture(tester.getCenter(dragHandle));
+        if (!desktop) await tester.pump(const Duration(milliseconds: 600));
+        await gesture.moveBy(const Offset(0, 14));
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(
+          tester.takeException(),
+          isNull,
+          reason:
+              'The group is now in the overlay, outside its original Material ancestor',
+        );
+        await gesture.moveTo(target);
+        await tester.pump(const Duration(milliseconds: 350));
+        await gesture.up();
+        await _settleWrites(tester, harness);
+        expect(harness.mcp.groups.map((g) => g.id), [second, first]);
+        expect(harness.mcp.presentationFor('server-0').groupId, first);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
+  testWidgets('Android long press on the server name drags the entire card', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = (await tester.runAsync(McpPresentationHarness.create))!;
+    await tester.pumpWidget(harness.app(const McpPage()));
+    await tester.pumpAndSettle();
+    final target =
+        tester.getBottomLeft(find.byKey(const ValueKey('mcp-server-2'))) +
+        const Offset(120, 30);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('GitHub')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveBy(const Offset(0, 14));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+    await gesture.moveTo(target);
+    await tester.pump(const Duration(milliseconds: 350));
+    await gesture.up();
+    await _settleWrites(tester, harness);
+    expect(harness.mcp.items.map((s) => s.id), [
+      'server-1',
+      'server-2',
+      'server-0',
+    ]);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('Undo restores after leaving the MCP page', (tester) async {
     final harness = (await tester.runAsync(McpPresentationHarness.create))!;
@@ -106,13 +277,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     await _deleteFirst(tester, harness);
-    await tester.tap(find.byTooltip('Reconnect').first);
+    await tester.tap(find.byTooltip('More').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reconnect'));
     await tester.pump();
     expect(
       tester
-          .widget<IconButton>(find.byKey(const ValueKey('mcp-selection-start')))
-          .onPressed,
-      isNull,
+          .widget<IosIconButton>(
+            find.byKey(const ValueKey('mcp-selection-start')),
+          )
+          .enabled,
+      isFalse,
     );
     await tester.tap(find.text('Undo').hitTestable());
     await _settleWrites(tester, harness);
@@ -137,7 +312,7 @@ void main() {
     await tester.tap(find.text('Details'));
     await tester.pumpAndSettle();
     expect(find.byType(McpErrorDetailsDialog), findsOneWidget);
-    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byType(DesktopFormDialog), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('Close').hitTestable(), findsOneWidget);
     expect(find.text('Reconnect').hitTestable(), findsOneWidget);
@@ -178,7 +353,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Manage groups'));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('mcp-create-group')));
+        await tester.tap(find.text('New group…'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'Development');
         await tester.pump();
@@ -208,7 +383,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(
           find.descendant(
-            of: find.byType(SimpleDialog),
+            of: find.byType(McpForm),
             matching: find.text('Development'),
           ),
         );
@@ -251,7 +426,7 @@ void main() {
       expect(find.text('GitHub'), findsNothing);
       await tester.tap(find.text('Search'));
       await _settleWrites(tester, harness);
-      await tester.longPress(find.text('GitHub'));
+      await tester.tap(find.byTooltip('More').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Select servers'));
       await tester.pumpAndSettle();
@@ -265,13 +440,18 @@ void main() {
       await tester.tap(
         find.descendant(
           of: header,
-          matching: find.byType(PopupMenuButton<String>),
+          matching: find.byKey(ValueKey('mcp-group-menu-$group')),
         ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FormSheetActions),
+          matching: find.text('Delete'),
+        ),
+      );
       await _settleWrites(tester, harness);
       expect(harness.mcp.groups, isEmpty);
       expect(harness.mcp.items.length, 3);
@@ -295,8 +475,8 @@ void main() {
     expect(harness.mcp.items.length, 3);
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.widgetWithText(TextButton, 'Delete'),
+        of: find.byType(FormSheetActions),
+        matching: find.text('Delete'),
       ),
     );
     await _settleWrites(tester, harness);
@@ -320,8 +500,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.widgetWithText(TextButton, 'Delete'),
+        of: find.byType(FormSheetActions),
+        matching: find.text('Delete'),
       ),
     );
     await _settleWrites(tester, harness);
@@ -402,7 +582,11 @@ void main() {
           Scaffold(
             body: Builder(
               builder: (context) => TextButton(
-                onPressed: () => showMcpIconPicker(context, 'server-0'),
+                onPressed: () => showMcpIconPicker(
+                  context,
+                  onSelected: (icon) =>
+                      harness.mcp.setServerIcon('server-0', icon),
+                ),
                 child: const Text('Icon'),
               ),
             ),

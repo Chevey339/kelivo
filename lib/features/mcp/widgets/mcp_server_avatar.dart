@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/mcp_provider.dart';
+import '../../../core/models/mcp_presentation.dart';
 import '../../../core/services/mcp/mcp_icon_cache.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'mcp_resolved_icon.dart';
@@ -63,6 +64,9 @@ class McpServerAvatar extends StatelessWidget {
     required this.radius,
     this.status,
     this.resolver,
+    this.customIcon,
+    this.useCustomIcon = false,
+    this.showBackground = true,
   });
 
   final McpServerConfig server;
@@ -70,6 +74,9 @@ class McpServerAvatar extends StatelessWidget {
   final double radius;
   final McpStatus? status;
   final McpIconResolver? resolver;
+  final McpServerIcon? customIcon;
+  final bool useCustomIcon;
+  final bool showBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -95,13 +102,15 @@ class McpServerAvatar extends StatelessWidget {
     ];
     final fallback = SvgPicture.asset(
       'assets/icons/mcp.svg',
-      width: size * .55,
-      height: size * .55,
+      width: size * (showBackground ? .55 : 1),
+      height: size * (showBackground ? .55 : 1),
       // Bake the color into the cached picture, avoiding one filter per row.
       theme: SvgTheme(currentColor: foreground),
       clipBehavior: Clip.none,
     );
-    final customIcon = mcp?.presentationFor(server.id).icon;
+    final resolvedCustomIcon = useCustomIcon
+        ? customIcon
+        : mcp?.presentationFor(server.id).icon;
     final connecting =
         server.enabled &&
         (status == McpStatus.connecting || status == McpStatus.authorizing);
@@ -113,18 +122,21 @@ class McpServerAvatar extends StatelessWidget {
             width: size,
             height: size,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colors.surfaceFill,
-              borderRadius: BorderRadius.circular(radius),
-            ),
+            decoration: showBackground
+                ? BoxDecoration(
+                    color: colors.surfaceFill,
+                    borderRadius: BorderRadius.circular(radius),
+                  )
+                : null,
             child:
                 icon ??
-                (customIcon == null && sources.isEmpty
+                (resolvedCustomIcon == null && sources.isEmpty
                     ? fallback
                     : McpResolvedIcon(
-                        icon: customIcon,
+                        icon: resolvedCustomIcon,
                         sources: sources,
                         size: size,
+                        inset: showBackground,
                         color: foreground,
                         fallback: fallback,
                       )),

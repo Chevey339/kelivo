@@ -17,12 +17,16 @@ class McpResolvedIcon extends StatefulWidget {
     required this.size,
     required this.color,
     required this.fallback,
+    this.inset = true,
   });
   final McpServerIcon? icon;
   final List<String> sources;
   final double size;
   final Color color;
   final Widget fallback;
+
+  /// Avatar tiles leave an inset; bare tool icons fill the whole icon slot.
+  final bool inset;
 
   @override
   State<McpResolvedIcon> createState() => _McpResolvedIconState();
@@ -110,7 +114,7 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
         style: TextStyle(color: widget.color),
         child: EmojiText(
           icon.value.characters.first,
-          fontSize: widget.size * .5,
+          fontSize: widget.size * (widget.inset ? .5 : 1),
         ),
       );
     }
@@ -121,8 +125,8 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
         return asset.endsWith('.svg')
             ? SvgPicture.asset(
                 asset,
-                width: widget.size * .65,
-                height: widget.size * .65,
+                width: widget.size * (widget.inset ? .65 : 1),
+                height: widget.size * (widget.inset ? .65 : 1),
                 colorFilter: mono
                     ? ColorFilter.mode(widget.color, BlendMode.srcIn)
                     : _imageTint == null
@@ -132,8 +136,8 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
               )
             : Image.asset(
                 asset,
-                width: widget.size * .65,
-                height: widget.size * .65,
+                width: widget.size * (widget.inset ? .65 : 1),
+                height: widget.size * (widget.inset ? .65 : 1),
                 fit: BoxFit.contain,
                 cacheWidth: decodeSize,
                 cacheHeight: decodeSize,
@@ -150,8 +154,8 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
         return path.endsWith('.svg')
             ? SvgPicture.file(
                 File(path),
-                width: widget.size * .65,
-                height: widget.size * .65,
+                width: widget.size * (widget.inset ? .65 : 1),
+                height: widget.size * (widget.inset ? .65 : 1),
                 theme: SvgTheme(
                   currentColor: widget.color.withValues(alpha: 1),
                 ),
@@ -161,16 +165,19 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
                 clipBehavior: Clip.none,
                 errorBuilder: (_, _, _) => _decodeFailed(path),
               )
-            : Image.file(
-                File(path),
-                width: widget.size * .75,
-                height: widget.size * .75,
-                fit: BoxFit.contain,
-                cacheWidth: decodeSize,
-                cacheHeight: decodeSize,
-                color: _imageTint,
-                colorBlendMode: BlendMode.modulate,
-                errorBuilder: (_, _, _) => _decodeFailed(path),
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(widget.size * .2),
+                child: Image.file(
+                  File(path),
+                  width: widget.size * (widget.inset ? .75 : 1),
+                  height: widget.size * (widget.inset ? .75 : 1),
+                  fit: BoxFit.cover,
+                  cacheWidth: decodeSize,
+                  cacheHeight: decodeSize,
+                  color: _imageTint,
+                  colorBlendMode: BlendMode.modulate,
+                  errorBuilder: (_, _, _) => _decodeFailed(path),
+                ),
               );
       },
     );
