@@ -21,18 +21,31 @@ class SearchServiceUsageInfo {
     required this.remaining,
     this.used,
     this.limit,
+    this.balances = const <String, num>{},
   });
 
   final num remaining;
   final num? used;
   final num? limit;
+
+  /// Wallet balance per currency code, for providers billed from a balance.
+  final Map<String, num> balances;
 }
 
 class SearchServiceUsageService {
   const SearchServiceUsageService._();
 
+  /// DeepSeek Search & Fetch list price per 1,000 successful requests, keyed
+  /// by balance currency. Both APIs share the same price.
+  static const Map<String, num> deepSeekPricePer1000Requests = {
+    'CNY': 5,
+    'USD': 0.75,
+  };
+
   static bool supports(SearchServiceOptions options) =>
-      options is TavilyOptions || options is LinkUpOptions;
+      options is TavilyOptions ||
+      options is LinkUpOptions ||
+      options is DeepSeekOptions;
 
   static Future<SearchServiceUsageInfo> fetch(
     SearchServiceOptions options, {
@@ -56,6 +69,9 @@ class SearchServiceUsageService {
       }
       if (options is LinkUpOptions) {
         return await _fetchLinkUp(options, effectiveClient);
+      }
+      if (options is DeepSeekOptions) {
+        return await _fetchDeepSeek(options, effectiveClient);
       }
       throw const SearchServiceUsageException(
         'Usage query is not supported for this search provider',
@@ -129,6 +145,42 @@ class SearchServiceUsageService {
       throw const FormatException('Missing credit balance');
     }
     return SearchServiceUsageInfo(remaining: decoded['balance'] as num);
+  }
+
+  /// Estimates remaining Search/Fetch requests from the account balance. The
+  /// balance is shared with model usage, so this is an upper bound.
+  static Future<SearchServiceUsageInfo> _fetchDeepSeek(
+    DeepSeekOptions options,
+    http.Client client,
+  ) async {
+    final response = await client.get(
+      Uri.parse('https://api.deepseek.com/user/balance'),
+      headers: {'Authorization': 'Bearer ${options.apiKey.trim()}'},
+    );
+    _ensureSuccess(response);
+
+    final decoded = jsonDecode(response.body);
+    final infos = decoded is Map<String, dynamic>
+        ? decoded['balance_infos']
+        : null;
+    if (infos is! List) {
+      throw const FormatException('Missing balance info');
+    }
+    final balances = <String, num>{};
+    var requests = 0;
+    for (final info in infos) {
+      if (info is! Map) continue;
+      final currency = info['currency'];
+      final price = deepSeekPricePer1000Requests[currency];
+      final balance = num.tryParse('${info['total_balance']}');
+      if (currency is! String || price == null || balance == null) continue;
+      balances[currency] = balance;
+      if (balance > 0) requests += (balance * 1000 / price).floor();
+    }
+    if (balances.isEmpty) {
+      throw const FormatException('Missing balance info');
+    }
+    return SearchServiceUsageInfo(remaining: requests, balances: balances);
   }
 
   static Uri _tavilyUsageUri(TavilyOptions options) {

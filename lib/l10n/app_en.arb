@@ -2232,6 +2232,19 @@
       }
     }
   },
+  "searchServiceEditorUsageDeepSeekRequests": "About {count} Search/Fetch requests left",
+  "@searchServiceEditorUsageDeepSeekRequests": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "searchServiceEditorUsageDeepSeekBalance": "Balance {balance} · {price} per 1,000 requests",
+  "@searchServiceEditorUsageDeepSeekBalance": {
+    "placeholders": {
+      "balance": { "type": "String" },
+      "price": { "type": "String" }
+    }
+  },
   "searchServiceEditorUsageUsed": "{used} of {limit} credits used",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {

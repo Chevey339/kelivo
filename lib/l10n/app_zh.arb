@@ -1723,6 +1723,19 @@
       }
     }
   },
+  "searchServiceEditorUsageDeepSeekRequests": "约可调用 {count} 次搜索/抓取",
+  "@searchServiceEditorUsageDeepSeekRequests": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "searchServiceEditorUsageDeepSeekBalance": "余额 {balance} · 每千次 {price}",
+  "@searchServiceEditorUsageDeepSeekBalance": {
+    "placeholders": {
+      "balance": { "type": "String" },
+      "price": { "type": "String" }
+    }
+  },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 额度",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {
