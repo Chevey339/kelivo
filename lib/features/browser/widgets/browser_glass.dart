@@ -104,7 +104,9 @@ class BrowserGlass extends StatefulWidget {
         !ImageFilter.isShaderFilterSupported) {
       return Future<void>.value();
     }
-    return _shaderWarmUp ??= LiquidGlassWidgets.preloadPremiumGlass();
+    return _shaderWarmUp ??= defaultTargetPlatform == TargetPlatform.windows
+        ? LightweightLiquidGlass.preWarm()
+        : LiquidGlassWidgets.preloadPremiumGlass();
   }
 
   @override
@@ -288,6 +290,7 @@ class _BrowserGlassState extends State<BrowserGlass>
         ? 0.0
         : interaction.intensity.clamp(0.0, 1.0);
     final isClear = clear || !blur;
+    final windowsGlass = defaultTargetPlatform == TargetPlatform.windows;
     final corners = BorderRadius.circular(radius);
 
     final materialGeneration = _materialGeneration;
@@ -327,7 +330,10 @@ class _BrowserGlassState extends State<BrowserGlass>
         ),
         child: AdaptiveGlass(
           shape: LiquidRoundedSuperellipse(borderRadius: radius),
-          quality: GlassQuality.premium,
+          // Match the glass library's Windows quality cap: its multi-pass
+          // SDF renderer can block ANGLE's raster thread on the first paint.
+          // Standard retains the lightweight glass shader and live blur.
+          quality: windowsGlass ? GlassQuality.standard : GlassQuality.premium,
           platformViewBackdrop: false,
           useOwnLayer: true,
           clipExpansion: const EdgeInsets.all(18),
@@ -341,13 +347,18 @@ class _BrowserGlassState extends State<BrowserGlass>
                     .withValues(alpha: isClear ? .47 : .62),
             bodyMode: GlassBodyMode.clear,
             lensModel: GlassLensModel.edgeWarp,
-            thickness: (isClear ? 24 : 30) + opticalIntensity * 8,
+            // Explicit standard quality expects pre-calibrated values; use
+            // AdaptiveGlass's existing premium-to-standard scale factors.
+            thickness:
+                ((isClear ? 24 : 30) + opticalIntensity * 8) *
+                (windowsGlass ? .4 : 1),
             blur: isClear ? 0 : 2,
             refractiveIndex: 1.20 + opticalIntensity * .04,
             chromaticAberration: 0,
             lightAngle:
                 -.75 + (interaction.touch ? 0 : interaction.position.dx * .32),
-            lightIntensity: .42 + opticalIntensity * .45,
+            lightIntensity:
+                (.42 + opticalIntensity * .45) * (windowsGlass ? .6 : 1),
             ambientStrength: .15,
             ambientRim: .07,
             saturation: 1.08,

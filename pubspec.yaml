@@ -176,6 +176,9 @@ dependency_overrides:
   # Deterministic native bounds when fractional desktop pane widths change.
   flutter_inappwebview_macos:
     path: dependencies/flutter_inappwebview_macos
+  # Retain WebView2 documents across hosts and bound native screenshot sizes.
+  flutter_inappwebview_windows:
+    path: dependencies/flutter_inappwebview_windows
   # Prevent the location from being accessed continuously on Windows
   permission_handler_windows:
     path: ./dependencies/flutter-permission-handler/permission_handler_windows

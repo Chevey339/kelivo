@@ -120,7 +120,7 @@ class LightweightLiquidGlass extends StatefulWidget {
 
   // Cache the FragmentProgram (compiled shader code) globally
   static ui.FragmentProgram? _cachedProgram;
-  static bool _isPreparing = false;
+  static Future<void>? _preparation;
 
   // On native: Share one shader instance (efficient)
   // On web: Each widget needs its own instance (CanvasKit requirement)
@@ -149,15 +149,22 @@ class LightweightLiquidGlass extends StatefulWidget {
   static void resetForTesting() {
     _cachedProgram = null;
     _sharedShader = null;
-    _isPreparing = false;
+    _preparation = null;
     _dummyImage?.dispose();
     _dummyImage = null;
   }
 
   /// Global pre-warm method - loads and compiles the shader program.
-  static Future<void> preWarm() async {
-    if (_cachedProgram != null || _isPreparing) return;
-    _isPreparing = true;
+  static Future<void> preWarm() {
+    if (_cachedProgram != null) return Future<void>.value();
+    // Every surface must await the same load. Returning early for a second
+    // caller leaves that surface on its shader-less placeholder indefinitely.
+    return _preparation ??= _loadShader().whenComplete(() {
+      _preparation = null;
+    });
+  }
+
+  static Future<void> _loadShader() async {
     const path = 'packages/liquid_glass_widgets/shaders/lightweight_glass.frag';
     const testPath = 'shaders/lightweight_glass.frag';
 
@@ -177,8 +184,6 @@ class LightweightLiquidGlass extends StatefulWidget {
       }
     } catch (e) {
       debugPrint('[LightweightGlass] Pre-warm failed: $e');
-    } finally {
-      _isPreparing = false;
     }
   }
 
@@ -390,10 +395,11 @@ class _LightweightLiquidGlassState extends State<LightweightLiquidGlass>
   }
 
   Future<void> _initShader() async {
-    // Ensure program is loaded
-    if (LightweightLiquidGlass._cachedProgram == null) {
+    final wasLoading = LightweightLiquidGlass._cachedProgram == null;
+    if (wasLoading) {
       await LightweightLiquidGlass.preWarm();
     }
+    if (!mounted || LightweightLiquidGlass._cachedProgram == null) return;
 
     // On web, create a per-widget shader instance
     if (kIsWeb && LightweightLiquidGlass._cachedProgram != null) {
@@ -407,6 +413,10 @@ class _LightweightLiquidGlassState extends State<LightweightLiquidGlass>
           }
         });
       }
+    } else if (wasLoading) {
+      // The shared native shader is now available, but an already mounted
+      // render object still holds null until this widget updates it.
+      setState(() {});
     }
   }
 
