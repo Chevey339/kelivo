@@ -85,6 +85,7 @@ namespace flutter_inappwebview_plugin
     const std::variant<std::string, int64_t> id;
     const std::shared_ptr<InAppWebViewSettings> initialSettings;
     const std::optional<std::vector<std::shared_ptr<UserScript>>> initialUserScripts;
+    const bool isPopup = false;
   };
 
   class InAppWebView
@@ -115,7 +116,13 @@ namespace flutter_inappwebview_plugin
 
     static void createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
       wil::com_ptr<ICoreWebView2Controller> webViewController,
-      wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler);
+      wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler,
+      wil::com_ptr<ICoreWebView2Environment> popupEnvironment = nullptr);
+
+    void refreshPageFrameId();
+    void setPageFrameId(const std::string& frameId);
+    void whenReady(std::function<void(HRESULT)> completion) const;
+    void registerPopupEventHandlers();
 
     // custom_platform_view
     ABI::Windows::UI::Composition::IVisual* const surface()
@@ -189,6 +196,8 @@ namespace flutter_inappwebview_plugin
     winrt::com_ptr<ABI::Windows::UI::Composition::IVisual> surface_;
     SurfaceSizeChangedCallback surfaceSizeChangedCallback_;
     CursorChangedCallback cursorChangedCallback_;
+    const std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+    uint64_t pageFrameEpoch_ = 0;
     mutable std::shared_ptr<ScreenshotQueue> screenshotQueue_;
     float scaleFactor_ = 1.0;
     POINT lastCursorPos_ = { 0, 0 };
@@ -200,6 +209,7 @@ namespace flutter_inappwebview_plugin
     std::string pageFrameId_;
     std::map<std::string, std::pair<wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver>, EventRegistrationToken>> devToolsProtocolEventListener_ = {};
 
+    void initializeContent();
     void registerEventHandlers();
     void registerSurfaceEventHandlers();
   };

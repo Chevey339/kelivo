@@ -1,12 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
-    show InAppWebView;
+    show
+        HeadlessInAppWebView,
+        InAppWebView,
+        InAppWebViewController,
+        URLRequest,
+        WebUri;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
@@ -40,6 +47,8 @@ void main() {
     final settings = SettingsProvider(preferences);
     await settings.loaded;
     final engines = <String, BrowserEngine>{};
+    var rejectNextPopup = false;
+    final sceneKey = GlobalKey();
     final browser = BrowserService(
       store: BrowserStore(directory: directory),
       engineFactory:
@@ -51,6 +60,10 @@ void main() {
             required onNewWindow,
             required isAgentActive,
           }) async {
+            if (tab.windowId != null && rejectNextPopup) {
+              rejectNextPopup = false;
+              throw StateError('Intentional popup creation failure');
+            }
             return engines[tab.id] = await NativeBrowserEngine.create(
               tab: tab,
               settings: settings,
@@ -63,6 +76,7 @@ void main() {
     );
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final origin = 'http://127.0.0.1:${server.port}';
+    Completer<void>? slowPopupResponse;
     final checks = <Map<String, Object?>>[];
     final failures = <String>[];
     var uiFrames = 0;
@@ -75,6 +89,7 @@ void main() {
 
     binding.addTimingsCallback(frameTimings);
     server.listen((request) async {
+      if (request.uri.path == '/slow-popup') await slowPopupResponse?.future;
       if (request.uri.path == '/download') {
         final cookies = {for (final c in request.cookies) c.name: c.value};
         final authenticated =
@@ -101,6 +116,9 @@ void main() {
             ..maxAge = 600
             ..httpOnly = true,
         );
+        final posted = request.method == 'POST'
+            ? await utf8.decoder.bind(request).join()
+            : '';
         request.response.write(
           '''<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Browser Probe ${request.uri.path}</title>
@@ -108,6 +126,17 @@ void main() {
 <header style="height:120px;background:#123456;color:white">Browser Probe ${request.uri.path}</header>
 <p id="first">Browser probe needle</p><p id="second">Browser probe needle</p>
 <a href="/b">Next page</a><input id="input" placeholder="Probe input">
+<a id="popup-link" href="/popup-link" target="_blank">New window link</a>
+<button id="popup-script" onclick="window.open('/popup-script', '_blank')">Open popup</button>
+<button id="popup-cross" onclick="window.open(location.href.replace('127.0.0.1', 'localhost').replace('/a', '/popup-cross'), '_blank')">Cross origin popup</button>
+<button id="counter" onclick="this.dataset.count = String(Number(this.dataset.count || 0) + 1)">Counter</button>
+<form id="popup-form" method="post" action="/popup-post" target="_blank"><input name="token" value="post-kept"></form>
+<p id="post-result">$posted</p>
+<script>
+window.addEventListener('message', e => { if (e.origin === location.origin) window.popupReply = e.data; });
+if (window.opener) window.opener.postMessage('child-ready', location.origin);
+${request.uri.path == '/bridge' ? "window.flutter_inappwebview.callHandler('probeReady').then(value => window.__probeReady = value);" : ''}
+</script>
 <button id="routes" onclick="history.pushState({}, '', '#one'); history.pushState({}, '', '#two')">Route states</button>
 </body>''',
         );
@@ -203,7 +232,13 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: BrowserPage(service: browser, conversationId: 'windows-probe'),
+          home: RepaintBoundary(
+            key: sceneKey,
+            child: BrowserPage(
+              service: browser,
+              conversationId: 'windows-probe',
+            ),
+          ),
         ),
       );
 
@@ -487,6 +522,58 @@ void main() {
           expect(await js(viewportScript), before);
         }
       });
+      await check(
+        'captures never expose a resized or white live texture',
+        () async {
+          await navigate('/a');
+          await js('scrollTo(0, 600)');
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          final webRect = tester.getRect(find.byType(InAppWebView));
+          final boundary =
+              sceneKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final sceneOrigin = boundary.localToGlobal(Offset.zero);
+          Future<void> sample() async {
+            await nextFrame();
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final pixels = (await image.toByteData())!;
+              for (final fraction in [0.25, 0.65, 0.9]) {
+                final point =
+                    Offset(
+                      webRect.left + webRect.width * fraction,
+                      webRect.top + webRect.height * 0.7,
+                    ) -
+                    sceneOrigin;
+                final offset =
+                    (point.dy.floor() * image.width + point.dx.floor()) * 4;
+                expect(pixels.getUint8(offset), inInclusiveRange(225, 240));
+                expect(pixels.getUint8(offset + 1), inInclusiveRange(185, 200));
+                expect(pixels.getUint8(offset + 2), inInclusiveRange(65, 85));
+              }
+            } finally {
+              image.dispose();
+            }
+          }
+
+          await sample(); // Verify the oracle sees actual WebView texture pixels.
+          for (var i = 0; i < 12; i++) {
+            var done = false;
+            final capture = Future.wait([
+              engines[tab.id]!.thumbnail(),
+              engines[tab.id]!.screenshot(),
+            ]).whenComplete(() => done = true);
+            var sampled = 0;
+            while (!done || sampled < 3) {
+              await sample();
+              sampled++;
+            }
+            final bytes = await capture;
+            expect(bytes.every((b) => b != null), isTrue);
+            checks.add({'name': 'in-flight texture samples', 'count': sampled});
+          }
+        },
+      );
       await check('browser menu in all surface modes', () async {
         await navigate('/a');
         checks.add({
@@ -542,6 +629,303 @@ void main() {
             contains('Browser probe needle'),
           );
         }
+      });
+      await navigate('/a');
+      for (final popup in ['script', 'cross', 'link', 'post']) {
+        await check('$popup popup loads and leaves opener usable', () async {
+          await js("document.getElementById('counter').dataset.count = '0'");
+          if (popup == 'cross') {
+            await js(
+              "window.addEventListener('message', e => { if (e.origin === ${jsonEncode(origin.replaceFirst('127.0.0.1', 'localhost'))}) window.crossReply = e.data; })",
+            );
+          }
+          final before = browser.tabs.map((t) => t.id).toSet();
+          debugPrint('WINDOWS_BROWSER_POPUP $popup click');
+          await js(
+            popup == 'post'
+                ? "document.getElementById('popup-form').submit(); 'submitted'"
+                : "document.getElementById('popup-$popup').click(); 'clicked'",
+          );
+          debugPrint('WINDOWS_BROWSER_POPUP $popup clicked');
+          await waitUntil(
+            () => browser.tabs.any((t) => !before.contains(t.id)),
+          );
+          final child = browser.tabs.firstWhere((t) => !before.contains(t.id));
+          try {
+            await browser.waitForLoad(
+              tabId: child.id,
+              timeout: const Duration(seconds: 10),
+            );
+            debugPrint('WINDOWS_BROWSER_POPUP $popup loaded');
+            await nextFrame();
+            await engines[child.id]!.viewReady.timeout(
+              const Duration(seconds: 5),
+            );
+            Future<Object?> childJs(String source) =>
+                browser.evaluateJavascript(source, tabId: child.id);
+            expect(await childJs('location.pathname'), '/popup-$popup');
+            expect(
+              await childJs('typeof window.flutter_inappwebview.callHandler'),
+              'function',
+            );
+            await childJs(
+              "window.__bridgeReply = null; window.flutter_inappwebview.callHandler('kelivoBrowserHistory').then(() => window.__bridgeReply = 'bridge-ok'); true",
+            );
+            final bridgeDeadline = Stopwatch()..start();
+            while (await childJs('window.__bridgeReply') != 'bridge-ok') {
+              if (bridgeDeadline.elapsed > const Duration(seconds: 3)) {
+                fail('Popup bridge did not complete');
+              }
+              await Future<void>.delayed(const Duration(milliseconds: 16));
+            }
+            debugPrint('WINDOWS_BROWSER_POPUP $popup bridge');
+            if (popup == 'script') {
+              expect(await childJs('!!window.opener'), isTrue);
+              expect(await js('window.popupReply'), 'child-ready');
+            }
+            if (popup == 'cross') {
+              expect(await childJs('!!window.opener'), isTrue);
+              await childJs(
+                "window.opener.postMessage('cross-ready', ${jsonEncode(origin)})",
+              );
+              await Future<void>.delayed(const Duration(milliseconds: 50));
+              expect(await js('window.crossReply'), 'cross-ready');
+            }
+            if (popup == 'post') {
+              expect(
+                await childJs(
+                  "document.getElementById('post-result').textContent",
+                ),
+                'token=post-kept',
+              );
+            }
+            debugPrint('WINDOWS_BROWSER_POPUP $popup reload');
+            await browser.reload(tabId: child.id);
+            await browser.waitForLoad(
+              tabId: child.id,
+              timeout: const Duration(seconds: 10),
+            );
+            expect(
+              await childJs('document.title'),
+              'Browser Probe /popup-$popup',
+            );
+            debugPrint('WINDOWS_BROWSER_POPUP $popup reloaded');
+            if (popup == 'script') {
+              slowPopupResponse = Completer<void>();
+              try {
+                await childJs(
+                  "document.querySelector('a').href = '/slow-popup'; document.querySelector('a').click()",
+                );
+                await waitUntil(() => browser.requireTab(child.id).isLoading);
+                var settled = false;
+                final loaded = browser
+                    .waitForLoad(
+                      tabId: child.id,
+                      timeout: const Duration(seconds: 10),
+                    )
+                    .then((_) => settled = true);
+                await Future<void>.delayed(const Duration(milliseconds: 200));
+                expect(
+                  settled,
+                  isFalse,
+                  reason: 'Popup link must await the new document',
+                );
+                slowPopupResponse!.complete();
+                await loaded;
+                expect(await childJs('location.pathname'), '/slow-popup');
+                expect(browser.requireTab(child.id).isLoading, isFalse);
+              } finally {
+                if (!slowPopupResponse!.isCompleted) {
+                  slowPopupResponse!.complete();
+                }
+                slowPopupResponse = null;
+              }
+            }
+          } finally {
+            debugPrint('WINDOWS_BROWSER_POPUP $popup close');
+            await browser.closeTab(child.id);
+            debugPrint('WINDOWS_BROWSER_POPUP $popup closed');
+          }
+          await browser.selectTab(tab.id);
+          await nextFrame();
+          await engines[tab.id]!.viewReady.timeout(const Duration(seconds: 5));
+          await js('scrollTo(0, 0)');
+          final target =
+              (await js("""(() => {
+            const r = document.getElementById('counter').getBoundingClientRect();
+            return {x:r.x+r.width/2,y:r.y+r.height/2};
+          })()"""))
+                  as Map;
+          await mouseClick(
+            tester.getTopLeft(find.byType(InAppWebView)) +
+                Offset(
+                  (target['x'] as num).toDouble(),
+                  (target['y'] as num).toDouble(),
+                ),
+          );
+          expect(
+            await js("document.getElementById('counter').dataset.count"),
+            '1',
+          );
+          expect(await js('location.pathname'), '/a');
+        });
+      }
+      await check(
+        'rejected popup unblocks opener without navigating it',
+        () async {
+          await js("document.getElementById('counter').dataset.count = '0'");
+          rejectNextPopup = true;
+          final count = browser.tabs.length;
+          await js(
+            "document.getElementById('popup-script').click(); 'returned'",
+          );
+          await waitUntil(() => !rejectNextPopup);
+          await waitUntil(() => browser.tabs.length == count);
+          expect(await js('location.pathname'), '/a');
+          await js("document.getElementById('counter').click()");
+          expect(
+            await js("document.getElementById('counter').dataset.count"),
+            '1',
+          );
+          await browser.reload(tabId: tab.id);
+          await browser.waitForLoad(
+            tabId: tab.id,
+            timeout: const Duration(seconds: 10),
+          );
+          expect(await js('document.title'), 'Browser Probe /a');
+        },
+      );
+      await check('bridge isolates frames and retired documents', () async {
+        late InAppWebViewController controller;
+        var loaded = Completer<void>();
+        var delayed = Completer<String>();
+        var delayStarted = Completer<void>();
+        var echoCalls = 0;
+        var disposed = false;
+        final view = HeadlessInAppWebView(
+          initialUrlRequest: URLRequest(url: WebUri('$origin/bridge')),
+          onWebViewCreated: (created) {
+            controller = created;
+            created.addJavaScriptHandler(
+              handlerName: 'probeReady',
+              callback: (_) => 'ready',
+            );
+            created.addJavaScriptHandler(
+              handlerName: 'probeEcho',
+              callback: (_) => ++echoCalls,
+            );
+            created.addJavaScriptHandler(
+              handlerName: 'probeDelay',
+              callback: (_) {
+                if (!delayStarted.isCompleted) delayStarted.complete();
+                return delayed.future;
+              },
+            );
+          },
+          onLoadStop: (_, _) {
+            if (!loaded.isCompleted) loaded.complete();
+          },
+        );
+        Future<Object?> evaluate(String source) =>
+            controller.evaluateJavascript(source: source);
+        Future<void> waitJs(String source, Object expected) async {
+          final deadline = Stopwatch()..start();
+          while (await evaluate(source) != expected) {
+            if (deadline.elapsed > const Duration(seconds: 3)) {
+              fail('Bridge did not reach $expected for $source');
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        }
+
+        try {
+          await view.run();
+          await loaded.future.timeout(const Duration(seconds: 5));
+          // The first document calls the bridge without waiting for a later
+          // navigation or manually opening the visible browser.
+          await waitJs('window.__probeReady', 'ready');
+          const envelope =
+              "JSON.stringify({name:'callHandler',body:{handlerName:'probeEcho',_callHandlerID:901,args:'[]'}})";
+          await evaluate('_flutter_inappwebview_postMessage($envelope)');
+          await waitUntil(() => echoCalls == 1);
+          final iframeScript =
+              '_flutter_inappwebview_postMessage($envelope); '
+              "parent.postMessage('frame-called', '*');";
+          await evaluate('''
+window.addEventListener('message', e => { if (e.data === 'frame-called') window.__frameCalled = true; });
+const frame = document.createElement('iframe');
+frame.sandbox = 'allow-scripts';
+frame.srcdoc = ${jsonEncode('<script>$iframeScript</script>')};
+document.body.appendChild(frame);
+''');
+          await waitJs('window.__frameCalled', true);
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          expect(
+            echoCalls,
+            1,
+            reason: 'A subframe must not invoke app handlers',
+          );
+          // Malformed binding messages must not escape a native event callback.
+          await evaluate('''
+_flutter_inappwebview_postMessage('not-json');
+_flutter_inappwebview_postMessage('{"name":"callHandler","body":3}');
+window.flutter_inappwebview.callHandler('probeEcho').then(v => window.__echo = v);
+''');
+          await waitJs('window.__echo', 2);
+          final callId = await evaluate('''
+window.flutter_inappwebview.callHandler('probeDelay');
+Object.keys(window.flutter_inappwebview).filter(k => !isNaN(Number(k))).map(Number).pop();
+''');
+          expect(callId, isA<num>());
+          await delayStarted.future.timeout(const Duration(seconds: 3));
+          loaded = Completer<void>();
+          await controller.loadUrl(
+            urlRequest: URLRequest(url: WebUri('$origin/b')),
+          );
+          await loaded.future.timeout(const Duration(seconds: 5));
+          await evaluate('''
+window.__leaked = false;
+window.flutter_inappwebview[$callId] = {resolve:()=>window.__leaked=true,reject:()=>window.__leaked=true};
+while (setTimeout(()=>{}, 0) <= $callId) {}
+''');
+          delayed.complete('old document result');
+          await evaluate(
+            "window.flutter_inappwebview.callHandler('probeEcho').then(v => window.__echo = v)",
+          );
+          await waitJs('window.__echo', 3);
+          expect(await evaluate('window.__leaked'), isFalse);
+          delayed = Completer<String>();
+          delayStarted = Completer<void>();
+          await evaluate(
+            "window.flutter_inappwebview.callHandler('probeDelay'); true",
+          );
+          await delayStarted.future.timeout(const Duration(seconds: 3));
+          await view.dispose();
+          disposed = true;
+          delayed.complete('closed document result');
+          await nextFrame();
+          expect(await js('document.title'), 'Browser Probe /a');
+        } finally {
+          if (!delayed.isCompleted) delayed.complete('test cleanup');
+          if (!disposed) await view.dispose();
+        }
+      });
+      await check('closing a tab during capture completes safely', () async {
+        final closing = await browser.createTab(
+          ownerSessionId: 'windows-probe',
+        );
+        await browser.navigate('$origin/a', tabId: closing.id);
+        await browser.waitForLoad(
+          tabId: closing.id,
+          timeout: const Duration(seconds: 10),
+        );
+        final capture = engines[closing.id]!.thumbnail();
+        await browser.closeTab(closing.id);
+        // A capture already copied may finish; a cancelled one returns null.
+        // In either case it must settle and leave the surviving tab usable.
+        await capture.timeout(const Duration(seconds: 5));
+        expect(browser.tabs.any((t) => t.id == closing.id), isFalse);
+        expect(await js('document.title'), 'Browser Probe /a');
       });
     } finally {
       if (framesResponsive) {

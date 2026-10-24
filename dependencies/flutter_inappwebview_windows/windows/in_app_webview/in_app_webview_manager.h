@@ -27,7 +27,8 @@ namespace flutter_inappwebview_plugin
     const FlutterInappwebviewWindowsPlugin* plugin;
     std::map<uint64_t, std::unique_ptr<CustomPlatformView>> webViews;
     std::map<std::string, std::unique_ptr<CustomPlatformView>> keepAliveWebViews;
-    std::map<int64_t, std::unique_ptr<NewWindowRequestedArgs>> windowWebViews;
+    std::map<int64_t, std::shared_ptr<NewWindowRequestedArgs>> windowWebViews;
+    const std::shared_ptr<bool> alive = std::make_shared<bool>(true);
     int64_t windowAutoincrementId = 0;
 
     bool isSupported() const { return valid_; }
@@ -50,6 +51,7 @@ namespace flutter_inappwebview_plugin
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
     void createInAppWebView(const flutter::EncodableMap* arguments, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+    std::shared_ptr<NewWindowRequestedArgs> pendingWindow(const std::optional<int64_t>& windowId) const;
     void disposeKeepAlive(const std::string& keepAliveId);
   private:
     inline static std::shared_ptr<rx::RoHelper> rohelper_ = nullptr;

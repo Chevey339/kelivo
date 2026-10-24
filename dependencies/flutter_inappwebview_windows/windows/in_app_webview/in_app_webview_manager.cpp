@@ -139,6 +139,12 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
+    auto pending = pendingWindow(windowId);
+    if (windowId.has_value() && (!pending || pending->completed)) {
+      result_->Error("0", "Popup request is no longer available");
+      return;
+    }
+
     RECT bounds;
     GetClientRect(plugin->registrar->GetView()->GetNativeWindow(), &bounds);
     auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", 0, 0,
@@ -163,53 +169,67 @@ namespace flutter_inappwebview_plugin
           InAppWebViewCreationParams params = {
             "",
             std::move(initialSettings),
-            initialUserScripts
+            initialUserScripts,
+            pending != nullptr
           };
 
-          auto inAppWebView = std::make_unique<InAppWebView>(plugin, params, hwnd, std::move(webViewEnv), std::move(webViewController), std::move(webViewCompositionController));
-
-          std::optional<std::shared_ptr<URLRequest>> urlRequest = urlRequestMap.has_value() ? std::make_shared<URLRequest>(urlRequestMap.value()) : std::optional<std::shared_ptr<URLRequest>>{};
-          if (urlRequest.has_value()) {
-            inAppWebView->loadUrl(urlRequest.value());
-          }
-          else if (initialFile.has_value()) {
-            inAppWebView->loadFile(initialFile.value());
-          }
-          else if (initialDataMap.has_value()) {
-            inAppWebView->loadData(get_fl_map_value<std::string>(initialDataMap.value(), "data"));
-          }
-
-          if (windowId.has_value() && map_contains(windowWebViews, windowId.value())) {
-            auto windowWebViewArgs = windowWebViews.at(windowId.value()).get();
-            windowWebViewArgs->args->put_NewWindow(inAppWebView->webView.get());
-            windowWebViewArgs->args->put_Handled(TRUE);
-            windowWebViewArgs->deferral->Complete();
-            windowWebViews.erase(windowId.value());
-          }
-
-          auto customPlatformView = std::make_unique<CustomPlatformView>(plugin->registrar->messenger(),
-            plugin->registrar->texture_registrar(),
-            graphics_context(),
-            hwnd,
-            std::move(inAppWebView));
-
-          auto textureId = customPlatformView->texture_id();
-
-          if (keepAliveId.has_value()) {
-            customPlatformView->view->initChannel(keepAliveId.value(), std::nullopt);
-            keepAliveWebViews.insert({ keepAliveId.value(), std::move(customPlatformView) });
-          }
-          else {
-            customPlatformView->view->initChannel(textureId, std::nullopt);
-            webViews.insert({ textureId, std::move(customPlatformView) });
-          }
-          result_->Success(textureId);
+          auto inAppWebView = std::make_shared<InAppWebView>(plugin, params, hwnd, std::move(webViewEnv), std::move(webViewController), std::move(webViewCompositionController));
+          auto finish = [=](HRESULT scriptResult) {
+            if (FAILED(scriptResult)) {
+              if (pending) {
+                pending->complete();
+                windowWebViews.erase(windowId.value());
+              }
+              result_->Error("0", "Cannot initialize the WebView scripts");
+              return;
+            }
+            if (pending) {
+              const auto handoff = SUCCEEDED(scriptResult) ? pending->complete(inAppWebView->webView.get(), [inAppWebView] { inAppWebView->registerPopupEventHandlers(); }) : scriptResult;
+              if (!pending->completed) pending->complete();
+              windowWebViews.erase(windowId.value());
+              if (FAILED(handoff)) {
+                result_->Error("0", "Cannot attach the popup WebView");
+                return;
+              }
+            }
+            else {
+              std::optional<std::shared_ptr<URLRequest>> urlRequest = urlRequestMap.has_value() ? std::make_shared<URLRequest>(urlRequestMap.value()) : std::optional<std::shared_ptr<URLRequest>>{};
+              if (urlRequest.has_value()) inAppWebView->loadUrl(urlRequest.value());
+              else if (initialFile.has_value()) inAppWebView->loadFile(initialFile.value());
+              else if (initialDataMap.has_value()) inAppWebView->loadData(get_fl_map_value<std::string>(initialDataMap.value(), "data"));
+            }
+            auto customPlatformView = std::make_unique<CustomPlatformView>(plugin->registrar->messenger(),
+              plugin->registrar->texture_registrar(), graphics_context(), hwnd, inAppWebView);
+            auto textureId = customPlatformView->texture_id();
+            if (keepAliveId.has_value()) {
+              customPlatformView->view->initChannel(keepAliveId.value(), std::nullopt);
+              keepAliveWebViews.insert({ keepAliveId.value(), std::move(customPlatformView) });
+            }
+            else {
+              customPlatformView->view->initChannel(textureId, std::nullopt);
+              webViews.insert({ textureId, std::move(customPlatformView) });
+            }
+            result_->Success(textureId);
+          };
+          inAppWebView->whenReady(finish);
         }
         else {
+          if (pending) {
+            pending->complete();
+            windowWebViews.erase(windowId.value());
+          }
+          DestroyWindow(hwnd);
           result_->Error("0", "Cannot create the InAppWebView instance!");
         }
-      }
+      }, pending ? pending->environment : nullptr
     );
+  }
+
+  std::shared_ptr<NewWindowRequestedArgs> InAppWebViewManager::pendingWindow(const std::optional<int64_t>& windowId) const
+  {
+    if (!windowId.has_value()) return nullptr;
+    const auto found = windowWebViews.find(windowId.value());
+    return found == windowWebViews.end() ? nullptr : found->second;
   }
 
   void InAppWebViewManager::disposeKeepAlive(const std::string& keepAliveId)
@@ -255,6 +275,7 @@ namespace flutter_inappwebview_plugin
   InAppWebViewManager::~InAppWebViewManager()
   {
     debugLog("dealloc InAppWebViewManager");
+    *alive = false;
     webViews.clear();
     keepAliveWebViews.clear();
     windowWebViews.clear();

@@ -55,6 +55,13 @@ namespace flutter_inappwebview_plugin
     auto id = get_fl_map_value<std::string>(*arguments, "id");
     auto params = get_fl_map_value<flutter::EncodableMap>(*arguments, "params");
 
+    const auto windowId = get_optional_fl_map_value<int64_t>(params, "windowId");
+    auto pendingWindow = plugin->inAppWebViewManager->pendingWindow(windowId);
+    if (windowId.has_value() && (!pendingWindow || pendingWindow->completed)) {
+      result_->Error("0", "Popup request is no longer available");
+      return;
+    }
+
     auto initialSize = std::make_shared<Size2D>(get_fl_map_value<flutter::EncodableMap>(params, "initialSize"));
 
     auto settingsMap = get_fl_map_value<flutter::EncodableMap>(params, "initialSettings");
@@ -94,7 +101,8 @@ namespace flutter_inappwebview_plugin
           InAppWebViewCreationParams params = {
             id,
             std::move(initialSettings),
-            initialUserScripts
+            initialUserScripts,
+            pendingWindow != nullptr
           };
 
           auto inAppWebView = std::make_unique<InAppWebView>(plugin, params, hwnd,
@@ -106,36 +114,42 @@ namespace flutter_inappwebview_plugin
             std::move(initialSize)
           };
 
-          auto headlessInAppWebView = std::make_unique<HeadlessInAppWebView>(plugin,
-            headlessParams,
-            hwnd,
-            std::move(inAppWebView));
-
-          headlessInAppWebView->webView->initChannel(std::nullopt, std::nullopt);
-
-          if (headlessInAppWebView->channelDelegate) {
-            headlessInAppWebView->channelDelegate->onWebViewCreated();
-          }
-
-          std::optional<std::shared_ptr<URLRequest>> urlRequest = urlRequestMap.has_value() ? std::make_shared<URLRequest>(urlRequestMap.value()) : std::optional<std::shared_ptr<URLRequest>>{};
-          if (urlRequest.has_value()) {
-            headlessInAppWebView->webView->loadUrl(urlRequest.value());
-          }
-          else if (initialFile.has_value()) {
-            headlessInAppWebView->webView->loadFile(initialFile.value());
-          }
-          else if (initialDataMap.has_value()) {
-            headlessInAppWebView->webView->loadData(get_fl_map_value<std::string>(initialDataMap.value(), "data"));
-          }
-
-          webViews.insert({ id, std::move(headlessInAppWebView) });
-
-          result_->Success(true);
+          auto retained = std::make_shared<HeadlessInAppWebView>(plugin,
+            headlessParams, hwnd, std::move(inAppWebView));
+          retained->webView->initChannel(std::nullopt, std::nullopt);
+          // Retain the child while bridge bindings and initial scripts finish.
+          // NewWindow's first document must see the complete initialization.
+          retained->webView->whenReady([=](HRESULT scriptResult) {
+            auto handoff = scriptResult;
+            if (pendingWindow) {
+              if (SUCCEEDED(handoff)) handoff = pendingWindow->complete(retained->webView->webView.get(),
+                [retained] { retained->webView->registerPopupEventHandlers(); });
+              if (!pendingWindow->completed) pendingWindow->complete();
+              plugin->inAppWebViewManager->windowWebViews.erase(windowId.value());
+            }
+            if (FAILED(handoff)) {
+              result_->Error("0", "Cannot initialize or attach the headless WebView");
+              return;
+            }
+            webViews.insert({ id, retained });
+            if (retained->channelDelegate) retained->channelDelegate->onWebViewCreated();
+            if (!pendingWindow) {
+              if (urlRequestMap.has_value()) retained->webView->loadUrl(std::make_shared<URLRequest>(urlRequestMap.value()));
+              else if (initialFile.has_value()) retained->webView->loadFile(initialFile.value());
+              else if (initialDataMap.has_value()) retained->webView->loadData(get_fl_map_value<std::string>(initialDataMap.value(), "data"));
+            }
+            result_->Success(true);
+          });
         }
         else {
+          if (pendingWindow) {
+            pendingWindow->complete();
+            plugin->inAppWebViewManager->windowWebViews.erase(windowId.value());
+          }
+          DestroyWindow(hwnd);
           result_->Error("0", "Cannot create the HeadlessInAppWebView instance!");
         }
-      }
+      }, pendingWindow ? pendingWindow->environment : nullptr
     );
   }
 
