@@ -639,7 +639,11 @@ class FileBrowserState extends State<FileBrowser> {
   }
 
   Offset _anchorFromKey(GlobalKey key) {
-    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    return _anchorFromContext(key.currentContext);
+  }
+
+  Offset _anchorFromContext(BuildContext? anchorContext) {
+    final box = anchorContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return Offset.zero;
     return box.localToGlobal(box.size.center(Offset.zero));
   }
@@ -1324,6 +1328,8 @@ class FileBrowserState extends State<FileBrowser> {
                             FileBrowserSortField.size,
                           ),
                         ),
+                        if (!widget.pickDirectoryMode)
+                          const SizedBox(width: 44),
                       ],
                     ),
                   ),
@@ -1343,91 +1349,119 @@ class FileBrowserState extends State<FileBrowser> {
                     itemCount: _entries.length,
                     itemBuilder: (context, index) {
                       final entry = _entries[index];
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          splashFactory: NoSplash.splashFactory,
-                          hoverColor: cs.onSurface.withValues(alpha: 0.035),
-                          highlightColor: cs.onSurface.withValues(alpha: 0.065),
-                          focusColor: cs.primary.withValues(alpha: 0.08),
-                          key: FileBrowser.itemKey(entry.name),
-                          borderRadius: BorderRadius.circular(6),
-                          onTap: () => unawaited(_openEntry(entry)),
-                          onSecondaryTapDown: widget.pickDirectoryMode
-                              ? null
-                              : (details) => unawaited(
-                                  _showItemActions(
-                                    entry,
-                                    details.globalPosition,
-                                  ),
-                                ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                      return Builder(
+                        builder: (rowContext) => Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            splashFactory: NoSplash.splashFactory,
+                            hoverColor: cs.onSurface.withValues(alpha: 0.035),
+                            highlightColor: cs.onSurface.withValues(
+                              alpha: 0.065,
                             ),
-                            child: Row(
-                              children: [
-                                SizedBox.square(
-                                  dimension: 24,
-                                  child: WorkspaceFileThumbnail.supports(entry)
-                                      ? WorkspaceFileThumbnail(
-                                          entry: entry,
-                                          size: 24,
-                                          iconSize: 18,
-                                          iconColor: cs.onSurfaceVariant,
-                                        )
-                                      : Icon(
-                                          entry.isDirectory
-                                              ? Lucide.Folder
-                                              : workspaceFileTypeIcon(
-                                                  entry.name,
-                                                ),
-                                          size: 18,
-                                          color: entry.isDirectory
-                                              ? cs.primary
-                                              : cs.onSurfaceVariant,
+                            focusColor: cs.primary.withValues(alpha: 0.08),
+                            key: FileBrowser.itemKey(entry.name),
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () => unawaited(_openEntry(entry)),
+                            onLongPress: widget.pickDirectoryMode
+                                ? null
+                                : () => unawaited(
+                                    _showItemActions(
+                                      entry,
+                                      _anchorFromContext(rowContext),
+                                    ),
+                                  ),
+                            onSecondaryTapDown: widget.pickDirectoryMode
+                                ? null
+                                : (details) => unawaited(
+                                    _showItemActions(
+                                      entry,
+                                      details.globalPosition,
+                                    ),
+                                  ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox.square(
+                                    dimension: 24,
+                                    child:
+                                        WorkspaceFileThumbnail.supports(entry)
+                                        ? WorkspaceFileThumbnail(
+                                            entry: entry,
+                                            size: 24,
+                                            iconSize: 18,
+                                            iconColor: cs.onSurfaceVariant,
+                                          )
+                                        : Icon(
+                                            entry.isDirectory
+                                                ? Lucide.Folder
+                                                : workspaceFileTypeIcon(
+                                                    entry.name,
+                                                  ),
+                                            size: 18,
+                                            color: entry.isDirectory
+                                                ? cs.primary
+                                                : cs.onSurfaceVariant,
+                                          ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      entry.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                  if (columns) ...[
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: 132,
+                                      child: Text(
+                                        _relativeMtime(
+                                          entry.modified,
+                                          l10n,
+                                          MaterialLocalizations.of(context),
                                         ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    entry.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                if (columns) ...[
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 132,
-                                    child: Text(
-                                      _relativeMtime(
-                                        entry.modified,
-                                        l10n,
-                                        MaterialLocalizations.of(context),
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(
-                                    width: 80,
-                                    child: Text(
-                                      entry.isDirectory
-                                          ? '—'
-                                          : formatBytes(entry.size),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        entry.isDirectory
+                                            ? '—'
+                                            : formatBytes(entry.size),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
+                                  if (!widget.pickDirectoryMode)
+                                    IosIconButton(
+                                      key: FileBrowser.itemMoreKey(entry.name),
+                                      icon: Lucide.Ellipsis,
+                                      semanticLabel: l10n.workspaceFilesActions,
+                                      size: 18,
+                                      minSize: 44,
+                                      color: cs.onSurfaceVariant,
+                                      onTap: () => unawaited(
+                                        _showItemActions(
+                                          entry,
+                                          _anchorFromContext(rowContext),
+                                        ),
+                                      ),
+                                    ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
                         ),

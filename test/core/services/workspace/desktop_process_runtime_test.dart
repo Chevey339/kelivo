@@ -35,6 +35,7 @@ void main() {
       expect(status.reason, isNull);
       expect(runtime.supportsPty, isFalse);
       expect(runtime.supportsSystemTerminal, isTrue);
+      expect(runtime.supportsFileManager, isTrue);
     });
 
     test('cancel of an unknown run is a no-op', () async {

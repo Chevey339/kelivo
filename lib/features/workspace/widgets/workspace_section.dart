@@ -348,12 +348,20 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final env = context.watch<EnvironmentProvider>();
     final envManager = _resolvedEnvManager();
     final desktop = useDesktopWorkspaceLayout(context);
-    final showEnvironment = envManager != null && !desktop;
+    final showEnvironment = envManager != null;
     final envStatus = workspaceEnvPhaseLabel(l10n, env.state.phase);
     final chevron = ToolsSheetRow.chevron(context);
 
     if (desktop) {
-      return _desktopPanel(l10n, workspace, binding, runtime);
+      return _desktopPanel(
+        l10n,
+        workspace,
+        binding,
+        runtime,
+        environmentRow: showEnvironment
+            ? _environmentRow(l10n, envStatus)
+            : null,
+      );
     }
 
     final rows = <Widget>[];
@@ -380,19 +388,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         ),
       );
       if (showEnvironment) {
-        rows.add(
-          ToolsSheetRow(
-            key: WorkspaceSection.environmentKey,
-            icon: Lucide.HardDrive,
-            label: l10n.workspaceEntryEnvironment,
-            detail: envStatus,
-            onTap: () {
-              Haptics.light();
-              _afterClose(WorkspaceNavigation.openEnvironmentPage);
-            },
-            trailing: chevron,
-          ),
-        );
+        rows.add(_environmentRow(l10n, envStatus));
       }
       rows.add(_allowAllRow(l10n, binding));
     }
@@ -408,12 +404,27 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     );
   }
 
+  Widget _environmentRow(AppLocalizations l10n, String status) {
+    return ToolsSheetRow(
+      key: WorkspaceSection.environmentKey,
+      icon: Lucide.HardDrive,
+      label: l10n.workspaceEntryEnvironment,
+      detail: status,
+      onTap: () {
+        Haptics.light();
+        _afterClose(WorkspaceNavigation.openEnvironmentPage);
+      },
+      trailing: ToolsSheetRow.chevron(context),
+    );
+  }
+
   Widget _desktopPanel(
     AppLocalizations l10n,
     Workspace? workspace,
     WorkspaceBinding binding,
-    WorkspaceRuntime? runtime,
-  ) {
+    WorkspaceRuntime? runtime, {
+    required Widget? environmentRow,
+  }) {
     final cs = Theme.of(context).colorScheme;
     if (workspace == null) {
       return Column(
@@ -491,7 +502,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                       )
                     : _openTerminal,
               ),
-            if (runtime != null)
+            if (runtime != null && runtime.supportsFileManager)
               DesktopWorkspaceButton(
                 key: WorkspaceSection.revealKey,
                 label: l10n.workspaceEntryReveal,
@@ -517,6 +528,10 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           onTap: () => _editCwd(workspace, binding),
         ),
         const SizedBox(height: 12),
+        if (environmentRow != null) ...[
+          environmentRow,
+          const SizedBox(height: 8),
+        ],
         _allowAllRow(l10n, binding),
       ],
     );
@@ -604,7 +619,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                     _openSystemThenClose(runtime, workspace, binding),
                   ),
                 ),
-              if (runtime != null && useDesktopWorkspaceLayout(context))
+              if (runtime != null && runtime.supportsFileManager)
                 action(
                   key: WorkspaceSection.revealKey,
                   icon: Lucide.ExternalLink,

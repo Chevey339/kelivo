@@ -513,6 +513,29 @@ void main() {
     expect(iconParent, isA<Column>());
   });
 
+  testWidgets(
+    'wide mobile previews retain dialogs without desktop-only reveal actions',
+    (tester) async {
+      _setDesktopView(tester);
+      final zip = File(p.join(tempDir.path, 'archive.zip'))
+        ..writeAsBytesSync(const [0x50, 0x4B, 0x03, 0x04]);
+      await _openPreview(tester, zip, kind: FilePreviewKind.binary);
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDialogHeader), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byKey(BinaryFilePreview.revealKey), findsNothing);
+      expect(find.byIcon(Lucide.FolderOpen), findsNothing);
+      expect(find.byKey(BinaryFilePreview.openWithKey), findsOneWidget);
+      expect(find.byKey(BinaryFilePreview.shareKey), findsOneWidget);
+      expect(find.byKey(BinaryFilePreview.exportKey), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+
   testWidgets('binary zip preview uses an archive glyph and desktop actions', (
     tester,
   ) async {
@@ -552,7 +575,7 @@ void main() {
       desktopButtons.every((button) => button.backgroundColor == null),
       isTrue,
     );
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('html preview has export and one browser action', (tester) async {
     final html = File(p.join(tempDir.path, '2048.html'))

@@ -327,6 +327,7 @@ void main() {
     await env.setProotOptions(shell: '/bin/sh', arguments: '-k\n5.10.0');
     expect(runtime.supportsPty, isTrue);
     expect(runtime.supportsSystemTerminal, isFalse);
+    expect(runtime.supportsFileManager, isFalse);
 
     final session = await runtime.openPty(
       mounts: const [Mount(host: '/data', guest: '/mnt/data')],
