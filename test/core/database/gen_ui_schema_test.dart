@@ -72,6 +72,94 @@ void main() {
           ).single['n']
           as int;
 
+  test(
+    'export preserves state and makes FTS removable by the frozen reader',
+    () async {
+      final sourceFile = await createDatabase();
+      final source = open(sourceFile);
+      for (final key in ['0:0', '0:1', '0:2']) {
+        insertState(source, key: key);
+      }
+      source.execute(
+        "DELETE FROM gen_ui_surface_state_rows WHERE surface_key = '0:1';",
+      );
+      source.execute(
+        'UPDATE gen_ui_surface_state_rows SET state_json = ?, search_text = ? '
+        "WHERE surface_key = '0:2';",
+        ['{"inputs":{"n":9},"view":{}}', 'retained sparse row'],
+      );
+      List<Map<String, Object?>> states(sqlite.Database database) => database
+          .select(
+            'SELECT * FROM gen_ui_surface_state_rows ORDER BY surface_key;',
+          )
+          .map((row) => Map<String, Object?>.from(row))
+          .toList();
+      final before = states(source);
+      final sourceRowids = source
+          .select('SELECT rowid FROM gen_ui_surface_state_rows ORDER BY rowid;')
+          .map((row) => row['rowid'])
+          .toList();
+      expect(sourceRowids, [1, 3]);
+      final snapshotFile = File('${directory.path}/portable.db');
+      await ChatDatabaseRepository.createConsistentSnapshot(
+        sourceFile: sourceFile,
+        destinationFile: snapshotFile,
+      );
+      final snapshot = open(snapshotFile);
+      GenUiDerivedSchema.validate(snapshot);
+      expect(states(snapshot), before);
+      expect(
+        snapshot
+            .select(
+              'SELECT s.surface_key FROM gen_ui_surface_search f '
+              'JOIN gen_ui_surface_state_rows s ON s.rowid = f.rowid '
+              "WHERE gen_ui_surface_search MATCH 'sparse';",
+            )
+            .single['surface_key'],
+        '0:2',
+      );
+      expect(matchCount(snapshot, 'alpha'), 1);
+      snapshot.execute(
+        "UPDATE gen_ui_surface_state_rows SET search_text = 'changed term' "
+        "WHERE surface_key = '0:2';",
+      );
+      expect(matchCount(snapshot, 'sparse'), 0);
+      expect(matchCount(snapshot, 'changed'), 1);
+      snapshot.execute(
+        "DELETE FROM gen_ui_surface_state_rows WHERE surface_key = '0:0';",
+      );
+      expect(matchCount(snapshot, 'alpha'), 0);
+      snapshot.execute('PRAGMA foreign_keys = OFF;');
+      final tables = snapshot
+          .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+          .map((row) => row['name'] as String)
+          .where((name) => name.startsWith('gen_ui_'))
+          .toList();
+      // Same unknown-table loop as the frozen v3 normalizer. It must encounter
+      // the virtual table before its protected shadow tables, even after VACUUM.
+      for (final table in tables) {
+        snapshot.execute('DROP TABLE IF EXISTS "$table";');
+      }
+      expect(
+        snapshot.select(
+          "SELECT name FROM sqlite_master WHERE name GLOB 'gen_ui_*';",
+        ),
+        isEmpty,
+      );
+      expect(states(source), before);
+      expect(
+        source
+            .select(
+              'SELECT rowid FROM gen_ui_surface_state_rows ORDER BY rowid;',
+            )
+            .map((row) => row['rowid'])
+            .toList(),
+        sourceRowids,
+      );
+      expect(matchCount(source, 'sparse'), 1);
+    },
+  );
+
   for (final version in [1, 2, 3]) {
     test(
       'published v$version upgrades to complete v5 with retained text',

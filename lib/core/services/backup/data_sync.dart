@@ -35,6 +35,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../database/backup_portability.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
+import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 import 'restore_business_lease.dart';
 import 'temporary_restore_file.dart';
@@ -309,6 +310,7 @@ class DataSync {
   final ChatService chatService;
   final BusinessRepository businessRepository;
   final BusinessPreferences? businessPreferences;
+  final RestoreDurability? _restoreDurability;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
 
@@ -316,16 +318,25 @@ class DataSync {
     required this.chatService,
     required this.businessRepository,
     this.businessPreferences,
-  });
+    @visibleForTesting RestoreDurability? restoreDurability,
+    // Public injection name deliberately omits the private-field prefix.
+    // ignore: prefer_initializing_formals
+  }) : _restoreDurability = restoreDurability;
 
-  Future<T> _runLiveBusinessRestore<T>(Future<T> Function() operation) {
+  Future<T> _runLiveBusinessRestore<T>(
+    Future<T> Function() operation, {
+    bool Function()? canResumeOnError,
+  }) {
     final preferences = businessPreferences;
     return preferences == null
         ? operation()
-        : preferences.runWithRestoreWriteFence(operation);
+        : preferences.runWithRestoreWriteFence(
+            operation,
+            canResumeOnError: canResumeOnError,
+          );
   }
 
-  static Future<void> _prepareRestoreBundle({
+  Future<void> _prepareLiveRestoreBundle({
     required String appDataPath,
     required String extractedPath,
     required String sourceManifestSha256,
@@ -337,19 +348,37 @@ class DataSync {
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
-  }) => RestoreBundlePreparation.prepare(
-    appDataDirectory: Directory(appDataPath),
-    extractedDirectory: Directory(extractedPath),
-    sourceManifestSha256: sourceManifestSha256,
-    bundleIncludesChats: includeChats,
-    bundleIncludesFiles: includeFiles,
-    restoreChats: restoreChats,
-    restoreFiles: restoreFiles,
-    scope: scope,
-    validatedSettings: validatedSettings,
-    onProgress: onProgress,
-    cancelToken: cancelToken,
-  );
+  }) {
+    var canResume = true;
+    void Function()? resumeUi;
+    return _runLiveBusinessRestore<void>(() async {
+      await RestoreBundlePreparation.prepare(
+        appDataDirectory: Directory(appDataPath),
+        extractedDirectory: Directory(extractedPath),
+        sourceManifestSha256: sourceManifestSha256,
+        bundleIncludesChats: includeChats,
+        bundleIncludesFiles: includeFiles,
+        restoreChats: restoreChats,
+        restoreFiles: restoreFiles,
+        scope: scope,
+        validatedSettings: validatedSettings,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+        durability: _restoreDurability,
+        beforePublish: () async {
+          final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
+          await uiStore?.pauseAndDrain();
+          resumeUi = uiStore?.resume;
+          // This conclusion also controls settings, even with no mounted UI store.
+          canResume = false;
+        },
+        onUnpublishedDiscarded: () {
+          canResume = true;
+          resumeUi?.call();
+        },
+      );
+    }, canResumeOnError: () => canResume);
+  }
 
   /// Prepares a local snapshot without opening the live database or providers.
   /// The normal startup gate installs the durable candidate on restart, keeping
@@ -3438,20 +3467,18 @@ class DataSync {
           }
           // Drain accepted business writes before preserving unselected data,
           // then keep writers fenced until the required restart.
-          await _runLiveBusinessRestore(
-            () => _prepareRestoreBundle(
-              appDataPath: appDataPath,
-              extractedPath: extractedPath,
-              sourceManifestSha256: sourceManifestSha256,
-              includeChats: includeChats,
-              includeFiles: includeFiles,
-              restoreChats: restoreChats,
-              restoreFiles: restoreFiles,
-              validatedSettings: settings,
-              scope: scope,
-              onProgress: onProgress,
-              cancelToken: cancelToken,
-            ),
+          await _prepareLiveRestoreBundle(
+            appDataPath: appDataPath,
+            extractedPath: extractedPath,
+            sourceManifestSha256: sourceManifestSha256,
+            includeChats: includeChats,
+            includeFiles: includeFiles,
+            restoreChats: restoreChats,
+            restoreFiles: restoreFiles,
+            validatedSettings: settings,
+            scope: scope,
+            onProgress: onProgress,
+            cancelToken: cancelToken,
           );
           return;
         }

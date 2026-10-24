@@ -55,7 +55,10 @@ final class BusinessPreferences {
   /// Drains accepted writes, runs one live restore, and keeps this process
   /// read-only after a successful commit. Restore callers already require a
   /// cold restart, so late background writes must not overwrite restored data.
-  Future<T> runWithRestoreWriteFence<T>(Future<T> Function() operation) async {
+  Future<T> runWithRestoreWriteFence<T>(
+    Future<T> Function() operation, {
+    bool Function()? canResumeOnError,
+  }) async {
     if (_writesBlockedForRestore) {
       throw StateError('business_preferences_restore_fence');
     }
@@ -64,7 +67,9 @@ final class BusinessPreferences {
     try {
       return await operation();
     } catch (_) {
-      _writesBlockedForRestore = false;
+      // A receipt may already be durable when publication reports a late IO
+      // error. Accept writes again only when the caller proves no cutover is due.
+      if (canResumeOnError?.call() ?? true) _writesBlockedForRestore = false;
       rethrow;
     }
   }

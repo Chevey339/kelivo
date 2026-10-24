@@ -47,6 +47,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
       store: _store,
       buildArchive: debugBuildArchive ?? _dataSync.prepareLocalSnapshotArchive,
       isBusy: isBusy,
+      flushPendingState: chatService.flushAcceptedUiState,
     );
     _settings = _preferences.readSettings();
     _state = _preferences.readState();

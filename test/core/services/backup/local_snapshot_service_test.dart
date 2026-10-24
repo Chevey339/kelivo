@@ -75,11 +75,13 @@ void main() {
     LocalSnapshotService build({
       LocalSnapshotBusyCheck? isBusy,
       Future<int?> Function()? freeBytes,
+      Future<void> Function()? flushPendingState,
     }) => LocalSnapshotService(
       appDataDirectory: root,
       preferences: preferences,
       buildArchive: buildArchive,
       isBusy: isBusy,
+      flushPendingState: flushPendingState,
       freeBytes: freeBytes ?? () async => null,
     );
 
@@ -89,6 +91,66 @@ void main() {
         'live database contents ${DateTime.now().microsecondsSinceEpoch}',
       );
     }
+
+    test(
+      'flushes pending UI changes before the unchanged fingerprint gate',
+      () async {
+        var flushes = 0;
+        final service = build(
+          flushPendingState: () async {
+            if (flushes++ > 0) await touchDatabase();
+          },
+        );
+        expect(
+          await service.runIfDue(now: DateTime.utc(2026, 5, 1)),
+          isA<LocalSnapshotCreated>(),
+        );
+        // No durable change exists until the injected store flushes its input.
+        expect(
+          await service.runIfDue(now: DateTime.utc(2026, 5, 2)),
+          isA<LocalSnapshotCreated>(),
+        );
+        expect(packCount, 2);
+        expect(flushes, 2);
+        await service.runIfDue(now: DateTime.utc(2026, 5, 2, 0, 1));
+        expect(flushes, 2);
+      },
+    );
+
+    test(
+      'failed pending-state flush records failure and respects backoff',
+      () async {
+        var flushes = 0;
+        final service = build(
+          flushPendingState: () async {
+            flushes++;
+            throw StateError('UI state could not be saved');
+          },
+        );
+        final at = DateTime.utc(2026, 5, 1);
+        expect(await service.runIfDue(now: at), isA<LocalSnapshotFailed>());
+        expect(packCount, 0);
+        expect(preferences.readState().failureStreak, 1);
+        expect(preferences.readState().lastFailureAt, at);
+        expect(
+          await service.runIfDue(now: at.add(const Duration(seconds: 1))),
+          isA<LocalSnapshotSkipped>(),
+        );
+        expect(flushes, 1);
+      },
+    );
+
+    test('busy skip does not flush pending UI state', () async {
+      var flushes = 0;
+      await build(
+        isBusy: () => LocalSnapshotSkipReason.generating,
+        flushPendingState: () async {
+          flushes++;
+        },
+      ).runIfDue(now: DateTime.utc(2026, 5, 1));
+      expect(flushes, 0);
+      expect(packCount, 0);
+    });
 
     test('升级后的第一次启动不立刻开跑，只是记下时间', () async {
       // 装了这个版本的所有用户都没有备份记录。若不给宽限期，每个人都会在

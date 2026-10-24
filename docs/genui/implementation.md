@@ -655,3 +655,63 @@ skips), markstream dependency resolution, fatal-info analysis and all 296 tests,
 the macOS debug host build and diff checks. Seven changed Dart files are
 formatted; source hashes stayed unchanged through staging. Mac native GUI
 acceptance remains pending; the lock was rechecked during this gate.
+
+## C13 backup and restore lifecycle
+
+The common database export flushes accepted UI state before taking its snapshot;
+a save error aborts export while retaining accepted values for retry. Automatic
+local snapshots flush after due/busy checks and before the unchanged fingerprint
+check, so a pending input can create a new snapshot. Flush failures use the
+existing failure/backoff record. Settings-only backups carry no separate UI
+state and do not pause the UI owner.
+
+Overwrite restoration stages and validates its incoming candidate before
+pausing/draining the live UI writer, then publishes the existing durable receipt.
+Publication keeps both UI and business writers fenced until startup recovery.
+If publishing fails, both resume only after strict cleanup proves that this
+exact run was never published. A final receipt or uncertain filesystem topology
+keeps the writers fenced. Existing shutdown, business-lease and startup-cutover
+semantics remain in force. No prepared restore is reported as a physical cutover.
+
+The 85-check final focused run covers real plaintext, encrypted and local snapshot
+round trips through shutdown/startup/reopen, inputs/view/search cache, selected
+revisions and FTS, includeChats=false, save failure/retry, wrong passwords,
+cancellation/preflight rejection, issued SQL draining, startup rollback, and
+faults before and after receipt publication. Independent review caught a test
+that waited for the held write itself; it now observes the actual pause/drain
+barrier before allowing the COMMIT. Final independent review returned no
+findings. An explicit analysis also includes the manual tool directory.
+
+`tool/legacy_restore/run.sh` generates a fresh real v5 export and runs the frozen
+v3 source's complete overwrite/startup/reopen path in a temporary source archive.
+The source fixture and reader tests are outside default test discovery; only the
+shared synthetic fixture helper is reused by deterministic tests. C13's manual
+run occurs after this commit, and C26 regenerates the fixture and repeats it.
+Until a successful result is recorded, this is implemented verification tooling,
+not old-reader acceptance evidence. See [release notes](changelog.md) and the
+[manual check](../../tool/legacy_restore/README.md).
+
+The first candidate passed G (9,483 root tests, two existing skips; 296
+markstream tests; both analyses and macOS build). Its formal old-reader run
+stopped at an unsupported Flutter test-runner package-URI API. The harness now
+checks the generated old-tree package configuration and imported v3 constants.
+A subsequent real diagnostic restore exposed VACUUM's FTS schema ordering:
+shadow tables precede their virtual table, and the frozen old normalizer cannot
+drop a protected shadow first.
+
+The common snapshot exporter now validates its private VACUUM copy, then
+atomically recreates only the GenUI search index and its generated triggers.
+This naturally places the virtual table before its shadows and refills from
+current state rowids. It preserves inputs, view, cache text and timestamps;
+the live database is untouched. A regression covers sparse rowids, lookup,
+update/delete triggers, the old table-drop order and unchanged live state.
+The complete frozen v3 diagnostic restore passed with this correction; the
+formal clean committed-tree script must still run after the corrected commit.
+Native GUI/physical-device acceptance remains separate and pending.
+
+Corrected final G passed: both fatal-info analyses, all 9,484 root tests (two
+existing skips), markstream dependency resolution and all 296 tests, macOS debug
+build and diff checks. All 16 changed Dart files are formatted, including the
+manual tools; the final source hashes stayed unchanged through validation and
+staging. Independent review of the exporter and harness correction returned no
+findings. The first candidate's logs and failed formal run are retained separately.

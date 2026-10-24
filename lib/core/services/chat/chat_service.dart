@@ -2534,6 +2534,11 @@ class ChatService extends ChangeNotifier {
     });
   }
 
+  /// Snapshot scheduling can inspect change fingerprints before it builds an
+  /// archive, so pending UI writes must be observable at both entry points.
+  Future<void> flushAcceptedUiState() =>
+      chatRepositoryOrNull?.genUiStates.flush() ?? Future<void>.value();
+
   Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
     File destinationFile, {
     BackupProgressSink? onProgress,
@@ -2541,6 +2546,7 @@ class ChatService extends ChangeNotifier {
     Duration timeout = const Duration(minutes: 10),
   }) async {
     if (!_initialized) await init();
+    await flushAcceptedUiState();
     final sourcePath = _databaseFile.path;
     final destinationPath = destinationFile.path;
     try {

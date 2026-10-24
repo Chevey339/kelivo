@@ -644,7 +644,9 @@ class ChatDatabaseRepository {
 
       final snapshot = sqlite.sqlite3.open(destinationPath);
       try {
-        return _validateRawSnapshot(snapshot);
+        final info = _validateRawSnapshot(snapshot);
+        GenUiDerivedSchema.rebuildExportIndex(snapshot);
+        return info;
       } finally {
         snapshot.close();
       }

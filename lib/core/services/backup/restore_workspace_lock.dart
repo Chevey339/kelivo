@@ -324,7 +324,9 @@ final class RestoreWorkspaceLock {
   /// initial-receipt publication topology is accepted. Any final receipt,
   /// previous bundle, link, special filesystem entry, or unknown path leaves
   /// the workspace untouched and fail-closed.
-  Future<bool> discardStrictlyUnpublishedRunWhileWorkspaceLocked() async {
+  Future<bool> discardStrictlyUnpublishedRunWhileWorkspaceLocked({
+    String? expectedRunId,
+  }) async {
     final observation = await _inspectWorkspaceForUnpublishedRun();
     final marker = observation.marker;
     final markerFileName = observation.markerFileName;
@@ -333,13 +335,19 @@ final class RestoreWorkspaceLock {
     if (markerFileName == archivingRunFileName) return false;
     final runDirectory = observation.runDirectory;
     String? runId;
+    if (expectedRunId != null) {
+      runId = await _readRunFile(marker);
+      if (runId != expectedRunId) {
+        throw StateError('restore_workspace_unpublished_identity');
+      }
+    }
     if (runDirectory == null) {
       if (markerFileName != activeRunFileName &&
           markerFileName != discardingRunFileName) {
         throw StateError('restore_workspace_unpublished_topology');
       }
     } else {
-      runId = await _readRunFile(marker);
+      runId ??= await _readRunFile(marker);
       if (observation.directoryRunId != runId) {
         throw StateError('restore_workspace_unpublished_identity');
       }

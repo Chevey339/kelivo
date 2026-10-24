@@ -11,6 +11,9 @@ abstract final class GenUiDerivedSchema {
   static const searchTable = 'gen_ui_surface_search';
   static final _schema = Schema5(database: const _SchemaMetadataOnly());
   static final VirtualTableInfo _fts = _schema.genUiSurfaceSearch;
+  static final String _searchDefinition =
+      'CREATE VIRTUAL TABLE ${_identifier(_fts.entityName)} '
+      'USING ${_fts.moduleAndArgs}';
   static final List<Trigger> _triggers = List.unmodifiable([
     _schema.genUiStateSearchInsert,
     _schema.genUiStateSearchUpdate,
@@ -140,14 +143,11 @@ abstract final class GenUiDerivedSchema {
       'SELECT type, tbl_name, sql FROM sqlite_schema WHERE name = ?;',
       [searchTable],
     );
-    final expectedTable =
-        'CREATE VIRTUAL TABLE ${_identifier(_fts.entityName)} '
-        'USING ${_fts.moduleAndArgs}';
     if (tables.length != 1 ||
         tables.single['type'] != 'table' ||
         tables.single['tbl_name'] != searchTable ||
         _canonicalCreate(tables.single['sql'] as String? ?? '') !=
-            _canonicalCreate(expectedTable)) {
+            _canonicalCreate(_searchDefinition)) {
       throw StateError('index_schema:$searchTable');
     }
     final columns = database.select('PRAGMA table_info($searchTable);');
@@ -203,6 +203,33 @@ abstract final class GenUiDerivedSchema {
       'INSERT INTO $searchTable(rowid, search_text) '
       'SELECT rowid, search_text FROM $stateTable;',
     );
+  }
+
+  /// Rebuild only a validated, private export copy after VACUUM INTO.
+  ///
+  /// VACUUM puts FTS shadow tables before the virtual table in sqlite_schema.
+  /// The frozen v3 reader drops unknown tables in that order, which SQLite
+  /// rejects for a shadow table. Recreating the index naturally restores the
+  /// virtual-table-first order without editing sqlite_schema. Refill from the
+  /// current state rowids as VACUUM may also renumber implicit rowids.
+  static void rebuildExportIndex(sqlite.Database database) {
+    database.execute('BEGIN IMMEDIATE;');
+    try {
+      discard(database);
+      database.execute(_searchDefinition);
+      for (final trigger in _triggers) {
+        database.execute(trigger.createStatementsByDialect[SqlDialect.sqlite]!);
+      }
+      database.execute(
+        'INSERT INTO $searchTable(rowid, search_text) '
+        'SELECT rowid, search_text FROM $stateTable;',
+      );
+      validate(database);
+      database.execute('COMMIT;');
+    } catch (_) {
+      database.execute('ROLLBACK;');
+      rethrow;
+    }
   }
 }
 

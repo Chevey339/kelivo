@@ -66,6 +66,7 @@ final class LocalSnapshotService {
     required LocalSnapshotArchiveBuilder buildArchive,
     LocalSnapshotStore? store,
     this.isBusy,
+    this.flushPendingState,
     Future<int?> Function()? freeBytes,
     // ignore: prefer_initializing_formals
   }) : _buildArchive = buildArchive,
@@ -76,6 +77,7 @@ final class LocalSnapshotService {
   final LocalSnapshotPreferences preferences;
   final LocalSnapshotStore store;
   final LocalSnapshotBusyCheck? isBusy;
+  final Future<void> Function()? flushPendingState;
   final LocalSnapshotArchiveBuilder _buildArchive;
   final Future<int?> Function() _freeBytes;
 
@@ -142,26 +144,27 @@ final class LocalSnapshotService {
       return LocalSnapshotSkipped(busy);
     }
 
-    final fingerprint = await DatabaseChangeFingerprint.read(databaseFile);
-    if (fingerprint.matches(state.fingerprint)) {
-      // Writing another identical copy would not add a copy -- it would
-      // replace the oldest one with a duplicate of the newest, collapsing the
-      // time depth the slots exist to provide.
-      await preferences.recordUnchanged(fingerprint);
-      return const LocalSnapshotSkipped(LocalSnapshotSkipReason.unchanged);
-    }
-
-    final free = await _freeBytes();
-    if (free != null &&
-        free - LocalSnapshotSchedule.estimatedSpaceRequired(databaseBytes) <
-            LocalSnapshotSchedule.freeSpaceFloor) {
-      await preferences.recordSkip(LocalSnapshotSkipReason.insufficientSpace);
-      return const LocalSnapshotSkipped(
-        LocalSnapshotSkipReason.insufficientSpace,
-      );
-    }
-
     try {
+      await flushPendingState?.call();
+      final fingerprint = await DatabaseChangeFingerprint.read(databaseFile);
+      if (fingerprint.matches(state.fingerprint)) {
+        // Writing another identical copy would not add a copy -- it would
+        // replace the oldest one with a duplicate of the newest, collapsing the
+        // time depth the slots exist to provide.
+        await preferences.recordUnchanged(fingerprint);
+        return const LocalSnapshotSkipped(LocalSnapshotSkipReason.unchanged);
+      }
+
+      final free = await _freeBytes();
+      if (free != null &&
+          free - LocalSnapshotSchedule.estimatedSpaceRequired(databaseBytes) <
+              LocalSnapshotSchedule.freeSpaceFloor) {
+        await preferences.recordSkip(LocalSnapshotSkipReason.insufficientSpace);
+        return const LocalSnapshotSkipped(
+          LocalSnapshotSkipReason.insufficientSpace,
+        );
+      }
+
       final entry = await take(origin: LocalSnapshotOrigin.automatic, now: now);
       final pruned = await store.prune(settings.retention, now: now);
       // Deliberately the fingerprint from before the copy, not after: the copy
