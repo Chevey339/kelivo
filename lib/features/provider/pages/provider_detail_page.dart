@@ -3,6 +3,7 @@ import '../widgets/prompt_cache_ttl_control.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/avatar_cache.dart';
@@ -156,7 +157,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       return !fixed.contains(key);
     }
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         leading: Tooltip(
           message: l10n.settingsPageBackButton,
@@ -307,7 +308,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       message: l10n.providerDetailPageProviderDeletedSnackbar,
                       type: NotificationType.success,
                     );
-                    Navigator.of(context).maybePop();
+                    // A deleted provider must close even during model selection.
+                    Navigator.of(context).pop();
                   }
                 },
               ),
@@ -344,6 +346,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
         ),
       ),
+    );
+    return SelectionBackScope(
+      selecting: _isSelectionMode,
+      onCancel: _exitSelectionMode,
+      child: page,
     );
   }
 

@@ -18,6 +18,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
@@ -982,7 +983,7 @@ class _WorldBookSectionState extends State<_WorldBookSection> {
       );
     }
 
-    return Column(
+    final section = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
@@ -998,6 +999,17 @@ class _WorldBookSectionState extends State<_WorldBookSection> {
                 ),
         ),
       ],
+    );
+    return SelectionBackScope(
+      selecting: _selecting,
+      onCancel: () {
+        if (_busy) return;
+        setState(() {
+          _selecting = false;
+          _selectedIds.clear();
+        });
+      },
+      child: section,
     );
   }
 }
