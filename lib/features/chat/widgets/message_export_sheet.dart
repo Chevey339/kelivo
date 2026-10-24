@@ -383,7 +383,7 @@ ChatMessage messageForThinkingExport(
   ChatMessage message, {
   required bool showThinkingAndToolCards,
 }) {
-  if (message.role != 'assistant' || uiEligibleFences(message).isNotEmpty) {
+  if (message.role != 'assistant' || uiDisplayFences(message).isNotEmpty) {
     return message;
   }
   final hasReasoningPart = message.parts.any((part) => part is ReasoningPart);
@@ -571,12 +571,12 @@ _ExportReasoningPayload _exportReasoningPayloadForMessage(
 
   // Non-UI image preparation still converts inline spans to ordered
   // ReasoningParts. Its timing overlays must match those split fragments.
-  // Native UI messages retain original parts and provider source authority.
+  // Native UI and Web cards retain original parts and provider source authority.
   final hasStructuredReasoning = message.parts.any(
     (part) => part is ReasoningPart,
   );
   if (fromInlineThinking ||
-      (!hasStructuredReasoning && uiEligibleFences(message).isEmpty)) {
+      (!hasStructuredReasoning && uiDisplayFences(message).isEmpty)) {
     segments = _expandSegmentsByLegacyThinkFragments(
       message,
       segments,

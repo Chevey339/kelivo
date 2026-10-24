@@ -14483,4 +14483,45 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get genuiExportTooLarge =>
       'This image exceeds 16 megapixels. Select fewer messages or export a smaller UI.';
+
+  @override
+  String get genuiWebTitle => 'Web preview';
+
+  @override
+  String get genuiWebOpen => 'Open';
+
+  @override
+  String get genuiWebNotReady => 'Can be opened after generation finishes';
+
+  @override
+  String get genuiWebInvalidMeta => 'Invalid header; not loaded';
+
+  @override
+  String get genuiWebSandboxNote => 'Sandboxed preview · discarded on close';
+
+  @override
+  String get genuiWebUnsupported =>
+      'Web previews aren\'t supported on this platform. Export to open in a browser.';
+
+  @override
+  String get genuiWebExportHtml => 'Export HTML';
+
+  @override
+  String get genuiWebCspNote =>
+      'CSP: default-src \'none\' · Restricted network access · Isolated page state';
+
+  @override
+  String get genuiWebFailed =>
+      'Preview initialization or loading failed. View or copy its source.';
+
+  @override
+  String get genuiWebEmpty => 'No HTML document after the header';
+
+  @override
+  String get genuiWebBlockLimit =>
+      'Up to 3 web previews per message; the rest are shown as source';
+
+  @override
+  String get genuiWebCloseFailed =>
+      'Couldn\'t confirm the previous preview closed. Restart the app before opening another.';
 }

@@ -25691,6 +25691,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This image exceeds 16 megapixels. Select fewer messages or export a smaller UI.'**
   String get genuiExportTooLarge;
+
+  /// No description provided for @genuiWebTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web preview'**
+  String get genuiWebTitle;
+
+  /// No description provided for @genuiWebOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get genuiWebOpen;
+
+  /// No description provided for @genuiWebNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Can be opened after generation finishes'**
+  String get genuiWebNotReady;
+
+  /// No description provided for @genuiWebInvalidMeta.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid header; not loaded'**
+  String get genuiWebInvalidMeta;
+
+  /// No description provided for @genuiWebSandboxNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandboxed preview · discarded on close'**
+  String get genuiWebSandboxNote;
+
+  /// No description provided for @genuiWebUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Web previews aren\'t supported on this platform. Export to open in a browser.'**
+  String get genuiWebUnsupported;
+
+  /// No description provided for @genuiWebExportHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'Export HTML'**
+  String get genuiWebExportHtml;
+
+  /// No description provided for @genuiWebCspNote.
+  ///
+  /// In en, this message translates to:
+  /// **'CSP: default-src \'none\' · Restricted network access · Isolated page state'**
+  String get genuiWebCspNote;
+
+  /// No description provided for @genuiWebFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview initialization or loading failed. View or copy its source.'**
+  String get genuiWebFailed;
+
+  /// No description provided for @genuiWebEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No HTML document after the header'**
+  String get genuiWebEmpty;
+
+  /// No description provided for @genuiWebBlockLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 3 web previews per message; the rest are shown as source'**
+  String get genuiWebBlockLimit;
+
+  /// No description provided for @genuiWebCloseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t confirm the previous preview closed. Restart the app before opening another.'**
+  String get genuiWebCloseFailed;
 }
 
 class _AppLocalizationsDelegate

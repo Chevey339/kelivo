@@ -1,4 +1,8 @@
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
+import 'package:Kelivo/features/intelligent_ui/host/gallery/web_gallery.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_web_controller.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_web_document.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_web_card.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_draft_request.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
@@ -82,6 +86,104 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+  desktopTest(
+    'Web cards require original assistant authority and never load inline',
+    (tester) async {
+      const web = '```kelivo-web\n$genUiWebGallerySource```';
+      final before = UiWebController.createdNativeViews;
+      for (final role in ['assistant', 'user', 'tool']) {
+        await tester.pumpWidget(
+          _MessageListHarness(
+            key: ValueKey(role),
+            messages: [message(web, role: role)],
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(GenUiWebCard),
+          role == 'assistant' ? findsOneWidget : findsNothing,
+        );
+        if (role == 'assistant') {
+          expect(
+            tester
+                .widget<GenUiWebCard>(find.byType(GenUiWebCard))
+                .document
+                .phase,
+            UiWebPhase.ready,
+          );
+        }
+        expect(UiWebController.createdNativeViews, before);
+        await tester.pumpWidget(const SizedBox());
+      }
+      for (final content in [
+        web.split('\n').map((line) => '> $line').join('\n'),
+        '- nested\n\n${web.split('\n').map((line) => '  $line').join('\n')}',
+        '<think>\n\n$web\n\n</think>visible',
+      ]) {
+        await tester.pumpWidget(
+          _MessageListHarness(messages: [message(content)]),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(GenUiWebCard), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+      }
+      expect(UiWebController.createdNativeViews, before);
+    },
+  );
+  desktopTest(
+    'three Web and three native blocks remain visible with independent limits',
+    (tester) async {
+      tester.view.physicalSize = const Size(900, 2800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const web = '```kelivo-web\n$genUiWebGallerySource```';
+      const native =
+          '```kelivo-ui\nui 1 catalog "kelivo.native/1"\nroot = Text(text="Native")\n```';
+      final text = List.filled(4, '$web\n\n$native').join('\n\n');
+      await tester.pumpWidget(_MessageListHarness(messages: [message(text)]));
+      await tester.pumpAndSettle();
+      expect(find.byType(GenUiWebCard), findsNWidgets(3));
+      expect(find.byType(GenUiSurface), findsNWidgets(3));
+      expect(
+        find.text(
+          'Up to 3 web previews per message; the rest are shown as source',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Up to 3 UI blocks per message; the rest are shown as source',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  desktopTest(
+    'a cached closed Web fence waits for actual generation completion',
+    (tester) async {
+      const web = '```kelivo-web\n$genUiWebGallerySource```';
+      for (final state in [
+        GenerationRunState.streaming,
+        GenerationRunState.completed,
+        GenerationRunState.interrupted,
+      ]) {
+        await tester.pumpWidget(
+          _MessageListHarness(messages: [message(web, state: state)]),
+        );
+        await tester.pumpAndSettle();
+        final card = tester.widget<GenUiWebCard>(find.byType(GenUiWebCard));
+        expect(card.document.canOpen, state == GenerationRunState.completed);
+        expect(card.document.phase, switch (state) {
+          GenerationRunState.streaming => UiWebPhase.streaming,
+          GenerationRunState.completed => UiWebPhase.ready,
+          _ => UiWebPhase.interrupted,
+        });
+      }
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   desktopTest(
     'repository replacement rebinds a cached native block with the same child',
     (tester) async {
@@ -837,7 +939,7 @@ void main() {
 }
 
 class _MessageListHarness extends StatefulWidget {
-  const _MessageListHarness({required this.messages, this.notifier});
+  const _MessageListHarness({super.key, required this.messages, this.notifier});
 
   final List<ChatMessage> messages;
   final StreamingContentNotifier? notifier;

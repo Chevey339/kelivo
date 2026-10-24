@@ -19,6 +19,7 @@ import '../../catalog/ui_catalog.dart';
 import '../../widgets/gallery/chart_gallery.dart';
 import '../../widgets/gallery/table_gallery.dart';
 import '../ui_host_scope.dart';
+import 'web_gallery.dart';
 
 const genUiMessageFixture = r'''ui 1 catalog "kelivo.native/1"
 $name: string = "Kelivo"
@@ -47,6 +48,7 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   int _step = 6, _role = 0, _fixture = 0;
   final _fixtures = [
     'form',
+    'web',
     ...genUiChartGallerySources.keys,
     ...genUiTableGallerySources.keys,
   ];
@@ -60,7 +62,10 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   }
 
   ChatMessage _message() {
-    final source = _fixture == 0
+    final web = _fixtures[_fixture] == 'web';
+    final source = web
+        ? genUiWebGallerySource
+        : _fixture == 0
         ? genUiMessageFixture
         : '${UiCatalog.header}\n${genUiChartGallerySources[_fixtures[_fixture]] ?? genUiTableGallerySources[_fixtures[_fixture]]}\n';
     final lines = source.trimRight().split('\n');
@@ -72,9 +77,13 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
       _ => lines.length,
     };
     var text =
-        '```kelivo-ui\n${lines.take(count).join('\n')}\n${_step >= 5 ? "```" : ""}';
+        '```${web ? "kelivo-web" : "kelivo-ui"}\n${lines.take(count).join('\n')}\n${_step >= 5 ? "```" : ""}';
     if (_role == 3) text = text.split('\n').map((l) => '> $l').join('\n');
-    if (_step == 8) text = text.replaceFirst('ui 1', 'ui 9');
+    if (_step == 8) {
+      text = web
+          ? text.replaceFirst('"version":1', '"version":9')
+          : text.replaceFirst('ui 1', 'ui 9');
+    }
     final message = ChatMessage(
       id: 'manual-native-$_role-$_fixture',
       conversationId: 'manual-native',

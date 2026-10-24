@@ -680,13 +680,15 @@ TimelineProjection? _projectNativeSplits({
   ];
   final blocks = <TimelineProjectedBlock>[];
   var ordinal = 0;
+  var webOrdinal = 0;
   void textBetween(int index) {
     for (final run in processed) {
       final mapped = run
           .slice(run.trackedOffsets[index], run.trackedOffsets[index + 1])
-          .withFirstMessageOrdinal(ordinal);
+          .withFirstMessageOrdinal(ordinal, webOrdinal: webOrdinal);
       if (mapped.text.trim().isEmpty) continue;
       ordinal += mapped.topLevelFenceCount;
+      webOrdinal += mapped.topLevelWebFenceCount;
       blocks.add(TimelineProjectedBlock.text(mapped.text, uiSource: mapped));
     }
   }
@@ -842,6 +844,7 @@ List<TimelineProjectedBlock> _projectFromParts({
   var sourceOrdinal = 0;
   var imageOrdinal = 0;
   var uiOrdinal = 0;
+  var webOrdinal = 0;
   UiTextSlice? pendingText;
 
   final sourceProjection = textSources == null
@@ -860,10 +863,13 @@ List<TimelineProjectedBlock> _projectFromParts({
   void emitText(String text, UiTextSlice? source) {
     final mapped = source == null
         ? null
-        : sourceProjection!.project(source).withFirstMessageOrdinal(uiOrdinal);
+        : sourceProjection!
+              .project(source)
+              .withFirstMessageOrdinal(uiOrdinal, webOrdinal: webOrdinal);
     final visual = mapped?.text ?? transformText?.call(text) ?? text;
     if (visual.trim().isEmpty) return;
     uiOrdinal += mapped?.topLevelFenceCount ?? 0;
+    webOrdinal += mapped?.topLevelWebFenceCount ?? 0;
     flushSteps();
     blocks.add(TimelineProjectedBlock.text(visual, uiSource: mapped));
   }

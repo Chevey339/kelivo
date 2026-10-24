@@ -3,6 +3,7 @@ import 'package:markstream/markstream.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import '../widgets/genui_theme.dart';
 import 'ui_block_adapter.dart';
+import 'ui_web_block_adapter.dart';
 import 'ui_host_scope.dart';
 import 'ui_runtime_registry.dart';
 
@@ -43,7 +44,7 @@ Widget buildGenUiBlock(
   final ordinal = fence == null
       ? null
       : host!.binding.source.messageOrdinalOf(fence);
-  if (host == null || registry == null || fence == null || ordinal == null) {
+  if (host == null || fence == null || ordinal == null) {
     return sourceBuilder(context);
   }
   if (ordinal >= 3) {
@@ -54,7 +55,9 @@ Widget buildGenUiBlock(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              AppLocalizations.of(context)!.genuiBlockLimit,
+              fence.isWeb
+                  ? AppLocalizations.of(context)!.genuiWebBlockLimit
+                  : AppLocalizations.of(context)!.genuiBlockLimit,
               style: GenUiTheme.of(context).caption,
             ),
             SizedBox(height: GenUiTheme.of(context).xs),
@@ -64,6 +67,15 @@ Widget buildGenUiBlock(
       ),
     );
   }
+  if (fence.isWeb) {
+    return UiWebBlockAdapter(
+      key: ValueKey((host.binding.revisionId, fence.surfaceKey)),
+      host: host,
+      fence: fence,
+      theme: rendering.theme,
+    );
+  }
+  if (registry == null) return sourceBuilder(context);
   return UiBlockAdapter(
     key: ValueKey((host.binding.revisionId, fence.surfaceKey)),
     host: host,

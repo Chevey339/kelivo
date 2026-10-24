@@ -18,6 +18,12 @@ final class GenUiTheme {
     final ladder = SurfaceLadder.fromScheme(cs, layered: semantic.layered);
     page = ladder.page;
     card = ladder.card;
+    previewHeader = theme.brightness == Brightness.dark
+        ? card
+        : cs.inverseSurface;
+    previewHeaderInk = theme.brightness == Brightness.dark
+        ? cs.onSurface
+        : cs.onInverseSurface;
     fill = ladder.surfaceFill;
     cardFill = ladder.surfaceCardFill;
     hairline = ladder.hairline;
@@ -119,6 +125,7 @@ final class GenUiTheme {
   }
 
   late final Color page, card, fill, cardFill, hairline, hairlineStrong;
+  late final Color previewHeader, previewHeaderInk;
   late final Color ink, secondaryInk, captionInk, disabledInk, transparent;
   late final Color sliderThumb;
   late final Color primary, onPrimary, primaryContainer, onPrimaryContainer;

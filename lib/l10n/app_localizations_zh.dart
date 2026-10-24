@@ -13766,6 +13766,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiExportTooLarge => '图片超过 1600 万像素，请减少所选消息或导出较小的界面。';
+
+  @override
+  String get genuiWebTitle => '网页预览';
+
+  @override
+  String get genuiWebOpen => '打开';
+
+  @override
+  String get genuiWebNotReady => '生成完成后才可打开';
+
+  @override
+  String get genuiWebInvalidMeta => '首行元信息无效，未加载';
+
+  @override
+  String get genuiWebSandboxNote => '沙盒预览 · 关闭后不保留';
+
+  @override
+  String get genuiWebUnsupported => '此平台暂不支持内嵌网页预览，可导出后在浏览器中打开';
+
+  @override
+  String get genuiWebExportHtml => '导出 HTML';
+
+  @override
+  String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制网络访问 · 独立页面状态';
+
+  @override
+  String get genuiWebFailed => '预览初始化或加载失败。可查看或复制源码。';
+
+  @override
+  String get genuiWebEmpty => '元信息后没有 HTML 内容';
+
+  @override
+  String get genuiWebBlockLimit => '每条消息最多渲染 3 个网页预览，其余以源码显示';
+
+  @override
+  String get genuiWebCloseFailed => '无法确认上一个预览已关闭。请重启应用后再打开。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27456,6 +27492,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiExportTooLarge => '图片超过 1600 万像素，请减少所选消息或导出较小的界面。';
+
+  @override
+  String get genuiWebTitle => '网页预览';
+
+  @override
+  String get genuiWebOpen => '打开';
+
+  @override
+  String get genuiWebNotReady => '生成完成后才可打开';
+
+  @override
+  String get genuiWebInvalidMeta => '首行元信息无效，未加载';
+
+  @override
+  String get genuiWebSandboxNote => '沙盒预览 · 关闭后不保留';
+
+  @override
+  String get genuiWebUnsupported => '此平台暂不支持内嵌网页预览，可导出后在浏览器中打开';
+
+  @override
+  String get genuiWebExportHtml => '导出 HTML';
+
+  @override
+  String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制网络访问 · 独立页面状态';
+
+  @override
+  String get genuiWebFailed => '预览初始化或加载失败。可查看或复制源码。';
+
+  @override
+  String get genuiWebEmpty => '元信息后没有 HTML 内容';
+
+  @override
+  String get genuiWebBlockLimit => '每条消息最多渲染 3 个网页预览，其余以源码显示';
+
+  @override
+  String get genuiWebCloseFailed => '无法确认上一个预览已关闭。请重启应用后再打开。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -41226,4 +41298,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiExportTooLarge => '圖片超過 1600 萬像素，請減少所選訊息或匯出較小的介面。';
+
+  @override
+  String get genuiWebTitle => '網頁預覽';
+
+  @override
+  String get genuiWebOpen => '開啟';
+
+  @override
+  String get genuiWebNotReady => '生成完成後才可開啟';
+
+  @override
+  String get genuiWebInvalidMeta => '首行中繼資訊無效，未載入';
+
+  @override
+  String get genuiWebSandboxNote => '沙盒預覽 · 關閉後不保留';
+
+  @override
+  String get genuiWebUnsupported => '此平台暫不支援內嵌網頁預覽，可匯出後在瀏覽器中開啟';
+
+  @override
+  String get genuiWebExportHtml => '匯出 HTML';
+
+  @override
+  String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制網路存取 · 獨立頁面狀態';
+
+  @override
+  String get genuiWebFailed => '預覽初始化或載入失敗。可檢視或複製原始碼。';
+
+  @override
+  String get genuiWebEmpty => '中繼資訊後沒有 HTML 內容';
+
+  @override
+  String get genuiWebBlockLimit => '每則訊息最多顯示 3 個網頁預覽，其餘以原始碼顯示';
+
+  @override
+  String get genuiWebCloseFailed => '無法確認上一個預覽已關閉。請重新啟動應用程式後再開啟。';
 }

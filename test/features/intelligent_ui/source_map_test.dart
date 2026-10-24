@@ -15,8 +15,58 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dar
 const _body =
     'ui 1 catalog "kelivo.native/1"\nroot = Text(text="你好 😀 <think>literal</think>")';
 const _fence = '```kelivo-ui\n$_body\n```';
+const _web =
+    '```kelivo-web\n{"version":1,"title":"<think>literal</think>","summary":"😀"}\n<b>Local</b>\n```';
 void main() {
   const parser = MarkdownParser();
+  test('web markers across every split preserve original authority', () {
+    for (var cut = 0; cut <= _web.length; cut++) {
+      final source = UiMessageSource.of([
+        TextPart(_web.substring(0, cut)),
+        TextPart(_web.substring(cut)),
+      ]);
+      final joined = source
+          .sliceForPart(0, 0, cut)!
+          .append(source.sliceForPart(1, 0, _web.length - cut)!)!;
+      final changed = joined.transform((s) => s.replaceAll('literal', 'wrong'));
+      final document = parser.parse(changed.text);
+      final fence = changed.resolve(
+        document,
+        document.children.single as CodeBlockNode,
+      )!;
+      expect(fence.isWeb, isTrue);
+      expect(fence.surfaceKey, 'web:0:0', reason: 'cut=$cut');
+      expect(changed.text, _web);
+    }
+  });
+  test('web and native ordinals and per-message caps are independent', () {
+    const text = '$_web\n\n$_fence\n\n$_web\n\n$_fence';
+    final source = UiMessageSource.of([const TextPart(text)]);
+    final slice = source
+        .sliceForPart(0, 0, text.length)!
+        .withFirstMessageOrdinal(2, webOrdinal: 1);
+    expect(slice.fences.map((f) => f.fence.surfaceKey), [
+      'web:0:0',
+      '0:0',
+      'web:0:1',
+      '0:1',
+    ]);
+    expect(slice.fences.map((f) => slice.messageOrdinalOf(f.fence)), [
+      1,
+      2,
+      2,
+      3,
+    ]);
+    expect(slice.topLevelFenceCount, 2);
+    expect(slice.topLevelWebFenceCount, 2);
+    for (final item in slice.fences) {
+      final piece = slice.slice(item.span.start, item.span.end);
+      expect(
+        piece.messageOrdinalOf(item.fence),
+        slice.messageOrdinalOf(item.fence),
+      );
+    }
+  });
   test(
     'every UTF-16 split across adjacent original parts resolves the same fence owner',
     () {

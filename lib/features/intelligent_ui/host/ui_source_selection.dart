@@ -3,9 +3,18 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/features/chat/utils/thinking_tag_parser.dart';
 import 'ui_source_map.dart';
 
-/// Shared original-source eligibility for the renderer and durable storage.
-/// The visible block budget belongs to presentation, not persisted identity.
+/// Native-only sources used by runtime, persistence and state projection.
 List<UiSourceFence> uiEligibleFences(
+  ChatMessage message, {
+  bool hasProviderReasoning = false,
+}) => uiDisplayFences(
+  message,
+  hasProviderReasoning: hasProviderReasoning,
+).where((fence) => !fence.isWeb).toList();
+
+/// Shared original-source eligibility for both native and Web presentation.
+/// The visible block budgets do not change original identity or source authority.
+List<UiSourceFence> uiDisplayFences(
   ChatMessage message, {
   bool hasProviderReasoning = false,
 }) {

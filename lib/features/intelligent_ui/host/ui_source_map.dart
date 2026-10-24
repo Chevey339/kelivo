@@ -23,13 +23,15 @@ final class UiMessageSource {
       }
       final text = part.text;
       if (text.contains('kelivo-ui') ||
-          (tail + text.substring(0, text.length.clamp(0, 8))).contains(
-            'kelivo-ui',
+          text.contains('kelivo-web') ||
+          const ['kelivo-ui', 'kelivo-web'].any(
+            (tag) => (tail + text.substring(0, text.length.clamp(0, 9)))
+                .contains(tag),
           )) {
         return true;
       }
-      final end = text.length >= 8 ? text : tail + text;
-      tail = end.substring((end.length - 8).clamp(0, end.length));
+      final end = text.length >= 9 ? text : tail + text;
+      tail = end.substring((end.length - 9).clamp(0, end.length));
     }
     return false;
   }
@@ -119,7 +121,10 @@ final class UiMessageSource {
     final source = _parts[ordinal];
     if (source == null) return null;
     final (run, part) = source;
-    if (!run.source.contains('kelivo-ui')) return null;
+    if (!run.source.contains('kelivo-ui') &&
+        !run.source.contains('kelivo-web')) {
+      return null;
+    }
     if (start < 0 || start > end || end > part.length) {
       throw RangeError('Invalid original TextPart slice');
     }
@@ -149,7 +154,7 @@ final class UiTextRun {
   late final List<UiSourceFence> fences;
 
   void _parseFences() {
-    if (!source.contains('kelivo-ui')) {
+    if (!source.contains('kelivo-ui') && !source.contains('kelivo-web')) {
       fences = const [];
       return;
     }
@@ -158,14 +163,22 @@ final class UiTextRun {
     final pending = <MarkdownNode>[document];
     while (pending.isNotEmpty) {
       final node = pending.removeLast();
-      if (node is CodeBlockNode && node.info.trim() == 'kelivo-ui') {
+      if (node is CodeBlockNode &&
+          const {'kelivo-ui', 'kelivo-web'}.contains(node.info.trim())) {
         nodes.add(node);
       }
       pending.addAll(node.children.reversed);
     }
+    var nativeOrdinal = 0;
+    var webOrdinal = 0;
     fences = List.unmodifiable([
-      for (final (ordinal, node) in nodes.indexed)
-        UiSourceFence._(this, ordinal, node, document.children.contains(node)),
+      for (final node in nodes)
+        UiSourceFence._(
+          this,
+          node.info.trim() == 'kelivo-web' ? webOrdinal++ : nativeOrdinal++,
+          node,
+          document.children.contains(node),
+        ),
     ]);
   }
 }
@@ -176,7 +189,9 @@ final class UiSourceFence {
   final int ordinal;
   final CodeBlockNode node;
   final bool topLevel;
-  String get surfaceKey => '${run.firstPartOrdinal}:$ordinal';
+  bool get isWeb => node.info.trim() == 'kelivo-web';
+  String get surfaceKey =>
+      '${isWeb ? "web:" : ""}${run.firstPartOrdinal}:$ordinal';
   String get source => node.span.slice(run.source);
 
   /// Markstream adds a display-only LF at an unfinished source line. Never
@@ -251,6 +266,7 @@ final class UiTextSlice {
     this.original,
     Iterable<UiMappedFence> fences, {
     this.firstMessageOrdinal,
+    this.firstWebMessageOrdinal,
     this.trackedOffsets = const [],
     this.trackedBeforeInsertion = const [],
   }) : fences = List.unmodifiable(fences);
@@ -271,7 +287,7 @@ final class UiTextSlice {
   final String text;
   final bool original;
   final List<UiMappedFence> fences;
-  final int? firstMessageOrdinal;
+  final int? firstMessageOrdinal, firstWebMessageOrdinal;
   final List<int> trackedOffsets;
   final List<bool> trackedBeforeInsertion;
 
@@ -321,24 +337,28 @@ final class UiTextSlice {
     );
   }
   int get topLevelFenceCount =>
-      fences.where((item) => item.fence.topLevel).length;
+      fences.where((item) => item.fence.topLevel && !item.fence.isWeb).length;
+  int get topLevelWebFenceCount =>
+      fences.where((item) => item.fence.topLevel && item.fence.isWeb).length;
 
-  UiTextSlice withFirstMessageOrdinal(int ordinal) => UiTextSlice._(
-    run,
-    originalStart,
-    originalEnd,
-    text,
-    original,
-    fences,
-    firstMessageOrdinal: ordinal,
-  );
+  UiTextSlice withFirstMessageOrdinal(int ordinal, {int webOrdinal = 0}) =>
+      UiTextSlice._(
+        run,
+        originalStart,
+        originalEnd,
+        text,
+        original,
+        fences,
+        firstMessageOrdinal: ordinal,
+        firstWebMessageOrdinal: webOrdinal,
+      );
 
   int? messageOrdinalOf(UiSourceFence fence) {
-    final first = firstMessageOrdinal;
+    final first = fence.isWeb ? firstWebMessageOrdinal : firstMessageOrdinal;
     if (first == null) return null;
     var ordinal = first;
     for (final item in fences) {
-      if (!item.fence.topLevel) continue;
+      if (!item.fence.topLevel || item.fence.isWeb != fence.isWeb) continue;
       if (identical(item.fence, fence)) return ordinal;
       ordinal++;
     }
@@ -380,6 +400,7 @@ final class UiTextSlice {
           UiMappedFence(fences[i].fence, transformed.ranges[i]),
       ],
       firstMessageOrdinal: firstMessageOrdinal,
+      firstWebMessageOrdinal: firstWebMessageOrdinal,
       trackedOffsets: transformed.offsets,
       trackedBeforeInsertion: transformed.beforeInsertion,
     );
@@ -405,7 +426,21 @@ final class UiTextSlice {
         : firstMessageOrdinal! +
               fences
                   .where(
-                    (item) => item.fence.topLevel && item.span.start < start,
+                    (item) =>
+                        item.fence.topLevel &&
+                        !item.fence.isWeb &&
+                        item.span.start < start,
+                  )
+                  .length,
+    firstWebMessageOrdinal: firstWebMessageOrdinal == null
+        ? null
+        : firstWebMessageOrdinal! +
+              fences
+                  .where(
+                    (item) =>
+                        item.fence.topLevel &&
+                        item.fence.isWeb &&
+                        item.span.start < start,
                   )
                   .length,
   );

@@ -1108,3 +1108,88 @@ from hosted to the vendored path; its SHA-256 is
 2d32627fb269d769a44845e3762026da77c6010cad0bc968d8935f963d0aeb04.
 These unit results do not claim C21 GUI, network, storage or ordinary-worker
 acceptance, or a successful Windows application build.
+
+
+## C21 — restricted Web cards and previews
+
+Top-level original assistant `kelivo-web` fences now have a native summary card.
+Web and native UI have independent three-block limits and stable source ordinals;
+quoted, hidden-thinking, user/tool or transformed text cannot acquire execution
+authority. Metadata is bounded and exact. A closed fence plus completed host
+generation and an explicit Open are all required before a native controller is
+created. Linux and the currently deferred Windows platform retain source/copy/
+HTML export. There is no new runtime rollout flag.
+
+Android, iOS and macOS use the same parent CSP and attribute-escaped opaque-origin
+srcdoc sandbox. Required policies finish installing before the first load;
+installation failure displays source/copy actions and never loads a permissive
+controller. No application bridge, console forwarding or generated parent DOM is
+installed. Android additionally disables file/content access, mixed content,
+geolocation and file selection. Ordinary WebView profile settings and data are
+left intact. The UI deliberately says restricted network access: WebRTC remains
+the proposal's accepted exception, not an absolute-offline promise.
+
+One application-wide lease waits for native teardown and route exit before
+opening a replacement. Mobile uses a full-screen route and dark status/header
+area; desktop uses the existing dialog container. Close removes the generated
+iframe, disables scripts and verifies the replacement's host-owned empty title.
+The five-second deadline includes pending initialization and cleanup evaluation.
+WebKit can omit its finish callback after blocked child loads, so completion is
+verified from the actual empty document. A teardown timeout is reported and
+prevents later previews until restart; it is not claimed to stop an unresponsive
+script. Whole-Navigator disposal also releases the lease independently of its
+push future.
+
+Independent review found and fixed an incomplete close deadline, Web-only image
+export source mapping, duplicate card semantics and a lease retained by Navigator
+disposal. The native acceptance's file-authority case now uses the same existing
+executable temporary canary as its ordinary-WebView positive control, rather
+than a nonexistent target. That localhost URI does not claim remote Windows
+SMB/UNC coverage. Final re-review reported no remaining findings.
+
+Manual native acceptance is recorded in `web-acceptance-c21.json`. All 23 probes
+and five trusted/active gestures passed on macOS, the iOS simulator and the
+dedicated Android physical device, with zero preview requests at the controlled
+HTTP/TLS listeners. Inline script/style/data image/font work; nested-srcdoc and
+child-CSP-removal attacks remain restricted; external resources, navigation,
+popups/downloads/protocols, files, capabilities and storage are exercised. The
+ordinary positive controls work before and after the preview sequence. The
+integration-only parent observer and navigation recorder do not exist in the
+product. Each preview reached its verified empty document, and three cases closed
+during initialization. The normal iOS message gallery separately demonstrated
+Open, counter 0→1, Close and reopening at 0 without any test observer.
+
+The pinned Flutter SDK's TestPlatformDispatcher drops the new onHitTest callback.
+That caused initial iOS test taps to reach Flutter but not UIKit. The integration
+executable now connects the real dispatcher to the SDK's actual render-tree hit
+algorithm and restores it afterwards. No SDK file or product gesture policy was
+modified. macOS semantics are established before the test leak baseline. Earlier
+harness failures remain in ignored logs and are not counted as passing runs.
+
+Windows remains paused under the user's earlier amendment; iPhone physical
+acceptance was also deferred by the user on 2026-10-24. The physical iPhone build
+used a separately signed `psyche.kelivo.genuiacceptance` bundle with isolated
+extension IDs and no production App Group. Its debug channel did not connect;
+no physical probes passed. All temporary iOS project/plist/entitlement edits were
+restored, and no further physical-iPhone operations were attempted after the
+user's deferral. Linux acceptance remains deferred as previously requested.
+
+The normal macOS message gallery also passed counter 0→1, Esc after native
+content interaction, Return reopening through the restored Open-button focus,
+and reset to 0 on the new session. These actions used the product wrapper without
+an observer. The ten Web goldens cover light/dark cards, RTL, 1.3 text scaling,
+mobile system insets and desktop dialog layout; native content is explicitly a
+test double in these goldens, while the engine evidence above is separate.
+
+Final G passed root fatal-info analysis and all 9,988 tests (one existing skip),
+markstream offline dependency resolution/fatal-info analysis and all 298 tests,
+macOS debug native build and diff checks. All 46 frozen non-document files were
+unchanged during G; the exact 48-file manifest and empty final review are retained
+under build/genui/c21/. All 28 changed Dart files were formatted. Four ARBs and
+generated localizations are included. Direct webview_flutter_android 4.14.1 and
+test-only platform_interface 2.15.1 reuse already resolved dependencies; no new
+engine or functional library is introduced. The ignored dependency lock's SHA-256
+is efe1ad0fe3c0fd957cff7f3679235c564029e4c5468671e8c88bd85f0578daa3.
+Logs are retained under build/genui/logs/c21-*. These checks and the three available
+engine runs do not claim the explicitly deferred Windows or physical-iPhone
+acceptance, nor Linux GUI acceptance.

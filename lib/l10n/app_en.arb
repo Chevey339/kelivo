@@ -6676,5 +6676,17 @@
   "genuiCopyLimit": "Text exceeds the 64 KiB copy limit. Select a smaller section.",
   "genuiExportSnapshot": "Export read-only snapshot",
   "genuiExpandedSharedState": "Shares the same state as the message",
-  "genuiExportTooLarge": "This image exceeds 16 megapixels. Select fewer messages or export a smaller UI."
+  "genuiExportTooLarge": "This image exceeds 16 megapixels. Select fewer messages or export a smaller UI.",
+  "genuiWebTitle": "Web preview",
+  "genuiWebOpen": "Open",
+  "genuiWebNotReady": "Can be opened after generation finishes",
+  "genuiWebInvalidMeta": "Invalid header; not loaded",
+  "genuiWebSandboxNote": "Sandboxed preview · discarded on close",
+  "genuiWebUnsupported": "Web previews aren't supported on this platform. Export to open in a browser.",
+  "genuiWebExportHtml": "Export HTML",
+  "genuiWebCspNote": "CSP: default-src 'none' · Restricted network access · Isolated page state",
+  "genuiWebFailed": "Preview initialization or loading failed. View or copy its source.",
+  "genuiWebEmpty": "No HTML document after the header",
+  "genuiWebBlockLimit": "Up to 3 web previews per message; the rest are shown as source",
+  "genuiWebCloseFailed": "Couldn't confirm the previous preview closed. Restart the app before opening another."
 }

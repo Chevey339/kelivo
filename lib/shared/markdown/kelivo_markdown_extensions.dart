@@ -21,6 +21,7 @@ final kelivoMarkdownExtensions = MarkstreamExtensions(
   namedInlineBuilders: {'kelivo-citation': buildCitation},
   codeBlockBuilders: {
     'kelivo-ui': _nativeUi,
+    'kelivo-web': _nativeUi,
     'mermaid': _diagram,
     'svg': _diagram,
     'xml': _diagram,

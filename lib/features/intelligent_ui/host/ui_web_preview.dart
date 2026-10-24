@@ -1,0 +1,319 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
+
+import '../widgets/genui_clipboard.dart';
+import '../widgets/genui_content.dart';
+import '../widgets/genui_theme.dart';
+import 'ui_web_controller.dart';
+import 'ui_web_document.dart';
+
+_UiWebPreviewLease? _active;
+int _latestOpen = 0;
+
+/// A newer Open waits for both native teardown and the old route's exit before
+/// creating a controller. Closing a route never clears shared site data.
+Future<void> showUiWebPreview(
+  BuildContext context,
+  UiWebDocument document,
+) async {
+  if (!document.canOpen || !uiWebPreviewSupported(defaultTargetPlatform)) {
+    return;
+  }
+  final ticket = ++_latestOpen;
+  final previous = _active;
+  await previous?.close();
+  if (ticket != _latestOpen || !context.mounted) return;
+  if (previous?.controller.closeError != null) {
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(context)!.genuiWebCloseFailed,
+      type: NotificationType.error,
+    );
+    return;
+  }
+  final lease = _UiWebPreviewLease(document);
+  _active = lease;
+  final desktop = ResponsiveHelper.isDesktop(context);
+  try {
+    if (desktop) {
+      final displayed = showAppDialog<void>(
+        context,
+        maxWidth: 960,
+        waitForExit: true,
+        onRoute: (route) {
+          lease.route = route;
+        },
+        child: _UiWebPreviewWindow(lease: lease, desktop: true),
+      );
+      await Future.any([displayed, lease.route!.completed]);
+    } else {
+      final route = _UiWebPageRoute(
+        reduceMotion: MediaQuery.disableAnimationsOf(context),
+        builder: (_) => _UiWebPreviewWindow(lease: lease, desktop: false),
+      );
+      lease.route = route;
+      final displayed = Navigator.of(context, rootNavigator: true).push(route);
+      await Future.any([displayed, route.completed]);
+      await route.completed;
+    }
+  } finally {
+    await lease.release();
+  }
+}
+
+final class _UiWebPreviewLease {
+  _UiWebPreviewLease(this.document);
+  final UiWebDocument document;
+  final UiWebController controller = UiWebController();
+  TransitionRoute<void>? route;
+  Future<void>? _closing;
+  Future<void>? _releasing;
+  Future<void> release() => _releasing ??= _release();
+  Future<void> _release() async {
+    await controller.close();
+    controller.dispose();
+    if (identical(_active, this) && controller.closeError == null) {
+      _active = null;
+    }
+  }
+
+  Future<void> close() => _closing ??= _close();
+  Future<void> _close() async {
+    await controller.close();
+    final current = route;
+    if (current == null) return;
+    final navigator = current.navigator;
+    if (navigator != null && current.isActive) {
+      if (current.isCurrent) {
+        navigator.pop();
+      } else {
+        navigator.removeRoute(current);
+      }
+    }
+    await current.completed;
+  }
+}
+
+class _UiWebPageRoute extends CupertinoPageRoute<void> {
+  _UiWebPageRoute({required super.builder, required this.reduceMotion});
+  final bool reduceMotion;
+  @override
+  Duration get transitionDuration =>
+      reduceMotion ? Duration.zero : const Duration(milliseconds: 200);
+  @override
+  Duration get reverseTransitionDuration => transitionDuration;
+}
+
+class _UiWebPreviewWindow extends StatefulWidget {
+  const _UiWebPreviewWindow({required this.lease, required this.desktop});
+  final _UiWebPreviewLease lease;
+  final bool desktop;
+  @override
+  State<_UiWebPreviewWindow> createState() => _UiWebPreviewWindowState();
+}
+
+class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
+  bool _source = false;
+  final _closeFocus = FocusNode(debugLabel: 'Web preview Close');
+  UiWebController get _controller => widget.lease.controller;
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_start());
+  }
+
+  Future<void> _start() async {
+    try {
+      await _controller.start(widget.lease.document);
+    } catch (_) {
+      /* The controller exposes a bounded failure state below. */
+    }
+  }
+
+  @override
+  void dispose() {
+    // Navigator disposal need not complete its push() future. Native teardown
+    // must also run when the containing app/router is replaced outright.
+    unawaited(widget.lease.release());
+    _closeFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => GenUiThemeScope(
+    child: Builder(
+      builder: (context) {
+        final theme = GenUiTheme.of(context);
+        final l10n = AppLocalizations.of(context)!;
+        final document = widget.lease.document;
+        final headerColor = widget.desktop ? theme.card : theme.previewHeader;
+        final headerInk = widget.desktop ? theme.ink : theme.previewHeaderInk;
+        Widget shell = Material(
+          color: theme.card,
+          child: SafeArea(
+            top: false,
+            bottom: !widget.desktop,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ColoredBox(
+                  color: headerColor,
+                  child: SafeArea(
+                    top: !widget.desktop,
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        theme.xs,
+                        theme.xs,
+                        theme.md,
+                        theme.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          IosIconButton(
+                            icon: LucideIcons.x,
+                            minSize: 44,
+                            color: headerInk,
+                            focusNode: _closeFocus,
+                            tooltip: l10n.mcpPageClose,
+                            onTap: () => unawaited(widget.lease.close()),
+                          ),
+                          SizedBox(width: theme.xs),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  document.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.header.copyWith(
+                                    color: headerInk,
+                                  ),
+                                ),
+                                Text(
+                                  l10n.genuiWebSandboxNote,
+                                  style: theme.caption.copyWith(
+                                    color: headerInk,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: _controller,
+                    builder: (context, _) {
+                      if (_controller.phase == UiWebNativePhase.failed ||
+                          _source) {
+                        return SingleChildScrollView(
+                          padding: EdgeInsets.all(theme.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_controller.phase == UiWebNativePhase.failed)
+                                Text(
+                                  l10n.genuiWebFailed,
+                                  style: theme.body.copyWith(
+                                    color: theme.error,
+                                  ),
+                                ),
+                              Wrap(
+                                spacing: theme.xs,
+                                children: [
+                                  IosTextButton(
+                                    label: l10n.genuiViewSource,
+                                    icon: LucideIcons.codeXml,
+                                    onPressed: () => setState(() {
+                                      _source = !_source;
+                                    }),
+                                  ),
+                                  IosTextButton(
+                                    label: l10n.genuiCopySource,
+                                    icon: LucideIcons.copy,
+                                    onPressed: () =>
+                                        copyGenUiText(context, document.source),
+                                  ),
+                                ],
+                              ),
+                              if (_source)
+                                GenUiSource(
+                                  source: document.source,
+                                  language: 'kelivo-web',
+                                ),
+                            ],
+                          ),
+                        );
+                      }
+                      if (_controller.phase == UiWebNativePhase.initializing) {
+                        return Center(
+                          child: CupertinoActivityIndicator(
+                            color: theme.primary,
+                          ),
+                        );
+                      }
+                      return _controller.buildView();
+                    },
+                  ),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.fill,
+                    border: Border(top: BorderSide(color: theme.hairline)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(theme.sm),
+                    child: Text(l10n.genuiWebCspNote, style: theme.caption),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (!widget.desktop) {
+          shell = AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: theme.previewHeader,
+              statusBarBrightness: Brightness.dark,
+            ),
+            child: Scaffold(backgroundColor: theme.card, body: shell),
+          );
+        }
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) unawaited(widget.lease.close());
+          },
+          child: Focus(
+            autofocus: true,
+            onKeyEvent: (_, event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.escape) {
+                unawaited(widget.lease.close());
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: shell,
+          ),
+        );
+      },
+    ),
+  );
+}

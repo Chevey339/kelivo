@@ -1,4 +1,6 @@
 import 'package:provider/provider.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_web_controller.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_web_card.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
@@ -356,6 +358,86 @@ void main() {
     expect(live.canSnapshot, isTrue);
     expect(live.captureRead().inputs['n'], 9);
   });
+  for (final provider in [false, true]) {
+    for (final showThinking in [false, true]) {
+      testWidgets(
+        'Web-only PNG preserves split original metadata provider=$provider thinking=$showThinking',
+        (tester) async {
+          const source =
+              '{"version":1,"title":"<think>Literal title</think>","summary":"Literal summary"}\n<p><think>Literal HTML</think></p>\n';
+          const web = '```kelivo-web\n$source```';
+          final parts = <MessagePart>[
+            if (provider) const ReasoningPart('provider reasoning'),
+            const TextPart('<think>PRIVATE</think>\n\n```kelivo-'),
+            TextPart(web.substring('```kelivo-'.length)),
+          ];
+          final msg = message(parts: parts);
+          final projection = await project(msg);
+          expect(projection.surfaces, isEmpty);
+          final captures = UiExportCapture(
+            messages: [msg],
+            projections: {'r': projection},
+          );
+          final prefs = createBusinessTestPreferences();
+          final settings = SettingsProvider(prefs);
+          await settings.loaded;
+          addTearDown(settings.dispose);
+          final before = UiWebController.createdNativeViews;
+          await tester.pumpWidget(
+            MultiProvider(
+              providers: [
+                ChangeNotifierProvider.value(value: settings),
+                ChangeNotifierProvider(
+                  create: (_) => AssistantProvider(preferences: prefs),
+                ),
+                ChangeNotifierProvider(
+                  create: (_) => UserProvider(preferences: prefs),
+                ),
+                ChangeNotifierProvider(
+                  create: (_) => TtsProvider(preferences: prefs),
+                ),
+                ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+                ChangeNotifierProvider(
+                  create: (_) => AskUserInteractionService(),
+                ),
+              ],
+              child: MaterialApp(
+                theme: buildLightTheme(null),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: SingleChildScrollView(
+                    child: ExportCaptureScope(
+                      enabled: true,
+                      child: UiExportSnapshotScope(
+                        captures: captures,
+                        child: buildExportedMessageCardForTesting(
+                          captures.messages.single,
+                          showThinkingAndToolCards: showThinking,
+                          expandThinkingContent: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final card = tester.widget<GenUiWebCard>(find.byType(GenUiWebCard));
+          expect(card.exporting, isTrue);
+          expect(card.document.canOpen, isTrue);
+          expect(card.document.source, source);
+          expect(card.document.title, '<think>Literal title</think>');
+          expect(find.byType(GenUiWebOpenButton), findsNothing);
+          expect(UiWebController.createdNativeViews, before);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
   for (final sourceKind in [
     'inline',
     'legacy',

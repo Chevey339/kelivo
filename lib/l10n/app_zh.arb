@@ -5340,5 +5340,17 @@
   "genuiCopyLimit": "文本超过 64 KiB 复制上限，请选择较小的片段。",
   "genuiExportSnapshot": "导出只读快照",
   "genuiExpandedSharedState": "与消息内共享同一状态",
-  "genuiExportTooLarge": "图片超过 1600 万像素，请减少所选消息或导出较小的界面。"
+  "genuiExportTooLarge": "图片超过 1600 万像素，请减少所选消息或导出较小的界面。",
+  "genuiWebTitle": "网页预览",
+  "genuiWebOpen": "打开",
+  "genuiWebNotReady": "生成完成后才可打开",
+  "genuiWebInvalidMeta": "首行元信息无效，未加载",
+  "genuiWebSandboxNote": "沙盒预览 · 关闭后不保留",
+  "genuiWebUnsupported": "此平台暂不支持内嵌网页预览，可导出后在浏览器中打开",
+  "genuiWebExportHtml": "导出 HTML",
+  "genuiWebCspNote": "CSP: default-src 'none' · 限制网络访问 · 独立页面状态",
+  "genuiWebFailed": "预览初始化或加载失败。可查看或复制源码。",
+  "genuiWebEmpty": "元信息后没有 HTML 内容",
+  "genuiWebBlockLimit": "每条消息最多渲染 3 个网页预览，其余以源码显示",
+  "genuiWebCloseFailed": "无法确认上一个预览已关闭。请重启应用后再打开。"
 }
