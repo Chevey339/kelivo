@@ -36,6 +36,12 @@ description: Create a native interactive calculator, conditional form, chart or 
    every referenced ID before closing the fence. Test the reasoning for changed
    inputs, not just initial values. Hidden fields retain values but do not block
    form validation. Ask creates an editable draft; it never sends automatically.
+   Check every number, sample count and trend in the surrounding prose against
+   those same expressions and records. Use the full sample grid, including
+   fractional coordinates and missing values. A trend must agree with every
+   relevant row; distinguish user-set parameters from calculated results.
+   Prefer a short explanation of the controls and data mapping over additional
+   numerical interpretations the user did not request.
 5. For an answer that displays a dataset or calculated result, include a visible
    provenance sentence in the prose or a Text/Callout. Label supplied synthetic
    rows, invented numbers and mathematical demonstrations as "Synthetic example

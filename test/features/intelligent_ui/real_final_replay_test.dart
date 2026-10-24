@@ -19,6 +19,11 @@ void main() {
       report: 'docs/genui/evaluation-final-first.json',
       rejected: {'s4-3', 's4-4', 's4-5'},
     ),
+    (
+      directory: 'final-c25-second',
+      report: 'docs/genui/evaluation-final-second.json',
+      rejected: {'s2-2', 's3-1'},
+    ),
   ];
   for (final run in runs) {
     final report =

@@ -1359,3 +1359,32 @@ files were formatted. Final G passed root fatal-info analysis, 10,178 tests
 macOS debug build and git diff --check. Independent review returned no findings.
 The exact 36-file manifest and 34 frozen non-document hashes were checked before
 staging; logs are retained as build/genui/logs/c25-repair-*.
+
+### C25 second round — prose must match the displayed data
+
+The second complete manual run tested repair commit
+`53eb751c8ac2fcdb1326323d4ad67533af7bb504`. Its native declarations passed all
+30 deterministic checks and the provenance omissions were fixed, but both agent
+reviews accepted only 28/30 (93.33%). In s2-2, the prose missed the defined x=1.5
+sample and claimed two valid points instead of three. In s3-1, it described
+3→4→7→6 as rising every quarter despite the last decrease. Correct code does not
+cancel an incorrect explanation. The [second four-field report](evaluation-final-second.json)
+and all thirty responses/reviews are preserved independently in
+`test/fixtures/genui/real/final-c25-second/`; no outcomes are combined across runs.
+
+A second §16.2 repair adds a shared Skill check that prose numbers, sample counts
+and trends agree with the same expressions/records, including fractional sample
+coordinates and missing values. It distinguishes input parameters from results
+and favors concise interaction explanations over extra unrequested numerical
+interpretations. The frozen tasks, scoring, catalog and runtime are unchanged.
+All thirty tasks must again be manually rerun after this repair is committed.
+
+Grounding-repair validation: 70 focused tests passed; all generated assets
+matched the source and the changed Skill matched the macOS bundle. Token counts
+(summary/main/references-with-examples) were 62/549/2283 for cl100k_base and
+61/543/2296 for o200k_base. Both changed Dart files were formatted. G passed
+root fatal-info analysis and 10,209 tests (one existing skip), markstream offline
+resolution/analysis and 298 tests, macOS debug build and git diff --check.
+Independent review returned no findings; the 35-file manifest and 33 frozen
+non-document hashes matched before staging. Logs remain under
+build/genui/logs/c25-grounding-*.
