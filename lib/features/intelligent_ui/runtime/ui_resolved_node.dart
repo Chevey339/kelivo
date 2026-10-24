@@ -1,5 +1,6 @@
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'ui_chart_data.dart';
+import 'ui_table_data.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_diagnostic.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_ir.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_evaluator.dart';
@@ -15,12 +16,14 @@ final class UiResolvedNode {
     this.askText,
     this.askContext,
     this.chartData,
+    this.tableData,
   }) : properties = Map.unmodifiable(properties),
        diagnostics = List.unmodifiable(diagnostics),
        gaps = List.unmodifiable(gaps);
   final UiNodeDeclaration declaration;
   final Map<String, Object?> properties;
   final UiChartData? chartData;
+  final UiTableData? tableData;
   final List<UiDiagnostic> diagnostics;
   final List<UiSampleGap> gaps;
   final bool pending;
@@ -224,10 +227,26 @@ UiResolvedNode uiResolveNode(
     }
   }
   UiChartData? chartData;
+  UiTableData? tableData;
   if (!pending && diagnostics.isEmpty && node.component == 'Chart') {
     try {
       chartData = UiChartData.read(properties, sampleGaps: gaps);
+      tableData = UiTableData.fromChart(chartData, properties);
     } on UiChartDataException catch (error) {
+      diagnostics.add(
+        UiDiagnostic(
+          error.code,
+          line: node.location.line,
+          symbol: node.name,
+          detail: error.detail,
+        ),
+      );
+    }
+  }
+  if (!pending && diagnostics.isEmpty && node.component == 'DataTable') {
+    try {
+      tableData = UiTableData.read(properties);
+    } on UiTableDataException catch (error) {
       diagnostics.add(
         UiDiagnostic(
           error.code,
@@ -247,5 +266,6 @@ UiResolvedNode uiResolveNode(
     askText: askText,
     askContext: askContext,
     chartData: chartData,
+    tableData: tableData,
   );
 }

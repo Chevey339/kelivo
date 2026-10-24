@@ -6609,5 +6609,50 @@
       }
     }
   },
-  "genuiSomeValuesUnavailable": "Some values are unavailable"
+  "genuiSomeValuesUnavailable": "Some values are unavailable",
+  "genuiViewChart": "Chart",
+  "genuiViewData": "Data",
+  "genuiTableFilterHint": "Filter visible text",
+  "genuiTableRows": "{count, plural, =1{1 row} other{{count} rows}}",
+  "@genuiTableRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePageInfo": "Rows {from}–{to} of {total}",
+  "@genuiTablePageInfo": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePerPage": "{n}/page",
+  "@genuiTablePerPage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTableEmpty": "No matching rows",
+  "genuiSortAsc": "Sorted ascending",
+  "genuiSortDesc": "Sorted descending",
+  "genuiSortNone": "Not sorted",
+  "genuiValueTrue": "True",
+  "genuiValueFalse": "False",
+  "genuiTablePreviousPage": "Previous page",
+  "genuiTableNextPage": "Next page",
+  "genuiTableCellsError": "Table data must contain records with finite scalar values or missing values.",
+  "genuiTableColumnsError": "Choose one to eight distinct fields with labels and optional digits from 0 to 10.",
+  "genuiTableRowKeyError": "Every row needs a non-null scalar key.",
+  "genuiViewStateFailed": "This view change exceeds the saved state limit. Shorten a field or reset the UI and try again."
 }

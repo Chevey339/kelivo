@@ -16,6 +16,7 @@ import 'genui_boolean_input.dart';
 import 'genui_choice_input.dart';
 import 'genui_slider.dart';
 import 'genui_chart.dart';
+import 'genui_table.dart';
 
 /// One dependency subscription per node. The host owns the controller; widget
 /// disposal only removes this observer, so off-screen messages retain state.
@@ -212,6 +213,12 @@ class _GenUiNodeState extends State<GenUiNode>
         token: controller.token,
       ),
       'Chart' => GenUiChart(
+        key: key,
+        id: widget.id,
+        node: node,
+        token: controller.token,
+      ),
+      'DataTable' => GenUiDataTable(
         key: key,
         id: widget.id,
         node: node,

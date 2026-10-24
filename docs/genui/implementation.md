@@ -135,10 +135,10 @@ feature flag or conversion of user messages into trusted assistants.
 
 | Environment | Discovery | Acceptance status |
 | --- | --- | --- |
-| macOS | Local GUI host, Xcode and Flutter available | C01 debug build passed; GenUI GUI flows later |
+| macOS | Local GUI host, Xcode and Flutter available; user unlocked it during C15 | C15 native gallery filter/sort/theme/text scale/RTL/data-view interactions observed; full host/final acceptance later |
 | iOS simulator | Booted iPhone 17, iOS 26.5 | Available; not physical-device evidence |
 | iOS physical | Flutter discovers device named HUAWEI, iOS 18.2.1 | Signing/install/behavior not yet verified |
-| Android | Local Android SDK/adb, no connected device | Build possible; physical runtime BLOCKED |
+| Android | User connected a dedicated disposable test phone during C15: model 2112123AC, Android 11/API 30, arm64-v8a, adb serial fee8c1be; WebView Dev 151.0.7885.0 | Physical test access authorized and verified; GenUI device execution/acceptance pending |
 | Windows | SSH verified; Windows 11 build 26100, x64, active console; isolated Flutter 3.47.6/Dart 3.13.5 and Visual Studio 2022 17.12.4 with C++ tools | Candidate builds available; actual GenUI build/plugin tests and C21 GUI pending |
 | Linux | No machine; user explicitly deferred acceptance | DEFERRED by user; not a delivery gate for this run |
 | Model evaluation | User supplied a test endpoint/key and named one model | C06 early run 1/3 preserved; C25 final 30 pending; credentials not in Git |
@@ -777,3 +777,56 @@ toolchains, actual commands, cache preparation and log locations are in
 [the C14 build record](c14-builds.json). All 61 non-document source/golden files
 were hash-checked unchanged after validation; final independent review returned
 no findings. Native GUI/physical-device acceptance is separate and pending.
+
+## C15 tables and Chart data views
+
+DataTable validates at most 1,000 scalar records and eight explicit columns,
+with stable original row identities. The Chart adapter retains its existing
+2,000-slot budget and duplicate X values through source row identities. Both
+use the same paginated presentation and normalized persistent sort/filter/page
+settings. Sorts are stable, nulls remain last in both directions, filtering and
+highlighting use the same visible formatted text, and only 10/20 rows render.
+Raw column names retain identity through reorder, including non-ASCII and lone
+surrogate keys; their bounded saved sort IDs hash JSON-encoded field names.
+
+Filter composition remains transient and prevents a late state restore.
+Committing or losing focus applies the same 256 UTF-16-unit bound without
+splitting graphemes. State-budget refusals retain the draft and explain the
+failure for filtering, sorting, paging, page size and Chart view/legend changes.
+Changing another view setting cannot hide an unapplied filter's error. Tables
+and view tabs have visible keyboard focus; mixed text retains inherited RTL,
+numbers remain LTR, and numeric missing cells align with their column.
+
+The shared IosTextButton adds optional start/end alignment while preserving its
+centered default. Column measurements are cached per data/appearance change;
+wide tables scroll horizontally and the pager wraps as one unit under large
+text. Four ARBs and generated localizations contain the table/view strings.
+Native gallery and production MessageListView fixtures include table data,
+empty and invalid states. Read-only presentations omit controls and retain the
+current page/filter explanation; complete exports are integrated in C19.
+
+Focused data/behavior checks and 55 Chart/table goldens passed, followed by a
+separate mixed-text RTL regression and table golden comparison. The explicit
+print-only debug benchmark measured a 1,000-row/eight-column combined
+sort/filter/page-to-paint p95 of 35.754 ms. Chart input-to-paint p95 was
+18.394/17.967/12.930/11.442 ms for line/area/bar/scatter; unrelated-node
+notifications remained zero. These are widget-runner observations, not the
+C24 device profile or ordinary-message scrolling acceptance.
+
+The local macOS gallery was built and operated through native computer use:
+filter Pro produced five rows, price sorted descending, and dark/1.3/RTL
+changes preserved the query. The native line chart switched to its six-row
+data table with units and the missing cell visible. This is a development
+entry point, not production message-host or final-head acceptance. This run
+preceded only the final mixed-string RTL correction, which has its own widget
+regression. Logs: build/genui/logs/c15-macos-gallery.log; native AX and screenshot
+observations are retained in this implementation chat.
+
+Final G passed: both fatal-info analyses, all 9,619 root tests (one existing
+skip), markstream dependency resolution and all 296 tests, macOS debug build,
+21 changed Dart files formatted, and diff checks. Final independent review
+returned no findings. All 76 non-document source and golden files remained
+hash-identical through the gate and staging. Logs are under build/genui/logs/
+with the c15 prefix; the local frozen manifest is build/genui/c15/. The final
+focused coverage totals 64 table/chart data and behavior tests, 55 goldens and
+the shared button regression, with the last RTL fix checked separately.

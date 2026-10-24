@@ -17,6 +17,7 @@ abstract final class UiBudgets {
   static const pieItems = 12;
   static const tableRows = 1000;
   static const tableColumns = 8;
+  static const tableFilterCodeUnits = 256;
   static const stateBytes = 32 * 1024;
   static const modelContentBytes = 4 * 1024;
   static const searchTextBytes = 16 * 1024;

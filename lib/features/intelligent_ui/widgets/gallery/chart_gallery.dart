@@ -8,8 +8,9 @@ import '../genui_surface.dart';
 /// Native-only development fixtures, without provider requests or installed
 /// application data. The static Canvas previews live in the web-safe graph.
 class GenUiChartGallery extends StatefulWidget {
-  const GenUiChartGallery({super.key, this.kind});
+  const GenUiChartGallery({super.key, this.kind, this.dataView = false});
   final String? kind;
+  final bool dataView;
   @override
   State<GenUiChartGallery> createState() => _GenUiChartGalleryState();
 }
@@ -31,6 +32,9 @@ class _GenUiChartGalleryState extends State<GenUiChartGallery> {
         closed: true,
         generation: UiGenerationStatus.complete,
       );
+      if (widget.dataView && c.nodes['root']?.chartData != null) {
+        c.setView('root', {'dataView': true}, token: c.token);
+      }
       _surfaces[entry.key] = c;
     }
   }

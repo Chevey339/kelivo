@@ -63,7 +63,7 @@ final class UiSurfaceState {
           program.failedSymbols.contains(name)) {
         throw const FormatException('Unknown or invalid view');
       }
-      final settings = _normalizeView(node.component, view[name]!);
+      final settings = _normalizeView(node, view[name]!);
       if (settings.isNotEmpty) {
         normalizedView[name] = Map.unmodifiable(settings);
       }
@@ -114,13 +114,18 @@ final class UiSurfaceState {
   }
 
   static Map<String, Object?> _normalizeView(
-    String component,
+    UiNodeDeclaration node,
     Map<String, Object?> raw,
   ) {
     final result = <String, Object?>{};
-    final allowed = component == 'Chart'
-        ? const {'dataView', 'hiddenSeries'}
-        : const {'sortKey', 'descending', 'filter', 'page'};
+    final allowed = {
+      'sortKey',
+      'descending',
+      'filter',
+      'page',
+      'pageSize',
+      if (node.component == 'Chart') ...['dataView', 'hiddenSeries'],
+    };
     if (raw.keys.any((key) => !allowed.contains(key))) {
       throw const FormatException('Unknown view setting');
     }
@@ -155,7 +160,8 @@ final class UiSurfaceState {
           }
           if (value != null) result[key] = value;
         case 'filter':
-          if (value is! String || value.length > 256) {
+          if (value is! String ||
+              value.length > UiBudgets.tableFilterCodeUnits) {
             throw const FormatException('Invalid filter');
           }
           if (value.isNotEmpty) result[key] = value;
@@ -168,9 +174,22 @@ final class UiSurfaceState {
             throw const FormatException('Invalid page');
           }
           if (value != 0) result[key] = value.toInt();
+        case 'pageSize':
+          if (value is! num || (value != 10 && value != 20)) {
+            throw const FormatException('Invalid page size');
+          }
+          final declared = node.arguments['pageSize'];
+          final defaultValue = declared == null
+              ? 10
+              : declared is UiLiteral
+              ? declared.value
+              : null;
+          // A dynamic source default can change with inputs. An explicit
+          // choice pins the page size until Reset; literal defaults normalize.
+          if (value != defaultValue) result[key] = value.toInt();
       }
     }
-    if (component == 'DataTable' && !result.containsKey('sortKey')) {
+    if (!result.containsKey('sortKey')) {
       result.remove('descending');
     }
     return result;

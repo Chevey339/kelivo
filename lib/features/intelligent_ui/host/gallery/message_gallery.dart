@@ -17,6 +17,7 @@ import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import '../../catalog/ui_catalog.dart';
 import '../../widgets/gallery/chart_gallery.dart';
+import '../../widgets/gallery/table_gallery.dart';
 import '../ui_host_scope.dart';
 
 const genUiMessageFixture = r'''ui 1 catalog "kelivo.native/1"
@@ -44,7 +45,11 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   final _processing = ValueNotifier<String?>(null);
   bool _dark = false, _large = false, _rtl = false;
   int _step = 6, _role = 0, _fixture = 0;
-  final _fixtures = ['form', ...genUiChartGallerySources.keys];
+  final _fixtures = [
+    'form',
+    ...genUiChartGallerySources.keys,
+    ...genUiTableGallerySources.keys,
+  ];
   String _intent = 'Ask is observed locally. No messages are sent.';
   @override
   void dispose() {
@@ -57,7 +62,7 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   ChatMessage _message() {
     final source = _fixture == 0
         ? genUiMessageFixture
-        : '${UiCatalog.header}\n${genUiChartGallerySources[_fixtures[_fixture]]}\n';
+        : '${UiCatalog.header}\n${genUiChartGallerySources[_fixtures[_fixture]] ?? genUiTableGallerySources[_fixtures[_fixture]]}\n';
     final lines = source.trimRight().split('\n');
     final count = switch (_step) {
       0 => 1,

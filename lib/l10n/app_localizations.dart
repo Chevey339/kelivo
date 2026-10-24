@@ -25451,6 +25451,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Some values are unavailable'**
   String get genuiSomeValuesUnavailable;
+
+  /// No description provided for @genuiViewChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart'**
+  String get genuiViewChart;
+
+  /// No description provided for @genuiViewData.
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get genuiViewData;
+
+  /// No description provided for @genuiTableFilterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter visible text'**
+  String get genuiTableFilterHint;
+
+  /// No description provided for @genuiTableRows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 row} other{{count} rows}}'**
+  String genuiTableRows(int count);
+
+  /// No description provided for @genuiTablePageInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows {from}–{to} of {total}'**
+  String genuiTablePageInfo(int from, int to, int total);
+
+  /// No description provided for @genuiTablePerPage.
+  ///
+  /// In en, this message translates to:
+  /// **'{n}/page'**
+  String genuiTablePerPage(int n);
+
+  /// No description provided for @genuiTableEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching rows'**
+  String get genuiTableEmpty;
+
+  /// No description provided for @genuiSortAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted ascending'**
+  String get genuiSortAsc;
+
+  /// No description provided for @genuiSortDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted descending'**
+  String get genuiSortDesc;
+
+  /// No description provided for @genuiSortNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sorted'**
+  String get genuiSortNone;
+
+  /// No description provided for @genuiValueTrue.
+  ///
+  /// In en, this message translates to:
+  /// **'True'**
+  String get genuiValueTrue;
+
+  /// No description provided for @genuiValueFalse.
+  ///
+  /// In en, this message translates to:
+  /// **'False'**
+  String get genuiValueFalse;
+
+  /// No description provided for @genuiTablePreviousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get genuiTablePreviousPage;
+
+  /// No description provided for @genuiTableNextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get genuiTableNextPage;
+
+  /// No description provided for @genuiTableCellsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Table data must contain records with finite scalar values or missing values.'**
+  String get genuiTableCellsError;
+
+  /// No description provided for @genuiTableColumnsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one to eight distinct fields with labels and optional digits from 0 to 10.'**
+  String get genuiTableColumnsError;
+
+  /// No description provided for @genuiTableRowKeyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Every row needs a non-null scalar key.'**
+  String get genuiTableRowKeyError;
+
+  /// No description provided for @genuiViewStateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This view change exceeds the saved state limit. Shorten a field or reset the UI and try again.'**
+  String get genuiViewStateFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -13640,6 +13640,66 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiSomeValuesUnavailable => '部分值无法计算';
+
+  @override
+  String get genuiViewChart => '图表';
+
+  @override
+  String get genuiViewData => '数据';
+
+  @override
+  String get genuiTableFilterHint => '筛选可见文本';
+
+  @override
+  String genuiTableRows(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String genuiTablePageInfo(int from, int to, int total) {
+    return '第 $from–$to 行，共 $total 行';
+  }
+
+  @override
+  String genuiTablePerPage(int n) {
+    return '$n 行/页';
+  }
+
+  @override
+  String get genuiTableEmpty => '没有匹配的行';
+
+  @override
+  String get genuiSortAsc => '升序';
+
+  @override
+  String get genuiSortDesc => '降序';
+
+  @override
+  String get genuiSortNone => '未排序';
+
+  @override
+  String get genuiValueTrue => '是';
+
+  @override
+  String get genuiValueFalse => '否';
+
+  @override
+  String get genuiTablePreviousPage => '上一页';
+
+  @override
+  String get genuiTableNextPage => '下一页';
+
+  @override
+  String get genuiTableCellsError => '表格数据必须是记录数组，单元格只能是有限标量或空值。';
+
+  @override
+  String get genuiTableColumnsError => '请选择 1–8 个不同的字段，并提供表头；小数位数可为 0–10。';
+
+  @override
+  String get genuiTableRowKeyError => '每行都需要一个非空值的标量标识。';
+
+  @override
+  String get genuiViewStateFailed => '保存状态过大，无法更改视图。请缩短输入或重置界面后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27204,6 +27264,66 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiSomeValuesUnavailable => '部分值无法计算';
+
+  @override
+  String get genuiViewChart => '图表';
+
+  @override
+  String get genuiViewData => '数据';
+
+  @override
+  String get genuiTableFilterHint => '筛选可见文本';
+
+  @override
+  String genuiTableRows(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String genuiTablePageInfo(int from, int to, int total) {
+    return '第 $from–$to 行，共 $total 行';
+  }
+
+  @override
+  String genuiTablePerPage(int n) {
+    return '$n 行/页';
+  }
+
+  @override
+  String get genuiTableEmpty => '没有匹配的行';
+
+  @override
+  String get genuiSortAsc => '升序';
+
+  @override
+  String get genuiSortDesc => '降序';
+
+  @override
+  String get genuiSortNone => '未排序';
+
+  @override
+  String get genuiValueTrue => '是';
+
+  @override
+  String get genuiValueFalse => '否';
+
+  @override
+  String get genuiTablePreviousPage => '上一页';
+
+  @override
+  String get genuiTableNextPage => '下一页';
+
+  @override
+  String get genuiTableCellsError => '表格数据必须是记录数组，单元格只能是有限标量或空值。';
+
+  @override
+  String get genuiTableColumnsError => '请选择 1–8 个不同的字段，并提供表头；小数位数可为 0–10。';
+
+  @override
+  String get genuiTableRowKeyError => '每行都需要一个非空值的标量标识。';
+
+  @override
+  String get genuiViewStateFailed => '保存状态过大，无法更改视图。请缩短输入或重置界面后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -40848,4 +40968,64 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiSomeValuesUnavailable => '部分值無法計算';
+
+  @override
+  String get genuiViewChart => '圖表';
+
+  @override
+  String get genuiViewData => '資料';
+
+  @override
+  String get genuiTableFilterHint => '篩選可見文字';
+
+  @override
+  String genuiTableRows(int count) {
+    return '$count 列';
+  }
+
+  @override
+  String genuiTablePageInfo(int from, int to, int total) {
+    return '第 $from–$to 列，共 $total 列';
+  }
+
+  @override
+  String genuiTablePerPage(int n) {
+    return '$n 列/頁';
+  }
+
+  @override
+  String get genuiTableEmpty => '沒有符合的列';
+
+  @override
+  String get genuiSortAsc => '升冪';
+
+  @override
+  String get genuiSortDesc => '降冪';
+
+  @override
+  String get genuiSortNone => '未排序';
+
+  @override
+  String get genuiValueTrue => '是';
+
+  @override
+  String get genuiValueFalse => '否';
+
+  @override
+  String get genuiTablePreviousPage => '上一頁';
+
+  @override
+  String get genuiTableNextPage => '下一頁';
+
+  @override
+  String get genuiTableCellsError => '表格資料必須是記錄陣列，儲存格只能是有限純量或空值。';
+
+  @override
+  String get genuiTableColumnsError => '請選擇 1–8 個不同的欄位，並提供表頭；小數位數可為 0–10。';
+
+  @override
+  String get genuiTableRowKeyError => '每列都需要一個非空值的純量識別碼。';
+
+  @override
+  String get genuiViewStateFailed => '儲存狀態過大，無法變更檢視。請縮短輸入或重設介面後重試。';
 }

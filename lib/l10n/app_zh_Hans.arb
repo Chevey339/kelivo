@@ -5249,5 +5249,50 @@
       }
     }
   },
-  "genuiSomeValuesUnavailable": "部分值无法计算"
+  "genuiSomeValuesUnavailable": "部分值无法计算",
+  "genuiViewChart": "图表",
+  "genuiViewData": "数据",
+  "genuiTableFilterHint": "筛选可见文本",
+  "genuiTableRows": "{count} 行",
+  "@genuiTableRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePageInfo": "第 {from}–{to} 行，共 {total} 行",
+  "@genuiTablePageInfo": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePerPage": "{n} 行/页",
+  "@genuiTablePerPage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTableEmpty": "没有匹配的行",
+  "genuiSortAsc": "升序",
+  "genuiSortDesc": "降序",
+  "genuiSortNone": "未排序",
+  "genuiValueTrue": "是",
+  "genuiValueFalse": "否",
+  "genuiTablePreviousPage": "上一页",
+  "genuiTableNextPage": "下一页",
+  "genuiTableCellsError": "表格数据必须是记录数组，单元格只能是有限标量或空值。",
+  "genuiTableColumnsError": "请选择 1–8 个不同的字段，并提供表头；小数位数可为 0–10。",
+  "genuiTableRowKeyError": "每行都需要一个非空值的标量标识。",
+  "genuiViewStateFailed": "保存状态过大，无法更改视图。请缩短输入或重置界面后重试。"
 }

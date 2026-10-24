@@ -5273,5 +5273,50 @@
       }
     }
   },
-  "genuiSomeValuesUnavailable": "部分值無法計算"
+  "genuiSomeValuesUnavailable": "部分值無法計算",
+  "genuiViewChart": "圖表",
+  "genuiViewData": "資料",
+  "genuiTableFilterHint": "篩選可見文字",
+  "genuiTableRows": "{count} 列",
+  "@genuiTableRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePageInfo": "第 {from}–{to} 列，共 {total} 列",
+  "@genuiTablePageInfo": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePerPage": "{n} 列/頁",
+  "@genuiTablePerPage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTableEmpty": "沒有符合的列",
+  "genuiSortAsc": "升冪",
+  "genuiSortDesc": "降冪",
+  "genuiSortNone": "未排序",
+  "genuiValueTrue": "是",
+  "genuiValueFalse": "否",
+  "genuiTablePreviousPage": "上一頁",
+  "genuiTableNextPage": "下一頁",
+  "genuiTableCellsError": "表格資料必須是記錄陣列，儲存格只能是有限純量或空值。",
+  "genuiTableColumnsError": "請選擇 1–8 個不同的欄位，並提供表頭；小數位數可為 0–10。",
+  "genuiTableRowKeyError": "每列都需要一個非空值的純量識別碼。",
+  "genuiViewStateFailed": "儲存狀態過大，無法變更檢視。請縮短輸入或重設介面後重試。"
 }
