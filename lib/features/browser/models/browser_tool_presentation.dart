@@ -184,6 +184,9 @@ String browserErrorSummary(AppLocalizations l, String error) {
     return l.browserErrNotVisible;
   }
   if (error.contains('element_not_found')) return l.browserErrNotFound;
+  if (error.contains('browser_action_timeout_outcome_unknown')) {
+    return l.browserErrActionTimeout;
+  }
   if (error.toLowerCase().contains('timeout')) return l.browserErrTimeout;
   if (error.contains('browser_human_control')) return l.browserErrHumanControl;
   if (error.contains('browser_tab_closed') ||

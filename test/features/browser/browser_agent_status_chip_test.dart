@@ -14,6 +14,7 @@ void main() {
     double width = 390,
     VoidCallback? onPause,
     VoidCallback? onResume,
+    BrowserAgentPauseReason? pauseReason,
   }) async {
     tester.view.resetPhysicalSize();
     tester.view.physicalSize = Size(width, 844);
@@ -36,6 +37,7 @@ void main() {
                 style: BrowserSurfaceStyle.solid,
                 child: BrowserAgentStatusChip(
                   activity: activity,
+                  pauseReason: pauseReason,
                   onPause: onPause ?? () {},
                   onResume: onResume ?? () {},
                 ),
@@ -101,6 +103,31 @@ void main() {
     expect(rect.left, greaterThanOrEqualTo(0));
     expect(rect.right, lessThanOrEqualTo(320));
     expect(find.text('Allow to continue'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('timeout pause explains its cause and keeps the resume action', (
+    tester,
+  ) async {
+    var resumed = 0;
+    await mount(
+      tester,
+      BrowserAgentActivity.paused,
+      pauseReason: BrowserAgentPauseReason.timeout,
+      onResume: () => resumed++,
+      width: 320,
+      scale: 3,
+    );
+    expect(find.text('Operation timed out; AI paused'), findsOneWidget);
+    expect(find.text('AI actions paused'), findsNothing);
+    expect(find.text('Take over'), findsNothing);
+    final rect = tester.getRect(
+      find.byKey(const ValueKey('browserAgentStatusChip')),
+    );
+    expect(rect.left, greaterThanOrEqualTo(0));
+    expect(rect.right, lessThanOrEqualTo(320));
+    await tester.tap(find.text('Allow to continue'));
+    expect(resumed, 1);
     expect(tester.takeException(), isNull);
   });
 }

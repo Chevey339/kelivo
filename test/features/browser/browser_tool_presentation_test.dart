@@ -127,6 +127,7 @@ void main() {
         'element_not_found': '未找到元素',
         'TimeoutException': '页面加载超时',
         'timeout': '页面加载超时',
+        'browser_action_timeout_outcome_unknown': '操作超时，结果未确认，请检查页面后允许继续',
         'browser_human_control': '你正在接管浏览器',
         'browser_tab_not_found': '标签页已关闭',
         'browser_tab_closed': '标签页已关闭',

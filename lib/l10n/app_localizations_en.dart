@@ -13591,6 +13591,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserAgentPaused => 'AI actions paused';
 
   @override
+  String get browserAgentTimedOut => 'Operation timed out; AI paused';
+
+  @override
   String get browserAllowAgent => 'Allow to continue';
 
   @override
@@ -13910,6 +13913,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserErrTimeout => 'Page load timed out';
+
+  @override
+  String get browserErrActionTimeout =>
+      'Operation timed out; outcome unknown. Check the page before allowing AI to continue.';
 
   @override
   String get browserErrHumanControl => 'You\'re controlling the browser';

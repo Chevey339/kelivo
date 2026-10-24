@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
+import 'package:Kelivo/features/browser/models/browser_agent_activity.dart';
 
 class FakeBrowserEngine extends BrowserEngine {
   FakeBrowserEngine(this.tab, this.onChanged, {this.onDisposed});
@@ -22,6 +24,8 @@ class FakeBrowserEngine extends BrowserEngine {
   final List<String> scripts = [];
   final List<String> htmlLoads = [];
   Completer<Object?>? evaluation;
+  Completer<void>? loading;
+  Completer<void>? navigating;
   @override
   Widget buildView() {
     viewBuilds++;
@@ -34,6 +38,7 @@ class FakeBrowserEngine extends BrowserEngine {
   @override
   Future<void> navigate(String url) async {
     navigations.add(url);
+    await navigating?.future;
   }
 
   @override
@@ -50,7 +55,10 @@ class FakeBrowserEngine extends BrowserEngine {
   @override
   Future<void> stop() async {}
   @override
-  Future<void> waitForLoad(Duration timeout) async {}
+  Future<void> waitForLoad(Duration timeout) async {
+    await loading?.future.timeout(timeout);
+  }
+
   @override
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async {
     scripts.add(source);
@@ -1074,6 +1082,168 @@ void main() {
       expect(engine.scripts, ['prepare', 'first', 'next']);
     },
   );
+
+  for (final timeout in [15, 60]) {
+    test(
+      'load deadline ($timeout seconds) preserves queued AI actions',
+      () async {
+        service.dispose();
+        service = createService(store: _RetryStore()..failRead = false);
+        final tab = await service.createTab(ownerSessionId: 'a');
+        await service.evaluateJavascript('prepare', tabId: tab.id);
+        final engine = engines[tab.id]!;
+        engine.loading = Completer<void>();
+        final epoch = service.controlEpoch;
+        fakeAsync((clock) {
+          Object? failure;
+          Object? next;
+          service
+              .runAgentAction(
+                sessionId: 'a',
+                label: 'open',
+                action: () => service.waitForLoad(
+                  tabId: tab.id,
+                  timeout: Duration(seconds: timeout),
+                ),
+              )
+              .then<void>((_) {}, onError: (Object error) => failure = error);
+          clock.flushMicrotasks();
+          service
+              .runAgentAction(
+                sessionId: 'a',
+                label: 'snapshot',
+                action: () => service.evaluateJavascript('next', tabId: tab.id),
+              )
+              .then<void>(
+                (value) => next = value,
+                onError: (Object error) => next = error,
+              );
+          clock.flushMicrotasks();
+          expect(failure, isNull);
+          expect(next, isNull);
+          clock.elapse(Duration(seconds: timeout > 30 ? 30 : timeout));
+          expect(failure, isA<TimeoutException>());
+          expect(next, 'complete');
+          expect(service.controlEpoch, epoch);
+          expect(service.agentPaused, isFalse);
+          expect(service.agentPauseReason, isNull);
+          expect(engine.scripts, ['prepare', 'next']);
+          engine.loading!.complete();
+          clock.flushMicrotasks();
+        });
+      },
+    );
+  }
+
+  for (final action in ['navigate', 'evaluate']) {
+    test('$action native deadline pauses before late settlement', () async {
+      service.dispose();
+      service = createService(store: _RetryStore()..failRead = false);
+      final tab = await service.createTab(ownerSessionId: 'a');
+      await service.evaluateJavascript('prepare', tabId: tab.id);
+      final engine = engines[tab.id]!;
+      if (action == 'navigate') {
+        engine.navigating = Completer<void>();
+      } else {
+        engine.evaluation = Completer<Object?>();
+      }
+      fakeAsync((clock) {
+        Object? failure;
+        Object? queued;
+        service
+            .runAgentAction<void>(
+              sessionId: 'a',
+              label: action == 'navigate' ? 'open' : 'click',
+              action: () async {
+                if (action == 'navigate') {
+                  await service.navigate(
+                    'https://example.com/next',
+                    tabId: tab.id,
+                  );
+                } else {
+                  await service.evaluateJavascript('click', tabId: tab.id);
+                }
+              },
+            )
+            .then<void>((_) {}, onError: (Object error) => failure = error);
+        clock.flushMicrotasks();
+        service
+            .runAgentAction(
+              sessionId: 'a',
+              label: 'snapshot',
+              action: () => service.evaluateJavascript('queued', tabId: tab.id),
+            )
+            .then<void>(
+              (value) => queued = value,
+              onError: (Object error) => queued = error,
+            );
+        clock.flushMicrotasks();
+        clock.elapse(const Duration(seconds: 29));
+        expect(failure, isNull);
+        expect(queued, isNull);
+        expect(service.agentPaused, isFalse);
+        clock.elapse(const Duration(seconds: 1));
+        expect(
+          failure.toString(),
+          contains('browser_action_timeout_outcome_unknown'),
+        );
+        expect(service.agentPaused, isTrue);
+        expect(service.agentPauseReason, BrowserAgentPauseReason.timeout);
+        expect(
+          queued.toString(),
+          contains('browser_action_timeout_outcome_unknown'),
+        );
+        expect(engine.scripts, isNot(contains('queued')));
+        engine.navigating?.complete();
+        engine.evaluation?.complete('late result');
+        clock.flushMicrotasks();
+        expect(service.agentPaused, isTrue);
+      });
+    });
+  }
+
+  for (final resume in [false, true]) {
+    test(
+      'late timeout cannot overwrite takeover or resume ($resume)',
+      () async {
+        final tab = await service.createTab(ownerSessionId: 'a');
+        await service.evaluateJavascript('prepare', tabId: tab.id);
+        final engine = engines[tab.id]!;
+        engine.evaluation = Completer<Object?>();
+        final running = service.runAgentAction(
+          sessionId: 'a',
+          label: 'click',
+          action: () => service.evaluateJavascript('click', tabId: tab.id),
+        );
+        final cancelled = expectLater(running, throwsStateError);
+        await Future<void>.delayed(Duration.zero);
+        service.takeOver(sessionId: 'a', tabId: tab.id);
+        await cancelled;
+        if (resume) service.allowAgentControl(sessionId: 'a');
+        final epoch = service.controlEpoch;
+        final pending = engine.evaluation!;
+        engine.evaluation = null;
+        pending.completeError(TimeoutException('Late native response'));
+        await Future<void>.delayed(Duration.zero);
+        expect(service.controlEpoch, epoch);
+        expect(service.agentPaused, !resume);
+        expect(
+          service.agentPauseReason,
+          resume ? null : BrowserAgentPauseReason.user,
+        );
+        if (resume) {
+          expect(
+            await service.runAgentAction(
+              sessionId: 'a',
+              label: 'read',
+              action: () => service.evaluateJavascript('read', tabId: tab.id),
+            ),
+            'complete',
+          );
+        }
+      },
+    );
+  }
 
   test(
     'concurrent persistence writes retain the newest complete snapshot',

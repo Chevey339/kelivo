@@ -59,6 +59,11 @@ class BrowserToolsService {
           'consent. Only act within the user request. Ask the user to take over '
           'for login, CAPTCHA, cross-origin frames or trusted native input. '
           'Human takeover pauses all agent actions until the user resumes. '
+          'A page-load timeout does not pause control: inspect the current page '
+          'with snapshot or extract before deciding whether to wait or navigate. '
+          'browser_action_timeout_outcome_unknown means a native operation '
+          'timed out and control is paused; ask the user to check the page '
+          'and allow continuation. This is not human takeover. '
           'Never retry a mutation with outcome_unknown without observing first. '
           'Screenshots cost image tokens; request them only for visual work.',
       'parameters': {

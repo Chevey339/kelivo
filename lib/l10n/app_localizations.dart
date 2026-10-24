@@ -24222,6 +24222,12 @@ abstract class AppLocalizations {
   /// **'AI actions paused'**
   String get browserAgentPaused;
 
+  /// No description provided for @browserAgentTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation timed out; AI paused'**
+  String get browserAgentTimedOut;
+
   /// No description provided for @browserAllowAgent.
   ///
   /// In en, this message translates to:
@@ -24779,6 +24785,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Page load timed out'**
   String get browserErrTimeout;
+
+  /// No description provided for @browserErrActionTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation timed out; outcome unknown. Check the page before allowing AI to continue.'**
+  String get browserErrActionTimeout;
 
   /// No description provided for @browserErrHumanControl.
   ///

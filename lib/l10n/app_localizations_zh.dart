@@ -12960,6 +12960,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserAgentPaused => 'AI 操作已暂停';
 
   @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
   String get browserAllowAgent => '允许继续';
 
   @override
@@ -13261,6 +13264,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
 
   @override
   String get browserErrHumanControl => '你正在接管浏览器';
@@ -26210,6 +26216,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get browserAgentPaused => 'AI 操作已暂停';
 
   @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
   String get browserAllowAgent => '允许继续';
 
   @override
@@ -26511,6 +26520,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
 
   @override
   String get browserErrHumanControl => '你正在接管浏览器';
@@ -39540,6 +39552,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get browserAgentPaused => 'AI 操作已暫停';
 
   @override
+  String get browserAgentTimedOut => '操作逾時，AI 已暫停';
+
+  @override
   String get browserAllowAgent => '允許繼續';
 
   @override
@@ -39841,6 +39856,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserErrTimeout => '頁面載入逾時';
+
+  @override
+  String get browserErrActionTimeout => '操作逾時，結果未確認，請檢查頁面後允許繼續';
 
   @override
   String get browserErrHumanControl => '你正在接管瀏覽器';
