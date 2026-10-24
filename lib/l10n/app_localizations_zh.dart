@@ -8064,6 +8064,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
 
   @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
+
+  @override
   String get worldBookTitle => '世界书';
 
   @override
@@ -21279,6 +21312,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
+
+  @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
 
   @override
   String get worldBookTitle => '世界书';
@@ -34571,6 +34637,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditOrganizeFrequencyCustomInvalid => '請輸入 1 到 20 之間的整數';
+
+  @override
+  String get worldBookCopyEntries => '複製到…';
+
+  @override
+  String get worldBookMoveEntries => '移動到…';
+
+  @override
+  String get worldBookSelectEntries => '多選條目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已選擇 $count 項';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '請先建立另一本世界書，再移動條目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已複製 $count 個條目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移動 $count 個條目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '儲存條目失敗，請重試。';
 
   @override
   String get worldBookTitle => '世界書';

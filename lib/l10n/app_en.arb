@@ -3685,6 +3685,36 @@
   "assistantEditOrganizeFrequencyCustomLabel": "Turns",
   "assistantEditOrganizeFrequencyCustomHint": "1–20",
   "assistantEditOrganizeFrequencyCustomInvalid": "Enter a number between 1 and 20",
+  "worldBookCopyEntries": "Copy to…",
+  "worldBookMoveEntries": "Move to…",
+  "worldBookSelectEntries": "Select entries",
+  "worldBookSelectedEntries": "{count} selected",
+  "@worldBookSelectedEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookSelectionDone": "Done",
+  "worldBookNoMoveTargets": "Create another world book to move entries into it.",
+  "worldBookEntriesCopied": "{count, plural, =1{Copied 1 entry} other{Copied {count} entries}}",
+  "@worldBookEntriesCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookEntriesMoved": "{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}",
+  "@worldBookEntriesMoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookTransferFailed": "Could not save the entries. Please try again.",
   "worldBookTitle": "World Book",
   "worldBookAdd": "Add World Book",
   "worldBookEmptyMessage": "No world books yet",

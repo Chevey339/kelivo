@@ -8412,6 +8412,53 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a number between 1 and 20';
 
   @override
+  String get worldBookCopyEntries => 'Copy to…';
+
+  @override
+  String get worldBookMoveEntries => 'Move to…';
+
+  @override
+  String get worldBookSelectEntries => 'Select entries';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get worldBookSelectionDone => 'Done';
+
+  @override
+  String get worldBookNoMoveTargets =>
+      'Create another world book to move entries into it.';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Copied $count entries',
+      one: 'Copied 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Moved $count entries',
+      one: 'Moved 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get worldBookTransferFailed =>
+      'Could not save the entries. Please try again.';
+
+  @override
   String get worldBookTitle => 'World Book';
 
   @override

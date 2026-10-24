@@ -15247,6 +15247,60 @@ abstract class AppLocalizations {
   /// **'Enter a number between 1 and 20'**
   String get assistantEditOrganizeFrequencyCustomInvalid;
 
+  /// No description provided for @worldBookCopyEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to…'**
+  String get worldBookCopyEntries;
+
+  /// No description provided for @worldBookMoveEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to…'**
+  String get worldBookMoveEntries;
+
+  /// No description provided for @worldBookSelectEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Select entries'**
+  String get worldBookSelectEntries;
+
+  /// No description provided for @worldBookSelectedEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String worldBookSelectedEntries(int count);
+
+  /// No description provided for @worldBookSelectionDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get worldBookSelectionDone;
+
+  /// No description provided for @worldBookNoMoveTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'Create another world book to move entries into it.'**
+  String get worldBookNoMoveTargets;
+
+  /// No description provided for @worldBookEntriesCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Copied 1 entry} other{Copied {count} entries}}'**
+  String worldBookEntriesCopied(int count);
+
+  /// No description provided for @worldBookEntriesMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}'**
+  String worldBookEntriesMoved(int count);
+
+  /// No description provided for @worldBookTransferFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the entries. Please try again.'**
+  String get worldBookTransferFailed;
+
   /// No description provided for @worldBookTitle.
   ///
   /// In en, this message translates to:

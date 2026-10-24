@@ -349,7 +349,7 @@ void main() {
               ),
             ],
           );
-          await books.updateBook(changed);
+          await books.updateBook(changed.id, (_) => changed);
           if (!force) expect(usage.current!.state, ContextUsageState.stale);
           await usage.refresh(conversationId, force: force);
           expect(
@@ -376,9 +376,12 @@ void main() {
           );
           expect(usage.snapshot(conversationId)!.usedTokens, 1);
 
-          await books.updateBook(changed);
+          await books.updateBook(changed.id, (_) => changed);
           await anchor();
-          await books.updateBook(changed.copyWith(enabled: false));
+          await books.updateBook(
+            changed.id,
+            (current) => current.copyWith(enabled: false),
+          );
           await usage.refresh(conversationId, force: force);
           expect(
             usage.snapshot(conversationId)!.state,
