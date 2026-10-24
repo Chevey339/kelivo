@@ -1,6 +1,8 @@
 import 'package:markstream/markstream_core.dart';
 import 'package:Kelivo/core/services/tts/tts_text_selection.dart';
 import '../catalog/ui_budgets.dart';
+import '../runtime/ui_surface_controller.dart';
+import '../runtime/ui_surface_state.dart';
 import 'ui_bounded_text.dart';
 
 /// A frozen message projection. UI values are literal text, so a value such as
@@ -11,10 +13,43 @@ final class UiMessageText {
     required Iterable<TtsTextPart> parts,
     required this.omitted,
     required this.hasUi,
-  }) : parts = List.unmodifiable(parts);
+    Iterable<UiMessageReplacement> replacements = const [],
+    Iterable<UiCapturedSurface> surfaces = const [],
+  }) : parts = List.unmodifiable(parts),
+       replacements = List.unmodifiable(replacements),
+       surfaces = List.unmodifiable(surfaces);
   final String source, omitted;
   final List<TtsTextPart> parts;
   final bool hasUi;
+  final List<UiMessageReplacement> replacements;
+  final List<UiCapturedSurface> surfaces;
+
+  /// Original joined TextPart coordinates. A fence spanning adjacent parts is
+  /// emitted exactly once; image/file/tool positions remain the caller's own.
+  String exportSlice(
+    int start,
+    int end, {
+    required bool markdown,
+    required String Function(int start, int end) ordinary,
+  }) {
+    final output = StringBuffer();
+    var cursor = start;
+    for (final replacement in replacements) {
+      if (replacement.end <= cursor) continue;
+      if (replacement.start >= end) break;
+      if (replacement.start > cursor) {
+        output.write(ordinary(cursor, replacement.start));
+      }
+      if (replacement.start >= start) {
+        output.write(
+          '\n${markdown ? replacement.markdown : replacement.text}\n',
+        );
+      }
+      cursor = replacement.end.clamp(cursor, end);
+    }
+    if (cursor < end) output.write(ordinary(cursor, end));
+    return output.toString();
+  }
 
   late final String copyText = _copyText();
 
@@ -57,4 +92,51 @@ final class UiMessageText {
 
   String speech(TtsTextSelectionMode mode) =>
       TtsTextSelection.prepareParts(_boundedParts, mode: mode);
+}
+
+/// The fenced form prevents model-authored semantic values from becoming
+/// Markdown links, HTML or another executable UI block in an exported file.
+String uiExportMarkdown(String text, String source) {
+  var width = 3;
+  for (final match in RegExp(r'`+').allMatches(text)) {
+    if (match.group(0)!.length >= width) width = match.group(0)!.length + 1;
+  }
+  final fence = '`' * width;
+  return '$fence'
+      'text\n$text\n$fence\n\n$source';
+}
+
+final class UiMessageReplacement {
+  const UiMessageReplacement(this.start, this.end, this.text, this.source);
+  final int start, end;
+  final String text, source;
+  String get markdown => uiExportMarkdown(text, source);
+}
+
+/// Immutable capture material; reconstructing it never touches a live owner.
+final class UiCapturedSurface {
+  const UiCapturedSurface({
+    required this.owner,
+    required this.source,
+    required this.closed,
+    required this.generation,
+    this.snapshot,
+  });
+  final UiSurfaceOwner owner;
+  final String source;
+  final bool closed;
+  final UiGenerationStatus generation;
+  final UiSurfaceSnapshot? snapshot;
+
+  UiSurfaceController createController() {
+    final controller = UiSurfaceController(owner: owner, readOnly: true)
+      ..updateSource(source, closed: closed, generation: generation);
+    if (snapshot case final state?) {
+      if (!controller.restore(state, token: controller.restoreToken)) {
+        controller.dispose();
+        throw StateError('genui_export_snapshot_invalid');
+      }
+    }
+    return controller;
+  }
 }

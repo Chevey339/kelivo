@@ -1,3 +1,5 @@
+import 'ui_snapshot_export.dart';
+import '../widgets/genui_expansion.dart';
 import 'ui_search_navigation.dart';
 import '../catalog/ui_budgets.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -74,6 +76,61 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
     final conversation = widget.host.binding.conversationId;
     final l10n = AppLocalizations.of(context)!;
     final projection = UiTextProjection(genUiProjectionLabels(l10n));
+    GenUiSurface buildSurface(
+      Future<void> Function()? expand,
+      FocusNode? focus,
+      bool expanded,
+    ) => GenUiSurface(
+      controller: controller,
+      interactions: _entry.interactions,
+      markdownTheme: widget.theme,
+      linkHandler: widget.linkHandler,
+      exporting: widget.host.exporting,
+      expanded: expanded,
+      onExpand: expand,
+      expandFocusNode: focus,
+      onExport: widget.host.exporting
+          ? null
+          : () => exportUiSnapshot(
+              context,
+              controller,
+              originalFence: widget.fence.source,
+              markdownTheme: widget.theme,
+            ),
+      onAsk: stage == null
+          ? actions?.onAsk
+          : (intent) => stage(
+              UiDraftRequest.attach(
+                conversationId: conversation,
+                snapshot: intent.snapshot,
+                context: projection.context(
+                  intent.read,
+                  selected: intent.context,
+                ),
+                text: intent.text,
+              ),
+            ),
+      onAttach: stage == null
+          ? null
+          : (intent) => stage(
+              UiDraftRequest.attach(
+                conversationId: conversation,
+                snapshot: intent.snapshot,
+                context: projection.context(intent.read),
+              ),
+            ),
+      onRepair: stage == null
+          ? null
+          : () => stage(
+              UiDraftRequest.repair(
+                conversationId: conversation,
+                controller: controller,
+                introduction: l10n.genuiRepairDraft,
+                omitted: l10n.genuiContextOmitted,
+              ),
+            ),
+      onRetrySave: controller.flushQuietly,
+    );
     return UiSearchReveal(
       conversationId: conversation,
       owner: controller.owner,
@@ -83,46 +140,9 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
         clipboardByteLimit: UiBudgets.copyBytes,
         project: (selected, complete) =>
             complete ? projection.text(controller.captureRead()) : selected,
-        child: GenUiSurface(
-          controller: controller,
-          interactions: _entry.interactions,
-          markdownTheme: widget.theme,
-          linkHandler: widget.linkHandler,
-          exporting: widget.host.exporting,
-          onAsk: stage == null
-              ? actions?.onAsk
-              : (intent) => stage(
-                  UiDraftRequest.attach(
-                    conversationId: conversation,
-                    snapshot: intent.snapshot,
-                    context: projection.context(
-                      intent.read,
-                      selected: intent.context,
-                    ),
-                    text: intent.text,
-                  ),
-                ),
-          onAttach: stage == null
-              ? null
-              : (intent) => stage(
-                  UiDraftRequest.attach(
-                    conversationId: conversation,
-                    snapshot: intent.snapshot,
-                    context: projection.context(intent.read),
-                  ),
-                ),
-          onRepair: stage == null
-              ? null
-              : () => stage(
-                  UiDraftRequest.repair(
-                    conversationId: conversation,
-                    controller: controller,
-                    introduction: l10n.genuiRepairDraft,
-                    omitted: l10n.genuiContextOmitted,
-                  ),
-                ),
-          onRetrySave: controller.flushQuietly,
-        ),
+        child: widget.host.exporting
+            ? buildSurface(null, null, false)
+            : GenUiExpansion(surfaceBuilder: buildSurface),
       ),
     );
   }

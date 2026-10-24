@@ -89,6 +89,10 @@ final class UiSurfaceController {
   final _stateListeners = <Object, void Function()>{};
   final _acceptedStateListeners = <Object, void Function()>{};
   final _resetListeners = <Object, void Function()>{};
+  final _disposeListeners = <Object, void Function()>{};
+
+  void Function() listenDispose(void Function() listener) =>
+      _listen(_disposeListeners, listener);
   final _nodeListeners = <String, Map<Object, void Function()>>{};
 
   UiParseSnapshot get parsed => _parse;
@@ -421,6 +425,8 @@ final class UiSurfaceController {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _notify(_disposeListeners);
+    _disposeListeners.clear();
     _flush = null;
     _epoch++;
     _nodeListeners.clear();

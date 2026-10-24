@@ -6673,5 +6673,8 @@
   "genuiRepairDraft": "Please repair this interface using the diagnostics and source excerpts below.",
   "genuiCopySourceMarkdown": "Copy source / Markdown",
   "genuiTextFailed": "The interface state could not be read. Try again.",
-  "genuiCopyLimit": "Text exceeds the 64 KiB copy limit. Select a smaller section."
+  "genuiCopyLimit": "Text exceeds the 64 KiB copy limit. Select a smaller section.",
+  "genuiExportSnapshot": "Export read-only snapshot",
+  "genuiExpandedSharedState": "Shares the same state as the message",
+  "genuiExportTooLarge": "This image exceeds 16 megapixels. Select fewer messages or export a smaller UI."
 }

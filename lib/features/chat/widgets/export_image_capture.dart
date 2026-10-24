@@ -20,6 +20,20 @@ class ExportImageProgress {
       total > 0 ? (completed / total).clamp(0.0, 1.0) : null;
 }
 
+final class ExportImageTooLarge implements Exception {
+  const ExportImageTooLarge(this.pixels, this.limit);
+  final int pixels, limit;
+  @override
+  String toString() => 'Image export exceeds $limit pixels ($pixels)';
+}
+
+/// Check the complete requested bitmap before allocating any image or slice.
+void checkExportPixelBudget(Size size, double ratio, int? maxPixels) {
+  if (maxPixels == null) return;
+  final pixels = (size.width * ratio).ceil() * (size.height * ratio).ceil();
+  if (pixels > maxPixels) throw ExportImageTooLarge(pixels, maxPixels);
+}
+
 const double maxExportFullCaptureDimension = 15360;
 const double maxExportSliceHeight = 4096;
 
@@ -63,6 +77,7 @@ Future<ProcessedExportImage> captureExportWidget(
   required ThemeData theme,
   double width = 480,
   double pixelRatio = 3,
+  int? maxPixels,
   ValueChanged<ExportImageProgress>? onProgress,
 }) async {
   onProgress?.call(const ExportImageProgress(ExportImageStage.preparing));
@@ -118,6 +133,7 @@ Future<ProcessedExportImage> captureExportWidget(
     final content = contentKey.currentContext!.findRenderObject()! as RenderBox;
     final size = content.size;
     if (size.isEmpty) throw StateError('Empty export content');
+    checkExportPixelBudget(size, pixelRatio, maxPixels);
     final slices = <({Uint8List bytes, int y})>[];
     Future<Uint8List?> capture(double top, double height) async {
       viewport.value = (top, height);

@@ -33,14 +33,16 @@ Future<T?> showAppDialog<T>(
   BuildContext context, {
   required Widget child,
   double maxWidth = 420,
+  void Function(RawDialogRoute<T>)? onRoute,
+  bool waitForExit = false,
   bool dismissible = true,
   EdgeInsets insetPadding = const EdgeInsets.symmetric(
     horizontal: 24,
     vertical: 24,
   ),
-}) {
-  return showGeneralDialog<T>(
-    context: context,
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final route = RawDialogRoute<T>(
     transitionDuration: MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 200),
@@ -104,6 +106,10 @@ Future<T?> showAppDialog<T>(
       );
     },
   );
+  onRoute?.call(route);
+  final result = await navigator.push(route);
+  if (waitForExit) await route.completed;
+  return result;
 }
 
 /// Bottom sheet styled like the app's import/add sheets: drag handle,

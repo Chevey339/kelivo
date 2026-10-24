@@ -5313,5 +5313,8 @@
   "genuiRepairDraft": "请根据以下诊断和源码片段修复这段界面。",
   "genuiCopySourceMarkdown": "复制源码 / Markdown",
   "genuiTextFailed": "无法读取界面状态，请重试。",
-  "genuiCopyLimit": "文本超过 64 KiB 复制上限，请选择较小的片段。"
+  "genuiCopyLimit": "文本超过 64 KiB 复制上限，请选择较小的片段。",
+  "genuiExportSnapshot": "导出只读快照",
+  "genuiExpandedSharedState": "与消息内共享同一状态",
+  "genuiExportTooLarge": "图片超过 1600 万像素，请减少所选消息或导出较小的界面。"
 }

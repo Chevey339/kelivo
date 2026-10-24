@@ -25673,6 +25673,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text exceeds the 64 KiB copy limit. Select a smaller section.'**
   String get genuiCopyLimit;
+
+  /// No description provided for @genuiExportSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Export read-only snapshot'**
+  String get genuiExportSnapshot;
+
+  /// No description provided for @genuiExpandedSharedState.
+  ///
+  /// In en, this message translates to:
+  /// **'Shares the same state as the message'**
+  String get genuiExpandedSharedState;
+
+  /// No description provided for @genuiExportTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This image exceeds 16 megapixels. Select fewer messages or export a smaller UI.'**
+  String get genuiExportTooLarge;
 }
 
 class _AppLocalizationsDelegate

@@ -1,3 +1,4 @@
+import '../utils/message_reasoning_source.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_user_message_content.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
@@ -1264,6 +1265,10 @@ class ChatMessageWidget extends StatefulWidget {
   final VoidCallback? onToggleReasoning;
   // For multiple reasoning segments
   final List<ReasoningSegment>? reasoningSegments;
+
+  /// Presentation overlays extracted from inline thinking are not independent
+  /// provider reasoning. Keep removing their original spans from the body.
+  final bool reasoningSegmentsFromInlineThinking;
   // Optional translation UI props
   final bool translationExpanded;
   final VoidCallback? onToggleTranslation;
@@ -1323,6 +1328,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.reasoningFinishedAt,
     this.onToggleReasoning,
     this.reasoningSegments,
+    this.reasoningSegmentsFromInlineThinking = false,
     this.translationExpanded = true,
     this.onToggleTranslation,
     this.toolParts,
@@ -1423,7 +1429,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     hasProviderReasoning:
         (widget.reasoningText?.isNotEmpty ?? false) ||
         widget.reasoningLoading ||
-        (widget.reasoningSegments?.isNotEmpty ?? false),
+        (!widget.reasoningSegmentsFromInlineThinking &&
+            (widget.reasoningSegments?.isNotEmpty ?? false)),
   );
 
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
@@ -1495,9 +1502,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   ThinkingTagParseResult _legacyInlineThinkingFor(ChatMessageWidget widget) {
-    if ((widget.reasoningText?.isNotEmpty ?? false) ||
+    if (messageHasProviderReasoning(widget.message) ||
+        (widget.reasoningText?.isNotEmpty ?? false) ||
         widget.reasoningLoading ||
-        (widget.reasoningSegments?.isNotEmpty ?? false)) {
+        (!widget.reasoningSegmentsFromInlineThinking &&
+            (widget.reasoningSegments?.isNotEmpty ?? false))) {
       return ThinkingTagParseResult(
         visibleContent: widget.message.content,
         thinkingTexts: const <String>[],

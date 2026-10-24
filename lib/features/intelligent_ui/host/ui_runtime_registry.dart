@@ -11,6 +11,8 @@ import '../runtime/ui_surface_state.dart';
 /// Lives with the message list, above disposable Markdown and sliver children.
 /// Durable bindings attach here; scrolling never owns a controller.
 final class UiRuntimeRegistry {
+  UiRuntimeRegistry({this.readOnly = false});
+  final bool readOnly;
   final _entries = <(String, String), Map<String, UiRuntimeEntry>>{};
   final _sources = <(String, String), Object>{};
   int revision = 0;
@@ -47,7 +49,8 @@ final class UiRuntimeRegistry {
     }
     final entry = group.putIfAbsent(
       owner.surfaceKey,
-      () => UiRuntimeEntry(UiSurfaceController(owner: owner)),
+      () =>
+          UiRuntimeEntry(UiSurfaceController(owner: owner, readOnly: readOnly)),
     );
     entry.persistWith(
       _canPersist?.call(conversationId) == true ? _store : null,

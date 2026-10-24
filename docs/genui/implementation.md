@@ -982,3 +982,70 @@ macOS debug native build, and diff checks. All 25 non-document files retained
 their frozen hashes throughout the gate. The 25 changed Dart files were formatted.
 The file manifest, review result and logs use build/genui/c18/ and
 build/genui/logs/c18-*.
+
+## C19 — one active expanded tree and frozen read-only export
+
+The message host now offers a native expanded surface. Mobile uses a full page;
+desktop reuses the app dialog with a 960 dp width and 85% viewport-height cap.
+The inline tree becomes a stub before the new route mounts, and returns only
+after the route's reverse transition disposes its controls. The interaction
+owner retains incomplete numbers and failed table-filter drafts. Source or
+owner changes close the old route. Theme, text scale and direction updates reach
+the expanded view without replacing active input controllers. Esc first clears
+an active chart selection, then closes the route; focus returns to the original
+expansion trigger. Long inline cards use a bounded viewport and a ShaderMask
+only when vertically overflowing. Descendant horizontal table metrics cannot
+trigger that mask, and changing the mask retains input elements.
+
+TXT exports semantic prose; Markdown adds the exact original DSL beside its
+readable snapshot. Replacements use original joined TextPart ranges, including
+fences split across adjacent parts, so image/file/tool positions are preserved.
+Both accepted state and message parts/generation metadata freeze before the
+first await. PNG rendering owns an isolated read-only registry with no write
+bindings; fields are text snapshots without editable clients, focus or actions.
+The complete requested output dimensions are checked against the inclusive
+16-million-pixel budget before allocating any raster image or capture slice.
+The surface menu also offers TXT, Markdown and PNG snapshots, with localized
+failure handling for stale/unavailable sources and oversize images.
+
+Source authority is independent of whether thinking cards are shown. A shared,
+memoized predicate retains the existing provider-evidence rules, including
+empty structured reasoning and validated metadata. Inline-derived overlays are
+explicitly distinguished from independent provider reasoning. Actual PNG-card
+regressions cover five source variants with four thinking-display combinations;
+a hidden inline fence never gains authority, and real provider-body fences do
+not disappear when the card is hidden. Ordinary non-UI export fragment timing
+and collapse behavior remain covered by their original assertions.
+
+The 63-test interaction/chart/table run and the 194-test source/export/host run
+passed. The latter includes split attachments, literal think tags, mutable
+message publication during capture, native read-only controls, exact image
+budget boundaries and rejection before raster allocation. The first source run
+exposed two ordinary export timing regressions; these were fixed without
+changing their expected outcomes. Twelve new light/dark goldens cover the
+expanded mobile page, desktop dialog, stub, read-only output, RTL and 1.3x text
+on the shared wallpaper host. The initial gallery fixture reused two declaration
+names; visual inspection caught it and the corrected golden test also asserts
+every illustrated surface is complete.
+
+Native macOS gallery interaction verified 3→4 before expansion, 4→5 within the
+dialog, a result of 54 USD after Esc return, and a PNG preview retaining the
+edited text and five items with no control actions. This is a development
+macOS GUI check, not the final four-platform/device acceptance. Automated
+focus-return and active-tree-count checks provide the exact focus/lifetime
+assertions.
+
+The broader focused run passed 737 tests and found three failures in standalone
+content-node tests. The new export check unnecessarily required an interaction
+scope for pure content. It now reads that scope only for the seven input types;
+the original content/Metric/conditional-layout assertions are unchanged. The
+focused correction was rerun before the final full gate. Final independent
+source-authority review returned no findings.
+
+Final G passed: both fatal-info analyses, all 9,917 root tests (one existing
+skip), markstream dependency resolution and all 298 tests, the macOS debug
+native build, and diff checks. All 44 non-document files retained their frozen
+hashes throughout G. The 28 changed Dart files were formatted. The exact
+45-file manifest, independent review result and logs are retained under
+build/genui/c19/ and build/genui/logs/c19-*. The dependency lock remained
+unchanged from C14.

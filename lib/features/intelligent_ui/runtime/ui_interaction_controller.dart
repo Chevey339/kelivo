@@ -57,6 +57,33 @@ final class UiInteractionController {
   final _nodeSubscriptions = <void Function()>[];
   final _listeners = <String, Map<Object, void Function()>>{};
   final _drafts = <String, ({UiFieldDraft draft, Object? base})>{};
+  final _tableFilters = <String, ({String text, String base, bool failed})>{};
+
+  ({String text, bool failed})? tableFilterDraft(String id, String committed) {
+    final pending = _tableFilters[id];
+    if (pending == null) return null;
+    if (pending.base != committed) {
+      _tableFilters.remove(id);
+      return null;
+    }
+    return (text: pending.text, failed: pending.failed);
+  }
+
+  void rememberTableFilter(
+    String id,
+    String text, {
+    required String committed,
+    required bool failed,
+    required UiRuntimeToken token,
+  }) {
+    if (_disposed || !surface.accepts(token)) return;
+    if (text == committed) {
+      _tableFilters.remove(id);
+      return;
+    }
+    _tableFilters[id] = (text: text, base: committed, failed: failed);
+  }
+
   final _touched = <String>{};
   final _submitted = <String>{};
   final _editing = <String>{};
@@ -134,7 +161,13 @@ final class UiInteractionController {
   }
 
   void _reset() {
-    final affected = {..._drafts.keys, ..._touched, ..._submitted};
+    final affected = {
+      ..._drafts.keys,
+      ..._tableFilters.keys,
+      ..._touched,
+      ..._submitted,
+    };
+    _tableFilters.clear();
     _drafts.clear();
     _touched.clear();
     _submitted.clear();

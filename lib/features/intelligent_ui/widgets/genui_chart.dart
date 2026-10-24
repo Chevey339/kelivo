@@ -170,6 +170,7 @@ class _GenUiChartState extends State<GenUiChart> {
     }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
+      if (_selected == null && _hover == null) return KeyEventResult.ignored;
       setState(() {
         _selected = null;
         _hover = null;

@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import 'genui_diagnostic_source.dart';
@@ -28,9 +29,12 @@ class GenUiSurface extends StatelessWidget {
     this.markdownTheme,
     this.linkHandler,
     this.onExpand,
+    this.expandFocusNode,
+    this.onExport,
     this.onRepair,
     this.onRetrySave,
     this.exporting = false,
+    this.expanded = false,
     this.interactions,
     this.onAsk,
     this.onAttach,
@@ -40,9 +44,12 @@ class GenUiSurface extends StatelessWidget {
   final ms.MarkstreamTheme? markdownTheme;
   final ms.LinkHandler? linkHandler;
   final Future<void> Function()? onExpand;
+  final FocusNode? expandFocusNode;
+  final Future<void> Function()? onExport;
   final VoidCallback? onRepair;
   final VoidCallback? onRetrySave;
   final bool exporting;
+  final bool expanded;
   final UiInteractionController? interactions;
   final GenUiAskHandler? onAsk;
   final Future<void> Function(UiAttachIntent)? onAttach;
@@ -74,7 +81,9 @@ class _SurfaceBodyState extends State<_SurfaceBody>
     duration: const Duration(milliseconds: 900),
   );
   final _sourceFocus = FocusNode(debugLabel: 'GenUI source');
-  final _expandFocus = FocusNode(debugLabel: 'GenUI expand');
+  final _localExpandFocus = FocusNode(debugLabel: 'GenUI expand');
+  FocusNode get _expandFocus =>
+      widget.surface.expandFocusNode ?? _localExpandFocus;
   final _moreFocus = FocusNode(debugLabel: 'GenUI more');
   final _subscriptions = <VoidCallback>[];
   Object? _chrome;
@@ -152,7 +161,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
     _unsubscribe();
     _motion.dispose();
     _sourceFocus.dispose();
-    _expandFocus.dispose();
+    _localExpandFocus.dispose();
     _moreFocus.dispose();
     super.dispose();
   }
@@ -217,6 +226,12 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                   icon: LucideIcons.paperclip,
                   onPressed: () => Navigator.of(dialogContext).pop('attach'),
                 ),
+              if (widget.surface.onExport != null)
+                IosTextButton(
+                  label: l10n.genuiExportSnapshot,
+                  icon: LucideIcons.image,
+                  onPressed: () => Navigator.of(dialogContext).pop('export'),
+                ),
               IosTextButton(
                 label: l10n.genuiReset,
                 icon: LucideIcons.rotateCcw,
@@ -228,6 +243,15 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       ),
     );
     if (!mounted) return;
+    if (action == 'export' && !controller.accepts(token)) {
+      showAppSnackBar(
+        context,
+        message: l10n.genuiTextFailed,
+        type: NotificationType.error,
+      );
+      _moreFocus.requestFocus();
+      return;
+    }
     if (action == 'attach') {
       final result = await GenUiInteractions.of(
         context,
@@ -239,6 +263,8 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       } else if (result.form?.firstField != null) {
         return; // Keep focus at the invalid field.
       }
+    } else if (action == 'export') {
+      await widget.surface.onExport?.call();
     } else if (action == 'reset') {
       controller.reset(token: token);
       controller.flushQuietly();
@@ -296,16 +322,17 @@ class _SurfaceBodyState extends State<_SurfaceBody>
           focusNode: _sourceFocus,
           onTap: _showSource,
         ),
-        IosIconButton(
-          icon: LucideIcons.expand,
-          size: 16,
-          minSize: 44,
-          color: theme.captionInk,
-          tooltip: l10n.genuiExpand,
-          focusNode: _expandFocus,
-          enabled: surface.onExpand != null,
-          onTap: surface.onExpand != null ? _expand : null,
-        ),
+        if (!surface.expanded)
+          IosIconButton(
+            icon: LucideIcons.expand,
+            size: 16,
+            minSize: 44,
+            color: theme.captionInk,
+            tooltip: l10n.genuiExpand,
+            focusNode: _expandFocus,
+            enabled: surface.onExpand != null,
+            onTap: surface.onExpand != null ? _expand : null,
+          ),
         IosIconButton(
           icon: LucideIcons.ellipsis,
           size: 16,

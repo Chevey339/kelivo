@@ -1,3 +1,5 @@
+import 'genui_interactions.dart';
+import 'genui_input_snapshot.dart';
 import 'genui_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -153,6 +155,18 @@ class _GenUiNodeState extends State<GenUiNode>
       );
     }
     if (!node.visible) return const SizedBox.shrink();
+    if (const {
+          'TextField',
+          'NumberField',
+          'Slider',
+          'Switch',
+          'Checkbox',
+          'Select',
+          'RadioGroup',
+        }.contains(node.declaration.component) &&
+        GenUiInteractions.of(context).exporting) {
+      return GenUiInputSnapshot(node: node);
+    }
     final props = node.properties;
     final key = ValueKey((controller, widget.id, controller.token.epoch));
     Widget children(Widget Function(List<Widget>) builder) => _GenUiChildren(

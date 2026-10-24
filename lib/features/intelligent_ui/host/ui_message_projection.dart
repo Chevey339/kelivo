@@ -47,11 +47,14 @@ Future<UiMessageText> projectUiMessageText(
   Iterable<UiSurfaceSnapshot> snapshots = const [],
   UiStateRepository? store,
   required String blockLimit,
+  UiTextMode mode = UiTextMode.copy,
 }) async {
   final fences = uiEligibleFences(message);
   final generation = uiGenerationStatus(message);
   final frozen = List<UiSurfaceSnapshot>.unmodifiable(snapshots);
   final parts = <TtsTextPart>[];
+  final replacements = <UiMessageReplacement>[];
+  final surfaces = <UiCapturedSurface>[];
   final source = message.content;
   var cursor = 0;
   for (final (ordinal, fence) in fences.indexed) {
@@ -97,11 +100,23 @@ Future<UiMessageText> projectUiMessageText(
             controller.restore(saved, token: controller.restoreToken);
           }
         }
-        text = projection.text(controller.captureRead());
+        text = projection.text(controller.captureRead(), mode: mode);
+        surfaces.add(
+          UiCapturedSurface(
+            owner: owner,
+            source: fence.body,
+            closed: fence.node.closed,
+            generation: generation,
+            snapshot: controller.canSnapshot
+                ? controller.captureSnapshot()
+                : null,
+          ),
+        );
       } finally {
         controller.dispose();
       }
     }
+    replacements.add(UiMessageReplacement(start, end, text, fence.source));
     parts.add(TtsTextPart(text, literal: true));
     cursor = end;
   }
@@ -111,5 +126,7 @@ Future<UiMessageText> projectUiMessageText(
     parts: parts,
     omitted: projection.labels.omitted,
     hasUi: fences.isNotEmpty,
+    replacements: replacements,
+    surfaces: surfaces,
   );
 }

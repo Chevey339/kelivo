@@ -69,10 +69,12 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   }
 
   void _readFilter({bool force = false}) {
-    final text = _view['filter'] as String? ?? '';
-    if (!force && text == _lastFilter) return;
-    _lastFilter = text;
-    _filterFailed = false;
+    final committed = _view['filter'] as String? ?? '';
+    final pending = _scope!.controller.tableFilterDraft(widget.id, committed);
+    final text = pending?.text ?? committed;
+    if (!force && committed == _lastFilter) return;
+    _lastFilter = committed;
+    _filterFailed = pending?.failed ?? false;
     if (force) _viewFailed = false;
     if (!force && _filter.text == text) return;
     _syncing = true;
@@ -132,11 +134,20 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
     return result;
   }
 
+  void _rememberFilter() => _scope!.controller.rememberTableFilter(
+    widget.id,
+    _filter.text,
+    committed: _view['filter'] as String? ?? '',
+    failed: _filterFailed,
+    token: widget.token,
+  );
+
   void _filterChanged() {
     if (_syncing || _scope == null || !_interactive) return;
     _surface.noteInteraction(token: widget.token);
     if (_filter.value.composing.isValid &&
         !_filter.value.composing.isCollapsed) {
+      _rememberFilter();
       return;
     }
     // Losing focus clears composing directly on the controller, bypassing
@@ -151,6 +162,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
       }
     }
     if (_filter.text == (_view['filter'] ?? '')) {
+      _rememberFilter();
       if (_filterFailed) {
         setState(() {
           _filterFailed = false;
@@ -161,6 +173,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
     }
     final result = _change({'filter': _filter.text, 'page': 0}, flush: false);
     setState(() => _filterFailed = result == UiMutationResult.invalid);
+    _rememberFilter();
   }
 
   UiTablePage _page() => _data.project(

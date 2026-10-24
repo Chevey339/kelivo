@@ -13757,6 +13757,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiCopyLimit => '文本超过 64 KiB 复制上限，请选择较小的片段。';
+
+  @override
+  String get genuiExportSnapshot => '导出只读快照';
+
+  @override
+  String get genuiExpandedSharedState => '与消息内共享同一状态';
+
+  @override
+  String get genuiExportTooLarge => '图片超过 1600 万像素，请减少所选消息或导出较小的界面。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27438,6 +27447,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiCopyLimit => '文本超过 64 KiB 复制上限，请选择较小的片段。';
+
+  @override
+  String get genuiExportSnapshot => '导出只读快照';
+
+  @override
+  String get genuiExpandedSharedState => '与消息内共享同一状态';
+
+  @override
+  String get genuiExportTooLarge => '图片超过 1600 万像素，请减少所选消息或导出较小的界面。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -41199,4 +41217,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiCopyLimit => '文字超過 64 KiB 複製上限，請選取較小的片段。';
+
+  @override
+  String get genuiExportSnapshot => '匯出唯讀快照';
+
+  @override
+  String get genuiExpandedSharedState => '與訊息內共用相同狀態';
+
+  @override
+  String get genuiExportTooLarge => '圖片超過 1600 萬像素，請減少所選訊息或匯出較小的介面。';
 }
