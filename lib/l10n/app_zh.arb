@@ -1047,6 +1047,7 @@
       }
     }
   },
+  "sideDrawerDeleteConfirmContent": "删除 \"{title}\"?",
   "sideDrawerDeleteSelectedSnackbar": "已删除 {count} 个话题",
   "@sideDrawerDeleteSelectedSnackbar": {
     "placeholders": {

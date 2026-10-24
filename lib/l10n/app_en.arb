@@ -1359,6 +1359,14 @@
       }
     }
   },
+  "sideDrawerDeleteConfirmContent": "Delete \"{title}\"?",
+  "@sideDrawerDeleteConfirmContent": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "sideDrawerDeleteSelectedSnackbar": "Deleted {count} conversations",
   "@sideDrawerDeleteSelectedSnackbar": {
     "placeholders": {
