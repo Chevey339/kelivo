@@ -501,7 +501,12 @@ class ToolHandlerService {
               tool: name,
             );
           }
-          return await BrowserToolsService().handle(conversationId, args);
+          return await BrowserToolsService().handle(
+            conversationId,
+            args,
+            capturePreview: settings.showBrowserPageCards,
+            temporary: _isTemporaryConversation(conversationId),
+          );
         }
         if (workspaceContext != null &&
             workspaceTools != null &&

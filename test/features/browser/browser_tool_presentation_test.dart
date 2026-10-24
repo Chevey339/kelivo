@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/browser/models/browser_tool_presentation.dart';
 import 'package:Kelivo/l10n/app_localizations_zh.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 void main() {
   final l = AppLocalizationsZh();
@@ -20,6 +21,33 @@ void main() {
     () {
       expect(estimateBrowserGroupBodyHeight(lite: false), 76);
       expect(estimateBrowserGroupBodyHeight(lite: true), 48);
+    },
+  );
+  test(
+    'preview belongs to result metadata, with explicit screenshots as fallback',
+    () {
+      BrowserToolAction saved(Map<String, dynamic> metadata) =>
+          BrowserToolAction(
+            id: 'step',
+            arguments: const {'action': 'snapshot'},
+            metadata: metadata,
+            content:
+                '{"ok":true,"page":{"previewImage":"file:///untrusted.png"}}',
+          );
+      expect(saved({}).previewImage, isNull);
+      expect(
+        saved({
+          kMcpResultMetadataKey: mcpResultMetadata(['own-screenshot']),
+        }).previewImage,
+        'own-screenshot',
+      );
+      expect(
+        saved({
+          'browser': {'previewImage': 'own-preview'},
+          kMcpResultMetadataKey: mcpResultMetadata(['own-screenshot']),
+        }).previewImage,
+        'own-preview',
+      );
     },
   );
   test('every browser operation has a localized label', () {

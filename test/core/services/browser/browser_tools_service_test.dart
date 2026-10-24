@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/browser/browser_tools_service.dart';
+import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/features/browser/models/browser_agent_activity.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -158,6 +159,186 @@ void main() {
     expect(browser.agentSessionId, isNull);
     expect(browser.tabs, isEmpty);
     expect(engines, isEmpty);
+  });
+
+  test(
+    'step previews persist independently and never enter model image input',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final engine = engines.values.single;
+      engine.onChanged(const BrowserPageState(isLoading: false));
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)..setPixelRgba(0, 0, 255, 0, 0, 255),
+      );
+      final first = await tools.handle('chat-a', {
+        'action': 'scroll',
+        'direction': 'down',
+      });
+      final firstUri =
+          (first.metadata!['browser'] as Map)['previewImage'] as String;
+      final firstFile = (await McpImageSnapshot.localFile(firstUri))!;
+      final firstBytes = await firstFile.readAsBytes();
+      expect(engine.thumbnailCalls, 1);
+      expect(
+        (await ToolResultContent.read(
+          'browser',
+          first.content,
+          metadata: first.metadata,
+        )).imageUrls,
+        isEmpty,
+      );
+      expect(first.content, isNot(contains(firstUri)));
+
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)..setPixelRgba(0, 0, 0, 0, 255, 255),
+      );
+      final second = await tools.handle('chat-a', {
+        'action': 'scroll',
+        'direction': 'down',
+      });
+      final secondUri =
+          (second.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(secondUri, isNot(firstUri));
+      expect(await firstFile.readAsBytes(), firstBytes);
+      expect(
+        await (await McpImageSnapshot.localFile(secondUri))!.readAsBytes(),
+        isNot(firstBytes),
+      );
+      expect(engine.thumbnailCalls, 2);
+
+      final read = await tools.handle('chat-a', {'action': 'extract'});
+      expect((read.metadata!['browser'] as Map)['previewImage'], secondUri);
+      expect(
+        engine.thumbnailCalls,
+        3,
+        reason: 'Each step samples current pixels, even at the same URL',
+      );
+      expect(
+        await firstFile.parent.list().length,
+        2,
+        reason: 'Reused preview pixels do not create duplicate files',
+      );
+      engine.previewBytes = Uint8List.fromList(engine.previewBytes!);
+      final unchanged = await tools.handle('chat-a', {
+        'action': 'click',
+        'selector': '#same-page',
+      });
+      expect(
+        (unchanged.metadata!['browser'] as Map)['previewImage'],
+        secondUri,
+      );
+      expect(await firstFile.parent.list().length, 2);
+      final persisted = jsonDecode(jsonEncode(first.metadata)) as Map;
+      expect(
+        await McpImageSnapshot.localFile(
+          persisted['browser']['previewImage'] as String,
+        ),
+        isNotNull,
+      );
+      await (await McpImageSnapshot.localFile(secondUri))!.delete();
+      final restored = await tools.handle('chat-a', {'action': 'snapshot'});
+      final restoredUri =
+          (restored.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(restoredUri, secondUri);
+      expect(await McpImageSnapshot.localFile(restoredUri), isNotNull);
+    },
+  );
+
+  test(
+    'hidden cards skip preview capture and explicit screenshots are reused',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final engine = engines.values.single;
+      engine.onChanged(const BrowserPageState(isLoading: false));
+      final hidden = await tools.handle('chat-a', {
+        'action': 'scroll',
+      }, capturePreview: false);
+      expect(hidden.metadata!['browser'], isNot(contains('previewImage')));
+      expect(engine.thumbnailCalls, 0);
+      final explicit = await tools.handle('chat-a', {
+        'action': 'snapshot',
+        'include_screenshot': true,
+      }, capturePreview: false);
+      final images = mcpResultImageUris(
+        readMcpResultMetadata(explicit.metadata),
+      );
+      expect(images, hasLength(1));
+      expect(
+        (explicit.metadata!['browser'] as Map)['previewImage'],
+        images.single,
+      );
+      expect(engine.thumbnailCalls, 0);
+      expect(
+        await (await McpImageSnapshot.localFile(
+          images.single,
+        ))!.parent.list().length,
+        1,
+      );
+    },
+  );
+
+  test(
+    'temporary chats skip extra previews and own explicit screenshot files',
+    () async {
+      await enable();
+      final opened = await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, temporary: true);
+      expect(opened.metadata!['browser'], isNot(contains('previewImage')));
+      final engine = engines.values.single;
+      expect(engine.thumbnailCalls, 0);
+      final uris = <String>{};
+      for (final temporary in [false, true, true]) {
+        final result = await tools.handle('chat-a', {
+          'action': 'snapshot',
+          'include_screenshot': true,
+        }, temporary: temporary);
+        final uri =
+            (result.metadata!['browser'] as Map)['previewImage'] as String;
+        expect(
+          uris.add(uri),
+          isTrue,
+          reason: 'Temporary screenshots must not share persistent assets',
+        );
+      }
+      expect(engine.thumbnailCalls, 0);
+    },
+  );
+
+  test('wait and reads capture asynchronous changes at the same URL', () async {
+    await enable();
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'https://example.com',
+    }, capturePreview: false);
+    final engine = engines.values.single;
+    engine.waitReady = true;
+    engine.onChanged(const BrowserPageState(isLoading: false));
+    final uris = <String>{};
+    for (final action in ['click', 'wait', 'snapshot', 'extract']) {
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)
+          ..setPixelRgba(0, 0, uris.length * 60, 0, 0, 255),
+      );
+      final result = await tools.handle('chat-a', {
+        'action': action,
+        if (action == 'click') 'selector': '#load-results',
+        if (action == 'wait') 'wait_for': '#results',
+      });
+      final uri =
+          (result.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(uris.add(uri), isTrue, reason: '$action must sample current DOM');
+    }
+    expect(engine.thumbnailCalls, 4);
   });
 
   for (final action in [
@@ -695,8 +876,11 @@ class _Engine extends BrowserEngine {
   final scripts = <String>[];
   String? domError;
   Uint8List? screenshotBytes;
+  Uint8List? previewBytes;
+  int thumbnailCalls = 0;
   TimeoutException? loadError;
   TimeoutException? evaluationError;
+  bool waitReady = false;
   int stopCalls = 0;
   @override
   Widget buildView() => const SizedBox.shrink();
@@ -718,7 +902,7 @@ class _Engine extends BrowserEngine {
     }
     if (domError != null) return jsonEncode({'ok': false, 'error': domError});
     if (source.contains('const action = "wait"')) {
-      return '{"ok":true,"ready":false}';
+      return jsonEncode({'ok': true, 'ready': waitReady});
     }
     if (source.contains('const action = "extract"')) {
       return '{"ok":true,"content":"A real page result"}';
@@ -729,6 +913,12 @@ class _Engine extends BrowserEngine {
   @override
   Future<Uint8List?> screenshot() async =>
       screenshotBytes ?? img.encodePng(img.Image(width: 1, height: 1));
+  @override
+  Future<Uint8List?> thumbnail() async {
+    thumbnailCalls++;
+    return previewBytes ?? img.encodePng(img.Image(width: 1, height: 1));
+  }
+
   @override
   Future<void> loadHtml(String html, {String? baseUrl}) async {}
   @override

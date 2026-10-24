@@ -1,10 +1,12 @@
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/services/browser/browser_service.dart';
+import '../../../core/services/mcp/mcp_image_snapshot.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
@@ -45,10 +47,11 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
   BrowserService get _browser => widget.service ?? BrowserService.instance;
   bool get _running =>
       widget.running ?? widget.actions.any((action) => action.loading);
+  bool get _live => _running && widget.actions.any((action) => action.loading);
   int get _failures => widget.actions.where((action) => action.failed).length;
 
   String? get _previewTabId {
-    if (_running &&
+    if (_live &&
         _browser.agentSessionId == widget.conversationId &&
         _browser.agentTabId != null) {
       return _browser.agentTabId;
@@ -62,11 +65,11 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
   @override
   void initState() {
     super.initState();
-    _browser.addListener(_syncPreview);
+    if (_live) _browser.addListener(_syncPreview);
   }
 
   void _syncPreview() {
-    final id = widget.lite || !_previewVisible ? null : _previewTabId;
+    final id = widget.lite || !_previewVisible || !_live ? null : _previewTabId;
     if (_watchedTab == id) return;
     _releasePreview?.call();
     _watchedTab = id;
@@ -92,13 +95,17 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
   @override
   void didUpdateWidget(BrowserStepGroupBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.service != widget.service) {
+    final wasLive =
+        (oldWidget.running ?? true) &&
+        oldWidget.actions.any((action) => action.loading);
+    if (oldWidget.service != widget.service || wasLive != _live) {
       (oldWidget.service ?? BrowserService.instance).removeListener(
         _syncPreview,
       );
       _releasePreview?.call();
       _watchedTab = null;
-      _browser.addListener(_syncPreview);
+      _releasePreview = null;
+      if (_live) _browser.addListener(_syncPreview);
     }
     _syncPreview();
     if (!identical(oldWidget.actions, widget.actions) ||
@@ -119,12 +126,22 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
         .whereType<String>()
         .firstOrNull;
     final previewId = _previewTabId ?? page?.tabId ?? lastTabId;
-    final liveTab = _browser.tabs
-        .where((tab) => tab.id == previewId)
-        .firstOrNull;
-    final bytes = previewId == null ? null : _browser.previewForTab(previewId);
+    final liveTab = !_live
+        ? null
+        : _browser.tabs.where((tab) => tab.id == previewId).firstOrNull;
+    final bytes = !_live || previewId == null
+        ? null
+        : _browser.previewForTab(previewId);
+    final savedPreview = page?.previewImage;
     final l = AppLocalizations.of(context)!;
-    final signature = (previewId, bytes, liveTab?.title, liveTab?.url, l);
+    final signature = (
+      previewId,
+      bytes,
+      savedPreview,
+      liveTab?.title,
+      liveTab?.url,
+      l,
+    );
     if (_card != null && signature == _cardSignature) return _card!;
     _cardSignature = signature;
     final current = actions.lastWhere(
@@ -136,15 +153,14 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
         .firstOrNull;
     final failed = !_running && page == null && _failures > 0;
     final url =
-        (_running ? liveTab?.url : null) ??
+        liveTab?.url ??
         page?.url ??
         actions.reversed
             .map((action) => action.url)
             .where((url) => url.isNotEmpty)
             .firstOrNull ??
-        liveTab?.url ??
         '';
-    final title = _running && liveTab?.title.isNotEmpty == true
+    final title = liveTab?.title.isNotEmpty == true
         ? liveTab!.title
         : page?.title.isNotEmpty == true
         ? page!.title
@@ -171,6 +187,7 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
           : host,
       url: url,
       preview: bytes,
+      previewImage: _live ? null : savedPreview,
       tabUrls: tabUrls.values.toList(),
       running: _running,
       failed: failed,
@@ -193,7 +210,9 @@ class _BrowserStepGroupBodyState extends State<BrowserStepGroupBody> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _browser,
+    // Keep the same parent when freezing the image so the card's press and
+    // transition state survive; completed cards no longer observe the tab.
+    listenable: _live ? _browser : const AlwaysStoppedAnimation<double>(0),
     builder: (context, _) => _pageCard(context),
   );
 }
@@ -206,6 +225,7 @@ class BrowserPageCard extends StatelessWidget {
     required this.url,
     required this.onTap,
     this.preview,
+    this.previewImage,
     this.tabUrls = const [],
     this.running = false,
     this.failed = false,
@@ -216,6 +236,7 @@ class BrowserPageCard extends StatelessWidget {
   final String title, subtitle, url;
   final VoidCallback onTap;
   final Uint8List? preview;
+  final String? previewImage;
   final List<String> tabUrls;
   final bool running, failed, enable, lite;
   final BrowserService? service;
@@ -361,9 +382,17 @@ class BrowserPageCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (preview != null && !failed)
+              if (previewImage != null && !failed)
+                _BrowserSavedPreview(
+                  key: ValueKey(previewImage),
+                  uri: previewImage!,
+                  placeholder: placeholder(),
+                )
+              else if (preview != null && !failed)
                 Image.memory(
                   preview!,
+                  cacheWidth: (72 * MediaQuery.devicePixelRatioOf(context))
+                      .ceil(),
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
                   gaplessPlayback: true,
@@ -380,6 +409,45 @@ class BrowserPageCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Resolve a persisted tool snapshot once, then let Flutter's image cache load
+/// and downsample it. Old cards never read the tab or start another capture.
+class _BrowserSavedPreview extends StatefulWidget {
+  const _BrowserSavedPreview({
+    super.key,
+    required this.uri,
+    required this.placeholder,
+  });
+  final String uri;
+  final Widget placeholder;
+
+  @override
+  State<_BrowserSavedPreview> createState() => _BrowserSavedPreviewState();
+}
+
+class _BrowserSavedPreviewState extends State<_BrowserSavedPreview> {
+  late final Future<File?> _file = McpImageSnapshot.localFile(widget.uri);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<File?>(
+    future: _file,
+    builder: (context, snapshot) {
+      final width = (72 * MediaQuery.devicePixelRatioOf(context)).ceil();
+      if (snapshot.data case final file?) {
+        return Image.file(
+          file,
+          cacheWidth: width,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          gaplessPlayback: true,
+          excludeFromSemantics: true,
+          errorBuilder: (_, __, ___) => widget.placeholder,
+        );
+      }
+      return widget.placeholder;
+    },
+  );
 }
 
 class _BrowserLiveBadge extends StatelessWidget {
