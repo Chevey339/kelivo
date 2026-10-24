@@ -5184,5 +5184,94 @@
       }
     }
   },
-  "genuiBlockLimit": "每条消息最多渲染 3 个界面，其余以源码显示"
+  "genuiBlockLimit": "每条消息最多渲染 3 个界面，其余以源码显示",
+  "genuiChartLine": "折线图",
+  "genuiChartArea": "面积图",
+  "genuiChartBar": "柱状图",
+  "genuiChartScatter": "散点图",
+  "genuiChartPie": "饼图",
+  "genuiChartDonut": "环形图",
+  "genuiChartEmpty": "所选区间没有数据",
+  "genuiChartAllHidden": "所有系列均已隐藏，可通过图例显示。",
+  "genuiChartSummary": "{kind}，{series} 个系列，{points} 行数据，{missing} 个值缺失（未连线，未填零）。",
+  "@genuiChartSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "series": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartPieSummary": "{kind}，{count} 项，合计 {total}。",
+  "@genuiChartPieSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartDomainGap": "此区间无定义",
+  "genuiChartDomainSummary": "{count} 个采样点无定义；阴影区域不连线。",
+  "@genuiChartDomainSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartShowSeries": "显示 {name}",
+  "@genuiChartShowSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartHideSeries": "隐藏 {name}",
+  "@genuiChartHideSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartKeyboardHint": "左右方向键选择数据行，上下方向键选择系列，Esc 清除选择。",
+  "genuiChartTotal": "合计",
+  "genuiChartFieldsError": "请选择一个 X 字段和一到四个不同的 Y 字段。",
+  "genuiChartRecordsError": "图表数据必须是记录数组。",
+  "genuiChartXError": "X 值须全为数值或全为文本；散点图必须使用数值。",
+  "genuiChartYError": "Y 字段须存在，且只能包含数值或空值。",
+  "genuiChartPieError": "饼图数值必须非负，且总和须为大于零的有限数。",
+  "genuiChartMissingValues": "{count} 个值缺失，未填零。",
+  "@genuiChartMissingValues": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartNoVisibleValues": "所选系列没有可绘制的数值。",
+  "genuiChartUnit": "单位：{unit}",
+  "@genuiChartUnit": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiSomeValuesUnavailable": "部分值无法计算"
 }

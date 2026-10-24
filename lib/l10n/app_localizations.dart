@@ -25301,6 +25301,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Up to 3 UI blocks per message; the rest are shown as source'**
   String get genuiBlockLimit;
+
+  /// No description provided for @genuiChartLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line chart'**
+  String get genuiChartLine;
+
+  /// No description provided for @genuiChartArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Area chart'**
+  String get genuiChartArea;
+
+  /// No description provided for @genuiChartBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Bar chart'**
+  String get genuiChartBar;
+
+  /// No description provided for @genuiChartScatter.
+  ///
+  /// In en, this message translates to:
+  /// **'Scatter plot'**
+  String get genuiChartScatter;
+
+  /// No description provided for @genuiChartPie.
+  ///
+  /// In en, this message translates to:
+  /// **'Pie chart'**
+  String get genuiChartPie;
+
+  /// No description provided for @genuiChartDonut.
+  ///
+  /// In en, this message translates to:
+  /// **'Donut chart'**
+  String get genuiChartDonut;
+
+  /// No description provided for @genuiChartEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No data in this range'**
+  String get genuiChartEmpty;
+
+  /// No description provided for @genuiChartAllHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'All series are hidden. Use the legend to show one.'**
+  String get genuiChartAllHidden;
+
+  /// No description provided for @genuiChartSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind}, {series, plural, =1{1 series} other{{series} series}}, {points, plural, =1{1 data row} other{{points} data rows}}, {missing, plural, =1{1 missing value} other{{missing} missing values}} (not connected or replaced with zero).'**
+  String genuiChartSummary(String kind, int series, int points, int missing);
+
+  /// No description provided for @genuiChartPieSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind}, {count, plural, =1{1 item} other{{count} items}}, total {total}.'**
+  String genuiChartPieSummary(String kind, int count, String total);
+
+  /// No description provided for @genuiChartDomainGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Undefined in this domain'**
+  String get genuiChartDomainGap;
+
+  /// No description provided for @genuiChartDomainSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 sampled point is undefined} other{{count} sampled points are undefined}}; shaded gaps are not connected.'**
+  String genuiChartDomainSummary(int count);
+
+  /// No description provided for @genuiChartShowSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {name}'**
+  String genuiChartShowSeries(String name);
+
+  /// No description provided for @genuiChartHideSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide {name}'**
+  String genuiChartHideSeries(String name);
+
+  /// No description provided for @genuiChartKeyboardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Left and right select a data row. Up and down select a series. Escape clears selection.'**
+  String get genuiChartKeyboardHint;
+
+  /// No description provided for @genuiChartTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get genuiChartTotal;
+
+  /// No description provided for @genuiChartFieldsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an X field and one to four distinct Y fields.'**
+  String get genuiChartFieldsError;
+
+  /// No description provided for @genuiChartRecordsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart data must be a list of records.'**
+  String get genuiChartRecordsError;
+
+  /// No description provided for @genuiChartXError.
+  ///
+  /// In en, this message translates to:
+  /// **'X values must all be numbers or all be text. Scatter plots require numbers.'**
+  String get genuiChartXError;
+
+  /// No description provided for @genuiChartYError.
+  ///
+  /// In en, this message translates to:
+  /// **'Y fields must exist and contain numbers or missing values.'**
+  String get genuiChartYError;
+
+  /// No description provided for @genuiChartPieError.
+  ///
+  /// In en, this message translates to:
+  /// **'Pie values must be nonnegative and have a finite total greater than zero.'**
+  String get genuiChartPieError;
+
+  /// No description provided for @genuiChartMissingValues.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 value is missing; it is not replaced with zero.} other{{count} values are missing; they are not replaced with zero.}}'**
+  String genuiChartMissingValues(int count);
+
+  /// No description provided for @genuiChartNoVisibleValues.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected series have no values to plot.'**
+  String get genuiChartNoVisibleValues;
+
+  /// No description provided for @genuiChartUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit: {unit}'**
+  String genuiChartUnit(String unit);
+
+  /// No description provided for @genuiSomeValuesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Some values are unavailable'**
+  String get genuiSomeValuesUnavailable;
 }
 
 class _AppLocalizationsDelegate

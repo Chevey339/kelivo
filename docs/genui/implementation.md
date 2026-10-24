@@ -715,3 +715,65 @@ build and diff checks. All 16 changed Dart files are formatted, including the
 manual tools; the final source hashes stayed unchanged through validation and
 staging. Independent review of the exporter and harness correction returned no
 findings. The first candidate's logs and failed formal run are retained separately.
+
+### C13 formal old-reader acceptance
+
+The clean committed-tree manual check passed on
+`4ac045e678456701ab5a7bae7b0beb346f3d80cd`, using the frozen reader
+`58d9badfb0912bb01739a71d2dc26ed7deded90b` and the same C01 Flutter executable.
+A fresh genuine v5 export passed the old overwrite preparation, connection
+shutdown, startup cutover, strict v3 inspection and repository CRUD. Original
+message/part/selection projections matched; all GenUI objects were absent,
+foreign keys passed, and the original archive hash was unchanged.
+See [the actual run record](legacy-restore-c13.json). Logs are retained under
+`build/genui/legacy-restore/20261024T011250Z/`. This proves the frozen business
+source with newly resolved dependencies, not a historical release binary.
+
+## C14 bounded native charts
+
+The five native chart types now render through the existing trusted message
+host. One immutable runtime data model validates numeric/category X values,
+missing values, pie totals and the four-series/2,000-slot/twelve-item budgets.
+Invalid data remains a local node error. Sampling domain gaps are shaded and
+never joined or replaced by zero. Legends, exact accessible point tooltips,
+keyboard selection and units share GenUiTheme; legend visibility persists,
+while hover and selected points remain transient. Read-only exports retain
+units and have no chart actions. C15 adds the shared data-table alternative.
+
+`fl_chart: 1.3.0` is the only added package, with no native plugin or platform
+SDK change. See [dependency, license and integration decisions](chart-dependency.md).
+The measured macOS debug app contains 334,756,356 regular-file bytes, excluding
+symlinks, versus the C13 record of 332,935,743 (+1,820,613 bytes, about 0.55%).
+This is a debug artifact observation, not a release-package estimate.
+
+Independent review found and corrected hidden scatter hit targets, extreme
+number scaling, bar baseline/edge geometry, missing semantic legend actions,
+units absent from read-only views and stale selection after a kind change.
+Area fills avoid the library's per-gap saveLayers and preserve independent
+contours even when their X order reverses. Visual inspection corrected
+overlapping boundary tick labels. Production adds no BackdropFilter,
+Opacity/AnimatedOpacity or RepaintBoundary to the message path.
+
+Final focused validation passed 40 data/behavior checks and 35 new goldens,
+including native chart hit/scroll gestures, signed/null areas, duplicate X,
+keyboard/semantics, streaming unlock, export, view restore/reset, RTL, 1.3 text,
+wallpaper and desktop. Existing content goldens still pass with the shared
+font loader. The standalone native gallery and MessageListView fixtures both
+include all five types, gaps, empty data and errors; canvas-only @Preview
+fixtures retain a web-safe import graph.
+
+The explicit print-only 2,000-slot benchmark measured debug input-to-paint p95
+13.122/13.036/10.679/9.795 ms for line/area/bar/scatter, and hover-to-paint p95
+7.569/9.157/5.656/4.412 ms. Unrelated-node notifications were zero in every case.
+These are widget-runner observations; C24 still owns real profile frames and
+the ordinary-message scrolling comparison.
+
+Final G passed both fatal-info analyses, all 9,559 root tests (two existing
+skips), markstream dependency resolution and all 296 tests, macOS debug build,
+formatting of all 21 changed Dart files and diff checks. The same frozen code
+also built iOS debug without signing, Android debug APK and Windows x64 debug.
+Linux acceptance is deferred by the user's explicit amendment. Candidate tree,
+toolchains, actual commands, cache preparation and log locations are in
+[the C14 build record](c14-builds.json). All 61 non-document source/golden files
+were hash-checked unchanged after validation; final independent review returned
+no findings. Native GUI/physical-device acceptance is separate and pending.

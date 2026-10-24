@@ -1,0 +1,87 @@
+{
+  "candidateTree": "561b036da0a9bca8f8b7f4b169a1b675636cc39b",
+  "parentCommit": "4ac045e678456701ab5a7bae7b0beb346f3d80cd",
+  "flutter": "3.47.6",
+  "dart": "3.13.5",
+  "frameworkRevision": "5fc346839b5d0eef006ed8404392afb4dfae428d",
+  "rootLockSha256": "a1edf1cbf93dcf2444d5a1b6c6b18dbdcaac9af39530fdaf1a634d1c2cf5f479",
+  "hostOs": "macOS 26.5.2 (25F84) arm64",
+  "xcode": "26.6 (17F113)",
+  "sourceVerification": "61 reviewed non-document files were hash-checked unchanged after all builds. Acceptance documents were added afterward.",
+  "platforms": [
+    {
+      "platform": "macOS",
+      "executor": "Codex on local macOS arm64",
+      "command": "flutter build macos --debug --no-pub",
+      "exitCode": 0,
+      "dateUtc": "2026-10-24T01:55:36.118636+00:00",
+      "artifact": "build/macos/Build/Products/Debug/kelivo.app",
+      "regularFileBytes": 334756356,
+      "log": "build/genui/logs/c14-macos-build.log"
+    },
+    {
+      "platform": "iOS",
+      "executor": "Codex on local macOS arm64",
+      "command": "flutter build ios --debug --no-codesign --no-pub",
+      "exitCode": 0,
+      "dateUtc": "2026-10-24T01:56:33.358082+00:00",
+      "artifact": "build/ios/iphoneos/Runner.app",
+      "regularFileBytes": 341410080,
+      "log": "build/genui/logs/c14-ios-build.log"
+    },
+    {
+      "platform": "Android",
+      "executor": "Codex on local macOS arm64",
+      "command": "flutter build apk --debug --no-pub",
+      "exitCode": 0,
+      "dateUtc": "2026-10-24T01:58:20.871490+00:00",
+      "artifact": "build/app/outputs/flutter-apk/app-debug.apk",
+      "regularFileBytes": 179959271,
+      "log": "build/genui/logs/c14-android-build.log"
+    },
+    {
+      "platform": "Windows",
+      "executor": "Codex over existing verified LAN SSH",
+      "os": "Microsoft Windows NT 10.0.26100.0",
+      "architecture": "AMD64",
+      "dateUtc": "2026-10-24T01:53:39.0571217Z",
+      "command": "flutter build windows --debug --no-pub",
+      "exitCode": 0,
+      "sourceDirectory": "C:/Users/Psyche/AppData/Local/Temp/kelivo-genui-561b036da0a9",
+      "artifact": "build/windows/x64/runner/Debug/kelivo.exe",
+      "log": "build/genui/c14/windows-windows-build.log"
+    },
+    {
+      "platform": "Linux",
+      "status": "deferred by explicit user instruction; not run"
+    }
+  ],
+  "preparation": {
+    "windowsPubSource": "Process-only PUB_HOSTED_URL=https://pub.dev to match the lockfile; global mirror unchanged.",
+    "windowsSqlite": "Official sqlite3 3.5.2 x64 DLL was fetched on Mac and transferred into its existing hook cache after a Windows GitHub timeout. The unchanged package hook verifies its hash.",
+    "windowsSqliteSha256": "2bf39f2aadafdc59a90b260f582a8fccebc5b89eb94175fdbaa9148c1e1f084d",
+    "iosCache": {
+      "source": "/Users/psyche/StudioProjects/kelivo/ios/sandbox",
+      "buildInputFingerprint": "0b91f035cbc16fc8bcb26b840fb5e7c31c591ab5c6a7ed45df61191985fd4503",
+      "rootfsVersion": "alpine-3.21.3-r5",
+      "files": 74,
+      "note": "Copied only ignored artifacts after verifying fingerprint and rootfs VERSION. Main checkout unchanged."
+    }
+  },
+  "gates": {
+    "rootAnalyze": "passed --fatal-infos lib test integration_test",
+    "rootTestsPassed": 9559,
+    "existingSkips": 2,
+    "markstreamPubGet": "passed --offline",
+    "markstreamAnalyze": "passed --fatal-infos",
+    "markstreamTestsPassed": 296,
+    "chartFocusedTests": 40,
+    "newChartGoldens": 35,
+    "diffCheck": "passed"
+  },
+  "limits": [
+    "Builds do not establish GUI, physical-device, release-size or Web sandbox acceptance.",
+    "Mac remains locked for GUI inspection.",
+    "Debug widget benchmarks are not device frame-time acceptance."
+  ]
+}

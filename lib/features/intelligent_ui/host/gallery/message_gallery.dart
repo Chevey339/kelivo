@@ -15,6 +15,8 @@ import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
+import '../../catalog/ui_catalog.dart';
+import '../../widgets/gallery/chart_gallery.dart';
 import '../ui_host_scope.dart';
 
 const genUiMessageFixture = r'''ui 1 catalog "kelivo.native/1"
@@ -41,7 +43,8 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   final _list = ListController();
   final _processing = ValueNotifier<String?>(null);
   bool _dark = false, _large = false, _rtl = false;
-  int _step = 6, _role = 0;
+  int _step = 6, _role = 0, _fixture = 0;
+  final _fixtures = ['form', ...genUiChartGallerySources.keys];
   String _intent = 'Ask is observed locally. No messages are sent.';
   @override
   void dispose() {
@@ -52,7 +55,10 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
   }
 
   ChatMessage _message() {
-    final lines = genUiMessageFixture.trimRight().split('\n');
+    final source = _fixture == 0
+        ? genUiMessageFixture
+        : '${UiCatalog.header}\n${genUiChartGallerySources[_fixtures[_fixture]]}\n';
+    final lines = source.trimRight().split('\n');
     final count = switch (_step) {
       0 => 1,
       1 => 4,
@@ -65,7 +71,7 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
     if (_role == 3) text = text.split('\n').map((l) => '> $l').join('\n');
     if (_step == 8) text = text.replaceFirst('ui 1', 'ui 9');
     final message = ChatMessage(
-      id: 'manual-native-$_role',
+      id: 'manual-native-$_role-$_fixture',
       conversationId: 'manual-native',
       role: switch (_role) {
         1 => 'user',
@@ -140,6 +146,12 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
                           label: 'Phase $_step / 8',
                           onPressed: () =>
                               setState(() => _step = (_step + 1) % 9),
+                        ),
+                        IosTextButton(
+                          label: _fixtures[_fixture],
+                          onPressed: () => setState(
+                            () => _fixture = (_fixture + 1) % _fixtures.length,
+                          ),
                         ),
                       ],
                     ),

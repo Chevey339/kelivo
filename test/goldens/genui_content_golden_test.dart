@@ -1,7 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -17,29 +14,10 @@ import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import '../support/markdown_backdrop_host.dart';
+import '../support/genui_golden_fonts.dart';
 
 void main() {
-  setUpAll(() async {
-    final fonts =
-        jsonDecode(await rootBundle.loadString('FontManifest.json')) as List;
-    for (final font in fonts.cast<Map<String, dynamic>>()) {
-      final loader = FontLoader(font['family'] as String);
-      for (final asset
-          in (font['fonts'] as List).cast<Map<String, dynamic>>()) {
-        loader.addFont(rootBundle.load(asset['asset'] as String));
-      }
-      await loader.load();
-    }
-    final bytes = File(
-      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
-    ).readAsBytesSync();
-    await (FontLoader(
-      'genui-golden',
-    )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
-    await (FontLoader(
-      'monospace',
-    )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
-  });
+  setUpAll(loadGenUiGoldenFonts);
   for (final dark in [false, true]) {
     for (final variant in [
       'mobile',

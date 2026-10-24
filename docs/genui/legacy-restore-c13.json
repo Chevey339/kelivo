@@ -1,0 +1,9 @@
+{
+  "tested_commit": "4ac045e678456701ab5a7bae7b0beb346f3d80cd",
+  "legacy_reader": "58d9badfb0912bb01739a71d2dc26ed7deded90b",
+  "date": "2026-10-24T01:13:26.640505+00:00",
+  "command": "bash tool/legacy_restore/run.sh",
+  "flutter": "/Users/psyche/development/flutter/bin/flutter",
+  "result": "passed",
+  "boundary": "Frozen v3 business source with freshly resolved dependencies; not a historical release binary."
+}

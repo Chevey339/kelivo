@@ -14211,4 +14211,136 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get genuiBlockLimit =>
       'Up to 3 UI blocks per message; the rest are shown as source';
+
+  @override
+  String get genuiChartLine => 'Line chart';
+
+  @override
+  String get genuiChartArea => 'Area chart';
+
+  @override
+  String get genuiChartBar => 'Bar chart';
+
+  @override
+  String get genuiChartScatter => 'Scatter plot';
+
+  @override
+  String get genuiChartPie => 'Pie chart';
+
+  @override
+  String get genuiChartDonut => 'Donut chart';
+
+  @override
+  String get genuiChartEmpty => 'No data in this range';
+
+  @override
+  String get genuiChartAllHidden =>
+      'All series are hidden. Use the legend to show one.';
+
+  @override
+  String genuiChartSummary(String kind, int series, int points, int missing) {
+    String _temp0 = intl.Intl.pluralLogic(
+      series,
+      locale: localeName,
+      other: '$series series',
+      one: '1 series',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      points,
+      locale: localeName,
+      other: '$points data rows',
+      one: '1 data row',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      missing,
+      locale: localeName,
+      other: '$missing missing values',
+      one: '1 missing value',
+    );
+    return '$kind, $_temp0, $_temp1, $_temp2 (not connected or replaced with zero).';
+  }
+
+  @override
+  String genuiChartPieSummary(String kind, int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$kind, $_temp0, total $total.';
+  }
+
+  @override
+  String get genuiChartDomainGap => 'Undefined in this domain';
+
+  @override
+  String genuiChartDomainSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sampled points are undefined',
+      one: '1 sampled point is undefined',
+    );
+    return '$_temp0; shaded gaps are not connected.';
+  }
+
+  @override
+  String genuiChartShowSeries(String name) {
+    return 'Show $name';
+  }
+
+  @override
+  String genuiChartHideSeries(String name) {
+    return 'Hide $name';
+  }
+
+  @override
+  String get genuiChartKeyboardHint =>
+      'Left and right select a data row. Up and down select a series. Escape clears selection.';
+
+  @override
+  String get genuiChartTotal => 'Total';
+
+  @override
+  String get genuiChartFieldsError =>
+      'Choose an X field and one to four distinct Y fields.';
+
+  @override
+  String get genuiChartRecordsError => 'Chart data must be a list of records.';
+
+  @override
+  String get genuiChartXError =>
+      'X values must all be numbers or all be text. Scatter plots require numbers.';
+
+  @override
+  String get genuiChartYError =>
+      'Y fields must exist and contain numbers or missing values.';
+
+  @override
+  String get genuiChartPieError =>
+      'Pie values must be nonnegative and have a finite total greater than zero.';
+
+  @override
+  String genuiChartMissingValues(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count values are missing; they are not replaced with zero.',
+      one: '1 value is missing; it is not replaced with zero.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get genuiChartNoVisibleValues =>
+      'The selected series have no values to plot.';
+
+  @override
+  String genuiChartUnit(String unit) {
+    return 'Unit: $unit';
+  }
+
+  @override
+  String get genuiSomeValuesUnavailable => 'Some values are unavailable';
 }

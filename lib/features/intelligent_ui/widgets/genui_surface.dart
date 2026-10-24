@@ -328,7 +328,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
         icon: LucideIcons.triangleAlert,
         text: _failedNodes > 0
             ? l10n.genuiNodesFailed(_failedNodes)
-            : l10n.genuiValueUnavailable,
+            : l10n.genuiSomeValuesUnavailable,
         action: actions && surface.onRepair != null
             ? IosTextButton(
                 label: l10n.genuiRepair,

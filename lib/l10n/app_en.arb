@@ -6520,5 +6520,94 @@
       }
     }
   },
-  "genuiBlockLimit": "Up to 3 UI blocks per message; the rest are shown as source"
+  "genuiBlockLimit": "Up to 3 UI blocks per message; the rest are shown as source",
+  "genuiChartLine": "Line chart",
+  "genuiChartArea": "Area chart",
+  "genuiChartBar": "Bar chart",
+  "genuiChartScatter": "Scatter plot",
+  "genuiChartPie": "Pie chart",
+  "genuiChartDonut": "Donut chart",
+  "genuiChartEmpty": "No data in this range",
+  "genuiChartAllHidden": "All series are hidden. Use the legend to show one.",
+  "genuiChartSummary": "{kind}, {series, plural, =1{1 series} other{{series} series}}, {points, plural, =1{1 data row} other{{points} data rows}}, {missing, plural, =1{1 missing value} other{{missing} missing values}} (not connected or replaced with zero).",
+  "@genuiChartSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "series": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartPieSummary": "{kind}, {count, plural, =1{1 item} other{{count} items}}, total {total}.",
+  "@genuiChartPieSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartDomainGap": "Undefined in this domain",
+  "genuiChartDomainSummary": "{count, plural, =1{1 sampled point is undefined} other{{count} sampled points are undefined}}; shaded gaps are not connected.",
+  "@genuiChartDomainSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartShowSeries": "Show {name}",
+  "@genuiChartShowSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartHideSeries": "Hide {name}",
+  "@genuiChartHideSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartKeyboardHint": "Left and right select a data row. Up and down select a series. Escape clears selection.",
+  "genuiChartTotal": "Total",
+  "genuiChartFieldsError": "Choose an X field and one to four distinct Y fields.",
+  "genuiChartRecordsError": "Chart data must be a list of records.",
+  "genuiChartXError": "X values must all be numbers or all be text. Scatter plots require numbers.",
+  "genuiChartYError": "Y fields must exist and contain numbers or missing values.",
+  "genuiChartPieError": "Pie values must be nonnegative and have a finite total greater than zero.",
+  "genuiChartMissingValues": "{count, plural, =1{1 value is missing; it is not replaced with zero.} other{{count} values are missing; they are not replaced with zero.}}",
+  "@genuiChartMissingValues": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartNoVisibleValues": "The selected series have no values to plot.",
+  "genuiChartUnit": "Unit: {unit}",
+  "@genuiChartUnit": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiSomeValuesUnavailable": "Some values are unavailable"
 }

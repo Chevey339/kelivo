@@ -13551,6 +13551,95 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiBlockLimit => '每条消息最多渲染 3 个界面，其余以源码显示';
+
+  @override
+  String get genuiChartLine => '折线图';
+
+  @override
+  String get genuiChartArea => '面积图';
+
+  @override
+  String get genuiChartBar => '柱状图';
+
+  @override
+  String get genuiChartScatter => '散点图';
+
+  @override
+  String get genuiChartPie => '饼图';
+
+  @override
+  String get genuiChartDonut => '环形图';
+
+  @override
+  String get genuiChartEmpty => '所选区间没有数据';
+
+  @override
+  String get genuiChartAllHidden => '所有系列均已隐藏，可通过图例显示。';
+
+  @override
+  String genuiChartSummary(String kind, int series, int points, int missing) {
+    return '$kind，$series 个系列，$points 行数据，$missing 个值缺失（未连线，未填零）。';
+  }
+
+  @override
+  String genuiChartPieSummary(String kind, int count, String total) {
+    return '$kind，$count 项，合计 $total。';
+  }
+
+  @override
+  String get genuiChartDomainGap => '此区间无定义';
+
+  @override
+  String genuiChartDomainSummary(int count) {
+    return '$count 个采样点无定义；阴影区域不连线。';
+  }
+
+  @override
+  String genuiChartShowSeries(String name) {
+    return '显示 $name';
+  }
+
+  @override
+  String genuiChartHideSeries(String name) {
+    return '隐藏 $name';
+  }
+
+  @override
+  String get genuiChartKeyboardHint => '左右方向键选择数据行，上下方向键选择系列，Esc 清除选择。';
+
+  @override
+  String get genuiChartTotal => '合计';
+
+  @override
+  String get genuiChartFieldsError => '请选择一个 X 字段和一到四个不同的 Y 字段。';
+
+  @override
+  String get genuiChartRecordsError => '图表数据必须是记录数组。';
+
+  @override
+  String get genuiChartXError => 'X 值须全为数值或全为文本；散点图必须使用数值。';
+
+  @override
+  String get genuiChartYError => 'Y 字段须存在，且只能包含数值或空值。';
+
+  @override
+  String get genuiChartPieError => '饼图数值必须非负，且总和须为大于零的有限数。';
+
+  @override
+  String genuiChartMissingValues(int count) {
+    return '$count 个值缺失，未填零。';
+  }
+
+  @override
+  String get genuiChartNoVisibleValues => '所选系列没有可绘制的数值。';
+
+  @override
+  String genuiChartUnit(String unit) {
+    return '单位：$unit';
+  }
+
+  @override
+  String get genuiSomeValuesUnavailable => '部分值无法计算';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27026,6 +27115,95 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiBlockLimit => '每条消息最多渲染 3 个界面，其余以源码显示';
+
+  @override
+  String get genuiChartLine => '折线图';
+
+  @override
+  String get genuiChartArea => '面积图';
+
+  @override
+  String get genuiChartBar => '柱状图';
+
+  @override
+  String get genuiChartScatter => '散点图';
+
+  @override
+  String get genuiChartPie => '饼图';
+
+  @override
+  String get genuiChartDonut => '环形图';
+
+  @override
+  String get genuiChartEmpty => '所选区间没有数据';
+
+  @override
+  String get genuiChartAllHidden => '所有系列均已隐藏，可通过图例显示。';
+
+  @override
+  String genuiChartSummary(String kind, int series, int points, int missing) {
+    return '$kind，$series 个系列，$points 行数据，$missing 个值缺失（未连线，未填零）。';
+  }
+
+  @override
+  String genuiChartPieSummary(String kind, int count, String total) {
+    return '$kind，$count 项，合计 $total。';
+  }
+
+  @override
+  String get genuiChartDomainGap => '此区间无定义';
+
+  @override
+  String genuiChartDomainSummary(int count) {
+    return '$count 个采样点无定义；阴影区域不连线。';
+  }
+
+  @override
+  String genuiChartShowSeries(String name) {
+    return '显示 $name';
+  }
+
+  @override
+  String genuiChartHideSeries(String name) {
+    return '隐藏 $name';
+  }
+
+  @override
+  String get genuiChartKeyboardHint => '左右方向键选择数据行，上下方向键选择系列，Esc 清除选择。';
+
+  @override
+  String get genuiChartTotal => '合计';
+
+  @override
+  String get genuiChartFieldsError => '请选择一个 X 字段和一到四个不同的 Y 字段。';
+
+  @override
+  String get genuiChartRecordsError => '图表数据必须是记录数组。';
+
+  @override
+  String get genuiChartXError => 'X 值须全为数值或全为文本；散点图必须使用数值。';
+
+  @override
+  String get genuiChartYError => 'Y 字段须存在，且只能包含数值或空值。';
+
+  @override
+  String get genuiChartPieError => '饼图数值必须非负，且总和须为大于零的有限数。';
+
+  @override
+  String genuiChartMissingValues(int count) {
+    return '$count 个值缺失，未填零。';
+  }
+
+  @override
+  String get genuiChartNoVisibleValues => '所选系列没有可绘制的数值。';
+
+  @override
+  String genuiChartUnit(String unit) {
+    return '单位：$unit';
+  }
+
+  @override
+  String get genuiSomeValuesUnavailable => '部分值无法计算';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -40581,4 +40759,93 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiBlockLimit => '每則訊息最多顯示 3 個介面，其餘以原始碼顯示';
+
+  @override
+  String get genuiChartLine => '折線圖';
+
+  @override
+  String get genuiChartArea => '面積圖';
+
+  @override
+  String get genuiChartBar => '長條圖';
+
+  @override
+  String get genuiChartScatter => '散佈圖';
+
+  @override
+  String get genuiChartPie => '圓餅圖';
+
+  @override
+  String get genuiChartDonut => '環圈圖';
+
+  @override
+  String get genuiChartEmpty => '所選區間沒有資料';
+
+  @override
+  String get genuiChartAllHidden => '所有系列均已隱藏，可透過圖例顯示。';
+
+  @override
+  String genuiChartSummary(String kind, int series, int points, int missing) {
+    return '$kind，$series 個系列，$points 列資料，$missing 個值缺失（未連線，未填零）。';
+  }
+
+  @override
+  String genuiChartPieSummary(String kind, int count, String total) {
+    return '$kind，$count 項，合計 $total。';
+  }
+
+  @override
+  String get genuiChartDomainGap => '此區間無定義';
+
+  @override
+  String genuiChartDomainSummary(int count) {
+    return '$count 個取樣點無定義；陰影區域不連線。';
+  }
+
+  @override
+  String genuiChartShowSeries(String name) {
+    return '顯示 $name';
+  }
+
+  @override
+  String genuiChartHideSeries(String name) {
+    return '隱藏 $name';
+  }
+
+  @override
+  String get genuiChartKeyboardHint => '左右方向鍵選擇資料列，上下方向鍵選擇系列，Esc 清除選擇。';
+
+  @override
+  String get genuiChartTotal => '合計';
+
+  @override
+  String get genuiChartFieldsError => '請選擇一個 X 欄位和一到四個不同的 Y 欄位。';
+
+  @override
+  String get genuiChartRecordsError => '圖表資料必須是記錄陣列。';
+
+  @override
+  String get genuiChartXError => 'X 值須全為數值或全為文字；散佈圖必須使用數值。';
+
+  @override
+  String get genuiChartYError => 'Y 欄位須存在，且只能包含數值或空值。';
+
+  @override
+  String get genuiChartPieError => '圓餅圖數值必須非負，且總和須為大於零的有限數。';
+
+  @override
+  String genuiChartMissingValues(int count) {
+    return '$count 個值缺失，未填零。';
+  }
+
+  @override
+  String get genuiChartNoVisibleValues => '所選系列沒有可繪製的數值。';
+
+  @override
+  String genuiChartUnit(String unit) {
+    return '單位：$unit';
+  }
+
+  @override
+  String get genuiSomeValuesUnavailable => '部分值無法計算';
 }
