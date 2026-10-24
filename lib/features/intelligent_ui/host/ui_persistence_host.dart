@@ -52,11 +52,27 @@ class _PersistenceLifecycle extends StatefulWidget {
 
 class _PersistenceLifecycleState extends State<_PersistenceLifecycle>
     with WidgetsBindingObserver {
-  void _configure() => widget.registry.configurePersistence(
-    widget.repository?.genUiStates,
-    canPersist: (id) =>
-        widget.service != null && !widget.service!.isTemporaryConversation(id),
-  );
+  ChatService? _registeredService;
+  UiRuntimeRegistry? _registeredRegistry;
+  void Function()? _removeSnapshotReader;
+
+  void _configure() {
+    widget.registry.configurePersistence(
+      widget.repository?.genUiStates,
+      canPersist: (id) =>
+          widget.service != null &&
+          !widget.service!.isTemporaryConversation(id),
+    );
+    if (!identical(_registeredService, widget.service) ||
+        !identical(_registeredRegistry, widget.registry)) {
+      _removeSnapshotReader?.call();
+      _registeredService = widget.service;
+      _registeredRegistry = widget.registry;
+      _removeSnapshotReader = widget.service?.registerGenUiSnapshotReader(
+        widget.registry.captureCopySnapshots,
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -82,6 +98,7 @@ class _PersistenceLifecycleState extends State<_PersistenceLifecycle>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _removeSnapshotReader?.call();
     widget.registry.flush();
     super.dispose();
   }

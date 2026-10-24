@@ -1,4 +1,6 @@
 import '../../models/composer_draft.dart';
+import '../../../features/intelligent_ui/storage/ui_state_transfer.dart';
+import '../../../features/intelligent_ui/runtime/ui_surface_state.dart';
 import '../../database/composer_draft_store.dart';
 import '../../models/conversation_prompt_settings.dart';
 import '../world_book_activation.dart';
@@ -66,6 +68,8 @@ final class LoadedTimelinePage {
 }
 
 typedef AssetContentHash = Future<String> Function(File file);
+typedef GenUiSnapshotReader =
+    Iterable<UiSurfaceSnapshot> Function(List<ChatMessage> messages);
 
 class ChatService extends ChangeNotifier {
   ChatService({
@@ -104,6 +108,37 @@ class ChatService extends ChangeNotifier {
   Future<void>? _postStartupAssetMaintenanceFuture;
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
+  final _genUiSnapshotReaders = <GenUiSnapshotReader>{};
+
+  void Function() registerGenUiSnapshotReader(GenUiSnapshotReader reader) {
+    _genUiSnapshotReaders.add(reader);
+    return () => _genUiSnapshotReaders.remove(reader);
+  }
+
+  Future<Map<String, UiRevisionTransfer>> _captureGenUiCopies(
+    List<ChatMessage> messages,
+  ) async {
+    final temporary = <String, ChatMessage>{};
+    for (final message in messages) {
+      if (!_temporaryConversationIds.contains(message.conversationId)) continue;
+      final cached = _messagesCache[message.conversationId]
+          ?.where((m) => m.id == message.id)
+          .firstOrNull;
+      if (cached != null) temporary[cached.id] = cached;
+    }
+    final snapshots = [
+      for (final reader in List.of(_genUiSnapshotReaders))
+        ...reader(temporary.values.toList()),
+    ];
+    final frozen = {
+      for (final message in temporary.values)
+        message.id: UiRevisionTransfer.temporary(message, snapshots),
+    };
+    final copies = await _repo.captureGenUiTransfer(messages.map((m) => m.id));
+    copies.addAll(frozen);
+    return copies;
+  }
+
   final Map<String, Conversation> _conversationsCache = {};
   final Map<String, Conversation> _draftConversations = {};
   final Set<String> _temporaryConversationIds = <String>{};
@@ -3678,6 +3713,7 @@ class ChatService extends ChangeNotifier {
     bool preserveVersions = false,
   }) async {
     if (!_initialized) await init();
+    final activationOwner = _currentConversationId;
     final source = _conversationsCache[sourceConversationId];
     if (source == null) throw StateError('conversation_missing');
     if (preserveVersions) {
@@ -3692,7 +3728,7 @@ class ChatService extends ChangeNotifier {
       _messageOrderIds[forked.id] = List<String>.of(forked.messageIds);
       _messageCounts[forked.id] = forked.messageIds.length;
       _bumpConversationListRevision();
-      _currentConversationId = forked.id;
+      _activateForkIfCurrent(forked.id, activationOwner);
       notifyListeners();
       return forked;
     }
@@ -3726,22 +3762,14 @@ class ChatService extends ChangeNotifier {
             window.slots.last.revisionId == sourceRevisionId
         ? List<String>.of(source.chatSuggestions)
         : const <String>[];
-    final sourceExtras = Map<String, dynamic>.from(source.extras);
-    final persisted = await createConversation(
+    return _forkSelectedMessages(
       title: source.title,
       assistantId: source.assistantId,
+      sourceMessages: sourceMessages,
+      sourceExtras: Map<String, dynamic>.from(source.extras),
+      suggestions: suggestions,
+      activationOwner: activationOwner,
     );
-    await _copyConversationSettingsFrom(persisted.id, sourceExtras);
-    _messagesCache[persisted.id] = <ChatMessage>[];
-    _messageOrderIds[persisted.id] = <String>[];
-    _messageCounts[persisted.id] = 0;
-    await _cloneMessagesInto(persisted.id, sourceMessages);
-    if (suggestions.isNotEmpty) {
-      await updateConversationSuggestions(persisted.id, suggestions);
-    }
-    _currentConversationId = persisted.id;
-    notifyListeners();
-    return getConversation(persisted.id) ?? persisted;
   }
 
   Future<Conversation> forkConversationFromMessages({
@@ -3758,24 +3786,83 @@ class ChatService extends ChangeNotifier {
         break;
       }
     }
+    return _forkSelectedMessages(
+      title: title,
+      assistantId: assistantId,
+      sourceMessages: sourceMessages,
+      sourceExtras: sourceExtras,
+      activationOwner: _currentConversationId,
+    );
+  }
+
+  Future<Conversation> _forkSelectedMessages({
+    required String title,
+    required String? assistantId,
+    required List<ChatMessage> sourceMessages,
+    required Map<String, dynamic> sourceExtras,
+    required String? activationOwner,
+    List<String> suggestions = const [],
+  }) async {
+    // Cache-only metadata belongs to temporary sources too. Capture it before
+    // the first await, since explicit navigation can discard that owner.
+    final cachedTools = {
+      for (final message in sourceMessages)
+        message.id: getToolEvents(message.id),
+    };
+    final cachedArtifacts = {
+      for (final kind in _providerArtifactKinds)
+        kind: {
+          for (final message in sourceMessages)
+            if (getProviderArtifact(message.id, kind) case final String payload)
+              message.id: payload,
+        },
+    };
+    final uiCopies = await _captureGenUiCopies(sourceMessages);
     final persisted = await createConversation(
       title: title,
       assistantId: assistantId,
+      activate: false,
     );
-    await _copyConversationSettingsFrom(persisted.id, sourceExtras);
-    _messagesCache[persisted.id] = <ChatMessage>[];
-    _messageOrderIds[persisted.id] = <String>[];
-    _messageCounts[persisted.id] = 0;
-    await _cloneMessagesInto(persisted.id, sourceMessages);
-    _currentConversationId = persisted.id;
+    try {
+      await _copyConversationSettingsFrom(persisted.id, sourceExtras);
+      _messagesCache[persisted.id] = <ChatMessage>[];
+      _messageOrderIds[persisted.id] = <String>[];
+      _messageCounts[persisted.id] = 0;
+      await _cloneMessagesInto(
+        persisted.id,
+        sourceMessages,
+        uiCopies,
+        cachedTools: cachedTools,
+        cachedArtifacts: cachedArtifacts,
+      );
+      if (suggestions.isNotEmpty) {
+        await updateConversationSuggestions(persisted.id, suggestions);
+      }
+    } catch (_) {
+      // This target belongs solely to the failed copy. Remove its committed
+      // partial rows and caches; keep the current owner and temporary assets.
+      await _deletePersistedConversation(persisted.id);
+      notifyListeners();
+      rethrow;
+    }
+    _activateForkIfCurrent(persisted.id, activationOwner);
     notifyListeners();
     return getConversation(persisted.id) ?? persisted;
+  }
+
+  void _activateForkIfCurrent(String targetId, String? activationOwner) {
+    if (_currentConversationId != activationOwner) return;
+    _discardTemporaryConversation(activationOwner);
+    _currentConversationId = targetId;
   }
 
   Future<void> _cloneMessagesInto(
     String targetConversationId,
     List<ChatMessage> sourceMessages,
-  ) async {
+    Map<String, UiRevisionTransfer> uiCopies, {
+    required Map<String, List<Map<String, dynamic>>> cachedTools,
+    required Map<String, Map<String, String>> cachedArtifacts,
+  }) async {
     final sourceIds = [
       for (final message in sourceMessages)
         if (message.id.isNotEmpty) message.id,
@@ -3797,6 +3884,7 @@ class ChatService extends ChangeNotifier {
     );
 
     final cloned = <ChatMessage>[];
+    final messageIdMap = <String, String>{};
     for (final message in sourceMessages) {
       final forked = ChatMessage(
         role: message.role,
@@ -3823,6 +3911,7 @@ class ChatService extends ChangeNotifier {
       );
       await addMessageDirectly(targetConversationId, forked);
       cloned.add(forked);
+      messageIdMap[message.id] = forked.id;
       if (message.role == 'user') {
         await _inheritImageOcrArtifactsBestEffort(
           fromRevisionId: message.id,
@@ -3835,20 +3924,33 @@ class ChatService extends ChangeNotifier {
       // `_cacheMessageArtifacts`. Persist under the new ids and refresh the
       // in-memory caches so tool cards and thought signatures survive.
       final events =
-          toolEventsBySourceId[message.id] ?? getToolEvents(message.id);
+          toolEventsBySourceId[message.id] ??
+          cachedTools[message.id] ??
+          const [];
       if (events.isNotEmpty) {
         await setToolEvents(forked.id, events);
       }
       for (final kind in _providerArtifactKinds) {
         final payload =
             artifactsBySourceId[kind]?[message.id] ??
-            getProviderArtifact(message.id, kind);
+            cachedArtifacts[kind]?[message.id];
         if (payload != null && payload.isNotEmpty) {
           await setProviderArtifact(forked.id, kind, payload);
         }
       }
     }
-    await _cacheMessageArtifacts(cloned);
+    await _repo.copyGenUiTransfer(
+      sources: uiCopies,
+      messageIdMap: messageIdMap,
+      targetConversationId: targetConversationId,
+    );
+    // Tool overlays can shift native surface ordinals. Publish the final parts
+    // and copied completion proof together, rather than retaining clone drafts.
+    final refreshed = await _repo.getMessagesByIds(
+      cloned.map((m) => m.id).toList(),
+    );
+    _messagesCache[targetConversationId] = refreshed;
+    await _cacheMessageArtifacts(refreshed);
   }
 
   Future<ChatMessage?> appendMessageVersion({

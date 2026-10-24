@@ -1200,6 +1200,9 @@ class HomeViewModel extends ChangeNotifier {
           .forkKeepMessageVersions,
     );
 
+    // Navigation during the copy owns the current page. The service activates
+    // the fork only while its original owner is still current.
+    if (_chatService.currentConversationId != newConvo.id) return;
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
     _syncContextUsageConversation(newConvo.id);
@@ -1405,6 +1408,7 @@ class HomeViewModel extends ChangeNotifier {
           sourceMessages: [summaryMsg, ...keptMessages],
         );
 
+        if (_chatService.currentConversationId != newConvo.id) return null;
         _chatService.setCurrentConversation(newConvo.id);
         _syncContextUsageConversation(newConvo.id);
         await _chatController.setCurrentConversationAndLoad(

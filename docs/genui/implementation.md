@@ -604,3 +604,54 @@ markstream dependency resolution, fatal-info analysis and all 296 tests, the
 macOS debug host build and diff checks. All 20 changed Dart files are formatted.
 The tested source hashes remained unchanged through staging. Native GUI
 acceptance remains separate and pending while the Mac is locked.
+
+## C12 copy, fork and merge ownership
+
+Duplicate and version-preserving fork flush before entering their writer
+transaction and transfer state for the actual revision map, including late-added
+versions of retained groups. Default service fork and list/compression fork use
+the same capture path before creating a target. They leave the current owner
+active until copying succeeds; a failed target write removes that new partial
+conversation and its caches without cleaning temporary source assets. A later
+user navigation prevents automatic activation; neither the service nor the home
+view model can discard the newer temporary owner. Temporary proof, snapshots and
+cached tool/provider metadata are captured before the first asynchronous wait.
+
+A feature-owned batch reader validates original assistant fences and normalizes
+inputs/view with the save decoder. Matching malformed private state aborts the
+operation; stale source/key/hash rows are ineligible. Copying retains semantic
+cache text and creates the target FTS entry through the existing state trigger.
+Fresh generation-run identities retain the latest overall completion proof;
+active runs become interrupted, missing proof stays unknown, and no task is
+resumed. Terminal timestamps account for source clocks ahead of the local clock.
+
+Temporary source proof comes from the actual service cache. The host registers a
+snapshot reader only for explicit copy, capturing accepted overrides before the
+source is discarded. Unseen completed temporary messages retain their proof and
+defaults. Original temporary owners never receive durable rows. Exact joined
+text, absolute fence intervals, source text and both endpoints' eligibility map
+state across inserted reasoning/tool boundaries, including repeated identical
+fences. The service reloads final target parts and proof before publishing its
+completed message cache.
+
+Merge fingerprints add message-scoped native completion and sorted non-default
+inputs/view. State timestamps, IDs, search cache and FTS are excluded; explicit
+defaults, Reset, cache-only and absent rows remain equivalent. Ordinary message
+fingerprints stay unchanged. Conflict message IDs derive from the final selected
+conversation ID, so editing an imported conflict and importing the original
+again cannot collide with its previous message IDs.
+
+The focused run passed 430 checks: the full GenUI set (including all 28 current
+goldens), new SQLite transfer/merge/service cases and existing duplicate, fork,
+merge, temporary conversation, workspace settings and model-selection cases.
+Actual host lifecycle tests verify snapshot-reader registration and removal.
+Independent review identified source-clock skew, partial service targets on
+state-write failure and navigation during a long fork. All three are fixed and
+covered, including four real SQL-gate tests that create and retain a newer
+temporary conversation while the target write is blocked. The final copy/service
+regression set passed 160 checks; independent final review returned no findings.
+Final G passed: root fatal-info analysis, all 9,468 root tests (two existing
+skips), markstream dependency resolution, fatal-info analysis and all 296 tests,
+the macOS debug host build and diff checks. Seven changed Dart files are
+formatted; source hashes stayed unchanged through staging. Mac native GUI
+acceptance remains pending; the lock was rechecked during this gate.

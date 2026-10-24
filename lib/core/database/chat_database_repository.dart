@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../features/intelligent_ui/storage/ui_state_repository.dart';
+import '../../features/intelligent_ui/storage/ui_state_transfer.dart';
 import '../../features/intelligent_ui/host/ui_source_map.dart';
 import '../models/composer_draft.dart';
 import 'composer_draft_store.dart';
@@ -4400,7 +4401,8 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<Conversation?> duplicateConversation(String sourceId) {
+  Future<Conversation?> duplicateConversation(String sourceId) async {
+    await genUiStates.flush();
     return _writeTransaction(() async {
       final sourceRow = await (_db.select(
         _db.conversationRows,
@@ -4462,12 +4464,35 @@ class ChatDatabaseRepository {
     });
   }
 
+  Future<Map<String, UiRevisionTransfer>> captureGenUiTransfer(
+    Iterable<String> revisionIds,
+  ) async {
+    await genUiStates.flush();
+    return _writeTransaction(
+      () => UiStateTransfer(_db).read(revisionIds: revisionIds),
+    );
+  }
+
+  Future<void> copyGenUiTransfer({
+    required Map<String, UiRevisionTransfer> sources,
+    required Map<String, String> messageIdMap,
+    required String targetConversationId,
+  }) => _writeTransaction(
+    () => UiStateTransfer(_db).copy(
+      sources: sources,
+      messageIdMap: messageIdMap,
+      targetConversationId: targetConversationId,
+    ),
+  );
+
   Future<void> _copyMessageRowsInto({
     required String targetConversationId,
     required List<MessageRow> messages,
     required Map<String, String> messageIdMap,
     required Map<String, String> groupIdMap,
   }) async {
+    final transfer = UiStateTransfer(_db);
+    final sources = await transfer.read(revisionIds: messageIdMap.keys);
     for (final message in messages) {
       final targetMessageId = messageIdMap[message.id]!;
       await _db
@@ -4526,6 +4551,11 @@ class ChatDatabaseRepository {
         [targetConversationId, targetMessageId, message.id],
       );
     }
+    await transfer.copy(
+      sources: sources,
+      messageIdMap: messageIdMap,
+      targetConversationId: targetConversationId,
+    );
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT revision_id FROM message_asset_rows WHERE conversation_id = ? '
@@ -4541,7 +4571,8 @@ class ChatDatabaseRepository {
     required String targetRevisionId,
     required String title,
     String? assistantId,
-  }) {
+  }) async {
+    await genUiStates.flush();
     return _writeTransaction(() async {
       final sourceRow = await (_db.select(
         _db.conversationRows,
@@ -5392,6 +5423,7 @@ class ChatDatabaseRepository {
       );
     }
 
+    await genUiStates.flush();
     var attached = false;
     try {
       await _db.customStatement('ATTACH DATABASE ? AS merge_source;', [
@@ -5481,7 +5513,7 @@ class ChatDatabaseRepository {
           final messageIdMap = <String, String>{};
           for (final messageId in sourceMessageIds) {
             messageIdMap[messageId] = remapWholeConversation
-                ? _deterministicMergeId('message', messageId, sourceFingerprint)
+                ? _deterministicMergeId('message', messageId, targetId)
                 : messageId;
           }
           await _insertMergedConversation(
@@ -5801,6 +5833,14 @@ class ChatDatabaseRepository {
       for (final row in signatureRows)
         row.read<String>('revision_id'): row.read<String>('payload'),
     };
+    final uiTransfers = await UiStateTransfer(_db).read(
+      source: switch (schema) {
+        'main' => UiTransferDatabase.main,
+        'merge_source' => UiTransferDatabase.mergeSource,
+        _ => throw ArgumentError.value(schema, 'schema'),
+      },
+      conversationId: id,
+    );
     final messages = <Object?>[];
     final groupOrdinals = <String, int>{};
     for (final row in messageRows) {
@@ -5827,6 +5867,7 @@ class ChatDatabaseRepository {
         payloads?['tool_call'],
         attachmentPayloads[messageId],
         signatures[messageId],
+        if (uiTransfers[messageId]?.fingerprint case final Object ui) ui,
       ]);
     }
     return sha256
@@ -5954,6 +5995,11 @@ class ChatDatabaseRepository {
     required Map<String, String> messageIdMap,
   }) async {
     await _invalidateEmptyAcknowledgement();
+    final transfer = UiStateTransfer(_db);
+    final sources = await transfer.read(
+      source: UiTransferDatabase.mergeSource,
+      revisionIds: messageIdMap.keys,
+    );
     final sourceMessages = await _db
         .customSelect(
           'SELECT id, group_id FROM merge_source.message_rows '
@@ -6051,8 +6097,6 @@ class ChatDatabaseRepository {
         'FROM merge_source.message_part_rows WHERE revision_id = ?;',
         [targetId, entry.value, entry.key],
       );
-      // generation_run_rows are intentionally not copied: merged revisions
-      // are always persisted as non-streaming.
       await _db.customStatement(
         'INSERT INTO main.provider_artifact_rows '
         '(conversation_id, revision_id, kind, payload, created_at, updated_at) '
@@ -6061,6 +6105,11 @@ class ChatDatabaseRepository {
         [targetId, entry.value, entry.key],
       );
     }
+    await transfer.copy(
+      sources: sources,
+      messageIdMap: messageIdMap,
+      targetConversationId: targetId,
+    );
     // Merged revisions bypass _replaceMessageParts, so queue the
     // attachment-bearing ones for the asset-reference backfill before GC can
     // treat their files as unreferenced.

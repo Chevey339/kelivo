@@ -58,6 +58,24 @@ final class UiRuntimeRegistry {
 
   void flush() => _store?.flushQuietly();
 
+  /// Freeze accepted values for an explicit copy before its source conversation
+  /// is discarded. Unmounted cards are retained by this registry; unseen cards
+  /// have no overrides and are reconstructed from their source declarations.
+  List<UiSurfaceSnapshot> captureCopySnapshots(List<ChatMessage> messages) {
+    final result = <UiSurfaceSnapshot>[];
+    for (final message in messages) {
+      reconcile(message);
+      final entries = _entries[(message.conversationId, message.id)];
+      if (entries == null) continue;
+      for (final entry in entries.values) {
+        if (!entry.revoked && entry.controller.canSnapshot) {
+          result.add(entry.controller.captureSnapshot());
+        }
+      }
+    }
+    return result;
+  }
+
   void leaveConversation(String? conversationId) {
     if (conversationId == null) return;
     flush();
