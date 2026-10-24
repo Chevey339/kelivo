@@ -49,6 +49,9 @@ app.*.map.json
 android/app/src/main/jniLibs/**/*.so
 
 pubspec.lock
+# Commit lockfiles for the packages checked by CI.
+!/pubspec.lock
+!/dependencies/markstream/pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc
 /linux/flutter/generated_plugin_registrant.h

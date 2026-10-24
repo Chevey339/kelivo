@@ -27,7 +27,6 @@ KEYCHAIN_READY=0
 ORIGINAL_DEFAULT=""
 ORIGINAL_KEYCHAINS=()
 P12_PATH=""
-PASS_FILE=""
 API_KEY_PATH=""
 SKIP_FILE=""
 IDENTITY=""
@@ -190,26 +189,11 @@ import_apple_intermediate() {
 }
 
 import_certificate() {
-  local identities line key_out openssl_err
+  local identities line
   P12_PATH="$WORK_DIR/certificate.p12"
-  PASS_FILE="$WORK_DIR/p12.pass"
   KEYCHAIN_PATH="$WORK_DIR/kelivo-signing.keychain-db"
   printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | tr -d '[:space:]' | base64 -D >"$P12_PATH"
-  printf '%s' "$MACOS_CERTIFICATE_PASSWORD" >"$PASS_FILE"
-  chmod 600 "$P12_PATH" "$PASS_FILE"
-
-  key_out="$WORK_DIR/keycheck.pem"
-  openssl_err="$WORK_DIR/openssl.err"
-  if ! openssl pkcs12 -in "$P12_PATH" -nocerts -nodes -passin "file:$PASS_FILE" -out "$key_out" 2>"$openssl_err"; then
-    cat "$openssl_err" >&2 || true
-    rm -f "$key_out"
-    die "无法读取 .p12。请确认 MACOS_CERTIFICATE_PASSWORD 正确，且 MACOS_CERTIFICATE_P12_BASE64 是证书文件的 base64。"
-  fi
-  if ! grep -q "PRIVATE KEY" "$key_out"; then
-    rm -f "$key_out"
-    die ".p12 里没有私钥。在钥匙串访问中同时选中 Developer ID Application 证书和它下面的私钥，再导出 .p12。"
-  fi
-  rm -f "$key_out" "$openssl_err"
+  chmod 600 "$P12_PATH"
 
   local keychain_password
   keychain_password=$(openssl rand -base64 32 | tr -d '\n') || die "无法生成临时钥匙串密码"
@@ -236,13 +220,17 @@ import_certificate() {
   security list-keychains -d user -s "$KEYCHAIN_PATH" "${ORIGINAL_KEYCHAINS[@]}"
   security default-keychain -s "$KEYCHAIN_PATH"
 
-  security import "$P12_PATH" \
+  # Let macOS read its native PKCS#12 export. OpenSSL 3+ rejects the RC2
+  # encryption used by valid Keychain exports unless a legacy provider is loaded.
+  if ! security import "$P12_PATH" \
     -k "$KEYCHAIN_PATH" \
     -P "$MACOS_CERTIFICATE_PASSWORD" \
     -f pkcs12 \
     -A \
     -T /usr/bin/codesign \
-    -T /usr/bin/security
+    -T /usr/bin/security; then
+    die "无法导入 .p12。请确认 MACOS_CERTIFICATE_PASSWORD 正确，且 MACOS_CERTIFICATE_P12_BASE64 是包含证书和私钥的 .p12 文件的 base64。"
+  fi
   security set-key-partition-list \
     -S apple-tool:,apple:,codesign: \
     -s \
@@ -271,12 +259,11 @@ import_certificate() {
   if [[ -z "$IDENTITY" ]]; then
     echo "钥匙串中的代码签名身份：" >&2
     security find-identity -v -p codesigning "$KEYCHAIN_PATH" >&2 || true
-    die "没有找到 Developer ID Application 证书。请导出 Developer ID Application（Team ID ${team_id}），不要用 Apple Development、Mac App Distribution 或 Developer ID Installer。"
+    die "没有找到带私钥的有效 Developer ID Application 签名身份。请连同私钥导出 Developer ID Application（Team ID ${team_id}），不要用 Apple Development、Mac App Distribution 或 Developer ID Installer。"
   fi
   echo "签名身份: $IDENTITY"
-  rm -f "$P12_PATH" "$PASS_FILE"
+  rm -f "$P12_PATH"
   P12_PATH=""
-  PASS_FILE=""
 }
 
 build_notary_args() {
