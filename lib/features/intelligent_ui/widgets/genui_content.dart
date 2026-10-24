@@ -1,3 +1,5 @@
+import '../text/ui_number.dart';
+import '../text/ui_markdown_text.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -7,13 +9,6 @@ import 'package:markstream/markstream.dart' as ms;
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
 import 'genui_theme.dart';
-
-String genUiNumber(num? value, {int? digits}) {
-  if (value == null) return '—';
-  if (digits != null) return value.toStringAsFixed(digits);
-  final text = value.toString();
-  return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
-}
 
 class GenUiText extends StatelessWidget {
   const GenUiText({super.key, required this.text, this.variant});
@@ -37,15 +32,7 @@ class GenUiMarkdown extends StatelessWidget {
   Widget build(BuildContext context) => ms.MarkstreamView(
     source: text,
     theme: GenUiTheme.of(context).markdown,
-    options: const ms.ParserOptions(
-      inlineHtml: false,
-      htmlBlocks: false,
-      directives: false,
-      details: false,
-      taskItems: false,
-      radioItems: false,
-      standaloneTaskLine: false,
-    ),
+    options: genUiMarkdownOptions,
     mathRenderer: const _GenUiMathRenderer(),
     linkHandler: linkHandler,
     labels: _labels(AppLocalizations.of(context)!),

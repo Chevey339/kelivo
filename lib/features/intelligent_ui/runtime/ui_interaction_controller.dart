@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_ir.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_form_validation.dart';
@@ -25,19 +24,19 @@ final class UiAskIntent {
   final UiSurfaceSnapshot snapshot;
 }
 
-enum UiActionBlock {
-  stale,
-  readOnly,
-  unavailable,
-  disabled,
-  dependency,
-  form,
-  contextBudget,
+/// A coherent snapshot captured by an explicit host Attach action.
+final class UiAttachIntent {
+  const UiAttachIntent({required this.read, required this.snapshot});
+  final UiSurfaceRead read;
+  final UiSurfaceSnapshot snapshot;
 }
 
+enum UiActionBlock { stale, readOnly, unavailable, disabled, dependency, form }
+
 final class UiActionResult {
-  const UiActionResult({this.intent, this.block, this.form});
+  const UiActionResult({this.intent, this.attachment, this.block, this.form});
   final UiAskIntent? intent;
+  final UiAttachIntent? attachment;
   final UiActionBlock? block;
   final UiFormCheck? form;
   bool get accepted => block == null;
@@ -346,6 +345,68 @@ final class UiInteractionController {
       }
       _submitted.add(form);
     }
+    final failure = _settleDrafts(token: token, action: id, form: form);
+    if (failure != null) return failure;
+    if (!surface.accepts(token)) {
+      return const UiActionResult(block: UiActionBlock.stale);
+    }
+    final ready = surface.nodes[id]!;
+    if (!ready.valid) {
+      return const UiActionResult(block: UiActionBlock.dependency);
+    }
+    if (tree.visible[id] != true || tree.enabled[id] != true) {
+      return const UiActionResult(block: UiActionBlock.disabled);
+    }
+    // The semantic projector selects complete fields under the model-content
+    // budget and explicitly reports omissions. Never truncate serialized JSON.
+    surface.flushQuietly();
+    // Everything below comes from one synchronous completed batch.
+    final read = surface.captureRead();
+    final current = read.nodes[id]!;
+    return UiActionResult(
+      intent: UiAskIntent(
+        owner: surface.owner,
+        sourceHash: surface.sourceHash!,
+        node: id,
+        text: current.askText!,
+        context: current.askContext!,
+        read: read,
+        snapshot: surface.captureSnapshot(),
+      ),
+    );
+  }
+
+  /// Explicit host attachment settles the visible field drafts, but does not
+  /// require untouched incomplete forms to become valid before describing them.
+  UiActionResult captureForAttach({required UiRuntimeToken token}) {
+    if (_disposed || !surface.accepts(token)) {
+      return const UiActionResult(block: UiActionBlock.stale);
+    }
+    if (surface.readOnly) {
+      return const UiActionResult(block: UiActionBlock.readOnly);
+    }
+    final failure = _settleDrafts(token: token);
+    if (failure != null) return failure;
+    if (!surface.accepts(token)) {
+      return const UiActionResult(block: UiActionBlock.stale);
+    }
+    if (!surface.canSnapshot || surface.readOnly) {
+      return const UiActionResult(block: UiActionBlock.readOnly);
+    }
+    surface.flushQuietly();
+    return UiActionResult(
+      attachment: UiAttachIntent(
+        read: surface.captureRead(),
+        snapshot: surface.captureSnapshot(),
+      ),
+    );
+  }
+
+  UiActionResult? _settleDrafts({
+    required UiRuntimeToken token,
+    String? action,
+    String? form,
+  }) {
     UiActionResult? failure(UiFormCheck result) {
       if (form != null) _notify(form);
       for (final issue in result.issues) {
@@ -364,7 +425,15 @@ final class UiInteractionController {
           (tree.visible[form] != true || tree.enabled[form] != true)) {
         return const UiActionResult(block: UiActionBlock.disabled);
       }
-      final draftIds = _actionDraftIds(id, form);
+      final draftIds = action == null
+          ? [
+              for (final id in tree.order)
+                if (_drafts.containsKey(id) &&
+                    tree.visible[id] == true &&
+                    tree.enabled[id] == true)
+                  id,
+            ]
+          : _actionDraftIds(action, form);
       final formCheck = form == null
           ? UiFormCheck(const [], const [])
           : checkForm(form);
@@ -409,6 +478,14 @@ final class UiInteractionController {
       } finally {
         _editing.removeAll(commitIds);
       }
+      if (result == UiMutationResult.stale ||
+          result == UiMutationResult.readOnly) {
+        return UiActionResult(
+          block: result == UiMutationResult.stale
+              ? UiActionBlock.stale
+              : UiActionBlock.readOnly,
+        );
+      }
       if (result == UiMutationResult.invalid) {
         return failure(
           UiFormCheck([
@@ -427,32 +504,7 @@ final class UiInteractionController {
         }
       }
     }
-    final ready = surface.nodes[id]!;
-    if (!ready.valid) {
-      return const UiActionResult(block: UiActionBlock.dependency);
-    }
-    if (tree.visible[id] != true || tree.enabled[id] != true) {
-      return const UiActionResult(block: UiActionBlock.disabled);
-    }
-    if (utf8.encode(jsonEncode(ready.askContext)).length >
-        UiBudgets.modelContentBytes) {
-      return const UiActionResult(block: UiActionBlock.contextBudget);
-    }
-    surface.flushQuietly();
-    // Everything below comes from one synchronous completed batch.
-    final read = surface.captureRead();
-    final current = read.nodes[id]!;
-    return UiActionResult(
-      intent: UiAskIntent(
-        owner: surface.owner,
-        sourceHash: surface.sourceHash!,
-        node: id,
-        text: current.askText!,
-        context: current.askContext!,
-        read: read,
-        snapshot: surface.captureSnapshot(),
-      ),
-    );
+    return null;
   }
 
   List<String> _actionDraftIds(String action, String? form) {

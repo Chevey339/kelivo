@@ -70,9 +70,13 @@ class ChatApiService {
     } catch (_) {}
   }
 
-  static Future<String> _stripImageMarkersFromText(String raw) async {
+  static Future<String> _stripImageMarkersFromText(
+    String raw, {
+    String? literalText,
+  }) async {
     final parsed = await parseTextAndImages(
       raw,
+      literalText: literalText,
       allowRemoteImages: false,
       allowLocalImages: false,
       allowDataImages: false,
@@ -84,13 +88,24 @@ class ChatApiService {
     return parsed.text;
   }
 
-  static Future<dynamic> _stripImageInputsFromContent(dynamic content) async {
-    if (content is String) return _stripImageMarkersFromText(content);
+  static Future<dynamic> _stripImageInputsFromContent(
+    dynamic content, {
+    String? literalText,
+  }) async {
+    if (content is String) {
+      return _stripImageMarkersFromText(content, literalText: literalText);
+    }
     if (content is List) {
-      return _stripImageMarkersFromText(textFromContentParts(content));
+      return _stripImageMarkersFromText(
+        textFromContentParts(content),
+        literalText: literalText,
+      );
     }
     if (content is Map) {
-      return _stripImageMarkersFromText(textFromContentParts([content]));
+      return _stripImageMarkersFromText(
+        textFromContentParts([content]),
+        literalText: literalText,
+      );
     }
     return content;
   }
@@ -165,7 +180,10 @@ class ChatApiService {
         }
       }
       if (!keepImage && copy.containsKey('content')) {
-        copy['content'] = await _stripImageInputsFromContent(copy['content']);
+        copy['content'] = await _stripImageInputsFromContent(
+          copy['content'],
+          literalText: internalLiteralText(copy),
+        );
       }
       out.add(copy);
     }

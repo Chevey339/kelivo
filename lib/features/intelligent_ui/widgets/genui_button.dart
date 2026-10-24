@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_diagnostic.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_ir.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_resolved_node.dart';
-import 'package:Kelivo/features/intelligent_ui/runtime/ui_interaction_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -118,11 +117,7 @@ class _GenUiButtonState extends State<GenUiButton> {
         token: widget.token,
       );
       if (mounted && result.block != null && result.form == null) {
-        setState(
-          () => _error = result.block == UiActionBlock.contextBudget
-              ? l10n.genuiErrorDataBudget
-              : l10n.genuiActionUnavailable,
-        );
+        setState(() => _error = l10n.genuiActionUnavailable);
       }
     } catch (_) {
       if (mounted) setState(() => _error = l10n.genuiActionUnavailable);

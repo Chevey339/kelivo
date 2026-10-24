@@ -1,3 +1,4 @@
+import '../text/ui_number.dart';
 import 'dart:math' as math;
 import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';
@@ -11,7 +12,6 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_table_data.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_resolved_node.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
-import 'package:Kelivo/features/intelligent_ui/widgets/genui_content.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_interactions.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';

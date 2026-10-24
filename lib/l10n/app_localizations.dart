@@ -25559,6 +25559,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This view change exceeds the saved state limit. Shorten a field or reset the UI and try again.'**
   String get genuiViewStateFailed;
+
+  /// No description provided for @genuiAttachState.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach current state'**
+  String get genuiAttachState;
+
+  /// No description provided for @genuiChipExactText.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact text to be sent (frozen)'**
+  String get genuiChipExactText;
+
+  /// No description provided for @genuiChipStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Source unavailable — remove or attach again'**
+  String get genuiChipStale;
+
+  /// No description provided for @genuiChipRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove attached UI'**
+  String get genuiChipRemove;
+
+  /// No description provided for @genuiReplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace attached UI?'**
+  String get genuiReplaceTitle;
+
+  /// No description provided for @genuiReplaceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A draft can carry one UI state.'**
+  String get genuiReplaceBody;
+
+  /// No description provided for @genuiReplaceCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get genuiReplaceCurrent;
+
+  /// No description provided for @genuiReplaceNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace with'**
+  String get genuiReplaceNew;
+
+  /// No description provided for @genuiReplaceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get genuiReplaceConfirm;
+
+  /// No description provided for @genuiMergeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to your draft?'**
+  String get genuiMergeTitle;
+
+  /// No description provided for @genuiMergeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get genuiMergeConfirm;
+
+  /// No description provided for @genuiContextEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No parameter or result fields are attached.'**
+  String get genuiContextEmpty;
+
+  /// No description provided for @genuiContextOmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'[Some fields or data rows are omitted.]'**
+  String get genuiContextOmitted;
+
+  /// No description provided for @genuiChipOmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'The previously attached UI state is unavailable and was not included.'**
+  String get genuiChipOmitted;
+
+  /// No description provided for @genuiDraftChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Your draft changed. Try attaching again.'**
+  String get genuiDraftChanged;
+
+  /// No description provided for @genuiRepairDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Please repair this interface using the diagnostics and source excerpts below.'**
+  String get genuiRepairDraft;
 }
 
 class _AppLocalizationsDelegate

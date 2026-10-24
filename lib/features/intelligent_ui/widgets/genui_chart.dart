@@ -1,3 +1,4 @@
+import '../text/ui_number.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +13,6 @@ import '../runtime/ui_resolved_node.dart';
 import '../runtime/ui_surface_controller.dart';
 import 'genui_chart_canvas.dart';
 import 'genui_chart_paint.dart';
-import 'genui_content.dart';
 import 'genui_control_region.dart';
 import 'genui_interactions.dart';
 import 'genui_theme.dart';

@@ -1,3 +1,7 @@
+import '../../intelligent_ui/host/ui_draft_staging.dart';
+import '../../intelligent_ui/host/ui_draft_request.dart';
+import '../../intelligent_ui/widgets/genui_draft_dialog.dart';
+import '../../intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/database/composer_draft_store.dart';
 import '../../../core/models/composer_draft.dart';
@@ -404,10 +408,35 @@ class HomePageController extends ChangeNotifier {
         draft.revision != revision) {
       return;
     }
+    final incoming = draft.pending!;
+    if (choice == 'append' &&
+        ComposerDraftStore.hasUiContextConflict(
+          draft.recoveryTarget,
+          incoming,
+        )) {
+      if (!_context.mounted ||
+          !await confirmGenUiReplacement(
+            _context,
+            current: draft.recoveryTarget.uiContext!,
+            replacement: incoming.uiContext!,
+          )) {
+        return;
+      }
+      if (_composerDisposed ||
+          owner != _composerOwner ||
+          draft.revision != revision) {
+        return;
+      }
+    }
+    await _inputController.flushMessageInput();
+    if (_composerDisposed || owner != _composerOwner) return;
+    _saveComposerDraft();
+    if (draft.revision != revision) return;
     drafts.restorePending(
       owner,
       append: choice == 'append',
       replace: choice == 'replace',
+      selectedUiContext: choice == 'append' ? incoming.uiContext : null,
     );
     _applyComposerValue(draft.active);
     _userMessageEditState = draft.editMessageId == null
@@ -1493,10 +1522,7 @@ class HomePageController extends ChangeNotifier {
   Future<ChatInputSubmissionResult> _sendComposerMessage(
     ChatInputData input,
   ) async {
-    final content = input.text.trim();
-    if (content.isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
+    if (input.isEmpty) {
       return ChatInputSubmissionResult.rejected;
     }
     final submissionConversation = input.draftSubmission == null
@@ -1612,36 +1638,56 @@ class HomePageController extends ChangeNotifier {
     await _viewModel.toggleTemporaryConversation();
   }
 
-  void cancelQueuedMessage() {
+  Future<void> cancelQueuedMessage() async {
+    final serial = _composerSwitch;
     final draining = _drainComposerInput();
-    if (draining != null) {
-      final serial = _composerSwitch;
-      unawaited(
-        draining.then((_) {
-          if (!_composerDisposed && serial == _composerSwitch) {
-            cancelQueuedMessage();
-          }
-        }),
-      );
+    if (draining != null) await draining;
+    if (_composerDisposed || serial != _composerSwitch) return;
+    final queued = _viewModel.currentQueuedInput;
+    if (queued == null) return;
+    if (queued.input.draftSubmission != null && _composerDrafts != null) {
+      if (_viewModel.cancelCurrentQueuedInput() == null) return;
+      await _restoreRecoveredDraft();
+      if (!_composerDisposed) notifyListeners();
       return;
     }
-    final restored = _viewModel.cancelCurrentQueuedInput();
-    if (restored == null) return;
-    if (restored.draftSubmission != null && _composerDrafts != null) {
-      unawaited(_restoreRecoveredDraft());
-      notifyListeners();
-      return;
+    final before = _mediaController.snapshotDraft(_inputController.text);
+    final incoming = ComposerDraftInput.fromInput(queued.input);
+    if (ComposerDraftStore.hasUiContextConflict(before, incoming)) {
+      if (!_context.mounted ||
+          !await confirmGenUiReplacement(
+            _context,
+            current: before.uiContext!,
+            replacement: incoming.uiContext!,
+          )) {
+        return;
+      }
     }
-
-    _inputController.value = TextEditingValue(
-      text: restored.text,
-      selection: TextSelection.collapsed(offset: restored.text.length),
-      composing: TextRange.empty,
+    final merged = ComposerDraftStore.merge(
+      before,
+      incoming,
+      selectedUiContext: incoming.uiContext,
     );
-    _mediaController.restoreInput(restored);
+    if (!before.isEmpty) {
+      if (!_context.mounted || !await confirmGenUiMerge(_context, merged)) {
+        return;
+      }
+    }
+    await _inputController.flushMessageInput();
+    if (_composerDisposed ||
+        serial != _composerSwitch ||
+        !identical(_viewModel.currentQueuedInput, queued) ||
+        !before.sameValue(
+          _mediaController.snapshotDraft(_inputController.text),
+        ) ||
+        !_inputController.value.composing.isCollapsed) {
+      return;
+    }
+    if (_viewModel.cancelCurrentQueuedInput() == null) return;
+    _applyComposerValue(merged);
+    _saveComposerDraft();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_context.mounted) return;
-      _inputFocus.requestFocus();
+      if (_context.mounted) _inputFocus.requestFocus();
     });
     notifyListeners();
   }
@@ -2255,7 +2301,8 @@ class HomePageController extends ChangeNotifier {
     if (!ctx.mounted || bindingSerial != _composerSwitch) return;
     final hasDraft =
         _inputController.text.trim().isNotEmpty ||
-        _mediaController.hasDraftMedia;
+        _mediaController.hasDraftMedia ||
+        _mediaController.hasUiContext;
     if (hasDraft &&
         (_composerDrafts == null ||
             isTemporaryConversation ||
@@ -2297,9 +2344,7 @@ class HomePageController extends ChangeNotifier {
       return;
     }
     var input = _mediaController.snapshotInput(_inputController.text);
-    if (input.text.trim().isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
+    if (input.isEmpty) {
       return;
     }
     final owner = _composerOwner;
@@ -2429,6 +2474,22 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> stageUiDraft(UiDraftRequest request) {
+    final serial = _composerSwitch;
+    final edit = _userMessageEditState;
+    return stageUiComposerDraft(
+      _context,
+      request: request,
+      target: _mediaController.capture(),
+      isCurrent: () =>
+          !_composerDisposed &&
+          serial == _composerSwitch &&
+          identical(edit, _userMessageEditState) &&
+          currentQueuedInput == null &&
+          currentConversation?.id == request.conversationId,
+    );
+  }
+
   Future<ChatMessage?> _saveEditedUserMessageVersion(
     ChatInputData input,
     UserMessageEditState editState,
@@ -2441,6 +2502,7 @@ class HomePageController extends ChangeNotifier {
     final assistant = assistants.resolveConversationAssistant(
       conversation.assistantId,
     );
+    final omittedText = AppLocalizations.of(_context)!.genuiChipOmitted;
     final parts = await MessageGenerationService.buildPersistedUserMessageParts(
       input,
       assistant: assistant,
@@ -2457,6 +2519,9 @@ class HomePageController extends ChangeNotifier {
       messageId: editState.messageId,
       parts: parts,
       draftSubmission: input.draftSubmission,
+      uiContext: input.uiContext == null
+          ? null
+          : UiContextSubmission(input.uiContext!, omittedText: omittedText),
     );
     if (newMsg == null) return null;
     if (currentConversation?.id != conversation.id) return newMsg;
@@ -3238,6 +3303,7 @@ class HomePageController extends ChangeNotifier {
     if (!_context.mounted) return false;
     if (_inputController.text.isEmpty &&
         !_mediaController.hasDraftMedia &&
+        !_mediaController.hasUiContext &&
         !_mediaController.hasUnreadyImages) {
       return true;
     }
@@ -3322,9 +3388,44 @@ class HomePageController extends ChangeNotifier {
             DraftImage(path: path, processing: true),
         ],
         documents: input.documents,
+        uiContext: input.uiContext,
       );
+      if (choice == 'append' &&
+          ComposerDraftStore.hasUiContextConflict(draft.active, shared)) {
+        if (!_context.mounted ||
+            !await confirmGenUiReplacement(
+              _context,
+              current: draft.active.uiContext!,
+              replacement: shared.uiContext!,
+            )) {
+          return false;
+        }
+        if (draft.revision != revision ||
+            _composerOwner != owner ||
+            !drafts.isCurrent(owner, generation)) {
+          throw StateError('composer_share_changed');
+        }
+      }
+      if (visible) {
+        await _inputController.flushMessageInput();
+        if (_composerDisposed ||
+            _composerOwner != owner ||
+            currentConversation?.id != owner) {
+          throw StateError('composer_share_changed');
+        }
+        _saveComposerDraft();
+      }
+      if (drafts.suspended ||
+          !drafts.isCurrent(owner, generation) ||
+          draft.revision != revision) {
+        throw StateError('composer_share_changed');
+      }
       final value = choice == 'append'
-          ? ComposerDraftStore.merge(draft.active, shared)
+          ? ComposerDraftStore.merge(
+              draft.active,
+              shared,
+              selectedUiContext: shared.uiContext,
+            )
           : shared;
       if (choice == 'replace') {
         drafts.invalidateInputOperations(
@@ -3389,7 +3490,9 @@ class HomePageController extends ChangeNotifier {
       text: input.text,
       selection: TextSelection.collapsed(offset: input.text.length),
     );
-    _mediaController.addFiles(input.documents);
+    _mediaController.restoreDraft(
+      ComposerDraftInput.fromInput(input).copyWith(images: const []),
+    );
     _mediaController.enqueueImages(
       input.imagePaths,
       _context.read<SettingsProvider>().resolveImageCompressConfig(),
@@ -3451,6 +3554,8 @@ class HomePageController extends ChangeNotifier {
           targetId,
           assistantId: _chatService.getConversation(targetId)?.assistantId,
         );
+        final source = await drafts.load(sourceId);
+        final sourceRevision = source.revision;
         final revision = target.revision;
         final choice = target.active.isEmpty
             ? 'replace'
@@ -3459,11 +3564,32 @@ class HomePageController extends ChangeNotifier {
         if (target.revision != revision) {
           throw StateError('composer_transfer_changed');
         }
+        final sourceContext = source.active.uiContext;
+        if (choice == 'append' &&
+            ComposerDraftStore.hasUiContextConflict(
+              target.active,
+              source.active,
+            )) {
+          if (!_context.mounted ||
+              !await confirmGenUiReplacement(
+                _context,
+                current: target.active.uiContext!,
+                replacement: sourceContext!,
+              )) {
+            return;
+          }
+        }
+        if (source.revision != sourceRevision ||
+            target.revision != revision ||
+            currentConversation?.id != visibleId) {
+          throw StateError('composer_transfer_changed');
+        }
         final finalInput = _drainComposerInput();
         if (finalInput != null) await finalInput;
         if (_composerDisposed ||
             currentConversation?.id != visibleId ||
-            target.revision != revision) {
+            target.revision != revision ||
+            source.revision != sourceRevision) {
           throw StateError('composer_transfer_changed');
         }
         _saveComposerDraft();
@@ -3473,7 +3599,12 @@ class HomePageController extends ChangeNotifier {
         _mediaController.restoringDraft = true;
         notifyListeners();
         try {
-          await drafts.transfer(sourceId, targetId, append: choice == 'append');
+          await drafts.transfer(
+            sourceId,
+            targetId,
+            append: choice == 'append',
+            selectedUiContext: choice == 'append' ? sourceContext : null,
+          );
         } finally {
           if (!_composerDisposed &&
               _composerOwner == bindingOwner &&

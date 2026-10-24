@@ -1171,10 +1171,7 @@ class ChatActions {
     bool scheduledNotify = true,
     bool scheduledPreview = true,
   }) async {
-    final content = input.text.trim();
-    if (content.isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
+    if (input.isEmpty) {
       return ChatActionResult.error('empty_input');
     }
 

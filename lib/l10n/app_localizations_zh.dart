@@ -13700,6 +13700,54 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiViewStateFailed => '保存状态过大，无法更改视图。请缩短输入或重置界面后重试。';
+
+  @override
+  String get genuiAttachState => '附带当前界面状态';
+
+  @override
+  String get genuiChipExactText => '将随消息发送的准确文本（已冻结）';
+
+  @override
+  String get genuiChipStale => '来源已失效 · 请移除或重新附带';
+
+  @override
+  String get genuiChipRemove => '移除附带的界面';
+
+  @override
+  String get genuiReplaceTitle => '替换已附带的界面？';
+
+  @override
+  String get genuiReplaceBody => '一份草稿只能附带一个界面状态。';
+
+  @override
+  String get genuiReplaceCurrent => '当前';
+
+  @override
+  String get genuiReplaceNew => '替换为';
+
+  @override
+  String get genuiReplaceConfirm => '替换';
+
+  @override
+  String get genuiMergeTitle => '合并到当前草稿？';
+
+  @override
+  String get genuiMergeConfirm => '合并';
+
+  @override
+  String get genuiContextEmpty => '没有附带参数或结果字段。';
+
+  @override
+  String get genuiContextOmitted => '[部分字段或数据行已省略。]';
+
+  @override
+  String get genuiChipOmitted => '此前附带的界面来源已失效，本条消息未附带其状态。';
+
+  @override
+  String get genuiDraftChanged => '草稿已发生变化，请重新附带。';
+
+  @override
+  String get genuiRepairDraft => '请根据以下诊断和源码片段修复这段界面。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27324,6 +27372,54 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiViewStateFailed => '保存状态过大，无法更改视图。请缩短输入或重置界面后重试。';
+
+  @override
+  String get genuiAttachState => '附带当前界面状态';
+
+  @override
+  String get genuiChipExactText => '将随消息发送的准确文本（已冻结）';
+
+  @override
+  String get genuiChipStale => '来源已失效 · 请移除或重新附带';
+
+  @override
+  String get genuiChipRemove => '移除附带的界面';
+
+  @override
+  String get genuiReplaceTitle => '替换已附带的界面？';
+
+  @override
+  String get genuiReplaceBody => '一份草稿只能附带一个界面状态。';
+
+  @override
+  String get genuiReplaceCurrent => '当前';
+
+  @override
+  String get genuiReplaceNew => '替换为';
+
+  @override
+  String get genuiReplaceConfirm => '替换';
+
+  @override
+  String get genuiMergeTitle => '合并到当前草稿？';
+
+  @override
+  String get genuiMergeConfirm => '合并';
+
+  @override
+  String get genuiContextEmpty => '没有附带参数或结果字段。';
+
+  @override
+  String get genuiContextOmitted => '[部分字段或数据行已省略。]';
+
+  @override
+  String get genuiChipOmitted => '此前附带的界面来源已失效，本条消息未附带其状态。';
+
+  @override
+  String get genuiDraftChanged => '草稿已发生变化，请重新附带。';
+
+  @override
+  String get genuiRepairDraft => '请根据以下诊断和源码片段修复这段界面。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -41028,4 +41124,52 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiViewStateFailed => '儲存狀態過大，無法變更檢視。請縮短輸入或重設介面後重試。';
+
+  @override
+  String get genuiAttachState => '附帶目前介面狀態';
+
+  @override
+  String get genuiChipExactText => '將隨訊息傳送的準確文字（已凍結）';
+
+  @override
+  String get genuiChipStale => '來源已失效 · 請移除或重新附帶';
+
+  @override
+  String get genuiChipRemove => '移除附帶的介面';
+
+  @override
+  String get genuiReplaceTitle => '取代已附帶的介面？';
+
+  @override
+  String get genuiReplaceBody => '一份草稿只能附帶一個介面狀態。';
+
+  @override
+  String get genuiReplaceCurrent => '目前';
+
+  @override
+  String get genuiReplaceNew => '取代為';
+
+  @override
+  String get genuiReplaceConfirm => '取代';
+
+  @override
+  String get genuiMergeTitle => '合併到目前草稿？';
+
+  @override
+  String get genuiMergeConfirm => '合併';
+
+  @override
+  String get genuiContextEmpty => '沒有附帶參數或結果欄位。';
+
+  @override
+  String get genuiContextOmitted => '[部分欄位或資料列已省略。]';
+
+  @override
+  String get genuiChipOmitted => '先前附帶的介面來源已失效，此則訊息未附帶其狀態。';
+
+  @override
+  String get genuiDraftChanged => '草稿已變更，請重新附帶。';
+
+  @override
+  String get genuiRepairDraft => '請根據以下診斷和原始碼片段修復這段介面。';
 }

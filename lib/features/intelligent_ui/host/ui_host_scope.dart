@@ -1,18 +1,25 @@
+import 'ui_draft_request.dart';
 import 'package:flutter/widgets.dart';
 import 'package:markstream/markstream.dart';
 import '../runtime/ui_surface_controller.dart';
 import '../widgets/genui_interactions.dart';
 import 'ui_source_map.dart';
 
-/// An explicit host action sink. The production composer is connected in C16;
-/// development entries can observe frozen intents without making requests.
+/// Explicit draft actions; development galleries can observe Ask intents.
 class UiActionsScope extends InheritedWidget {
-  const UiActionsScope({super.key, required this.onAsk, required super.child});
-  final GenUiAskHandler onAsk;
-  static GenUiAskHandler? askOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<UiActionsScope>()?.onAsk;
+  const UiActionsScope({
+    super.key,
+    this.onAsk,
+    this.onDraft,
+    required super.child,
+  });
+  final GenUiAskHandler? onAsk;
+  final Future<void> Function(UiDraftRequest)? onDraft;
+  static UiActionsScope? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<UiActionsScope>();
   @override
-  bool updateShouldNotify(UiActionsScope oldWidget) => onAsk != oldWidget.onAsk;
+  bool updateShouldNotify(UiActionsScope oldWidget) =>
+      onAsk != oldWidget.onAsk || onDraft != oldWidget.onDraft;
 }
 
 /// Only the assistant's original main-text projection may create this binding.
@@ -23,12 +30,10 @@ final class UiHostBinding {
     required this.revisionId,
     required this.source,
     required this.generation,
-    this.onAsk,
   });
   final String conversationId, revisionId;
   final UiTextSlice source;
   final UiGenerationStatus generation;
-  final GenUiAskHandler? onAsk;
 }
 
 class UiHostScope extends InheritedWidget {

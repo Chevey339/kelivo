@@ -1,3 +1,4 @@
+import '../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -660,6 +661,7 @@ class ComposerDraftStore extends ChangeNotifier {
     }
 
     checkOwner();
+    if (input.imagePaths.isEmpty && input.documents.isEmpty) return input;
 
     final dir = await AppDirectories.getUploadDirectory();
     await dir.create(recursive: true);
@@ -719,17 +721,29 @@ class ComposerDraftStore extends ChangeNotifier {
           ),
       ],
       allowImagesApiRouting: input.allowImagesApiRouting,
+      uiContext: input.uiContext,
       draftSubmission: submission,
     );
   }
 
-  void restorePending(String id, {bool append = false, bool replace = false}) {
+  void restorePending(
+    String id, {
+    bool append = false,
+    bool replace = false,
+    UiContextAttachment? selectedUiContext,
+  }) {
     final draft = _drafts[id];
     if (draft == null || _deleted.contains(id)) return;
     final pending = draft.pending;
     if (pending == null) return;
     if (draft.hasRecoveryConflict && !append && !replace) return;
-    final restored = append ? merge(draft.recoveryTarget, pending) : pending;
+    final restored = append
+        ? merge(
+            draft.recoveryTarget,
+            pending,
+            selectedUiContext: selectedUiContext,
+          )
+        : pending;
     if (replace && !append) {
       invalidateInputOperations(id, editMessageId: draft.submissionEditId);
     }
@@ -774,10 +788,28 @@ class ComposerDraftStore extends ChangeNotifier {
     _changed(draft);
   }
 
-  static ComposerDraftInput merge(
+  static bool hasUiContextConflict(
     ComposerDraftInput first,
     ComposerDraftInput second,
-  ) {
+  ) =>
+      first.uiContext != null &&
+      second.uiContext != null &&
+      first.uiContext != second.uiContext;
+
+  static ComposerDraftInput merge(
+    ComposerDraftInput first,
+    ComposerDraftInput second, {
+    UiContextAttachment? selectedUiContext,
+  }) {
+    final conflict = hasUiContextConflict(first, second);
+    if (conflict && selectedUiContext == null) {
+      throw StateError('composer_ui_context_conflict');
+    }
+    if (selectedUiContext != null &&
+        selectedUiContext != first.uiContext &&
+        selectedUiContext != second.uiContext) {
+      throw ArgumentError('Selected UI context must belong to either draft');
+    }
     final text = first.text.isEmpty
         ? second.text
         : second.text.isEmpty
@@ -789,6 +821,7 @@ class ComposerDraftStore extends ChangeNotifier {
       selectionExtent: text.length,
       images: [...first.images, ...second.images],
       documents: [...first.documents, ...second.documents],
+      uiContext: selectedUiContext ?? first.uiContext ?? second.uiContext,
     );
   }
 
@@ -829,6 +862,7 @@ class ComposerDraftStore extends ChangeNotifier {
     String sourceId,
     String targetId, {
     required bool append,
+    UiContextAttachment? selectedUiContext,
   }) async {
     if (sourceId == targetId) return;
     final source = await load(sourceId);
@@ -864,7 +898,9 @@ class ComposerDraftStore extends ChangeNotifier {
         check();
         final from = ComposerDraft.fromJson(source.toJson());
         final to = ComposerDraft.fromJson(target.toJson());
-        final value = append ? merge(to.active, moved) : moved;
+        final value = append
+            ? merge(to.active, moved, selectedUiContext: selectedUiContext)
+            : moved;
         if (to.edit != null) {
           to.edit = value;
         } else {

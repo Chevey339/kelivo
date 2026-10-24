@@ -6654,5 +6654,21 @@
   "genuiTableCellsError": "Table data must contain records with finite scalar values or missing values.",
   "genuiTableColumnsError": "Choose one to eight distinct fields with labels and optional digits from 0 to 10.",
   "genuiTableRowKeyError": "Every row needs a non-null scalar key.",
-  "genuiViewStateFailed": "This view change exceeds the saved state limit. Shorten a field or reset the UI and try again."
+  "genuiViewStateFailed": "This view change exceeds the saved state limit. Shorten a field or reset the UI and try again.",
+  "genuiAttachState": "Attach current state",
+  "genuiChipExactText": "Exact text to be sent (frozen)",
+  "genuiChipStale": "Source unavailable — remove or attach again",
+  "genuiChipRemove": "Remove attached UI",
+  "genuiReplaceTitle": "Replace attached UI?",
+  "genuiReplaceBody": "A draft can carry one UI state.",
+  "genuiReplaceCurrent": "Current",
+  "genuiReplaceNew": "Replace with",
+  "genuiReplaceConfirm": "Replace",
+  "genuiMergeTitle": "Add to your draft?",
+  "genuiMergeConfirm": "Add",
+  "genuiContextEmpty": "No parameter or result fields are attached.",
+  "genuiContextOmitted": "[Some fields or data rows are omitted.]",
+  "genuiChipOmitted": "The previously attached UI state is unavailable and was not included.",
+  "genuiDraftChanged": "Your draft changed. Try attaching again.",
+  "genuiRepairDraft": "Please repair this interface using the diagnostics and source excerpts below."
 }

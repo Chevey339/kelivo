@@ -1,3 +1,5 @@
+import '../../../features/intelligent_ui/host/ui_context_submission.dart';
+import '../../../features/intelligent_ui/models/ui_context_attachment.dart';
 import '../../models/composer_draft.dart';
 import '../../../features/intelligent_ui/storage/ui_state_transfer.dart';
 import '../../../features/intelligent_ui/runtime/ui_surface_state.dart';
@@ -2666,7 +2668,7 @@ class ChatService extends ChangeNotifier {
     if (_messageCanOwnAssets(message)) {
       await _synchronizeMessageAssetsBestEffort(message);
     }
-    _conversationsCache[conversationId] = persisted;
+    _conversationsCache[conversationId] = persisted.conversation;
     order.add(message.id);
     _messageCounts[conversationId] = order.length;
 
@@ -2927,6 +2929,48 @@ class ChatService extends ChangeNotifier {
     return changed;
   }
 
+  Future<bool> isUiContextCurrent(UiContextSource source) async {
+    if (!_initialized) await init();
+    return isTemporaryConversation(source.conversationId)
+        ? _temporaryUiContextCurrent(source)
+        : _repo.isUiContextCurrent(source);
+  }
+
+  bool _temporaryUiContextCurrent(UiContextSource source) {
+    final message = _cachedTemporaryMessage(source.revisionId);
+    final conversation = _draftConversations[source.conversationId];
+    if (message == null || conversation == null) return false;
+    final group = message.groupId ?? message.id;
+    final revisions = (_messagesCache[source.conversationId] ?? [])
+        .where((m) => (m.groupId ?? m.id) == group)
+        .toList();
+    return uiContextSourceMatches(
+      source,
+      message,
+      selectedRevisionId: revisions.isEmpty
+          ? null
+          : _selectTimelineRevision(
+              revisions,
+              conversation.versionSelections[group],
+            ).id,
+    );
+  }
+
+  ChatMessage _withTemporaryUiContext(
+    ChatMessage message,
+    UiContextSubmission? request,
+  ) {
+    if (request == null) return message;
+    if (message.role != 'user') throw StateError('ui_context_requires_user');
+    final source = request.attachment.source;
+    return message.copyWith(
+      parts: request.resolve(
+        message.parts,
+        sourceIsCurrent: source != null && _temporaryUiContextCurrent(source),
+      ),
+    );
+  }
+
   Future<ChatMessage> addMessage({
     required String conversationId,
     required String role,
@@ -2943,6 +2987,7 @@ class ChatService extends ChangeNotifier {
     int? version,
     bool selectVersion = false,
     String? temporaryAfterGroupId,
+    UiContextSubmission? uiContext,
   }) async {
     if (!_initialized) await init();
 
@@ -2966,7 +3011,7 @@ class ChatService extends ChangeNotifier {
       }
     }
 
-    final message = ChatMessage(
+    var message = ChatMessage(
       role: role,
       content: parts == null ? content : null,
       parts: parts,
@@ -2989,6 +3034,7 @@ class ChatService extends ChangeNotifier {
 
     int? temporaryInsertIndex;
     if (temporary) {
+      message = _withTemporaryUiContext(message, uiContext);
       if (temporaryAfterGroupId != null) {
         final messages = _messagesCache[conversationId]!;
         final anchorIndex = messages.indexWhere(
@@ -3017,13 +3063,15 @@ class ChatService extends ChangeNotifier {
         conversation: conversation,
         message: message,
         selectVersion: selectVersion,
+        uiContext: uiContext,
       );
+      message = persisted.message;
       if (_messageCanOwnAssets(message)) {
         await _synchronizeMessageAssetsBestEffort(message);
       }
       _draftConversations.remove(conversationId);
-      _conversationsCache[conversationId] = persisted;
-      conversation = persisted;
+      _conversationsCache[conversationId] = persisted.conversation;
+      conversation = persisted.conversation;
       _messageCounts[conversationId] = await _repo.getMessageCount(
         conversationId,
       );
@@ -3055,6 +3103,7 @@ class ChatService extends ChangeNotifier {
     required String modelId,
     required String providerId,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -3087,6 +3136,7 @@ class ChatService extends ChangeNotifier {
       assistantMessage: assistantMessage,
       runId: const Uuid().v4(),
       draftSubmission: draftSubmission,
+      uiContext: uiContext,
     );
     await _publishGenerationBegin(result);
     return result;
@@ -3964,6 +4014,7 @@ class ChatService extends ChangeNotifier {
     String content = '',
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) async {
     if (!_initialized) await init();
     final temporaryOriginal = _cachedTemporaryMessage(messageId);
@@ -3992,28 +4043,31 @@ class ChatService extends ChangeNotifier {
             temporaryOriginal.parts,
             content,
           );
-      final newMsg = ChatMessage(
-        role: temporaryOriginal.role,
-        parts: resolvedParts,
-        conversationId: conversationId,
-        modelId: temporaryOriginal.modelId,
-        providerId: temporaryOriginal.providerId,
-        totalTokens: null,
-        isStreaming: false,
-        reasoningText: preserveReasoning
-            ? temporaryOriginal.reasoningText
-            : null,
-        reasoningStartAt: preserveReasoning
-            ? temporaryOriginal.reasoningStartAt
-            : null,
-        reasoningFinishedAt: preserveReasoning
-            ? temporaryOriginal.reasoningFinishedAt
-            : null,
-        reasoningSegmentsJson: preserveReasoning
-            ? temporaryOriginal.reasoningSegmentsJson
-            : null,
-        groupId: groupId,
-        version: nextVersion,
+      final newMsg = _withTemporaryUiContext(
+        ChatMessage(
+          role: temporaryOriginal.role,
+          parts: resolvedParts,
+          conversationId: conversationId,
+          modelId: temporaryOriginal.modelId,
+          providerId: temporaryOriginal.providerId,
+          totalTokens: null,
+          isStreaming: false,
+          reasoningText: preserveReasoning
+              ? temporaryOriginal.reasoningText
+              : null,
+          reasoningStartAt: preserveReasoning
+              ? temporaryOriginal.reasoningStartAt
+              : null,
+          reasoningFinishedAt: preserveReasoning
+              ? temporaryOriginal.reasoningFinishedAt
+              : null,
+          reasoningSegmentsJson: preserveReasoning
+              ? temporaryOriginal.reasoningSegmentsJson
+              : null,
+          groupId: groupId,
+          version: nextVersion,
+        ),
+        uiContext,
       );
 
       final preserveArtifacts =
@@ -4054,6 +4108,7 @@ class ChatService extends ChangeNotifier {
       content: content,
       parts: parts,
       draftSubmission: draftSubmission,
+      uiContext: uiContext,
     );
     if (result == null) return null;
     final newMsg = result.message;

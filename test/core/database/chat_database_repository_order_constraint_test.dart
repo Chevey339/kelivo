@@ -76,10 +76,10 @@ void main() {
         groupId: 'assistant-slot',
         version: 0,
       );
-      conversation = await repository.appendLinearMessageToConversation(
+      conversation = (await repository.appendLinearMessageToConversation(
         conversation: conversation,
         message: original,
-      );
+      )).conversation;
       final alternate = ChatMessage(
         id: 'assistant-v1',
         role: 'assistant',
@@ -88,11 +88,11 @@ void main() {
         groupId: 'assistant-slot',
         version: 1,
       );
-      conversation = await repository.appendLinearMessageToConversation(
+      conversation = (await repository.appendLinearMessageToConversation(
         conversation: conversation,
         message: alternate,
         selectVersion: true,
-      );
+      )).conversation;
       await repository.setSelectedVersion(
         conversationId: conversation.id,
         groupId: 'assistant-slot',

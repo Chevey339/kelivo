@@ -1,3 +1,6 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_context_submission.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -93,6 +96,7 @@ class _GatedChatService extends ChatService {
     int? version,
     bool selectVersion = false,
     String? temporaryAfterGroupId,
+    UiContextSubmission? uiContext,
   }) async {
     if (content == 'preset question' && presetHold != null) {
       presetConversationId = conversationId;
@@ -114,6 +118,7 @@ class _GatedChatService extends ChatService {
       version: version,
       selectVersion: selectVersion,
       temporaryAfterGroupId: temporaryAfterGroupId,
+      uiContext: uiContext,
     );
   }
 
@@ -142,6 +147,7 @@ class _GatedChatService extends ChatService {
     String content = '',
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) async {
     if (!holdAfterVersionSave) {
       versionSaveEntered = true;
@@ -152,6 +158,7 @@ class _GatedChatService extends ChatService {
       content: content,
       parts: parts,
       draftSubmission: draftSubmission,
+      uiContext: uiContext,
     );
     if (holdAfterVersionSave) {
       versionSaveEntered = true;
@@ -1465,6 +1472,117 @@ void main() {
       },
     );
   }
+
+  for (final temporary in [false, true]) {
+    testWidgets(
+      'chip-only real send and edit reach storage and provider: temporary=$temporary',
+      (tester) async {
+        final controller = await pumpHarness(tester, withComposer: true);
+        final frozen = UiContextText(
+          title: 'Line',
+          body: 'Slope: 3.1\nIntercept: 1',
+        );
+        final input = ChatInputData(
+          text: '',
+          uiContext: UiContextAttachment.history(frozen),
+        );
+        await tester.runAsync(() async {
+          final convo = temporary
+              ? await service.createDraftConversation(
+                  title: 'Temporary',
+                  temporary: true,
+                )
+              : await openConversation(controller);
+          if (temporary) controller.chatController.setDraftConversation(convo);
+          expect(
+            await controller.sendMessage(input),
+            ChatInputSubmissionResult.sent,
+          );
+          await waitFor(() => streamRequestCount == 1, 'chip-only request');
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'chip-only finish',
+          );
+          final messages = temporary
+              ? service.getMessages(convo.id)
+              : await service.loadMessages(convo.id);
+          final user = messages.firstWhere((message) => message.role == 'user');
+          expect(UiUserContextParts.read(user.parts).context, frozen);
+          expect(
+            (streamRequests.single['messages'] as List)
+                .where((m) => m['role'] == 'user')
+                .any((m) => m['content'].toString().contains(frozen.exactText)),
+            isTrue,
+          );
+          await controller.startUserMessageEdit(user);
+          expect(
+            await controller.sendMessage(input),
+            ChatInputSubmissionResult.sent,
+          );
+          await waitFor(
+            () => streamRequestCount == 2,
+            'chip-only edited request',
+          );
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'edited chip finish',
+          );
+          final edited = service
+              .getMessages(convo.id)
+              .where(
+                (message) => message.role == 'user' && message.version == 1,
+              )
+              .single;
+          expect(UiUserContextParts.read(edited.parts).context, frozen);
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'queued chip-only input retains its frozen state after model selection changes',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      final frozen = UiContextText(title: 'Queued', body: 'value: 73');
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        streamHold = Completer<void>();
+        expect(
+          await controller.sendMessage(const ChatInputData(text: 'Start')),
+          ChatInputSubmissionResult.sent,
+        );
+        await waitFor(() => streamRequestCount == 1, 'first held request');
+        expect(
+          await controller.sendMessage(
+            ChatInputData(
+              text: '',
+              uiContext: UiContextAttachment.history(frozen),
+            ),
+          ),
+          ChatInputSubmissionResult.queued,
+        );
+        await settings.setCurrentModel('SiliconFlow', 'other-model');
+        streamHold!.complete();
+        streamHold = null;
+        await waitFor(() => streamRequestCount == 2, 'queued request');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'queue finish',
+        );
+        final users = (await service.loadMessages(
+          convo.id,
+        )).where((m) => m.role == 'user').toList();
+        expect(UiUserContextParts.read(users.last.parts).context, frozen);
+        expect(
+          (streamRequests.last['messages'] as List)
+              .where((m) => m['role'] == 'user')
+              .any((m) => m['content'].toString().contains(frozen.exactText)),
+          isTrue,
+        );
+      });
+    },
+  );
 
   testWidgets('concurrent sends persist a single user/assistant pair', (
     tester,

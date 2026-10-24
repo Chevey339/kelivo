@@ -1,3 +1,4 @@
+import 'context_gallery.dart';
 import 'package:flutter/material.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
@@ -111,6 +112,7 @@ class _GenUiGalleryAppState extends State<GenUiGalleryApp> {
                               child: GenUiThemeScope(
                                 child: GenUiColumn(
                                   children: [
+                                    const GenUiContextGallery(),
                                     const GenUiTableGallery(),
                                     const GenUiChartGallery(),
                                     const GenUiInputGallery(),

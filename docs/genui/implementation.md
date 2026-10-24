@@ -830,3 +830,63 @@ hash-identical through the gate and staging. Logs are under build/genui/logs/
 with the c15 prefix; the local frozen manifest is build/genui/c15/. The final
 focused coverage totals 64 table/chart data and behavior tests, 55 goldens and
 the shared button regression, with the last RTL fix checked separately.
+
+
+## C16 — explicit frozen context and editable action drafts
+
+Attach and Ask now stage one immutable, inspectable chip through the feature
+host. The 21 catalog text policies project the same completed runtime batch,
+select whole fields within 4 KiB UTF-8, and report omitted data. Markdown and
+data conversion also have a bounded work budget; repeated large Markdown
+references cannot repeatedly parse unbounded text. The print-only development
+benchmark reduced the reviewed 255-reference case from 14.2 seconds to a
+0.273 ms p95 in the widget runner; this is not a device-profile acceptance.
+
+Surface drafts settle before capture. Composer staging drains accepted native
+input both before preview and before final application, rejects composition,
+and checks owner, edit, input epoch and the unchanged draft. Existing chips
+require replacement preview; existing text remains in a merge preview. Reset
+and ordinary input/view changes never attach or send. Repair drafts combine
+parser, node and derived-value diagnostics, domain gaps, line numbers and
+bounded source excerpts; they do not send automatically.
+
+The draft store, submission receipt, queue, history edit and transfer retain
+the frozen chip. Distinct chips require an explicit merge choice. Chip-only
+messages pass the real controller/viewmodel/action send and edit guards.
+Storage validates fresh provenance and the selected source revision inside
+the same coordinated transaction as the user message. Deleted or replaced
+sources produce a visible omission notice without substituting another state
+or blocking a chip-only send. Explicit cross-conversation draft transfer still
+checks the original source. Previously sent text stays historical during edit.
+
+The message stores only ordinary TextParts. Persist/send regexes operate on the
+ordinary body; a separately identified literal-text part also bypasses later
+Markdown image rewriting, capability filtering and provider image extraction.
+Unicode is normalized once before freezing. Loopback wire tests passed for
+OpenAI Chat, Responses, Images, Claude, Gemini and text-only capability paths:
+exact text was retained, no extra image blocks or remote probes occurred, and
+internal metadata stayed off the wire. These are local fake-provider tests,
+not additional paid model evaluation calls.
+
+The input chip can expand and be removed, reports stale provenance, and has a
+read-only user-bubble summary. Four ARBs and generated output contain the new
+wording. Twenty-six light/dark goldens cover chips, history, replacement and
+merge previews, RTL, large text, desktop and wallpaper. Source/owner/transaction,
+queue/model-selection, real send/edit, IME, repair and media regressions passed.
+The macOS development gallery was also operated via native computer use:
+expanded exact text survived dark/1.3/RTL changes; replacement showed both
+summaries, merge retained the original question, and Esc closed the dialogs.
+The gallery's per-page direction/scale controls do not override root overlays;
+those dialog dimensions are covered by root-scoped widget goldens. This is
+not the later production/device acceptance. Logs use the c16 prefix under
+build/genui/logs/; native AX/screenshot observations remain in this chat.
+
+Final independent review returned no findings. The final gate passed: root analysis plus 9,730 tests (one skipped), markstream analysis plus 296 tests, macOS debug native build, and diff checks. All 102 non-document files retained their frozen hashes throughout the successful gate.
+
+The initial full run found an outdated incoming-share test fake: it did not
+implement full draft restoration. The fake now mirrors restore/snapshot/clear;
+existing document and image-ownership assertions remain, with an additional
+chip-preservation assertion. Its premature failures also caused two cleanup
+failures. One unchanged migration restart test failed in that initial run;
+it passed both the focused 19-test rerun and the complete final run. The
+initial failure log is retained as `c16-initial-root-test.log`.

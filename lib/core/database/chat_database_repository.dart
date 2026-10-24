@@ -1,3 +1,5 @@
+import '../../features/intelligent_ui/host/ui_context_submission.dart';
+import '../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import '../../features/intelligent_ui/storage/ui_state_repository.dart';
 import '../../features/intelligent_ui/storage/ui_state_transfer.dart';
@@ -106,7 +108,7 @@ final class LinearMessageWindow {
   final bool hasMoreAfter;
 }
 
-typedef AppendedMessageVersion = ({
+typedef PersistedChatMessage = ({
   Conversation conversation,
   ChatMessage message,
 });
@@ -4752,20 +4754,72 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<Conversation> appendLinearMessageToConversation({
+  /// Returns the actual persisted parts, including a frozen UI context or its
+  /// stale-source notice. The check and insert share the coordinated writer.
+  Future<PersistedChatMessage> appendLinearMessageToConversation({
     required Conversation conversation,
     required ChatMessage message,
     bool selectVersion = false,
     bool touchUpdatedAt = true,
+    UiContextSubmission? uiContext,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
-      () => _appendLinearMessageToConversation(
-        conversation: conversation,
-        message: message,
-        selectVersion: selectVersion,
-        touchUpdatedAt: touchUpdatedAt,
-      ),
+      () => _writeTransaction(() async {
+        final resolved = await _withUiContext(message, uiContext);
+        final persisted = await _appendLinearMessageToConversation(
+          conversation: conversation,
+          message: resolved,
+          selectVersion: selectVersion,
+          touchUpdatedAt: touchUpdatedAt,
+        );
+        return (conversation: persisted, message: resolved);
+      }),
+    );
+  }
+
+  Future<bool> isUiContextCurrent(UiContextSource source) async {
+    final message = await getMessage(source.revisionId);
+    if (message == null || message.conversationId != source.conversationId) {
+      return false;
+    }
+    final conversation = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(source.conversationId))).getSingleOrNull();
+    if (conversation == null) return false;
+    final group = message.groupId ?? message.id;
+    final version = _decodeStringIntMap(
+      conversation.versionSelectionsJson,
+    )[group];
+    final selected = await _db
+        .customSelect(
+          'SELECT id FROM message_rows WHERE conversation_id=? '
+          'AND COALESCE(group_id,id)=? '
+          'ORDER BY CASE WHEN version=? THEN 0 ELSE 1 END,version DESC,message_order DESC LIMIT 1',
+          variables: [
+            Variable<String>(source.conversationId),
+            Variable<String>(group),
+            Variable<int>(version),
+          ],
+        )
+        .getSingleOrNull();
+    return uiContextSourceMatches(
+      source,
+      message,
+      selectedRevisionId: selected?.read<String>('id'),
+    );
+  }
+
+  Future<ChatMessage> _withUiContext(
+    ChatMessage message,
+    UiContextSubmission? request,
+  ) async {
+    if (request == null) return message;
+    if (message.role != 'user') throw StateError('ui_context_requires_user');
+    final source = request.attachment.source;
+    final current = source != null && await isUiContextCurrent(source);
+    return message.copyWith(
+      parts: request.resolve(message.parts, sourceIsCurrent: current),
     );
   }
 
@@ -4775,6 +4829,7 @@ class ChatDatabaseRepository {
     required ChatMessage assistantMessage,
     required String runId,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) {
     if (draftSubmission != null &&
         (draftSubmission.conversationId != conversation.id ||
@@ -4790,9 +4845,10 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _writeTransaction(() async {
+        final resolvedUser = await _withUiContext(userMessage, uiContext);
         final afterUser = await _appendLinearMessageToConversation(
           conversation: conversation,
-          message: userMessage,
+          message: resolvedUser,
           selectVersion: false,
           touchUpdatedAt: true,
         );
@@ -4813,7 +4869,7 @@ class ChatDatabaseRepository {
         }
         return (
           conversation: persisted,
-          userMessage: userMessage,
+          userMessage: resolvedUser,
           assistantMessage: assistantMessage,
           run: run,
         );
@@ -5101,11 +5157,12 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<AppendedMessageVersion?> appendMessageVersion({
+  Future<PersistedChatMessage?> appendMessageVersion({
     required String messageId,
     String content = '',
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendVersion,
@@ -5114,15 +5171,17 @@ class ChatDatabaseRepository {
         content: content,
         parts: parts,
         draftSubmission: draftSubmission,
+        uiContext: uiContext,
       ),
     );
   }
 
-  Future<AppendedMessageVersion?> _appendMessageVersion({
+  Future<PersistedChatMessage?> _appendMessageVersion({
     required String messageId,
     required String content,
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    UiContextSubmission? uiContext,
   }) async {
     return _writeTransaction(() async {
       final originalRow = await (_db.select(
@@ -5167,25 +5226,30 @@ class ChatDatabaseRepository {
       final resolvedParts =
           parts ??
           ChatMessage.partsWithRedistributedText(original.parts, content);
-      final message = ChatMessage(
-        id: draftSubmission?.id,
-        role: original.role,
-        parts: resolvedParts,
-        conversationId: original.conversationId,
-        modelId: original.modelId,
-        providerId: original.providerId,
-        totalTokens: null,
-        isStreaming: false,
-        reasoningText: preserveReasoning ? original.reasoningText : null,
-        reasoningStartAt: preserveReasoning ? original.reasoningStartAt : null,
-        reasoningFinishedAt: preserveReasoning
-            ? original.reasoningFinishedAt
-            : null,
-        reasoningSegmentsJson: preserveReasoning
-            ? original.reasoningSegmentsJson
-            : null,
-        groupId: groupId,
-        version: nextVersion,
+      final message = await _withUiContext(
+        ChatMessage(
+          id: draftSubmission?.id,
+          role: original.role,
+          parts: resolvedParts,
+          conversationId: original.conversationId,
+          modelId: original.modelId,
+          providerId: original.providerId,
+          totalTokens: null,
+          isStreaming: false,
+          reasoningText: preserveReasoning ? original.reasoningText : null,
+          reasoningStartAt: preserveReasoning
+              ? original.reasoningStartAt
+              : null,
+          reasoningFinishedAt: preserveReasoning
+              ? original.reasoningFinishedAt
+              : null,
+          reasoningSegmentsJson: preserveReasoning
+              ? original.reasoningSegmentsJson
+              : null,
+          groupId: groupId,
+          version: nextVersion,
+        ),
+        uiContext,
       );
       final currentConversation = await _conversationFromRow(
         conversationRow,

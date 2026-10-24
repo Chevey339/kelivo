@@ -1,3 +1,5 @@
+import '../../intelligent_ui/models/ui_context_attachment.dart';
+import '../../intelligent_ui/host/ui_composer_context_chip.dart';
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
@@ -352,7 +354,63 @@ class ChatInputBarController {
       ],
       documents: draft.documents,
       allowImagesApiRouting: draft.allowImagesApiRouting,
+      uiContext: draft.uiContext,
     );
+  }
+
+  bool get hasUiContext =>
+      (_state?._uiContext ?? _pendingDraft?.uiContext) != null;
+
+  bool get isComposing =>
+      !(_root._state?._controller.value.composing.isCollapsed ?? true);
+
+  bool get _canStageDraft {
+    final state = _root._state;
+    return _currentTarget &&
+        state != null &&
+        !state._composerLocked &&
+        !state._isSubmitting &&
+        !state._ownsVoiceSession &&
+        !state._finishingVoice &&
+        (state._nativeOwner?.pending ?? 0) == 0 &&
+        !(state._controller is MessageEditingController &&
+            (state._controller as MessageEditingController).isInputPaused);
+  }
+
+  /// Flush accepted native work before a preview. A captured controller can
+  /// only stage into the still-visible owner/edit/input epoch.
+  Future<ComposerDraftInput?> prepareExternalDraft() async {
+    if (!_canStageDraft) return null;
+    final state = _root._state!;
+    final value = await state._controller.flushMessageInput();
+    if (!_canStageDraft ||
+        !identical(state, _root._state) ||
+        !value.composing.isCollapsed) {
+      return null;
+    }
+    return state._snapshotDraft(value.text);
+  }
+
+  bool applyExternalDraft(
+    ComposerDraftInput expected,
+    ComposerDraftInput next,
+  ) {
+    if (!_canStageDraft) return false;
+    final state = _root._state!;
+    if (!state._controller.value.composing.isCollapsed ||
+        !state._snapshotDraft(state._controller.text).sameValue(expected)) {
+      return false;
+    }
+    state.setState(() {
+      state._uiContext = next.uiContext;
+      state._controller.value = TextEditingValue(
+        text: next.text,
+        selection: TextSelection.collapsed(offset: next.text.length),
+      );
+    });
+    _root.onDraftChanged?.call();
+    state.widget.focusNode?.requestFocus();
+    return true;
   }
 
   void clearDraft() {
@@ -782,6 +840,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
+  UiContextAttachment? _uiContext;
   bool _isSubmitting = false;
   int _submitSerial = 0;
   String? _imageModeModelKey;
@@ -1094,6 +1153,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _restoreInput(ChatInputData input) {
     setState(() {
       _draftReplacementRevision++;
+      _uiContext = input.uiContext;
       _abandonVoiceSession();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
@@ -1127,6 +1187,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       ],
       documents: List<DocumentAttachment>.of(_docs),
       allowImagesApiRouting: _allowImagesApiRouting,
+      uiContext: _uiContext,
     );
   }
 
@@ -1144,6 +1205,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     ],
     documents: List.of(_docs),
     allowImagesApiRouting: _allowImagesApiRouting,
+    uiContext: _uiContext,
   );
 
   void _restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
@@ -1164,6 +1226,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       );
     setState(() {
       _draftReplacementRevision++;
+      _uiContext = input.uiContext;
       if (resetHistory) {
         _abandonVoiceSession();
         _pendingImagePasteIds.clear();
@@ -1212,6 +1275,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {
       _draftReplacementRevision++;
       _abandonVoiceSession();
+      _uiContext = null;
       _controller.clear();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
@@ -1973,7 +2037,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedText = submittedValue.text;
     final send = widget.onSend;
     final text = submittedText.trim();
-    if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+    if (text.isEmpty &&
+        _images.isEmpty &&
+        _docs.isEmpty &&
+        _uiContext == null) {
+      return;
+    }
     final submittedImages = List<_DraftImage>.of(_images);
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
@@ -2000,6 +2069,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     // depend on it at all. A rejected send puts everything back below.
     setState(() {
       _resetInputHistory();
+      _uiContext = null;
       _controller.clear();
       _images.removeWhere((image) => submittedImageIds.contains(image.id));
       for (final document in submittedDocuments) {
@@ -2025,6 +2095,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           submittedValue,
           submittedImages,
           submittedDocuments,
+          submittedDraft.uiContext,
         ),
       );
     }
@@ -2041,6 +2112,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                 documents: List<DocumentAttachment>.of(submittedDocuments),
                 allowImagesApiRouting: submittedDraft.allowImagesApiRouting,
                 draftSubmission: draftSubmission,
+                uiContext: submittedDraft.uiContext,
               ),
             ) ??
             ChatInputSubmissionResult.rejected;
@@ -2087,7 +2159,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     TextEditingValue submittedValue,
     List<_DraftImage> submittedImages,
     List<DocumentAttachment> submittedDocuments,
+    UiContextAttachment? submittedUiContext,
   ) {
+    _uiContext = submittedUiContext;
     _restoreSubmittedText(submittedValue);
     final existingImageIds = _images.map((image) => image.id).toSet();
     _images.insertAll(
@@ -3743,7 +3817,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
-    final hasInput = hasText || hasImages || hasDocs;
+    final hasInput = hasText || hasImages || hasDocs || _uiContext != null;
     _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
@@ -3961,6 +4035,28 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             ),
                                     ),
                                 ],
+                                if (_uiContext case final attachment?)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                          AppSpacing.md,
+                                          AppSpacing.xs,
+                                          AppSpacing.md,
+                                          AppSpacing.xs,
+                                        ),
+                                    child: UiComposerContextChip(
+                                      attachment: attachment,
+                                      onRemove: _composerLocked || _isSubmitting
+                                          ? null
+                                          : () {
+                                              setState(() => _uiContext = null);
+                                              widget
+                                                  .mediaController
+                                                  ?.onDraftChanged
+                                                  ?.call();
+                                            },
+                                    ),
+                                  ),
                                 if (hasDocs || hasImages)
                                   _buildInlineAttachmentPreviews(
                                     context,

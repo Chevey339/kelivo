@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'chat_input_data.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 
 /// The editor value, before the send path trims text or filters attachments.
 class ComposerDraftInput {
@@ -10,6 +11,7 @@ class ComposerDraftInput {
     this.images = const [],
     this.documents = const [],
     this.allowImagesApiRouting = true,
+    this.uiContext,
   });
 
   final String text;
@@ -18,7 +20,9 @@ class ComposerDraftInput {
   final List<DraftImage> images;
   final List<DocumentAttachment> documents;
   final bool allowImagesApiRouting;
-  bool get isEmpty => text.isEmpty && images.isEmpty && documents.isEmpty;
+  final UiContextAttachment? uiContext;
+  bool get isEmpty =>
+      text.isEmpty && images.isEmpty && documents.isEmpty && uiContext == null;
   Iterable<String> get paths sync* {
     yield* images.map((image) => image.path);
     yield* documents.map((document) => document.path);
@@ -30,6 +34,8 @@ class ComposerDraftInput {
     int? selectionExtent,
     List<DraftImage>? images,
     List<DocumentAttachment>? documents,
+    UiContextAttachment? uiContext,
+    bool clearUiContext = false,
   }) => ComposerDraftInput(
     text: text ?? this.text,
     selectionBase: selectionBase ?? this.selectionBase,
@@ -37,6 +43,7 @@ class ComposerDraftInput {
     images: images ?? this.images,
     documents: documents ?? this.documents,
     allowImagesApiRouting: allowImagesApiRouting,
+    uiContext: clearUiContext ? null : uiContext ?? this.uiContext,
   );
 
   ChatInputData toInput({DraftSubmission? submission}) => ChatInputData(
@@ -45,6 +52,7 @@ class ComposerDraftInput {
     documents: documents,
     allowImagesApiRouting: allowImagesApiRouting,
     draftSubmission: submission,
+    uiContext: uiContext,
   );
 
   factory ComposerDraftInput.fromInput(ChatInputData input) =>
@@ -53,6 +61,7 @@ class ComposerDraftInput {
         images: [for (final path in input.imagePaths) DraftImage(path: path)],
         documents: List.of(input.documents),
         allowImagesApiRouting: input.allowImagesApiRouting,
+        uiContext: input.uiContext,
       );
 
   Map<String, dynamic> toJson() => {
@@ -65,6 +74,7 @@ class ComposerDraftInput {
         {'path': doc.path, 'fileName': doc.fileName, 'mime': doc.mime},
     ],
     'allowImagesApiRouting': allowImagesApiRouting,
+    'uiContext': uiContext?.toJson(),
   };
 
   factory ComposerDraftInput.fromJson(Map<String, dynamic> json) =>
@@ -85,6 +95,11 @@ class ComposerDraftInput {
             ),
         ],
         allowImagesApiRouting: json['allowImagesApiRouting'] as bool,
+        uiContext: json['uiContext'] == null
+            ? null
+            : UiContextAttachment.fromJson(
+                Map<String, dynamic>.from(json['uiContext'] as Map),
+              ),
       );
 
   bool sameValue(ComposerDraftInput other) =>
@@ -92,6 +107,7 @@ class ComposerDraftInput {
       selectionBase == other.selectionBase &&
       selectionExtent == other.selectionExtent &&
       allowImagesApiRouting == other.allowImagesApiRouting &&
+      uiContext == other.uiContext &&
       listEquals(
         images
             .map((image) => (image.path, image.processing, image.failed))

@@ -1,6 +1,8 @@
+import '../text/ui_number.dart';
+import '../text/ui_text_projection.dart';
+import '../catalog/ui_catalog.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_form_validation.dart';
-import 'genui_content.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_diagnostic.dart';
 
 String genUiDiagnosticMessage(AppLocalizations l10n, UiDiagnostic diagnostic) =>
@@ -79,3 +81,30 @@ String genUiFieldIssueMessage(AppLocalizations l10n, UiFieldIssue issue) =>
                 genUiNumber(issue.max),
               ),
     };
+
+UiProjectionLabels genUiProjectionLabels(AppLocalizations l10n) =>
+    UiProjectionLabels(
+      defaultTitle: l10n.genuiSurfaceTitle,
+      yes: l10n.genuiValueTrue,
+      no: l10n.genuiValueFalse,
+      empty: l10n.genuiContextEmpty,
+      omitted: l10n.genuiContextOmitted,
+      waiting: l10n.genuiPendingNode,
+      diagnostic: (d) =>
+          '${genUiDiagnosticMessage(l10n, d)} (${l10n.genuiErrorLine(d.line)})',
+      fieldIssue: (issue) => genUiFieldIssueMessage(l10n, issue),
+      chartKind: (kind, donut) => switch (kind) {
+        UiChartKind.line => l10n.genuiChartLine,
+        UiChartKind.area => l10n.genuiChartArea,
+        UiChartKind.bar => l10n.genuiChartBar,
+        UiChartKind.scatter => l10n.genuiChartScatter,
+        UiChartKind.pie => donut ? l10n.genuiChartDonut : l10n.genuiChartPie,
+      },
+      chartSummary: l10n.genuiChartSummary,
+      pieSummary: l10n.genuiChartPieSummary,
+      range: (name, min, max) => '$name: ${l10n.genuiNumberRange(min, max)}',
+      tablePage: l10n.genuiTablePageInfo,
+      filter: (query) => '${l10n.genuiTableFilterHint}: $query',
+      domainGaps: l10n.genuiChartDomainSummary,
+      trend: l10n.genuiMetricTrend,
+    );

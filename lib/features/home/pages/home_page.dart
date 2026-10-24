@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_host_scope.dart';
 import '../../browser/browser_navigation.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -999,7 +1000,12 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) =>
       // Keep action callbacks on the page's live context. Dialogs must not
       // capture the deferred theme intended only for this page's contents.
-      VisibleRouteTheme(child: _buildPage(context));
+      VisibleRouteTheme(
+        child: UiActionsScope(
+          onDraft: _controller.stageUiDraft,
+          child: _buildPage(context),
+        ),
+      );
 
   Widget _buildPage(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;

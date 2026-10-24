@@ -670,6 +670,7 @@ class ClaudeHistory {
 
     final parsed = await parseTextAndImages(
       raw,
+      literalText: internalLiteralText(m),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: true,

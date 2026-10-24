@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:async';
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -93,6 +94,72 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'chip-only draft can send and carries the exact frozen attachment',
+    (tester) async {
+      final controller = TextEditingController(), focus = FocusNode();
+      final media = ChatInputBarController();
+      final chip = UiContextAttachment.history(
+        UiContextText(title: 'Parameters', body: 'a: 31'),
+      );
+      media.restoreDraft(ComposerDraftInput(uiContext: chip));
+      ChatInputData? submitted;
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focus,
+          mediaController: media,
+          onSend: (input) async {
+            submitted = input;
+            return ChatInputSubmissionResult.sent;
+          },
+        ),
+      );
+      await tapSendButton(tester);
+      expect(submitted!.isEmpty, isFalse);
+      expect(submitted!.text, '');
+      expect(submitted!.uiContext, chip);
+      expect(media.snapshotInput('').uiContext, isNull);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      focus.dispose();
+    },
+  );
+
+  testWidgets(
+    'rejected submission restores its chip and keeps newly typed text',
+    (tester) async {
+      final controller = TextEditingController(text: 'First'),
+          focus = FocusNode();
+      final media = ChatInputBarController();
+      final chip = UiContextAttachment.history(
+        UiContextText(title: 'Parameters', body: 'a: 31'),
+      );
+      media.restoreDraft(ComposerDraftInput(uiContext: chip));
+      final result = Completer<ChatInputSubmissionResult>();
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focus,
+          mediaController: media,
+          onSend: (_) => result.future,
+        ),
+      );
+      await tester.tap(find.byIcon(Lucide.ArrowUp).last);
+      await tester.pump();
+      expect(controller.text, '');
+      controller.text = 'New typing';
+      expect(await media.capture().prepareExternalDraft(), isNull);
+      result.complete(ChatInputSubmissionResult.rejected);
+      await tester.pumpAndSettle();
+      expect(controller.text, 'FirstNew typing');
+      expect(media.snapshotInput(controller.text).uiContext, chip);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      focus.dispose();
+    },
+  );
 
   testWidgets('提交结果 queued 时会清空输入', (tester) async {
     final controller = TextEditingController(text: 'queued message');

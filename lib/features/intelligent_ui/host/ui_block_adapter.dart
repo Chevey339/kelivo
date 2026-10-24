@@ -1,10 +1,14 @@
+import 'package:Kelivo/l10n/app_localizations.dart';
+import '../text/ui_text_projection.dart';
+import '../widgets/genui_localizations.dart';
+import 'ui_draft_request.dart';
 import 'package:flutter/widgets.dart';
 import 'package:markstream/markstream.dart';
 import '../runtime/ui_surface_state.dart';
 import '../widgets/genui_surface.dart';
 import 'ui_host_scope.dart';
 import 'ui_runtime_registry.dart';
-import 'ui_source_map.dart';
+import 'ui_source_map.dart' show UiSourceFence;
 
 /// Source reduction runs in lifecycle hooks, never in a widget build method.
 class UiBlockAdapter extends StatefulWidget {
@@ -56,17 +60,55 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      !_entry.controller.parsed.headerAccepted &&
-          !_entry.controller.parsed.invalid
-      ? const SizedBox.shrink()
-      : GenUiSurface(
-          controller: _entry.controller,
-          interactions: _entry.interactions,
-          markdownTheme: widget.theme,
-          linkHandler: widget.linkHandler,
-          exporting: widget.host.exporting,
-          onAsk: widget.host.binding.onAsk,
-          onRetrySave: _entry.controller.flushQuietly,
-        );
+  Widget build(BuildContext context) {
+    final controller = _entry.controller;
+    if (!controller.parsed.headerAccepted && !controller.parsed.invalid) {
+      return const SizedBox.shrink();
+    }
+    final actions = UiActionsScope.of(context);
+    final stage = actions?.onDraft;
+    final conversation = widget.host.binding.conversationId;
+    final l10n = AppLocalizations.of(context)!;
+    final projection = UiTextProjection(genUiProjectionLabels(l10n));
+    return GenUiSurface(
+      controller: controller,
+      interactions: _entry.interactions,
+      markdownTheme: widget.theme,
+      linkHandler: widget.linkHandler,
+      exporting: widget.host.exporting,
+      onAsk: stage == null
+          ? actions?.onAsk
+          : (intent) => stage(
+              UiDraftRequest.attach(
+                conversationId: conversation,
+                snapshot: intent.snapshot,
+                context: projection.context(
+                  intent.read,
+                  selected: intent.context,
+                ),
+                text: intent.text,
+              ),
+            ),
+      onAttach: stage == null
+          ? null
+          : (intent) => stage(
+              UiDraftRequest.attach(
+                conversationId: conversation,
+                snapshot: intent.snapshot,
+                context: projection.context(intent.read),
+              ),
+            ),
+      onRepair: stage == null
+          ? null
+          : () => stage(
+              UiDraftRequest.repair(
+                conversationId: conversation,
+                controller: controller,
+                introduction: l10n.genuiRepairDraft,
+                omitted: l10n.genuiContextOmitted,
+              ),
+            ),
+      onRetrySave: controller.flushQuietly,
+    );
+  }
 }

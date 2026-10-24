@@ -5318,5 +5318,21 @@
   "genuiTableCellsError": "表格資料必須是記錄陣列，儲存格只能是有限純量或空值。",
   "genuiTableColumnsError": "請選擇 1–8 個不同的欄位，並提供表頭；小數位數可為 0–10。",
   "genuiTableRowKeyError": "每列都需要一個非空值的純量識別碼。",
-  "genuiViewStateFailed": "儲存狀態過大，無法變更檢視。請縮短輸入或重設介面後重試。"
+  "genuiViewStateFailed": "儲存狀態過大，無法變更檢視。請縮短輸入或重設介面後重試。",
+  "genuiAttachState": "附帶目前介面狀態",
+  "genuiChipExactText": "將隨訊息傳送的準確文字（已凍結）",
+  "genuiChipStale": "來源已失效 · 請移除或重新附帶",
+  "genuiChipRemove": "移除附帶的介面",
+  "genuiReplaceTitle": "取代已附帶的介面？",
+  "genuiReplaceBody": "一份草稿只能附帶一個介面狀態。",
+  "genuiReplaceCurrent": "目前",
+  "genuiReplaceNew": "取代為",
+  "genuiReplaceConfirm": "取代",
+  "genuiMergeTitle": "合併到目前草稿？",
+  "genuiMergeConfirm": "合併",
+  "genuiContextEmpty": "沒有附帶參數或結果欄位。",
+  "genuiContextOmitted": "[部分欄位或資料列已省略。]",
+  "genuiChipOmitted": "先前附帶的介面來源已失效，此則訊息未附帶其狀態。",
+  "genuiDraftChanged": "草稿已變更，請重新附帶。",
+  "genuiRepairDraft": "請根據以下診斷和原始碼片段修復這段介面。"
 }

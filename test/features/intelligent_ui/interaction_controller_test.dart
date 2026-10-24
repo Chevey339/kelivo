@@ -32,6 +32,61 @@ UiInteractionController _interaction([String body = _body]) {
 
 void main() {
   test(
+    'Attach rejects incomplete numbers and composition instead of old values',
+    () {
+      final i = _interaction(), c = i.surface;
+      i.editText('amount', const UiFieldDraft('-'), token: c.token);
+      final invalid = i.captureForAttach(token: c.token);
+      expect(invalid.block, UiActionBlock.form);
+      expect(invalid.form!.firstField, 'amount');
+      expect(invalid.attachment, isNull);
+      expect(c.captureRead().inputs['n'], 2);
+      i.setValue('amount', 2, token: c.token);
+      i.editText(
+        'nameField',
+        const UiFieldDraft('中文', composing: true),
+        token: c.token,
+      );
+      final composing = i.captureForAttach(token: c.token);
+      expect(composing.form!.issues.single.error, UiFieldError.composing);
+      expect(composing.attachment, isNull);
+      expect(c.captureRead().inputs['name'], 'Ready');
+    },
+  );
+  test(
+    'Attach settles nullable blanks and finished drafts into one frozen read',
+    () {
+      final i = _interaction(), c = i.surface;
+      i.editText('amount', const UiFieldDraft(''), token: c.token);
+      i.editText(
+        'nameField',
+        const UiFieldDraft('中文', composing: true),
+        token: c.token,
+      );
+      i.endComposition('nameField', i.draft('nameField')!, token: c.token);
+      final attached = i.captureForAttach(token: c.token).attachment!;
+      expect(attached.read.inputs['n'], isNull);
+      expect(attached.read.inputs['name'], '中文');
+      expect(attached.read.state, same(attached.snapshot.state));
+      i.setValue('amount', 7, token: c.token);
+      expect(attached.read.inputs['n'], isNull);
+      expect(c.captureRead().inputs['n'], 7);
+    },
+  );
+  test(
+    'Attach can describe untouched required defaults and ignores hidden drafts',
+    () {
+      final i = _interaction(_body.replaceFirst('"Ready"', '""')),
+          c = i.surface;
+      expect(i.captureForAttach(token: c.token).attachment, isNotNull);
+      i.editText('amount', const UiFieldDraft('-'), token: c.token);
+      c.setInputs({'show': false}, token: c.token);
+      expect(i.captureForAttach(token: c.token).attachment, isNotNull);
+      c.setInputs({'show': true}, token: c.token);
+      expect(i.captureForAttach(token: c.token).form!.firstField, 'amount');
+    },
+  );
+  test(
     'a new alias edit owns the only draft for its binding, regardless of hidden editors',
     () {
       final fields = List.generate(66, (index) => 'f$index');

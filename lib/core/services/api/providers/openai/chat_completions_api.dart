@@ -343,6 +343,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     );
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalLiteralTextKey);
     outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);
@@ -652,6 +653,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
 
     final parsed = await parseTextAndImages(
       raw,
+      literalText: internalLiteralText(m),
       allowRemoteImages: canImageInput && allowRemoteImages,
       allowLocalImages: canImageInput,
       allowDataImages: canImageInput,

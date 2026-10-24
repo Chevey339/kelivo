@@ -113,6 +113,28 @@ class GenUiInteractions extends InheritedWidget {
       return const UiActionResult(block: UiActionBlock.unavailable);
     }
     final result = controller.activate(id, token: token);
+    await _focusFailure(context, result, token);
+    if (result.intent case final intent?) {
+      await onAsk!(intent);
+    }
+    return result;
+  }
+
+  Future<UiActionResult> captureForAttach(
+    BuildContext context, {
+    required UiRuntimeToken token,
+  }) async {
+    if (exporting) return const UiActionResult(block: UiActionBlock.readOnly);
+    final result = controller.captureForAttach(token: token);
+    await _focusFailure(context, result, token);
+    return result;
+  }
+
+  Future<void> _focusFailure(
+    BuildContext context,
+    UiActionResult result,
+    UiRuntimeToken token,
+  ) async {
     final first = result.form?.firstField;
     if (first != null) {
       // Committing a blank number may just have revealed this field. Its
@@ -138,10 +160,6 @@ class GenUiInteractions extends InheritedWidget {
         }
       }
     }
-    if (result.intent case final intent?) {
-      await onAsk!(intent);
-    }
-    return result;
   }
 
   VoidCallback registerAction(String id, Future<void> Function() action) {

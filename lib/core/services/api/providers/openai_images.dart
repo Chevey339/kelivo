@@ -198,6 +198,7 @@ Future<String> _lastOpenAIImagePrompt(
     }
     final parsed = await parseTextAndImages(
       (content ?? '').toString(),
+      literalText: internalLiteralText(messages[i]),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: false,
@@ -263,6 +264,7 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
 
     final parsed = await parseTextAndImages(
       (content ?? '').toString(),
+      literalText: internalLiteralText(messages[i]),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: false,

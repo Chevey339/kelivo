@@ -1,3 +1,7 @@
+import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_draft_request.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_context_chip.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../support/native_message_input_harness.dart';
 import 'dart:async';
@@ -34,6 +38,15 @@ class _DraftChatService extends ChatService {
     for (final id in ['a', 'b', 'c']) id: Conversation(id: id, title: id),
   };
   String? current;
+  final unavailableSources = <String>{};
+  @override
+  Future<bool> isUiContextCurrent(UiContextSource source) async =>
+      !unavailableSources.contains(source.revisionId);
+  void invalidateUiSource(String id) {
+    unavailableSources.add(id);
+    notifyListeners();
+  }
+
   @override
   ComposerDraftStore get composerDrafts => store;
   @override
@@ -241,6 +254,198 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await finish(tester, store.flush());
   }
+
+  UiContextAttachment frozen(String value) => UiContextAttachment.attached(
+    source: UiContextSource(
+      conversationId: 'a',
+      revisionId: 'source',
+      surfaceKey: '0:0',
+      sourceHash: 'a' * 64,
+    ),
+    text: UiContextText(title: 'Parameters', body: 'value: $value'),
+  );
+  UiDraftRequest attach(String value, {String text = ''}) => UiDraftRequest(
+    conversationId: 'a',
+    attachment: frozen(value),
+    text: text,
+  );
+
+  testWidgets(
+    'explicit Attach stages one frozen chip and persists across owner switches',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      await finish(tester, state.controller.stageUiDraft(attach('31')));
+      await tester.pumpAndSettle();
+      expect(state.media.snapshotInput('').uiContext, frozen('31'));
+      expect(state.text.text, isEmpty);
+      expect(find.byType(GenUiContextChip), findsOneWidget);
+      await go(tester, state, 'b');
+      expect(state.media.snapshotInput('').uiContext, isNull);
+      await go(tester, state, 'a');
+      expect(state.media.snapshotInput('').uiContext, frozen('31'));
+      service.invalidateUiSource('source');
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<GenUiContextChip>(find.byType(GenUiContextChip)).stale,
+        isTrue,
+      );
+      expect(
+        state.media.snapshotInput('').uiContext!.text.exactText,
+        frozen('31').text.exactText,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'Ask previews append, leaves draft unchanged until confirmation',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      state.text.text = 'My question';
+      final pending = state.controller.stageUiDraft(
+        attach('7', text: 'Explain parameters'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Add to your draft?'), findsOneWidget);
+      expect(state.text.text, 'My question');
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      await tester.tap(find.text('Add').last);
+      await finish(tester, pending);
+      expect(state.text.text, 'My question\n\nExplain parameters');
+      expect(state.media.snapshotInput(state.text.text).uiContext, frozen('7'));
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'replacement cancellation keeps the original chip; confirmation replaces once',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      await finish(tester, state.controller.stageUiDraft(attach('1')));
+      var pending = state.controller.stageUiDraft(attach('2'));
+      await tester.pumpAndSettle();
+      expect(find.text('Replace attached UI?'), findsOneWidget);
+      expect(find.text('value: 1'), findsWidgets);
+      expect(find.text('value: 2'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await finish(tester, pending);
+      expect(state.media.snapshotInput('').uiContext, frozen('1'));
+      pending = state.controller.stageUiDraft(attach('2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Replace').last);
+      await finish(tester, pending);
+      expect(state.media.snapshotInput('').uiContext, frozen('2'));
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'typing during preview aborts atomic staging without overwriting text',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      state.text.text = 'Before';
+      final pending = state.controller.stageUiDraft(attach('7'));
+      await tester.pumpAndSettle();
+      state.text.text = 'New typing';
+      await tester.tap(find.text('Add').last);
+      await finish(tester, pending);
+      expect(state.text.text, 'New typing');
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'switching owner during preview cannot stage into the new composer',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      state.text.text = 'A draft';
+      final pending = state.controller.stageUiDraft(attach('7'));
+      await tester.pumpAndSettle();
+      await go(tester, state, 'b');
+      await tester.tap(find.text('Add').last);
+      await finish(tester, pending);
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      expect(store.peek('a')!.active.text, 'A draft');
+      expect(store.peek('a')!.active.uiContext, isNull);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'native edits accepted during preview drain before atomic staging',
+    (tester) async {
+      final native = NativeMessageInputHarness(tester);
+      addTearDown(native.dispose);
+      final state = await pump(tester, nativeInput: true);
+      await go(tester, state, 'a');
+      final before = 'Before\n' * 300;
+      state.text.value = TextEditingValue(
+        text: before,
+        selection: TextSelection.collapsed(offset: before.length),
+      );
+      state.focus.requestFocus();
+      await tester.pump();
+      await tester.pump();
+      expect(native.session, isNotNull);
+      final pending = state.controller.stageUiDraft(attach('7'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add to your draft?'), findsOneWidget);
+      native.holdDelivery = true;
+      await native.commit('X');
+      expect(state.text.text, before);
+      await tester.tap(find.text('Add').last);
+      await tester.pump();
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      await native.release();
+      await finish(tester, pending);
+      expect(state.text.text, '${before}X');
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'active composer composition refuses staging and retains composing text',
+    (tester) async {
+      final state = await pump(tester);
+      await go(tester, state, 'a');
+      state.text.value = const TextEditingValue(
+        text: 'zhong',
+        selection: TextSelection.collapsed(offset: 5),
+        composing: TextRange(start: 0, end: 5),
+      );
+      await finish(tester, state.controller.stageUiDraft(attach('7')));
+      expect(state.text.text, 'zhong');
+      expect(state.media.snapshotInput(state.text.text).uiContext, isNull);
+      expect(
+        AppSnackBarManager().activeToasts.map(
+          (entry) => entry.notification.message,
+        ),
+        contains('Finish composing before continuing'),
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await unmount(tester);
+    },
+  );
 
   for (final operation in ['switch', 'background', 'dispose']) {
     testWidgets('native accepted input drains before draft $operation', (

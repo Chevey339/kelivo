@@ -31,6 +31,7 @@ class GenUiSurface extends StatelessWidget {
     this.exporting = false,
     this.interactions,
     this.onAsk,
+    this.onAttach,
   });
   final UiSurfaceController controller;
   final String? title;
@@ -42,6 +43,7 @@ class GenUiSurface extends StatelessWidget {
   final bool exporting;
   final UiInteractionController? interactions;
   final GenUiAskHandler? onAsk;
+  final Future<void> Function(UiAttachIntent)? onAttach;
 
   @override
   Widget build(BuildContext context) => GenUiThemeScope(
@@ -196,30 +198,49 @@ class _SurfaceBodyState extends State<_SurfaceBody>
   Future<void> _showMore() async {
     final l10n = AppLocalizations.of(context)!;
     final token = controller.token;
-    final reset = await showAppDialog<bool>(
+    final onAttach = widget.surface.onAttach;
+    final action = await showAppDialog<String>(
       context,
-      child: GenUiThemeScope(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppDialogHeader(title: l10n.genuiMore),
-            IosTextButton(
-              label: l10n.genuiReset,
-              icon: LucideIcons.rotateCcw,
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pop(true),
-            ),
-          ],
+      child: Builder(
+        builder: (dialogContext) => GenUiThemeScope(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppDialogHeader(title: l10n.genuiMore),
+              if (widget.surface.onAttach != null)
+                IosTextButton(
+                  label: l10n.genuiAttachState,
+                  icon: LucideIcons.paperclip,
+                  onPressed: () => Navigator.of(dialogContext).pop('attach'),
+                ),
+              IosTextButton(
+                label: l10n.genuiReset,
+                icon: LucideIcons.rotateCcw,
+                onPressed: () => Navigator.of(dialogContext).pop('reset'),
+              ),
+            ],
+          ),
         ),
       ),
     );
     if (!mounted) return;
-    if (reset == true) {
+    if (action == 'attach') {
+      final result = await GenUiInteractions.of(
+        context,
+      ).captureForAttach(context, token: token);
+      if (!mounted) return;
+      if (result.attachment case final intent?) {
+        await onAttach?.call(intent);
+        return; // Successful staging owns composer focus.
+      } else if (result.form?.firstField != null) {
+        return; // Keep focus at the invalid field.
+      }
+    } else if (action == 'reset') {
       controller.reset(token: token);
       controller.flushQuietly();
     }
-    _moreFocus.requestFocus();
+    if (mounted) _moreFocus.requestFocus();
   }
 
   Future<void> _expand() async {

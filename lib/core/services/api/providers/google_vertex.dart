@@ -353,6 +353,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 
       final parsed = await parseTextAndImages(
         raw,
+        literalText: internalLiteralText(m),
         allowRemoteImages: true,
         allowLocalImages: true,
         keepRemoteMarkdownText: true,

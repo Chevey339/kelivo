@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../protocol/ui_source_hash.dart';
+import '../protocol/ui_validation.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_expression_walk.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_ir.dart';
 import 'package:Kelivo/features/intelligent_ui/protocol/ui_stream_parser.dart';
@@ -41,6 +42,8 @@ final class UiRestoreToken {
 /// after subsequent user input. It is not a model-content serialization.
 final class UiSurfaceRead {
   const UiSurfaceRead({
+    required this.program,
+    required this.phase,
     required this.inputs,
     required this.values,
     required this.nodes,
@@ -48,6 +51,8 @@ final class UiSurfaceRead {
     required this.sequence,
   });
   final Map<String, Object?> inputs;
+  final UiValidationResult program;
+  final SurfacePhase phase;
   final Map<String, UiComputedValue> values;
   final Map<String, UiResolvedNode> nodes;
   final UiSurfaceState state;
@@ -230,6 +235,8 @@ final class UiSurfaceController {
   UiSurfaceRead captureRead() {
     _ensureAlive();
     return UiSurfaceRead(
+      program: _parse.program,
+      phase: phase,
       inputs: _batch.inputs,
       values: _batch.values,
       nodes: _nodes,

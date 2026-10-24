@@ -1,3 +1,7 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_draft_request.dart';
+import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_context_chip.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -599,6 +603,105 @@ void main() {
       expect(intents.single.context, {'name': 'Kelivo', 'quantity': 3});
       surface.setInputs({'amount': 8}, token: surface.token);
       expect(intents.single.context['quantity'], 3);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  desktopTest(
+    'explicit More attachment freezes state; ordinary edits and Reset do not stage',
+    (tester) async {
+      final drafts = <UiDraftRequest>[];
+      await tester.pumpWidget(
+        UiActionsScope(
+          onDraft: (request) async => drafts.add(request),
+          child: _MessageListHarness(messages: [message(fence)]),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final surface = tester
+          .widget<GenUiSurface>(find.byType(GenUiSurface))
+          .controller;
+      surface.setInputs({'name': 'Frozen'}, token: surface.token);
+      await tester.pump();
+      expect(drafts, isEmpty);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(GenUiSurface),
+          matching: find.byTooltip('More'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Attach current state'));
+      await tester.pumpAndSettle();
+      expect(drafts, hasLength(1));
+      final chip = drafts.single.attachment!;
+      expect(chip.source!.revisionId, 'native-revision');
+      expect(chip.source!.conversationId, 'native-conversation');
+      expect(chip.text.body, contains('Frozen'));
+      surface.setInputs({'name': 'Later'}, token: surface.token);
+      await tester.pump();
+      await tester.tap(find.text('Reset local'));
+      await tester.pumpAndSettle();
+      expect(surface.nodes['field']!.properties['bind'], 'initial');
+      expect(drafts, hasLength(1));
+      expect(chip.text.body, isNot(contains('Later')));
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  desktopTest(
+    'host repair stages diagnostics without an attachment or automatic send',
+    (tester) async {
+      final drafts = <UiDraftRequest>[];
+      await tester.pumpWidget(
+        UiActionsScope(
+          onDraft: (request) async => drafts.add(request),
+          child: _MessageListHarness(
+            messages: [
+              message(
+                '```kelivo-ui\nui 1 catalog "kelivo.native/1"\n'
+                'root = Text(text="Broken", extra=true)\n```',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Repair UI'));
+      await tester.pumpAndSettle();
+      expect(drafts, hasLength(1));
+      expect(drafts.single.attachment, isNull);
+      expect(drafts.single.text, contains('unknownProperty'));
+      expect(drafts.single.text, contains('extra=true'));
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  desktopTest(
+    'sent user chip is a readonly summary and marker-like text stays ordinary',
+    (tester) async {
+      final frozen = UiContextText(title: 'Parameters', body: 'Slope: 3.1');
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: [
+            message(
+              '',
+              role: 'user',
+              parts: UiUserContextParts.attach(const [
+                TextPart('Question'),
+              ], frozen),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(GenUiContextChip), findsOneWidget);
+      expect(find.byKey(const ValueKey('genui-context-remove')), findsNothing);
+      expect(find.byType(GenUiSurface), findsNothing);
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: [message('${frozen.exactText}\n\nQuestion', role: 'user')],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(GenUiContextChip), findsNothing);
       await tester.pumpWidget(const SizedBox());
     },
   );

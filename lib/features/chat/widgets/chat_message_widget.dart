@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_user_message_content.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_host_scope.dart';
@@ -2007,8 +2008,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // Attachments come from structured parts only. Literal marker-like text
     // inside TextPart stays plain text and is never re-parsed.
     final assistant = _assistantForMessage();
+    final uiContent = UiUserMessageContent(widget.message);
     final visualText = _applyVisualAssistantRegexes(
-      widget.message.content,
+      uiContent.text,
       assistant: assistant,
       scope: AssistantRegexScope.user,
     );
@@ -2020,19 +2022,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       isDark: isDark,
       alignEnd: true,
     );
-    final textBubble = visualText.isNotEmpty
+    final textBubble = visualText.isNotEmpty || uiContent.hasContext
         ? Container(
             key: ValueKey('user-message-text-bubble:${widget.message.id}'),
             child: _buildBubbleContainer(
               context: context,
               isUser: true,
-              child: _buildUserTextContent(
-                context,
-                visualText,
-                userMessageSettings.enableMarkdown,
-                widget.collapseLongUserText
-                    ? userMessageSettings.collapseChars
-                    : 0,
+              child: uiContent.wrap(
+                _buildUserTextContent(
+                  context,
+                  visualText,
+                  userMessageSettings.enableMarkdown,
+                  widget.collapseLongUserText
+                      ? userMessageSettings.collapseChars
+                      : 0,
+                ),
               ),
             ),
           )
@@ -2791,7 +2795,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 revisionId: widget.message.id,
                 source: uiSource,
                 generation: uiGenerationStatus(widget.message),
-                onAsk: UiActionsScope.askOf(context),
               ),
         onCitationTap: _handleCitationTap,
         citationIndexResolver: citationIndexResolver,

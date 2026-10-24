@@ -1,3 +1,5 @@
+import '../../intelligent_ui/host/ui_user_context_parts.dart';
+import '../../intelligent_ui/models/ui_context_attachment.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
@@ -543,6 +545,10 @@ class MessageBuilderService {
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
+        final frozenUi = UiUserContextParts.read(m.parts).context;
+        if (frozenUi != null) {
+          message[multimodalInternalLiteralTextKey] = frozenUi.exactText;
+        }
       } else {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
@@ -785,10 +791,13 @@ class MessageBuilderService {
     ChatMessage message, {
     bool includeMediaFilePathsAsImages = true,
   }) {
+    final contextParts = message.role == 'user'
+        ? UiUserContextParts.read(message.parts)
+        : null;
     final images = <String>[];
     final docs = <DocumentAttachment>[];
     final textParts = <String>[];
-    for (final part in message.parts) {
+    for (final part in contextParts?.body ?? message.parts) {
       if (part is TextPart) {
         textParts.add(part.text);
       } else if (part is ImagePart) {
@@ -819,6 +828,9 @@ class MessageBuilderService {
       text: textParts.join().trim(),
       imagePaths: images,
       documents: docs,
+      uiContext: contextParts?.context == null
+          ? null
+          : UiContextAttachment.history(contextParts!.context!),
     );
   }
 
@@ -1305,7 +1317,11 @@ class MessageBuilderService {
 
       // Attachments travel via internalMediaPathsKey / lastUserImagePaths —
       // never re-embed legacy attachment markers into content.
-      final cleanedUser = replacedUserText.trim();
+      final ordinaryUser = replacedUserText.trim();
+      final frozenUi = parsedUser.uiContext?.text.exactText;
+      final cleanedUser = frozenUi == null
+          ? ordinaryUser
+          : '$frozenUi\n\n$ordinaryUser';
 
       final filePrompts = StringBuffer();
       var leftToSandbox = false;
@@ -2551,7 +2567,10 @@ class MessageBuilderService {
       final s = (apiMessages[i]['content'] ?? '').toString();
       if (s.isNotEmpty) {
         apiMessages[i]['content'] =
-            await MarkdownMediaSanitizer.inlineLocalImagesToBase64(s);
+            await MarkdownMediaSanitizer.inlineLocalImagesToBase64(
+              s,
+              literalText: internalLiteralText(apiMessages[i]),
+            );
       }
     }
   }

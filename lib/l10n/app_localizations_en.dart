@@ -14412,4 +14412,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get genuiViewStateFailed =>
       'This view change exceeds the saved state limit. Shorten a field or reset the UI and try again.';
+
+  @override
+  String get genuiAttachState => 'Attach current state';
+
+  @override
+  String get genuiChipExactText => 'Exact text to be sent (frozen)';
+
+  @override
+  String get genuiChipStale => 'Source unavailable — remove or attach again';
+
+  @override
+  String get genuiChipRemove => 'Remove attached UI';
+
+  @override
+  String get genuiReplaceTitle => 'Replace attached UI?';
+
+  @override
+  String get genuiReplaceBody => 'A draft can carry one UI state.';
+
+  @override
+  String get genuiReplaceCurrent => 'Current';
+
+  @override
+  String get genuiReplaceNew => 'Replace with';
+
+  @override
+  String get genuiReplaceConfirm => 'Replace';
+
+  @override
+  String get genuiMergeTitle => 'Add to your draft?';
+
+  @override
+  String get genuiMergeConfirm => 'Add';
+
+  @override
+  String get genuiContextEmpty => 'No parameter or result fields are attached.';
+
+  @override
+  String get genuiContextOmitted => '[Some fields or data rows are omitted.]';
+
+  @override
+  String get genuiChipOmitted =>
+      'The previously attached UI state is unavailable and was not included.';
+
+  @override
+  String get genuiDraftChanged => 'Your draft changed. Try attaching again.';
+
+  @override
+  String get genuiRepairDraft =>
+      'Please repair this interface using the diagnostics and source excerpts below.';
 }

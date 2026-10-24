@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart';
@@ -564,12 +565,23 @@ class MessageGenerationService {
     );
   }
 
+  UiContextSubmission? _uiContext(ChatInputData input) {
+    final attachment = input.uiContext;
+    return attachment == null
+        ? null
+        : UiContextSubmission(
+            attachment,
+            omittedText: AppLocalizations.of(contextProvider)!.genuiChipOmitted,
+          );
+  }
+
   /// Create user message from input data.
   Future<ChatMessage> createUserMessage({
     required String conversationId,
     required ChatInputData input,
     required Assistant? assistant,
   }) async {
+    final uiContext = _uiContext(input);
     final parts = await MessageGenerationService.buildPersistedUserMessageParts(
       input,
       assistant: assistant,
@@ -578,6 +590,7 @@ class MessageGenerationService {
       conversationId: conversationId,
       role: 'user',
       parts: parts,
+      uiContext: uiContext,
     );
   }
 
@@ -591,6 +604,7 @@ class MessageGenerationService {
     required String modelId,
     required String providerKey,
   }) async {
+    final uiContext = _uiContext(input);
     final userParts = await buildPersistedUserMessageParts(
       input,
       assistant: assistant,
@@ -600,6 +614,7 @@ class MessageGenerationService {
         conversationId: conversationId,
         role: 'user',
         parts: userParts,
+        uiContext: uiContext,
       );
       final assistantMessage = await createAssistantPlaceholder(
         conversationId: conversationId,
@@ -618,6 +633,7 @@ class MessageGenerationService {
       modelId: modelId,
       providerId: providerKey,
       draftSubmission: input.draftSubmission,
+      uiContext: uiContext,
     );
     return (
       userMessage: result.userMessage!,

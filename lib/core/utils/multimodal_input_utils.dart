@@ -7,6 +7,17 @@ import '../../utils/sandbox_path_resolver.dart';
 const String multimodalInternalMediaPathsKey = '_kelivo_media_paths';
 const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
 
+/// A separately persisted plain-text part that must bypass Markdown media
+/// extraction. Set from structured message parts, never inferred from markers
+/// inside ordinary content. Providers consume this metadata before the wire.
+const String multimodalInternalLiteralTextKey = '_kelivo_literal_text';
+String? internalLiteralText(Map<String, dynamic> message) {
+  final value = message[multimodalInternalLiteralTextKey];
+  return value is String && value.isNotEmpty && value.length <= 4096
+      ? value
+      : null;
+}
+
 /// Internal message key listing a user message's document attachments as
 /// `{uri, name, mime}` entries — the `FilePart`s that are not images, audio
 /// or video. They normally reach the model as extracted text; this key lets a

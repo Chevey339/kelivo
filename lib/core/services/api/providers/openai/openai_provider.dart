@@ -385,6 +385,7 @@ Stream<StreamChunk> sendOpenAIStream(
           shouldAttachAssistantImage) {
         final parsed = await parseTextAndImages(
           raw,
+          literalText: internalLiteralText(m),
           allowRemoteImages: allowRemoteImages,
           allowLocalImages: canImageInput,
           allowDataImages: canImageInput,

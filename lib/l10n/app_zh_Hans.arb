@@ -5294,5 +5294,21 @@
   "genuiTableCellsError": "表格数据必须是记录数组，单元格只能是有限标量或空值。",
   "genuiTableColumnsError": "请选择 1–8 个不同的字段，并提供表头；小数位数可为 0–10。",
   "genuiTableRowKeyError": "每行都需要一个非空值的标量标识。",
-  "genuiViewStateFailed": "保存状态过大，无法更改视图。请缩短输入或重置界面后重试。"
+  "genuiViewStateFailed": "保存状态过大，无法更改视图。请缩短输入或重置界面后重试。",
+  "genuiAttachState": "附带当前界面状态",
+  "genuiChipExactText": "将随消息发送的准确文本（已冻结）",
+  "genuiChipStale": "来源已失效 · 请移除或重新附带",
+  "genuiChipRemove": "移除附带的界面",
+  "genuiReplaceTitle": "替换已附带的界面？",
+  "genuiReplaceBody": "一份草稿只能附带一个界面状态。",
+  "genuiReplaceCurrent": "当前",
+  "genuiReplaceNew": "替换为",
+  "genuiReplaceConfirm": "替换",
+  "genuiMergeTitle": "合并到当前草稿？",
+  "genuiMergeConfirm": "合并",
+  "genuiContextEmpty": "没有附带参数或结果字段。",
+  "genuiContextOmitted": "[部分字段或数据行已省略。]",
+  "genuiChipOmitted": "此前附带的界面来源已失效，本条消息未附带其状态。",
+  "genuiDraftChanged": "草稿已发生变化，请重新附带。",
+  "genuiRepairDraft": "请根据以下诊断和源码片段修复这段界面。"
 }

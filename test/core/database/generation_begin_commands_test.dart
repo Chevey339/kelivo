@@ -68,10 +68,10 @@ void main() {
       conversation: current,
       message: user('user-2'),
     );
-    return repository.appendLinearMessageToConversation(
-      conversation: afterUser,
+    return (await repository.appendLinearMessageToConversation(
+      conversation: afterUser.conversation,
       message: assistant('assistant-tail').copyWith(isStreaming: false),
-    );
+    )).conversation;
   }
 
   Future<GenerationRun> advanceToStreaming(GenerationRun run) async {

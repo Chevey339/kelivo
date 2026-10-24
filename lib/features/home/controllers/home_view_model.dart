@@ -426,10 +426,7 @@ class HomeViewModel extends ChangeNotifier {
       return ChatInputSubmissionResult.rejected;
     }
     await ScheduledTasksService.instance.reconcileBeforeSend();
-    final content = input.text.trim();
-    if (content.isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
+    if (input.isEmpty) {
       return ChatInputSubmissionResult.rejected;
     }
 
@@ -479,10 +476,7 @@ class HomeViewModel extends ChangeNotifier {
     ChatInputData input,
     Conversation conversation,
   ) async {
-    final content = input.text.trim();
-    if (content.isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
+    if (input.isEmpty) {
       return false;
     }
 
@@ -534,6 +528,7 @@ class HomeViewModel extends ChangeNotifier {
       imagePaths: List<String>.of(input.imagePaths),
       documents: List<DocumentAttachment>.of(input.documents),
       allowImagesApiRouting: input.allowImagesApiRouting,
+      uiContext: input.uiContext,
       draftSubmission: input.draftSubmission,
     );
   }
