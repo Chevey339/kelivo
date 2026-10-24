@@ -1,0 +1,27 @@
+{
+  "tokenizerPackage": "tiktoken",
+  "version": "0.12.0",
+  "purpose": "Reference BPE measurements, not DeepSeek billing-token claims. No model API requests.",
+  "bytes": {
+    "summary": 350,
+    "skill": 1954,
+    "referencesWithExamples": 9538
+  },
+  "tokenLimits": {
+    "summary": 300,
+    "skill": 900,
+    "referencesWithExamples": 4000
+  },
+  "encodings": {
+    "cl100k_base": {
+      "summary": 62,
+      "skill": 386,
+      "referencesWithExamples": 2277
+    },
+    "o200k_base": {
+      "summary": 61,
+      "skill": 383,
+      "referencesWithExamples": 2290
+    }
+  }
+}

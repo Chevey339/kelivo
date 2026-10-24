@@ -2149,6 +2149,7 @@ class MessageBuilderService {
       final fragment = buildAvailableSkillsFragment(
         skills,
         skillsModelRoot: skillsModelRoot,
+        selectedSkillIds: override ?? assistant?.skillIds ?? const [],
       );
       if (fragment.trim().isEmpty) return;
       _appendToSystemMessage(

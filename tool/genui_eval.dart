@@ -99,6 +99,7 @@ Future<void> _run(List<String> args) async {
   }
   final trackedInputs = [
     'lib/features/intelligent_ui',
+    'assets/skills/visualize',
     'tool/genui_eval.dart',
     'tool/genui_eval',
     'dependencies/markstream',

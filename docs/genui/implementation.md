@@ -1193,3 +1193,51 @@ is efe1ad0fe3c0fd957cff7f3679235c564029e4c5468671e8c88bd85f0578daa3.
 Logs are retained under build/genui/logs/c21-*. These checks and the three available
 engine runs do not claim the explicitly deferred Windows or physical-iPhone
 acceptance, nor Linux GUI acceptance.
+
+
+## C22 — generated guidance and stable discovery
+
+UiGuidance generates nine visualize assets from final catalog signatures,
+defaults, choices, budgets and semantic field names. Authored usage guidance and
+three fixed calculator/curve/conditional-form templates supply the scenario
+meaning; their node/property names are checked against the catalog. The tests
+parse/type-check/resolve every example and verify changed calculator, chart/table
+and conditional Ask values. Exact generated-asset equality and complete component/
+function coverage detect drift. The main Skill points to the relevant protocol,
+component, function, example, semantic and Web references. Assets are prepared
+but are not yet bundled or registered; C23 owns that step.
+
+The available-skill list now sorts by stable name/id rather than usage count.
+An already-available bundled visualize entry has a fixed first position; explicit
+selections are prioritized and, beyond the twenty detailed descriptions, retain
+read_file paths. Existing enabled and assistant/conversation filters run before
+this ordering. A user-imported same-name skill is not treated as the built-in.
+The message builder passes the effective explicit selection; its regression test
+checks all twenty-five selected paths, conversation overrides and disabled skills.
+UI usage counters and the existing read_file access path are unchanged.
+
+The manual evaluator shares the generated Skill/protocol/reference/examples and
+includes assets/skills/visualize in its clean-input check. No paid calls ran.
+Reference token budgets were measured using tiktoken 0.12.0 installed only in an
+ignored local virtual environment, with cl100k_base and o200k_base. Both stay
+below 300/900/4,000 tokens for summary/main/all relevant references plus all three
+examples. Exact counts and UTF-8 sizes are in guidance-budget-c22.json; these are
+reference BPE measurements, not DeepSeek billing-token claims. G uses byte guards
+and asset checks without installing or invoking the tokenizer.
+
+Independent review corrected the search-default/current-state distinction,
+DataTable's scalar-only records including undisplayed fields, and NumberField's
+positive-step requirement. Further checks document Chart X/Y type/field rules and
+table key/column/digit constraints. Final re-review reported no remaining findings.
+The focused guidance suite passed all eight tests, the prompt injection regression
+passed, and the original focused run completed all thirty-three non-injection
+checks before an I/O fixture hang. That fixture now performs setup under runAsync
+and uses ChangeNotifierProvider; no product code was changed to satisfy it.
+
+C22 final G passed: root fatal-info analysis and all 10,000 tests (one existing
+skip), markstream pub get, fatal-info analysis and all 298 tests. The macOS debug
+application built successfully, and diff whitespace checks passed. Tool analysis
+also passed. All eighteen non-document files retained their frozen hashes through
+G; the exact twenty-one-file manifest was checked before staging. Logs remain in
+build/genui/logs/c22-*. Windows/Linux and physical-iPhone acceptance remain
+deferred as directed; C22 does not add a native platform dependency.
