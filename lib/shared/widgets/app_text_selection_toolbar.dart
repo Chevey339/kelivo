@@ -1,5 +1,10 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/providers/settings_provider.dart';
+import 'ios_text_selection_toolbar.dart';
 
 /// Platform selection menus whose desktop labels use the application font.
 class AppTextSelectionToolbar extends StatelessWidget {
@@ -7,15 +12,31 @@ class AppTextSelectionToolbar extends StatelessWidget {
     super.key,
     required this.anchors,
     required this.buttonItems,
+    required this.selectionContext,
+    required this.onDismiss,
   });
 
   final TextSelectionToolbarAnchors anchors;
   final List<ContextMenuButtonItem> buttonItems;
+  final BuildContext selectionContext;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final platform = theme.platform;
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        context.select<SettingsProvider?, bool>(
+          (settings) => settings?.iosNativeSelectionMenuEnabled ?? true,
+        )) {
+      return IosTextSelectionToolbar(
+        anchors: anchors,
+        buttonItems: buttonItems,
+        selectionContext: selectionContext,
+        onDismiss: onDismiss,
+      );
+    }
     if (platform != TargetPlatform.macOS &&
         platform != TargetPlatform.windows &&
         platform != TargetPlatform.linux) {

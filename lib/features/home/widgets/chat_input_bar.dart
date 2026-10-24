@@ -1,6 +1,7 @@
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/rendering.dart';
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
@@ -2183,12 +2184,13 @@ class _ChatInputBarState extends State<ChatInputBar>
     TextSelectionToolbarAnchors anchors,
     List<ContextMenuButtonItem> defaultItems,
     VoidCallback hideToolbar,
+    VoidCallback onNativeDismiss,
   ) {
     // Suppress context menu during app lifecycle transitions to avoid flickering
     if (_suppressContextMenu) {
       return const SizedBox.shrink();
     }
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       final items = <ContextMenuButtonItem>[];
       try {
         final appL10n = AppLocalizations.of(context)!;
@@ -2279,7 +2281,12 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
       } catch (_) {}
-      return AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
+      return AppTextSelectionToolbar(
+        anchors: anchors,
+        buttonItems: items,
+        selectionContext: context,
+        onDismiss: onNativeDismiss,
+      );
     }
 
     final items = defaultItems
@@ -2293,7 +2300,12 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         })
         .toList(growable: false);
-    return AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
+    return AppTextSelectionToolbar(
+      anchors: anchors,
+      buttonItems: items,
+      selectionContext: context,
+      onDismiss: onNativeDismiss,
+    );
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {

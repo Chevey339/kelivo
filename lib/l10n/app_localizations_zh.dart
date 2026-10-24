@@ -5085,6 +5085,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '在输入栏的推理图标旁显示当前档位';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -18369,6 +18376,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在输入栏的推理图标旁显示当前档位';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -31576,6 +31590,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsShowReasoningLevelBadgeSubtitle =>
       '在輸入欄的推理圖示旁顯示目前檔位';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生選取選單';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用於輸入框和訊息選取範圍；如遇卡頓可關閉，恢復原選單。';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';

@@ -1863,6 +1863,8 @@
   "displaySettingsPageShowToolCardsSubtitle": "關閉後，聊天中不再顯示工具呼叫卡片",
   "displaySettingsShowReasoningLevelBadge": "在推理按鈕上顯示檔位",
   "displaySettingsShowReasoningLevelBadgeSubtitle": "在輸入欄的推理圖示旁顯示目前檔位",
+  "displaySettingsPageIosNativeSelectionMenuTitle": "iOS 26+ 原生選取選單",
+  "displaySettingsPageIosNativeSelectionMenuSubtitle": "用於輸入框和訊息選取範圍；如遇卡頓可關閉，恢復原選單。",
   "displaySettingsPageAutoCollapseThinkingTitle": "自動折疊思考",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "思考完成後自動折疊，保持介面簡潔",
   "displaySettingsPageCollapseThinkingStepsTitle": "折疊思考步驟",

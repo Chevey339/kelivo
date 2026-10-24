@@ -680,6 +680,14 @@ class SettingsSearchIndex {
         (l) => l.displaySettingsPageMobileCodeBlockWrapTitle,
       );
     }
+    if (!kIsWeb && platform == TargetPlatform.iOS) {
+      add(
+        'displaySettingsPageIosNativeSelectionMenuTitle',
+        SettingsSearchDestination.behavior,
+        (l) => l.displaySettingsPageIosNativeSelectionMenuTitle,
+        keywords: 'liquid glass native selection menu 液态玻璃 液態玻璃 原生 选择 選取 菜单 選單',
+      );
+    }
     add(
       'displaySettingsPageAutoCollapseThinkingTitle',
       SettingsSearchDestination.behavior,

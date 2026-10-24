@@ -94,6 +94,8 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     final anchors = region.contextMenuAnchors;
     return AppTextSelectionToolbar(
       anchors: anchors,
+      selectionContext: region.context,
+      onDismiss: () => region.hideToolbar(false),
       buttonItems: [
         ...region.contextMenuButtonItems,
         if (_markdownSelection.hasSelection)

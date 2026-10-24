@@ -12,6 +12,7 @@ typedef LongMessageContextMenuBuilder =
       TextSelectionToolbarAnchors anchors,
       List<ContextMenuButtonItem> items,
       VoidCallback onDismiss,
+      VoidCallback onNativeDismiss,
     );
 
 /// Keeps long message edits local to visible lines instead of reshaping one
@@ -703,8 +704,14 @@ class LongMessageEditorState extends State<LongMessageEditor>
           anchors,
           items,
           onDismiss,
+          onDismiss,
         ) ??
-        AppTextSelectionToolbar(anchors: anchors, buttonItems: items);
+        AppTextSelectionToolbar(
+          anchors: anchors,
+          buttonItems: items,
+          selectionContext: context,
+          onDismiss: onDismiss,
+        );
   }
 
   void _retireInputForModeChange() {
@@ -838,10 +845,13 @@ class LongMessageEditorState extends State<LongMessageEditor>
                   state.contextMenuAnchors,
                   items,
                   state.hideToolbar,
+                  () => state.hideToolbar(false),
                 ) ??
                 AppTextSelectionToolbar(
                   anchors: state.contextMenuAnchors,
                   buttonItems: items,
+                  selectionContext: state.context,
+                  onDismiss: () => state.hideToolbar(false),
                 );
           },
           decoration: widget.decoration,

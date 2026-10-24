@@ -18,6 +18,8 @@
    private let incomingShareHandler = IosIncomingShareHandler()
    private let browserViewportInsets = BrowserViewportInsetsBridge()
    private let browserScroll = BrowserScrollBridge()
+   // The presenter is only constructed on iOS 26 and later.
+   private var iosSelectionMenuHandler: AnyObject?
 
   override func application(
     _ application: UIApplication,
@@ -34,6 +36,19 @@
     // to flutter_local_notifications. Assigning a delegate requests no access.
     UNUserNotificationCenter.current().delegate = self
     if let controller = window?.rootViewController as? FlutterViewController {
+      let selectionMenuChannel = FlutterMethodChannel(name: "app.ios_selection_menu", binaryMessenger: controller.binaryMessenger)
+      if #available(iOS 26.0, *) {
+        let handler = IosSelectionMenuHandler(view: controller.view, channel: selectionMenuChannel)
+        iosSelectionMenuHandler = handler
+        selectionMenuChannel.setMethodCallHandler { [weak handler] call, result in
+          guard let handler else { result(false); return }
+          handler.handle(call, result: result)
+        }
+      } else {
+        selectionMenuChannel.setMethodCallHandler { call, result in
+          result(call.method == "isAvailable" ? false : FlutterMethodNotImplemented)
+        }
+      }
       browserViewportInsets.register(messenger: controller.binaryMessenger, window: window) {
         ($0 as? InAppWebView)?.browserNativeViewId
       }
