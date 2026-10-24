@@ -235,6 +235,16 @@ jobs:
     name: 构建 macOS
     runs-on: macos-latest
     permissions: write-all
+    # 未配置时 tool/macos_sign_and_notarize.sh 会跳过签名。说明见 docs/macos-signing.md。
+    env:
+      MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: 📦 检出代码
@@ -270,6 +280,9 @@ jobs:
       - name: 🏗️ 构建 macOS
         run: flutter build macos --release
 
+      - name: 🔐 使用 Developer ID 签名应用
+        run: bash tool/macos_sign_and_notarize.sh sign-app "build/macos/Build/Products/Release/kelivo.app"
+
       - name: 📦 创建 DMG
         run: |
           brew install create-dmg
@@ -285,6 +298,10 @@ jobs:
           if [ ! -f "Kelivo_macos_${VERSION}.dmg" ]; then
             hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
           fi
+
+      - name: 🧾 公证并验证 DMG
+        run: bash tool/macos_sign_and_notarize.sh notarize-dmg "Kelivo_macos_${VERSION}.dmg" "build/macos/Build/Products/Release/kelivo.app"
+
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2
