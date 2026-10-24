@@ -257,9 +257,10 @@ Future<List<String>> exerciseGenUiScenarios(
       isTrue,
     );
     await type('nameInput', 'Ada');
-    final modifier = defaultTargetPlatform == TargetPlatform.macOS
-        ? LogicalKeyboardKey.metaLeft
-        : LogicalKeyboardKey.controlLeft;
+    final modifier = switch (defaultTargetPlatform) {
+      TargetPlatform.iOS || TargetPlatform.macOS => LogicalKeyboardKey.metaLeft,
+      _ => LogicalKeyboardKey.controlLeft,
+    };
     await tester.sendKeyDownEvent(modifier);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
     await tester.sendKeyUpEvent(modifier);

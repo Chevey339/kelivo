@@ -84,6 +84,19 @@ its separate required G passed the same 10,240 root tests (one existing skip),
 debug build and diff whitespace check. Independent review returned no findings.
 Logs are retained under build/genui/logs/c26-*. No Dart files changed in C26.
 
+### iOS scenario-driver correction
+
+The first C26 simulator attempt found that the test driver used Ctrl+A on iOS.
+The pinned SDK uses Cmd+A for Select All there, and Ctrl+A moves to the line
+start. An added iOS widget variant reproduced the same selection failure; using
+Meta on both Apple platforms makes Android/iOS/macOS composed variants pass.
+This is a test-fixture correction with no application, prompt or scoring change.
+Its separate full G passed root analysis and 10,241 tests (one existing skip),
+markstream resolution/analysis and 298 tests, macOS debug build and diff checks.
+Independent review returned no findings. Both changed Dart files were formatted;
+logs remain under build/genui/logs/c26-ios-*. Earlier final-HEAD records remain
+retained as history; the final repetitions use the corrected committed fixture.
+
 ## Final-HEAD procedure
 
 C26 is committed only after the root and markstream G checks, independent

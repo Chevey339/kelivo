@@ -1436,3 +1436,27 @@ record the actual commit and results without amending the commit to contain its
 own hash. Earlier C21/C24 evidence cannot replace an unexecuted final check.
 Windows, Linux, physical-iPhone and macOS-Chinese-IME acceptance remain deferred
 by the user. No recurring model API evaluation or old-reader gate is introduced.
+
+### C26 follow-up — correct the iOS test keyboard shortcut
+
+The initial final-HEAD simulator run exposed a test-fixture error: the shared
+scene driver sent Ctrl+A on iOS. The pinned Flutter SDK maps iOS text shortcuts
+to its macOS map: Cmd+A selects all, while Ctrl+A collapses to the start of the
+line. Adding the iOS platform to the ordinary composed-scene test reproduced
+the exact collapsed-at-zero failure. The driver now uses Meta on both Apple
+platforms; all three platform variants pass. Application code, model inputs and
+scoring are unchanged. Both changed Dart files are formatted. Independent review
+returned no findings; full G passed root fatal-info analysis and 10,241 tests
+(one existing skip), markstream offline resolution/analysis and 298 tests,
+macOS debug build and git diff --check. The four-file manifest and two frozen
+Dart hashes matched before staging. Logs remain under build/genui/logs/c26-ios-*.
+
+Earlier final-HEAD attempts remain under build/genui/c26. The first Android
+release attempt used --no-pub with a stale debug plugin registrant; the standard
+release build regenerated it and passed without changing tracked files. The
+Mac scenario attempt reported a form-focus failure while application foreground
+activation failed; CUA independently reported that the Mac was locked. Its cause
+will be assessed after unlocking, not declared fixed by this iOS-only fixture
+change. Passed Android native/Web/IME, three release builds and the second old
+reader restore at the earlier HEAD remain historical evidence; final acceptance
+will use fresh attempts at the follow-up commit rather than combining versions.
