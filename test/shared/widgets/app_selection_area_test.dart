@@ -16,7 +16,11 @@ Widget _widgetHarness(
   Widget child, {
   MarkstreamSelectionController? controller,
   ClipboardWriter? writer,
+  bool notifications = false,
 }) => MaterialApp(
+  builder: notifications
+      ? (context, child) => AppSnackBarOverlay(child: child!)
+      : null,
   locale: const Locale('en'),
   supportedLocales: AppLocalizations.supportedLocales,
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -96,6 +100,104 @@ void main() {
         .selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'projected selection enforces the aggregate UTF8 limit for toolbar, keyboard, Markdown and rich copy',
+    (tester) async {
+      final controller = MarkstreamSelectionController();
+      final writer = _ClipboardWriter();
+      final copied = <String>[];
+      final field = TextEditingController(text: 'Editor value');
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      });
+      final extensions = MarkstreamExtensions(
+        codeBlockBuilders: {
+          'card': (context, node, rendering) => MarkstreamSelectionProjection(
+            node: node,
+            clipboardByteLimit: 64 * 1024,
+            project: (selected, complete) => complete ? '界' * 18000 : selected,
+            child: Text('State ${node.code.trim()}'),
+          ),
+        },
+      );
+      await tester.pumpWidget(
+        _widgetHarness(
+          Column(
+            children: [
+              MarkstreamView(
+                source: '```card\none\n```\n\n```card\ntwo\n```',
+                extensions: extensions,
+                selectionController: controller,
+              ),
+              TextField(controller: field),
+            ],
+          ),
+          controller: controller,
+          writer: writer,
+          notifications: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectAll(tester);
+      expect(controller.selectedPlainText.length, greaterThan(30000));
+      for (final label in ['native', 'Copy Markdown', 'Copy rich text']) {
+        final menu = _menu(tester);
+        menu.buttonItems!
+            .singleWhere(
+              (item) => label == 'native'
+                  ? item.type == ContextMenuButtonType.copy
+                  : item.label == label,
+            )
+            .onPressed!();
+        await tester.pumpAndSettle();
+        expect(copied, isEmpty);
+        expect(writer.items, isEmpty);
+        expect(
+          find.text(
+            'Text exceeds the 64 KiB copy limit. Select a smaller section.',
+          ),
+          findsOneWidget,
+        );
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      }
+      tester
+          .widget<SelectionArea>(find.byType(SelectionArea))
+          .focusNode!
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(copied, isEmpty);
+      expect(
+        find.text(
+          'Text exceeds the 64 KiB copy limit. Select a smaller section.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      // The surrounding selection action must never steal an editable control's copy.
+      await tester.tap(find.byType(TextField));
+      field.selection = const TextSelection(baseOffset: 0, extentOffset: 6);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(copied, ['Editor']);
+      await tester.pumpWidget(const SizedBox.shrink());
+      field.dispose();
+      controller.dispose();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   for (final platform in [TargetPlatform.macOS, TargetPlatform.android]) {
     testWidgets(

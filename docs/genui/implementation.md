@@ -890,3 +890,60 @@ chip-preservation assertion. Its premature failures also caused two cleanup
 failures. One unchanged migration restart test failed in that initial run;
 it passed both the focused 19-test rerun and the complete final run. The
 initial failure log is retained as `c16-initial-root-test.log`.
+
+
+## C17 — semantic copy and speech
+
+Message copy and all three selection previews now freeze readable prose and the
+current semantic UI state before awaiting navigation or persistence reads. The
+explicit source/Markdown action retains the original TextParts. Unseen durable
+surfaces are reconstructed read-only; accepted unsaved input and temporary
+surfaces use the registry's coherent snapshot. Failed or revoked reads report
+failure instead of silently copying defaults. All 21 catalog text policies are
+covered in copy, speech, search and export modes.
+
+Native UI text joins the surrounding message selection. Markstream's generic
+block projection retains actual glyph selection ranges, projects complete
+blocks semantically, and keeps partial selection literal. Rich Markdown/HTML
+serializes literal nodes and explicit line breaks rather than reparsing model
+text. Aggregate plain/Markdown/HTML clipboard data is limited to 64 KiB UTF-8;
+source dialogs and standalone source/diagnostic previews enforce the same
+inclusive boundary through native menus and keyboard copy. Editable controls
+retain their independent copy action. Diagnostics no longer use an unguarded
+EditableText selection path.
+
+TTS projects before filtering, applies quote/parenthesis/italic selection across
+the whole message, and skips the provider's second Markdown cleanup for already
+prepared semantic text. UI literals cannot create Markdown emphasis, while real
+quotes and parentheses retain the existing filtering behavior. First play and
+replay use the same prepared text. A loopback network test found that the old
+chunker inserted spaces after decimal points and URL periods; chunks now retain
+exact normalized source slices and avoid splitting UTF-16 surrogate pairs.
+
+Focused root copy/selection/source tests passed (40 tests), generic Markstream
+selection tests passed (24 tests), and the speech/controller/provider coverage
+passed including system and loopback network replay. These are automated tests,
+not additional paid model evaluations or physical-device TTS acceptance. Four
+RTL content/shell goldens changed only where joining native text selection
+removed the previous EditableText caret reservation; all 28 content goldens
+were checked. The other baselines are unchanged. Final independent review
+returned no findings after fixing the global speech filtering, rich multiline
+serialization, aggregate selection budget and source-selection budget findings.
+
+The initial full gate reached 9,839 passing tests and one existing skip, with
+one failure in the unchanged migration restart widget test. Its real filesystem
+and SQLite wait allowed only about one second; its broad FlutterError collector
+could also count the wait's own runAsync failure as the expected restart error.
+The test now forwards unexpected errors to the test framework, collects only
+the explicit injected restart failure, and waits up to ten seconds for the real
+completion condition. Existing database, retained-file, restart-count and UI
+assertions remain. The seven focused migration tests passed, and independent
+review found no weakening. The failed run is retained as
+`build/genui/logs/c17-initial-root-test.log`.
+
+C17 gate logs and the frozen file manifest are under build/genui/logs/c17-* and
+build/genui/c17/. Final G passed: both fatal-info analyses, all 9,840 root tests
+(one existing skip), markstream dependency resolution and all 298 tests, macOS
+debug native build, and diff checks. All 52 non-document files retained their
+frozen hashes during the successful gate. Forty-four changed Dart files were
+formatted. Final independent review returned no findings.

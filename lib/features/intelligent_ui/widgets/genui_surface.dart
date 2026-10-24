@@ -1,3 +1,5 @@
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import 'genui_diagnostic_source.dart';
 import 'genui_motion.dart';
 import 'genui_control_region.dart';
@@ -171,7 +173,8 @@ class _SurfaceBodyState extends State<_SurfaceBody>
             AppDialogHeader(title: l10n.genuiViewSource),
             Flexible(
               child: SingleChildScrollView(
-                child: SelectionArea(
+                child: AppSelectionArea(
+                  copyByteLimit: UiBudgets.copyBytes,
                   child: Padding(
                     padding: EdgeInsets.all(GenUiTheme.of(context).sm),
                     child: controller.phase == SurfacePhase.invalid

@@ -5334,5 +5334,8 @@
   "genuiContextOmitted": "[部分字段或数据行已省略。]",
   "genuiChipOmitted": "此前附带的界面来源已失效，本条消息未附带其状态。",
   "genuiDraftChanged": "草稿已发生变化，请重新附带。",
-  "genuiRepairDraft": "请根据以下诊断和源码片段修复这段界面。"
+  "genuiRepairDraft": "请根据以下诊断和源码片段修复这段界面。",
+  "genuiCopySourceMarkdown": "复制源码 / Markdown",
+  "genuiTextFailed": "无法读取界面状态，请重试。",
+  "genuiCopyLimit": "文本超过 64 KiB 复制上限，请选择较小的片段。"
 }

@@ -19,6 +19,13 @@ extension TtsTextSelectionModeStorage on TtsTextSelectionMode {
   }
 }
 
+/// A semantic value is plain text, even when it contains Markdown punctuation.
+final class TtsTextPart {
+  const TtsTextPart(this.text, {this.literal = false});
+  final String text;
+  final bool literal;
+}
+
 class TtsTextSelection {
   const TtsTextSelection._();
 
@@ -46,7 +53,85 @@ class TtsTextSelection {
     return source;
   }
 
-  static String _quotedText(String input) {
+  /// Selection syntax spans the whole projected message. Only Markdown
+  /// recognition/cleanup distinguishes literal values from ordinary prose.
+  static String prepareParts(
+    Iterable<TtsTextPart> source, {
+    required TtsTextSelectionMode mode,
+  }) {
+    final buffer = StringBuffer(), syntax = StringBuffer();
+    final spans = <(_TextRange, bool)>[];
+    for (final part in source) {
+      if (buffer.isNotEmpty) {
+        buffer.write('\n');
+        syntax.write('\n');
+      }
+      final text = mode == TtsTextSelectionMode.fullText || part.literal
+          ? part.text
+          : removeCode(part.text);
+      final start = buffer.length;
+      buffer.write(text);
+      // Mask only style delimiters, with identical UTF-16 lengths. Quotes and
+      // parentheses remain visible to their whole-message selection modes.
+      syntax.write(
+        part.literal ? text.replaceAll(RegExp(r'[*_<>]'), '\uFFFC') : text,
+      );
+      spans.add((_TextRange(start, buffer.length), part.literal));
+    }
+    final text = buffer.toString();
+    if (text.trim().isEmpty) return '';
+    final ranges = switch (mode) {
+      TtsTextSelectionMode.fullText => [_TextRange(0, text.length)],
+      TtsTextSelectionMode.quotedOnly => _quotedRanges(text),
+      TtsTextSelectionMode.outsideParentheses => _outsideParenthesesRanges(
+        text,
+      ),
+      TtsTextSelectionMode.italicOnly => _collectItalicMatches(
+        syntax.toString(),
+      ).map((m) => m.contentRange).toList(),
+      TtsTextSelectionMode.nonItalic => _complementRanges(
+        text.length,
+        _collectItalicMatches(syntax.toString()).map((m) => m.range).toList(),
+      ),
+    };
+    String render(List<_TextRange> ranges) {
+      final pieces = <String>[];
+      for (final range in ranges) {
+        for (final (span, literal) in spans) {
+          final start = range.start > span.start ? range.start : span.start;
+          final end = range.end < span.end ? range.end : span.end;
+          if (start >= end) continue;
+          final selected = text.substring(start, end);
+          pieces.add(literal ? selected : stripMarkdown(selected));
+        }
+      }
+      return pieces.join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    }
+
+    final selected = render(ranges);
+    return selected.isNotEmpty
+        ? selected
+        : render([_TextRange(0, text.length)]);
+  }
+
+  static String stripMarkdown(String input) {
+    var s = removeCode(input);
+    s = s.replaceAllMapped(
+      RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
+      (m) => m.group(1) ?? '',
+    );
+    s = s.replaceAll(RegExp(r'!\[[^\]]*\]\([^\)]*\)'), ' ');
+    s = s.replaceAll(RegExp(r'^[#>\-\*\+]+\s*', multiLine: true), '');
+    s = s.replaceAll(RegExp(r'[*_~]{1,3}'), '');
+    s = s.replaceAll('|', ' ');
+    s = s.replaceAll(RegExp(r'\s+'), ' ');
+    return s;
+  }
+
+  static String _quotedText(String input) =>
+      _joinRanges(input, _quotedRanges(input));
+
+  static List<_TextRange> _quotedRanges(String input) {
     final ranges = <_TextRange>[];
     const pairedQuotes = <String, String>{
       '“': '”',
@@ -78,26 +163,44 @@ class TtsTextSelection {
       i++;
     }
 
-    return _joinRanges(input, ranges);
+    return ranges;
   }
 
-  static String _outsideParentheses(String input) {
-    final buffer = StringBuffer();
-    var depth = 0;
+  static String _outsideParentheses(String input) => _outsideParenthesesRanges(
+    input,
+  ).map((range) => input.substring(range.start, range.end)).join(' ');
+
+  static List<_TextRange> _outsideParenthesesRanges(String input) {
+    final ranges = <_TextRange>[];
+    var depth = 0, start = 0;
     for (var i = 0; i < input.length; i++) {
       final char = input[i];
       if (char == '(' || char == '（') {
-        if (buffer.isNotEmpty) buffer.write(' ');
+        if (depth == 0 && start < i) ranges.add(_TextRange(start, i));
         depth++;
-        continue;
-      }
-      if ((char == ')' || char == '）') && depth > 0) {
+      } else if ((char == ')' || char == '）') && depth > 0) {
         depth--;
-        continue;
+        if (depth == 0) start = i + 1;
       }
-      if (depth == 0) buffer.write(char);
     }
-    return buffer.toString();
+    if (depth == 0 && start < input.length) {
+      ranges.add(_TextRange(start, input.length));
+    }
+    return ranges;
+  }
+
+  static List<_TextRange> _complementRanges(
+    int length,
+    List<_TextRange> removed,
+  ) {
+    final result = <_TextRange>[];
+    var start = 0;
+    for (final range in removed) {
+      if (start < range.start) result.add(_TextRange(start, range.start));
+      start = range.end;
+    }
+    if (start < length) result.add(_TextRange(start, length));
+    return result;
   }
 
   static String _italicText(String input) {
@@ -125,6 +228,10 @@ class TtsTextSelection {
       matches.add(
         _ItalicMatch(
           range: _TextRange(match.start, match.end),
+          contentRange: _TextRange(
+            match.start + match.group(0)!.indexOf('>') + 1,
+            match.end - match.group(1)!.length - 3,
+          ),
           text: match.group(2) ?? '',
         ),
       );
@@ -141,6 +248,7 @@ class TtsTextSelection {
           matches.add(
             _ItalicMatch(
               range: _TextRange(i, end + 1),
+              contentRange: _TextRange(i + 1, end),
               text: input.substring(i + 1, end),
             ),
           );
@@ -275,8 +383,12 @@ class _TextRange {
 }
 
 class _ItalicMatch {
-  const _ItalicMatch({required this.range, required this.text});
+  const _ItalicMatch({
+    required this.range,
+    required this.contentRange,
+    required this.text,
+  });
 
-  final _TextRange range;
+  final _TextRange range, contentRange;
   final String text;
 }

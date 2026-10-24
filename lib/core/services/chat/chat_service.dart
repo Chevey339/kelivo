@@ -117,6 +117,13 @@ class ChatService extends ChangeNotifier {
     return () => _genUiSnapshotReaders.remove(reader);
   }
 
+  /// Freeze accepted values synchronously for explicit copy/speech actions.
+  /// Owners register for their lifetime; leaving a viewport does not discard
+  /// state and unrelated conversations are never used as an implicit source.
+  List<UiSurfaceSnapshot> captureGenUiSnapshots(List<ChatMessage> messages) => [
+    for (final reader in List.of(_genUiSnapshotReaders)) ...reader(messages),
+  ];
+
   Future<Map<String, UiRevisionTransfer>> _captureGenUiCopies(
     List<ChatMessage> messages,
   ) async {

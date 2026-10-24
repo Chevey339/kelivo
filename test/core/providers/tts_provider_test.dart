@@ -543,6 +543,26 @@ void main() {
     },
   );
 
+  test(
+    'prepared UI text reaches system TTS and replay without being stripped',
+    () async {
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      const text = '-3 `literal value` *times* [data](local)';
+      unawaited(provider.speakSystem(text, plainText: true));
+      await _waitUntil(() => spokenTexts.isNotEmpty);
+      expect(spokenTexts.single, text);
+      await _emitTtsCallback('speak.onComplete');
+      await _waitUntil(
+        () => provider.playbackState.status == TtsPlaybackStatus.ended,
+      );
+      unawaited(provider.replay());
+      await _waitUntil(() => spokenTexts.length == 2);
+      expect(spokenTexts, [text, text]);
+    },
+  );
+
   test('system TTS strips supported Markdown code ranges', () async {
     final provider = TtsProvider(preferences: session.preferences);
     addTearDown(provider.dispose);
@@ -699,6 +719,66 @@ void main() {
     expect(networkSources, 1);
     expect(requestCount, 3);
   });
+
+  test(
+    'prepared UI values reach network TTS unchanged on first play and replay',
+    () async {
+      final previousPaths = PathProviderPlatform.instance;
+      final directory = await Directory.systemTemp.createTemp(
+        'kelivo_genui_speech_',
+      );
+      PathProviderPlatform.instance = _FakePathProviderPlatform(directory.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPaths;
+        await directory.delete(recursive: true);
+      });
+      final inputs = <String>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        inputs.add(body['input'] as String);
+        request.response.headers.contentType = ContentType('audio', 'mpeg');
+        request.response.add([1, 2, 3, 4]);
+        await request.response.close();
+      });
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      const text = '-3 `kept` [data](https://example.invalid) _unit_';
+      final playback = provider.speakWithNetworkService(
+        OpenAiTtsOptions(
+          enabled: true,
+          name: 'Loopback',
+          apiKey: '',
+          baseUrl: 'http://${server.address.address}:${server.port}/v1',
+          model: 'test',
+          voice: 'alloy',
+        ),
+        text,
+        plainText: true,
+      );
+      await _waitUntil(
+        () => provider.playbackState.status == TtsPlaybackStatus.playing,
+      );
+      await _emitAudioEvent(audioPlayerEventChannel!, {
+        'event': 'audio.onComplete',
+      });
+      await playback;
+      expect(inputs, [text]);
+      final replay = provider.replay();
+      await _waitUntil(
+        () =>
+            inputs.length == 2 &&
+            provider.playbackState.status == TtsPlaybackStatus.playing,
+      );
+      await _emitAudioEvent(audioPlayerEventChannel!, {
+        'event': 'audio.onComplete',
+      });
+      await replay;
+      expect(inputs, [text, text]);
+    },
+  );
 
   test('network replay uses cached audio only when enabled', () async {
     final originalPathProvider = PathProviderPlatform.instance;

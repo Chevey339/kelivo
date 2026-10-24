@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'genui_clipboard.dart';
+import 'genui_source_selection.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -43,69 +44,70 @@ class GenUiDiagnosticSource extends StatelessWidget {
         label: errorLines.contains(index + 1)
             ? l10n.genuiErrorLine(index + 1)
             : null,
-        child: SelectableText(
+        child: Text(
           lines[index].isEmpty ? ' ' : lines[index],
           style: code.text,
         ),
       ),
     );
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: code.backgroundColor,
-          borderRadius: BorderRadius.circular(code.radius),
-          border: Border.all(color: code.borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              color: code.headerBackgroundColor,
-              padding: code.headerPadding,
-              child: Row(
-                children: [
-                  Expanded(child: Text('kelivo-ui', style: code.label)),
-                  if (!exporting)
-                    GenUiControlRegion(
-                      child: IosIconButton(
-                        icon: LucideIcons.copy,
-                        size: 16,
-                        minSize: 44,
-                        tooltip: l10n.genuiCopySource,
-                        color: theme.captionInk,
-                        onTap: () =>
-                            Clipboard.setData(ClipboardData(text: source)),
+    return GenUiSourceSelection(
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: code.backgroundColor,
+            borderRadius: BorderRadius.circular(code.radius),
+            border: Border.all(color: code.borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                color: code.headerBackgroundColor,
+                padding: code.headerPadding,
+                child: Row(
+                  children: [
+                    Expanded(child: Text('kelivo-ui', style: code.label)),
+                    if (!exporting)
+                      GenUiControlRegion(
+                        child: IosIconButton(
+                          icon: LucideIcons.copy,
+                          size: 16,
+                          minSize: 44,
+                          tooltip: l10n.genuiCopySource,
+                          color: theme.captionInk,
+                          onTap: () => copyGenUiText(context, source),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (exporting)
-              for (var i = 0; i < lines.length; i++) line(i)
-            else
-              SizedBox(
-                height: math.min(
-                  320,
-                  math.max(
-                    64,
-                    lines.length *
-                        MediaQuery.textScalerOf(
-                          context,
-                        ).scale(code.text.fontSize ?? 13) *
-                        (code.text.height ?? 1.5),
+              if (exporting)
+                for (var i = 0; i < lines.length; i++) line(i)
+              else
+                SizedBox(
+                  height: math.min(
+                    320,
+                    math.max(
+                      64,
+                      lines.length *
+                          MediaQuery.textScalerOf(
+                            context,
+                          ).scale(code.text.fontSize ?? 13) *
+                          (code.text.height ?? 1.5),
+                    ),
+                  ),
+                  child: ListView.builder(
+                    primary: false,
+                    padding: EdgeInsets.symmetric(vertical: theme.xs),
+                    itemCount: lines.length,
+                    itemBuilder: (_, index) => line(index),
                   ),
                 ),
-                child: ListView.builder(
-                  primary: false,
-                  padding: EdgeInsets.symmetric(vertical: theme.xs),
-                  itemCount: lines.length,
-                  itemBuilder: (_, index) => line(index),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,8 +1,12 @@
+import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
+import '../../intelligent_ui/widgets/genui_clipboard.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../intelligent_ui/host/ui_copy_actions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/snackbar.dart';
+
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
@@ -13,6 +17,8 @@ Future<void> showSelectCopySheet(
   BuildContext context, {
   required ChatMessage message,
 }) async {
+  final projection = await readUiMessageText(context, message);
+  if (projection == null || !context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -20,25 +26,23 @@ Future<void> showSelectCopySheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) =>
-        SafeArea(top: false, child: _SelectCopySheet(message: message)),
+    builder: (ctx) => SafeArea(
+      top: false,
+      child: _SelectCopySheet(message: message, content: projection.copyText),
+    ),
   );
 }
 
 class _SelectCopySheet extends StatelessWidget {
-  const _SelectCopySheet({required this.message});
+  const _SelectCopySheet({required this.message, required this.content});
+  final String content;
   final ChatMessage message;
 
-  Future<void> _copyAll(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    await Clipboard.setData(ClipboardData(text: message.content));
-    if (!context.mounted) return;
-    showAppSnackBar(
-      context,
-      message: l10n.selectCopyPageCopiedAll,
-      type: NotificationType.success,
-    );
-  }
+  Future<void> _copyAll(BuildContext context) => copyGenUiText(
+    context,
+    content,
+    successMessage: AppLocalizations.of(context)!.selectCopyPageCopiedAll,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -69,24 +73,11 @@ class _SelectCopySheet extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Invisible left button to balance the right button's width
-                  Opacity(
-                    opacity: 0,
-                    child: IgnorePointer(
-                      child: IosCardPress(
-                        onTap: () {},
-                        borderRadius: BorderRadius.circular(20),
-                        baseColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          l10n.selectCopyPageCopyAll,
-                          style: TextStyle(fontWeight: AppFontWeights.emphasis),
-                        ),
-                      ),
-                    ),
+                  IosIconButton(
+                    icon: LucideIcons.code,
+                    tooltip: l10n.genuiCopySourceMarkdown,
+                    minSize: 44,
+                    onTap: () => copyUiMessageSource(context, message),
                   ),
                   Expanded(
                     child: Center(
@@ -134,8 +125,9 @@ class _SelectCopySheet extends StatelessWidget {
                   controller: sc,
                   primary: false,
                   child: AppSelectionArea(
+                    copyByteLimit: UiBudgets.copyBytes,
                     child: Text(
-                      message.content,
+                      content,
                       style: TextStyle(fontSize: 15, height: 1.5),
                     ),
                   ),

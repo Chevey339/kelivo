@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_draft_staging.dart';
 import '../../intelligent_ui/host/ui_draft_request.dart';
 import '../../intelligent_ui/widgets/genui_draft_dialog.dart';
@@ -2630,6 +2631,8 @@ class HomePageController extends ChangeNotifier {
   Future<void> debugHandleAssistantMessageFinished(ChatMessage message) =>
       _handleAssistantMessageFinished(message);
 
+  int _speechProjectionEpoch = 0;
+
   Future<void> speakMessage(ChatMessage message) async {
     await _speakAssistantMessage(message, autoPlay: false);
   }
@@ -2638,6 +2641,7 @@ class HomePageController extends ChangeNotifier {
     ChatMessage message, {
     required bool autoPlay,
   }) async {
+    final epoch = ++_speechProjectionEpoch;
     final tts = _context.read<TtsProvider>();
     if (!autoPlay && tts.playbackState.isActive) {
       await tts.stop();
@@ -2658,14 +2662,25 @@ class HomePageController extends ChangeNotifier {
     }
 
     final sp = _context.read<SettingsProvider>();
-    final text = TtsTextSelection.apply(
-      message.content,
-      mode: sp.ttsTextSelectionMode,
-    );
+    final mode = sp.ttsTextSelectionMode;
+    final projected = await readUiMessageText(_context, message);
+    if (projected == null ||
+        !_context.mounted ||
+        _composerDisposed ||
+        epoch != _speechProjectionEpoch) {
+      return;
+    }
+    final text = projected.hasUi
+        ? projected.speech(mode)
+        : TtsTextSelection.apply(message.content, mode: mode);
     if (text.trim().isEmpty) return;
     // Automatic narration acknowledges preparation, so ChatActions can release
     // generation resources while the independent speech session keeps running.
-    await tts.speak(text, waitForCompletion: !autoPlay);
+    await tts.speak(
+      text,
+      waitForCompletion: !autoPlay,
+      plainText: projected.hasUi,
+    );
   }
 
   void shareMessage(int messageIndex, List<ChatMessage> messageList) {

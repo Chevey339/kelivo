@@ -13,6 +13,7 @@ final class UiBoundedText {
   final _lines = <String>[];
   int _bytes = 0;
   bool _omitted = false;
+  bool get omitted => _omitted;
   bool add(String line) {
     if (line.isEmpty) return true;
     if (line.length > budget - _bytes) {

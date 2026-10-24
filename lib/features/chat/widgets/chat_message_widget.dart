@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_user_message_content.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
@@ -1784,19 +1785,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   if (widget.onCopy != null) {
                                     widget.onCopy!.call();
                                   } else {
-                                    await Clipboard.setData(
-                                      ClipboardData(
-                                        text: widget.message.content,
-                                      ),
+                                    await copyUiMessage(
+                                      context,
+                                      widget.message,
                                     );
-                                    if (mounted) {
-                                      showAppSnackBar(
-                                        context,
-                                        message: l10n
-                                            .chatMessageWidgetCopiedToClipboard,
-                                        type: NotificationType.success,
-                                      );
-                                    }
                                   }
                                 },
                               ),
@@ -1983,7 +1975,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final userAvatarValue = context.select<UserProvider, String?>(
       (u) => u.avatarValue,
     );
-    final l10n = AppLocalizations.of(context)!;
     final userMessageSettings = context
         .select<
           SettingsProvider,
@@ -2145,17 +2136,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             color: cs.onSurface.withValues(alpha: 0.9),
                             onTap:
                                 widget.onCopy ??
-                                () {
-                                  Clipboard.setData(
-                                    ClipboardData(text: widget.message.content),
-                                  );
-                                  showAppSnackBar(
-                                    context,
-                                    message:
-                                        l10n.chatMessageWidgetCopiedToClipboard,
-                                    type: NotificationType.success,
-                                  );
-                                },
+                                () => copyUiMessage(context, widget.message),
                           ),
                         ),
                       ),
@@ -2272,16 +2253,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             if (widget.onCopy != null) {
               widget.onCopy!.call();
             } else {
-              await Clipboard.setData(
-                ClipboardData(text: widget.message.content),
-              );
-              if (mounted) {
-                showAppSnackBar(
-                  context,
-                  message: l10n.chatMessageWidgetCopiedToClipboard,
-                  type: NotificationType.success,
-                );
-              }
+              await copyUiMessage(context, widget.message);
             }
           },
         ),
@@ -3627,19 +3599,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 color: cs.onSurface.withValues(alpha: 0.9),
                                 onTap:
                                     widget.onCopy ??
-                                    () {
-                                      Clipboard.setData(
-                                        ClipboardData(
-                                          text: widget.message.content,
-                                        ),
-                                      );
-                                      showAppSnackBar(
-                                        context,
-                                        message: l10n
-                                            .chatMessageWidgetCopiedToClipboard,
-                                        type: NotificationType.success,
-                                      );
-                                    },
+                                    () =>
+                                        copyUiMessage(context, widget.message),
                               ),
                             ),
                           ),

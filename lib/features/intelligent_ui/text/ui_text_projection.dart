@@ -52,6 +52,8 @@ final class UiProjectionLabels {
 /// Human-readable semantic fields in visual order, selected under byte budgets.
 /// Context contains accepted values; an interaction owner must first settle or
 /// reject transient field drafts. Later edits cannot mutate [UiSurfaceRead].
+enum UiTextMode { copy, speech, search, export }
+
 final class UiTextProjection {
   const UiTextProjection(this.labels);
   final UiProjectionLabels labels;
@@ -74,6 +76,23 @@ final class UiTextProjection {
       title: title,
       body: body.isEmpty ? labels.empty : body,
     );
+  }
+
+  String text(UiSurfaceRead read, {UiTextMode mode = UiTextMode.copy}) {
+    final output = UiBoundedText(
+      mode == UiTextMode.search
+          ? UiBudgets.searchTextBytes
+          : UiBudgets.copyBytes,
+      omission: labels.omitted,
+    );
+    if (read.phase == SurfacePhase.invalid &&
+        read.program.diagnostics.isNotEmpty) {
+      output.add(labels.diagnostic(read.program.diagnostics.first));
+    } else {
+      _walk(read, output);
+    }
+    final result = output.finish();
+    return result.isEmpty ? labels.empty : result;
   }
 
   String _title(UiSurfaceRead read) {

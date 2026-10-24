@@ -25655,6 +25655,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please repair this interface using the diagnostics and source excerpts below.'**
   String get genuiRepairDraft;
+
+  /// No description provided for @genuiCopySourceMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy source / Markdown'**
+  String get genuiCopySourceMarkdown;
+
+  /// No description provided for @genuiTextFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The interface state could not be read. Try again.'**
+  String get genuiTextFailed;
+
+  /// No description provided for @genuiCopyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Text exceeds the 64 KiB copy limit. Select a smaller section.'**
+  String get genuiCopyLimit;
 }
 
 class _AppLocalizationsDelegate

@@ -26,6 +26,27 @@ void main() {
       expect(chunks.last.startOffset, 90);
     });
 
+    test('punctuation and Unicode remain exact across normalized chunks', () {
+      const text = '-3.14 https://example.invalid 1,000.5 😀🧪 end.';
+      for (final limit in [4, 12, 220]) {
+        final chunks = TtsTextChunker.split(text, maxChunkLength: limit);
+        expect(chunks.map((c) => c.text).join(), text);
+        expect(chunks.every((c) => c.text.length <= limit), isTrue);
+        for (final chunk in chunks) {
+          expect(String.fromCharCodes(chunk.text.runes), chunk.text);
+          expect(
+            chunk.text.codeUnits.first,
+            isNot(inInclusiveRange(0xdc00, 0xdfff)),
+          );
+          expect(
+            chunk.text.codeUnits.last,
+            isNot(inInclusiveRange(0xd800, 0xdbff)),
+          );
+        }
+        expect(chunks.last.endOffset, text.length);
+      }
+    });
+
     test('returns no chunks for blank input', () {
       expect(TtsTextChunker.split('   \n\n  '), isEmpty);
     });

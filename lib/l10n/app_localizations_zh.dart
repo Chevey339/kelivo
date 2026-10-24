@@ -13748,6 +13748,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiRepairDraft => '请根据以下诊断和源码片段修复这段界面。';
+
+  @override
+  String get genuiCopySourceMarkdown => '复制源码 / Markdown';
+
+  @override
+  String get genuiTextFailed => '无法读取界面状态，请重试。';
+
+  @override
+  String get genuiCopyLimit => '文本超过 64 KiB 复制上限，请选择较小的片段。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27420,6 +27429,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiRepairDraft => '请根据以下诊断和源码片段修复这段界面。';
+
+  @override
+  String get genuiCopySourceMarkdown => '复制源码 / Markdown';
+
+  @override
+  String get genuiTextFailed => '无法读取界面状态，请重试。';
+
+  @override
+  String get genuiCopyLimit => '文本超过 64 KiB 复制上限，请选择较小的片段。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -41172,4 +41190,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiRepairDraft => '請根據以下診斷和原始碼片段修復這段介面。';
+
+  @override
+  String get genuiCopySourceMarkdown => '複製原始碼 / Markdown';
+
+  @override
+  String get genuiTextFailed => '無法讀取介面狀態，請重試。';
+
+  @override
+  String get genuiCopyLimit => '文字超過 64 KiB 複製上限，請選取較小的片段。';
 }

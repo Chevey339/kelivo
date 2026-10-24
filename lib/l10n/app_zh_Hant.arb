@@ -5334,5 +5334,8 @@
   "genuiContextOmitted": "[部分欄位或資料列已省略。]",
   "genuiChipOmitted": "先前附帶的介面來源已失效，此則訊息未附帶其狀態。",
   "genuiDraftChanged": "草稿已變更，請重新附帶。",
-  "genuiRepairDraft": "請根據以下診斷和原始碼片段修復這段介面。"
+  "genuiRepairDraft": "請根據以下診斷和原始碼片段修復這段介面。",
+  "genuiCopySourceMarkdown": "複製原始碼 / Markdown",
+  "genuiTextFailed": "無法讀取介面狀態，請重試。",
+  "genuiCopyLimit": "文字超過 64 KiB 複製上限，請選取較小的片段。"
 }

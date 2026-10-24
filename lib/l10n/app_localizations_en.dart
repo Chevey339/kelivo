@@ -14462,4 +14462,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get genuiRepairDraft =>
       'Please repair this interface using the diagnostics and source excerpts below.';
+
+  @override
+  String get genuiCopySourceMarkdown => 'Copy source / Markdown';
+
+  @override
+  String get genuiTextFailed =>
+      'The interface state could not be read. Try again.';
+
+  @override
+  String get genuiCopyLimit =>
+      'Text exceeds the 64 KiB copy limit. Select a smaller section.';
 }

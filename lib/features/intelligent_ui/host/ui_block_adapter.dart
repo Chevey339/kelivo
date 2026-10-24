@@ -1,3 +1,4 @@
+import '../catalog/ui_budgets.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import '../text/ui_text_projection.dart';
 import '../widgets/genui_localizations.dart';
@@ -18,12 +19,14 @@ class UiBlockAdapter extends StatefulWidget {
     required this.registry,
     required this.fence,
     required this.theme,
+    required this.selectionNode,
     this.linkHandler,
   });
   final UiHostScope host;
   final UiRuntimeRegistry registry;
   final UiSourceFence fence;
   final MarkstreamTheme theme;
+  final CodeBlockNode selectionNode;
   final LinkHandler? linkHandler;
   @override
   State<UiBlockAdapter> createState() => _UiBlockAdapterState();
@@ -70,45 +73,51 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
     final conversation = widget.host.binding.conversationId;
     final l10n = AppLocalizations.of(context)!;
     final projection = UiTextProjection(genUiProjectionLabels(l10n));
-    return GenUiSurface(
-      controller: controller,
-      interactions: _entry.interactions,
-      markdownTheme: widget.theme,
-      linkHandler: widget.linkHandler,
-      exporting: widget.host.exporting,
-      onAsk: stage == null
-          ? actions?.onAsk
-          : (intent) => stage(
-              UiDraftRequest.attach(
-                conversationId: conversation,
-                snapshot: intent.snapshot,
-                context: projection.context(
-                  intent.read,
-                  selected: intent.context,
+    return MarkstreamSelectionProjection(
+      node: widget.selectionNode,
+      clipboardByteLimit: UiBudgets.copyBytes,
+      project: (selected, complete) =>
+          complete ? projection.text(controller.captureRead()) : selected,
+      child: GenUiSurface(
+        controller: controller,
+        interactions: _entry.interactions,
+        markdownTheme: widget.theme,
+        linkHandler: widget.linkHandler,
+        exporting: widget.host.exporting,
+        onAsk: stage == null
+            ? actions?.onAsk
+            : (intent) => stage(
+                UiDraftRequest.attach(
+                  conversationId: conversation,
+                  snapshot: intent.snapshot,
+                  context: projection.context(
+                    intent.read,
+                    selected: intent.context,
+                  ),
+                  text: intent.text,
                 ),
-                text: intent.text,
               ),
-            ),
-      onAttach: stage == null
-          ? null
-          : (intent) => stage(
-              UiDraftRequest.attach(
-                conversationId: conversation,
-                snapshot: intent.snapshot,
-                context: projection.context(intent.read),
+        onAttach: stage == null
+            ? null
+            : (intent) => stage(
+                UiDraftRequest.attach(
+                  conversationId: conversation,
+                  snapshot: intent.snapshot,
+                  context: projection.context(intent.read),
+                ),
               ),
-            ),
-      onRepair: stage == null
-          ? null
-          : () => stage(
-              UiDraftRequest.repair(
-                conversationId: conversation,
-                controller: controller,
-                introduction: l10n.genuiRepairDraft,
-                omitted: l10n.genuiContextOmitted,
+        onRepair: stage == null
+            ? null
+            : () => stage(
+                UiDraftRequest.repair(
+                  conversationId: conversation,
+                  controller: controller,
+                  introduction: l10n.genuiRepairDraft,
+                  omitted: l10n.genuiContextOmitted,
+                ),
               ),
-            ),
-      onRetrySave: controller.flushQuietly,
+        onRetrySave: controller.flushQuietly,
+      ),
     );
   }
 }

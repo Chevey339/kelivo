@@ -9,13 +9,28 @@ import 'package:markstream/markstream.dart' as ms;
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
 import 'genui_theme.dart';
+import 'genui_clipboard.dart';
+import 'genui_source_selection.dart';
+
+/// Join a surrounding message selection; still support standalone galleries.
+class _GenUiSelectableText extends StatelessWidget {
+  const _GenUiSelectableText(this.text, {this.style, this.textDirection});
+  final String text;
+  final TextStyle? style;
+  final TextDirection? textDirection;
+  @override
+  Widget build(BuildContext context) =>
+      SelectionContainer.maybeOf(context) == null
+      ? SelectableText(text, style: style, textDirection: textDirection)
+      : Text(text, style: style, textDirection: textDirection);
+}
 
 class GenUiText extends StatelessWidget {
   const GenUiText({super.key, required this.text, this.variant});
   final String text;
   final String? variant;
   @override
-  Widget build(BuildContext context) => SelectableText(
+  Widget build(BuildContext context) => _GenUiSelectableText(
     text,
     style: GenUiTheme.of(context).text(variant),
     textDirection: variant == 'mono' ? TextDirection.ltr : null,
@@ -101,6 +116,18 @@ class GenUiSource extends StatefulWidget {
 
 class _GenUiSourceState extends State<GenUiSource> {
   late ms.DocumentNode _document;
+  late final _extensions = ms.MarkstreamExtensions(
+    actionButtonBuilder: (context, action) => ms.MarkstreamActionButton(
+      action: action.kind != ms.MarkstreamActionKind.copyCode
+          ? action
+          : ms.MarkstreamAction(
+              kind: action.kind,
+              chrome: action.chrome,
+              label: action.label,
+              onInvoke: () => copyGenUiText(context, widget.source),
+            ),
+    ),
+  );
   void _update() {
     final span = ms.SourceSpan(0, widget.source.length);
     _document = ms.DocumentNode(
@@ -131,14 +158,17 @@ class _GenUiSourceState extends State<GenUiSource> {
   }
 
   @override
-  Widget build(BuildContext context) => Directionality(
-    textDirection: TextDirection.ltr,
-    child: ms.MarkstreamView(
-      document: _document,
-      theme: GenUiTheme.of(context).markdown,
-      exporting: widget.exporting,
-      labels: _labels(AppLocalizations.of(context)!),
-      codeOptions: const ms.CodeBlockOptions(highlight: false),
+  Widget build(BuildContext context) => GenUiSourceSelection(
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: ms.MarkstreamView(
+        document: _document,
+        extensions: _extensions,
+        theme: GenUiTheme.of(context).markdown,
+        exporting: widget.exporting,
+        labels: _labels(AppLocalizations.of(context)!),
+        codeOptions: const ms.CodeBlockOptions(highlight: false),
+      ),
     ),
   );
 }
@@ -218,7 +248,7 @@ class GenUiFormula extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       if (label?.isNotEmpty == true) ...[
-        SelectableText(label!, style: theme.label),
+        _GenUiSelectableText(label!, style: theme.label),
         SizedBox(height: theme.xs),
       ],
       child,
@@ -446,7 +476,7 @@ class GenUiCallout extends StatelessWidget {
                     ),
                     SizedBox(height: theme.xxs),
                   ],
-                  SelectableText(
+                  _GenUiSelectableText(
                     text,
                     style: theme.body.copyWith(color: colors.ink),
                   ),

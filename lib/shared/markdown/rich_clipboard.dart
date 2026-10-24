@@ -6,6 +6,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 Future<void> copyRichMarkdownSelection(
   MarkstreamSelectionController controller, {
   ClipboardWriter? writer,
+  int? byteLimit,
 }) async {
   final documents = controller.selectedDocuments;
   if (documents.isEmpty) {
@@ -13,6 +14,7 @@ Future<void> copyRichMarkdownSelection(
   }
   final plain = controller.selectedPlainText;
   final html = documents.map(toHtml).join('\n');
+  controller.verifyCopyBudget([plain, html], byteLimit: byteLimit);
   final clipboard = writer ?? SystemClipboard.instance;
   if (clipboard == null) {
     throw UnsupportedError('Rich clipboard is unavailable');

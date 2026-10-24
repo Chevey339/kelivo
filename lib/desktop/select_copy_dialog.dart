@@ -1,9 +1,13 @@
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
+import '../features/intelligent_ui/widgets/genui_clipboard.dart';
+import '../shared/widgets/ios_tactile.dart';
+import '../features/intelligent_ui/host/ui_copy_actions.dart';
 import 'package:flutter/material.dart';
 import '../core/models/chat_message.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
-import '../shared/widgets/snackbar.dart';
-import 'package:flutter/services.dart';
+
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -11,27 +15,31 @@ Future<void> showSelectCopyDesktopDialog(
   BuildContext context, {
   required ChatMessage message,
 }) async {
+  final projection = await readUiMessageText(context, message);
+  if (projection == null || !context.mounted) return;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => _SelectCopyDesktopDialog(message: message),
+    builder: (ctx) => _SelectCopyDesktopDialog(
+      message: message,
+      content: projection.copyText,
+    ),
   );
 }
 
 class _SelectCopyDesktopDialog extends StatelessWidget {
-  const _SelectCopyDesktopDialog({required this.message});
+  const _SelectCopyDesktopDialog({
+    required this.message,
+    required this.content,
+  });
+  final String content;
   final ChatMessage message;
 
-  Future<void> _copyAll(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    await Clipboard.setData(ClipboardData(text: message.content));
-    if (!context.mounted) return;
-    showAppSnackBar(
-      context,
-      message: l10n.selectCopyPageCopiedAll,
-      type: NotificationType.success,
-    );
-  }
+  Future<void> _copyAll(BuildContext context) => copyGenUiText(
+    context,
+    content,
+    successMessage: AppLocalizations.of(context)!.selectCopyPageCopiedAll,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +85,12 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                           ),
                         ),
                       ),
+                      IosIconButton(
+                        icon: Lucide.Code,
+                        tooltip: l10n.genuiCopySourceMarkdown,
+                        minSize: 44,
+                        onTap: () => copyUiMessageSource(context, message),
+                      ),
                       IconButton(
                         tooltip: l10n.mcpPageClose,
                         onPressed: () => Navigator.of(context).maybePop(),
@@ -105,9 +119,10 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                       child: Scrollbar(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(12),
-                          child: SelectionArea(
+                          child: AppSelectionArea(
+                            copyByteLimit: UiBudgets.copyBytes,
                             child: Text(
-                              message.content,
+                              content,
                               style: TextStyle(fontSize: 15, height: 1.5),
                             ),
                           ),

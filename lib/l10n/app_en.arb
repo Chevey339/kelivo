@@ -6670,5 +6670,8 @@
   "genuiContextOmitted": "[Some fields or data rows are omitted.]",
   "genuiChipOmitted": "The previously attached UI state is unavailable and was not included.",
   "genuiDraftChanged": "Your draft changed. Try attaching again.",
-  "genuiRepairDraft": "Please repair this interface using the diagnostics and source excerpts below."
+  "genuiRepairDraft": "Please repair this interface using the diagnostics and source excerpts below.",
+  "genuiCopySourceMarkdown": "Copy source / Markdown",
+  "genuiTextFailed": "The interface state could not be read. Try again.",
+  "genuiCopyLimit": "Text exceeds the 64 KiB copy limit. Select a smaller section."
 }

@@ -9,7 +9,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'package:markstream/markstream_core.dart';
+import '../services/tts/tts_text_selection.dart';
 import '../database/business_preferences.dart';
 import '../services/tts/network_tts.dart';
 import '../services/mobile_background.dart';
@@ -442,6 +442,7 @@ class TtsProvider extends ChangeNotifier {
     String text, {
     bool flush = true,
     bool waitForCompletion = true,
+    bool plainText = false,
   }) async {
     if (!_initialized) return;
     final selected = await _getSelectedNetworkService();
@@ -451,26 +452,38 @@ class TtsProvider extends ChangeNotifier {
         networkService: selected,
         flush: flush,
         waitForCompletion: waitForCompletion,
+        plainText: plainText,
       );
     }
     return _speakQueued(
       text,
       flush: flush,
       waitForCompletion: waitForCompletion,
+      plainText: plainText,
     );
   }
 
-  Future<void> speakSystem(String text, {bool flush = true}) async {
+  Future<void> speakSystem(
+    String text, {
+    bool flush = true,
+    bool plainText = false,
+  }) async {
     if (!_initialized) return;
-    return _speakQueued(text, flush: flush);
+    return _speakQueued(text, flush: flush, plainText: plainText);
   }
 
   Future<void> speakWithNetworkService(
     TtsServiceOptions service,
     String text, {
     bool flush = true,
+    bool plainText = false,
   }) async {
-    await _speakQueued(text, networkService: service, flush: flush);
+    await _speakQueued(
+      text,
+      networkService: service,
+      flush: flush,
+      plainText: plainText,
+    );
   }
 
   Future<void> _speakQueued(
@@ -479,8 +492,10 @@ class TtsProvider extends ChangeNotifier {
     bool flush = true,
     bool reuseResolvedNetworkAudio = false,
     bool waitForCompletion = true,
+    bool plainText = false,
   }) async {
-    final content = _stripMarkdown(text).trim();
+    final content = (plainText ? text : TtsTextSelection.stripMarkdown(text))
+        .trim();
     if (content.isEmpty) return;
     if (flush) await _stopPlaybackEngines();
     _lastReplayContent = content;
@@ -634,6 +649,7 @@ class TtsProvider extends ChangeNotifier {
       content,
       networkService: networkService,
       flush: true,
+      plainText: true,
       reuseResolvedNetworkAudio:
           _cacheNetworkAudioForReplay &&
           networkService != null &&
@@ -709,7 +725,7 @@ class TtsProvider extends ChangeNotifier {
     TtsServiceOptions service,
     String text,
   ) async {
-    final content = _stripMarkdown(text).trim();
+    final content = TtsTextSelection.stripMarkdown(text).trim();
     if (content.isEmpty) return null;
     try {
       final res = await NetworkTtsService.synthesize(
@@ -1136,20 +1152,6 @@ class TtsProvider extends ChangeNotifier {
     final country = l.countryCode;
     if (country != null && country.isNotEmpty) return '$lang-$country';
     return lang;
-  }
-
-  static String _stripMarkdown(String input) {
-    var s = removeCode(input);
-    s = s.replaceAllMapped(
-      RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
-      (m) => m.group(1) ?? '',
-    );
-    s = s.replaceAll(RegExp(r'!\[[^\]]*\]\([^\)]*\)'), ' ');
-    s = s.replaceAll(RegExp(r'^[#>\-\*\+]+\s*', multiLine: true), '');
-    s = s.replaceAll(RegExp(r'[*_~]{1,3}'), '');
-    s = s.replaceAll('|', ' ');
-    s = s.replaceAll(RegExp(r'\s+'), ' ');
-    return s;
   }
 
   Future<void> _playAudioBytes(Uint8List bytes, {String? mime}) async {

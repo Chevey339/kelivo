@@ -104,6 +104,7 @@ class _RecordingTtsProvider extends TtsProvider {
     String text, {
     bool flush = true,
     bool waitForCompletion = true,
+    bool plainText = false,
   }) async {
     spokenTexts.add(text);
   }

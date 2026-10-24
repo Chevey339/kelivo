@@ -70,6 +70,7 @@ Widget buildGenUiBlock(
     registry: registry,
     fence: fence,
     theme: rendering.theme,
+    selectionNode: node,
     linkHandler: linkHandler,
   );
 }

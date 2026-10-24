@@ -1,3 +1,4 @@
+import '../../intelligent_ui/host/ui_copy_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
@@ -73,6 +74,13 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             if (!context.mounted) return;
             showSelectCopyDesktopDialog(context, message: message);
           };
+        },
+      ),
+      DesktopContextMenuItem(
+        icon: Lucide.Code,
+        label: l10n.genuiCopySourceMarkdown,
+        onTap: () {
+          afterClose = () => copyUiMessageSource(context, message);
         },
       ),
       DesktopContextMenuItem(
@@ -275,6 +283,15 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                             message: widget.message,
                           );
                         });
+                      },
+                    ),
+                    _actionItem(
+                      icon: Lucide.Code,
+                      label: l10n.genuiCopySourceMarkdown,
+                      onTap: () {
+                        final parent = widget.parentContext;
+                        Navigator.of(context).pop();
+                        copyUiMessageSource(parent, widget.message);
                       },
                     ),
                     _actionItem(

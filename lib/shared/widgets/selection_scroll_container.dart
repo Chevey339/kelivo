@@ -17,11 +17,12 @@ class SelectionScrollContainer extends StatefulWidget {
 
   @override
   State<SelectionScrollContainer> createState() =>
-      _SelectionScrollContainerState();
+      SelectionScrollContainerState();
 }
 
-class _SelectionScrollContainerState extends State<SelectionScrollContainer> {
+class SelectionScrollContainerState extends State<SelectionScrollContainer> {
   late final _delegate = _ScrollSelectionDelegate(_edgeUpdated, _stop);
+  String? get selectedText => _delegate.getSelectedContent()?.plainText;
   ScrollableState? _scrollable;
   ScrollPosition? _position;
   EdgeDraggingAutoScroller? _autoScroller;
