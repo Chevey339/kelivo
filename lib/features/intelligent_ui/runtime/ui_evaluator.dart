@@ -129,7 +129,10 @@ final class UiEvaluationBatch {
   late final Map<String, Object?> inputs;
   final Map<String, UiDiagnostic> _inputErrors = {};
   final Map<String, UiComputedValue> _values = {};
-  final Map<Object, _ValueShape> _shapes = Map.identity();
+  // Containers produced by this evaluator have identity equality; scalar keys
+  // use value hashes. identityHashCode is not a suitable hash for doubles and
+  // turns large numeric datasets into repeated collision-chain scans.
+  final Map<Object, _ValueShape> _shapes = {};
   final Set<String> _dirty = {};
   bool _resolved = false;
   int _operations = 0;
@@ -212,7 +215,8 @@ final class UiEvaluationBatch {
   }
 
   // A small DAG can otherwise expand exponentially when copied or serialized.
-  // Cache shapes by immutable value identity, including cached derived values.
+  // Cache immutable container identities and scalar values, including derived
+  // values reused from the preceding batch.
   _ValueShape _valueShape(Object? value) {
     if (value == null) return (nodes: 1, bytes: 4, depth: 1);
     if (_shapes[value] case final cached?) return cached;
@@ -411,6 +415,7 @@ final class UiEvaluationBatch {
           throw const _EvaluationFault(UiDiagnosticCode.invalidSample);
         }
         final points = <Map<String, Object?>>[];
+        final span = b - a;
         var previousX = a;
         _sampling++;
         try {
@@ -419,8 +424,11 @@ final class UiEvaluationBatch {
             final t = i / (n - 1);
             var x = i == 0 ? a : b;
             if (i > 0 && i < n - 1) {
-              final interpolated = (a >= 0 && b >= 0) || (a <= 0 && b <= 0)
-                  ? _finite(a + (b - a) * t)
+              // Prefer a single offset even across zero. Two weighted terms
+              // can turn an exact grid zero into a tiny negative number and
+              // invent a sqrt gap (or miss a division-by-zero gap).
+              final interpolated = span.isFinite
+                  ? _finite(a + span * t)
                   : _finite(a * (1 - t) + b * t);
               x = math.max(previousX, interpolated.clamp(a, b));
             }

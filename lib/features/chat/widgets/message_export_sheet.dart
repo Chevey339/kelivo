@@ -5,6 +5,7 @@ import '../../intelligent_ui/catalog/ui_budgets.dart';
 import '../../intelligent_ui/host/ui_export_capture.dart';
 import '../../intelligent_ui/host/ui_source_map.dart' show UiMessageSource;
 import '../../intelligent_ui/host/ui_source_selection.dart';
+import '../../intelligent_ui/host/ui_presented_fences.dart';
 import '../../intelligent_ui/text/ui_message_text.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -462,6 +463,19 @@ List<ToolUIPart> _exportToolPartsForMessage(
   BuildContext context,
   ChatMessage message,
 ) {
+  if (uiDisplayFences(message).isNotEmpty) {
+    return [
+      for (final tool in uiMessageTimeline(message).tools)
+        ToolUIPart(
+          id: tool.providerId,
+          toolName: tool.toolName,
+          arguments: tool.arguments,
+          content: tool.content,
+          metadata: tool.metadata,
+          loading: tool.loading,
+        ),
+    ];
+  }
   try {
     final chatService = context.read<ChatService>();
     final events = chatService.getToolEventsForMessage(message);
@@ -493,6 +507,26 @@ _ExportReasoningPayload _exportReasoningPayloadForMessage(
   ChatMessage message, {
   required bool expandThinkingContent,
 }) {
+  if (uiDisplayFences(message).isNotEmpty) {
+    final timeline = uiMessageTimeline(message);
+    return _ExportReasoningPayload(
+      segments: [
+        for (final segment in timeline.segments)
+          ReasoningSegment(
+            text: segment.text,
+            expanded: expandThinkingContent,
+            loading: false,
+            startAt: segment.startAt,
+            finishedAt: segment.finishedAt,
+            toolStartIndex: segment.toolStartIndex,
+          ),
+      ],
+      fromInlineThinking: timeline.inlineThinking,
+      contentSplitOffsets: timeline.splits?.offsets,
+      reasoningCountAtSplit: timeline.splits?.reasoningCounts,
+      toolCountAtSplit: timeline.splits?.toolCounts,
+    );
+  }
   final segJson = (message.reasoningSegmentsJson ?? '').trim();
   var segments = <ReasoningSegment>[];
   var fromInlineThinking = false;
@@ -2537,15 +2571,23 @@ Widget buildExportedMessageCardForTesting(
   ChatMessage message, {
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
+  bool conversationBubble = false,
 }) => Builder(
-  builder: (context) => _ExportedMessageCard(
-    message: message,
-    title: 'Export',
-    cs: Theme.of(context).colorScheme,
-    chatFontScale: 1,
-    showThinkingAndToolCards: showThinkingAndToolCards,
-    expandThinkingContent: expandThinkingContent,
-  ),
+  builder: (context) => conversationBubble
+      ? _ExportedBubble(
+          message: message,
+          cs: Theme.of(context).colorScheme,
+          showThinkingAndToolCards: showThinkingAndToolCards,
+          expandThinkingContent: expandThinkingContent,
+        )
+      : _ExportedMessageCard(
+          message: message,
+          title: 'Export',
+          cs: Theme.of(context).colorScheme,
+          chatFontScale: 1,
+          showThinkingAndToolCards: showThinkingAndToolCards,
+          expandThinkingContent: expandThinkingContent,
+        ),
 );
 
 class _ExportedMessageCard extends StatelessWidget {
@@ -2583,13 +2625,16 @@ class _ExportedMessageCard extends StatelessWidget {
       message,
       showThinkingAndToolCards: showThinkingAndToolCards,
     );
-    final exportReasoningPayload = showThinkingAndToolCards && isAssistant
+    final preserveTimeline =
+        isAssistant &&
+        (showThinkingAndToolCards || uiDisplayFences(message).isNotEmpty);
+    final exportReasoningPayload = preserveTimeline
         ? _exportReasoningPayloadForMessage(
             message,
             expandThinkingContent: expandThinkingContent,
           )
         : const _ExportReasoningPayload(segments: <ReasoningSegment>[]);
-    final toolParts = showThinkingAndToolCards && isAssistant
+    final toolParts = preserveTimeline
         ? _exportToolPartsForMessage(context, message)
         : const <ToolUIPart>[];
     final assistant = context.read<AssistantProvider>().currentAssistant;
@@ -2800,13 +2845,16 @@ class _ExportedBubble extends StatelessWidget {
       message,
       showThinkingAndToolCards: showThinkingAndToolCards,
     );
-    final exportReasoningPayload = showThinkingAndToolCards && isAssistant
+    final preserveTimeline =
+        isAssistant &&
+        (showThinkingAndToolCards || uiDisplayFences(message).isNotEmpty);
+    final exportReasoningPayload = preserveTimeline
         ? _exportReasoningPayloadForMessage(
             message,
             expandThinkingContent: expandThinkingContent,
           )
         : const _ExportReasoningPayload(segments: <ReasoningSegment>[]);
-    final toolParts = showThinkingAndToolCards && isAssistant
+    final toolParts = preserveTimeline
         ? _exportToolPartsForMessage(context, message)
         : const <ToolUIPart>[];
     final assistant = context.read<AssistantProvider>().currentAssistant;

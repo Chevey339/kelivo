@@ -409,7 +409,11 @@ class ChatInputBarController {
       );
     });
     _root.onDraftChanged?.call();
-    state.widget.focusNode?.requestFocus();
+    // A draft can be prepared from an expanded UI route. Keep that route's
+    // keyboard focus until it closes; a covered composer must not steal Esc.
+    if (ModalRoute.of(state.context)?.isCurrent != false) {
+      state.widget.focusNode?.requestFocus();
+    }
     return true;
   }
 

@@ -144,6 +144,18 @@ void main() {
     },
   );
 
+  test('cross-zero sample grids preserve actual function boundaries', () {
+    final root = _expression('@sample(x => @sqrt(x), -2, 4, 13)');
+    expect(root.error, isNull);
+    expect((root.value as List)[4], {'x': 0.0, 'y': 0.0});
+    expect(root.gaps.map((gap) => gap.index), [0, 1, 2, 3]);
+    final reciprocal = _expression('@sample(x => 1 / x, -2, 4, 13)');
+    expect(reciprocal.error, isNull);
+    expect((reciprocal.value as List)[4], {'x': 0.0, 'y': null});
+    expect(reciprocal.gaps.single.index, 4);
+    expect(reciprocal.gaps.single.code, UiDiagnosticCode.divisionByZero);
+  });
+
   test('sample parameters read current surface inputs and local scope', () {
     final value = _batch(
       r'$a: number = 2'

@@ -93,6 +93,72 @@ Offset _scatterPoint(WidgetTester tester, int point) {
 }
 
 void main() {
+  testWidgets('overlapping source rows do not repeat every decorative marker', (
+    tester,
+  ) async {
+    final c = _controller(
+      'root = Chart(kind="line",data=[${List.filled(500, '{"x":1,"y":1}').join(',')}],x="x",y=["y"])',
+    );
+    await tester.pumpWidget(_app(c));
+    await tester.pumpAndSettle();
+    final rendered = tester.widget<LineChartLeaf>(find.byType(LineChartLeaf));
+    final bar = rendered.data.lineBarsData.single;
+    expect(bar.spots, hasLength(500));
+    expect(
+      bar.spots.where((spot) => bar.dotData.checkToShowDot(spot, bar)),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('dense line markers preserve vertices, gaps and hit targets', (
+    tester,
+  ) async {
+    final rows = List.generate(
+      500,
+      (i) => '{"x":$i,"y":${i == 10 ? 'null' : i}}',
+    ).join(',');
+    final c = _controller(
+      'root = Chart(kind="line",data=[$rows],x="x",y=["y"])',
+    );
+    await tester.pumpWidget(_app(c));
+    await tester.pumpAndSettle();
+    LineChartBarData bar() => tester
+        .widget<LineChart>(find.byType(LineChart))
+        .data
+        .lineBarsData
+        .single;
+    bool marked(int row) =>
+        bar().dotData.checkToShowDot(bar().spots[row], bar());
+    expect(bar().spots, hasLength(500));
+    expect(bar().spots[10], FlSpot.nullSpot);
+    expect([0, 9, 11, 499].every(marked), isTrue);
+    expect(
+      bar().spots
+          .where((s) => s.isNotNull() && bar().dotData.checkToShowDot(s, bar()))
+          .length,
+      lessThan(50),
+    );
+    final row = List.generate(450, (i) => i + 20).firstWhere((i) => !marked(i));
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    final position = _linePoint(tester, row, 0);
+    final base = tester.widget<LineChart>(find.byType(LineChart));
+    await mouse.moveTo(position);
+    await tester.pumpAndSettle();
+    expect(find.text('x: $row\ny: $row'), findsOneWidget);
+    final marker = find.byKey(const ValueKey('genui-chart-active-marker'));
+    expect(marker, findsOneWidget);
+    final paint =
+        tester.widget<CustomPaint>(marker).painter! as GenUiChartMarkerPainter;
+    expect(
+      (tester.getTopLeft(marker) + paint.point - position).distance,
+      lessThan(.01),
+    );
+    expect(tester.widget<LineChart>(find.byType(LineChart)), same(base));
+    expect(bar().spots, hasLength(500));
+    await mouse.removePointer();
+  });
+
   test('opposite-direction area segments do not cancel overlapping fills', () {
     final data = UiChartData.read({
       'kind': 'area',

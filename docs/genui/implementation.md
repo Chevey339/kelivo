@@ -12,6 +12,12 @@ deferred; model evaluation uses only `deepseek-v4.1-flash-1017` (the 30 tasks an
 identity and verified host key can be reused. Credentials provided for model
 evaluation must remain outside source control and are not copied here.
 
+Later user amendments: Windows work is paused after a blue screen (no cause
+attributed); physical iPhone work and macOS Chinese IME acceptance are deferred.
+Do not contact or retry the paused Windows host until the user resumes it.
+On 2026-10-24 the user accepted the measured Android performance limits recorded
+in C24; above-target numbers remain explicit and are not relabeled as passes.
+
 ## C01 baseline
 
 - Date: 2026-10-23, America/Los_Angeles. Implementer/build operator: this Codex
@@ -1273,3 +1279,45 @@ all 298 tests, the macOS debug build, and diff whitespace checks. The five non-
 document files retained their frozen hashes through G; staging uses the exact
 six-file manifest. Logs remain under build/genui/logs/c23-*. No new dependency or
 platform implementation was added in this step; deferred environments are unchanged.
+
+
+## C24 — composed acceptance and measured performance
+
+The shared S1–S6 synthetic fixtures exercise production message/list focus,
+GenUI controls, expansion, draft staging, frozen context and local send/storage.
+Widget scenarios run on Android and macOS target platforms, including
+Ctrl/Cmd+A selection inside the Markdown selection host. Deterministic
+Semantics assertions are retained in widget tests; native scenarios leave
+accessibility enablement to the OS and record that boundary explicitly.
+
+104 added pixel baselines cover the full S1/S6/shell matrix and S2–S5 visual
+scenes; contrast checks include solid/frosted/tinted. Existing component, chip,
+Web, lifecycle and persistence tests remain part of G. The real C06 error
+fixtures continue to run offline; C25 will record the final model set separately.
+
+Composed acceptance fixed expanded Ask focus, exact-zero sampling and historical
+split presentation budgets in copy/TTS/export/search. Native
+profiling justified scalar shape-cache hashing, bounded text-width caching,
+dense decorative-marker spacing (all vertices/hits retained), and one chart
+canvas repaint boundary with a separately drawn active marker. Duplicate
+coordinates have a renderer-level regression. No new blur/Opacity widget or
+additional message-path boundary was introduced.
+
+[The detailed acceptance record](acceptance-c24.md) and [profile samples](performance-c24.json)
+distinguish actual native runs, automated Flutter input, real keyboard input and
+OS semantics. Mac profile samples met their targets; Android sustained chart
+updates remain above the 120 Hz budget; the user explicitly accepted this
+Android performance exception on 2026-10-24. Ordinary-message mean build changed
++2.292% and raster -3.444% relative to the archived C01 source with identical
+fixtures. This is a measured comparison, not statistical equivalence or an exact
+symmetric ±3% result. User-deferred Windows/Linux/physical-iPhone/macOS-Chinese-IME
+evidence is not claimed as passed.
+
+C24 validation: all 31 changed Dart files formatted; root fatal-info analysis
+and full suite passed (10,147 tests, one existing skip); markstream offline
+dependency resolution, fatal-info analysis and all 298 tests passed; macOS debug
+build and git diff --check passed. Independent final review returned no findings.
+The final 145-file manifest includes 142 non-document files whose frozen hashes
+were checked again before staging. Raw logs remain under build/genui/logs/c24-*;
+failed baseline, interrupted review-candidate and disk-full runs are preserved
+separately and are not counted as passes.

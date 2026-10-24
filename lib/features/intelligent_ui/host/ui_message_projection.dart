@@ -13,7 +13,7 @@ import '../text/ui_text_projection.dart';
 import '../widgets/genui_localizations.dart';
 import 'ui_generation_state.dart';
 import 'ui_runtime_registry.dart';
-import 'ui_source_selection.dart';
+import 'ui_presented_fences.dart';
 
 Future<UiMessageText> captureUiMessageText(
   BuildContext context,
@@ -49,7 +49,7 @@ Future<UiMessageText> projectUiMessageText(
   required String blockLimit,
   UiTextMode mode = UiTextMode.copy,
 }) async {
-  final fences = uiEligibleFences(message);
+  final fences = uiPresentedNativeFences(message);
   final generation = uiGenerationStatus(message);
   final frozen = List<UiSurfaceSnapshot>.unmodifiable(snapshots);
   final parts = <TtsTextPart>[];
@@ -57,7 +57,7 @@ Future<UiMessageText> projectUiMessageText(
   final surfaces = <UiCapturedSurface>[];
   final source = message.content;
   var cursor = 0;
-  for (final (ordinal, fence) in fences.indexed) {
+  for (final (:ordinal, :fence) in fences) {
     final start = fence.run.joinedStart + fence.node.span.start;
     final end = fence.run.joinedStart + fence.node.span.end;
     if (start > cursor) {

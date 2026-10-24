@@ -1,0 +1,1442 @@
+{
+  "boundary": "Profile mode, ordinary WidgetsFlutterBinding; synthetic pointer traces exclude hardware input and display scanout. Build and raster are separate stages. Logs from C24 working tree before its commit.",
+  "sdk": "Flutter 3.47.6 / Dart 3.13.5 / 5fc346839b5d0eef006ed8404392afb4dfae428d",
+  "devices": {
+    "android": {
+      "hardware": "Xiaomi 2112123AC, Android 11, Adreno 650, Skia, 1080x2400 / 2.75 DPR",
+      "metadata": {
+        "fixture": "native-local-parameters",
+        "os": "RKQ1.200826.002 test-keys",
+        "platform": "android",
+        "refreshHz": 120.00000762939453,
+        "rssBytes": 284975104,
+        "peakRssBytes": 347500544,
+        "measurements": [
+          "S1-input",
+          "S1-drag",
+          "S1-drag-input",
+          "S1-state",
+          "S2-input",
+          "S2-drag",
+          "S2-drag-input",
+          "S2-state",
+          "S6-input",
+          "S6-drag",
+          "S6-drag-input",
+          "S6-state",
+          "limit-input",
+          "limit-drag",
+          "limit-drag-input",
+          "limit-hover",
+          "limit-state",
+          "native-history-scroll-0",
+          "native-history-scroll-1",
+          "native-history-scroll-2",
+          "native-history-idle",
+          "cold-mount",
+          "memory"
+        ],
+        "binding": "WidgetsFlutterBinding",
+        "semanticsEnabled": true,
+        "stages": "build and raster tested separately; durations are not added",
+        "profile": true,
+        "remainingTransientCallbacks": 0,
+        "nativeWebViewsCreated": 0,
+        "memoryBoundary": "Process RSS includes engine, font and GPU caches; unmount samples do not imply all caches are released"
+      },
+      "measurements": {
+        "S1-input": {
+          "frames": 83,
+          "elapsedMs": 2665.911,
+          "buildUs": {
+            "mean": 3408.120481927711,
+            "p50": 3420,
+            "p95": 4156,
+            "max": 6569
+          },
+          "rasterUs": {
+            "mean": 3530.1686746987953,
+            "p50": 3333,
+            "p95": 5081,
+            "max": 9378
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 1,
+          "slowPercent": 1.2048192771084338,
+          "rssBytes": 238481408,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 12844.6625,
+            "p50": 12594,
+            "p95": 17283,
+            "max": 19782
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S1-drag": {
+          "frames": 341,
+          "elapsedMs": 6043.427,
+          "buildUs": {
+            "mean": 2483.58357771261,
+            "p50": 2016,
+            "p95": 4271,
+            "max": 11600
+          },
+          "rasterUs": {
+            "mean": 2320.730205278592,
+            "p50": 1899,
+            "p95": 3752,
+            "max": 34692
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 2,
+          "slowPercent": 0.5865102639296188,
+          "rssBytes": 246226944
+        },
+        "S1-drag-input": {
+          "distinctAcceptedValues": 90,
+          "traces": [
+            {
+              "moves": 57,
+              "elapsedUs": 1008665,
+              "meanTimerLatenessUs": 470.8421052631579,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 59,
+              "elapsedUs": 1003899,
+              "meanTimerLatenessUs": 69.67796610169492,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 59,
+              "elapsedUs": 1004943,
+              "meanTimerLatenessUs": 85.1864406779661,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 59,
+              "elapsedUs": 1004008,
+              "meanTimerLatenessUs": 78.69491525423729,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 59,
+              "elapsedUs": 1004851,
+              "meanTimerLatenessUs": 67.44067796610169,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 59,
+              "elapsedUs": 1015276,
+              "meanTimerLatenessUs": 152.45762711864407,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S1-state": {
+          "phase": "complete",
+          "validNodes": 10,
+          "chartRows": null,
+          "nativeWebViewsCreated": 0
+        },
+        "S2-input": {
+          "frames": 80,
+          "elapsedMs": 3544.518,
+          "buildUs": {
+            "mean": 9997.525,
+            "p50": 9936,
+            "p95": 13142,
+            "max": 14818
+          },
+          "rasterUs": {
+            "mean": 4737.8625,
+            "p50": 4619,
+            "p95": 6037,
+            "max": 6715
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 62,
+          "slowPercent": 77.5,
+          "rssBytes": 268750848,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 31242.3625,
+            "p50": 31091,
+            "p95": 40636,
+            "max": 42699
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S2-drag": {
+          "frames": 206,
+          "elapsedMs": 6086.405,
+          "buildUs": {
+            "mean": 3742.0242718446602,
+            "p50": 2402,
+            "p95": 11486,
+            "max": 27844
+          },
+          "rasterUs": {
+            "mean": 5378.466019417476,
+            "p50": 5414,
+            "p95": 7522,
+            "max": 15108
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 27,
+          "slowPercent": 13.106796116504855,
+          "rssBytes": 276910080
+        },
+        "S2-drag-input": {
+          "distinctAcceptedValues": 13,
+          "traces": [
+            {
+              "moves": 44,
+              "elapsedUs": 1021134,
+              "meanTimerLatenessUs": 1782.4772727272727,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 47,
+              "elapsedUs": 1004505,
+              "meanTimerLatenessUs": 1092.5531914893618,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 48,
+              "elapsedUs": 1027957,
+              "meanTimerLatenessUs": 1100.4166666666667,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1009878,
+              "meanTimerLatenessUs": 1536.6,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 56,
+              "elapsedUs": 1006727,
+              "meanTimerLatenessUs": 1185.4642857142858,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 56,
+              "elapsedUs": 1014265,
+              "meanTimerLatenessUs": 1282.642857142857,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S2-state": {
+          "phase": "completeWithErrors",
+          "validNodes": 5,
+          "chartRows": 501,
+          "nativeWebViewsCreated": 0
+        },
+        "S6-input": {
+          "frames": 82,
+          "elapsedMs": 2714.712,
+          "buildUs": {
+            "mean": 11994.865853658537,
+            "p50": 11968,
+            "p95": 14475,
+            "max": 28626
+          },
+          "rasterUs": {
+            "mean": 3965.2073170731705,
+            "p50": 3811,
+            "p95": 5127,
+            "max": 7431
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 79,
+          "slowPercent": 96.34146341463415,
+          "rssBytes": 280080384,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 23075.425,
+            "p50": 22996,
+            "p95": 27041,
+            "max": 45831
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S6-drag": {
+          "frames": 282,
+          "elapsedMs": 6068.921,
+          "buildUs": {
+            "mean": 9778.698581560284,
+            "p50": 8768,
+            "p95": 14258,
+            "max": 25469
+          },
+          "rasterUs": {
+            "mean": 4036.095744680851,
+            "p50": 3928,
+            "p95": 5516,
+            "max": 14401
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 163,
+          "slowPercent": 57.801418439716315,
+          "rssBytes": 280551424
+        },
+        "S6-drag-input": {
+          "distinctAcceptedValues": 121,
+          "traces": [
+            {
+              "moves": 52,
+              "elapsedUs": 1010905,
+              "meanTimerLatenessUs": 2216.3076923076924,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 50,
+              "elapsedUs": 1016104,
+              "meanTimerLatenessUs": 3124.56,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 50,
+              "elapsedUs": 1005256,
+              "meanTimerLatenessUs": 2871.96,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 49,
+              "elapsedUs": 1005879,
+              "meanTimerLatenessUs": 3357.6326530612246,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 50,
+              "elapsedUs": 1015659,
+              "meanTimerLatenessUs": 3075.82,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 50,
+              "elapsedUs": 1013240,
+              "meanTimerLatenessUs": 3063.62,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S6-state": {
+          "phase": "complete",
+          "validNodes": 11,
+          "chartRows": 6,
+          "nativeWebViewsCreated": 0
+        },
+        "limit-input": {
+          "frames": 80,
+          "elapsedMs": 3166.334,
+          "buildUs": {
+            "mean": 14743.525,
+            "p50": 15154,
+            "p95": 22420,
+            "max": 29210
+          },
+          "rasterUs": {
+            "mean": 18745.6125,
+            "p50": 18681,
+            "p95": 21517,
+            "max": 22574
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 80,
+          "slowPercent": 100.0,
+          "rssBytes": 309518336,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 44717.175,
+            "p50": 45841,
+            "p95": 55298,
+            "max": 78459
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "limit-drag": {
+          "frames": 224,
+          "elapsedMs": 6098.844,
+          "buildUs": {
+            "mean": 13360.129464285714,
+            "p50": 12194,
+            "p95": 17914,
+            "max": 22911
+          },
+          "rasterUs": {
+            "mean": 17811.178571428572,
+            "p50": 17687,
+            "p95": 20806,
+            "max": 24837
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 224,
+          "slowPercent": 100.0,
+          "rssBytes": 345296896
+        },
+        "limit-drag-input": {
+          "distinctAcceptedValues": 171,
+          "traces": [
+            {
+              "moves": 39,
+              "elapsedUs": 1017330,
+              "meanTimerLatenessUs": 5152.794871794872,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 41,
+              "elapsedUs": 1000649,
+              "meanTimerLatenessUs": 3561.4146341463415,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 41,
+              "elapsedUs": 1018224,
+              "meanTimerLatenessUs": 3890.512195121951,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 41,
+              "elapsedUs": 1018164,
+              "meanTimerLatenessUs": 3800.7073170731705,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 41,
+              "elapsedUs": 1013750,
+              "meanTimerLatenessUs": 4015.2195121951218,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            },
+            {
+              "moves": 40,
+              "elapsedUs": 1030010,
+              "meanTimerLatenessUs": 4363.6,
+              "logicalDistance": 276.72727272727275,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "limit-hover": {
+          "frames": 237,
+          "elapsedMs": 4201.962,
+          "buildUs": {
+            "mean": 4037.0464135021098,
+            "p50": 4098,
+            "p95": 4826,
+            "max": 11664
+          },
+          "rasterUs": {
+            "mean": 4593.021097046413,
+            "p50": 4437,
+            "p95": 5773,
+            "max": 20442
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 1,
+          "slowPercent": 0.4219409282700422,
+          "rssBytes": 331714560
+        },
+        "limit-state": {
+          "phase": "complete",
+          "validNodes": 4,
+          "chartRows": 500,
+          "nativeWebViewsCreated": 0
+        },
+        "native-history-scroll-0": {
+          "frames": 772,
+          "elapsedMs": 8006.95,
+          "buildUs": {
+            "mean": 1647.9727979274612,
+            "p50": 957,
+            "p95": 4242,
+            "max": 26003
+          },
+          "rasterUs": {
+            "mean": 2551.556994818653,
+            "p50": 2146,
+            "p95": 5482,
+            "max": 19883
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 32,
+          "slowPercent": 4.1450777202072535,
+          "rssBytes": 288382976
+        },
+        "native-history-scroll-1": {
+          "frames": 758,
+          "elapsedMs": 8017.323,
+          "buildUs": {
+            "mean": 1678.1517150395778,
+            "p50": 967,
+            "p95": 4503,
+            "max": 27904
+          },
+          "rasterUs": {
+            "mean": 2411.84036939314,
+            "p50": 2029,
+            "p95": 4909,
+            "max": 11481
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 33,
+          "slowPercent": 4.353562005277045,
+          "rssBytes": 286662656
+        },
+        "native-history-scroll-2": {
+          "frames": 759,
+          "elapsedMs": 8017.285,
+          "buildUs": {
+            "mean": 1655.2529644268775,
+            "p50": 964,
+            "p95": 4748,
+            "max": 23086
+          },
+          "rasterUs": {
+            "mean": 2387.02371541502,
+            "p50": 2113,
+            "p95": 4369,
+            "max": 12655
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 27,
+          "slowPercent": 3.5573122529644268,
+          "rssBytes": 286601216
+        },
+        "native-history-idle": {
+          "frames": 0,
+          "elapsedMs": 10003.633,
+          "buildUs": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rasterUs": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 0,
+          "slowPercent": null,
+          "rssBytes": 287154176
+        },
+        "cold-mount": {
+          "S1": {
+            "mountAndSettleUs": 391848,
+            "sourceBytes": 829
+          },
+          "S2": {
+            "mountAndSettleUs": 433116,
+            "sourceBytes": 502
+          },
+          "S6": {
+            "mountAndSettleUs": 365368,
+            "sourceBytes": 1179
+          },
+          "limit": {
+            "mountAndSettleUs": 460637,
+            "sourceBytes": 37784
+          }
+        },
+        "memory": {
+          "initial": 192618496,
+          "S1-steady": 246226944,
+          "S1-afterUnmount": 246276096,
+          "S2-steady": 276910080,
+          "S2-afterUnmount": 276615168,
+          "S6-steady": 280551424,
+          "S6-afterUnmount": 280432640,
+          "limit-steady": 331714560,
+          "limit-afterUnmount": 331694080,
+          "cycle-0": 283979776,
+          "cycle-1": 283455488,
+          "cycle-2": 282677248,
+          "cycle-3": 281702400,
+          "cycle-4": 284844032,
+          "cycle-5": 286265344,
+          "cycle-6": 286257152,
+          "cycle-7": 284975104
+        }
+      },
+      "log": "build/genui/c24/android-native-profile-final.log"
+    },
+    "macos": {
+      "hardware": "Mac16,8, Apple M4 Pro, 24 GiB, macOS 26.5.2 (25F84)",
+      "metadata": {
+        "fixture": "native-local-parameters",
+        "os": "Version 26.5.2 (Build 25F84)",
+        "platform": "macos",
+        "refreshHz": 120.0,
+        "rssBytes": 200540160,
+        "peakRssBytes": 260571136,
+        "measurements": [
+          "S1-input",
+          "S1-drag",
+          "S1-drag-input",
+          "S1-state",
+          "S2-input",
+          "S2-drag",
+          "S2-drag-input",
+          "S2-state",
+          "S6-input",
+          "S6-drag",
+          "S6-drag-input",
+          "S6-state",
+          "limit-input",
+          "limit-drag",
+          "limit-drag-input",
+          "limit-hover",
+          "limit-state",
+          "native-history-scroll-0",
+          "native-history-scroll-1",
+          "native-history-scroll-2",
+          "native-history-idle",
+          "cold-mount",
+          "memory"
+        ],
+        "binding": "WidgetsFlutterBinding",
+        "semanticsEnabled": false,
+        "stages": "build and raster tested separately; durations are not added",
+        "profile": true,
+        "remainingTransientCallbacks": 0,
+        "nativeWebViewsCreated": 0,
+        "memoryBoundary": "Process RSS includes engine, font and GPU caches; unmount samples do not imply all caches are released"
+      },
+      "measurements": {
+        "S1-input": {
+          "frames": 86,
+          "elapsedMs": 2763.44,
+          "buildUs": {
+            "mean": 1967.7906976744187,
+            "p50": 1971,
+            "p95": 2900,
+            "max": 3188
+          },
+          "rasterUs": {
+            "mean": 1139.6279069767443,
+            "p50": 1126,
+            "p95": 1431,
+            "max": 4065
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": 0.0,
+          "rssBytes": 190169088,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 8146.1625,
+            "p50": 8227,
+            "p95": 11506,
+            "max": 12729
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S1-drag": {
+          "frames": 329,
+          "elapsedMs": 6045.79,
+          "buildUs": {
+            "mean": 1919.09726443769,
+            "p50": 1967,
+            "p95": 2838,
+            "max": 3727
+          },
+          "rasterUs": {
+            "mean": 969.4954407294833,
+            "p50": 930,
+            "p95": 1304,
+            "max": 13992
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 1,
+          "slowPercent": 0.303951367781155,
+          "rssBytes": 214548480
+        },
+        "S1-drag-input": {
+          "distinctAcceptedValues": 98,
+          "traces": [
+            {
+              "moves": 55,
+              "elapsedUs": 1008848,
+              "meanTimerLatenessUs": 1301.3090909090909,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1009544,
+              "meanTimerLatenessUs": 1281.090909090909,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1008368,
+              "meanTimerLatenessUs": 1293.6545454545455,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1006290,
+              "meanTimerLatenessUs": 1316.7454545454545,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1003141,
+              "meanTimerLatenessUs": 1264.9818181818182,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1008910,
+              "meanTimerLatenessUs": 1287.6363636363637,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S1-state": {
+          "phase": "complete",
+          "validNodes": 10,
+          "chartRows": null,
+          "nativeWebViewsCreated": 0
+        },
+        "S2-input": {
+          "frames": 80,
+          "elapsedMs": 3082.995,
+          "buildUs": {
+            "mean": 3049.9875,
+            "p50": 2931,
+            "p95": 4371,
+            "max": 6090
+          },
+          "rasterUs": {
+            "mean": 918.75,
+            "p50": 793,
+            "p95": 1141,
+            "max": 7350
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": 0.0,
+          "rssBytes": 205291520,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 13354.2375,
+            "p50": 13313,
+            "p95": 18778,
+            "max": 27143
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S2-drag": {
+          "frames": 308,
+          "elapsedMs": 6033.701,
+          "buildUs": {
+            "mean": 1587.840909090909,
+            "p50": 1147,
+            "p95": 4297,
+            "max": 8891
+          },
+          "rasterUs": {
+            "mean": 1088.0064935064936,
+            "p50": 869,
+            "p95": 1777,
+            "max": 4439
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 1,
+          "slowPercent": 0.3246753246753247,
+          "rssBytes": 205504512
+        },
+        "S2-drag-input": {
+          "distinctAcceptedValues": 13,
+          "traces": [
+            {
+              "moves": 52,
+              "elapsedUs": 1014915,
+              "meanTimerLatenessUs": 1328.6538461538462,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1001313,
+              "meanTimerLatenessUs": 1387.5294117647059,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 52,
+              "elapsedUs": 1002330,
+              "meanTimerLatenessUs": 1291.5192307692307,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 52,
+              "elapsedUs": 1004894,
+              "meanTimerLatenessUs": 1298.2692307692307,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 52,
+              "elapsedUs": 1001512,
+              "meanTimerLatenessUs": 1302.576923076923,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 52,
+              "elapsedUs": 1007938,
+              "meanTimerLatenessUs": 1280.0384615384614,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S2-state": {
+          "phase": "complete",
+          "validNodes": 5,
+          "chartRows": 501,
+          "nativeWebViewsCreated": 0
+        },
+        "S6-input": {
+          "frames": 85,
+          "elapsedMs": 2763.165,
+          "buildUs": {
+            "mean": 4348.541176470589,
+            "p50": 4771,
+            "p95": 6461,
+            "max": 7058
+          },
+          "rasterUs": {
+            "mean": 1062.5058823529412,
+            "p50": 985,
+            "p95": 1737,
+            "max": 2215
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": 0.0,
+          "rssBytes": 212631552,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 10166.025,
+            "p50": 9968,
+            "p95": 16141,
+            "max": 16661
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "S6-drag": {
+          "frames": 326,
+          "elapsedMs": 6022.736,
+          "buildUs": {
+            "mean": 3115.819018404908,
+            "p50": 2874,
+            "p95": 4931,
+            "max": 6893
+          },
+          "rasterUs": {
+            "mean": 624.2055214723927,
+            "p50": 554,
+            "p95": 1056,
+            "max": 5911
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": 0.0,
+          "rssBytes": 209829888
+        },
+        "S6-drag-input": {
+          "distinctAcceptedValues": 115,
+          "traces": [
+            {
+              "moves": 55,
+              "elapsedUs": 1002274,
+              "meanTimerLatenessUs": 1249.2727272727273,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1001497,
+              "meanTimerLatenessUs": 1207.0363636363636,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1006807,
+              "meanTimerLatenessUs": 1304.5454545454545,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1003870,
+              "meanTimerLatenessUs": 1268.0363636363636,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1004147,
+              "meanTimerLatenessUs": 1282.7636363636364,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 55,
+              "elapsedUs": 1003276,
+              "meanTimerLatenessUs": 1274.5636363636363,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "S6-state": {
+          "phase": "complete",
+          "validNodes": 11,
+          "chartRows": 6,
+          "nativeWebViewsCreated": 0
+        },
+        "limit-input": {
+          "frames": 80,
+          "elapsedMs": 2924.557,
+          "buildUs": {
+            "mean": 4517.425,
+            "p50": 4451,
+            "p95": 5428,
+            "max": 6101
+          },
+          "rasterUs": {
+            "mean": 1683.9375,
+            "p50": 1612,
+            "p95": 1911,
+            "max": 6207
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": 0.0,
+          "rssBytes": 227934208,
+          "acceptedInputSamples": 80,
+          "drawnInputStates": 80,
+          "matchedInputFrames": 80,
+          "coalescedOrUnpresentedInputs": 0,
+          "inputToRasterFinishUs": {
+            "mean": 13122.15,
+            "p50": 12738,
+            "p95": 17448,
+            "max": 20532
+          },
+          "latencyBoundary": "Changed input to raster completion of its frameNumber; excludes hardware input and display scanout"
+        },
+        "limit-drag": {
+          "frames": 298,
+          "elapsedMs": 6091.913,
+          "buildUs": {
+            "mean": 3789.1677852348994,
+            "p50": 3666,
+            "p95": 5511,
+            "max": 8366
+          },
+          "rasterUs": {
+            "mean": 1278.5738255033557,
+            "p50": 1238,
+            "p95": 1384,
+            "max": 9769
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 1,
+          "slowPercent": 0.33557046979865773,
+          "rssBytes": 234881024
+        },
+        "limit-drag-input": {
+          "distinctAcceptedValues": 198,
+          "traces": [
+            {
+              "moves": 50,
+              "elapsedUs": 1006785,
+              "meanTimerLatenessUs": 1341.0,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1018795,
+              "meanTimerLatenessUs": 1381.5294117647059,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1013643,
+              "meanTimerLatenessUs": 1345.8823529411766,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1017071,
+              "meanTimerLatenessUs": 1304.2941176470588,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1017468,
+              "meanTimerLatenessUs": 1344.4117647058824,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            },
+            {
+              "moves": 51,
+              "elapsedUs": 1017678,
+              "meanTimerLatenessUs": 1331.137254901961,
+              "logicalDistance": 744.0,
+              "viewId": 0
+            }
+          ],
+          "input": "Flutter synthesized pointer events; no hardware latency claim"
+        },
+        "limit-hover": {
+          "frames": 233,
+          "elapsedMs": 4383.972,
+          "buildUs": {
+            "mean": 1545.37339055794,
+            "p50": 1456,
+            "p95": 2531,
+            "max": 3014
+          },
+          "rasterUs": {
+            "mean": 2228.8068669527897,
+            "p50": 2183,
+            "p95": 3306,
+            "max": 9988
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 1,
+          "slowPercent": 0.4291845493562232,
+          "rssBytes": 236011520
+        },
+        "limit-state": {
+          "phase": "complete",
+          "validNodes": 4,
+          "chartRows": 500,
+          "nativeWebViewsCreated": 0
+        },
+        "native-history-scroll-0": {
+          "frames": 963,
+          "elapsedMs": 8021.371,
+          "buildUs": {
+            "mean": 877.1277258566978,
+            "p50": 647,
+            "p95": 2118,
+            "max": 11381
+          },
+          "rasterUs": {
+            "mean": 1110.0301142263759,
+            "p50": 1010,
+            "p95": 1835,
+            "max": 8672
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 8,
+          "slowPercent": 0.8307372793354102,
+          "rssBytes": 245415936
+        },
+        "native-history-scroll-1": {
+          "frames": 963,
+          "elapsedMs": 8018.426,
+          "buildUs": {
+            "mean": 867.2056074766355,
+            "p50": 667,
+            "p95": 2022,
+            "max": 9765
+          },
+          "rasterUs": {
+            "mean": 1109.1028037383178,
+            "p50": 956,
+            "p95": 1855,
+            "max": 10289
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 5,
+          "slowPercent": 0.5192107995846313,
+          "rssBytes": 240058368
+        },
+        "native-history-scroll-2": {
+          "frames": 963,
+          "elapsedMs": 8019.21,
+          "buildUs": {
+            "mean": 908.6645898234683,
+            "p50": 695,
+            "p95": 2043,
+            "max": 9473
+          },
+          "rasterUs": {
+            "mean": 1171.0778816199377,
+            "p50": 1038,
+            "p95": 2034,
+            "max": 11607
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 4,
+          "slowPercent": 0.4153686396677051,
+          "rssBytes": 246349824
+        },
+        "native-history-idle": {
+          "frames": 0,
+          "elapsedMs": 10002.089,
+          "buildUs": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rasterUs": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "stageBudgetUs": 8333.333333333334,
+          "slowFrames": 0,
+          "slowPercent": null,
+          "rssBytes": 209403904
+        },
+        "cold-mount": {
+          "S1": {
+            "mountAndSettleUs": 349114,
+            "sourceBytes": 829
+          },
+          "S2": {
+            "mountAndSettleUs": 347523,
+            "sourceBytes": 502
+          },
+          "S6": {
+            "mountAndSettleUs": 328473,
+            "sourceBytes": 1179
+          },
+          "limit": {
+            "mountAndSettleUs": 347105,
+            "sourceBytes": 37784
+          }
+        },
+        "memory": {
+          "initial": 171327488,
+          "S1-steady": 214581248,
+          "S1-afterUnmount": 211501056,
+          "S2-steady": 205520896,
+          "S2-afterUnmount": 205848576,
+          "S6-steady": 209846272,
+          "S6-afterUnmount": 210206720,
+          "limit-steady": 236011520,
+          "limit-afterUnmount": 236240896,
+          "cycle-0": 194985984,
+          "cycle-1": 202883072,
+          "cycle-2": 197722112,
+          "cycle-3": 195100672,
+          "cycle-4": 202964992,
+          "cycle-5": 196968448,
+          "cycle-6": 192659456,
+          "cycle-7": 200507392
+        }
+      },
+      "log": "build/genui/c24/macos-native-profile.log"
+    }
+  },
+  "ordinaryHistoryComparison": {
+    "baseline": {
+      "samples": [
+        {
+          "frames": 837,
+          "elapsedMs": 8019.869,
+          "buildUs": {
+            "mean": 1412.1015531660694,
+            "p50": 887,
+            "p95": 3881,
+            "max": 17858
+          },
+          "rasterUs": {
+            "mean": 2652.3189964157705,
+            "p50": 2275,
+            "p95": 4717,
+            "max": 14055
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 30,
+          "slowPercent": 3.5842293906810037,
+          "rssBytes": 270249984
+        },
+        {
+          "frames": 763,
+          "elapsedMs": 8012.776,
+          "buildUs": {
+            "mean": 1761.5006553079947,
+            "p50": 1059,
+            "p95": 5798,
+            "max": 18405
+          },
+          "rasterUs": {
+            "mean": 3256.4062909567497,
+            "p50": 2936,
+            "p95": 5005,
+            "max": 14999
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 44,
+          "slowPercent": 5.766710353866317,
+          "rssBytes": 269176832
+        },
+        {
+          "frames": 753,
+          "elapsedMs": 8014.903,
+          "buildUs": {
+            "mean": 1763.784860557769,
+            "p50": 1053,
+            "p95": 4964,
+            "max": 20111
+          },
+          "rasterUs": {
+            "mean": 3302.762284196547,
+            "p50": 2988,
+            "p95": 5291,
+            "max": 14050
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 46,
+          "slowPercent": 6.108897742363878,
+          "rssBytes": 271065088
+        },
+        {
+          "frames": 789,
+          "elapsedMs": 8016.541,
+          "buildUs": {
+            "mean": 1714.0557667934095,
+            "p50": 1033,
+            "p95": 4584,
+            "max": 23339
+          },
+          "rasterUs": {
+            "mean": 3211.8441064638782,
+            "p50": 2880,
+            "p95": 5066,
+            "max": 12092
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 47,
+          "slowPercent": 5.9569074778200255,
+          "rssBytes": 272805888
+        },
+        {
+          "frames": 768,
+          "elapsedMs": 8015.236,
+          "buildUs": {
+            "mean": 1728.6927083333333,
+            "p50": 1039,
+            "p95": 5558,
+            "max": 19447
+          },
+          "rasterUs": {
+            "mean": 3283.3307291666665,
+            "p50": 2967,
+            "p95": 5195,
+            "max": 14712
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 41,
+          "slowPercent": 5.338541666666667,
+          "rssBytes": 279908352
+        }
+      ],
+      "meanBuildUs": 1676.0271088317152,
+      "meanRasterUs": 3141.3324814399225
+    },
+    "candidate": {
+      "samples": [
+        {
+          "frames": 832,
+          "elapsedMs": 8018.724,
+          "buildUs": {
+            "mean": 1399.1814903846155,
+            "p50": 889,
+            "p95": 4199,
+            "max": 20788
+          },
+          "rasterUs": {
+            "mean": 2539.358173076923,
+            "p50": 2163,
+            "p95": 4515,
+            "max": 12495
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 22,
+          "slowPercent": 2.644230769230769,
+          "rssBytes": 264814592
+        },
+        {
+          "frames": 751,
+          "elapsedMs": 8014.477,
+          "buildUs": {
+            "mean": 1789.8015978695073,
+            "p50": 1072,
+            "p95": 5796,
+            "max": 18623
+          },
+          "rasterUs": {
+            "mean": 3191.161118508655,
+            "p50": 2911,
+            "p95": 5160,
+            "max": 12572
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 45,
+          "slowPercent": 5.9920106524633825,
+          "rssBytes": 266407936
+        },
+        {
+          "frames": 775,
+          "elapsedMs": 8017.716,
+          "buildUs": {
+            "mean": 1777.2787096774193,
+            "p50": 1041,
+            "p95": 6015,
+            "max": 22942
+          },
+          "rasterUs": {
+            "mean": 3219.3122580645163,
+            "p50": 2830,
+            "p95": 5999,
+            "max": 14853
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 43,
+          "slowPercent": 5.548387096774194,
+          "rssBytes": 263405568
+        },
+        {
+          "frames": 755,
+          "elapsedMs": 8015.973,
+          "buildUs": {
+            "mean": 1817.2543046357616,
+            "p50": 1078,
+            "p95": 6034,
+            "max": 22120
+          },
+          "rasterUs": {
+            "mean": 3126.348344370861,
+            "p50": 2800,
+            "p95": 4691,
+            "max": 18126
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 44,
+          "slowPercent": 5.827814569536423,
+          "rssBytes": 270536704
+        },
+        {
+          "frames": 761,
+          "elapsedMs": 8018.152,
+          "buildUs": {
+            "mean": 1788.6911957950065,
+            "p50": 1058,
+            "p95": 5681,
+            "max": 19385
+          },
+          "rasterUs": {
+            "mean": 3089.550591327201,
+            "p50": 2826,
+            "p95": 4765,
+            "max": 13975
+          },
+          "stageBudgetUs": 8333.332803514302,
+          "slowFrames": 41,
+          "slowPercent": 5.387647831800263,
+          "rssBytes": 272343040
+        }
+      ],
+      "meanBuildUs": 1714.441459672462,
+      "meanRasterUs": 3033.146097069631
+    },
+    "deltaPercent": {
+      "meanBuildUs": 2.291988634212716,
+      "meanRasterUs": -3.4439647827631648
+    }
+  },
+  "acceptance": {
+    "macos": "Measured parameter, drag, hover and scroll samples met the <=50 ms / <1% targets in this run. OS semantics was off; this is not screen-reader performance acceptance.",
+    "android": "Some 120 Hz drag/scroll samples and maximum-chart latency remain above target. The user explicitly accepted these measured Android performance limits on 2026-10-24; this is an acceptance exception, not a passing measurement.",
+    "idle": "No frames in 10 seconds with native history mounted; zero transient callbacks at the end, zero native WebViews in these scenes.",
+    "memory": "RSS includes runtime, font and GPU caches; repeated unmount is not proof that every cache is released.",
+    "userException": {
+      "date": "2026-10-24",
+      "scope": "Android performance only",
+      "decision": "接受本次 Android 性能限制",
+      "limits": "Maximum-chart response p95 55.298 ms and reported >1% slow-frame ratios are retained."
+    }
+  }
+}

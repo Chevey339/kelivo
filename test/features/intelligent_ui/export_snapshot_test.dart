@@ -444,6 +444,9 @@ void main() {
     'empty-part',
     'empty-segments',
     'invalid-segments',
+    'historical-single',
+    'historical-multiple',
+    'historical-tool',
   ]) {
     for (final showThinking in [false, true]) {
       for (final expandedThinking in [false, true]) {
@@ -464,12 +467,58 @@ void main() {
               ),
               _ => msg,
             };
+            final historical = sourceKind.startsWith('historical-');
+            final historicalTool = sourceKind == 'historical-tool';
+            if (historical) {
+              final raw = List.filled(4, _fence).join('\n\n');
+              msg =
+                  message(
+                    parts: [
+                      if (historicalTool)
+                        for (final completed in [false, true])
+                          ToolCallPart(
+                            jsonEncode({
+                              'id': 'historical-tool',
+                              'name': 'search',
+                              'arguments': <String, Object?>{},
+                              if (completed) 'content': 'synthetic result',
+                            }),
+                          )
+                      else
+                        const ReasoningPart('first\nsecond'),
+                      TextPart(raw),
+                    ],
+                  ).copyWith(
+                    reasoningText: sourceKind == 'historical-single'
+                        ? 'plan'
+                        : null,
+                    reasoningSegmentsJson: jsonEncode({
+                      'segments': [
+                        if (sourceKind == 'historical-multiple') ...[
+                          {'text': 'first', 'toolStartIndex': 0},
+                          {'text': 'second', 'toolStartIndex': 0},
+                        ],
+                      ],
+                      'contentSplits': {
+                        'offsets': [raw.indexOf('root =')],
+                        'reasoningCounts': [
+                          historicalTool
+                              ? 0
+                              : (sourceKind == 'historical-multiple' ? 2 : 1),
+                        ],
+                        'toolCounts': [historicalTool ? 1 : 0],
+                      },
+                    }),
+                  );
+            }
             final provider = !const {
               'inline',
               'invalid-segments',
             }.contains(sourceKind);
             final ordinal = sourceKind == 'empty-part' ? 1 : 0;
-            final keys = [if (provider) '$ordinal:0', '$ordinal:1'];
+            final keys = historical
+                ? ['${historicalTool ? 2 : 1}:2', '${historicalTool ? 2 : 1}:3']
+                : [if (provider) '$ordinal:0', '$ordinal:1'];
             final snapshots = <UiSurfaceSnapshot>[];
             for (final key in keys) {
               final live =
@@ -527,6 +576,7 @@ void main() {
                             captures.messages.single,
                             showThinkingAndToolCards: showThinking,
                             expandThinkingContent: expandedThinking,
+                            conversationBubble: historical && expandedThinking,
                           ),
                         ),
                       ),

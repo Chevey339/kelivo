@@ -16,6 +16,7 @@ import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_interactions.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_view_tabs.dart';
+import 'genui_text_widths.dart';
 
 /// One paginated presentation for DataTable nodes and validated Chart rows.
 /// Persistent settings stay in the surface; only editing/focus/scroll are local.
@@ -44,6 +45,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   String? _lastFilter;
   Object? _widthSignature;
   List<double> _widths = const [];
+  final _textWidths = GenUiTextWidths();
   UiSurfaceController get _surface => _scope!.controller.surface;
   UiTableData get _data => widget.node.tableData!;
   Map<String, Object?> get _view => _surface.state.view[widget.id] ?? const {};
@@ -220,19 +222,16 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
               width = maximum;
               break;
             }
-            final painter = TextPainter(
-              text: TextSpan(
-                text: text,
-                style: header ? theme.label : theme.body,
-              ),
-              textScaler: scaler,
-              textDirection: Directionality.of(context),
-            )..layout();
+            final measured = _textWidths.measure(
+              text,
+              header ? theme.label : theme.body,
+              scaler,
+              Directionality.of(context),
+            );
             width = math.max(
               width,
-              painter.width + theme.sm * 2 + (header && _sortable ? 23 : 0),
+              measured + theme.sm * 2 + (header && _sortable ? 23 : 0),
             );
-            painter.dispose();
           }
           return math.min(maximum, width);
         })(),

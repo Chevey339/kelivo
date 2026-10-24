@@ -32,6 +32,33 @@ FlDotPainter genUiChartDot(
   _ => _PolygonDot(series % 4, color, fill, size),
 };
 
+class GenUiChartMarkerPainter extends CustomPainter {
+  const GenUiChartMarkerPainter({
+    required this.point,
+    required this.series,
+    required this.color,
+    required this.fill,
+  });
+  final Offset point;
+  final int series;
+  final Color color, fill;
+
+  @override
+  void paint(Canvas canvas, Size size) => genUiChartDot(
+    series,
+    color,
+    fill,
+    size: 9,
+  ).draw(canvas, const FlSpot(0, 0), point);
+
+  @override
+  bool shouldRepaint(GenUiChartMarkerPainter old) =>
+      point != old.point ||
+      series != old.series ||
+      color != old.color ||
+      fill != old.fill;
+}
+
 /// fl_chart owns positions and hit testing; only two small marker shapes are
 /// supplied here because its stock painters provide circle/square/cross.
 final class _PolygonDot extends FlDotPainter {

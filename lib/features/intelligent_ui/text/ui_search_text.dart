@@ -1,6 +1,6 @@
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
-import '../host/ui_source_selection.dart';
+import '../host/ui_presented_fences.dart';
 import '../catalog/ui_budgets.dart';
 import '../protocol/ui_source_hash.dart';
 import '../protocol/ui_stream_parser.dart';
@@ -41,9 +41,8 @@ final class UiSearchSurfaceText {
 /// Initial values only: searching must not make every slider drag reindex data.
 Map<String, UiSearchSurfaceText> initialUiSearchText(ChatMessage message) {
   final result = <String, UiSearchSurfaceText>{};
-  for (final fence in uiEligibleFences(
-    message,
-  ).take(UiBudgets.blocksPerMessage)) {
+  for (final (:fence, :ordinal) in uiPresentedNativeFences(message)) {
+    if (ordinal >= UiBudgets.blocksPerMessage) continue;
     if (!fence.node.closed) continue;
     final controller = UiSurfaceController(
       owner: UiSurfaceOwner(
@@ -103,7 +102,7 @@ UiSearchText uiSearchableText(
   final ranges = <({int start, int end, String surfaceKey})>[];
   var cursor = 0;
   final source = message.content;
-  for (final (index, fence) in uiEligibleFences(message).indexed) {
+  for (final (:fence, :ordinal) in uiPresentedNativeFences(message)) {
     final start = fence.run.joinedStart + fence.node.span.start;
     final end = fence.run.joinedStart + fence.node.span.end;
     out.write(
@@ -113,7 +112,7 @@ UiSearchText uiSearchableText(
     final from = out.length;
     final saved = cached[fence.surfaceKey];
     out.write(
-      index >= UiBudgets.blocksPerMessage
+      ordinal >= UiBudgets.blocksPerMessage
           ? 'Additional interface shown as source.'
           : saved != null &&
                 !message.isStreaming &&

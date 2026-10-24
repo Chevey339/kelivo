@@ -1,11 +1,13 @@
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import '../catalog/ui_catalog.dart';
 import '../runtime/ui_chart_data.dart';
 import 'genui_chart_paint.dart';
 import 'genui_theme.dart';
+import 'genui_text_widths.dart';
 
 typedef GenUiChartPoint = ({int row, int series});
 typedef GenUiChartTouch =
@@ -26,7 +28,7 @@ String genUiChartTick(double? value) {
 
 /// This widget owns no source state, animation clock or persistence. Native
 /// chart hit responses are translated through explicit raw row/series mappings.
-class GenUiChartCanvas extends StatelessWidget {
+class GenUiChartCanvas extends StatefulWidget {
   const GenUiChartCanvas({
     super.key,
     required this.data,
@@ -47,6 +49,24 @@ class GenUiChartCanvas extends StatelessWidget {
   final GenUiChartTouch onTouch;
   final String gapLabel;
 
+  @override
+  State<GenUiChartCanvas> createState() => _GenUiChartCanvasState();
+}
+
+class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
+  final _textWidths = GenUiTextWidths();
+  Object? _plotSignature;
+  Set<int> _plotHidden = const {};
+  Widget? _plot;
+  UiChartData get data => widget.data;
+  Map<String, Object?> get properties => widget.properties;
+  Set<int> get hidden => widget.hidden;
+  GenUiChartPoint? get active => widget.active;
+  int? get highlightedSeries => widget.highlightedSeries;
+  bool get interactive => widget.interactive;
+  GenUiChartTouch get onTouch => widget.onTouch;
+  String get gapLabel => widget.gapLabel;
+
   Color _color(GenUiTheme theme, int series) {
     final color = data.kind == UiChartKind.pie
         ? theme.pieColor(series)
@@ -65,18 +85,15 @@ class GenUiChartCanvas extends StatelessWidget {
     final axis = data.yAxis;
     var left = 32.0;
     for (var i = 0; i <= 4; i++) {
-      final text = TextPainter(
-        text: TextSpan(
-          text: genUiChartTick(
-            axis.value(axis.minimum + (axis.maximum - axis.minimum) * i / 4),
-          ),
-          style: labelStyle,
+      final width = _textWidths.measure(
+        genUiChartTick(
+          axis.value(axis.minimum + (axis.maximum - axis.minimum) * i / 4),
         ),
-        textScaler: scale,
-        textDirection: TextDirection.ltr,
-      )..layout();
-      left = math.max(left, text.width + 8);
-      text.dispose();
+        labelStyle,
+        scale,
+        TextDirection.ltr,
+      );
+      left = math.max(left, width + 8);
     }
     final bottom = scale.scale(labelStyle.fontSize!) * 1.4 + 8;
     return LayoutBuilder(
@@ -86,73 +103,132 @@ class GenUiChartCanvas extends StatelessWidget {
           math.max(1, constraints.maxWidth - axisLeft),
           math.max(1, constraints.maxHeight - bottom - 1),
         );
-        final titles = _titles(theme, labelStyle, axisLeft, bottom, plot.width);
-        final grid = FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: (axis.maximum - axis.minimum) / 4,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: theme.hairline, strokeWidth: 1),
+        final line =
+            data.kind == UiChartKind.line || data.kind == UiChartKind.area;
+        final signature = (
+          data,
+          theme,
+          scale,
+          Directionality.of(context),
+          constraints,
+          highlightedSeries,
+          interactive,
+          onTouch,
+          gapLabel,
+          line ? null : active,
         );
-        final border = FlBorderData(
-          show: true,
-          border: Border(bottom: BorderSide(color: theme.hairlineStrong)),
-        );
-        final chart =
-            data.kind == UiChartKind.scatter || data.kind == UiChartKind.bar
-            ? _scatter(theme, titles, grid, border, plot)
-            : _line(theme, titles, grid, border);
+        if (_plot == null ||
+            _plotSignature != signature ||
+            !setEquals(_plotHidden, hidden)) {
+          _plotSignature = signature;
+          _plotHidden = Set.of(hidden);
+          final titles = _titles(
+            theme,
+            labelStyle,
+            axisLeft,
+            bottom,
+            plot.width,
+          );
+          final grid = FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: (axis.maximum - axis.minimum) / 4,
+            getDrawingHorizontalLine: (_) =>
+                FlLine(color: theme.hairline, strokeWidth: 1),
+          );
+          final border = FlBorderData(
+            show: true,
+            border: Border(bottom: BorderSide(color: theme.hairlineStrong)),
+          );
+          final chart =
+              data.kind == UiChartKind.scatter || data.kind == UiChartKind.bar
+              ? _scatter(theme, titles, grid, border, plot)
+              : _line(theme, titles, grid, border, plot.width);
+          // The only extra repaint boundary is the chart canvas. Hover paints
+          // one marker above this retained base, without redrawing all series.
+          _plot = RepaintBoundary(
+            child: Stack(
+              children: [
+                if (data.gaps.isNotEmpty)
+                  Positioned.fill(
+                    left: axisLeft,
+                    bottom: bottom + 1,
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: CustomPaint(
+                          painter: GenUiChartGapPainter(
+                            data: data,
+                            fill: theme.warningContainer.withValues(alpha: .20),
+                            line: theme.hairlineStrong,
+                            label: gapLabel,
+                            style: theme.label.copyWith(
+                              color: theme.onWarningContainer,
+                            ),
+                            textScaler: scale,
+                            direction: Directionality.of(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (data.kind == UiChartKind.area)
+                  Positioned.fill(
+                    left: axisLeft,
+                    bottom: bottom + 1,
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: CustomPaint(
+                          painter: GenUiChartAreaPainter(
+                            data: data,
+                            colors: [
+                              for (var s = 0; s < data.yKeys.length; s++)
+                                hidden.contains(s)
+                                    ? theme.transparent
+                                    : _color(theme, s).withValues(
+                                        alpha: _color(theme, s).a * .12,
+                                      ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Positioned.fill(child: chart),
+              ],
+            ),
+          );
+        }
+        final point = active;
+        final rawY = point == null
+            ? null
+            : data.rows[point.row].y[point.series];
         return Directionality(
-          // Numeric/time/category order is data order, independent of the UI's
-          // direction. Legends and data-table columns retain inherited direction.
+          // Axes retain data order; legends/tables use the surrounding direction.
           textDirection: TextDirection.ltr,
           child: Stack(
             children: [
-              if (data.gaps.isNotEmpty)
+              Positioned.fill(child: _plot!),
+              if (line && point != null && rawY != null)
                 Positioned.fill(
                   left: axisLeft,
                   bottom: bottom + 1,
                   child: IgnorePointer(
-                    child: ExcludeSemantics(
-                      child: CustomPaint(
-                        painter: GenUiChartGapPainter(
-                          data: data,
-                          fill: theme.warningContainer.withValues(alpha: .20),
-                          line: theme.hairlineStrong,
-                          label: gapLabel,
-                          style: theme.label.copyWith(
-                            color: theme.onWarningContainer,
-                          ),
-                          textScaler: scale,
-                          direction: Directionality.of(context),
+                    child: CustomPaint(
+                      key: const ValueKey('genui-chart-active-marker'),
+                      painter: GenUiChartMarkerPainter(
+                        point: Offset(
+                          (data.x(data.rows[point.row]) - data.xAxis.minimum) /
+                              (data.xAxis.maximum - data.xAxis.minimum) *
+                              plot.width,
+                          (1 - data.yAxis.fraction(rawY)) * plot.height,
                         ),
+                        series: point.series,
+                        color: _color(theme, point.series),
+                        fill: theme.card,
                       ),
                     ),
                   ),
                 ),
-              if (data.kind == UiChartKind.area)
-                Positioned.fill(
-                  left: axisLeft,
-                  bottom: bottom + 1,
-                  child: IgnorePointer(
-                    child: ExcludeSemantics(
-                      child: CustomPaint(
-                        painter: GenUiChartAreaPainter(
-                          data: data,
-                          colors: [
-                            for (var s = 0; s < data.yKeys.length; s++)
-                              hidden.contains(s)
-                                  ? theme.transparent
-                                  : _color(theme, s).withValues(
-                                      alpha: _color(theme, s).a * .12,
-                                    ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              Positioned.fill(child: chart),
             ],
           ),
         );
@@ -243,34 +319,58 @@ class GenUiChartCanvas extends StatelessWidget {
     FlTitlesData titles,
     FlGridData grid,
     FlBorderData border,
+    double plotWidth,
   ) {
     final series = [
       for (var i = 0; i < data.yKeys.length; i++)
         if (!hidden.contains(i)) i,
     ];
-    final bars = [
-      for (final s in series)
+    final bars = <LineChartBarData>[];
+    for (final s in series) {
+      final spots = [
+        for (final row in data.rows)
+          row.y[s] == null
+              ? FlSpot.nullSpot
+              : FlSpot(data.x(row), data.yAxis.coordinate(row.y[s]!)),
+      ];
+      // Keep every line vertex and hit target. Dense decorative markers would
+      // overlap; space those marks along X while retaining gap endpoints,
+      // isolated values and the active point. Scatter points are never thinned.
+      final marked = Set<FlSpot>.identity();
+      double? previousX;
+      for (var i = 0; i < spots.length; i++) {
+        final spot = spots[i];
+        if (spot.isNull()) {
+          previousX = null;
+          continue;
+        }
+        final x =
+            (spot.x - data.xAxis.minimum) /
+            (data.xAxis.maximum - data.xAxis.minimum) *
+            plotWidth;
+        if (previousX == null ||
+            (x - previousX).abs() >= 12 ||
+            i == spots.length - 1 ||
+            spots[i + 1].isNull()) {
+          marked.add(spot);
+          previousX = x;
+        }
+      }
+      final normalDot = genUiChartDot(s, _color(theme, s), theme.card);
+      bars.add(
         LineChartBarData(
-          spots: [
-            for (final row in data.rows)
-              row.y[s] == null
-                  ? FlSpot.nullSpot
-                  : FlSpot(data.x(row), data.yAxis.coordinate(row.y[s]!)),
-          ],
+          spots: spots,
           color: _color(theme, s),
           barWidth: 2,
           isCurved: false,
           dashArray: genUiChartDashes[s],
           dotData: FlDotData(
-            getDotPainter: (spot, percent, bar, index) => genUiChartDot(
-              s,
-              _color(theme, s),
-              theme.card,
-              size: active == (row: index, series: s) ? 9 : 6,
-            ),
+            checkToShowDot: (spot, bar) => marked.contains(spot),
+            getDotPainter: (spot, percent, bar, index) => normalDot,
           ),
         ),
-    ];
+      );
+    }
     return LineChart(
       LineChartData(
         lineBarsData: bars,
