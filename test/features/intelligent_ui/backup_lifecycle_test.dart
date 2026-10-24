@@ -101,7 +101,7 @@ void main() {
           'items': {'descending': true, 'filter': 'o', 'sortKey': 'v'},
         },
       });
-      expect(selected.searchText, 'Synthetic total and items');
+      expect(selected.searchText, contains('Synthetic total: 6'));
       expect(
         (await repository.getConversation('genui-legacy'))!.versionSelections,
         {'a0': 1},
@@ -110,6 +110,21 @@ void main() {
         (await repository.getMessage('a1'))!.content,
         contains(genUiBackupFence),
       );
+      final found = await repository.searchConversationMatches(tokens: ['6']);
+      expect(found.map((match) => match.messageId), ['a1']);
+      expect(found.single.searchableText, contains('Synthetic total: 6'));
+      expect(found.single.matchedSurfaceKey, '0:0');
+      final miniMap = await repository.searchMiniMapMatches(
+        'genui-legacy',
+        'Synthetic total: 6',
+      );
+      expect(miniMap.single.messageId, 'a1');
+      expect(miniMap.single.matchedSurfaceKey, '0:0');
+      final afterIndex = await (database.select(
+        database.genUiSurfaceStateRows,
+      )..where((row) => row.revisionId.equals('a1'))).getSingle();
+      expect(afterIndex.stateJson, selected.stateJson);
+      expect(afterIndex.updatedAt, selected.updatedAt);
       expect(
         await database.customSelect('PRAGMA foreign_key_check;').get(),
         isEmpty,

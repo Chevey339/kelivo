@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_draft_request.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
@@ -794,6 +795,42 @@ void main() {
       await tester.pump();
       expect(find.byType(GenUiSurface), findsNothing);
       expect(surface.accepts(token), isFalse);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  desktopTest(
+    'search target reveals its original surface in the real message host',
+    (tester) async {
+      final navigation = UiSearchNavigation();
+      addTearDown(navigation.dispose);
+      await tester.pumpWidget(
+        UiSearchNavigationScope(
+          navigation: navigation,
+          child: _MessageListHarness(
+            messages: [
+              message(
+                '$fence\n\n${List.filled(50, "Ordinary paragraph between interfaces.").join("\n\n")}\n\n```kelivo-ui\nui 1 catalog "kelivo.native/1"\nroot = Metric(label="Target result",value=42)\n```',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final state = tester.state<_MessageListHarnessState>(
+        find.byType(_MessageListHarness),
+      );
+      state.scrollController.jumpTo(0);
+      await tester.pumpAndSettle();
+      final target = find.byWidgetPredicate(
+        (w) => w is GenUiSurface && w.controller.owner.surfaceKey == '0:1',
+      );
+      expect(target, findsOneWidget);
+      expect(tester.getTopLeft(target).dy, greaterThan(600));
+      navigation.reveal('native-conversation', 'native-revision', '0:1');
+      await tester.pumpAndSettle();
+      expect(navigation.value, isNull);
+      expect(state.scrollController.offset, greaterThan(0));
+      expect(tester.getTopLeft(target).dy, inInclusiveRange(0, 500));
       await tester.pumpWidget(const SizedBox());
     },
   );

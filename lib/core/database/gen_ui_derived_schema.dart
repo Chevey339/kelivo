@@ -191,6 +191,17 @@ abstract final class GenUiDerivedSchema {
     database.execute('DROP TABLE IF EXISTS $searchTable;');
   }
 
+  /// Repair only our disposable search objects, using the published v5 DDL.
+  static Future<void> resetSearch(AppDatabase database) async {
+    for (final trigger in _triggers) {
+      await database.customStatement(
+        'DROP TRIGGER IF EXISTS ${_identifier(trigger.entityName)};',
+      );
+    }
+    await database.customStatement('DROP TABLE IF EXISTS $searchTable;');
+    await rebuild(database);
+  }
+
   /// Uses the caller's connection/transaction. It does not overwrite overrides,
   /// state versions or save timestamps, and cannot create missing parent rows.
   static Future<void> rebuild(AppDatabase database) async {

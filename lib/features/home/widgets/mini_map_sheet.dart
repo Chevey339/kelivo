@@ -19,6 +19,7 @@ Future<String?> showMiniMapSheet(
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
   Future<List<MiniMapSearchHit>> Function(String query)? onSearch,
+  ValueChanged<MiniMapSearchHit>? onSearchHitSelected,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
@@ -38,6 +39,7 @@ Future<String?> showMiniMapSheet(
       selectionListenable: selectionListenable,
       onToggleSelection: onToggleSelection,
       onSearch: onSearch,
+      onSearchHitSelected: onSearchHitSelected,
     ),
   );
 }
@@ -49,6 +51,7 @@ class _MiniMapSheet extends StatefulWidget {
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
   final Future<List<MiniMapSearchHit>> Function(String query)? onSearch;
+  final ValueChanged<MiniMapSearchHit>? onSearchHitSelected;
 
   const _MiniMapSheet({
     required this.messages,
@@ -57,6 +60,7 @@ class _MiniMapSheet extends StatefulWidget {
     this.selectionListenable,
     this.onToggleSelection,
     this.onSearch,
+    this.onSearchHitSelected,
   });
 
   @override
@@ -241,6 +245,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                       ? null
                       : _hits[pair.assistant!.id],
                   searchNeedle: _query.trim().toLowerCase(),
+                  onSearchHitSelected: widget.onSearchHitSelected,
                 );
               },
             );
@@ -481,6 +486,7 @@ class _MiniMapRow extends StatelessWidget {
   final MiniMapSearchHit? userHit;
   final MiniMapSearchHit? assistantHit;
   final String searchNeedle;
+  final ValueChanged<MiniMapSearchHit>? onSearchHitSelected;
 
   const _MiniMapRow({
     required this.pair,
@@ -490,6 +496,7 @@ class _MiniMapRow extends StatelessWidget {
     this.userHit,
     this.assistantHit,
     this.searchNeedle = '',
+    this.onSearchHitSelected,
   });
 
   String _summaryText(ChatMessage? message) {
@@ -664,7 +671,12 @@ class _MiniMapRow extends StatelessWidget {
                     : InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: pair.user != null
-                            ? () => Navigator.of(context).pop(pair.user!.id)
+                            ? () {
+                                if (userHit != null) {
+                                  onSearchHitSelected?.call(userHit!);
+                                }
+                                Navigator.of(context).pop(pair.user!.id);
+                              }
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -731,8 +743,12 @@ class _MiniMapRow extends StatelessWidget {
                     : InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: pair.assistant != null
-                            ? () =>
-                                  Navigator.of(context).pop(pair.assistant!.id)
+                            ? () {
+                                if (assistantHit != null) {
+                                  onSearchHitSelected?.call(assistantHit!);
+                                }
+                                Navigator.of(context).pop(pair.assistant!.id);
+                              }
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(

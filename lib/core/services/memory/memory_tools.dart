@@ -874,7 +874,7 @@ abstract final class MemoryTools {
     for (final m in matches) {
       final role = m.messageRole;
       if (role != 'user' && role != 'assistant') continue;
-      final content = (m.messageContent ?? '').trim();
+      final content = (m.searchableText ?? '').trim();
       if (content.isEmpty) continue;
 
       final conv = chatService.getConversation(m.conversationId);

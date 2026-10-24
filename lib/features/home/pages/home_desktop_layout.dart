@@ -107,7 +107,11 @@ class HomeDesktopScaffold extends StatelessWidget {
   final bool globalSearchMode;
   final String globalSearchQuery;
   final ValueChanged<String> onGlobalSearchQueryChanged;
-  final Future<void> Function(String conversationId, String messageId)
+  final Future<void> Function(
+    String conversationId,
+    String messageId,
+    String? surfaceKey,
+  )
   onOpenGlobalSearchResult;
   final void Function(double dx) onSidebarWidthChanged;
   final VoidCallback onSidebarWidthChangeEnd;
@@ -307,7 +311,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                   onGlobalSearchQueryChanged: (_) {},
                   onEnterGlobalSearch: () {},
                   onExitGlobalSearch: () {},
-                  onOpenGlobalSearchResult: (_, __) async {},
+                  onOpenGlobalSearchResult: (_, _, _) async {},
                   onSelectConversation: (id, {closeDrawer = true}) =>
                       onSelectConversation(id),
                   onNewConversation: ({closeDrawer = true}) =>

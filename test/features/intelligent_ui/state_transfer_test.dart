@@ -234,9 +234,8 @@ void main() {
       await seed(repo, [message('r')]);
       await run(db, 'r');
       await save(repo, 'r');
-      await db.customStatement(
-        "UPDATE gen_ui_surface_state_rows SET search_text = 'original semantic cache';",
-      );
+      await repo.rebuildGenUiSearchIndex();
+      final sourceCache = (await rows('source')).single.searchText;
       await save(
         repo,
         'r',
@@ -254,7 +253,9 @@ void main() {
           'chart': {'dataView': true},
         },
       });
-      expect(copiedState.searchText, 'original semantic cache');
+      expect(copiedState.searchText, sourceCache);
+      expect(sourceCache, contains('Value: 1'));
+      expect(sourceCache, isNot(contains('Value: 12')));
       expect(copiedState.sourceHash, (await rows('source')).single.sourceHash);
       expect(copiedState.revisionId, isNot('r'));
       expect(
@@ -264,7 +265,7 @@ void main() {
       expect(
         (await db
                 .customSelect(
-                  "SELECT rowid FROM gen_ui_surface_search WHERE gen_ui_surface_search MATCH 'semantic';",
+                  "SELECT rowid FROM gen_ui_surface_search WHERE gen_ui_surface_search MATCH 'Value';",
                 )
                 .get())
             .length,
@@ -513,7 +514,7 @@ void main() {
       expect(await repo.getConversation(temporary.id), isNull);
       expect(chat.getMessages(temporary.id), isEmpty);
       final copiedRows = await rows(copied.id);
-      expect(copiedRows, hasLength(2));
+      expect(copiedRows, hasLength(3));
       final copiedMessages = chat
           .getMessages(copied.id)
           .where((m) => m.role == 'assistant')
@@ -533,6 +534,11 @@ void main() {
         );
         expect(jsonDecode(row.stateJson)['inputs']['value'], index + 6);
       }
+      final defaultCache = copiedRows.singleWhere(
+        (row) => row.revisionId == copiedMessages.last.id,
+      );
+      expect(defaultCache.stateJson, '{"inputs":{},"view":{}}');
+      expect(defaultCache.searchText, contains('Value: 1'));
       expect(first.parts.whereType<ReasoningPart>(), isNotEmpty);
     },
   );
@@ -600,7 +606,9 @@ void main() {
         sourceMessages: [second],
       ),
     ))!;
-    expect((await tester.runAsync(() => rows(detachedCopy.id)))!, isEmpty);
+    final detachedRows = (await tester.runAsync(() => rows(detachedCopy.id)))!;
+    expect(detachedRows.single.stateJson, '{"inputs":{},"view":{}}');
+    expect(detachedRows.single.searchText, contains('Value: 1'));
   });
 
   for (final path in ['revision', 'messages', 'temporary']) {
@@ -1012,7 +1020,10 @@ void main() {
       "UPDATE gen_ui_surface_state_rows SET source_hash = 'stale';",
     );
     final copied = (await repo.duplicateConversation('source'))!;
-    expect(await rows(copied.id), isEmpty);
+    final copiedState = (await rows(copied.id)).single;
+    expect(copiedState.stateJson, '{"inputs":{},"view":{}}');
+    expect(copiedState.sourceHash, isNot('stale'));
+    expect(copiedState.searchText, contains('Value: 1'));
   });
 
   test(

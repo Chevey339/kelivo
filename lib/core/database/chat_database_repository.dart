@@ -1,3 +1,7 @@
+import 'package:Kelivo/utils/utf16_safe_cut.dart';
+import 'package:Kelivo/features/search/utils/searchable_text.dart';
+import 'package:Kelivo/features/intelligent_ui/storage/ui_search_index.dart';
+import 'package:Kelivo/features/intelligent_ui/text/ui_search_text.dart';
 import '../../features/intelligent_ui/host/ui_context_submission.dart';
 import '../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
@@ -175,6 +179,17 @@ class ChatDatabaseRepository {
     getMessage,
     lifetimeZone: _lifetimeZone,
   );
+  late final _genUiSearch = UiSearchIndex(
+    _db,
+    readMessages: getMessagesByIds,
+    transaction: (action) => _writeTransaction(action),
+  );
+
+  Future<void> rebuildGenUiSearchIndex() => _genUiSearch.rebuild();
+
+  Future<void> _sealGenUiSearch(Iterable<String> ids) =>
+      _genUiSearch.sealRevisions(ids);
+
   late final ComposerDraftStore composerDrafts = ComposerDraftStore(
     _db,
     writeTransaction: _writeTransaction,
@@ -216,14 +231,18 @@ class ChatDatabaseRepository {
     required GenerationRunState nextState,
     required DateTime updatedAt,
     String? errorCode,
-  }) => GenerationRunCommands(_db).transition(
-    id: id,
-    expectedState: expectedState,
-    expectedStateRevision: expectedStateRevision,
-    nextState: nextState,
-    updatedAt: updatedAt,
-    errorCode: errorCode,
-  );
+  }) => _writeTransaction(() async {
+    final run = await GenerationRunCommands(_db).transition(
+      id: id,
+      expectedState: expectedState,
+      expectedStateRevision: expectedStateRevision,
+      nextState: nextState,
+      updatedAt: updatedAt,
+      errorCode: errorCode,
+    );
+    await _sealGenUiSearch([run.targetRevisionId]);
+    return run;
+  });
 
   Future<GenerationRun> checkpointGenerationRun({
     required String id,
@@ -259,7 +278,7 @@ class ChatDatabaseRepository {
           generationRunId: checkpointSeq == null ? null : generationRunId,
           checkpointSeq: checkpointSeq,
         );
-        return GenerationRunCommands(_db).transition(
+        final run = await GenerationRunCommands(_db).transition(
           id: generationRunId,
           expectedState: expectedState,
           expectedStateRevision: expectedStateRevision,
@@ -267,6 +286,8 @@ class ChatDatabaseRepository {
           updatedAt: DateTime.now().toUtc(),
           errorCode: errorCode,
         );
+        await _sealGenUiSearch([run.targetRevisionId]);
+        return run;
       }),
     );
   }
@@ -2853,15 +2874,17 @@ class ChatDatabaseRepository {
   }) async {
     final needle = query.trim().toLowerCase();
     if (needle.isEmpty) return const <MiniMapSearchHit>[];
-    final radius = snippetRadius < 0 ? 0 : snippetRadius;
-    final length = miniMapSnippetLength(
-      needleLength: needle.length,
-      snippetRadius: snippetRadius,
-      snippetLength: snippetLength,
-    );
-    final rows = await _db
-        .customSelect(
-          '''
+    await _genUiSearch.ensure();
+    return _db.transaction(() async {
+      final radius = snippetRadius < 0 ? 0 : snippetRadius;
+      final length = miniMapSnippetLength(
+        needleLength: needle.length,
+        snippetRadius: snippetRadius,
+        snippetLength: snippetLength,
+      );
+      final rows = await _db
+          .customSelect(
+            '''
           WITH group_rows AS (
             SELECT
               COALESCE(m.group_id, m.id) AS group_id,
@@ -2915,6 +2938,7 @@ class ChatDatabaseRepository {
           )
           SELECT
             ranked.id AS message_id,
+            CASE WHEN ranked.role='assistant' AND INSTR(t.txt, 'kelivo-ui') > 0 THEN t.txt END AS message_content,
             (LENGTH(t.txt) - LENGTH(REPLACE(LOWER(t.txt), p.needle, '')))
               / LENGTH(p.needle) AS match_count,
             SUBSTR(
@@ -2928,34 +2952,83 @@ class ChatDatabaseRepository {
           CROSS JOIN params p
           WHERE ranked.version_rank = 1
             AND ranked.role IN ('user', 'assistant')
-            AND INSTR(LOWER(t.txt), p.needle) > 0
+            AND (INSTR(LOWER(t.txt), p.needle) > 0 OR EXISTS (
+              SELECT 1 FROM gen_ui_surface_state_rows u WHERE u.revision_id=ranked.id
+                AND INSTR(LOWER(u.search_text), p.needle) > 0
+            ))
           ORDER BY ranked.anchor_order, ranked.group_id;
           ''',
-          variables: [
-            Variable<String>(conversationId),
-            Variable<String>(conversationId),
-            Variable<String>(conversationId),
-            Variable<String>(conversationId),
-            Variable<String>(needle),
-            Variable<int>(radius),
-            Variable<int>(length),
-          ],
-          readsFrom: {
-            _db.conversationRows,
-            _db.messageRows,
-            _db.messagePartRows,
-          },
-        )
-        .get();
-    return [
-      for (final row in rows)
-        MiniMapSearchHit(
-          messageId: row.read<String>('message_id'),
-          matchCount: row.read<int>('match_count'),
-          snippet: row.readNullable<String>('snippet') ?? '',
-          snippetStart: row.read<int>('snippet_start') - 1,
-        ),
-    ];
+            variables: [
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(needle),
+              Variable<int>(radius),
+              Variable<int>(length),
+            ],
+            readsFrom: {
+              _db.conversationRows,
+              _db.messageRows,
+              _db.messagePartRows,
+              _db.genUiSurfaceStateRows,
+            },
+          )
+          .get();
+      final projections = await _searchTextForCandidates({
+        for (final row in rows)
+          if (row.readNullable<String>('message_content') != null)
+            row.read<String>('message_id'),
+      });
+      final result = <MiniMapSearchHit>[];
+      for (final row in rows) {
+        final id = row.read<String>('message_id');
+        final projection = projections[id];
+        if (projection == null) {
+          result.add(
+            MiniMapSearchHit(
+              messageId: id,
+              matchCount: row.read<int>('match_count'),
+              snippet: row.readNullable<String>('snippet') ?? '',
+              snippetStart: row.read<int>('snippet_start') - 1,
+            ),
+          );
+          continue;
+        }
+        // Match SQLite's existing ASCII case-folding without changing UTF-16
+        // offsets (some Unicode lowercase mappings change string length).
+        final lower = projection.text.replaceAllMapped(
+          RegExp('[A-Z]'),
+          (m) => m[0]!.toLowerCase(),
+        );
+        final matches = RegExp(
+          RegExp.escape(needle),
+        ).allMatches(lower).toList();
+        if (matches.isEmpty) {
+          continue; // DSL-only candidates are not visible hits.
+        }
+        final offset = matches.first.start;
+        final from = utf16SafeTailStart(
+          projection.text,
+          (offset - radius).clamp(0, projection.text.length),
+        );
+        final to = utf16SafeHeadEnd(
+          projection.text,
+          (from + length).clamp(from, projection.text.length),
+        );
+        result.add(
+          MiniMapSearchHit(
+            messageId: id,
+            matchCount: matches.length,
+            snippet: projection.text.substring(from, to),
+            snippetStart: from,
+            searchableText: projection.text,
+            matchedSurfaceKey: projection.surfaceAt(offset),
+          ),
+        );
+      }
+      return result;
+    });
   }
 
   Future<Set<String>> getMessageIdsForGroups(
@@ -3329,198 +3402,295 @@ class ChatDatabaseRepository {
     String? assistantId,
   }) async {
     final cleanTokens = tokens
-        .map((token) => token.trim().toLowerCase())
-        .where((token) => token.isNotEmpty)
-        .toList(growable: false);
-    if (cleanTokens.isEmpty || limit <= 0) {
-      return const <ConversationSearchMatch>[];
-    }
+        .map((t) => t.trim().toLowerCase())
+        .where((t) => t.isNotEmpty)
+        .toSet()
+        .toList();
+    if (cleanTokens.isEmpty || limit <= 0) return const [];
     await _ensureMessageSearchFts();
-    final useSubstringFallback = cleanTokens.any(_requiresCjkFallback);
-
-    String escapeLike(String value) => value
-        .replaceAll(r'\', r'\\')
-        .replaceAll('%', r'\%')
-        .replaceAll('_', r'\_');
-
-    final titleClauses = <String>[];
-    final existsClauses = <String>[];
-    final messageAnyClauses = <String>[];
-    final titleArgs = <Object?>[];
-    final existsArgs = <Object?>[];
-    final messageArgs = <Object?>[];
-    for (final token in cleanTokens) {
-      final pattern = '%${escapeLike(token)}%';
-      titleClauses.add('LOWER(c.title) LIKE ? ESCAPE \'\\\'');
-      titleArgs.add(pattern);
-      existsClauses.add('''
-        EXISTS (
-          SELECT 1 FROM message_rows mx
-          WHERE mx.conversation_id = c.id
-            AND mx.role IN ('user', 'assistant')
-            AND EXISTS (
-              SELECT 1 FROM message_part_rows px
-              WHERE px.revision_id = mx.id
-                AND px.kind = 'text'
-                AND LOWER(px.payload) LIKE ? ESCAPE '\\'
-            )
-            ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM visible_groups visible WHERE visible.conversation_id = mx.conversation_id AND visible.group_id = COALESCE(mx.group_id, mx.id) AND visible.selected_version = mx.version)'}
-        )
-        ''');
-      existsArgs.add(pattern);
-      if (useSubstringFallback) {
-        messageAnyClauses.add('''
-          EXISTS (
-            SELECT 1 FROM message_part_rows px
-            WHERE px.revision_id = m.id
-              AND px.kind = 'text'
-              AND LOWER(px.payload) LIKE ? ESCAPE '\\'
-          )
-          ''');
-        messageArgs.add(pattern);
+    await _genUiSearch.ensure();
+    return _db.transaction(() async {
+      final useSubstringFallback = cleanTokens.any(_requiresCjkFallback);
+      String escapeLike(String value) => value
+          .replaceAll(r'\', r'\\')
+          .replaceAll('%', r'\%')
+          .replaceAll('_', r'\_');
+      final tokenJson = jsonEncode([
+        for (final token in cleanTokens)
+          {
+            'pattern': '%${escapeLike(token)}%',
+            'fts': '"${token.replaceAll('"', '""')}"',
+          },
+      ]);
+      // Two fixed SELECTs, independent of token count. One UNION per token hits
+      // SQLite's compound SELECT ceiling for an otherwise valid long query.
+      final hits = useSubstringFallback
+          ? '''
+      SELECT t.token_index, p.revision_id FROM tokens t CROSS JOIN message_part_rows p
+      WHERE p.kind='text' AND LOWER(p.payload) LIKE t.pattern ESCAPE '\\'
+      UNION
+      SELECT t.token_index, s.revision_id FROM tokens t CROSS JOIN gen_ui_surface_state_rows s
+      WHERE LOWER(s.search_text) LIKE t.pattern ESCAPE '\\'
+    '''
+          : '''
+      SELECT t.token_index, f.revision_id FROM tokens t CROSS JOIN message_search_fts f
+      WHERE f.payload MATCH t.fts
+      UNION
+      SELECT t.token_index, s.revision_id FROM tokens t CROSS JOIN gen_ui_surface_search f
+      JOIN gen_ui_surface_state_rows s ON s.rowid=f.rowid WHERE f.search_text MATCH t.fts
+    ''';
+      final scopeArgs = <Variable>[];
+      var scopeSql = '';
+      if (conversationId != null && conversationId.isNotEmpty) {
+        scopeSql = 'AND c.id = ?';
+        scopeArgs.add(Variable<String>(conversationId));
+      } else if (excludeConversationId != null &&
+          excludeConversationId.isNotEmpty) {
+        scopeSql = 'AND c.id <> ?';
+        scopeArgs.add(Variable<String>(excludeConversationId));
       }
-    }
-    final ftsQuery = cleanTokens
-        .map((token) => '"${token.replaceAll('"', '""')}"')
-        .join(' AND ');
-    if (!useSubstringFallback) {
-      messageAnyClauses.add(
-        'm.id IN (SELECT revision_id FROM message_search_fts '
-        'WHERE payload MATCH ?)',
-      );
-      messageArgs.add(ftsQuery);
-      existsClauses
-        ..clear()
-        ..add('''
-        EXISTS (
-          SELECT 1 FROM message_search_fts fx
-          WHERE fx.conversation_id = c.id AND fx.payload MATCH ?
-            ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM visible_groups visible INNER JOIN message_rows selected ON selected.id = fx.revision_id WHERE visible.conversation_id = selected.conversation_id AND visible.group_id = COALESCE(selected.group_id, selected.id) AND visible.selected_version = selected.version)'}
-        )
-        ''');
-      existsArgs
-        ..clear()
-        ..add(ftsQuery);
-    }
-
-    // Applied alongside the match predicate so the candidate LIMIT is spent on
-    // rows the caller can actually use.
-    final scopeArgs = <String>[];
-    var scopeSql = '';
-    if (conversationId != null && conversationId.isNotEmpty) {
-      scopeSql = 'AND c.id = ?';
-      scopeArgs.add(conversationId);
-    } else if (excludeConversationId != null &&
-        excludeConversationId.isNotEmpty) {
-      scopeSql = 'AND c.id <> ?';
-      scopeArgs.add(excludeConversationId);
-    }
-    if (assistantId != null && assistantId.isNotEmpty) {
-      scopeSql += ' AND (c.assistant_id = ? OR c.assistant_id IS NULL)';
-      scopeArgs.add(assistantId);
-    }
-
-    final candidateLimit = (limit * candidateMultiplier)
-        .clamp(limit, 2000)
-        .toInt();
-    final rows = await _db
-        .customSelect(
+      if (assistantId != null && assistantId.isNotEmpty) {
+        scopeSql += ' AND (c.assistant_id = ? OR c.assistant_id IS NULL)';
+        scopeArgs.add(Variable<String>(assistantId));
+      }
+      final candidateLimit = (limit * candidateMultiplier)
+          .clamp(limit, 2000)
+          .toInt();
+      final query =
           '''
       WITH selections AS (
-        SELECT c.id AS conversation_id, j.key AS group_id,
-               CAST(j.value AS INTEGER) AS selected_version
+        SELECT c.id AS conversation_id, j.key AS group_id, CAST(j.value AS INTEGER) AS selected_version
         FROM conversation_rows c, json_each(c.version_selections_json) j
       ), visible_groups AS (
-        SELECT
-          m.conversation_id,
-          COALESCE(m.group_id, m.id) AS group_id,
+        SELECT m.conversation_id, COALESCE(m.group_id,m.id) AS group_id,
           MAX(m.version) AS max_version,
-          COALESCE(
-            MAX(CASE
-              WHEN m.version = s.selected_version THEN m.version
-            END),
-            MAX(m.version)
-          ) AS selected_version
-        FROM message_rows m
-        LEFT JOIN selections s
-          ON s.conversation_id = m.conversation_id
-         AND s.group_id = COALESCE(m.group_id, m.id)
-        GROUP BY m.conversation_id, COALESCE(m.group_id, m.id)
-      )
-      SELECT
-        c.id AS conversation_id,
-        c.title AS conversation_title,
-        c.updated_at AS updated_at,
-        m.id AS message_id,
-        (
-          SELECT px.payload
-          FROM message_part_rows px
-          WHERE px.revision_id = m.id AND px.kind = 'text'
-          ORDER BY px.ordinal
-          LIMIT 1
-        ) AS message_content,
-        m.role AS message_role,
-        m.group_id AS group_id,
-        m.version AS version,
-        m.message_order AS message_order,
-        (
-          SELECT visible.selected_version
-          FROM visible_groups visible
-          WHERE visible.conversation_id = m.conversation_id
-            AND visible.group_id = COALESCE(m.group_id, m.id)
-          LIMIT 1
-        ) AS selected_version,
-        (
-          SELECT visible.max_version
-          FROM visible_groups visible
-          WHERE visible.conversation_id = m.conversation_id
-            AND visible.group_id = COALESCE(m.group_id, m.id)
-          LIMIT 1
-        ) AS max_version
+          COALESCE(MAX(CASE WHEN m.version=s.selected_version THEN m.version END), MAX(m.version)) AS selected_version
+        FROM message_rows m LEFT JOIN selections s
+          ON s.conversation_id=m.conversation_id AND s.group_id=COALESCE(m.group_id,m.id)
+        GROUP BY m.conversation_id, COALESCE(m.group_id,m.id)
+      ), tokens AS (
+        SELECT CAST(key AS INTEGER) AS token_index, json_extract(value,'\$.pattern') AS pattern,
+          json_extract(value,'\$.fts') AS fts FROM json_each(?)
+      ), token_hits AS ($hits)
+      SELECT c.id AS conversation_id, c.title AS conversation_title, c.updated_at,
+        m.id AS message_id, m.role AS message_role, m.group_id, m.version,
+        (SELECT GROUP_CONCAT(payload, '') FROM (
+          SELECT px.payload FROM message_part_rows px WHERE px.revision_id=m.id AND px.kind='text' ORDER BY px.ordinal
+        )) AS message_content,
+        v.selected_version, v.max_version
       FROM conversation_rows c
-      LEFT JOIN message_rows m
-        ON m.conversation_id = c.id
-        AND m.role IN ('user', 'assistant')
-        AND (${messageAnyClauses.join(' OR ')})
-        ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM visible_groups visible WHERE visible.conversation_id = m.conversation_id AND visible.group_id = COALESCE(m.group_id, m.id) AND visible.selected_version = m.version)'}
-      WHERE ((${titleClauses.join(' AND ')}) OR (${existsClauses.join(' AND ')}))
-        $scopeSql
-      ORDER BY c.updated_at DESC, m.message_order ASC
-      LIMIT ?
-      ''',
-          variables: [
-            ...messageArgs.map((value) => Variable<String>(value! as String)),
-            ...titleArgs.map((value) => Variable<String>(value! as String)),
-            ...existsArgs.map((value) => Variable<String>(value! as String)),
-            ...scopeArgs.map(Variable<String>.new),
-            Variable<int>(candidateLimit),
-          ],
-        )
-        .get();
+      LEFT JOIN message_rows m ON m.conversation_id=c.id AND m.role IN ('user','assistant')
+        AND m.id IN (SELECT revision_id FROM token_hits)
+        ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM visible_groups visible WHERE visible.conversation_id=m.conversation_id AND visible.group_id=COALESCE(m.group_id,m.id) AND visible.selected_version=m.version)'}
+      LEFT JOIN visible_groups v ON v.conversation_id=m.conversation_id AND v.group_id=COALESCE(m.group_id,m.id)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM tokens t WHERE NOT (LOWER(c.title) LIKE t.pattern ESCAPE '\\' OR EXISTS (
+          SELECT 1 FROM token_hits h JOIN message_rows mx ON mx.id=h.revision_id
+          WHERE h.token_index=t.token_index AND mx.conversation_id=c.id AND mx.role IN ('user','assistant')
+            ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM visible_groups v WHERE v.conversation_id=mx.conversation_id AND v.group_id=COALESCE(mx.group_id,mx.id) AND v.selected_version=mx.version)'}
+        ))
+      ) $scopeSql
+      ORDER BY c.updated_at DESC, c.id, m.message_order ASC, m.id
+      LIMIT ? OFFSET ?
+    ''';
+      final matches = <ConversationSearchMatch>[];
+      var group =
+          <({ConversationSearchMatch match, Set<String> tokens, int order})>[];
+      var groupTokens = <String>{};
+      var counts = <String, int>{};
+      String? groupId;
+      ConversationSearchMatch? titleCandidate;
+      var groupHasUi = false;
+      var order = 0;
+      bool coversTokens() => cleanTokens.every(groupTokens.contains);
+      void finishGroup() {
+        if (!groupHasUi || coversTokens()) {
+          final evidence = Set<String>.unmodifiable(groupTokens);
+          final selected =
+              (groupHasUi ? group.where((row) => row.tokens.isNotEmpty) : group)
+                  .toList()
+                ..sort((a, b) => a.order.compareTo(b.order));
+          if (selected.isEmpty &&
+              titleCandidate != null &&
+              cleanTokens.every(
+                titleCandidate!.conversationTitle.toLowerCase().contains,
+              )) {
+            matches.add(titleCandidate!.withVerifiedTokens(evidence));
+          } else {
+            matches.addAll(
+              selected
+                  .take(candidateLimit - matches.length)
+                  .map((row) => row.match.withVerifiedTokens(evidence)),
+            );
+          }
+        }
+        group = [];
+        groupTokens = {};
+        counts = {};
+        titleCandidate = null;
+        groupHasUi = false;
+      }
 
-    return rows
-        .map((row) {
-          final groupId = row.readNullable<String>('group_id');
+      void retain(ConversationSearchMatch match, Set<String> hits) {
+        final row = (match: match, tokens: hits, order: order++);
+        final capacity = candidateLimit - matches.length;
+        if (group.length < capacity) {
+          group.add(row);
+        } else {
+          final empty = hits.isEmpty
+              ? -1
+              : group.lastIndexWhere((old) => old.tokens.isEmpty);
+          if (empty < 0 && hits.every(counts.containsKey)) return;
+          // Replace a redundant snippet with new keyword evidence, without
+          // retaining an unbounded conversation or solving set cover.
+          final index = empty >= 0
+              ? empty
+              : group.lastIndexWhere(
+                  (old) => old.tokens.every(
+                    (t) => (counts[t] ?? 0) > 1 || hits.contains(t),
+                  ),
+                );
+          if (index < 0) return;
+          for (final token in group[index].tokens) {
+            final count = counts[token]! - 1;
+            if (count == 0) {
+              counts.remove(token);
+            } else {
+              counts[token] = count;
+            }
+          }
+          group[index] = row;
+        }
+        for (final token in hits) {
+          counts[token] = (counts[token] ?? 0) + 1;
+        }
+      }
+
+      var offset = 0;
+      // Raw FTS can nominate source-only symbols. Page it in bounded batches so
+      // discarded DSL rows do not consume the final visible candidate budget.
+      // Coverage is independent of retained snippets: all visible sources
+      // contribute to AND before the final bounded candidates are returned.
+      while (matches.length < candidateLimit) {
+        final rows = await _db
+            .customSelect(
+              query,
+              variables: [
+                Variable<String>(tokenJson),
+                ...scopeArgs,
+                const Variable<int>(64),
+                Variable<int>(offset),
+              ],
+            )
+            .get();
+        if (rows.isEmpty) {
+          finishGroup();
+          break;
+        }
+        offset += rows.length;
+        final uiText = await _searchTextForCandidates({
+          for (final row in rows)
+            if (row.readNullable<String>('message_role') == 'assistant' &&
+                (row
+                        .readNullable<String>('message_content')
+                        ?.contains('kelivo-ui') ??
+                    false))
+              row.read<String>('message_id'),
+        }, hideInternalBlocks: true);
+        for (final row in rows) {
+          final conversation = row.read<String>('conversation_id');
+          if (groupId != conversation) {
+            finishGroup();
+            if (matches.length >= candidateLimit) break;
+            groupId = conversation;
+          }
           final messageId = row.readNullable<String>('message_id');
-          final effectiveGroupId = groupId ?? messageId;
-          final selectedVersion = row.readNullable<int>('selected_version');
-          return ConversationSearchMatch(
-            conversationId: row.read<String>('conversation_id'),
-            conversationTitle: row.read<String>('conversation_title'),
-            updatedAt: _dateTimeFromSqlite(row.read<int>('updated_at')),
-            versionSelections:
-                effectiveGroupId == null || selectedVersion == null
-                ? const {}
-                : {effectiveGroupId: selectedVersion},
-            messageId: messageId,
-            messageContent: row.readNullable<String>('message_content'),
-            messageRole: row.readNullable<String>('message_role'),
-            groupId: groupId,
-            version: row.readNullable<int>('version'),
-            maxVersion: row.readNullable<int>('max_version'),
+          final projected = uiText[messageId];
+          final isUi = projected?.surfaces.isNotEmpty == true;
+          groupHasUi |= isUi;
+          final raw = row.readNullable<String>('message_content');
+          final searchable =
+              projected?.text ??
+              (raw == null ? null : stripHiddenSearchBlocks(raw));
+          final title = row.read<String>('conversation_title');
+          final titleHits = cleanTokens
+              .where(title.toLowerCase().contains)
+              .toSet();
+          final visibleHits = cleanTokens
+              .where((searchable ?? '').toLowerCase().contains)
+              .toSet();
+          groupTokens.addAll(titleHits);
+          groupTokens.addAll(visibleHits);
+          final updated = _dateTimeFromSqlite(row.read<int>('updated_at'));
+          titleCandidate ??= ConversationSearchMatch(
+            conversationId: conversation,
+            conversationTitle: title,
+            updatedAt: updated,
+            versionSelections: const {},
+            messageId: null,
+            messageContent: null,
+            searchableText: null,
+            messageRole: null,
+            groupId: null,
+            version: null,
+            maxVersion: null,
           );
-        })
-        .toList(growable: false);
+          if (messageId == null || (isUi && visibleHits.isEmpty)) continue;
+          final rawGroupId = row.readNullable<String>('group_id');
+          final effectiveGroupId = rawGroupId ?? messageId;
+          final selectedVersion = row.readNullable<int>('selected_version');
+          retain(
+            ConversationSearchMatch(
+              conversationId: conversation,
+              conversationTitle: title,
+              updatedAt: updated,
+              versionSelections: selectedVersion == null
+                  ? const {}
+                  : {effectiveGroupId: selectedVersion},
+              messageId: messageId,
+              messageContent: raw,
+              searchableText: searchable,
+              matchedSurfaceKey: projected?.matchedSurface(cleanTokens),
+              messageRole: row.readNullable<String>('message_role'),
+              groupId: rawGroupId,
+              version: row.readNullable<int>('version'),
+              maxVersion: row.readNullable<int>('max_version'),
+            ),
+            visibleHits,
+          );
+          final publishable = groupHasUi
+              ? group.where((row) => row.tokens.isNotEmpty).length
+              : group.length;
+          if (publishable >= candidateLimit - matches.length &&
+              coversTokens()) {
+            finishGroup();
+            break;
+          }
+        }
+      }
+      return matches;
+    });
+  }
+
+  Future<Map<String, UiSearchText>> _searchTextForCandidates(
+    Set<String> ids, {
+    bool hideInternalBlocks = false,
+  }) async {
+    final result = <String, UiSearchText>{};
+    final values = ids.toList();
+    for (var from = 0; from < values.length; from += 32) {
+      final batch = values.skip(from).take(32).toList();
+      final messages = await getMessagesByIds(batch);
+      final cached = await _genUiSearch.read(batch);
+      for (final message in messages) {
+        result[message.id] = uiSearchableText(
+          message,
+          cached[message.id] ?? const {},
+          ordinaryText: hideInternalBlocks ? stripHiddenSearchBlocks : null,
+        );
+      }
+    }
+    return result;
   }
 
   Future<ChatStatsAggregate> queryStatsAggregate({
@@ -4481,13 +4651,14 @@ class ChatDatabaseRepository {
     required Map<String, UiRevisionTransfer> sources,
     required Map<String, String> messageIdMap,
     required String targetConversationId,
-  }) => _writeTransaction(
-    () => UiStateTransfer(_db).copy(
+  }) => _writeTransaction(() async {
+    await UiStateTransfer(_db).copy(
       sources: sources,
       messageIdMap: messageIdMap,
       targetConversationId: targetConversationId,
-    ),
-  );
+    );
+    await _sealGenUiSearch(messageIdMap.values);
+  });
 
   Future<void> _copyMessageRowsInto({
     required String targetConversationId,
@@ -4560,6 +4731,7 @@ class ChatDatabaseRepository {
       messageIdMap: messageIdMap,
       targetConversationId: targetConversationId,
     );
+    await _sealGenUiSearch(messageIdMap.values);
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT revision_id FROM message_asset_rows WHERE conversation_id = ? '
@@ -5155,6 +5327,9 @@ class ChatDatabaseRepository {
         );
       }
     });
+    if (!message.isStreaming && UiMessageSource.of(parts).hasCandidate) {
+      await _sealGenUiSearch([message.id]);
+    }
   }
 
   Future<PersistedChatMessage?> appendMessageVersion({
@@ -6176,6 +6351,7 @@ class ChatDatabaseRepository {
       messageIdMap: messageIdMap,
       targetConversationId: targetId,
     );
+    await _sealGenUiSearch(messageIdMap.values);
     // Merged revisions bypass _replaceMessageParts, so queue the
     // attachment-bearing ones for the asset-reference backfill before GC can
     // treat their files as unreferenced.
@@ -6368,6 +6544,10 @@ class ChatDatabaseRepository {
       if (content == null && reasoningText == null && parts == null) {
         if (reasoningSegmentsJson != null) {
           await genUiStates.reconcileSource(updated);
+        }
+        if ((reasoningSegmentsJson != null || isStreaming != null) &&
+            UiMessageSource.of(updated.parts).hasCandidate) {
+          await _genUiSearch.seal(updated);
         }
         return updated;
       }
@@ -8378,6 +8558,9 @@ class ConversationSearchMatch {
     required this.versionSelections,
     required this.messageId,
     required this.messageContent,
+    required this.searchableText,
+    this.matchedSurfaceKey,
+    this.verifiedTokens = const {},
     required this.messageRole,
     required this.groupId,
     required this.version,
@@ -8390,6 +8573,29 @@ class ConversationSearchMatch {
   final Map<String, int> versionSelections;
   final String? messageId;
   final String? messageContent;
+  final String? searchableText;
+  final String? matchedSurfaceKey;
+
+  /// Tokens verified against all visible sources in the same read transaction,
+  /// before the bounded snippet candidates are selected. Never raw FTS proof.
+  final Set<String> verifiedTokens;
+
+  ConversationSearchMatch withVerifiedTokens(Set<String> tokens) =>
+      ConversationSearchMatch(
+        conversationId: conversationId,
+        conversationTitle: conversationTitle,
+        updatedAt: updatedAt,
+        versionSelections: versionSelections,
+        messageId: messageId,
+        messageContent: messageContent,
+        searchableText: searchableText,
+        matchedSurfaceKey: matchedSurfaceKey,
+        messageRole: messageRole,
+        groupId: groupId,
+        version: version,
+        maxVersion: maxVersion,
+        verifiedTokens: tokens,
+      );
   final String? messageRole;
   final String? groupId;
   final int? version;
@@ -8402,12 +8608,18 @@ class MiniMapSearchHit {
     required this.matchCount,
     required this.snippet,
     required this.snippetStart,
+    this.searchableText,
+    this.matchedSurfaceKey,
   });
 
   final String messageId;
   final int matchCount;
   final String snippet;
+
+  /// Offset into the independent searchable text, never a Markdown selection.
   final int snippetStart;
+  final String? searchableText;
+  final String? matchedSurfaceKey;
 }
 
 /// Grows the snippet window so the first hit is not cut mid-keyword.

@@ -100,7 +100,11 @@ class SideDrawer extends StatefulWidget {
   final ValueChanged<String>? onGlobalSearchQueryChanged;
   final VoidCallback? onEnterGlobalSearch;
   final VoidCallback? onExitGlobalSearch;
-  final Future<void> Function(String conversationId, String messageId)?
+  final Future<void> Function(
+    String conversationId,
+    String messageId,
+    String? surfaceKey,
+  )?
   onOpenGlobalSearchResult;
 
   /// Number of times the conversation-list area has (re)built. The sidebar
@@ -1311,6 +1315,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       await widget.onOpenGlobalSearchResult?.call(
                         result.conversationId,
                         result.firstMatchedMessageId,
+                        result.matchedSurfaceKey,
                       );
                     },
                     child: AnimatedContainer(

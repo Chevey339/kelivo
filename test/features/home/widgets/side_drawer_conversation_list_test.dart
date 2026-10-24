@@ -221,7 +221,7 @@ void main() {
                   onGlobalSearchQueryChanged: (_) {},
                   onEnterGlobalSearch: () {},
                   onExitGlobalSearch: () {},
-                  onOpenGlobalSearchResult: (_, _) async {},
+                  onOpenGlobalSearchResult: (_, _, _) async {},
                   body: const SizedBox.expand(),
                 ),
               )

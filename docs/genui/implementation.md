@@ -947,3 +947,38 @@ build/genui/c17/. Final G passed: both fatal-info analyses, all 9,840 root tests
 debug native build, and diff checks. All 52 non-document files retained their
 frozen hashes during the successful gate. Forty-four changed Dart files were
 formatted. Final independent review returned no findings.
+
+## C18 — semantic search and surface navigation
+
+Completion now seals a bounded initial-state search projection independently of
+widget mounting. The separate GenUI FTS index is rebuilt in coordinated batches
+of 32 messages; updates affect search_text only and retain saved inputs, view
+state and timestamps. Copy, fork, merge, metadata-only changes and durable
+stream completion use the same seal path. Deleted owners retain no FTS rows.
+
+Global search combines title, ordinary body and UI semantics per keyword before
+applying the conversation-level AND. Raw DSL hits are rechecked against visible
+text before consuming the existing candidate budget. Bounded candidates retain
+transaction-local proof for keywords distributed across different messages;
+they do not fabricate a merged body or original-source character offsets. The
+SQL uses two fixed sources and JSON token iteration, including long queries.
+Minimap uses the same semantic projection and carries a revision/surface owner.
+Both global and minimap navigation reveal the actual surface after the message
+has mounted. Literal UI text is not stripped as hidden reasoning metadata.
+
+Focused tests cover cross-source and cross-surface keywords, CJK, selected
+revisions, original split TextParts, durable completion, metadata changes,
+unseen restore search, cache damage/rebuild, unchanged user state and time,
+copy, deletion, candidate page boundaries, long queries and emoji snippets.
+The 137-test owner/navigation run and four persistence widget tests passed.
+The broader feature run initially passed 689 tests and failed two old
+no-cache assertions: default search rows now legitimately precede interaction.
+Those tests now compare the complete initial row, preserving their checks that
+IME composition and incomplete numeric drafts never alter state or time.
+Independent review of the actual diff and this final test correction returned
+no findings. Final G passed: both fatal-info analyses, all 9,866 root tests
+(one existing skip), markstream dependency resolution and all 298 tests,
+macOS debug native build, and diff checks. All 25 non-document files retained
+their frozen hashes throughout the gate. The 25 changed Dart files were formatted.
+The file manifest, review result and logs use build/genui/c18/ and
+build/genui/logs/c18-*.

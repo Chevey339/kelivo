@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_draft_staging.dart';
 import '../../intelligent_ui/host/ui_draft_request.dart';
@@ -1287,9 +1288,12 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  final uiSearchNavigation = UiSearchNavigation();
+
   Future<void> openGlobalSearchResult({
     required String conversationId,
     required String messageId,
+    String? surfaceKey,
   }) async {
     await switchConversationAnimated(conversationId);
     // Wait one extra frame so the new conversation's indexed message list is
@@ -1298,7 +1302,7 @@ class HomePageController extends ChangeNotifier {
       await WidgetsBinding.instance.endOfFrame;
     } catch (_) {}
     if (messageId.isNotEmpty) {
-      await scrollToMessageId(messageId);
+      await scrollToMessageId(messageId, surfaceKey: surfaceKey);
       _spotlightMessageId = messageId;
       _spotlightToken++;
       notifyListeners();
@@ -3706,8 +3710,11 @@ class HomePageController extends ChangeNotifier {
   Future<void> scrollToMessageId(
     String targetId, {
     bool useRikkaTransition = false,
+    String? surfaceKey,
   }) async {
     _warmupSerial++;
+    uiSearchNavigation.clear();
+    final conversationId = currentConversation?.id;
     if (useRikkaTransition) {
       try {
         await _messageJumpTransitionController.reverse();
@@ -3728,6 +3735,11 @@ class HomePageController extends ChangeNotifier {
         targetId: targetId,
         targetIndex: index,
       );
+      if (surfaceKey != null &&
+          conversationId != null &&
+          currentConversation?.id == conversationId) {
+        uiSearchNavigation.reveal(conversationId, targetId, surfaceKey);
+      }
     } finally {
       if (useRikkaTransition) {
         try {
@@ -4075,6 +4087,7 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    uiSearchNavigation.dispose();
     final owner = _composerOwner;
     final drafts = _composerDrafts;
     final edit = owner == null ? null : drafts?.peek(owner)?.editMessageId;

@@ -41,6 +41,8 @@ void main() {
   Future<void> pumpSheet(
     WidgetTester tester, {
     Future<List<MiniMapSearchHit>> Function(String query)? onSearch,
+    ValueChanged<MiniMapSearchHit>? onSearchHitSelected,
+    ValueChanged<String?>? onResult,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -52,7 +54,14 @@ void main() {
               body: TextButton(
                 onPressed: () {
                   unawaited(
-                    showMiniMapSheet(context, messages, onSearch: onSearch),
+                    showMiniMapSheet(
+                      context,
+                      messages,
+                      onSearch: onSearch,
+                      onSearchHitSelected: onSearchHitSelected,
+                    ).then<void>((value) {
+                      onResult?.call(value);
+                    }),
                   );
                 },
                 child: const Text('open'),
@@ -312,4 +321,32 @@ void main() {
     }
     expect(highlighted, ['foo bar']);
   });
+  testWidgets(
+    'selecting a semantic hit returns its revision and explicit surface address',
+    (tester) async {
+      const hit = MiniMapSearchHit(
+        messageId: 'asst-1',
+        matchCount: 1,
+        snippet: 'Target result: 42',
+        snippetStart: 0,
+        matchedSurfaceKey: '0:1',
+      );
+      MiniMapSearchHit? selected;
+      String? revision;
+      await pumpSheet(
+        tester,
+        onSearch: (_) async => [hit],
+        onSearchHitSelected: (value) => selected = value,
+        onResult: (value) => revision = value,
+      );
+      await openSearch(tester);
+      await tester.enterText(find.byType(TextField), 'Target');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Target result: 42', findRichText: true));
+      await tester.pumpAndSettle();
+      expect(selected, same(hit));
+      expect(revision, 'asst-1');
+    },
+  );
 }

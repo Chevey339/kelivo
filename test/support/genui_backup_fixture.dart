@@ -179,9 +179,7 @@ final class GenUiBackupFixture {
     }
     await accept(revision: 'a0', value: 7, flush: true);
     await accept(revision: 'a1', value: 9, flush: true);
-    await database.customStatement(
-      "UPDATE gen_ui_surface_state_rows SET search_text = 'Synthetic total and items';",
-    );
+    await repository.rebuildGenUiSearchIndex();
     await accept(value: 15); // This accepted update must be flushed by export.
   }
 

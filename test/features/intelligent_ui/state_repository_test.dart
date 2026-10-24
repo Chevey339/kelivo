@@ -34,6 +34,7 @@ void main() {
   late ChatDatabaseRepository repo;
   late CommitGate commits;
   late ChatMessage original;
+  late List<GenUiSurfaceStateRow> initialCache;
   final bindings = <UiPersistenceBinding>[];
   final controllers = <UiSurfaceController>[];
 
@@ -111,6 +112,7 @@ void main() {
     await repo.putMessage(original);
     await complete(original.id);
     original = (await repo.getMessage(original.id))!;
+    initialCache = await rows();
   });
 
   tearDown(() async {
@@ -235,12 +237,14 @@ void main() {
       final saved = db
           .select(db.genUiSurfaceStateRows)
           .watch()
-          .firstWhere((rows) => rows.isNotEmpty)
+          .firstWhere(
+            (rows) => rows.any((row) => row.stateJson.contains('4.0')),
+          )
           .timeout(const Duration(seconds: 3));
       accept(value, lease, 2);
       accept(value, lease, 3);
       accept(value, lease, 4);
-      expect(await rows(), isEmpty);
+      expect(await rows(), initialCache);
       expect((await saved).single.stateJson, contains('4.0'));
     },
   );
@@ -262,7 +266,7 @@ void main() {
     final lease = attach(value);
     accept(value, lease, 3);
     await repo.genUiStates.flush();
-    expect(await rows(), isEmpty);
+    expect(await rows(), initialCache);
     expect(lease.valid, isFalse);
   });
 
@@ -294,7 +298,16 @@ void main() {
             );
         }
         await repo.genUiStates.flush();
-        expect(await rows(), isEmpty);
+        if (change == 'role') {
+          expect(await rows(), initialCache);
+        } else if (change == 'source') {
+          final cached = (await rows()).single;
+          expect(cached.stateJson, '{"inputs":{},"view":{}}');
+          expect(cached.sourceHash, isNot(initialCache.single.sourceHash));
+          expect(cached.searchText, contains('Result: 4'));
+        } else {
+          expect(await rows(), isEmpty);
+        }
         expect(lease.valid, isFalse);
         expect(
           repo.genUiStates.accept(lease, value.captureSnapshot()),
@@ -337,10 +350,10 @@ void main() {
       expect(lease.valid, isFalse);
       expect(repo.genUiStates.accept(lease, value.captureSnapshot()), isFalse);
       await repo.genUiStates.flush();
-      expect(await rows(), isEmpty);
+      expect(await rows(), initialCache);
       final fresh = await repo.genUiStates.load(attach(controller()));
       expect(fresh.valid, isTrue);
-      expect(fresh.snapshot, isNull);
+      expect(fresh.snapshot!.state.isDefault, isTrue);
     },
   );
 
@@ -451,7 +464,7 @@ void main() {
     value.setInputs({'value': 9}, token: value.token);
     await expectLater(value.flush(), throwsA(anything));
     expect(value.saveFailed, isTrue);
-    expect(await rows(), isEmpty);
+    expect(await rows(), initialCache);
     binding.dispose();
     value.dispose();
     final reopened = controller();
@@ -461,7 +474,7 @@ void main() {
       'conversation',
     );
     bindings.add(next);
-    // The queue's accepted value wins over the empty durable table.
+    // The queue's accepted value wins over the durable default cache.
     await repo.genUiStates.load(attach(reopened));
     await Future<void>.delayed(Duration.zero);
     expect(reopened.state.inputs['value'], 9);
@@ -504,7 +517,7 @@ void main() {
       await entry.controller.flush();
       registry.dispose();
       await repo.genUiStates.flush();
-      expect(await rows(), isEmpty);
+      expect(await rows(), initialCache);
       expect(await repo.getMessage('temporary'), isNull);
     },
   );
@@ -536,7 +549,15 @@ void main() {
       );
       accept(value, attach(value), 7);
       await repo.genUiStates.flush();
-      expect((await rows()).single.surfaceKey, '1:0');
+      final stored = await rows();
+      expect(stored, hasLength(2));
+      expect(
+        stored.where((row) => row.revisionId == original.id).single,
+        initialCache.single,
+      );
+      final saved = stored.singleWhere((row) => row.revisionId == next.id);
+      expect(saved.surfaceKey, '1:0');
+      expect(saved.stateJson, contains('7.0'));
     },
   );
 
@@ -699,7 +720,7 @@ void main() {
           );
         });
         expect(lease.valid, isFalse);
-        expect(await rows(), isEmpty);
+        expect(await rows(), initialCache);
       },
     );
   }
@@ -915,7 +936,7 @@ void main() {
       await repo.genUiStates.flush();
       await repo.deleteToolEvents('revision');
       expect(lease.valid, isFalse);
-      expect(await rows(), isEmpty);
+      expect(await rows(), initialCache);
       expect(
         uiEligibleFences(
           (await repo.getMessage('revision'))!,

@@ -35,6 +35,7 @@ void main() {
   late ChatService service;
   late UiRuntimeRegistry registry;
   late UiSurfaceController controller;
+  late List<GenUiSurfaceStateRow> initialCache;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
@@ -67,6 +68,8 @@ void main() {
         updatedAt: DateTime.now().toUtc(),
       );
     }
+    initialCache = await db.select(db.genUiSurfaceStateRows).get();
+    expect(initialCache.single.stateJson, '{"inputs":{},"view":{}}');
     service = ChatService(existingRepository: repo);
     registry = UiRuntimeRegistry();
     controller = registry.obtain('conversation', _owner).controller
@@ -196,7 +199,7 @@ void main() {
       await tester.runAsync(controller.flush);
       expect(
         await tester.runAsync(() => db.select(db.genUiSurfaceStateRows).get()),
-        isEmpty,
+        initialCache,
       );
       tester.testTextInput.updateEditingValue(
         const TextEditingValue(
@@ -230,7 +233,7 @@ void main() {
     expect(controller.captureRead().inputs['n'], 1);
     expect(
       await tester.runAsync(() => db.select(db.genUiSurfaceStateRows).get()),
-      isEmpty,
+      initialCache,
     );
     await tester.pumpWidget(const SizedBox());
   });

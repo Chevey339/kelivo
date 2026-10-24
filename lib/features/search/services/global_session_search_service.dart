@@ -7,6 +7,7 @@ class GlobalSessionSearchResult {
     required this.conversationTitle,
     required this.updatedAt,
     required this.firstMatchedMessageId,
+    this.matchedSurfaceKey,
     required this.snippet,
     required this.score,
     required this.titleMatched,
@@ -16,6 +17,7 @@ class GlobalSessionSearchResult {
   final String conversationTitle;
   final DateTime updatedAt;
   final String firstMatchedMessageId;
+  final String? matchedSurfaceKey;
   final String snippet;
   final int score;
   final bool titleMatched;
@@ -23,20 +25,6 @@ class GlobalSessionSearchResult {
 
 class GlobalSessionSearchService {
   const GlobalSessionSearchService._();
-
-  // Hidden/internal blocks that should not participate in global search.
-  static final RegExp _geminiThoughtSigRe = RegExp(
-    r'<!--\s*gemini_thought_signatures:.*?-->',
-    dotAll: true,
-  );
-  static final RegExp _thinkBlockRe = RegExp(
-    r'<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>',
-    caseSensitive: false,
-  );
-  static final RegExp _reasoningBlockRe = RegExp(
-    r'<reasoning>[\s\S]*?<\/reasoning>',
-    caseSensitive: false,
-  );
 
   static Future<List<GlobalSessionSearchResult>> search({
     required ChatService chatService,
@@ -92,11 +80,17 @@ class GlobalSessionSearchService {
       // Only search visible conversation body: user + assistant messages.
       // Exclude tool/system-like messages and hidden reasoning/thought blocks.
       if (m.messageRole != 'user' && m.messageRole != 'assistant') continue;
-      final body = _searchableBody(m.messageContent ?? '');
+      final body = _normalize(m.searchableText ?? '');
       if (body.isEmpty) continue;
       final messageId = m.messageId;
       if (messageId == null || messageId.isEmpty) continue;
-      contentItems.add(_ContentRef(messageId: messageId, text: body));
+      contentItems.add(
+        _ContentRef(
+          messageId: messageId,
+          text: body,
+          surfaceKey: m.matchedSurfaceKey,
+        ),
+      );
     }
     if (contentItems.isEmpty && title.isEmpty) return null;
 
@@ -104,8 +98,13 @@ class GlobalSessionSearchService {
         .map((e) => e.text.toLowerCase())
         .join('\n');
     final searchHaystack = '$lowerTitle\n$contentLower';
+    final verifiedTokens = {
+      for (final match in matches) ...match.verifiedTokens,
+    };
     for (final t in tokens) {
-      if (!searchHaystack.contains(t)) return null;
+      if (!searchHaystack.contains(t) && !verifiedTokens.contains(t)) {
+        return null;
+      }
     }
 
     final titleMatches = _countMatches(lowerTitle, tokens);
@@ -161,6 +160,9 @@ class GlobalSessionSearchService {
       conversationTitle: displayTitle,
       updatedAt: first.updatedAt,
       firstMatchedMessageId: targetMessageId,
+      matchedSurfaceKey: firstMatchedIndex >= 0
+          ? contentItems[firstMatchedIndex].surfaceKey
+          : null,
       snippet: snippet,
       score: score,
       titleMatched: hasTitleMatch,
@@ -280,16 +282,6 @@ class GlobalSessionSearchService {
         .trim();
   }
 
-  static String _searchableBody(String content) {
-    if (content.trim().isEmpty) return '';
-    return _normalize(
-      content
-          .replaceAll(_geminiThoughtSigRe, ' ')
-          .replaceAll(_thinkBlockRe, ' ')
-          .replaceAll(_reasoningBlockRe, ' '),
-    );
-  }
-
   static String _snippetFor(String source, List<String> tokens) {
     final s = source.trim();
     if (s.isEmpty) return '';
@@ -324,8 +316,13 @@ class GlobalSessionSearchService {
 }
 
 class _ContentRef {
-  const _ContentRef({required this.messageId, required this.text});
+  const _ContentRef({
+    required this.messageId,
+    required this.text,
+    this.surfaceKey,
+  });
 
   final String messageId;
   final String text;
+  final String? surfaceKey;
 }

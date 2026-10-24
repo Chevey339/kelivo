@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_host_scope.dart';
 import '../../browser/browser_navigation.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
@@ -1003,7 +1004,10 @@ class _HomePageState extends State<HomePage>
       VisibleRouteTheme(
         child: UiActionsScope(
           onDraft: _controller.stageUiDraft,
-          child: _buildPage(context),
+          child: UiSearchNavigationScope(
+            navigation: _controller.uiSearchNavigation,
+            child: _buildPage(context),
+          ),
         ),
       );
 
@@ -1094,8 +1098,12 @@ class _HomePageState extends State<HomePage>
           _controller.enterGlobalSearchMode(preserveQuery: false),
       onExitGlobalSearch: () =>
           _controller.exitGlobalSearchMode(clearQuery: true),
-      onOpenGlobalSearchResult: (convId, msgId) => _controller
-          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
+      onOpenGlobalSearchResult: (convId, msgId, surfaceKey) =>
+          _controller.openGlobalSearchResult(
+            conversationId: convId,
+            messageId: msgId,
+            surfaceKey: surfaceKey,
+          ),
       appBarOverride: _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
@@ -1215,8 +1223,12 @@ class _HomePageState extends State<HomePage>
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
-      onOpenGlobalSearchResult: (convId, msgId) => _controller
-          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
+      onOpenGlobalSearchResult: (convId, msgId, surfaceKey) =>
+          _controller.openGlobalSearchResult(
+            conversationId: convId,
+            messageId: msgId,
+            surfaceKey: surfaceKey,
+          ),
       onSelectModel: () =>
           showModelSelectSheet(context, controller: _controller),
       onSidebarWidthChanged: _controller.updateSidebarWidth,
@@ -1759,6 +1771,7 @@ class _HomePageState extends State<HomePage>
     if (collapsed.isEmpty) return;
 
     String? selectedId;
+    String? selectedSurface;
     if (PlatformUtils.isDesktop) {
       selectedId = await showDesktopMiniMapPopover(
         context,
@@ -1770,11 +1783,16 @@ class _HomePageState extends State<HomePage>
         context,
         collapsed,
         onSearch: (query) => _controller.searchMiniMapMatches(query),
+        onSearchHitSelected: (hit) => selectedSurface = hit.matchedSurfaceKey,
       );
     }
     if (!mounted) return;
     if (selectedId != null && selectedId.isNotEmpty) {
-      await _controller.scrollToMessageId(selectedId, useRikkaTransition: true);
+      await _controller.scrollToMessageId(
+        selectedId,
+        useRikkaTransition: true,
+        surfaceKey: selectedSurface,
+      );
     }
   }
 
