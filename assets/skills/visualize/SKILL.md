@@ -8,7 +8,7 @@ description: Create a native interactive calculator, conditional form, chart or 
 1. Choose a small native interface when the user benefits from changing inputs,
    comparing values or exploring supplied data. Use prose for a single fact or
    explanation without useful interaction. State a useful conclusion outside
-   the interface, and cite real data or label synthetic values as example data.
+   the interface.
 2. Read `references/protocol.md`. Read `references/content.md` for layout and
    text; `references/inputs.md` for controls, validation and actions;
    `references/data.md` for charts/tables; `references/functions.md` when computing.
@@ -21,6 +21,12 @@ description: Create a native interactive calculator, conditional form, chart or 
    every referenced ID before closing the fence. Test the reasoning for changed
    inputs, not just initial values. Hidden fields retain values but do not block
    form validation. Ask creates an editable draft; it never sends automatically.
+5. For an answer that displays a dataset or calculated result, include a visible
+   provenance sentence in the prose or a Text/Callout. Label supplied synthetic
+   rows, invented numbers and mathematical demonstrations as "Synthetic example
+   data" in the user's language. Keep this label when copying supplied values
+   unchanged. For real user data, identify its supplied source instead. Finish
+   only after this qualification appears in the visible answer, outside code.
 
 For repairs, preserve the user's intended behavior and correct the supplied
 bounded diagnostics/source. Return a complete corrected interface with a short

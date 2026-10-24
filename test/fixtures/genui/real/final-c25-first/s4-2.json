@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s4-2",
+  "response": "合成方案比较表（示例数据）：共 12 行，价格列保留原始空值，空值显示为缺失值而不是 0。表格支持在本地排序、筛选，每页显示 10 行；可以翻到第 2 页查看剩余 2 行。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[table])\ntable = DataTable(data=[{\"id\": \"p01\", \"name\": \"方案 1\", \"price\": 3, \"score\": 98}, {\"id\": \"p02\", \"name\": \"方案 2\", \"price\": 6, \"score\": 96}, {\"id\": \"p03\", \"name\": \"方案 3\", \"price\": 9, \"score\": 94}, {\"id\": \"p04\", \"name\": \"方案 4\", \"price\": null, \"score\": 92}, {\"id\": \"p05\", \"name\": \"方案 5\", \"price\": 15, \"score\": 90}, {\"id\": \"p06\", \"name\": \"方案 6\", \"price\": 18, \"score\": 88}, {\"id\": \"p07\", \"name\": \"方案 7\", \"price\": 21, \"score\": 86}, {\"id\": \"p08\", \"name\": \"方案 8\", \"price\": 24, \"score\": 84}, {\"id\": \"p09\", \"name\": \"方案 9\", \"price\": 27, \"score\": 82}, {\"id\": \"p10\", \"name\": \"方案 10\", \"price\": 30, \"score\": 80}, {\"id\": \"p11\", \"name\": \"方案 11\", \"price\": 33, \"score\": 78}, {\"id\": \"p12\", \"name\": \"方案 12\", \"price\": 36, \"score\": 76}], rowKey=\"id\", pageSize=10, sortable=true, filterable=true, columns=[{\"key\": \"name\", \"label\": \"方案\"}, {\"key\": \"price\", \"label\": \"价格\", \"digits\": 2}, {\"key\": \"score\", \"label\": \"得分\"}])\n```\n\n排序时，空值始终排在最后；因此按价格排序时，“方案 4”（价格缺失）会出现在末尾，而不会被当作 0 处理。",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: all twelve rows and the exact name/price/score mapping are preserved, including the null price. Prose explicitly identifies synthetic example data and correctly describes pagination and null-last sorting."
+  }
+}

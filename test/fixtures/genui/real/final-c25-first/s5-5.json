@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s5-5",
+  "response": "下面是表单：开关关闭时明细被隐藏但不丢值，且不参与必填校验；Ask 按钮只会生成可编辑草稿，不会发送任何内容。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,note,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"机构报销条件\")\ntoggle = Switch(label=\"启用报销明细\", bind=$on)\nnameField = TextField(label=\"机构名称\", bind=$name, required=true, placeholder=\"请输入机构名称\")\ndetailField = TextField(label=\"报销明细\", bind=$detail, required=true, visible=$on, placeholder=\"请输入报销明细\")\nnote = Callout(title=\"隐藏字段说明\", text=\"关闭开关时明细致隐藏，已填写内容仍保留；隐藏期间不参与必填校验，提交时会一并带入草稿。\", tone=\"info\")\nask = Button(label=\"准备表单检查草稿\", form=form, action=Ask(text=\"请检查此机构报销条件表单，确认必填项是否齐全、明细开关状态与填写内容是否一致。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```\n\n使用提示：初始状态下开关关闭，因此只需填写“机构名称”即可生成草稿；打开开关后，“报销明细”变为必填，若为空则草稿不会生成。",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: organization name, conditional reimbursement detail, retained hidden value and visible required validation are coherent. Ask has the exact context and draft-only behavior; the blank name and explicit placeholder do not assert a real reimbursement record."
+  }
+}

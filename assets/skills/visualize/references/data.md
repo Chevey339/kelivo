@@ -18,7 +18,7 @@ least one record. Cartesian
 charts allow 4 series and 2000 total
 points; scatter requires numeric x. Pie uses one nonnegative y field, a positive
 total and at most 12 items. Missing values remain gaps, never
-zero; supply labels/units and identify synthetic data. The app provides legends,
+zero; supply labels/units and follow the Skill's visible-provenance check. The app provides legends,
 tooltips, data-table alternatives and accessible summaries.
 DataTable accepts at most 1000 records and
 1..8 columns, with a unique stable non-null scalar rowKey in each row.

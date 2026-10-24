@@ -1321,3 +1321,41 @@ The final 145-file manifest includes 142 non-document files whose frozen hashes
 were checked again before staging. Raw logs remain under build/genui/logs/c24-*;
 failed baseline, interrupted review-candidate and disk-full runs are preserved
 separately and are not counted as passes.
+
+## C25 — first final model round and provenance repair
+
+The manually invoked 30-task run tested C24
+`80f455ea308cab4dc35fba96aa160489835d3dc1` with the user-selected
+`deepseek-v4.1-flash-1017`. All deterministic checks passed, but implementation
+and independent agent semantic review accepted only 27/30 (90%). Tasks s4-3,
+s4-4 and s4-5 reproduced the supplied synthetic prices/scores without labeling
+them as example/synthetic data. This fails the frozen provenance criterion;
+the threshold remains 29/30. The four-field [first report](evaluation-final-first.json)
+and all thirty original responses/attributed reviews are retained in
+`test/fixtures/genui/real/final-c25-first/` for normal offline replay.
+
+The semantic review treats S5's empty names and explicitly requested placeholder
+content as form inputs, not factual observations needing a synthetic-data label.
+That interpretation is recorded before the repair and stays fixed for the next
+round. No prompt, task, scoring or threshold was changed to turn this failed run
+into a pass.
+
+Following proposal §16.2, a separate repair commit strengthens the shared
+visualize Skill's visible-provenance completion check. Answers showing datasets
+or calculated results must explicitly label synthetic examples even when copying
+supplied rows unchanged; real user data keeps its actual supplied provenance.
+The application and manual evaluator use the same generated Skill. The task set,
+catalog, interpreter, examples and scoring rules stay unchanged. Because the
+shared prompt changed, all thirty tasks must be manually rerun after the repair
+commit; the old 27/30 cannot be combined with new outputs. No automatic paid
+retry or network call is added to G or CI.
+
+Repair validation: 39 focused tests passed; generated assets matched the
+catalog-derived source and the actual macOS application bundle. Token counts
+(summary/main/references-with-examples) were 62/470/2283 for cl100k_base and
+61/464/2296 for o200k_base, within the 200/1000/3000 budgets. Both changed Dart
+files were formatted. Final G passed root fatal-info analysis, 10,178 tests
+(one existing skip), markstream offline resolution/analysis and 298 tests,
+macOS debug build and git diff --check. Independent review returned no findings.
+The exact 36-file manifest and 34 frozen non-document hashes were checked before
+staging; logs are retained as build/genui/logs/c25-repair-*.
