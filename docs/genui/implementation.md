@@ -1415,3 +1415,24 @@ offline dependency resolution, fatal-info analysis and all 298 tests. The macOS
 debug build and git diff --check passed. Independent diff review returned no
 findings. The 33-file manifest and 31 frozen non-document hashes matched before
 staging; raw logs remain under build/genui/logs/c25-*.
+
+## C26 — delivery record and final-HEAD verification
+
+[The delivery record](delivery.md) brings together implementation scope,
+attributed model evaluation, native/visual/profile evidence, execution
+environments and the user's deferrals and accepted Android performance limits.
+This step changes documentation only. Independent review returned no findings;
+root fatal-info analysis and all 10,240 tests passed (one existing skip), along
+with markstream offline dependency resolution, fatal-info analysis and all 298
+tests. The macOS debug build and git diff --check passed. Logs remain under
+build/genui/logs/c26-*. No Dart files changed; only the two reviewed documents
+are staged.
+
+After this commit, all available-platform final builds, six-scene and Web engine
+checks, Android real-keyboard flow and the second manual frozen-reader restore
+will run against that same final HEAD. Per-attempt logs and fresh integration
+driver results will be retained under build/genui/c26; delivery-final.json will
+record the actual commit and results without amending the commit to contain its
+own hash. Earlier C21/C24 evidence cannot replace an unexecuted final check.
+Windows, Linux, physical-iPhone and macOS-Chinese-IME acceptance remain deferred
+by the user. No recurring model API evaluation or old-reader gate is introduced.
