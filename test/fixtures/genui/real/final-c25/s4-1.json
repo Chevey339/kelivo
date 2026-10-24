@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "39f1c336545c2aecca0093dcbcaa54ca446e557d",
+  "task": "s4-1",
+  "response": "以下为**合成示例数据**。表格共 12 行，默认每页显示 10 行；支持按“方案”“价格”“得分”在本地排序、筛选和分页。方案 4 的价格为 `null`，会显示为空值，不会补零。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[table])\ntable = DataTable(columns=[{\"key\": \"name\", \"label\": \"方案\"}, {\"key\": \"price\", \"label\": \"价格\", \"digits\": 2}, {\"key\": \"score\", \"label\": \"得分\"}], data=[{\"id\": \"p01\", \"name\": \"方案 1\", \"price\": 2, \"score\": 99}, {\"id\": \"p02\", \"name\": \"方案 2\", \"price\": 4, \"score\": 98}, {\"id\": \"p03\", \"name\": \"方案 3\", \"price\": 6, \"score\": 97}, {\"id\": \"p04\", \"name\": \"方案 4\", \"price\": null, \"score\": 96}, {\"id\": \"p05\", \"name\": \"方案 5\", \"price\": 10, \"score\": 95}, {\"id\": \"p06\", \"name\": \"方案 6\", \"price\": 12, \"score\": 94}, {\"id\": \"p07\", \"name\": \"方案 7\", \"price\": 14, \"score\": 93}, {\"id\": \"p08\", \"name\": \"方案 8\", \"price\": 16, \"score\": 92}, {\"id\": \"p09\", \"name\": \"方案 9\", \"price\": 18, \"score\": 91}, {\"id\": \"p10\", \"name\": \"方案 10\", \"price\": 20, \"score\": 90}, {\"id\": \"p11\", \"name\": \"方案 11\", \"price\": 22, \"score\": 89}, {\"id\": \"p12\", \"name\": \"方案 12\", \"price\": 24, \"score\": 88}], rowKey=\"id\", pageSize=10, sortable=true, filterable=true)\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: The table retains all 12 supplied synthetic rows, the null price, exact columns and local sorting/filtering/pageSize=10. The visible synthetic label and prose counts are correct."
+  }
+}

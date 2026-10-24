@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "39f1c336545c2aecca0093dcbcaa54ca446e557d",
+  "task": "s5-3",
+  "response": "关闭开关时，明细字段会隐藏，但其中已填的值会保留；隐藏的明细不参与必填校验。姓名字段始终必填。按钮只准备可编辑草稿，不会自动发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"旅行同行人条件\")\ntoggle = Switch(bind=$on, label=\"需要填写同行明细\")\nnameField = TextField(bind=$name, label=\"同行人姓名\", required=true)\ndetailField = TextField(bind=$detail, label=\"同行明细\", required=true, visible=$on)\nask = Button(action=Ask(text=\"请检查此表单内容，并准备一份可编辑草稿；不会自动发送。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}), form=form, label=\"准备检查草稿\")\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: Travel-companion Form uses the requested controls and exact Ask context. Prose correctly keeps name required and preserves hidden detail without validating it; no send claim."
+  }
+}

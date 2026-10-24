@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "39f1c336545c2aecca0093dcbcaa54ca446e557d",
+  "task": "s5-1",
+  "response": "关闭开关时，明细字段会隐藏，但它的值仍保留，而且不参与必填校验；开启开关时，明细字段会参与必填校验。点击按钮只会生成可编辑草稿，不会自动发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"公司发票信息\")\ntoggle = Switch(label=\"启用发票明细\", bind=$on)\nnameField = TextField(label=\"公司名称\", bind=$name, required=true)\ndetailField = TextField(label=\"发票明细\", bind=$detail, required=true, visible=$on)\nask = Button(label=\"生成检查草稿\", form=form, action=Ask(text=\"请检查此表单的可编辑草稿，确认内容后再决定是否发送。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: Company-invoice Form keeps the specified state, visible required fields, conditional detail and exact Ask context. Prose accurately explains retained hidden values and editable draft without sending; input defaults are not factual sample data."
+  }
+}

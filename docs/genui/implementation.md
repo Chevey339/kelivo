@@ -1388,3 +1388,30 @@ resolution/analysis and 298 tests, macOS debug build and git diff --check.
 Independent review returned no findings; the 35-file manifest and 33 frozen
 non-document hashes matched before staging. Logs remain under
 build/genui/logs/c25-grounding-*.
+
+### C25 final round — accepted complete evaluation
+
+The third complete manual run tested
+`39f1c336545c2aecca0093dcbcaa54ca446e557d` using the same thirty frozen tasks,
+parameters and user-selected model. All deterministic checks passed and both
+the implementation agent and independent reviewer `agent:/root/review_c01`
+accepted every full response: **30/30 (100.00%)**. The review includes surrounding
+prose, numerical claims, provenance, units, controls and draft-only Ask semantics;
+it is attributed agent review, not a claim of human acceptance. This exceeds
+the 29/30 requirement for this finite evaluation set, not a guarantee about
+arbitrary user tasks.
+
+The [final four-field report](evaluation-final.json) records the actual tested
+commit. All thirty original outputs and reviews are retained under
+`test/fixtures/genui/real/final-c25/`. The two unsuccessful complete rounds remain
+separate; no result was selected across rounds. The offline replay test covers
+all ninety final-round outputs plus their reports without API credentials or
+network access. No model input, interpreter, catalog or scoring semantics change
+in this recording commit.
+
+Final C25 validation: the changed Dart test was formatted; root fatal-info
+analysis and all 10,240 tests passed (one existing skip), as did markstream
+offline dependency resolution, fatal-info analysis and all 298 tests. The macOS
+debug build and git diff --check passed. Independent diff review returned no
+findings. The 33-file manifest and 31 frozen non-document hashes matched before
+staging; raw logs remain under build/genui/logs/c25-*.
