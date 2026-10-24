@@ -108,7 +108,8 @@ dependencies:
   liquid_glass_widgets:
     path: ./dependencies/liquid_glass_widgets
   webview_flutter_wkwebview: ^3.25.1
-  webview_windows: ^0.4.0
+  webview_windows:
+    path: dependencies/webview_windows
   flutter_math_fork: # ^0.7.4
     path: ./dependencies/flutter_math_fork
   scrollable_positioned_list: ^0.3.8

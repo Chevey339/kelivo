@@ -1049,3 +1049,62 @@ hashes throughout G. The 28 changed Dart files were formatted. The exact
 45-file manifest, independent review result and logs are retained under
 build/genui/c19/ and build/genui/logs/c19-*. The dependency lock remained
 unchanged from C14.
+
+## C20 — vendored Windows restricted preview controller
+
+The Windows plugin is vendored from the exact upstream baseline specified by
+section 13.4, with its original license and a focused fork record. WebView2 SDK
+1.0.2365.46 is pinned; NuGet packages use this plugin's own binary directory so
+its older SDK cannot overwrite another plugin's SDK during parallel builds.
+The ordinary entry point retains the same shared environment/profile and policy.
+
+The new initialization entry fixes restricted mode before loading. It requires
+ICoreWebView2_22, installs settings, synchronous navigation cancellation,
+DOCUMENT-only resource filtering, and popup/download/protocol/permission denial
+before the single allowed NavigateToString call. A failed required installation
+closes the controller and reports failure. Dart observes already-applied native
+decisions; it cannot approve requests or relax the native method allowlist.
+No ordinary web-message, permission deferral or CDP listener is installed on the
+restricted controller. C21 owns the trusted CSP/sandbox wrapper and runtime proof.
+
+On 2026-10-24 the user explicitly approved keeping the shared profile without
+changing Settings4 autofill/password-saving switches. Microsoft's documentation
+states those switches affect every WebView sharing that profile, conflicting
+with the proposal's requirement to leave ordinary pages unchanged. The fork
+leaves those switches untouched and C21 must validate opaque-origin isolation
+against synthetic saved autofill/password data; a failure still blocks acceptance.
+The amendment does not introduce a separate profile or waive runtime checks.
+
+Close removes events, explicitly closes this controller and stops frame capture.
+The texture and drawing bridge remain alive until Flutter's asynchronous texture
+unregistration completes. Pending creation retains its host and checks plugin
+lifetime before publishing a bridge. Dart handles failed creation, disposal before
+or during creation, repeated disposal and immutable modes; streams close without
+waiting for listeners that may never exist. Review identified a closed native
+view that could still receive queued input: the widget now observes controller
+state, removes the texture/input tree and guards pending pointer/resize calls.
+A widget regression exercises the actual mounted view and this failure event.
+
+The plugin's 13 Dart tests and fatal-info analysis pass. The policy test uses the
+production decision/order code with failing installers, loaders and Close
+callbacks. Its first MSVC build exposed unreachable return statements in aborting
+test callbacks; the callbacks now express a non-returning body without relaxing
+/W4 /WX. Windows execution passed that native policy test. Independent re-review returned
+no findings. The Windows candidate application build did not return a result. Its last
+observed phase was downloading the pinned SDK artifacts.
+The user reported a Windows blue screen and explicitly deferred Windows work and
+acceptance on 2026-10-24. Further Windows operations were stopped; no cause is
+inferred from the interrupted session. The candidate build and Windows runtime
+checks remain deferred, not passed. This user amendment supersedes the C20
+Windows build gate for now; source and local validation are retained while work
+continues on macOS, iOS and Android. Linux acceptance was already deferred by the
+user. Final local G passed: root fatal-info analysis and all 9,917 tests (one existing
+skip); markstream dependency resolution, fatal-info analysis and all 298 tests;
+macOS debug native build and diff checks. All 44 frozen non-document hashes
+remained unchanged throughout the gate; five Dart files were formatted. The
+45-file manifest, empty final review and logs are retained at build/genui/c20/
+and build/genui/logs/c20-*. The root dependency lock changed only webview_windows
+from hosted to the vendored path; its SHA-256 is
+2d32627fb269d769a44845e3762026da77c6010cad0bc968d8935f963d0aeb04.
+These unit results do not claim C21 GUI, network, storage or ordinary-worker
+acceptance, or a successful Windows application build.
