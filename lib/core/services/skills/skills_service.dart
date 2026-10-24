@@ -71,23 +71,60 @@ class SkillsService extends ChangeNotifier {
   Future<void> _load() => _serializeMutation(() async {
     final assets = _bundledAssets;
     if (assets != null) {
-      await _seedSkillCreator(await _ensureRoot(), assets);
+      final root = await _ensureRoot();
+      for (final bundle in _bundledSkillFiles.entries) {
+        await _seedBundledSkill(root, assets, bundle.key, bundle.value);
+      }
     }
     await _rescan();
   });
 
-  Future<void> _seedSkillCreator(Directory root, AssetBundle assets) async {
-    const id = 'skill-creator';
-    // Keep this receipt beside the skills so backup/restore also preserves a
-    // user's deletion. Seeding never replaces an existing skill or its settings.
-    final receipt = File(p.join(root.path, '.bundled-skill-creator'));
-    if (await receipt.exists()) return;
+  static const _bundledSkillFiles = <String, List<String>>{
+    'skill-creator': ['SKILL.md'],
+    'visualize': [
+      'SKILL.md',
+      'references/protocol.md',
+      'references/content.md',
+      'references/inputs.md',
+      'references/data.md',
+      'references/functions.md',
+      'references/examples.md',
+      'references/semantics.md',
+      'references/web.md',
+    ],
+  };
+
+  Future<void> _seedBundledSkill(
+    Directory root,
+    AssetBundle assets,
+    String id,
+    List<String> files,
+  ) async {
+    // Receipts travel with skill backups, including a user's deletion choice.
+    // Existing Skill documents and settings always remain user-owned.
+    final receipt = File(p.join(root.path, '.bundled-$id'));
+    final receiptType = await FileSystemEntity.type(
+      receipt.path,
+      followLinks: false,
+    );
+    var resuming = false;
+    if (receiptType == FileSystemEntityType.file) {
+      final state = (await receipt.readAsString()).trim();
+      if (state == '1') return;
+      if (state != 'installing') {
+        throw const FormatException('bundled_skill_receipt');
+      }
+      resuming = true;
+    } else if (receiptType != FileSystemEntityType.notFound) {
+      throw const FormatException('bundled_skill_receipt');
+    }
     final dest = Directory(p.join(root.path, id));
     final destType = await FileSystemEntity.type(dest.path, followLinks: false);
     final md = File(p.join(dest.path, 'SKILL.md'));
+    final mdType = await FileSystemEntity.type(md.path, followLinks: false);
     if ((destType == FileSystemEntityType.notFound ||
             destType == FileSystemEntityType.directory) &&
-        !await md.exists()) {
+        (mdType == FileSystemEntityType.notFound || resuming)) {
       final entity = await store.get(ExtensionEntityStore.kindSkill, id);
       final previous = entity == null
           ? null
@@ -98,39 +135,116 @@ class SkillsService extends ChangeNotifier {
         throw FormatException('Invalid bundled SKILL.md: ${errors.join(', ')}');
       }
       final staging = await root.createTemp('.bundled-');
+      final installedFiles = <File>[];
+      final installedDirectories = <Directory>[];
+      var movedDirectory = false;
+      var marked = false;
       try {
-        await File(
-          p.join(staging.path, 'SKILL.md'),
-        ).writeAsString(markdown, flush: true);
+        // Load the complete bundle before changing an existing destination.
+        for (final relative in files) {
+          final file = File(p.join(staging.path, relative));
+          await file.parent.create(recursive: true);
+          await file.writeAsString(
+            relative == 'SKILL.md'
+                ? markdown
+                : await assets.loadString('assets/skills/$id/$relative'),
+            flush: true,
+          );
+        }
+        // Persist ownership before publishing files. If the process exits
+        // before DB registration, restart can finish this bundled install
+        // instead of adopting it as a same-name user import.
+        await _writeBundledReceipt(root, receipt, 'installing\n');
+        marked = true;
         if (destType == FileSystemEntityType.notFound) {
           await staging.rename(dest.path);
+          movedDirectory = true;
         } else {
-          await File(p.join(staging.path, 'SKILL.md')).rename(md.path);
-        }
-        try {
-          final now = DateTime.now().toUtc();
-          await _upsertRecord(
-            previous?.copyWith(source: SkillSource.bundled, updatedAt: now) ??
-                SkillRecord(
-                  id: id,
-                  source: SkillSource.bundled,
-                  installedAt: now,
-                  updatedAt: now,
-                ),
-          );
-        } catch (_) {
-          if (destType == FileSystemEntityType.notFound) {
-            await dest.delete(recursive: true);
-          } else {
-            await md.delete();
+          // Metadata-only recovery may leave user notes/references in place.
+          // Fill missing files, preserving edits; never traverse a link.
+          // SKILL.md is the publication point. An interrupted merge leaves it
+          // absent, so the next startup fills any remaining reference files.
+          final order = [
+            ...files.where((name) => name != 'SKILL.md'),
+            'SKILL.md',
+          ];
+          for (final relative in order) {
+            var parent = dest;
+            for (final segment in p.split(p.dirname(relative))) {
+              if (segment == '.') continue;
+              parent = Directory(p.join(parent.path, segment));
+              final type = await FileSystemEntity.type(
+                parent.path,
+                followLinks: false,
+              );
+              if (type == FileSystemEntityType.notFound) {
+                await parent.create();
+                installedDirectories.add(parent);
+              } else if (type != FileSystemEntityType.directory) {
+                throw const FormatException('bundled_skill_parent');
+              }
+            }
+            final target = File(p.join(dest.path, relative));
+            final type = await FileSystemEntity.type(
+              target.path,
+              followLinks: false,
+            );
+            if (type == FileSystemEntityType.file) continue;
+            if (type != FileSystemEntityType.notFound) {
+              throw const FormatException('bundled_skill_file');
+            }
+            await File(p.join(staging.path, relative)).rename(target.path);
+            installedFiles.add(target);
           }
-          rethrow;
         }
+        final now = DateTime.now().toUtc();
+        await _upsertRecord(
+          previous?.copyWith(source: SkillSource.bundled, updatedAt: now) ??
+              SkillRecord(
+                id: id,
+                source: SkillSource.bundled,
+                installedAt: now,
+                updatedAt: now,
+              ),
+        );
+      } catch (_) {
+        if (movedDirectory) {
+          await dest.delete(recursive: true);
+        } else {
+          for (final file in installedFiles.reversed) {
+            await file.delete();
+          }
+          for (final directory in installedDirectories.reversed) {
+            await directory.delete();
+          }
+        }
+        if (marked && !resuming) await receipt.delete();
+        rethrow;
       } finally {
         if (await staging.exists()) await staging.delete(recursive: true);
       }
+    } else if (resuming) {
+      throw const FormatException('bundled_skill_destination');
     }
-    await receipt.writeAsString('1\n', flush: true);
+    // A failed completion write leaves the installing marker and the valid
+    // registered bundle intact; the next startup retries completion.
+    await _writeBundledReceipt(root, receipt, '1\n');
+  }
+
+  Future<void> _writeBundledReceipt(
+    Directory root,
+    File receipt,
+    String state,
+  ) async {
+    final staging = await root.createTemp('.bundled-receipt-');
+    try {
+      final file = File(p.join(staging.path, 'state'));
+      await file.writeAsString(state, flush: true);
+      // Rename publishes a complete marker and does not follow a leaf link.
+      await file.rename(receipt.path);
+    } finally {
+      await staging.delete(recursive: true);
+    }
   }
 
   Future<Directory> _ensureRoot() async {

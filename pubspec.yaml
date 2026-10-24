@@ -222,6 +222,8 @@ flutter:
     - assets/mermaid.min.js
     - assets/html/mark.html
     - assets/skills/skill-creator/
+    - assets/skills/visualize/
+    - assets/skills/visualize/references/
     - assets/model_catalog/models_dev.json
   #   - images/a_dot_ham.jpeg
 

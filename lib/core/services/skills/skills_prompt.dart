@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/catalog/ui_guidance.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../models/skill_record.dart';
 import 'skill.dart';
@@ -42,6 +43,9 @@ String buildAvailableSkillsFragment(
       'its SKILL.md first and follow it. Files referenced by a skill live in '
       'the same directory.',
     );
+  if (ordered.any(visualize)) {
+    buf.writeln(UiGuidance.capabilitySummary);
+  }
   for (final skill in visible) {
     final description = truncateHeadUtf16Safe(
       skill.description,

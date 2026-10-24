@@ -1241,3 +1241,35 @@ also passed. All eighteen non-document files retained their frozen hashes throug
 G; the exact twenty-one-file manifest was checked before staging. Logs remain in
 build/genui/logs/c22-*. Windows/Linux and physical-iPhone acceptance remain
 deferred as directed; C22 does not add a native platform dependency.
+
+
+## C23 — built-in visualize registration
+
+The existing SkillsService now installs both built-in Skills from their bundled
+assets. visualize includes its main document and all eight generated references,
+readable through the existing skills-only read_file route. The existing enabled,
+assistant and conversation selection rules control the capability summary and
+read entry. No separate engine, runtime rollout switch or forced response schema
+was added. The Skill describes completed native components and the three active
+Web preview platforms; Windows remains deferred and Linux retains source export.
+
+Installation loads the entire asset bundle before publishing, preserves existing
+user documents/references and metadata choices, and rejects link destinations.
+An atomic installing receipt precedes file publication; restart completes missing
+references and bundled registration after an interrupted install. The completed
+receipt preserves deliberate deletion. Recovering an existing partial directory
+publishes SKILL.md last. Registration failure removes only newly installed files.
+A same-name user import retains its source, content and ordinary prompt behavior.
+
+The focused Skills, prompt and message-injection run passed all 28 tests, including
+actual bundled asset reads, filters, edits/disable/delete/restart, missing assets,
+registration failure, partial installation, receipt recovery and link rejection.
+Independent draft review found and corrected interrupted-publication and receipt
+link problems, then verified the fixes; final actual-diff review is recorded below.
+
+Final actual-diff review reported no remaining findings. C23 G passed both fatal-
+info analyzers, all 10,010 root tests (one existing skip), markstream pub get and
+all 298 tests, the macOS debug build, and diff whitespace checks. The five non-
+document files retained their frozen hashes through G; staging uses the exact
+six-file manifest. Logs remain under build/genui/logs/c23-*. No new dependency or
+platform implementation was added in this step; deferred environments are unchanged.
