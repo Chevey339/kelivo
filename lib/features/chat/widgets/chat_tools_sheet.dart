@@ -18,10 +18,13 @@ import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import 'tools_sheet_row.dart';
+import '../../mcp/widgets/mcp_server_avatar.dart';
+import '../../mcp/utils/mcp_tool_groups.dart';
 
 /// Everything the model can call in this chat: device-local tools, connected
 /// MCP servers, and the workspace binding. Replaces the MCP-only sheet that
@@ -149,28 +152,44 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
             ),
             const SizedBox(height: 4),
             Flexible(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _LocalToolsGroup(
-                      assistantId: widget.assistantId,
-                      expanded: _expanded.contains(_ToolsGroupId.local),
-                      onToggle: () => _toggleGroup(_ToolsGroupId.local),
-                    ),
-                    _McpGroup(
-                      assistantId: widget.assistantId,
-                      expanded: _expanded.contains(_ToolsGroupId.mcp),
-                      onToggle: () => _toggleGroup(_ToolsGroupId.mcp),
-                    ),
-                    _WorkspaceGroup(
-                      assistantId: widget.assistantId,
-                      conversationId: widget.conversationId,
-                      expanded: _expanded.contains(_ToolsGroupId.workspace),
-                      onToggle: () => _toggleGroup(_ToolsGroupId.workspace),
-                      onClose: widget.onClose,
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: CustomScrollView(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: _LocalToolsGroup(
+                              assistantId: widget.assistantId,
+                              expanded: _expanded.contains(_ToolsGroupId.local),
+                              onToggle: () => _toggleGroup(_ToolsGroupId.local),
+                            ),
+                          ),
+                          _McpGroup(
+                            assistantId: widget.assistantId,
+                            expanded: _expanded.contains(_ToolsGroupId.mcp),
+                            onToggle: () => _toggleGroup(_ToolsGroupId.mcp),
+                          ),
+                          SliverToBoxAdapter(
+                            child: _WorkspaceGroup(
+                              assistantId: widget.assistantId,
+                              conversationId: widget.conversationId,
+                              expanded: _expanded.contains(
+                                _ToolsGroupId.workspace,
+                              ),
+                              onToggle: () =>
+                                  _toggleGroup(_ToolsGroupId.workspace),
+                              onClose: widget.onClose,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -222,64 +241,71 @@ class _ToolsGroup extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!isFirst) const SizedBox(height: 14),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onToggle,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: _rowPadding),
-            child: SizedBox(
-              height: 32,
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: _iconColumn,
-                    child: Center(
-                      child: AnimatedRotation(
-                        turns: expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOutCubic,
-                        child: Icon(
-                          Lucide.ChevronRight,
-                          size: 14,
-                          color: cs.onSurface.withValues(alpha: 0.4),
+        Semantics(
+          button: true,
+          expanded: expanded,
+          child: IosCardPress(
+            focusable: true,
+            haptics: false,
+            baseColor: Colors.transparent,
+            pressedBlendStrength: 0,
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: _rowPadding),
+              child: SizedBox(
+                height: 32,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: _iconColumn,
+                      child: Center(
+                        child: AnimatedRotation(
+                          turns: expanded ? 0.25 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Lucide.ChevronRight,
+                            size: 14,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: _iconGap),
-                  // Expanded (not Flexible + Spacer): the title has to absorb
-                  // all the slack, or the trailing text gets a share of it and
-                  // floats away from the right edge the rows align to.
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: AppFontWeights.semibold,
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (!expanded &&
-                      summaryText != null &&
-                      summaryText.isNotEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 160),
+                    const SizedBox(width: _iconGap),
+                    // Expanded (not Flexible + Spacer): the title has to absorb
+                    // all the slack, or the trailing text gets a share of it and
+                    // floats away from the right edge the rows align to.
+                    Expanded(
                       child: Text(
-                        summaryText,
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
                         style: TextStyle(
                           fontSize: 13,
+                          fontWeight: AppFontWeights.semibold,
                           color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
-                ],
+                    const SizedBox(width: 8),
+                    if (!expanded &&
+                        summaryText != null &&
+                        summaryText.isNotEmpty)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 160),
+                        child: Text(
+                          summaryText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -398,12 +424,21 @@ class _McpGroup extends StatelessWidget {
     final assistant = context.select<AssistantProvider, Assistant?>(
       (provider) => provider.getById(assistantId),
     );
-    if (assistant == null) return const SizedBox.shrink();
-    final servers = mcp.servers
-        .where((server) => mcp.statusFor(server.id) == McpStatus.connected)
+    if (assistant == null) return const SliverToBoxAdapter();
+    final groups = mcpToolGroups(mcp);
+    final servers = groups
+        .expand((group) => group.servers)
         .toList(growable: false);
     // Nothing connected means nothing to choose from — skip the empty block.
-    if (servers.isEmpty) return const SizedBox.shrink();
+    if (servers.isEmpty) return const SliverToBoxAdapter();
+
+    final rows = <({String? title, McpServerConfig? server})>[
+      for (final group in groups) ...[
+        if (mcp.groups.isNotEmpty)
+          (title: group.group?.name ?? l10n.providerGroupsOther, server: null),
+        for (final server in group.servers) (title: null, server: server),
+      ],
+    ];
 
     final selected = assistant.mcpServerIds.toSet();
     final selectedCount = servers
@@ -426,31 +461,67 @@ class _McpGroup extends StatelessWidget {
       return setIds(next);
     }
 
-    return _ToolsGroup(
-      key: ChatToolsSheet.mcpGroupKey,
-      title: l10n.mcpAssistantSheetTitle,
-      summary: '$selectedCount/${servers.length}',
-      expanded: expanded,
-      onToggle: onToggle,
-      children: [
-        for (final server in servers)
-          ToolsSheetRow(
-            key: ChatToolsSheet.mcpServerKey(server.id),
-            icon: Lucide.Hammer,
-            label: server.name,
-            selected: selected.contains(server.id),
-            detail: l10n.assistantEditMcpToolsCountTag(
-              server.tools.where((tool) => tool.enabled).length.toString(),
-              server.tools.length.toString(),
-            ),
-            onTap: () => unawaited(
-              setSelected(server.id, !selected.contains(server.id)),
-            ),
-            trailing: IosSwitch(
-              value: selected.contains(server.id),
-              semanticLabel: server.name,
-              onChanged: (value) => unawaited(setSelected(server.id, value)),
-            ),
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: _ToolsGroup(
+            key: ChatToolsSheet.mcpGroupKey,
+            title: l10n.mcpAssistantSheetTitle,
+            summary: '$selectedCount/${servers.length}',
+            expanded: expanded,
+            onToggle: onToggle,
+            children: const [],
+          ),
+        ),
+        if (expanded)
+          SliverList.builder(
+            addRepaintBoundaries: false,
+            itemCount: rows.length,
+            itemBuilder: (context, index) {
+              final row = rows[index];
+              final server = row.server;
+              if (server == null) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                  child: Text(
+                    row.title!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: .5),
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 || rows[index - 1].server == null ? 0 : 8,
+                ),
+                child: ToolsSheetRow(
+                  key: ChatToolsSheet.mcpServerKey(server.id),
+                  leading: McpServerAvatar(
+                    server: server,
+                    size: 20,
+                    radius: 7,
+                    showBackground: false,
+                  ),
+                  label: server.name,
+                  selected: selected.contains(server.id),
+                  detail:
+                      '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
+                  onTap: () => unawaited(
+                    setSelected(server.id, !selected.contains(server.id)),
+                  ),
+                  trailing: IosSwitch(
+                    value: selected.contains(server.id),
+                    semanticLabel: server.name,
+                    onChanged: (value) =>
+                        unawaited(setSelected(server.id, value)),
+                  ),
+                ),
+              );
+            },
           ),
       ],
     );

@@ -14,6 +14,7 @@ import 'providers/linkup_search_service.dart';
 import 'providers/brave_search_service.dart';
 import 'providers/metaso_search_service.dart';
 import 'providers/ollama_search_service.dart';
+import 'providers/deepseek_search_service.dart';
 import 'providers/jina_search_service.dart';
 import 'providers/bocha_search_service.dart';
 import 'providers/perplexity_search_service.dart';
@@ -88,6 +89,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return MetasoSearchService() as SearchService;
       case OllamaOptions _:
         return OllamaSearchService() as SearchService;
+      case DeepSeekOptions _:
+        return DeepSeekSearchService() as SearchService;
       case JinaOptions _:
         return JinaSearchService() as SearchService;
       case BochaOptions _:
@@ -251,6 +254,8 @@ abstract class SearchServiceOptions {
         return MetasoOptions.fromJson(json);
       case 'ollama':
         return OllamaOptions.fromJson(json);
+      case 'deepseek':
+        return DeepSeekOptions.fromJson(json);
       case 'jina':
         return JinaOptions.fromJson(json);
       case 'bocha':
@@ -587,6 +592,31 @@ class OllamaOptions extends SearchServiceOptions {
     apiKey: json['apiKey'],
     extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
   );
+}
+
+class DeepSeekOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  DeepSeekOptions({
+    required super.id,
+    required this.apiKey,
+    super.extraApiKeys,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'deepseek',
+    'id': id,
+    'apiKey': apiKey,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory DeepSeekOptions.fromJson(Map<String, dynamic> json) =>
+      DeepSeekOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
 }
 
 class JinaOptions extends SearchServiceOptions {

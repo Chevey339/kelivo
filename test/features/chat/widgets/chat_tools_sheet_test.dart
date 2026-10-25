@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Tristate;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
@@ -16,6 +17,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/chat_tools_sheet.dart';
+import 'package:Kelivo/desktop/tools_popover.dart';
 import 'package:Kelivo/features/home/services/local_tool_labels.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
@@ -25,6 +27,7 @@ import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
@@ -66,8 +69,9 @@ class _FakeChatService extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    Conversation? expectedOwner,
+  }) async {
     final current = getConversation(conversationId);
     if (current == null) return;
     conversation = current.copyWith(
@@ -170,12 +174,14 @@ void main() {
     WidgetTester tester, {
     List<McpServerConfig> servers = const [],
     Conversation? conversation,
+    bool desktop = false,
   }) async {
     mcp.fakeServers = servers;
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final anchor = GlobalKey();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -198,17 +204,90 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: AppSnackBarOverlay(
             child: Scaffold(
-              body: ChatToolsSheet(
-                assistantId: assistantId,
-                conversationId: conversation?.id,
-              ),
+              body: desktop
+                  ? Builder(
+                      builder: (context) => Align(
+                        alignment: Alignment.bottomCenter,
+                        child: SizedBox(
+                          key: anchor,
+                          width: 400,
+                          height: 44,
+                          child: TextButton(
+                            onPressed: () => showDesktopToolsPopover(
+                              context,
+                              anchorKey: anchor,
+                              assistantId: assistantId,
+                              supportsModelTools: true,
+                            ),
+                            child: const Text('Open tools'),
+                          ),
+                        ),
+                      ),
+                    )
+                  : ChatToolsSheet(
+                      assistantId: assistantId,
+                      conversationId: conversation?.id,
+                    ),
             ),
           ),
         ),
       ),
     );
+    if (desktop) await tester.tap(find.text('Open tools'));
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'keyboard folds workspace and announces state desktop=$desktop',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.runAsync(
+          () => uiPreferences.setStringList(
+            'display_chat_tools_expanded_groups_v1',
+            ['mcp'],
+          ),
+        );
+        final l10n = await pumpSheet(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        final title = find.text(l10n.workspacesTitle);
+        await tester.scrollUntilVisible(
+          title,
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final header = find.ancestor(
+          of: title,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics && widget.properties.expanded != null,
+          ),
+        );
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isFalse,
+        );
+        Focus.of(tester.element(title)).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isTrue,
+        );
+        expect(find.byType(WorkspaceSection), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(header).flagsCollection.isExpanded,
+          Tristate.isFalse,
+        );
+        expect(find.byType(WorkspaceSection), findsNothing);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
   }
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
@@ -251,6 +330,11 @@ void main() {
       variant: TargetPlatformVariant.only(platform),
     );
   }
+
+  testWidgets('tool sheet has no standalone browser entry', (tester) async {
+    await pumpSheet(tester);
+    expect(find.byKey(const ValueKey('chat-tools-open-browser')), findsNothing);
+  });
 
   testWidgets('shows the local tools group folded with an enabled count', (
     tester,

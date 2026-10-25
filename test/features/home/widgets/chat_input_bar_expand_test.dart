@@ -17,6 +17,17 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 void main() {
   const barKey = Key('bar');
   const bodyHeight = 600.0;
+  const nativeMenuChannel = MethodChannel('app.ios_selection_menu');
+
+  setUp(() {
+    // These assertions exercise the existing Flutter toolbar on older iOS.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(nativeMenuChannel, (_) async => false);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(nativeMenuChannel, null);
+  });
 
   Future<List<bool>> pumpBar(
     WidgetTester tester,

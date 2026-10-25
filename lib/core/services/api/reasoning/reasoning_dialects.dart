@@ -102,9 +102,9 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
 /// No-op when the model has no reasoning ability or dialect == none.
 ///
 /// `auto` is non-destructive: it strips nothing and only put-if-absent surface
-/// flags (Responses `reasoning.summary`, adaptive `thinking`, Gemini
-/// `includeThoughts`). Explicit levels and `off` strip only the keys the
-/// effective dialect/transport owns, then write the shape.
+/// flags (OpenRouter `reasoning.enabled`, Responses `reasoning.summary`,
+/// adaptive `thinking`, Gemini `includeThoughts`). Explicit levels and `off`
+/// strip only the keys the effective dialect/transport owns, then write the shape.
 ///
 /// `qwenEnableThinking` + `!canDisable` never writes `enable_thinking`
 /// (thinking-only DashScope models reject it). `thinkingType` over
@@ -245,6 +245,11 @@ void _writeAutoSurfaceFlags(
   ReasoningDialect dialect,
   ReasoningTransport transport,
 ) {
+  if (dialect == ReasoningDialect.openrouterReasoning) {
+    final reasoning = _ensureMap(body, 'reasoning');
+    reasoning.putIfAbsent('enabled', () => true);
+    return;
+  }
   if (_isOpenAiDialect(dialect) && transport == ReasoningTransport.responses) {
     final reasoning = _ensureMap(body, 'reasoning');
     reasoning.putIfAbsent('summary', () => 'auto');

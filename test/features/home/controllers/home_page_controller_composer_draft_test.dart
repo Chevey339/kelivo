@@ -1,3 +1,5 @@
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
+import '../../../support/native_message_input_harness.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -17,6 +19,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show ApplyInterceptor;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -65,13 +68,14 @@ class _DraftChatService extends ChatService {
 }
 
 class _Harness extends StatefulWidget {
-  const _Harness({super.key});
+  const _Harness({super.key, this.nativeInput = false});
+  final bool nativeInput;
   @override
   State<_Harness> createState() => _HarnessState();
 }
 
 class _HarnessState extends State<_Harness> with TickerProviderStateMixin {
-  final text = TextEditingController();
+  late final TextEditingController text;
   final media = ChatInputBarController();
   final focus = FocusNode();
   final scroll = ChatAutoFollowScrollController();
@@ -81,6 +85,9 @@ class _HarnessState extends State<_Harness> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    text = widget.nativeInput
+        ? MessageEditingController(nativeInputEnabled: true)
+        : TextEditingController();
     controller = HomePageController(
       context: context,
       vsync: this,
@@ -123,6 +130,20 @@ class _HarnessState extends State<_Harness> with TickerProviderStateMixin {
   }
 }
 
+// Gate attachment preparation without changing the Home recovery implementation.
+class _GatedDraftStore extends ComposerDraftStore {
+  _GatedDraftStore(super.db, {super.directory});
+  final preparationStarted = Completer<void>();
+  final releasePreparation = Completer<void>();
+
+  @override
+  Future<ChatInputData> prepareSubmissionInput(ChatInputData input) async {
+    preparationStarted.complete();
+    await releasePreparation.future;
+    return input; // Text-only submission has no attachment transformations.
+  }
+}
+
 void main() {
   late Directory root;
   late AppDatabase db;
@@ -145,7 +166,10 @@ void main() {
     await db.close();
     await root.delete(recursive: true);
   });
-  Future<_HarnessState> pump(WidgetTester tester) async {
+  Future<_HarnessState> pump(
+    WidgetTester tester, {
+    bool nativeInput = false,
+  }) async {
     final key = GlobalKey<_HarnessState>();
     await tester.pumpWidget(
       MultiProvider(
@@ -162,7 +186,7 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: _Harness(key: key),
+          home: _Harness(key: key, nativeInput: nativeInput),
         ),
       ),
     );
@@ -181,7 +205,8 @@ void main() {
         done = true;
       },
     );
-    for (var i = 0; i < 200 && !done; i++) {
+    final waiting = Stopwatch()..start();
+    while (!done && waiting.elapsed < const Duration(seconds: 10)) {
       await tester.pump(const Duration(milliseconds: 10));
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 5)),
@@ -216,6 +241,250 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await finish(tester, store.flush());
   }
+
+  for (final operation in ['switch', 'background', 'dispose']) {
+    testWidgets('native accepted input drains before draft $operation', (
+      tester,
+    ) async {
+      final native = NativeMessageInputHarness(tester);
+      addTearDown(native.dispose);
+      final state = await pump(tester, nativeInput: true);
+      await go(tester, state, 'a');
+      final source = 'original line\n' * 300;
+      state.text.value = TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: source.length),
+      );
+      state.focus.requestFocus();
+      await tester.pump();
+      await tester.pump();
+      expect(native.session, isNotNull);
+      native.holdDelivery = true;
+      await native.commit('X');
+      expect(state.text.text, source);
+      if (operation == 'switch') {
+        await finish(
+          tester,
+          state.controller.debugViewModel.switchConversation('b'),
+        );
+        await tester.pump();
+        expect(state.media.draftOwnerId, 'a');
+        await native.release();
+        await go(tester, state, 'b');
+        expect(state.text.text, isEmpty);
+        expect(store.peek('a')!.active.text, '${source}X');
+        expect(store.peek('a')!.active.selectionExtent, source.length + 1);
+        await go(tester, state, 'a');
+        expect(state.text.text, '${source}X');
+        await unmount(tester);
+      } else if (operation == 'background') {
+        state.controller.onAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        await native.release();
+        await finish(tester, store.flush());
+        expect(store.peek('a')!.active.text, '${source}X');
+        await unmount(tester);
+      } else {
+        await tester.pumpWidget(const SizedBox());
+        await native.release();
+        await finish(
+          tester,
+          (state.text as MessageEditingController).disposeAfterInput(),
+        );
+        await finish(tester, store.flush());
+        expect(store.peek('a')!.active.text, '${source}X');
+        expect(store.peek('a')!.active.selectionExtent, source.length + 1);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final operation in ['switch', 'dispose']) {
+    for (final mode in ['short', 'long', 'file']) {
+      testWidgets(
+        'accepted $mode paste finishes in the original draft during $operation',
+        (tester) async {
+          final native = NativeMessageInputHarness(tester);
+          addTearDown(native.dispose);
+          final clipboard = Completer<Map<String, String>>();
+          final requested = Completer<void>();
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            (call) async {
+              if (call.method == 'Clipboard.getData') {
+                if (!requested.isCompleted) requested.complete();
+                return clipboard.future;
+              }
+              return null;
+            },
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(SystemChannels.platform, null),
+          );
+          final state = await pump(tester, nativeInput: true);
+          await go(tester, state, 'a');
+          final source = mode == 'short'
+              ? 'short draft'
+              : 'original line\n' * 300;
+          final pasted = mode == 'file' ? 'P' * 6000 : 'PASTE';
+          final expected = mode == 'file' ? source : '$source$pasted';
+          state.text.value = TextEditingValue(
+            text: source,
+            selection: TextSelection.collapsed(offset: source.length),
+          );
+          state.focus.requestFocus();
+          await tester.pump();
+          await tester.pump();
+          final document = state.text as MessageEditingController;
+          final pasting = document.performCommand('paste');
+          await finish(tester, requested.future);
+          if (operation == 'switch') {
+            await finish(
+              tester,
+              state.controller.debugViewModel.switchConversation('b'),
+            );
+            await tester.pump();
+            expect(state.media.draftOwnerId, 'a');
+            clipboard.complete({'text': pasted});
+            await finish(tester, pasting);
+            await go(tester, state, 'b');
+            expect(state.text.text, isEmpty);
+            expect(store.peek('a')!.active.text, expected);
+            await unmount(tester);
+          } else {
+            await tester.pumpWidget(const SizedBox());
+            clipboard.complete({'text': pasted});
+            await finish(tester, pasting);
+            await finish(tester, document.disposeAfterInput());
+            await finish(tester, store.flush());
+            expect(store.peek('a')!.active.text, expected);
+          }
+          if (mode == 'file') {
+            final attachment = store.peek('a')!.active.documents.single;
+            expect(
+              await tester.runAsync(() => File(attachment.path).readAsString()),
+              pasted,
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('queued submit during a draft switch keeps the original draft', (
+    tester,
+  ) async {
+    final native = NativeMessageInputHarness(tester);
+    addTearDown(native.dispose);
+    final state = await pump(tester, nativeInput: true);
+    await go(tester, state, 'a');
+    final source = 'original line\n' * 300;
+    state.text.value = TextEditingValue(
+      text: source,
+      selection: TextSelection.collapsed(offset: source.length),
+    );
+    state.focus.requestFocus();
+    await tester.pump();
+    await tester.pump();
+    native.holdDelivery = true;
+    await native.commit('X');
+    await finish(
+      tester,
+      state.controller.debugViewModel.switchConversation('b'),
+    );
+    expect(state.media.draftOwnerId, 'a');
+    await native.deliver(
+      NativeMessageInputHarness.codec.encodeMethodCall(
+        MethodCall('command', {'session': native.session, 'command': 'submit'}),
+      ),
+    );
+    await native.release();
+    await go(tester, state, 'b');
+    expect(store.peek('a')!.active.text, '${source}X');
+    expect(store.peek('a')!.submissionId, isNull);
+    expect(state.text.text, isEmpty);
+    await unmount(tester);
+  });
+
+  testWidgets('clipboard failure does not disable later native input', (
+    tester,
+  ) async {
+    final native = NativeMessageInputHarness(tester);
+    addTearDown(native.dispose);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.getData') {
+          throw PlatformException(code: 'clipboard_unavailable');
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final state = await pump(tester, nativeInput: true);
+    await go(tester, state, 'a');
+    final source = 'original line\n' * 300;
+    state.text.value = TextEditingValue(
+      text: source,
+      selection: TextSelection.collapsed(offset: source.length),
+    );
+    state.focus.requestFocus();
+    await tester.pump();
+    await tester.pump();
+    final document = state.text as MessageEditingController;
+    await finish(tester, document.performCommand('paste'));
+    await native.commit('X');
+    await finish(tester, document.flushInput());
+    expect(document.text, '${source}X');
+    await go(tester, state, 'b');
+    expect(store.peek('a')!.active.text, '${source}X');
+    await unmount(tester);
+  });
+
+  testWidgets('native undo while selecting is saved before changing drafts', (
+    tester,
+  ) async {
+    final native = NativeMessageInputHarness(tester);
+    addTearDown(native.dispose);
+    final state = await pump(tester, nativeInput: true);
+    await go(tester, state, 'a');
+    final source = 'original line\n' * 300;
+    state.text.value = TextEditingValue(
+      text: source,
+      selection: TextSelection.collapsed(offset: source.length),
+    );
+    state.focus.requestFocus();
+    await tester.pump(const Duration(milliseconds: 600));
+    await native.commit('X');
+    await tester.pump(const Duration(milliseconds: 600));
+    state.controller.shareMessage(-1, const []);
+    await tester.pumpAndSettle();
+    expect(state.media.isAttached, isFalse);
+    await native.deliver(
+      NativeMessageInputHarness.codec.encodeMethodCall(
+        MethodCall('command', {'session': native.session, 'command': 'undo'}),
+      ),
+    );
+    await finish(tester, (state.text as MessageEditingController).flushInput());
+    expect(state.text.text, source);
+    state.controller.onAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await finish(tester, store.flush());
+    expect(store.peek('a')!.active.text, source);
+    state.controller.cancelSelection();
+    await tester.pumpAndSettle();
+    await go(tester, state, 'b');
+    await go(tester, state, 'a');
+    expect(state.text.text, source);
+    expect(state.text.selection.extentOffset, source.length);
+    await unmount(tester);
+  });
 
   testWidgets('real binder isolates A/B text, attachments and selection', (
     tester,
@@ -788,4 +1057,109 @@ void main() {
     expect(store.errors, contains('a'));
     await unmount(tester);
   });
+
+  for (final closeDuringRecovery in [false, true]) {
+    testWidgets(
+      'durable rejected submission survives retirement; close=$closeDuringRecovery',
+      (tester) async {
+        store.dispose();
+        final gatedStore = _GatedDraftStore(
+          db,
+          directory: () async => Directory('${root.path}/drafts'),
+        );
+        store = gatedStore;
+        await finish(tester, store.initialize());
+        service = _DraftChatService(store);
+        final native = NativeMessageInputHarness(tester);
+        addTearDown(native.dispose);
+        final state = await pump(tester, nativeInput: true);
+        await go(tester, state, 'a');
+        final document = state.text as MessageEditingController;
+        final source = 'original line\n' * 300;
+        document.value = TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: source.length),
+        );
+        state.focus.requestFocus();
+        await tester.pump();
+        await tester.pump();
+        expect(document.hasNativeInput, isTrue);
+        await document.performCommand('submit');
+        await finish(tester, gatedStore.preparationStarted.future);
+        expect(store.peek('a')!.pending, isNotNull);
+        expect(document.text, isEmpty);
+
+        native.holdDelivery = true;
+        await native.commit('X');
+        final retirement = document.retireInput();
+        expect(document.isDraining, isTrue);
+        gatedStore.releasePreparation.complete();
+        // Default fixture has no selected provider/model, so actual Home sending
+        // rejects and invokes its durable _recoverComposerSubmission path.
+        for (var i = 0; i < 20 && store.submitting.contains('a'); i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)),
+          );
+        }
+        expect(document.isDraining, isTrue);
+        if (closeDuringRecovery) {
+          // Recovery already awaits input; disposal must save its final snapshot
+          // before recovery is allowed to consume the pending submission.
+          expect(store.submitting, contains('a'));
+          await tester.pump(const Duration(seconds: 4));
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpWidget(const SizedBox());
+        }
+        await native.release();
+        await retirement;
+        for (var i = 0; i < 200 && store.submitting.contains('a'); i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)),
+          );
+        }
+        expect(store.submitting, isNot(contains('a')));
+        // Allow the actual rejection toast to dispose its animation before unmount.
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump(const Duration(milliseconds: 400));
+        final visible = document.text;
+        final errors = <Object>[];
+        Object? error;
+        while ((error = tester.takeException()) != null) {
+          errors.add(error!);
+        }
+        await unmount(tester);
+        final reopened = ComposerDraftStore(
+          db,
+          directory: () async => Directory('${root.path}/drafts'),
+        );
+        late ComposerDraft persisted;
+        await finish(tester, () async {
+          persisted = await reopened.load('a');
+        }());
+        reopened.dispose();
+        expect(errors, isEmpty);
+        expect(
+          persisted.active.text == visible,
+          isTrue,
+          reason:
+              'Visible accepted input and the durable active draft must agree',
+        );
+        final allRetained =
+            persisted.active.text + (persisted.pending?.text ?? '');
+        expect(
+          allRetained.contains(source),
+          isTrue,
+          reason:
+              'The rejected submission remains in active or recoverable pending',
+        );
+        expect(
+          allRetained.contains('X'),
+          isTrue,
+          reason: 'The later accepted native edit must also survive close',
+        );
+      },
+    );
+  }
 }

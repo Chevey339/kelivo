@@ -251,9 +251,32 @@ void main() {
       expect(guess.replayField, replayField, reason: id);
     }
 
+    test('GPT-5 variants require at least minimal reasoning', () {
+      for (final model in const ['gpt-5', 'gpt-5-mini', 'gpt-5-nano']) {
+        for (final id in [
+          model,
+          '$model-2025-08-07',
+          'openai/$model',
+          'openai/$model-2025-08-07',
+        ]) {
+          expectHit(
+            id,
+            dialect: ReasoningDialect.openaiReasoningEffort,
+            levels: const [
+              ReasoningLevel.minimal,
+              ReasoningLevel.low,
+              ReasoningLevel.medium,
+              ReasoningLevel.high,
+            ],
+            canDisable: false,
+          );
+        }
+      }
+    });
+
     test('OpenAI effort ladders', () {
       expectHit(
-        'gpt-5',
+        'gpt-5.1',
         dialect: ReasoningDialect.openaiReasoningEffort,
         levels: const [
           ReasoningLevel.low,
@@ -278,6 +301,16 @@ void main() {
         'gpt-5-pro',
         dialect: ReasoningDialect.openaiReasoningEffort,
         levels: const [ReasoningLevel.high],
+        canDisable: false,
+      );
+      expectHit(
+        'gpt-5-codex',
+        dialect: ReasoningDialect.openaiReasoningEffort,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
         canDisable: false,
       );
       expectHit(

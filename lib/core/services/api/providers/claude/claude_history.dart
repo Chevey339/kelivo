@@ -498,7 +498,7 @@ class ClaudeHistory {
     // that made it — comes after everything that was recorded.
     for (final entry in cards.entries) {
       if (declared.contains(entry.key)) continue;
-      final block = _toolUseBlockFromToolCall(entry.value);
+      final block = _toolUseBlockFromToolCall(entry.value, recordedTurn: true);
       if (block != null) responses.last.add(block);
     }
     // A turn left with nothing to send still owns its `tool` messages.
@@ -529,11 +529,28 @@ class ClaudeHistory {
     );
   }
 
-  static Map<String, dynamic>? _toolUseBlockFromToolCall(Map? tc) {
+  static final _toolUseIdPattern = RegExp(r'^[a-zA-Z0-9_-]+$');
+
+  Map<String, dynamic>? _toolUseBlockFromToolCall(
+    Map? tc, {
+    bool recordedTurn = false,
+  }) {
     if (tc == null) return null;
     final id = (tc['id'] ?? '').toString();
     final fn = tc['function'];
-    if (id.isEmpty || fn is! Map) return null;
+    // Display-only ids (including citation cards in already stored messages)
+    // cannot declare an Anthropic tool call. Its unmatched result is dropped.
+    if (!_toolUseIdPattern.hasMatch(id) || fn is! Map) return null;
+    // A native recording owns server calls; its extra cards are only display.
+    // Without a recording, valid cards may come from a different provider and
+    // still carry useful tool history when the user switches to Claude.
+    final metadata = tc['metadata'];
+    if (replayServerToolBlocks &&
+        recordedTurn &&
+        metadata is Map &&
+        metadata['server'] == true) {
+      return null;
+    }
     Map<String, dynamic> input = const <String, dynamic>{};
     try {
       input = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)

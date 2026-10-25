@@ -306,6 +306,38 @@ void main() {
     expect(other.stats.bytes, 0);
   });
 
+  test(
+    'renamed and root-level snapshots stay out of Other and cleanup',
+    () async {
+      final name = LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 10, 19));
+      for (final location in ['', 'snapshots 2', 'snapshots (3)']) {
+        await _writeSizedFile(tempDir, p.join(location, name), 512);
+        await _writeSizedFile(tempDir, p.join(location, '$name.json'), 64);
+      }
+      final report = await StorageUsageService.computeReport();
+      expect(
+        report.categories
+            .singleWhere(
+              (category) =>
+                  category.key == StorageUsageCategoryKey.localSnapshots,
+            )
+            .stats
+            .bytes,
+        3 * 576,
+      );
+      expect(
+        report.categories
+            .singleWhere(
+              (category) => category.key == StorageUsageCategoryKey.other,
+            )
+            .stats
+            .bytes,
+        0,
+      );
+      expect(report.clearable.bytes, 0);
+    },
+  );
+
   test('restore traces stay hidden while a restore run is active', () async {
     const runId = '0123456789abcdef0123456789abcdef';
     final workspace = Directory(

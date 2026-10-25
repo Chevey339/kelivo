@@ -9,6 +9,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_prompt_settings.dart';
+import '../../../core/models/memory_entry.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -46,6 +47,7 @@ Future<String?> readContextMemorySnapshotHash({
     assistantId: assistant!.id,
     lang: settings.resolvedMemoryPromptLang,
     maxItems: settings.memoryInjectionMaxItems,
+    fullInjectionTypes: settings.memoryFullInjectionTypes,
   );
   return snapshot.isEmpty ? null : snapshot.hash;
 }
@@ -74,6 +76,9 @@ ContextUsageConfiguration contextUsageConfiguration({
     jsonEncode(assistant?.toJson()),
     settings.legacyMemoryMode,
     settings.memoryInjectionMaxItems,
+    jsonEncode(
+      settings.memoryFullInjectionTypes.map(MemoryEntry.typeToString).toList(),
+    ),
     settings.resolvedMemoryPromptLang,
     settings.memoryRulesPromptEn,
     settings.memoryRulesPromptZh,

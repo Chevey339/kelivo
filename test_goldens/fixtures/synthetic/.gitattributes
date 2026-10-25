@@ -1,0 +1,2 @@
+# Two trailing spaces are Markdown hard-break syntax in this fixture.
+40_entities_escapes.md whitespace=-blank-at-eol

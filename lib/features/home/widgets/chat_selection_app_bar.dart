@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
+import '../../../desktop/macos_window_drag_area.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -33,6 +34,7 @@ class ChatSelectionAppBar extends StatelessWidget
     final l10n = AppLocalizations.of(context)!;
 
     return AppBar(
+      flexibleSpace: const MacosWindowDragArea(child: SizedBox.expand()),
       centerTitle: true,
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,

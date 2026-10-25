@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/haptics.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../features/dev/pages/markdown_playground_page.dart';
 import '../../shared/widgets/qq_group_join_sheet.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
@@ -183,6 +185,18 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [
+                  if (kDebugMode || kProfileMode) ...[
+                    _DeskNavRow(
+                      icon: lucide.Lucide.Code,
+                      label: l10n.markdownPlaygroundTitle,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const MarkdownPlaygroundPage(),
+                        ),
+                      ),
+                    ),
+                    const _DeskRowDivider(),
+                  ],
                   _DeskInfoRow(
                     icon: lucide.Lucide.Code,
                     label: l10n.aboutPageVersion,

@@ -254,7 +254,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
   }
 
   Future<void> setPinned(LocalCopy copy, bool pinned) async {
-    if (copy.kind != LocalCopyKind.snapshot) return;
+    if (copy.discovered || copy.kind != LocalCopyKind.snapshot) return;
     await _store.setPinned(copy.id, pinned);
     await refresh();
   }

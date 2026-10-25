@@ -1062,6 +1062,7 @@ class MessageGenerationService {
       return WorkspaceToolContext.skillsOnly(
         skillsHostDir: skillsService.skillsDirectory.path,
         conversationId: conversation?.id,
+        assistantId: conversation?.assistantId,
       );
     } catch (_) {
       return null;

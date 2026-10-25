@@ -1263,7 +1263,7 @@ _ReasoningHit? _gpt5Support(String id) {
   }
   if (_matches(id, r'(^|[/_:@])gpt-5(?:$|-)')) {
     return _ladder(
-      efforts: const ['none', 'low', 'medium', 'high'],
+      efforts: const ['minimal', 'low', 'medium', 'high'],
       dialect: ReasoningDialect.openaiReasoningEffort,
     );
   }

@@ -13,6 +13,50 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('adds DeepSeek with a required API key', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+    await tester.dragUntilVisible(
+      find.text('DeepSeek'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('DeepSeek'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    expect(result, isNull);
+    expect(find.byType(SearchServiceEditorPage), findsOneWidget);
+
+    await tester.enterText(_apiKeyField(), 'deepseek-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    expect(result?.service, isA<DeepSeekOptions>());
+    expect((result!.service! as DeepSeekOptions).apiKey, 'deepseek-key');
+  });
+
+  testWidgets('edits DeepSeek and preserves extra API keys', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: DeepSeekOptions(
+        id: 'deepseek',
+        apiKey: 'old-key',
+        extraApiKeys: const ['extra-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+    expect(find.text('old-key'), findsOneWidget);
+    await tester.enterText(_apiKeyField(), 'new-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as DeepSeekOptions;
+    expect(saved.id, 'deepseek');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['extra-key']);
+  });
+
   testWidgets(
     'fetch test uses the current provider and ignores an obsolete URL',
     (tester) async {

@@ -108,7 +108,7 @@ The [User Guide](https://kelivo.psycheas.top/guide) (Chinese) covers providers, 
 
 ### 🤖 Agent and Workspaces
 
-- **Workspaces**: bind a conversation to a workspace to give the model seven tools: `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `glob` and `grep`. Command output streams live, file edits appear as diffs, and shell commands can require approval, which you grant per command or for the whole session.
+- **Workspaces**: bind a conversation to a workspace to give the model eight tools: `shell`, `read_file`, `view_image`, `write_file`, `edit_file`, `list_dir`, `glob` and `grep`. Command output streams live, file edits appear as diffs, and file access outside authorized folders and desktop commands ask for approval. A conversation can explicitly enable Full access to skip ordinary tool approvals, including MCP and supported local actions.
 - **A Linux sandbox on your phone**: Android runs Ubuntu, Debian or Alpine Linux through PRoot, or a rootfs image you import. iOS includes Alpine Linux based on iSH, so nothing needs to be downloaded. Install Python, Node.js, Git, SSH and other common tools from the app, and choose the fastest apt/apk, pip and npm mirrors after a speed test.
 - **Native on desktop**: on macOS, Windows and Linux, tools run in your system shell, in an app-managed folder or a folder you link from your computer.
 - **Files and terminal**: browse workspace files with previews for Markdown, HTML, CSV, images and text. Mobile has an in-app terminal; on desktop, open the workspace in your system terminal. On mobile, you can also mount up to 10 external folders into the sandbox, read-only or read-write.

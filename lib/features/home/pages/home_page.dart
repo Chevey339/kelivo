@@ -1,3 +1,5 @@
+import '../../browser/browser_navigation.dart';
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -8,6 +10,8 @@ import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
+import '../../../shared/widgets/visible_route_theme.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/responsive/breakpoints.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -705,7 +709,7 @@ class _HomePageState extends State<HomePage>
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = TextEditingController();
+  final TextEditingController _inputController = MessageEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
@@ -993,7 +997,23 @@ class _HomePageState extends State<HomePage>
   // ============================================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      // Keep action callbacks on the page's live context. Dialogs must not
+      // capture the deferred theme intended only for this page's contents.
+      SelectionBackScope(
+        selecting: _controller.selecting,
+        onCancel: () {
+          // Only the mobile drawer takes this back first. Its controller keeps
+          // its last value after switching to the wide layout without a drawer.
+          if (MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet ||
+              _drawerController.isClosed) {
+            _controller.cancelSelection();
+          }
+        },
+        child: VisibleRouteTheme(child: _buildPage(context)),
+      );
+
+  Widget _buildPage(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
@@ -1453,6 +1473,7 @@ class _HomePageState extends State<HomePage>
       showProducedFiles: settings.showProducedFiles,
       showToolResultSummary: settings.showToolResultSummary,
       hideToolResultImages: settings.hideToolResultImages,
+      showBrowserPageCards: settings.showBrowserPageCards,
       collapsedCodeLines: settings.autoCollapseCodeBlock
           ? settings.autoCollapseCodeBlockLines
           : null,
@@ -1583,6 +1604,14 @@ class _HomePageState extends State<HomePage>
             context,
             anchorKey: _inputBarKey,
             assistantId: a.id,
+            supportsModelTools:
+                chatModel.providerKey != null &&
+                chatModel.modelId != null &&
+                _controller.isToolModel(
+                  chatModel.providerKey!,
+                  chatModel.modelId!,
+                ),
+            conversationId: _controller.currentConversation?.id,
           );
         } else {
           _controller.dismissKeyboard();
@@ -1633,6 +1662,11 @@ class _HomePageState extends State<HomePage>
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,
       onUploadFiles: _controller.onPickFiles,
+      onOpenBrowser: () => openBrowserPage(
+        context,
+        conversationId: _controller.currentConversation?.id,
+        assistantId: context.read<AssistantProvider>().currentAssistantId,
+      ),
       onToggleLearningMode: _openInstructionInjectionPopover,
       onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,

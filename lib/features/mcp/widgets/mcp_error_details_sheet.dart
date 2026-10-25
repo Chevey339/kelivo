@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'mcp_form.dart';
 
 /// FormSheet bounds and scrolls the details while keeping actions reachable.
 class McpErrorDetailsSheet extends StatelessWidget {
@@ -48,6 +49,61 @@ class McpErrorDetailsSheet extends StatelessWidget {
                   ? message!
                   : l10n.mcpPageErrorNoDetails,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Desktop keeps error details in a scrollable dialog with reachable actions.
+class McpErrorDetailsDialog extends StatelessWidget {
+  const McpErrorDetailsDialog({
+    super.key,
+    required this.serverName,
+    required this.message,
+    required this.onReconnect,
+  });
+  final String serverName;
+  final String? message;
+  final VoidCallback onReconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return McpForm(
+      desktop: true,
+      width: 600,
+      title: l10n.mcpPageErrorDialogTitle,
+      actions: FormSheetActions(
+        cancelLabel: l10n.mcpPageClose,
+        confirmLabel: l10n.mcpPageReconnect,
+        onCancel: () => Navigator.of(context).pop(),
+        onConfirm: onReconnect,
+      ),
+      children: [
+        SizedBox(
+          width: 600,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                serverName,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SectionCard(
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  message?.isNotEmpty == true
+                      ? message!
+                      : l10n.mcpPageErrorNoDetails,
+                ),
+              ),
+            ],
           ),
         ),
       ],

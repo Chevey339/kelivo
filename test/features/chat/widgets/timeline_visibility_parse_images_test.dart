@@ -3,6 +3,17 @@ import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Unicode-separated fences protect images until their actual closer', () {
+    for (final separator in ['\u2028', '\u2029', '\r\n']) {
+      final source =
+          '```text$separator![](inside.png)$separator```$separator![](outside.png)';
+      final (text, images) = parseToolResultImages(source);
+      expect(images, ['outside.png']);
+      expect(text, contains('![](inside.png)'));
+      expect(text, isNot(contains('outside.png')));
+    }
+  });
+
   group('parseToolResultImages', () {
     test('extracts standalone-line markdown images', () {
       const content = '''

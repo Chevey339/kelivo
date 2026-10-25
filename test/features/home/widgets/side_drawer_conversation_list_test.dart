@@ -3,6 +3,7 @@ import 'dart:io';
 
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
@@ -10,6 +11,9 @@ import 'package:Kelivo/core/providers/tag_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
+import 'package:Kelivo/features/home/pages/home_mobile_layout.dart';
+import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
+import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -168,10 +172,14 @@ void main() {
     ValueNotifier<Locale>? localeListenable,
     bool showChatListDate = false,
     AssistantProvider? assistantProvider,
+    InteractiveDrawerController? mobileDrawer,
+    SettingsProvider? settingsProvider,
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
-    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.physicalSize = mobileDrawer == null
+        ? const Size(1200, 900)
+        : const Size(400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -179,31 +187,68 @@ void main() {
     final assistantPrefs = createBusinessTestPreferences();
     final backupPrefs = createBusinessTestPreferences();
     final tagPrefs = createBusinessTestPreferences();
-    final settings = SettingsProvider(settingsPrefs);
+    final settings = settingsProvider ?? SettingsProvider(settingsPrefs);
+    final scaffoldKey = GlobalKey<ScaffoldState>();
+    final closeTick = ValueNotifier(0);
+    addTearDown(closeTick.dispose);
     Widget materialFor(Locale currentLocale) {
       return MaterialApp(
         locale: currentLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SideDrawer(
-            userName: 'User',
-            assistantName: 'Assistant',
-            embedded: true,
-            desktopTopicsOnly: desktopTopicsOnly,
-            desktopAssistantsOnly: desktopAssistantsOnly,
-            globalSearchMode: globalSearchMode,
-            globalSearchQuery: globalSearchQuery,
-            showBottomBar: false,
-            onSelectConversation: onSelectConversation,
-          ),
-        ),
+        home: mobileDrawer != null
+            ? VisibleRouteTheme(
+                child: HomeMobileScaffold(
+                  scaffoldKey: scaffoldKey,
+                  drawerController: mobileDrawer,
+                  assistantPickerCloseTick: closeTick,
+                  loadingConversationIds: const {},
+                  title: 'Conversation',
+                  providerName: null,
+                  modelDisplay: null,
+                  onToggleDrawer: mobileDrawer.toggle,
+                  onDismissKeyboard: () {},
+                  onSelectConversation: (id) => onSelectConversation?.call(id),
+                  onNewConversation: () {},
+                  onOpenMiniMap: () {},
+                  onCreateNewConversation: () async {},
+                  onToggleTemporaryConversation: () async {},
+                  onSelectModel: () {},
+                  canToggleTemporaryConversation: false,
+                  temporaryConversationEnabled: false,
+                  globalSearchMode: false,
+                  globalSearchQuery: '',
+                  onGlobalSearchQueryChanged: (_) {},
+                  onEnterGlobalSearch: () {},
+                  onExitGlobalSearch: () {},
+                  onOpenGlobalSearchResult: (_, _) async {},
+                  body: const SizedBox.expand(),
+                ),
+              )
+            : Scaffold(
+                body: SideDrawer(
+                  userName: 'User',
+                  assistantName: 'Assistant',
+                  embedded: true,
+                  desktopTopicsOnly: desktopTopicsOnly,
+                  desktopAssistantsOnly: desktopAssistantsOnly,
+                  globalSearchMode: globalSearchMode,
+                  globalSearchQuery: globalSearchQuery,
+                  showBottomBar: false,
+                  onSelectConversation: onSelectConversation,
+                ),
+              ),
       );
     }
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          if (mobileDrawer != null)
+            ChangeNotifierProvider(
+              create: (_) =>
+                  UserProvider(preferences: createBusinessTestPreferences()),
+            ),
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           if (assistantProvider != null)
@@ -244,6 +289,72 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 400));
   }
+
+  testWidgets(
+    'mobile topic taps close the drawer unless keep-open is enabled',
+    (tester) async {
+      final service = createService();
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        await service.init();
+        settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+      });
+      service.seedConversationsForTest([
+        Conversation(id: 'one', title: 'Topic one'),
+        Conversation(id: 'two', title: 'Topic two'),
+      ]);
+      final drawer = InteractiveDrawerController();
+      String? selected;
+      await pumpDrawer(
+        tester,
+        service,
+        mobileDrawer: drawer,
+        settingsProvider: settings,
+        onSelectConversation: (id, {closeDrawer = true}) => selected = id,
+      );
+      for (final keepOpen in [false, true, false]) {
+        await tester.runAsync(
+          () => settings.setKeepSidebarOpenOnTopicTap(keepOpen),
+        );
+        await drawer.open();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Topic two'));
+        await tester.pumpAndSettle();
+        expect(selected, 'two');
+        expect(drawer.isOpen, keepOpen);
+        expect(drawer.isClosed, !keepOpen);
+      }
+      // Covering the page freezes its theme but must not act like a user
+      // request to close the drawer or collapse the inline assistant list.
+      await tester.runAsync(
+        () => settings.setKeepAssistantListExpandedOnSidebarClose(true),
+      );
+      await drawer.open();
+      await tester.pumpAndSettle();
+      final sideDrawer = tester.widget<SideDrawer>(find.byType(SideDrawer));
+      await tester.tap(find.text(sideDrawer.assistantName).first);
+      await tester.pumpAndSettle();
+      final inlineAssistants = find.byKey(const ValueKey('assistants-inline'));
+      expect(inlineAssistants, findsOneWidget);
+      final drawerState = tester.state(find.byType(InteractiveDrawer));
+      final navigator = Navigator.of(tester.element(find.byType(SideDrawer)));
+      navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
+      await tester.pumpAndSettle();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(InteractiveDrawer)), same(drawerState));
+      expect(drawer.isOpen, isTrue);
+      expect(inlineAssistants, findsOneWidget);
+      await tester.tap(find.text('Topic one'));
+      await tester.pumpAndSettle();
+      expect(selected, 'one');
+      expect(drawer.isClosed, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      drawer.dispose();
+    },
+  );
 
   Finder drawerScrollable(WidgetTester tester) {
     // Prefer the onstage conversation ListView. PageTransitionSwitcher can
