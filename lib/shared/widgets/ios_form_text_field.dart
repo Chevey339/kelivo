@@ -10,6 +10,7 @@ class IosFormTextField extends StatelessWidget {
     required this.controller,
     this.hintText,
     this.suffix,
+    this.prefix,
     this.maxLines = 1,
     this.minLines,
     this.inlineLabel,
@@ -41,7 +42,7 @@ class IosFormTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final String? hintText;
-  final Widget? suffix;
+  final Widget? suffix, prefix;
   final int maxLines;
   final int? minLines;
   final bool? inlineLabel;
@@ -157,6 +158,10 @@ class IosFormTextField extends StatelessWidget {
         isDense: true,
         isCollapsed: maxLines > 1,
         hintText: hintText,
+        prefixIcon: prefix,
+        prefixIconConstraints: prefix == null
+            ? null
+            : const BoxConstraints(minWidth: 28, minHeight: 36),
         suffixIcon: suffix,
         suffixIconConstraints: suffix == null
             ? null

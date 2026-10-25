@@ -285,9 +285,8 @@ class _ExpandedSurface extends StatelessWidget {
   }
 }
 
-/// A bounded viewport retains one ordinary child layout. Keyboard focus can
-/// reveal its field through the viewport; long content also has a full-view
-/// action. Only overflowing cards need the fade, and no Opacity layer is added.
+/// A clipped preview, never a second vertical gesture target in the message.
+/// The expanded route owns scrolling through the complete control tree.
 class GenUiInlineViewport extends StatefulWidget {
   const GenUiInlineViewport({
     super.key,
@@ -310,7 +309,11 @@ class _GenUiInlineViewportState extends State<GenUiInlineViewport> {
     final theme = GenUiTheme.of(context);
     final viewport = KeyedSubtree(
       key: _viewportKey,
-      child: SingleChildScrollView(primary: false, child: widget.child),
+      child: SingleChildScrollView(
+        primary: false,
+        physics: const _InlinePreviewPhysics(),
+        child: widget.child,
+      ),
     );
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -361,6 +364,17 @@ class _GenUiInlineViewportState extends State<GenUiInlineViewport> {
       ],
     );
   }
+}
+
+// User drags belong to the message, but caret/accessibility showOnScreen and
+// keyboard traversal must still be able to reveal a partly clipped field.
+class _InlinePreviewPhysics extends NeverScrollableScrollPhysics {
+  const _InlinePreviewPhysics({super.parent});
+  @override
+  bool get allowImplicitScrolling => true;
+  @override
+  _InlinePreviewPhysics applyTo(ScrollPhysics? ancestor) =>
+      _InlinePreviewPhysics(parent: buildParent(ancestor));
 }
 
 class _GenUiPageRoute extends CupertinoPageRoute<void> {

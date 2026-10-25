@@ -82,6 +82,12 @@ final class GenUiTheme {
       height: 1.3,
       fontWeight: AppFontWeights.semibold,
     );
+    fieldLabel = header.copyWith(
+      color: secondaryInk,
+      fontWeight: AppFontWeights.medium,
+    );
+    input = body.copyWith(height: 1.3);
+    tableBody = body.copyWith(fontSize: 13 * scale, height: 1.4);
     badge = body.copyWith(
       fontSize: 11 * scale,
       height: 1.3,
@@ -141,6 +147,9 @@ final class GenUiTheme {
       caption,
       label,
       header,
+      fieldLabel,
+      input,
+      tableBody,
       badge,
       metric,
       mono;
@@ -154,6 +163,20 @@ final class GenUiTheme {
   double get lg => AppSpacing.lg;
   double get cardRadius => MarkstreamTheme.radiusMd;
   double get controlRadius => 10;
+  Color get headerFill => markdown.code.headerBackgroundColor;
+  BoxDecoration fieldDecoration({bool focused = false, bool invalid = false}) =>
+      BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(controlRadius),
+        border: Border.all(
+          color: invalid
+              ? error
+              : focused
+              ? primary
+              : transparent,
+          width: 2,
+        ),
+      );
   double get capsuleRadius => AppRadii.capsule;
   List<BoxShadow> get softShadow => AppShadows.soft;
   double gap(String? value) => switch (value) {

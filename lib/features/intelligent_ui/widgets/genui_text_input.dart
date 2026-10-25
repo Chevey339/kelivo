@@ -1,4 +1,5 @@
 import '../text/ui_number.dart';
+import '../runtime/ui_numeric_step.dart';
 import 'genui_control_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -151,9 +152,11 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
     }
     final min = props['min'] as num?;
     final max = props['max'] as num?;
-    var value =
-        (props['bind'] as num? ?? min ?? 0) +
-        direction * (props['step'] as num);
+    num value = uiNumericStep(
+      props['bind'] as num? ?? min ?? 0,
+      props['step'] as num,
+      direction,
+    );
     if (min != null && value < min) value = min;
     if (max != null && value > max) value = max;
     if (value.isFinite) {
@@ -238,11 +241,14 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
                 maxLines: multiline ? 6 : 1,
                 minLines: multiline ? 2 : null,
                 hintText: props['placeholder'] as String?,
-                textStyle: theme.body.copyWith(
+                textStyle: theme.input.copyWith(
                   color: enabled ? theme.ink : theme.disabledInk,
+                  fontFeatures: _number
+                      ? const [FontFeature.tabularFigures()]
+                      : null,
                 ),
                 textDirection: _number ? TextDirection.ltr : null,
-                textAlign: _number ? TextAlign.end : TextAlign.start,
+                textAlign: TextAlign.start,
                 keyboardType: _number
                     ? const TextInputType.numberWithOptions(
                         signed: true,
@@ -263,17 +269,9 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
                         MaxLengthEnforcement.truncateAfterCompositionEnds,
                   ),
                 ],
-                fieldDecoration: BoxDecoration(
-                  color: theme.fill,
-                  borderRadius: BorderRadius.circular(theme.controlRadius),
-                  border: Border.all(
-                    color: error != null
-                        ? theme.error
-                        : _focus.hasFocus
-                        ? theme.primary
-                        : theme.hairlineStrong,
-                    width: _focus.hasFocus || error != null ? 2 : 1,
-                  ),
+                fieldDecoration: theme.fieldDecoration(
+                  focused: _focus.hasFocus,
+                  invalid: error != null,
                 ),
                 onSubmitted: multiline
                     ? null

@@ -12,7 +12,7 @@ import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
-import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
+import 'genui_segments.dart';
 import 'genui_field_frame.dart';
 import 'genui_interactions.dart';
 import 'genui_localizations.dart';
@@ -170,17 +170,9 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
       if (_props['required'] == true) l10n.genuiFieldRequired,
       if (error != null) error,
     ].join('. ');
-    final decoration = BoxDecoration(
-      color: theme.fill,
-      borderRadius: BorderRadius.circular(theme.controlRadius),
-      border: Border.all(
-        color: error != null
-            ? theme.error
-            : _focus.hasFocus
-            ? theme.primary
-            : theme.hairlineStrong,
-        width: _focus.hasFocus ? 2 : 1,
-      ),
+    final decoration = theme.fieldDecoration(
+      focused: _focus.hasFocus,
+      invalid: error != null,
     );
     Widget control;
     if (widget.node.declaration.component == 'RadioGroup') {
@@ -196,16 +188,19 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
             builder: (context, constraints) {
               final scaler = MediaQuery.textScalerOf(context);
               var longest = 0.0;
+              var singleLine = true;
               for (final option in options) {
                 final painter = TextPainter(
                   text: TextSpan(text: option.label, style: theme.header),
                   textDirection: Directionality.of(context),
                   textScaler: scaler,
                 )..layout();
+                if (painter.computeLineMetrics().length > 1) singleLine = false;
                 if (painter.width > longest) longest = painter.width;
                 painter.dispose();
               }
               final segments =
+                  singleLine &&
                   options.isNotEmpty &&
                   options.length <= 4 &&
                   scaler.scale(1) < 1.3 &&
@@ -213,55 +208,36 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
                           8 +
                           6 * (options.length - 1) <=
                       constraints.maxWidth;
-              return Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(theme.cardRadius),
-                  border: Border.all(
-                    color: _focus.hasFocus ? theme.primary : theme.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: segments
-                    ? SegmentedTabs(
-                        tabs: [
-                          for (final option in options)
-                            SegmentedTab(label: option.label),
-                        ],
-                        index: selectedIndex,
-                        onChanged: (index) {
-                          _focus.requestFocus();
-                          _set(options[index].value);
-                        },
-                        enabled: _interactive,
-                        radioGroup: true,
-                        enableHaptics: false,
-                        height: 44,
-                        backgroundColor: theme.fill,
-                        selectedColor: theme.primaryContainer,
-                        selectedForegroundColor: _enabled
-                            ? theme.onPrimaryContainer
-                            : theme.disabledInk,
-                        foregroundColor: _enabled
-                            ? theme.ink
-                            : theme.disabledInk,
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var i = 0; i < options.length; i++)
-                            _ChoiceRow(
-                              label: options[i].label,
-                              selected: i == selectedIndex,
-                              enabled: _enabled,
-                              interactive: _interactive,
-                              onTap: () {
-                                _focus.requestFocus();
-                                _set(options[i].value);
-                              },
-                            ),
-                        ],
-                      ),
-              );
+              return segments
+                  ? GenUiSegments(
+                      labels: [for (final option in options) option.label],
+                      index: selectedIndex,
+                      onChanged: (index) {
+                        _focus.requestFocus();
+                        _set(options[index].value);
+                      },
+                      enabled: _interactive,
+                      radioGroup: true,
+                      visualEnabled: _enabled,
+                      expand: true,
+                      focused: _focus.hasFocus,
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < options.length; i++)
+                          _ChoiceRow(
+                            label: options[i].label,
+                            selected: i == selectedIndex,
+                            enabled: _enabled,
+                            interactive: _interactive,
+                            onTap: () {
+                              _focus.requestFocus();
+                              _set(options[i].value);
+                            },
+                          ),
+                      ],
+                    );
             },
           ),
         ),
@@ -338,7 +314,7 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
                       Expanded(
                         child: Text(
                           selectedLabel,
-                          style: theme.body.copyWith(
+                          style: theme.input.copyWith(
                             color: !_enabled
                                 ? theme.disabledInk
                                 : selectedIndex < 0

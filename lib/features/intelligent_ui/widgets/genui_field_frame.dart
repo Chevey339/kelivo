@@ -26,7 +26,7 @@ class GenUiFieldFrame extends StatelessWidget {
           ExcludeSemantics(
             child: Text(
               '$label${requiredField ? ' *' : ''}',
-              style: theme.header,
+              style: theme.fieldLabel,
             ),
           ),
         if (label.isNotEmpty) SizedBox(height: theme.xs),

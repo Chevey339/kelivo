@@ -1460,3 +1460,50 @@ will be assessed after unlocking, not declared fixed by this iOS-only fixture
 change. Passed Android native/Web/IME, three release builds and the second old
 reader restore at the earlier HEAD remain historical evidence; final acceptance
 will use fresh attempts at the follow-up commit rather than combining versions.
+
+
+## C27 — Visual refinement after the hands-on trial (2026-10-25 UTC)
+
+The user's real messages revealed oversized controls, harsh resting input
+outlines, square tables and competing vertical scrolling that the previous
+self-generated golden baselines had not detected. The follow-up restores the
+supplied design's compact surface header, filled inputs, small view segments,
+rounded tables, restrained pagination and button proportions. Mobile touch
+regions stay at least 44 points; desktop segments stay at least 32. Long inline
+cards yield user drags to the timeline while preserving implicit caret and
+accessibility reveal. Full controls remain available in the shared expanded
+view. Decimal stepping fixes binary input tails; decimal donut total text is
+separate from the chart's validated floating-point geometry.
+
+Independent review identified and verified repairs for missing-value legends,
+maximum finite totals, multiline radio labels, narrow pagination, page-size
+modal disposal, and implicit focus reveal. Final independent review returned
+no remaining findings. Twelve new regression cases include the production
+MessageListView with a long native card. All 235 GenUI golden cases passed after
+comparison with the visual reference; 187 baseline images changed.
+
+Full G passed: root fatal-info analysis and 10,253 tests (one existing skip),
+markstream offline pub resolution/fatal-info analysis and 298 tests, independent
+macOS debug build, and git diff --check. Twenty Dart files and 187 images were
+frozen before G; their hashes matched afterwards. No additional BackdropFilter,
+Opacity/AnimatedOpacity or RepaintBoundary was added to the message path.
+Logs: build/genui/logs/c27-visual-*.log; exact implementation manifest:
+build/genui/visual-repair/implementation-manifest.json.
+
+Native Android evidence uses dedicated device fee8c1be with an isolated visual
+package and synthetic data in the production message host. A swipe starting
+on its chart reached the text following the capped card; the expanded view
+reached its final node. Input changed a dependent result under dark/1.3x and
+retained the accepted value when returning to light/1x. Captures and metadata
+are under build/genui/trial/android-visual-20261025T042946Z. This is functional
+and visual evidence, not a new native performance benchmark.
+
+The normal lib/main.dart iOS simulator trial retained the user's existing
+configuration and chats; their budget and line/table messages were inspected.
+The simulator automation did not yield a reliable drag, so native swipe proof
+is attributed to Android. Clean-HEAD normal-app builds save the actual commit,
+bundle, simulator and install result under build/genui/trial/ios-main-*/result.json.
+Both temporary platform identity overrides were restored. Model prompts,
+protocol interpretation, evaluation/scoring, storage schema and the earlier
+user-approved platform/performance exceptions are unchanged. No paid provider
+request, Windows operation, push or merge was performed for this correction.

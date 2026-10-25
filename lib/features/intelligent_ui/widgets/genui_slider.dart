@@ -1,4 +1,5 @@
 import '../text/ui_number.dart';
+import '../runtime/ui_numeric_step.dart';
 import 'genui_control_region.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -73,7 +74,7 @@ class _GenUiSliderState extends State<GenUiSlider> {
     if (value >= _max) return _max;
     final steps = (value - _min) / _step;
     if (!steps.isFinite) return value;
-    final snapped = _min + steps.roundToDouble() * _step;
+    final snapped = uiNumericStep(_min, _step, steps.roundToDouble());
     return snapped.isFinite ? snapped.clamp(_min, _max) : value;
   }
 
@@ -188,12 +189,12 @@ class _GenUiSliderState extends State<GenUiSlider> {
                   alignment: WrapAlignment.spaceBetween,
                   spacing: theme.xs,
                   children: [
-                    Text(label, style: theme.header),
+                    Text(label, style: theme.fieldLabel),
                     Text(
                       format(_value),
                       textDirection: TextDirection.ltr,
                       style: theme.header.copyWith(
-                        color: _enabled ? theme.primary : theme.disabledInk,
+                        color: _enabled ? theme.ink : theme.disabledInk,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),

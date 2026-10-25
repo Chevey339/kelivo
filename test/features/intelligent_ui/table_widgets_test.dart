@@ -79,6 +79,16 @@ Finder get _filter => find.descendant(
 );
 Finder get _sort => find.byKey(const ValueKey('genui-table-sort-root-price'));
 Finder get _next => find.byKey(const ValueKey('genui-table-next-root'));
+Finder get _pageSize =>
+    find.byKey(const ValueKey('genui-table-page-size-root'));
+Future<void> _chooseSize(WidgetTester tester, int size) async {
+  await tester.ensureVisible(_pageSize);
+  await tester.tap(_pageSize);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('$size/page').last);
+  await tester.pumpAndSettle();
+}
+
 const _viewFailure =
     'This view change exceeds the saved state limit. Shorten a field or reset the UI and try again.';
 void _fillState(UiSurfaceController c) {
@@ -107,6 +117,35 @@ void main() {
     view.devicePixelRatio = 1;
     addTearDown(view.reset);
   });
+  testWidgets('page size dialog closes when its source node disappears', (
+    tester,
+  ) async {
+    final c = _controller(_source());
+    await tester.pumpWidget(_app(c));
+    await tester.pumpAndSettle();
+    await tester.tap(_pageSize);
+    await tester.pumpAndSettle();
+    expect(find.text('20/page'), findsOneWidget);
+    c.updateSource(
+      '${UiCatalog.header}\nroot = Text(text="Replacement")\n',
+      closed: true,
+      generation: UiGenerationStatus.complete,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('20/page'), findsNothing);
+    expect(find.text('Replacement'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('two narrow tables wrap their page controls', (tester) async {
+    const data = '[{"name":"A","price":1}]';
+    final c = _controller(
+      'root = Row(children=[a,b])\na = DataTable(data=$data,rowKey="name",columns=[{"key":"name","label":"Name"},{"key":"price","label":"Price"}])\nb = DataTable(data=$data,rowKey="name",columns=[{"key":"name","label":"Name"},{"key":"price","label":"Price"}])',
+    );
+    await tester.pumpWidget(_app(c));
+    await tester.pumpAndSettle();
+    expect(find.byType(GenUiDataTable), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'local paging renders only the selected page and handles same-frame clicks',
     (tester) async {
@@ -120,7 +159,7 @@ void main() {
       expect(c.state.view['root']?['page'], 2);
       expect(_items(tester).first, 'Item 20');
       expect(find.text('Rows 21–30 of 35'), findsOneWidget);
-      await tester.tap(find.text('20/page'));
+      await _chooseSize(tester, 20);
       await tester.pumpAndSettle();
       expect(c.state.view['root']?['pageSize'], 20);
       expect(_items(tester), hasLength(20));
@@ -281,8 +320,12 @@ void main() {
     _fillState(c);
     await tester.pumpWidget(_app(c));
     await tester.pumpAndSettle();
-    for (final action in [_sort, _next, find.text('20/page')]) {
-      await tester.tap(action);
+    for (final (index, action) in [_sort, _next, _pageSize].indexed) {
+      if (index == 2) {
+        await _chooseSize(tester, 20);
+      } else {
+        await tester.tap(action);
+      }
       await tester.pumpAndSettle();
       expect(c.state.view, isEmpty);
       expect(find.text(_viewFailure), findsOneWidget);
@@ -336,7 +379,7 @@ void main() {
                 as Border)
             .top
             .color;
-    expect(border(), theme.transparent);
+    expect(border(), theme.hairline);
     Focus.of(tester.element(viewport)).requestFocus();
     await tester.pumpAndSettle();
     expect(border(), theme.primary);
@@ -344,22 +387,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.state.view['root']?['page'], 1);
   });
-  testWidgets('view segments accept taps at the edge of a 44dp target', (
-    tester,
-  ) async {
-    final c = _controller(_source());
-    await tester.pumpWidget(_app(c));
-    await tester.pumpAndSettle();
-    final labelCenter = tester.getCenter(find.text('20/page'));
-    await tester.tapAt(labelCenter.translate(0, 21));
-    await tester.pumpAndSettle();
-    expect(c.state.view['root']?['pageSize'], 20);
-    await tester.ensureVisible(find.text('10/page'));
-    final center = tester.getCenter(find.text('10/page'));
-    await tester.tapAt(center.translate(0, -21));
-    await tester.pumpAndSettle();
-    expect(c.state.view['root']?['pageSize'], isNull);
-  });
+  testWidgets(
+    'compact page selector retains its 44dp target and focus return',
+    (tester) async {
+      final c = _controller(_source());
+      await tester.pumpWidget(_app(c));
+      await tester.pumpAndSettle();
+      final center = tester.getCenter(_pageSize);
+      await tester.tapAt(center.translate(0, 21));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('20/page'));
+      await tester.pumpAndSettle();
+      expect(c.state.view['root']?['pageSize'], 20);
+      expect(
+        tester.widget<IosIconButton>(_pageSize).focusNode!.hasFocus,
+        isTrue,
+      );
+      await _chooseSize(tester, 10);
+      expect(c.state.view['root']?['pageSize'], isNull);
+    },
+  );
   testWidgets(
     'state-budget failure keeps draft with an explicit error and can recover',
     (tester) async {
@@ -406,7 +453,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(_filter, 'Item');
       await tester.pumpAndSettle();
-      await tester.tap(find.text('20/page'));
+      await _chooseSize(tester, 20);
       await tester.pumpAndSettle();
       await tester.tap(_next);
       await tester.pumpAndSettle();

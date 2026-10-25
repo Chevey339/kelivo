@@ -176,19 +176,24 @@ class _GenUiButtonState extends State<GenUiButton> {
             duration: MediaQuery.disableAnimationsOf(context)
                 ? Duration.zero
                 : const Duration(milliseconds: 160),
-            baseColor: background,
+            baseColor: theme.transparent,
             pressedScale: 0.98,
             borderRadius: BorderRadius.circular(theme.controlRadius),
-            border: Border.all(
-              color: _focused ? theme.primary : theme.transparent,
-              width: 2,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-              child: Padding(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: theme.xxs),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 36, minWidth: 44),
                 padding: EdgeInsets.symmetric(
                   horizontal: theme.sm,
-                  vertical: theme.xs,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(theme.controlRadius),
+                  border: Border.all(
+                    color: _focused ? theme.primary : theme.transparent,
+                    width: 2,
+                  ),
                 ),
                 child: Center(
                   widthFactor: 1,

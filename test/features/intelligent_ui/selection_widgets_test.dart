@@ -14,7 +14,7 @@ import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
-import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_segments.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 UiSurfaceController _controller(String source) {
@@ -418,13 +418,13 @@ check = Checkbox(label="Agree",bind=$ok,required=true)''');
 root = RadioGroup(label="Mode",bind=$mode,options=[{"value":"a","label":"One"},{"value":"b","label":"Two"}])''',
       );
       await tester.pumpWidget(_app(c));
-      expect(find.byType(SegmentedTabs), findsOneWidget);
+      expect(find.byType(GenUiSegments), findsOneWidget);
       await tester.tap(find.text('Two'));
       await tester.pump();
       expect(c.captureRead().inputs['mode'], 'b');
       await tester.pumpWidget(_app(c, rtl: true, scale: 1.3, dark: true));
       await tester.pumpAndSettle();
-      expect(find.byType(SegmentedTabs), findsNothing);
+      expect(find.byType(GenUiSegments), findsNothing);
       expect(c.captureRead().inputs['mode'], 'b');
       await tester.tap(find.text('One'));
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);

@@ -224,6 +224,7 @@ Future<List<String>> exerciseGenUiScenarios(
     await tap(find.byKey(const ValueKey('genui-table-next-table')));
     expect(surface().state.view['table']?['page'], 1);
     expect(find.text('Rows 11–12 of 12'), findsOneWidget);
+    await tap(find.byKey(const ValueKey('genui-table-page-size-table')));
     await tap(find.text('20/page'));
     final sort = find.byKey(const ValueKey('genui-table-sort-table-price'));
     List<String> rowNames() => tester

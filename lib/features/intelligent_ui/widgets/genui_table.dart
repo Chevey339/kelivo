@@ -15,7 +15,7 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dar
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_interactions.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
-import 'package:Kelivo/features/intelligent_ui/widgets/genui_view_tabs.dart';
+import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'genui_text_widths.dart';
 
 /// One paginated presentation for DataTable nodes and validated Chart rows.
@@ -38,6 +38,8 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   final _filter = TextEditingController();
   final _filterFocus = FocusNode(debugLabel: 'GenUI table filter');
   final _scroll = ScrollController();
+  final _pageSizeFocus = FocusNode(debugLabel: 'GenUI page size');
+  RawDialogRoute<int>? _pageSizeRoute;
   GenUiInteractions? _scope;
   VoidCallback? _unsubscribe, _reset;
   bool _syncing = false, _filterFailed = false;
@@ -122,6 +124,14 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
     _filterFocus.removeListener(_blur);
     _filterFocus.dispose();
     _scroll.dispose();
+    _pageSizeFocus.dispose();
+    final route = _pageSizeRoute;
+    final navigator = route?.navigator;
+    if (route != null && navigator != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (navigator.mounted && route.isActive) navigator.removeRoute(route);
+      });
+    }
     super.dispose();
   }
 
@@ -189,7 +199,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   List<double> _columnWidths(GenUiTheme theme, TextScaler scaler) {
     final signature = (
       _data,
-      theme.body,
+      theme.tableBody,
       theme.label,
       scaler,
       Directionality.of(context),
@@ -224,7 +234,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
             }
             final measured = _textWidths.measure(
               text,
-              header ? theme.label : theme.body,
+              header ? theme.label : theme.tableBody,
               scaler,
               Directionality.of(context),
             );
@@ -242,6 +252,40 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   void _pageBy(int delta) {
     final page = _page();
     _change({'page': (page.page + delta).clamp(0, page.pages - 1)});
+  }
+
+  Future<void> _choosePageSize() async {
+    if (!_interactive || _pageSizeRoute != null) return;
+    final token = widget.token;
+    _surface.noteInteraction(token: token);
+    final l10n = AppLocalizations.of(context)!;
+    final size = await showAppDialog<int>(
+      context,
+      maxWidth: 280,
+      waitForExit: true,
+      onRoute: (route) => _pageSizeRoute = route,
+      child: Builder(
+        builder: (dialogContext) => Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final count in [10, 20])
+                IosTextButton(
+                  label: l10n.genuiTablePerPage(count),
+                  onPressed: () => Navigator.of(dialogContext).pop(count),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    _pageSizeRoute = null;
+    if (!mounted) return;
+    if (size != null && _surface.accepts(token)) {
+      _change({'pageSize': size, 'page': 0});
+    }
+    _pageSizeFocus.requestFocus();
   }
 
   void _sort(UiTableColumn column) {
@@ -319,6 +363,11 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       constraints: const BoxConstraints(minHeight: 44),
                       child: IosFormTextField(
                         label: '',
+                        prefix: Icon(
+                          LucideIcons.search,
+                          size: 16,
+                          color: theme.captionInk,
+                        ),
                         controller: _filter,
                         focusNode: _filterFocus,
                         key: ValueKey('genui-table-filter-${widget.id}'),
@@ -326,22 +375,12 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                         hintText: l10n.genuiTableFilterHint,
                         outerPadding: EdgeInsets.zero,
                         enabled: _interactive,
-                        textStyle: theme.body,
+                        textStyle: theme.input,
                         onSubmitted: (_) => _surface.flushQuietly(),
                         inputFormatters: [_filterLengthFormatter],
-                        fieldDecoration: BoxDecoration(
-                          color: theme.fill,
-                          borderRadius: BorderRadius.circular(
-                            theme.controlRadius,
-                          ),
-                          border: Border.all(
-                            color: _filterFailed
-                                ? theme.error
-                                : _filterFocus.hasFocus
-                                ? theme.primary
-                                : theme.hairlineStrong,
-                            width: _filterFocus.hasFocus ? 2 : 1,
-                          ),
+                        fieldDecoration: theme.fieldDecoration(
+                          focused: _filterFocus.hasFocus,
+                          invalid: _filterFailed,
                         ),
                       ),
                     ),
@@ -369,7 +408,6 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
               style: theme.caption.copyWith(color: theme.error),
             ),
           ),
-        SizedBox(height: theme.xs),
         if (!_filterable || exporting)
           Semantics(
             liveRegion: true,
@@ -389,11 +427,16 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                   setState(() => _viewportFocused = value),
               child: Container(
                 key: ValueKey('genui-table-viewport-${widget.id}'),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: theme.card,
+                  borderRadius: BorderRadius.circular(theme.controlRadius),
+                ),
                 foregroundDecoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(theme.controlRadius),
                   border: Border.all(
-                    color: _viewportFocused ? theme.primary : theme.transparent,
-                    width: 2,
+                    color: _viewportFocused ? theme.primary : theme.hairline,
+                    width: _viewportFocused ? 2 : 1,
                   ),
                 ),
                 child: Scrollbar(
@@ -421,7 +464,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                         ),
                         children: [
                           TableRow(
-                            decoration: BoxDecoration(color: theme.cardFill),
+                            decoration: BoxDecoration(color: theme.headerFill),
                             children: [
                               for (final col in _data.columns)
                                 _header(
@@ -465,31 +508,58 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
             ),
           ),
         SizedBox(height: theme.xs),
-        Text(
-          l10n.genuiTablePageInfo(page.from, page.to, page.total),
-          style: theme.caption,
-        ),
-        if (!exporting)
-          Wrap(
-            spacing: theme.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: math.min(
-                  280,
-                  MediaQuery.textScalerOf(context).scale(180),
-                ),
-                child: GenUiViewTabs(
-                  labels: [
-                    l10n.genuiTablePerPage(10),
-                    l10n.genuiTablePerPage(20),
-                  ],
-                  index: page.pageSize == 20 ? 1 : 0,
+        Wrap(
+          spacing: theme.xs,
+          runSpacing: theme.xxs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.genuiTablePageInfo(page.from, page.to, page.total),
+              style: theme.label,
+            ),
+            if (!exporting)
+              GenUiControlRegion(
+                child: IosIconButton(
+                  key: ValueKey('genui-table-page-size-${widget.id}'),
+                  focusNode: _pageSizeFocus,
+                  semanticLabel: l10n.genuiTablePerPage(page.pageSize),
+                  minSize: 44,
+                  padding: EdgeInsets.zero,
                   enabled: _interactive,
-                  onChanged: (index) =>
-                      _change({'pageSize': index == 0 ? 10 : 20, 'page': 0}),
+                  onTap: _choosePageSize,
+                  builder: (_) => Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: theme.xs,
+                      vertical: theme.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.fill,
+                      borderRadius: BorderRadius.circular(
+                        theme.controlRadius - 3,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.genuiTablePerPage(page.pageSize),
+                          style: theme.label.copyWith(
+                            color: theme.secondaryInk,
+                          ),
+                        ),
+                        SizedBox(width: theme.xxs),
+                        Icon(
+                          LucideIcons.chevronDown,
+                          size: 12,
+                          color: theme.captionInk,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
+            if (!exporting)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -502,7 +572,8 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       semanticLabel: l10n.genuiTablePreviousPage,
                       tooltip: l10n.genuiTablePreviousPage,
                       minSize: 44,
-                      color: theme.primary,
+                      size: 16,
+                      color: theme.secondaryInk,
                       enabled: _interactive && page.page > 0,
                       onTap: () => _pageBy(-1),
                     ),
@@ -521,15 +592,16 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       semanticLabel: l10n.genuiTableNextPage,
                       tooltip: l10n.genuiTableNextPage,
                       minSize: 44,
-                      color: theme.primary,
+                      size: 16,
+                      color: theme.secondaryInk,
                       enabled: _interactive && page.page + 1 < page.pages,
                       onTap: () => _pageBy(1),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+          ],
+        ),
       ],
     );
   }
@@ -560,7 +632,10 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                         ? ' ↓'
                         : ' ↑'
                   : ''}',
-              style: theme.header.copyWith(color: theme.secondaryInk),
+              style: theme.label.copyWith(
+                color: theme.secondaryInk,
+                fontWeight: theme.header.fontWeight,
+              ),
               textAlign: col.numeric ? TextAlign.end : TextAlign.start,
             ),
           ),
@@ -635,7 +710,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
               : AlignmentDirectional.centerStart,
           child: Text.rich(
             TextSpan(children: spans),
-            style: theme.body.copyWith(
+            style: theme.tableBody.copyWith(
               fontFeatures: value is num
                   ? const [FontFeature.tabularFigures()]
                   : null,

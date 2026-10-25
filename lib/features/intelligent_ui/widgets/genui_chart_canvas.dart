@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../runtime/ui_numeric_step.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -93,7 +94,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
         scale,
         TextDirection.ltr,
       );
-      left = math.max(left, width + 8);
+      left = math.max(left, width.ceilToDouble() + 12);
     }
     final bottom = scale.scale(labelStyle.fontSize!) * 1.4 + 8;
     return LayoutBuilder(
@@ -564,7 +565,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
                       style: theme.label,
                     ),
                     Text(
-                      genUiChartTick(visibleTotal),
+                      uiNumericTotalText(rows.map((row) => row.y.single!)),
                       style: theme.header,
                       textAlign: TextAlign.center,
                       textDirection: TextDirection.ltr,

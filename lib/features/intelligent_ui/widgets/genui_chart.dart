@@ -1,4 +1,5 @@
 import '../text/ui_number.dart';
+import '../runtime/ui_numeric_step.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -248,7 +249,11 @@ class _GenUiChartState extends State<GenUiChart> {
       donut: _props['donut'] == true,
     );
     final summary = _pie
-        ? l10n.genuiChartPieSummary(kind, _pieRows.length, _value(_pieTotal))
+        ? l10n.genuiChartPieSummary(
+            kind,
+            _pieRows.length,
+            '${uiNumericTotalText(_pieRows.map((r) => r.y.single ?? 0))}${_props['unit'] == null ? '' : ' ${_props['unit']}'}',
+          )
         : l10n.genuiChartSummary(
             kind,
             _data.yKeys.length,
@@ -266,22 +271,26 @@ class _GenUiChartState extends State<GenUiChart> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_props['title'] case final String title)
-            Text(title, style: theme.sectionTitle),
-          if (!_scope!.exporting)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: SizedBox(
-                width: 220,
-                child: GenUiViewTabs(
+          Row(
+            children: [
+              Expanded(
+                child: switch (_props['title']) {
+                  final String title => Text(title, style: theme.sectionTitle),
+                  _ => const SizedBox(),
+                },
+              ),
+              if (!_scope!.exporting) ...[
+                SizedBox(width: theme.xs),
+                GenUiViewTabs(
                   key: ValueKey('genui-chart-view-${widget.id}'),
                   labels: [l10n.genuiViewChart, l10n.genuiViewData],
                   index: dataView ? 1 : 0,
                   enabled: _interactive,
                   onChanged: (index) => _changeView({'dataView': index == 1}),
                 ),
-              ),
-            ),
+              ],
+            ],
+          ),
           if (_viewFailed && !_scope!.exporting)
             Semantics(
               liveRegion: true,
@@ -300,7 +309,7 @@ class _GenUiChartState extends State<GenUiChart> {
             LayoutBuilder(
               builder: (context, constraints) => Wrap(
                 spacing: theme.xs,
-                runSpacing: theme.xxs,
+                runSpacing: 0,
                 children: [
                   for (var s = 0; s < _seriesCount; s++)
                     _legend(s, constraints.maxWidth, theme, l10n),
@@ -427,8 +436,9 @@ class _GenUiChartState extends State<GenUiChart> {
     final hidden = _hidden.contains(series);
     final name = _pie ? _xValue(_data.rows[series]) : _data.yKeys[series];
     final color = _pie ? theme.pieColor(series) : theme.chartColors[series];
+    final value = _pie ? _data.rows[series].y.single : null;
     final label = _pie
-        ? '$name · ${_value(_data.rows[series].y.single)}'
+        ? '$name  ${value == null || _pieTotal == 0 ? '—' : '${genUiChartTick(value / _pieTotal * 100)}%'}'
         : name;
     final action = hidden
         ? l10n.genuiChartShowSeries(name)
@@ -441,7 +451,7 @@ class _GenUiChartState extends State<GenUiChart> {
           children: [
             ExcludeSemantics(
               child: CustomPaint(
-                size: const Size(24, 14),
+                size: Size(_pie ? 16 : 24, 14),
                 painter: GenUiChartLegendPainter(
                   series: series,
                   color: hidden ? theme.disabledInk : color,
@@ -468,7 +478,7 @@ class _GenUiChartState extends State<GenUiChart> {
         children: [
           ExcludeSemantics(
             child: CustomPaint(
-              size: const Size(24, 14),
+              size: Size(_pie ? 16 : 24, 14),
               painter: GenUiChartLegendPainter(
                 series: series,
                 color: hidden ? theme.disabledInk : color,
@@ -492,6 +502,7 @@ class _GenUiChartState extends State<GenUiChart> {
                     child: IosTextButton(
                       key: ValueKey('genui-chart-legend-${widget.id}-$series'),
                       label: label,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       icon: hidden ? LucideIcons.eyeOff : null,
                       color: hidden ? theme.captionInk : theme.secondaryInk,
                       fontSize: theme.label.fontSize!,

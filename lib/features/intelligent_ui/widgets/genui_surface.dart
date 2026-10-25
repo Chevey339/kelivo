@@ -18,6 +18,7 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_interaction_controller
 import 'genui_localizations.dart';
 import 'genui_node.dart';
 import 'genui_theme.dart';
+import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
 
 /// Native card chrome. The host retains controller ownership across message
 /// rebuilds and supplies actions only when their integration is available.
@@ -351,12 +352,19 @@ class _SurfaceBodyState extends State<_SurfaceBody>
           child: Icon(
             LucideIcons.panelsTopLeft,
             size: 16,
-            color: theme.primary,
+            color: theme.secondaryInk,
           ),
         ),
         SizedBox(width: theme.xs),
         Expanded(
-          child: ExcludeSemantics(child: Text(title, style: theme.header)),
+          child: ExcludeSemantics(
+            child: Text(
+              title,
+              style: theme.header.copyWith(color: theme.secondaryInk),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ),
       ],
     );
@@ -400,19 +408,29 @@ class _SurfaceBodyState extends State<_SurfaceBody>
         label: title,
         child: FocusTraversalGroup(
           policy: ReadingOrderTraversalPolicy(),
-          child: DecoratedBox(
+          child: Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: theme.card,
               borderRadius: BorderRadius.circular(theme.cardRadius),
               border: Border.all(color: theme.hairline),
             ),
-            child: Padding(
-              padding: EdgeInsets.all(theme.md),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  LayoutBuilder(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  key: const ValueKey('genui-surface-header'),
+                  constraints: const BoxConstraints(minHeight: 44),
+                  padding: EdgeInsetsDirectional.only(
+                    start: theme.sm,
+                    end: theme.xxs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.headerFill,
+                    border: Border(bottom: BorderSide(color: theme.hairline)),
+                  ),
+                  child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact =
                           constraints.maxWidth < 480 ||
@@ -446,48 +464,68 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                       );
                     },
                   ),
-                  SizedBox(height: theme.sm),
-                  if (invalid) ...[
-                    GenUiCallout(
-                      title: l10n.genuiInvalidTitle,
-                      text: diagnostic != null
-                          ? '${genUiDiagnosticMessage(l10n, diagnostic)} · ${l10n.genuiErrorLine(diagnostic.line)}'
-                          : l10n.genuiNodeUnavailable,
-                      tone: 'error',
-                    ),
-                    SizedBox(height: theme.sm),
-                    GenUiDiagnosticSource(
-                      source: controller.parsed.source,
-                      errorLines: {
-                        for (final d in controller.parsed.program.diagnostics)
-                          d.line,
-                      },
-                      exporting: surface.exporting,
-                    ),
-                    if (actions)
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Tooltip(
-                          message: surface.onRepair == null
-                              ? l10n.genuiActionUnavailable
-                              : l10n.genuiRepair,
-                          child: GenUiControlRegion(
-                            child: IosTextButton(
-                              label: l10n.genuiRepair,
-                              onPressed: surface.onRepair,
+                ),
+                Padding(
+                  padding: EdgeInsets.all(
+                    ResponsiveHelper.isMobile(context) ? 14 : theme.md,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (invalid) ...[
+                        GenUiCallout(
+                          title: l10n.genuiInvalidTitle,
+                          text: diagnostic != null
+                              ? '${genUiDiagnosticMessage(l10n, diagnostic)} · ${l10n.genuiErrorLine(diagnostic.line)}'
+                              : l10n.genuiNodeUnavailable,
+                          tone: 'error',
+                        ),
+                        SizedBox(height: theme.sm),
+                        GenUiDiagnosticSource(
+                          source: controller.parsed.source,
+                          errorLines: {
+                            for (final d
+                                in controller.parsed.program.diagnostics)
+                              d.line,
+                          },
+                          exporting: surface.exporting,
+                        ),
+                        if (actions)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Tooltip(
+                              message: surface.onRepair == null
+                                  ? l10n.genuiActionUnavailable
+                                  : l10n.genuiRepair,
+                              child: GenUiControlRegion(
+                                child: IosTextButton(
+                                  label: l10n.genuiRepair,
+                                  onPressed: surface.onRepair,
+                                ),
+                              ),
                             ),
                           ),
+                      ] else
+                        GenUiNode(
+                          controller: controller,
+                          id: 'root',
+                          linkHandler: surface.linkHandler,
                         ),
-                      ),
-                  ] else
-                    GenUiNode(
-                      controller: controller,
-                      id: 'root',
-                      linkHandler: surface.linkHandler,
+                    ],
+                  ),
+                ),
+                if (footer != null)
+                  Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      theme.sm,
+                      0,
+                      theme.sm,
+                      theme.xs,
                     ),
-                  if (footer != null) ...[SizedBox(height: theme.sm), footer],
-                ],
-              ),
+                    child: footer,
+                  ),
+              ],
             ),
           ),
         ),

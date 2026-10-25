@@ -1,3 +1,6 @@
+// Inspect the retained native paragraph used by the real timeline renderer.
+// ignore: implementation_imports
+import 'package:markstream/src/flutter/render/native_paragraph_run.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import 'package:Kelivo/features/intelligent_ui/host/gallery/web_gallery.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_web_controller.dart';
@@ -86,6 +89,52 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+  testWidgets(
+    'long native card in the real timeline yields drags to later text',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final source =
+          'ui 1 catalog "kelivo.native/1"\nroot = Column(children=[chart,${List.generate(14, (i) => 'm$i').join(',')}])\nchart = Chart(kind="pie",data=[{"x":"A","y":1},{"x":"B","y":2}],x="x",y=["y"])\n${List.generate(14, (i) => 'm$i = Metric(label="Result $i",value=$i)').join('\n')}';
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: [
+            message('```kelivo-ui\n$source\n```\n\nAfter card marker'),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      final state = tester.state<_MessageListHarnessState>(
+        find.byType(_MessageListHarness),
+      );
+      state.scrollController.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const ValueKey('genui-chart-canvas-chart')),
+        const Offset(0, -250),
+      );
+      await tester.pumpAndSettle();
+      expect(state.scrollController.offset, greaterThan(100));
+      await tester.dragFrom(const Offset(190, 480), const Offset(0, -450));
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .byWidgetPredicate(
+              (w) =>
+                  w is NativeParagraphRun &&
+                  w.paragraphs.any(
+                    (p) => p.text.toPlainText().contains('After card marker'),
+                  ),
+            )
+            .hitTestable(),
+        findsWidgets,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
   desktopTest(
     'Web cards require original assistant authority and never load inline',
     (tester) async {

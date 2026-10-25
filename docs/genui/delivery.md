@@ -42,6 +42,17 @@ Detailed evidence: [implementation log](implementation.md),
 [C24 performance samples](performance-c24.json), and
 [C21 Web engine observations](web-acceptance-c21.json).
 
+## Visual refinement after the trial
+
+The user's hands-on screenshots identified visual and scrolling issues that the
+original golden baselines had not caught. The follow-up aligns compact controls,
+input fills, card headers, table framing and pagination with the supplied visual
+reference, and removes the competing inline vertical drag. Details and native
+verification boundaries are in [the refinement record](visual-refinement.md).
+The earlier model, restore, Web and performance records below remain evidence
+for their recorded commits; this visual correction adds G and focused native UI
+verification rather than relabelling those earlier results.
+
 ## Final model evidence
 
 The accepted [four-field report](evaluation-final.json) records
