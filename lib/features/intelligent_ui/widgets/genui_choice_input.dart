@@ -251,7 +251,7 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
             TargetPlatform.linux,
           }.contains(defaultTargetPlatform);
       if (desktop) {
-        control = DecoratedBox(
+        control = GenUiFieldSurface(
           decoration: decoration,
           child: DesktopSelectDropdown<Object?>(
             value: _props['bind'],
@@ -302,34 +302,36 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
                 duration: MediaQuery.disableAnimationsOf(context)
                     ? Duration.zero
                     : const Duration(milliseconds: 160),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: theme.sm,
-                    vertical: theme.xs,
-                  ),
+                child: GenUiFieldSurface(
                   decoration: decoration,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          selectedLabel,
-                          style: theme.input.copyWith(
-                            color: !_enabled
-                                ? theme.disabledInk
-                                : selectedIndex < 0
-                                ? theme.captionInk
-                                : theme.ink,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: theme.sm,
+                      vertical: theme.xs,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            selectedLabel,
+                            style: theme.input.copyWith(
+                              color: !_enabled
+                                  ? theme.disabledInk
+                                  : selectedIndex < 0
+                                  ? theme.captionInk
+                                  : theme.ink,
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: theme.xs),
-                      Icon(
-                        LucideIcons.chevronDown,
-                        size: 16,
-                        color: theme.captionInk,
-                      ),
-                    ],
+                        SizedBox(width: theme.xs),
+                        Icon(
+                          LucideIcons.chevronDown,
+                          size: 16,
+                          color: theme.captionInk,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

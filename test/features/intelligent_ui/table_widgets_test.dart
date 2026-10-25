@@ -158,7 +158,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(c.state.view['root']?['page'], 2);
       expect(_items(tester).first, 'Item 20');
-      expect(find.text('Rows 21–30 of 35'), findsOneWidget);
+      expect(find.text('21–30 / 35'), findsOneWidget);
       await _chooseSize(tester, 20);
       await tester.pumpAndSettle();
       expect(c.state.view['root']?['pageSize'], 20);
@@ -380,6 +380,7 @@ void main() {
             .top
             .color;
     expect(border(), theme.hairline);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     Focus.of(tester.element(viewport)).requestFocus();
     await tester.pumpAndSettle();
     expect(border(), theme.primary);
@@ -626,7 +627,7 @@ void main() {
       await tester.pumpWidget(_app(c));
       await tester.pumpAndSettle();
       expect(_items(tester).last, 'Item 1999');
-      expect(find.text('Rows 1991–2000 of 2000'), findsOneWidget);
+      expect(find.text('1991–2000 / 2000'), findsOneWidget);
     },
   );
 }

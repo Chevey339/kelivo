@@ -53,6 +53,15 @@ The earlier model, restore, Web and performance records below remain evidence
 for their recorded commits; this visual correction adds G and focused native UI
 verification rather than relabelling those earlier results.
 
+The [C28 full-component audit](component-audit.md) follows the second hands-on
+review: full inline height, an optional title bar, compact fields/buttons/chips,
+short-table pagination suppression, clearer charts and streaming placeholders.
+Its separate full G passed 10,260 root tests (one existing skip), 298 markstream
+tests, both fatal-info analyses, dependency resolution, macOS debug build and
+diff checks. Two 28-page native simulator review runs and the six production-host
+scenarios passed; their tested source and screenshot limitations are explicit
+in the audit. Clean-HEAD trial builds are recorded separately after commit.
+
 ## Final model evidence
 
 The accepted [four-field report](evaluation-final.json) records
@@ -139,6 +148,13 @@ Unexecuted final checks must stay pending; earlier C21/C24 runs do not substitut
 for the final-HEAD repetitions.
 
 ## Evidence limits
+
+The later [C28 component audit](component-audit.md) records the user's requested
+full-height presentation, immersive header setting, compact controls and renewed
+native simulator interaction/visual checks. It supersedes the C27 bounded-card
+presentation without converting any deferred device or performance item into a
+pass. The isolated 28-case review and production-host six-scene flow are separate
+from the normal `lib/main.dart` trial installed for the user.
 
 Goldens establish deterministic pixels; widget tests establish their tested
 behavior/Semantics. Native automated scenes, actual keyboard input, provider

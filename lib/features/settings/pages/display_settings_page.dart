@@ -1680,6 +1680,16 @@ class RenderingSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.AppWindow,
+                label: l10n.displaySettingsShowGenUiHeader,
+                tip: l10n.displaySettingsShowGenUiHeaderSubtitle,
+                value: sp.showGenUiHeader,
+                onChanged: (value) =>
+                    context.read<SettingsProvider>().setShowGenUiHeader(value),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.FoldVertical,
                 label: l10n.displaySettingsPageAutoCollapseCodeBlockTitle,
                 value: sp.autoCollapseCodeBlock,

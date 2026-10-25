@@ -387,7 +387,14 @@ class GenUiPendingNode extends StatelessWidget {
       _ => 64.0,
     };
     return CustomPaint(
-      painter: _PendingPainter(GenUiMotion.of(context), theme),
+      painter: _PendingPainter(
+        GenUiMotion.of(context),
+        theme,
+        theme.sm +
+            MediaQuery.textScalerOf(context).scale(theme.caption.fontSize!) *
+                theme.caption.height! +
+            theme.xs,
+      ),
       child: Container(
         constraints: BoxConstraints(minHeight: height),
         padding: EdgeInsets.all(theme.sm),
@@ -397,10 +404,13 @@ class GenUiPendingNode extends StatelessWidget {
             Row(
               children: [
                 ExcludeSemantics(
-                  child: Icon(
-                    LucideIcons.loaderCircle,
-                    size: 14,
-                    color: theme.captionInk,
+                  child: RotationTransition(
+                    turns: GenUiMotion.of(context),
+                    child: Icon(
+                      LucideIcons.loaderCircle,
+                      size: 14,
+                      color: theme.captionInk,
+                    ),
                   ),
                 ),
                 SizedBox(width: theme.xs),
@@ -408,6 +418,8 @@ class GenUiPendingNode extends StatelessWidget {
                   child: Text(
                     '${AppLocalizations.of(context)!.genuiPendingNode(_displayId(id))}${component == null ? "" : " · $component"}',
                     style: theme.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -422,7 +434,9 @@ class GenUiPendingNode extends StatelessWidget {
 }
 
 class _PendingPainter extends CustomPainter {
-  _PendingPainter(this.animation, this.theme) : super(repaint: animation);
+  _PendingPainter(this.animation, this.theme, this.contentTop)
+    : super(repaint: animation);
+  final double contentTop;
   final Animation<double> animation;
   final GenUiTheme theme;
   @override
@@ -431,7 +445,7 @@ class _PendingPainter extends CustomPainter {
       Offset.zero & size,
       Radius.circular(theme.controlRadius),
     );
-    canvas.drawRRect(rect, Paint()..color = theme.cardFill);
+    canvas.drawRRect(rect, Paint()..color = theme.card);
     final outline = Path()..addRRect(rect.deflate(.5));
     final stroke = Paint()
       ..color = theme.hairlineStrong
@@ -445,25 +459,35 @@ class _PendingPainter extends CustomPainter {
         );
       }
     }
-    if (size.height > 48) {
-      // Alpha lives in Paint, with no Opacity widget or offscreen saveLayer.
-      final alpha = .55 + .35 * (1 - (animation.value * 2 - 1).abs());
-      final bar = Rect.fromLTWH(
+    if (size.height > contentTop + theme.sm) {
+      final block = Rect.fromLTRB(
         theme.sm,
-        size.height - 16,
-        (size.width - 2 * theme.sm) * .7,
-        5,
+        contentTop,
+        size.width - theme.sm,
+        size.height - theme.sm,
       );
+      // A full-height shimmer, painted from the surface's one shared clock.
+      // No layer/Opacity widget and no node-owned animation controller.
+      final progress = animation.value * 3 - 1;
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment(progress - 1, 0),
+          end: Alignment(progress + 1, 0),
+          colors: [theme.fill, theme.cardFill, theme.fill],
+          stops: const [0, .5, 1],
+        ).createShader(block);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(bar, const Radius.circular(2)),
-        Paint()..color = theme.fill.withValues(alpha: alpha),
+        RRect.fromRectAndRadius(block, Radius.circular(theme.controlRadius)),
+        paint,
       );
     }
   }
 
   @override
   bool shouldRepaint(_PendingPainter oldDelegate) =>
-      theme != oldDelegate.theme || animation != oldDelegate.animation;
+      theme != oldDelegate.theme ||
+      animation != oldDelegate.animation ||
+      contentTop != oldDelegate.contentTop;
 }
 
 class GenUiNodeError extends StatelessWidget {

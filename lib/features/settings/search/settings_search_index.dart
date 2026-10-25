@@ -668,6 +668,12 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageEnableAssistantMarkdownTitle,
     );
     add(
+      'displaySettingsShowGenUiHeader',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsShowGenUiHeader,
+      keywords: 'genui intelligent interactive header immersive 交互界面 标题栏 沉浸',
+    );
+    add(
       'displaySettingsPageAutoCollapseCodeBlockTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageAutoCollapseCodeBlockTitle,

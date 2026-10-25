@@ -25365,7 +25365,7 @@ abstract class AppLocalizations {
   /// No description provided for @genuiChartDomainGap.
   ///
   /// In en, this message translates to:
-  /// **'Undefined in this domain'**
+  /// **'Undefined'**
   String get genuiChartDomainGap;
 
   /// No description provided for @genuiChartDomainSummary.
@@ -25763,6 +25763,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t confirm the previous preview closed. Restart the app before opening another.'**
   String get genuiWebCloseFailed;
+
+  /// No description provided for @displaySettingsShowGenUiHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Show interactive UI title bar'**
+  String get displaySettingsShowGenUiHeader;
+
+  /// No description provided for @displaySettingsShowGenUiHeaderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide for a cleaner message. Source and actions remain in the menu below the UI.'**
+  String get displaySettingsShowGenUiHeaderSubtitle;
+
+  /// No description provided for @genuiClearFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filter'**
+  String get genuiClearFilter;
+
+  /// No description provided for @genuiClearSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get genuiClearSelection;
 }
 
 class _AppLocalizationsDelegate

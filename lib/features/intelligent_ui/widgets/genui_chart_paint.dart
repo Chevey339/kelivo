@@ -354,24 +354,46 @@ final class GenUiBarDot extends FlDotPainter {
 
   @override
   void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
+    if (baselineDelta == 0) {
+      genUiChartDot(
+        series,
+        color,
+        fill,
+        size: selected ? 9 : 6,
+      ).draw(canvas, spot, offsetInCanvas);
+      return;
+    }
     final rect = _rect(offsetInCanvas);
-    canvas.drawRect(
+    final radius = Radius.circular(math.min(3, width / 3));
+    final bar = RRect.fromRectAndCorners(
       rect,
-      Paint()..color = color.withValues(alpha: color.a * .7),
+      topLeft: baselineDelta > 0 ? radius : Radius.zero,
+      topRight: baselineDelta > 0 ? radius : Radius.zero,
+      bottomLeft: baselineDelta < 0 ? radius : Radius.zero,
+      bottomRight: baselineDelta < 0 ? radius : Radius.zero,
     );
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = selected ? 2 : 1,
-    );
-    genUiChartDot(
-      series,
-      color,
-      fill,
-      size: selected ? 9 : 6,
-    ).draw(canvas, spot, offsetInCanvas);
+    canvas.drawRRect(bar, Paint()..color = color);
+    // Match the legend's shape without an oversized cap outside the bar.
+    // A small inset mark keeps grouped series identifiable without color.
+    if (rect.height >= 10 && width >= 6) {
+      final mark = Offset(
+        rect.center.dx,
+        baselineDelta > 0 ? rect.top + 6 : rect.bottom - 6,
+      );
+      canvas.save();
+      canvas.clipRRect(bar);
+      genUiChartDot(series, fill, color, size: 4).draw(canvas, spot, mark);
+      canvas.restore();
+    }
+    if (selected) {
+      canvas.drawRRect(
+        bar.inflate(2),
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
   }
 
   @override

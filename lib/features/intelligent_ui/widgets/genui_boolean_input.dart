@@ -104,8 +104,19 @@ class _GenUiBooleanInputState extends State<GenUiBooleanInput> {
             hitTestSize: 44,
           );
     final text = Expanded(
-      child: Text(
-        '$label${required ? ' *' : ''}',
+      child: Text.rich(
+        TextSpan(
+          text: label,
+          children: [
+            if (required)
+              TextSpan(
+                text: ' *',
+                style: TextStyle(
+                  color: enabled ? theme.error : theme.disabledInk,
+                ),
+              ),
+          ],
+        ),
         style: theme.body.copyWith(
           color: enabled ? theme.ink : theme.disabledInk,
         ),

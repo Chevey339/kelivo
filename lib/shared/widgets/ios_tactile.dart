@@ -19,6 +19,7 @@ class IosIconButton extends StatefulWidget {
     this.color,
     this.pressedColor,
     this.minSize,
+    this.visualSize,
     this.borderRadius = 8,
     this.semanticLabel,
     this.tooltip,
@@ -41,6 +42,8 @@ class IosIconButton extends StatefulWidget {
   pressedColor; // override pressed color; defaults to blend with primary
   final double borderRadius;
   final double? minSize; // min tap target (e.g., 44 for AppBar)
+  /// Optional painted feedback size within the unchanged full touch target.
+  final double? visualSize;
   final String? semanticLabel;
   final String? tooltip;
   final bool enabled;
@@ -139,26 +142,43 @@ class _IosIconButtonState extends State<IosIconButton> {
             onLongPress: widget.enabled && widget.onLongPress != null
                 ? widget.onLongPress
                 : null,
-            child: AnimatedContainer(
+            child: ConstrainedBox(
               constraints: widget.minSize == null
-                  ? null
+                  ? const BoxConstraints()
                   : BoxConstraints(
                       minWidth: widget.minSize!,
                       minHeight: widget.minSize!,
                     ),
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                color: bgTarget,
-                borderRadius: BorderRadius.circular(widget.borderRadius),
-              ),
-              child: Padding(
-                padding: widget.padding,
-                child: widget.minSize == null
-                    ? child
-                    : Center(widthFactor: 1, heightFactor: 1, child: child),
+              child: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: AnimatedContainer(
+                  constraints:
+                      widget.visualSize == null && widget.minSize != null
+                      ? BoxConstraints(
+                          minWidth: widget.minSize!,
+                          minHeight: widget.minSize!,
+                        )
+                      : null,
+                  width: widget.visualSize,
+                  height: widget.visualSize,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: bgTarget,
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                  ),
+                  child: Padding(
+                    padding: widget.padding,
+                    child: Center(
+                      widthFactor: 1,
+                      heightFactor: 1,
+                      child: child,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

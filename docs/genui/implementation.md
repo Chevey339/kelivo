@@ -1507,3 +1507,59 @@ Both temporary platform identity overrides were restored. Model prompts,
 protocol interpretation, evaluation/scoring, storage schema and the earlier
 user-approved platform/performance exceptions are unchanged. No paid provider
 request, Windows operation, push or merge was performed for this correction.
+
+## C28 — Full component and interaction refinement (2026-10-25 UTC)
+
+The user's second trial explicitly requests full inline content, a setting to
+hide the surface title bar, smaller painted controls, less pagination and chart
+chrome, selected donut values in the center, a compact frozen-context chip and
+the supplied streaming skeleton. These requirements supersede the old height
+cap and compulsory visible statistical summary. The 21-component checklist,
+actual native observations and evidence boundaries are recorded in
+[the component audit](component-audit.md).
+
+Inline surfaces now have no private vertical viewport. The outer message
+timeline scrolls past their full content; expansion remains optional and shares
+one stateful control tree. A persisted display preference hides the header while
+keeping status and source/expand/attach/export/reset access. Filled input and
+icon feedback sizes shrink independently of their mobile hit areas. Table
+pagination is a single row and disappears for short or filtered-short results.
+Chart accessibility descriptions retain full statistics while visible chrome
+only calls out actual missing values and domain gaps. Integer/decimal display
+cleanup does not rewrite editing drafts or frozen context.
+
+The isolated native review covered 28 pages twice in the iPhone 17 / iOS 26.5
+simulator, with 142 screenshots per run, all visually inspected. It exercised
+inputs, dialogs, validation focus, chart selection and legends, tables,
+attachments, streamed records, retry, expansion and repeated full-height
+scrolling. Production MessageListView/composer/storage S1–S6 also passed in that
+simulator with zero native WebViews. The final two header feedback/alignment
+adjustments are covered by the refreshed goldens; native candidate manifests
+retain their actual tested source. A Web screenshot captured only the shell,
+so content display is separately checked through the native window, not inferred
+from the screenshot callback returning true.
+
+The explicit macOS profile experiment compares identical current widgets with
+and without the old cap. Twelve surfaces each contain 501 chart samples and 16
+extra metrics. Full-height traversal produced zero slow build/raster-stage
+frames out of 2,166 measured frames over three alternating rounds. This is a
+bounded layout/paint comparison, not a production-history equivalence claim or
+an Android performance requalification. Existing user-approved exceptions remain.
+
+Independent source and documentation review returned no remaining findings.
+The last correctness finding, substring-based chart-unit suppression, was fixed
+and covered by a read-only export regression. Forty changed Dart files are
+formatted; the 235 GenUI golden cases passed with 215 updated baseline images.
+The frozen implementation manifest contains 259 files under
+`build/genui/component-refinement/implementation-manifest.json`. No added
+BackdropFilter, Opacity/AnimatedOpacity or RepaintBoundary occurs in the changed
+message path. No paid API request, Windows operation, push or merge is part of
+this refinement. Final clean-HEAD simulator installation records live under
+`build/genui/trial/`, avoiding a self-referential commit/amend loop.
+
+Full G passed: root fatal-info analysis and 10,260 tests (one existing skip),
+markstream offline resolution/fatal-info analysis and 298 tests, a macOS debug
+build and diff whitespace check. The manual benchmark and integration driver
+also passed explicit fatal-info analysis. All frozen implementation hashes
+matched after G. Logs are `build/genui/logs/c28-final-*.log`; final staging is
+restricted to the recorded implementation and four documentation files.

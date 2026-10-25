@@ -6560,7 +6560,7 @@
       }
     }
   },
-  "genuiChartDomainGap": "Undefined in this domain",
+  "genuiChartDomainGap": "Undefined",
   "genuiChartDomainSummary": "{count, plural, =1{1 sampled point is undefined} other{{count} sampled points are undefined}}; shaded gaps are not connected.",
   "@genuiChartDomainSummary": {
     "placeholders": {
@@ -6688,5 +6688,9 @@
   "genuiWebFailed": "Preview initialization or loading failed. View or copy its source.",
   "genuiWebEmpty": "No HTML document after the header",
   "genuiWebBlockLimit": "Up to 3 web previews per message; the rest are shown as source",
-  "genuiWebCloseFailed": "Couldn't confirm the previous preview closed. Restart the app before opening another."
+  "genuiWebCloseFailed": "Couldn't confirm the previous preview closed. Restart the app before opening another.",
+  "displaySettingsShowGenUiHeader": "Show interactive UI title bar",
+  "displaySettingsShowGenUiHeaderSubtitle": "Hide for a cleaner message. Source and actions remain in the menu below the UI.",
+  "genuiClearFilter": "Clear filter",
+  "genuiClearSelection": "Clear selection"
 }

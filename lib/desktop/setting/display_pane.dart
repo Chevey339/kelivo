@@ -112,6 +112,7 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowReasoningMarkdown(),
                   _RowDivider(),
                   _ToggleRowAssistantMarkdown(),
+                  _ToggleRowGenUiHeader(),
                   _RowDivider(),
                   _AutoCollapseCodeBlocksSection(),
                 ],
@@ -2565,6 +2566,22 @@ class _ToggleRowAssistantMarkdown extends StatelessWidget {
       value: sp.enableAssistantMarkdown,
       onChanged: (v) =>
           context.read<SettingsProvider>().setEnableAssistantMarkdown(v),
+    );
+  }
+}
+
+class _ToggleRowGenUiHeader extends StatelessWidget {
+  const _ToggleRowGenUiHeader();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsShowGenUiHeader,
+      tip: l10n.displaySettingsShowGenUiHeaderSubtitle,
+      value: sp.showGenUiHeader,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setShowGenUiHeader(value),
     );
   }
 }

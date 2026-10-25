@@ -93,7 +93,7 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
           border: Border.all(color: theme.hairline),
         ),
         child: Padding(
-          padding: EdgeInsets.all(theme.md),
+          padding: EdgeInsets.all(theme.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -101,21 +101,47 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ExcludeSemantics(
-                    child: Icon(
-                      LucideIcons.globe,
-                      size: 18,
-                      color: theme.primary,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: theme.primaryContainer,
+                        borderRadius: BorderRadius.circular(
+                          theme.controlRadius,
+                        ),
+                      ),
+                      child: Icon(
+                        LucideIcons.globe,
+                        size: 18,
+                        color: theme.primary,
+                      ),
                     ),
                   ),
                   SizedBox(width: theme.xs),
                   Expanded(
-                    child: ExcludeSemantics(
-                      child: Text(
-                        title,
-                        style: theme.header,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ExcludeSemantics(
+                          child: Text(
+                            title,
+                            style: theme.header,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (document.summary.isNotEmpty) ...[
+                          SizedBox(height: theme.xxs),
+                          Text(
+                            document.summary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.caption.copyWith(
+                              color: theme.secondaryInk,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (streaming)
@@ -130,15 +156,6 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                     ),
                 ],
               ),
-              if (document.summary.isNotEmpty) ...[
-                SizedBox(height: theme.xs),
-                Text(
-                  document.summary,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.body.copyWith(color: theme.secondaryInk),
-                ),
-              ],
               if (invalid ||
                   (!widget.supported && !widget.exporting) ||
                   (streaming && actions)) ...[
@@ -270,40 +287,55 @@ class _GenUiWebOpenButtonState extends State<GenUiWebOpenButton> {
             child: IosCardPress(
               haptics: false,
               onTap: disabled ? null : widget.onTap,
-              baseColor: disabled ? theme.fill : theme.primary,
-              border: Border.all(
-                color: _focused ? theme.primary : theme.transparent,
-                width: _focused ? 2 : 1,
-              ),
+              baseColor: theme.transparent,
               borderRadius: BorderRadius.circular(theme.controlRadius),
               duration: MediaQuery.disableAnimationsOf(context)
                   ? Duration.zero
                   : const Duration(milliseconds: 160),
               pressedScale: MediaQuery.disableAnimationsOf(context) ? 1 : .98,
-              padding: EdgeInsets.symmetric(
-                horizontal: theme.sm,
-                vertical: theme.xs,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 28, minWidth: 44),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      LucideIcons.externalLink,
-                      size: 15,
-                      color: disabled ? theme.disabledInk : theme.onPrimary,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: theme.xxs),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  decoration: BoxDecoration(
+                    color: disabled ? theme.fill : theme.primary,
+                    borderRadius: BorderRadius.circular(theme.controlRadius),
+                    border: Border.all(
+                      color: _focused ? theme.primary : theme.transparent,
+                      width: 2,
                     ),
-                    SizedBox(width: theme.xs),
-                    Flexible(
-                      child: Text(
-                        widget.label,
-                        style: theme.header.copyWith(
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: theme.sm,
+                    vertical: theme.xxs,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 20,
+                      minWidth: 44,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          LucideIcons.externalLink,
+                          size: 15,
                           color: disabled ? theme.disabledInk : theme.onPrimary,
                         ),
-                      ),
+                        SizedBox(width: theme.xs),
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            style: theme.header.copyWith(
+                              color: disabled
+                                  ? theme.disabledInk
+                                  : theme.onPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

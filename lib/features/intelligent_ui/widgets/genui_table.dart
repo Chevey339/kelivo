@@ -1,4 +1,4 @@
-import '../text/ui_number.dart';
+import 'genui_number_text.dart';
 import 'dart:math' as math;
 import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';
@@ -301,7 +301,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
   String _text(UiTableColumn column, Object? value) {
     final l10n = AppLocalizations.of(context)!;
     return value is num
-        ? genUiNumber(value, digits: column.digits)
+        ? genUiDisplayNumber(value, digits: column.digits)
         : value == null
         ? '—'
         : value is bool
@@ -363,6 +363,21 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       constraints: const BoxConstraints(minHeight: 44),
                       child: IosFormTextField(
                         label: '',
+                        compact: true,
+                        suffix: _filter.text.isEmpty
+                            ? null
+                            : IosIconButton(
+                                icon: LucideIcons.x,
+                                size: 14,
+                                minSize: 44,
+                                visualSize: 28,
+                                tooltip: l10n.genuiClearFilter,
+                                onTap: _filter.clear,
+                              ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
                         prefix: Icon(
                           LucideIcons.search,
                           size: 16,
@@ -421,75 +436,80 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
             final sum = minimums.fold(0.0, (a, b) => a + b);
             final width = math.max(sum, constraints.maxWidth);
             return Focus(
-              canRequestFocus: !exporting,
+              canRequestFocus: false,
               onKeyEvent: _key,
-              onFocusChange: (value) =>
-                  setState(() => _viewportFocused = value),
-              child: Container(
-                key: ValueKey('genui-table-viewport-${widget.id}'),
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: theme.card,
-                  borderRadius: BorderRadius.circular(theme.controlRadius),
-                ),
-                foregroundDecoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(theme.controlRadius),
-                  border: Border.all(
-                    color: _viewportFocused ? theme.primary : theme.hairline,
-                    width: _viewportFocused ? 2 : 1,
+              child: FocusableActionDetector(
+                enabled: !exporting,
+                onShowFocusHighlight: (value) =>
+                    setState(() => _viewportFocused = value),
+                child: Container(
+                  key: ValueKey('genui-table-viewport-${widget.id}'),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: theme.card,
+                    borderRadius: BorderRadius.circular(theme.controlRadius),
                   ),
-                ),
-                child: Scrollbar(
-                  controller: _scroll,
-                  thumbVisibility: width > constraints.maxWidth,
-                  child: SingleChildScrollView(
-                    controller: _scroll,
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.only(
-                      bottom: width > constraints.maxWidth ? theme.sm : 0,
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(theme.controlRadius),
+                    border: Border.all(
+                      color: _viewportFocused ? theme.primary : theme.hairline,
+                      width: _viewportFocused ? 2 : 1,
                     ),
-                    child: SizedBox(
-                      width: width,
-                      child: Table(
-                        defaultVerticalAlignment:
-                            TableCellVerticalAlignment.middle,
-                        columnWidths: {
-                          for (var c = 0; c < minimums.length; c++)
-                            c: FixedColumnWidth(
-                              minimums[c] + (width - sum) / minimums.length,
-                            ),
-                        },
-                        border: TableBorder(
-                          horizontalInside: BorderSide(color: theme.hairline),
-                        ),
-                        children: [
-                          TableRow(
-                            decoration: BoxDecoration(color: theme.headerFill),
-                            children: [
-                              for (final col in _data.columns)
-                                _header(
-                                  col,
-                                  page,
-                                  theme,
-                                  l10n,
-                                  exporting: exporting,
-                                ),
-                            ],
+                  ),
+                  child: Scrollbar(
+                    controller: _scroll,
+                    thumbVisibility: width > constraints.maxWidth,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(
+                        bottom: width > constraints.maxWidth ? theme.sm : 0,
+                      ),
+                      child: SizedBox(
+                        width: width,
+                        child: Table(
+                          defaultVerticalAlignment:
+                              TableCellVerticalAlignment.middle,
+                          columnWidths: {
+                            for (var c = 0; c < minimums.length; c++)
+                              c: FixedColumnWidth(
+                                minimums[c] + (width - sum) / minimums.length,
+                              ),
+                          },
+                          border: TableBorder(
+                            horizontalInside: BorderSide(color: theme.hairline),
                           ),
-                          for (final row in page.rows)
+                          children: [
                             TableRow(
-                              key: ValueKey((widget.id, row.key)),
+                              decoration: BoxDecoration(
+                                color: theme.headerFill,
+                              ),
                               children: [
-                                for (var c = 0; c < _data.columns.length; c++)
-                                  _cell(
-                                    _data.columns[c],
-                                    row.values[c],
-                                    matcher,
+                                for (final col in _data.columns)
+                                  _header(
+                                    col,
+                                    page,
                                     theme,
+                                    l10n,
+                                    exporting: exporting,
                                   ),
                               ],
                             ),
-                        ],
+                            for (final row in page.rows)
+                              TableRow(
+                                key: ValueKey((widget.id, row.key)),
+                                children: [
+                                  for (var c = 0; c < _data.columns.length; c++)
+                                    _cell(
+                                      _data.columns[c],
+                                      row.values[c],
+                                      matcher,
+                                      theme,
+                                    ),
+                                ],
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -507,104 +527,110 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
               style: theme.caption,
             ),
           ),
-        SizedBox(height: theme.xs),
-        Wrap(
-          spacing: theme.xs,
-          runSpacing: theme.xxs,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          alignment: WrapAlignment.spaceBetween,
-          children: [
-            Text(
-              l10n.genuiTablePageInfo(page.from, page.to, page.total),
-              style: theme.label,
-            ),
-            if (!exporting)
-              GenUiControlRegion(
-                child: IosIconButton(
-                  key: ValueKey('genui-table-page-size-${widget.id}'),
-                  focusNode: _pageSizeFocus,
-                  semanticLabel: l10n.genuiTablePerPage(page.pageSize),
-                  minSize: 44,
-                  padding: EdgeInsets.zero,
-                  enabled: _interactive,
-                  onTap: _choosePageSize,
-                  builder: (_) => Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: theme.xs,
-                      vertical: theme.xxs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.fill,
-                      borderRadius: BorderRadius.circular(
-                        theme.controlRadius - 3,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          l10n.genuiTablePerPage(page.pageSize),
-                          style: theme.label.copyWith(
-                            color: theme.secondaryInk,
-                          ),
-                        ),
-                        SizedBox(width: theme.xxs),
-                        Icon(
-                          LucideIcons.chevronDown,
-                          size: 12,
-                          color: theme.captionInk,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            if (!exporting)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GenUiControlRegion(
-                    child: IosIconButton(
-                      key: ValueKey('genui-table-previous-${widget.id}'),
-                      icon: Directionality.of(context) == TextDirection.rtl
-                          ? LucideIcons.chevronRight
-                          : LucideIcons.chevronLeft,
-                      semanticLabel: l10n.genuiTablePreviousPage,
-                      tooltip: l10n.genuiTablePreviousPage,
-                      minSize: 44,
-                      size: 16,
-                      color: theme.secondaryInk,
-                      enabled: _interactive && page.page > 0,
-                      onTap: () => _pageBy(-1),
-                    ),
-                  ),
-                  Text(
-                    '${page.page + 1}/${page.pages}',
-                    style: theme.caption,
-                    textDirection: TextDirection.ltr,
-                  ),
-                  GenUiControlRegion(
-                    child: IosIconButton(
-                      key: ValueKey('genui-table-next-${widget.id}'),
-                      icon: Directionality.of(context) == TextDirection.rtl
-                          ? LucideIcons.chevronLeft
-                          : LucideIcons.chevronRight,
-                      semanticLabel: l10n.genuiTableNextPage,
-                      tooltip: l10n.genuiTableNextPage,
-                      minSize: 44,
-                      size: 16,
-                      color: theme.secondaryInk,
-                      enabled: _interactive && page.page + 1 < page.pages,
-                      onTap: () => _pageBy(1),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
+        if (page.total > 10 || exporting && page.pages > 1) ...[
+          SizedBox(height: theme.xxs),
+          _pagination(page, theme, l10n, exporting: exporting),
+        ],
       ],
     );
   }
+
+  Widget _pagination(
+    UiTablePage page,
+    GenUiTheme theme,
+    AppLocalizations l10n, {
+    required bool exporting,
+  }) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact =
+          constraints.maxWidth <
+          320 * MediaQuery.textScalerOf(context).scale(1);
+      return Row(
+        key: ValueKey('genui-table-pagination-${widget.id}'),
+        children: [
+          Expanded(
+            child: Semantics(
+              label: l10n.genuiTablePageInfo(page.from, page.to, page.total),
+              excludeSemantics: true,
+              child: Text(
+                '${page.from}–${page.to} / ${page.total}',
+                style: theme.label,
+                textDirection: TextDirection.ltr,
+              ),
+            ),
+          ),
+          if (!exporting) ...[
+            GenUiControlRegion(
+              child: IosIconButton(
+                key: ValueKey('genui-table-page-size-${widget.id}'),
+                focusNode: _pageSizeFocus,
+                semanticLabel: l10n.genuiTablePerPage(page.pageSize),
+                tooltip: l10n.genuiTablePerPage(page.pageSize),
+                minSize: 44,
+                padding: EdgeInsets.symmetric(horizontal: theme.xxs),
+                enabled: _interactive,
+                onTap: _choosePageSize,
+                builder: (_) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      compact
+                          ? '${page.pageSize}'
+                          : l10n.genuiTablePerPage(page.pageSize),
+                      style: theme.label.copyWith(color: theme.secondaryInk),
+                    ),
+                    SizedBox(width: theme.xxs),
+                    Icon(
+                      LucideIcons.chevronDown,
+                      size: 12,
+                      color: theme.captionInk,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (page.pages > 1) ...[
+              GenUiControlRegion(
+                child: IosIconButton(
+                  key: ValueKey('genui-table-previous-${widget.id}'),
+                  icon: Directionality.of(context) == TextDirection.rtl
+                      ? LucideIcons.chevronRight
+                      : LucideIcons.chevronLeft,
+                  tooltip: l10n.genuiTablePreviousPage,
+                  minSize: 44,
+                  visualSize: 28,
+                  size: 16,
+                  color: theme.secondaryInk,
+                  enabled: _interactive && page.page > 0,
+                  onTap: () => _pageBy(-1),
+                ),
+              ),
+              Text(
+                '${page.page + 1}/${page.pages}',
+                style: theme.label,
+                textDirection: TextDirection.ltr,
+              ),
+              GenUiControlRegion(
+                child: IosIconButton(
+                  key: ValueKey('genui-table-next-${widget.id}'),
+                  icon: Directionality.of(context) == TextDirection.rtl
+                      ? LucideIcons.chevronLeft
+                      : LucideIcons.chevronRight,
+                  tooltip: l10n.genuiTableNextPage,
+                  minSize: 44,
+                  visualSize: 28,
+                  size: 16,
+                  color: theme.secondaryInk,
+                  enabled: _interactive && page.page + 1 < page.pages,
+                  onTap: () => _pageBy(1),
+                ),
+              ),
+            ],
+          ],
+        ],
+      );
+    },
+  );
 
   Widget _header(
     UiTableColumn col,

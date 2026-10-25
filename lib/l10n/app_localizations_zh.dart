@@ -13587,7 +13587,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get genuiChartDomainGap => '此区间无定义';
+  String get genuiChartDomainGap => '未定义';
 
   @override
   String genuiChartDomainSummary(int count) {
@@ -13802,6 +13802,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiWebCloseFailed => '无法确认上一个预览已关闭。请重启应用后再打开。';
+
+  @override
+  String get displaySettingsShowGenUiHeader => '显示交互界面标题栏';
+
+  @override
+  String get displaySettingsShowGenUiHeaderSubtitle =>
+      '关闭后更沉浸；源码与操作仍可从界面底部的更多菜单访问。';
+
+  @override
+  String get genuiClearFilter => '清除筛选';
+
+  @override
+  String get genuiClearSelection => '清除选择';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -27313,7 +27326,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get genuiChartDomainGap => '此区间无定义';
+  String get genuiChartDomainGap => '未定义';
 
   @override
   String genuiChartDomainSummary(int count) {
@@ -27528,6 +27541,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiWebCloseFailed => '无法确认上一个预览已关闭。请重启应用后再打开。';
+
+  @override
+  String get displaySettingsShowGenUiHeader => '显示交互界面标题栏';
+
+  @override
+  String get displaySettingsShowGenUiHeaderSubtitle =>
+      '关闭后更沉浸；源码与操作仍可从界面底部的更多菜单访问。';
+
+  @override
+  String get genuiClearFilter => '清除筛选';
+
+  @override
+  String get genuiClearSelection => '清除选择';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -41119,7 +41145,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get genuiChartDomainGap => '此區間無定義';
+  String get genuiChartDomainGap => '未定義';
 
   @override
   String genuiChartDomainSummary(int count) {
@@ -41334,4 +41360,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiWebCloseFailed => '無法確認上一個預覽已關閉。請重新啟動應用程式後再開啟。';
+
+  @override
+  String get displaySettingsShowGenUiHeader => '顯示互動介面標題列';
+
+  @override
+  String get displaySettingsShowGenUiHeaderSubtitle =>
+      '關閉後更沉浸；原始碼與操作仍可從介面底部的更多選單存取。';
+
+  @override
+  String get genuiClearFilter => '清除篩選';
+
+  @override
+  String get genuiClearSelection => '清除選取';
 }

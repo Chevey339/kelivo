@@ -116,8 +116,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(state.scrollController.offset, greaterThan(100));
-      await tester.dragFrom(const Offset(190, 480), const Offset(0, -450));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 6; i++) {
+        await tester.dragFrom(const Offset(190, 480), const Offset(0, -450));
+        await tester.pumpAndSettle();
+      }
       expect(
         find
             .byWidgetPredicate(

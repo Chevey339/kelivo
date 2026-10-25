@@ -232,6 +232,7 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
             child: GenUiControlRegion(
               child: IosFormTextField(
                 label: '',
+                compact: true,
                 controller: _text,
                 focusNode: _focus,
                 inlineLabel: false,
@@ -299,6 +300,7 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
                             icon: LucideIcons.minus,
                             size: 16,
                             minSize: 44,
+                            visualSize: 28,
                             tooltip: l10n.genuiDecrease(label),
                             color: theme.primary,
                             enabled:
@@ -310,6 +312,7 @@ class _GenUiTextInputState extends State<GenUiTextInput> {
                             icon: LucideIcons.plus,
                             size: 16,
                             minSize: 44,
+                            visualSize: 28,
                             tooltip: l10n.genuiIncrease(label),
                             color: theme.primary,
                             enabled:

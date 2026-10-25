@@ -1,5 +1,10 @@
 # Visual refinement after the hands-on trial
 
+This records C27. The subsequent full-component audit and current presentation
+are documented in [C28 component audit](component-audit.md). In particular, C28
+removes the inline height cap at the user's request and keeps pagination in one
+row instead of wrapping its controls independently.
+
 The trial exposed oversized view selectors, heavy resting input borders,
 square table headers, a card header that did not follow the supplied reference,
 and a second vertical gesture target inside long messages. This follow-up uses

@@ -37,8 +37,11 @@ class IosFormTextField extends StatelessWidget {
     this.fieldDecoration,
     this.suffixIconConstraints,
     this.inputFormatters,
+    this.compact = false,
   });
 
+  /// Compact painted field with an unchanged 44 dp interaction area.
+  final bool compact;
   final String label;
   final TextEditingController controller;
   final String? hintText;
@@ -167,15 +170,17 @@ class IosFormTextField extends StatelessWidget {
             ? null
             : suffixIconConstraints ??
                   const BoxConstraints.tightFor(width: 36, height: 36),
-        hintStyle: TextStyle(
-          fontSize: 15,
-          fontWeight: AppFontWeights.medium,
-          color: hintColor,
-          height: maxLines > 1 ? 1.25 : 1.0,
-        ),
+        hintStyle:
+            textStyle?.copyWith(color: hintColor) ??
+            TextStyle(
+              fontSize: 15,
+              fontWeight: AppFontWeights.medium,
+              color: hintColor,
+              height: maxLines > 1 ? 1.25 : 1.0,
+            ),
         border: InputBorder.none,
         contentPadding: maxLines == 1
-            ? const EdgeInsets.symmetric(vertical: 10)
+            ? EdgeInsets.symmetric(vertical: compact ? 8 : 10)
             : EdgeInsets.zero,
       ),
     );
@@ -239,21 +244,45 @@ class IosFormTextField extends StatelessWidget {
       );
     }
 
-    final fieldBox = Container(
-      constraints: maxLines == 1 ? const BoxConstraints(minHeight: 40) : null,
-      alignment: maxLines == 1 ? Alignment.centerLeft : Alignment.topLeft,
-      decoration:
-          fieldDecoration ??
-          BoxDecoration(
-            color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(12),
-          ),
-      padding: EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: maxLines > 1 ? 12 : 0,
-      ),
-      child: field,
-    );
+    final decoration =
+        fieldDecoration ??
+        BoxDecoration(
+          color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+        );
+    final fieldBox = compact
+        ? Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                top: maxLines == 1 ? 4 : 0,
+                bottom: maxLines == 1 ? 4 : 0,
+                child: DecoratedBox(decoration: decoration),
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: maxLines > 1 ? 8 : 0,
+                  ),
+                  child: field,
+                ),
+              ),
+            ],
+          )
+        : Container(
+            constraints: maxLines == 1
+                ? const BoxConstraints(minHeight: 40)
+                : null,
+            alignment: maxLines == 1 ? Alignment.centerLeft : Alignment.topLeft,
+            decoration: decoration,
+            padding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: maxLines > 1 ? 12 : 0,
+            ),
+            child: field,
+          );
 
     return Padding(
       padding: resolvedOuterPadding,

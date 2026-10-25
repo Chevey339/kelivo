@@ -1,5 +1,4 @@
-import '../text/ui_number.dart';
-import '../runtime/ui_numeric_step.dart';
+import 'genui_number_text.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -7,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
-import 'package:Kelivo/shared/widgets/ios_text_button.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import '../catalog/ui_catalog.dart';
 import '../runtime/ui_chart_data.dart';
 import '../runtime/ui_resolved_node.dart';
@@ -51,7 +50,7 @@ class _GenUiChartState extends State<GenUiChart> {
   GenUiInteractions? _scope;
   VoidCallback? _unsubscribe, _reset;
   GenUiChartPoint? _hover, _selected;
-  bool _focused = false;
+  bool _focused = false, _showFocus = false;
   bool _viewFailed = false;
   UiChartData get _data => widget.node.chartData!;
   Map<String, Object?> get _props => widget.node.properties;
@@ -223,9 +222,9 @@ class _GenUiChartState extends State<GenUiChart> {
   }
 
   String _value(num? value) =>
-      '${genUiNumber(value)}${_props['unit'] == null || value == null ? '' : ' ${_props['unit']}'}';
+      '${genUiDisplayNumber(value)}${_props['unit'] == null || value == null ? '' : ' ${_props['unit']}'}';
   String _xValue(UiChartRow row) =>
-      row.x is num ? genUiNumber(row.x as num) : row.x as String;
+      row.x is num ? genUiDisplayNumber(row.x as num) : row.x as String;
   String _tooltip(GenUiChartPoint point, AppLocalizations l10n) {
     final row = _data.rows[point.row];
     if (_pie) {
@@ -237,6 +236,25 @@ class _GenUiChartState extends State<GenUiChart> {
         '${_data.yKeys[s]}: ${_value(row.y[s])}',
       if (_data.domainRows.contains(row.index)) l10n.genuiChartDomainGap,
     ].join('\n');
+  }
+
+  String get _axisCaption {
+    final title = (_props['title'] as String? ?? '').trim();
+    final label = _props['yLabel'] as String? ?? '';
+    final unit = _props['unit'] as String? ?? '';
+    final parts = <String>[
+      if (label.isNotEmpty &&
+          title != label &&
+          !(_data.yKeys.length == 1 && _data.yKeys.single == label))
+        label,
+      if (unit.isNotEmpty &&
+          title != unit &&
+          !title.contains('($unit)') &&
+          !title.contains('（$unit）') &&
+          !title.contains('[$unit]'))
+        unit,
+    ];
+    return parts.join(' · ');
   }
 
   @override
@@ -252,7 +270,7 @@ class _GenUiChartState extends State<GenUiChart> {
         ? l10n.genuiChartPieSummary(
             kind,
             _pieRows.length,
-            '${uiNumericTotalText(_pieRows.map((r) => r.y.single ?? 0))}${_props['unit'] == null ? '' : ' ${_props['unit']}'}',
+            '${genUiDisplayTotal(_pieRows.map((r) => r.y.single ?? 0))}${_props['unit'] == null ? '' : ' ${_props['unit']}'}',
           )
         : l10n.genuiChartSummary(
             kind,
@@ -316,80 +334,84 @@ class _GenUiChartState extends State<GenUiChart> {
                 ],
               ),
             ),
-            if (_props['yLabel'] case final String label)
+            if (!_pie && _axisCaption.isNotEmpty)
               Padding(
-                padding: EdgeInsets.only(bottom: theme.xxs),
-                child: Text(label, style: theme.label),
-              ),
-            if (_props['unit'] case final String unit when !_pie)
-              Padding(
-                padding: EdgeInsets.only(bottom: theme.xxs),
-                child: Text(l10n.genuiChartUnit(unit), style: theme.label),
+                padding: EdgeInsets.only(bottom: theme.xs),
+                child: Text(_axisCaption, style: theme.label),
               ),
             GenUiControlRegion(
               child: Focus(
-                focusNode: _focus,
-                canRequestFocus: _interactive,
+                canRequestFocus: false,
                 onKeyEvent: _key,
-                onFocusChange: (value) => setState(() => _focused = value),
-                child: Semantics(
-                  focusable: _interactive,
-                  focused: _focused,
-                  hint: l10n.genuiChartKeyboardHint,
-                  child: Container(
-                    key: ValueKey('genui-chart-canvas-${widget.id}'),
-                    height: height,
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _focused ? theme.primary : theme.transparent,
-                        width: 2,
+                child: FocusableActionDetector(
+                  focusNode: _focus,
+                  onFocusChange: (value) => setState(() => _focused = value),
+                  enabled: _interactive,
+                  onShowFocusHighlight: (value) =>
+                      setState(() => _showFocus = value),
+                  child: Semantics(
+                    focusable: _interactive,
+                    focused: _focused,
+                    hint: l10n.genuiChartKeyboardHint,
+                    child: Container(
+                      key: ValueKey('genui-chart-canvas-${widget.id}'),
+                      height: height,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: _showFocus ? theme.primary : theme.transparent,
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          theme.controlRadius,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(theme.controlRadius),
+                      child: !_visibleValues
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.chartNoAxesCombined,
+                                    color: theme.captionInk,
+                                  ),
+                                  SizedBox(height: theme.xs),
+                                  Text(
+                                    _data.isEmpty
+                                        ? l10n.genuiChartEmpty
+                                        : _hidden.length >= _seriesCount
+                                        ? l10n.genuiChartAllHidden
+                                        : l10n.genuiChartNoVisibleValues,
+                                    textAlign: TextAlign.center,
+                                    style: theme.caption,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ExcludeSemantics(
+                              child: GenUiChartCanvas(
+                                data: _data,
+                                properties: _props,
+                                hidden: _hidden,
+                                active: active,
+                                highlightedSeries: _scope!.exporting
+                                    ? null
+                                    : _visible(_selected)?.series,
+                                interactive: _interactive,
+                                onTouch: _touch,
+                                gapLabel: l10n.genuiChartDomainGap,
+                              ),
+                            ),
                     ),
-                    child: !_visibleValues
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  LucideIcons.chartNoAxesCombined,
-                                  color: theme.captionInk,
-                                ),
-                                SizedBox(height: theme.xs),
-                                Text(
-                                  _data.isEmpty
-                                      ? l10n.genuiChartEmpty
-                                      : _hidden.length >= _seriesCount
-                                      ? l10n.genuiChartAllHidden
-                                      : l10n.genuiChartNoVisibleValues,
-                                  textAlign: TextAlign.center,
-                                  style: theme.caption,
-                                ),
-                              ],
-                            ),
-                          )
-                        : ExcludeSemantics(
-                            child: GenUiChartCanvas(
-                              data: _data,
-                              properties: _props,
-                              hidden: _hidden,
-                              active: active,
-                              highlightedSeries: _scope!.exporting
-                                  ? null
-                                  : _visible(_selected)?.series,
-                              interactive: _interactive,
-                              onTouch: _touch,
-                              gapLabel: l10n.genuiChartDomainGap,
-                            ),
-                          ),
                   ),
                 ),
               ),
             ),
             if (_props['xLabel'] case final String label)
               Text(label, textAlign: TextAlign.center, style: theme.label),
-            if (active != null && !_scope!.exporting)
+            if (active != null &&
+                !_scope!.exporting &&
+                !(_pie && _props['donut'] == true))
               Semantics(
                 liveRegion: true,
                 child: Container(
@@ -403,21 +425,45 @@ class _GenUiChartState extends State<GenUiChart> {
                   ),
                   // A normal text subtree keeps the exact values reachable to assistive
                   // technology and large text, unlike a clipped canvas tooltip.
-                  child: Text(
-                    _tooltip(active, l10n),
-                    style: theme.caption.copyWith(color: theme.secondaryInk),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _tooltip(active, l10n).replaceAll('\n', ' · '),
+                          style: theme.caption.copyWith(
+                            color: theme.secondaryInk,
+                          ),
+                        ),
+                      ),
+                      IosIconButton(
+                        icon: LucideIcons.x,
+                        size: 14,
+                        minSize: 44,
+                        visualSize: 28,
+                        tooltip: l10n.genuiClearSelection,
+                        onTap: () => setState(() {
+                          _selected = null;
+                          _hover = null;
+                        }),
+                      ),
+                    ],
                   ),
                 ),
               ),
           ],
-          SizedBox(height: theme.xs),
-          ExcludeSemantics(child: Text(summary, style: theme.caption)),
+
+          if (_pie && active != null && _props['donut'] == true)
+            Semantics(
+              liveRegion: true,
+              label: _tooltip(active, l10n),
+              child: const SizedBox.shrink(),
+            ),
           if (_data.domainRows.isNotEmpty)
             Text(
               l10n.genuiChartDomainSummary(_data.domainRows.length),
               style: theme.caption,
             ),
-          if (_pie && _data.missingCount > 0)
+          if (_data.missingCount > 0 && _data.domainRows.isEmpty)
             Text(
               l10n.genuiChartMissingValues(_data.missingCount),
               style: theme.caption,
@@ -443,78 +489,59 @@ class _GenUiChartState extends State<GenUiChart> {
     final action = hidden
         ? l10n.genuiChartShowSeries(name)
         : l10n.genuiChartHideSeries(name);
-    if (_scope!.exporting) {
-      return ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: width),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ExcludeSemantics(
-              child: CustomPaint(
-                size: Size(_pie ? 16 : 24, 14),
-                painter: GenUiChartLegendPainter(
-                  series: series,
-                  color: hidden ? theme.disabledInk : color,
-                  fill: theme.card,
-                  pie: _pie,
-                ),
-              ),
-            ),
-            SizedBox(width: theme.xs),
-            Flexible(
-              child: Text(
-                label,
-                style: theme.caption.copyWith(color: theme.secondaryInk),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: width),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ExcludeSemantics(
-            child: CustomPaint(
-              size: Size(_pie ? 16 : 24, 14),
-              painter: GenUiChartLegendPainter(
-                series: series,
-                color: hidden ? theme.disabledInk : color,
-                fill: theme.card,
-                pie: _pie,
-              ),
+    Widget item(Color ink) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ExcludeSemantics(
+          child: CustomPaint(
+            size: Size(_pie ? 16 : 24, 14),
+            painter: GenUiChartLegendPainter(
+              series: series,
+              color: hidden ? theme.disabledInk : color,
+              fill: theme.card,
+              pie: _pie,
             ),
           ),
-          Flexible(
-            child: GenUiControlRegion(
-              child: Tooltip(
-                message: action,
-                child: Semantics(
-                  button: true,
-                  toggled: !hidden,
-                  label: action,
-                  value: _pie ? _value(_data.rows[series].y.single) : null,
-                  enabled: _interactive,
-                  onTap: _interactive ? () => _toggle(series) : null,
-                  child: ExcludeSemantics(
-                    child: IosTextButton(
-                      key: ValueKey('genui-chart-legend-${widget.id}-$series'),
-                      label: label,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      icon: hidden ? LucideIcons.eyeOff : null,
-                      color: hidden ? theme.captionInk : theme.secondaryInk,
-                      fontSize: theme.label.fontSize!,
-                      onPressed: _interactive ? () => _toggle(series) : null,
-                    ),
+        ),
+        SizedBox(width: theme.xxs),
+        Flexible(
+          child: Text(
+            label,
+            style: theme.label.copyWith(
+              color: ink,
+              decoration: hidden ? TextDecoration.lineThrough : null,
+              decorationColor: theme.captionInk,
+            ),
+          ),
+        ),
+      ],
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: width),
+      child: _scope!.exporting
+          ? item(theme.secondaryInk)
+          : GenUiControlRegion(
+              child: Semantics(
+                button: true,
+                toggled: !hidden,
+                label: action,
+                value: _pie ? _value(_data.rows[series].y.single) : null,
+                enabled: _interactive,
+                onTap: _interactive ? () => _toggle(series) : null,
+                child: ExcludeSemantics(
+                  child: IosIconButton(
+                    key: ValueKey('genui-chart-legend-${widget.id}-$series'),
+                    minSize: 44,
+                    padding: EdgeInsets.symmetric(horizontal: theme.xxs),
+                    color: hidden ? theme.captionInk : theme.secondaryInk,
+                    tooltip: action,
+                    enabled: _interactive,
+                    onTap: () => _toggle(series),
+                    builder: item,
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
     );
   }
 }

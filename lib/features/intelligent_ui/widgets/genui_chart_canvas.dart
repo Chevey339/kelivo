@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import '../runtime/ui_numeric_step.dart';
+import 'genui_number_text.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -133,7 +133,8 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
           final grid = FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: (axis.maximum - axis.minimum) / 4,
+            horizontalInterval:
+                axis.tickInterval ?? (axis.maximum - axis.minimum) / 4,
             getDrawingHorizontalLine: (_) =>
                 FlLine(color: theme.hairline, strokeWidth: 1),
           );
@@ -254,7 +255,9 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
           reservedSize: left,
           minIncluded: false,
           maxIncluded: false,
-          interval: (data.yAxis.maximum - data.yAxis.minimum) / 4,
+          interval:
+              data.yAxis.tickInterval ??
+              (data.yAxis.maximum - data.yAxis.minimum) / 4,
           getTitlesWidget: (value, meta) => SideTitleWidget(
             meta: meta,
             space: 6,
@@ -279,7 +282,8 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
           minIncluded: false,
           maxIncluded: false,
           interval: data.numericX
-              ? (data.xAxis.maximum - data.xAxis.minimum) / 4
+              ? data.xAxis.tickInterval ??
+                    (data.xAxis.maximum - data.xAxis.minimum) / 4
               : categoryStep / data.xAxis.factor,
           getTitlesWidget: (value, meta) {
             final raw = data.xAxis.value(value);
@@ -509,7 +513,8 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
       final radius =
           math.min(constraints.maxWidth, constraints.maxHeight) / 2 - 8;
       final donut = properties['donut'] == true;
-      final center = donut ? radius * .5 : 0.0;
+      final center = donut ? radius * .53 : 0.0;
+      final selected = active == null ? null : data.rows[active!.row];
       return Directionality(
         textDirection: TextDirection.ltr,
         child: Stack(
@@ -561,20 +566,31 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      AppLocalizations.of(context)!.genuiChartTotal,
+                      selected == null
+                          ? AppLocalizations.of(context)!.genuiChartTotal
+                          : selected.x.toString(),
                       style: theme.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      uiNumericTotalText(rows.map((row) => row.y.single!)),
+                      selected == null
+                          ? genUiDisplayTotal(rows.map((row) => row.y.single!))
+                          : genUiDisplayNumber(selected.y.single),
                       style: theme.header,
                       textAlign: TextAlign.center,
                       textDirection: TextDirection.ltr,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (properties['unit'] case final String unit)
+                    if (properties['unit'] != null ||
+                        selected?.y.single != null)
                       Text(
-                        unit,
+                        [
+                          if (properties['unit'] case final String unit) unit,
+                          if (selected?.y.single != null)
+                            '${genUiChartTick(selected!.y.single! / visibleTotal * 100)}%',
+                        ].join(' · '),
                         style: theme.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

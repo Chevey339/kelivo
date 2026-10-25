@@ -5200,7 +5200,7 @@
       }
     }
   },
-  "genuiChartDomainGap": "此区间无定义",
+  "genuiChartDomainGap": "未定义",
   "genuiChartDomainSummary": "{count} 个采样点无定义；阴影区域不连线。",
   "@genuiChartDomainSummary": {
     "placeholders": {
@@ -5328,5 +5328,9 @@
   "genuiWebFailed": "预览初始化或加载失败。可查看或复制源码。",
   "genuiWebEmpty": "元信息后没有 HTML 内容",
   "genuiWebBlockLimit": "每条消息最多渲染 3 个网页预览，其余以源码显示",
-  "genuiWebCloseFailed": "无法确认上一个预览已关闭。请重启应用后再打开。"
+  "genuiWebCloseFailed": "无法确认上一个预览已关闭。请重启应用后再打开。",
+  "displaySettingsShowGenUiHeader": "显示交互界面标题栏",
+  "displaySettingsShowGenUiHeaderSubtitle": "关闭后更沉浸；源码与操作仍可从界面底部的更多菜单访问。",
+  "genuiClearFilter": "清除筛选",
+  "genuiClearSelection": "清除选择"
 }

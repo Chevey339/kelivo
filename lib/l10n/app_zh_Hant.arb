@@ -5224,7 +5224,7 @@
       }
     }
   },
-  "genuiChartDomainGap": "此區間無定義",
+  "genuiChartDomainGap": "未定義",
   "genuiChartDomainSummary": "{count} 個取樣點無定義；陰影區域不連線。",
   "@genuiChartDomainSummary": {
     "placeholders": {
@@ -5352,5 +5352,9 @@
   "genuiWebFailed": "預覽初始化或載入失敗。可檢視或複製原始碼。",
   "genuiWebEmpty": "中繼資訊後沒有 HTML 內容",
   "genuiWebBlockLimit": "每則訊息最多顯示 3 個網頁預覽，其餘以原始碼顯示",
-  "genuiWebCloseFailed": "無法確認上一個預覽已關閉。請重新啟動應用程式後再開啟。"
+  "genuiWebCloseFailed": "無法確認上一個預覽已關閉。請重新啟動應用程式後再開啟。",
+  "displaySettingsShowGenUiHeader": "顯示互動介面標題列",
+  "displaySettingsShowGenUiHeaderSubtitle": "關閉後更沉浸；原始碼與操作仍可從介面底部的更多選單存取。",
+  "genuiClearFilter": "清除篩選",
+  "genuiClearSelection": "清除選取"
 }

@@ -1,4 +1,4 @@
-import '../text/ui_number.dart';
+import 'genui_number_text.dart';
 import '../text/ui_markdown_text.dart';
 import 'dart:async';
 
@@ -284,10 +284,10 @@ class _GenUiMetricState extends State<GenUiMetric> {
       widget.label,
       widget.value == null
           ? l10n.genuiValueUnavailable
-          : genUiNumber(widget.value, digits: widget.digits),
+          : genUiDisplayNumber(widget.value, digits: widget.digits),
       if (widget.unit?.isNotEmpty == true) widget.unit!,
       if (widget.trend != null)
-        l10n.genuiMetricTrend(genUiNumber(widget.trend)),
+        l10n.genuiMetricTrend(genUiDisplayNumber(widget.trend)),
     ].join(' ');
   }
 
@@ -341,7 +341,7 @@ class _GenUiMetricState extends State<GenUiMetric> {
               spacing: theme.xxs,
               children: [
                 Text(
-                  genUiNumber(widget.value, digits: widget.digits),
+                  genUiDisplayNumber(widget.value, digits: widget.digits),
                   textDirection: TextDirection.ltr,
                   style: theme.metric,
                 ),
@@ -370,7 +370,7 @@ class _GenUiMetricState extends State<GenUiMetric> {
                   SizedBox(width: theme.xxs),
                   Flexible(
                     child: Text(
-                      '${trend > 0 ? '+' : ''}${genUiNumber(trend)}',
+                      '${trend > 0 ? '+' : ''}${genUiDisplayNumber(trend)}',
                       textDirection: TextDirection.ltr,
                       style: theme.label.copyWith(
                         color: trend >= 0

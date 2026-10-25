@@ -36,6 +36,7 @@ class GenUiSurface extends StatelessWidget {
     this.onRetrySave,
     this.exporting = false,
     this.expanded = false,
+    this.showHeader = true,
     this.interactions,
     this.onAsk,
     this.onAttach,
@@ -51,6 +52,7 @@ class GenUiSurface extends StatelessWidget {
   final VoidCallback? onRetrySave;
   final bool exporting;
   final bool expanded;
+  final bool showHeader;
   final UiInteractionController? interactions;
   final GenUiAskHandler? onAsk;
   final Future<void> Function(UiAttachIntent)? onAttach;
@@ -85,7 +87,9 @@ class _SurfaceBodyState extends State<_SurfaceBody>
   final _localExpandFocus = FocusNode(debugLabel: 'GenUI expand');
   FocusNode get _expandFocus =>
       widget.surface.expandFocusNode ?? _localExpandFocus;
-  final _moreFocus = FocusNode(debugLabel: 'GenUI more');
+  final _localMoreFocus = FocusNode(debugLabel: 'GenUI more');
+  FocusNode get _moreFocus =>
+      widget.surface.showHeader ? _localMoreFocus : _expandFocus;
   final _subscriptions = <VoidCallback>[];
   Object? _chrome;
   UiSurfaceController get controller => widget.surface.controller;
@@ -163,7 +167,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
     _motion.dispose();
     _sourceFocus.dispose();
     _localExpandFocus.dispose();
-    _moreFocus.dispose();
+    _localMoreFocus.dispose();
     super.dispose();
   }
 
@@ -205,7 +209,9 @@ class _SurfaceBodyState extends State<_SurfaceBody>
         ),
       ),
     );
-    if (mounted) _sourceFocus.requestFocus();
+    if (mounted) {
+      (widget.surface.showHeader ? _sourceFocus : _moreFocus).requestFocus();
+    }
   }
 
   Future<void> _showMore() async {
@@ -214,6 +220,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
     final onAttach = widget.surface.onAttach;
     final action = await showAppDialog<String>(
       context,
+      maxWidth: 360,
       child: Builder(
         builder: (dialogContext) => GenUiThemeScope(
           child: Column(
@@ -221,7 +228,20 @@ class _SurfaceBodyState extends State<_SurfaceBody>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppDialogHeader(title: l10n.genuiMore),
-              if (widget.surface.onAttach != null)
+              if (!widget.surface.showHeader) ...[
+                IosTextButton(
+                  label: l10n.genuiViewSource,
+                  icon: LucideIcons.codeXml,
+                  onPressed: () => Navigator.of(dialogContext).pop('source'),
+                ),
+                if (widget.surface.onExpand != null)
+                  IosTextButton(
+                    label: l10n.genuiExpand,
+                    icon: LucideIcons.expand,
+                    onPressed: () => Navigator.of(dialogContext).pop('expand'),
+                  ),
+              ],
+              if (widget.surface.onAttach != null && !controller.readOnly)
                 IosTextButton(
                   label: l10n.genuiAttachState,
                   icon: LucideIcons.paperclip,
@@ -236,7 +256,9 @@ class _SurfaceBodyState extends State<_SurfaceBody>
               IosTextButton(
                 label: l10n.genuiReset,
                 icon: LucideIcons.rotateCcw,
-                onPressed: () => Navigator.of(dialogContext).pop('reset'),
+                onPressed: controller.readOnly
+                    ? null
+                    : () => Navigator.of(dialogContext).pop('reset'),
               ),
             ],
           ),
@@ -253,7 +275,11 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       _moreFocus.requestFocus();
       return;
     }
-    if (action == 'attach') {
+    if (action == 'source') {
+      await _showSource();
+    } else if (action == 'expand') {
+      await _expand();
+    } else if (action == 'attach') {
       final result = await GenUiInteractions.of(
         context,
       ).captureForAttach(context, token: token);
@@ -291,9 +317,6 @@ class _SurfaceBodyState extends State<_SurfaceBody>
     final errors = phase == SurfacePhase.completeWithErrors;
     final actions = !surface.exporting;
     final diagnostic = controller.parsed.program.diagnostics.firstOrNull;
-    final canReset =
-        !controller.readOnly &&
-        controller.parsed.program.declarations.isNotEmpty;
     final status = <Widget>[
       if (streaming) _GeneratingBadge(text: l10n.genuiStatusStreaming),
       if (interrupted)
@@ -318,6 +341,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
           icon: LucideIcons.codeXml,
           size: 16,
           minSize: 44,
+          visualSize: 28,
           color: theme.captionInk,
           tooltip: l10n.genuiViewSource,
           focusNode: _sourceFocus,
@@ -328,6 +352,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
             icon: LucideIcons.expand,
             size: 16,
             minSize: 44,
+            visualSize: 28,
             color: theme.captionInk,
             tooltip: l10n.genuiExpand,
             focusNode: _expandFocus,
@@ -338,11 +363,11 @@ class _SurfaceBodyState extends State<_SurfaceBody>
           icon: LucideIcons.ellipsis,
           size: 16,
           minSize: 44,
+          visualSize: 28,
           color: theme.captionInk,
           tooltip: l10n.genuiMore,
           focusNode: _moreFocus,
-          enabled: canReset,
-          onTap: canReset ? _showMore : null,
+          onTap: _showMore,
         ),
       ],
     );
@@ -419,52 +444,61 @@ class _SurfaceBodyState extends State<_SurfaceBody>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  key: const ValueKey('genui-surface-header'),
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: EdgeInsetsDirectional.only(
-                    start: theme.sm,
-                    end: theme.xxs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.headerFill,
-                    border: Border(bottom: BorderSide(color: theme.hairline)),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact =
-                          constraints.maxWidth < 480 ||
-                          MediaQuery.textScalerOf(context).scale(1) >= 1.3;
-                      if (compact) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(child: heading()),
-                                if (actions) GenUiControlRegion(child: buttons),
-                              ],
-                            ),
-                            if (status.isNotEmpty)
-                              Wrap(
-                                spacing: theme.xs,
-                                runSpacing: theme.xxs,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: status,
+                if (surface.showHeader)
+                  Container(
+                    key: const ValueKey('genui-surface-header'),
+                    constraints: const BoxConstraints(minHeight: 44),
+                    padding: EdgeInsetsDirectional.only(
+                      start: theme.sm,
+                      end: theme.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.headerFill,
+                      border: Border(bottom: BorderSide(color: theme.hairline)),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact =
+                            constraints.maxWidth < 480 ||
+                            MediaQuery.textScalerOf(context).scale(1) >= 1.3;
+                        if (compact) {
+                          final inlineStatus =
+                              status.length == 1 &&
+                              constraints.maxWidth >= 320 &&
+                              MediaQuery.textScalerOf(context).scale(1) < 1.3;
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: heading()),
+                                  if (inlineStatus) status.single,
+                                  if (actions)
+                                    GenUiControlRegion(child: buttons),
+                                ],
                               ),
+                              if (status.isNotEmpty && !inlineStatus)
+                                Wrap(
+                                  spacing: theme.xs,
+                                  runSpacing: theme.xxs,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: status,
+                                ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: heading()),
+                            ...status,
+                            if (actions) GenUiControlRegion(child: buttons),
                           ],
                         );
-                      }
-                      return Row(
-                        children: [
-                          Expanded(child: heading()),
-                          ...status,
-                          if (actions) GenUiControlRegion(child: buttons),
-                        ],
-                      );
-                    },
+                      },
+                    ),
                   ),
-                ),
                 Padding(
                   padding: EdgeInsets.all(
                     ResponsiveHelper.isMobile(context) ? 14 : theme.md,
@@ -473,6 +507,14 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (!surface.showHeader && status.isNotEmpty) ...[
+                        Wrap(
+                          spacing: theme.xs,
+                          runSpacing: theme.xxs,
+                          children: status,
+                        ),
+                        SizedBox(height: theme.xs),
+                      ],
                       if (invalid) ...[
                         GenUiCallout(
                           title: l10n.genuiInvalidTitle,
@@ -515,6 +557,23 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                     ],
                   ),
                 ),
+                if (!surface.showHeader && actions)
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: GenUiControlRegion(
+                      child: IosIconButton(
+                        key: const ValueKey('genui-immersive-more'),
+                        icon: LucideIcons.ellipsis,
+                        size: 16,
+                        minSize: 44,
+                        visualSize: 28,
+                        color: theme.captionInk,
+                        tooltip: l10n.genuiMore,
+                        focusNode: _moreFocus,
+                        onTap: _showMore,
+                      ),
+                    ),
+                  ),
                 if (footer != null)
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(

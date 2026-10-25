@@ -24,12 +24,21 @@ class GenUiFieldFrame extends StatelessWidget {
       children: [
         if (label.isNotEmpty)
           ExcludeSemantics(
-            child: Text(
-              '$label${requiredField ? ' *' : ''}',
+            child: Text.rich(
+              TextSpan(
+                text: label,
+                children: [
+                  if (requiredField)
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(color: theme.error),
+                    ),
+                ],
+              ),
               style: theme.fieldLabel,
             ),
           ),
-        if (label.isNotEmpty) SizedBox(height: theme.xs),
+        if (label.isNotEmpty) SizedBox(height: theme.xxs),
         child,
         if (error != null) ...[
           SizedBox(height: theme.xxs),
@@ -68,4 +77,26 @@ class GenUiFieldFrame extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Compact visual fill; the child retains its complete touch/keyboard region.
+class GenUiFieldSurface extends StatelessWidget {
+  const GenUiFieldSurface({
+    super.key,
+    required this.decoration,
+    required this.child,
+  });
+  final BoxDecoration decoration;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(
+        top: 4,
+        bottom: 4,
+        child: DecoratedBox(decoration: decoration),
+      ),
+      child,
+    ],
+  );
 }

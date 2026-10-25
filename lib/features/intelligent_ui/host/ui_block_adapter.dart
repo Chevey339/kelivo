@@ -1,3 +1,5 @@
+import 'package:provider/provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'ui_snapshot_export.dart';
 import '../widgets/genui_expansion.dart';
 import 'ui_search_navigation.dart';
@@ -67,6 +69,9 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
 
   @override
   Widget build(BuildContext context) {
+    final showHeader = context.select<SettingsProvider?, bool>(
+      (settings) => settings?.showGenUiHeader ?? true,
+    );
     final controller = _entry.controller;
     if (!controller.parsed.headerAccepted && !controller.parsed.invalid) {
       return const SizedBox.shrink();
@@ -87,6 +92,7 @@ class _UiBlockAdapterState extends State<UiBlockAdapter> {
       linkHandler: widget.linkHandler,
       exporting: widget.host.exporting,
       expanded: expanded,
+      showHeader: showHeader,
       onExpand: expand,
       expandFocusNode: focus,
       onExport: widget.host.exporting

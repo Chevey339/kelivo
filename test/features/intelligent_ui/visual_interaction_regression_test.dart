@@ -82,30 +82,31 @@ ${List.generate(14, (i) => 'm$i = Metric(label="Result $i",value=$i)').join('\n'
       );
       await tester.pumpWidget(_app(c, scroll: scroll));
       await tester.pumpAndSettle();
-      final inner = tester.state<ScrollableState>(
-        find
-            .descendant(
-              of: find.byType(GenUiInlineViewport),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+      expect(
+        tester.getSize(find.byType(GenUiSurface)).height,
+        greaterThan(1200),
       );
-      expect(inner.position.maxScrollExtent, greaterThan(100));
+      expect(
+        find.descendant(
+          of: find.byType(GenUiExpansion),
+          matching: find.byType(Scrollable),
+        ),
+        findsNothing,
+      );
       await tester.drag(
         find.byKey(const ValueKey('genui-chart-canvas-chart')),
         const Offset(0, -220),
       );
       await tester.pumpAndSettle();
       expect(scroll.offset, greaterThan(100));
-      expect(inner.position.pixels, 0);
-      await tester.dragFrom(const Offset(190, 480), const Offset(0, -450));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 5; i++) {
+        await tester.dragFrom(const Offset(190, 480), const Offset(0, -450));
+        await tester.pumpAndSettle();
+      }
       expect(find.text('Following message').hitTestable(), findsOneWidget);
-      expect(inner.position.pixels, 0);
-      expect(find.text('Result 13').hitTestable(), findsNothing);
-      // Complete content is still reachable in the one active expanded tree.
-      await tester.ensureVisible(find.text('Expand'));
-      await tester.tap(find.text('Expand'));
+      expect(find.text('Result 13').hitTestable(), findsOneWidget);
+      await tester.ensureVisible(find.byTooltip('Expand'));
+      await tester.tap(find.byTooltip('Expand'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Result 13'));
       await tester.pumpAndSettle();
@@ -221,51 +222,6 @@ root = RadioGroup(label="Mode",bind=$mode,options=[{"value":"a","label":"One\nTw
     expect(find.text('One\nTwo'), findsOneWidget);
     await tester.tap(find.text('Three'));
     expect(c.captureRead().inputs['mode'], 'b');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('clipped field honors native caret and accessibility reveal', (
-    tester,
-  ) async {
-    final editing = TextEditingController(
-      text: 'First\nSecond\nThird\nFourth\nFifth',
-    );
-    addTearDown(editing.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: GenUiInlineViewport(
-              maxHeight: 300,
-              onExpand: () async {},
-              child: Column(
-                children: [
-                  const SizedBox(height: 220),
-                  TextField(controller: editing, minLines: 5, maxLines: 5),
-                  const SizedBox(height: 300),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final inner = tester.state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byType(GenUiInlineViewport),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(inner.position.pixels, 0);
-    final field = tester.renderObject<RenderBox>(find.byType(EditableText));
-    field.showOnScreen(rect: Rect.fromLTWH(0, field.size.height - 10, 2, 10));
-    await tester.pumpAndSettle();
-    expect(inner.position.pixels, greaterThan(0));
     expect(tester.takeException(), isNull);
   });
 

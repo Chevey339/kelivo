@@ -22,6 +22,7 @@ class GenUiViewTabs extends StatefulWidget {
 
 class _GenUiViewTabsState extends State<GenUiViewTabs> {
   final _focus = FocusNode(debugLabel: 'GenUI view tabs');
+  bool _showFocus = false;
   @override
   void dispose() {
     _focus.dispose();
@@ -48,19 +49,22 @@ class _GenUiViewTabsState extends State<GenUiViewTabs> {
   Widget build(BuildContext context) {
     return GenUiControlRegion(
       child: Focus(
-        focusNode: _focus,
-        canRequestFocus: widget.enabled,
+        canRequestFocus: false,
         onKeyEvent: _key,
-        onFocusChange: (_) => setState(() {}),
-        child: GenUiSegments(
-          labels: widget.labels,
-          index: widget.index,
+        child: FocusableActionDetector(
+          focusNode: _focus,
           enabled: widget.enabled,
-          focused: _focus.hasFocus,
-          onChanged: (index) {
-            _focus.requestFocus();
-            widget.onChanged(index);
-          },
+          onShowFocusHighlight: (value) => setState(() => _showFocus = value),
+          child: GenUiSegments(
+            labels: widget.labels,
+            index: widget.index,
+            enabled: widget.enabled,
+            focused: _showFocus,
+            onChanged: (index) {
+              _focus.requestFocus();
+              widget.onChanged(index);
+            },
+          ),
         ),
       ),
     );

@@ -145,7 +145,7 @@ void main() {
     final base = tester.widget<LineChart>(find.byType(LineChart));
     await mouse.moveTo(position);
     await tester.pumpAndSettle();
-    expect(find.text('x: $row\ny: $row'), findsOneWidget);
+    expect(find.text('x: $row · y: $row'), findsOneWidget);
     final marker = find.byKey(const ValueKey('genui-chart-active-marker'));
     expect(marker, findsOneWidget);
     final paint =
@@ -229,11 +229,22 @@ void main() {
       );
       await tester.pumpWidget(_app(c, exporting: true));
       await tester.pumpAndSettle();
-      expect(find.text('Unit: USD'), findsOneWidget);
-      expect(find.bySemanticsLabel('Unit: USD'), findsOneWidget);
+      expect(find.text('USD'), findsOneWidget);
+      expect(find.bySemanticsLabel('USD'), findsOneWidget);
     } finally {
       semantics.dispose();
     }
+  });
+  testWidgets('title words do not hide axis labels or units in exports', (
+    tester,
+  ) async {
+    final c = _controller(
+      'root = Chart(kind="line",title="Commuting distance",yLabel="distance",unit="m",x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])',
+      readOnly: true,
+    );
+    await tester.pumpWidget(_app(c, exporting: true));
+    await tester.pumpAndSettle();
+    expect(find.text('distance · m'), findsOneWidget);
   });
   testWidgets(
     'changing from Cartesian to pie clears selection before real pie hits',
@@ -297,14 +308,14 @@ root = Chart(kind=$kind,x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])''');
       await tester.pumpAndSettle();
       await tester.tapAt(_linePoint(tester, 1, 0));
       await tester.pumpAndSettle();
-      expect(find.text('x: 2\nA: 3 u\nB: —'), findsOneWidget);
+      expect(find.text('x: 2 · A: 3 u · B: —'), findsOneWidget);
       final data = tester.widget<LineChart>(find.byType(LineChart)).data;
       expect(data.lineBarsData[0].color!.a, 1);
       expect(data.lineBarsData[1].color!.a, closeTo(.35, .01));
       expect(data.lineBarsData[1].spots[1], FlSpot.nullSpot);
       await tester.pumpWidget(_app(c, dark: true, rtl: true, scale: 1.3));
       await tester.pumpAndSettle();
-      expect(find.text('x: 2\nA: 3 u\nB: —'), findsOneWidget);
+      expect(find.text('x: 2 · A: 3 u · B: —'), findsOneWidget);
       expect(
         _linePoint(tester, 0, 0).dx,
         lessThan(_linePoint(tester, 2, 0).dx),
@@ -374,7 +385,7 @@ root = Chart(kind=$kind,x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])''');
     await tester.pumpAndSettle();
     await tester.tapAt(_scatterPoint(tester, 0));
     await tester.pumpAndSettle();
-    expect(find.text('x: 0\nA: 0'), findsOneWidget);
+    expect(find.text('x: 0 · A: 0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   testWidgets(
@@ -408,7 +419,7 @@ root = Chart(kind=$kind,x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])''');
         _scatterPoint(tester, 1) + Offset(0, negative.baselineDelta / 2),
       );
       await tester.pumpAndSettle();
-      expect(find.text('x: 0\nA: 3\nB: -2\nC: 1\nD: 0'), findsOneWidget);
+      expect(find.text('x: 0 · A: 3 · B: -2 · C: 1 · D: 0'), findsOneWidget);
       final selected = tester
           .widget<ScatterChart>(find.byType(ScatterChart))
           .data;
@@ -438,7 +449,7 @@ root = Chart(kind=$kind,x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])''');
       );
       await tester.tapAt(_scatterPoint(tester, 0));
       await tester.pumpAndSettle();
-      expect(find.text('x: 0\nA: 2\nB: 2'), findsOneWidget);
+      expect(find.text('x: 0 · A: 2 · B: 2'), findsOneWidget);
       final snapshot = c.captureSnapshot();
       final reopened = _controller(
         c.parsed.source.substring(UiCatalog.header.length + 1).trimRight(),
@@ -480,10 +491,10 @@ root = Chart(kind=$kind,x="x",y=["y"],data=[{"x":0,"y":2},{"x":1,"y":3}])''');
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
-      expect(find.text('x: 1\nA: —'), findsOneWidget);
+      expect(find.text('x: 1 · A: —'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.end);
       await tester.pumpAndSettle();
-      expect(find.text('x: 2\nA: 3'), findsOneWidget);
+      expect(find.text('x: 2 · A: 3'), findsOneWidget);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(
@@ -576,7 +587,7 @@ root = Chart(kind=$kind,x="x",y=["A"],data=[{"x":0,"A":1},{"x":2,"A":3}])''');
       );
       await tester.tapAt(_scatterPoint(tester, 1));
       await tester.pumpAndSettle();
-      expect(find.text('x: 2\nA: 3'), findsOneWidget);
+      expect(find.text('x: 2 · A: 3'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

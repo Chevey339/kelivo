@@ -18,6 +18,7 @@ final class UiChartAxis {
     Iterable<double> values, {
     bool includeZero = false,
     bool padGroups = false,
+    bool niceTicks = false,
   }) {
     final numbers = [...values, if (includeZero) 0.0];
     final low = numbers.isEmpty ? 0.0 : numbers.reduce(math.min);
@@ -26,7 +27,38 @@ final class UiChartAxis {
     final magnitude = math.max(low.abs(), high.abs());
     // A narrow same-sign range must subtract its origin first. Dividing two
     // adjacent large values separately would distort their relative spacing.
-    _origin = span.isFinite ? low : 0;
+    // Ordinary Y axes use readable ticks (0, 50, 100 rather than 0, 46.17,
+    // 92.34). Keep the normalized precision path for extreme/narrow ranges.
+    double? niceLow, niceHigh, niceStep;
+    if (niceTicks &&
+        span.isFinite &&
+        span / 4 > 0 &&
+        span > magnitude * 1e-10) {
+      final rough = span / 4;
+      final power = math
+          .pow(10.0, (math.log(rough) / math.ln10).floor())
+          .toDouble();
+      if (power.isFinite && power > 0) {
+        final part = rough / power;
+        final step =
+            (part <= 1
+                ? 1
+                : part <= 2
+                ? 2
+                : part <= 5
+                ? 5
+                : 10) *
+            power;
+        final a = (low / step).floorToDouble() * step;
+        final b = (high / step).ceilToDouble() * step;
+        if (a.isFinite && b.isFinite && (b - a).isFinite && a < b) {
+          niceLow = a;
+          niceHigh = b;
+          niceStep = step;
+        }
+      }
+    }
+    _origin = niceLow ?? (span.isFinite ? low : 0);
     factor = span.isFinite && span > 0
         ? span
         : (magnitude == 0 ? 1 : magnitude);
@@ -42,8 +74,9 @@ final class UiChartAxis {
       padding = math.max(padding, gap / 2);
       groupGap = gap;
     }
-    minimum = start - padding;
-    maximum = end + padding;
+    minimum = niceLow == null ? start - padding : coordinate(niceLow) - padding;
+    maximum = niceHigh == null ? end + padding : coordinate(niceHigh) + padding;
+    tickInterval = niceStep == null ? null : niceStep / factor;
     groupSpacing = groupGap == null
         ? null
         : groupGap > 0
@@ -54,6 +87,7 @@ final class UiChartAxis {
 
   /// Cached for grouped bars; pointer hover never re-sorts the source data.
   late final double? groupSpacing;
+  late final double? tickInterval;
   double coordinate(double value) => (value - _origin) / factor;
   double? value(double coordinate) {
     final result = _origin + coordinate * factor;
@@ -204,10 +238,12 @@ final class UiChartData {
     final xAxis = UiChartAxis(
       rows.map((r) => numeric ? (r.x as num).toDouble() : r.index.toDouble()),
       padGroups: kind == UiChartKind.bar,
+      niceTicks: numeric && kind != UiChartKind.bar,
     );
     final yAxis = UiChartAxis(
       rows.expand((r) => r.y).whereType<double>(),
       includeZero: kind == UiChartKind.bar || kind == UiChartKind.area,
+      niceTicks: true,
     );
     final domainRows = <int>{};
     for (final gap in sampleGaps) {

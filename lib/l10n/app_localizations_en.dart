@@ -14272,7 +14272,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get genuiChartDomainGap => 'Undefined in this domain';
+  String get genuiChartDomainGap => 'Undefined';
 
   @override
   String genuiChartDomainSummary(int count) {
@@ -14524,4 +14524,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get genuiWebCloseFailed =>
       'Couldn\'t confirm the previous preview closed. Restart the app before opening another.';
+
+  @override
+  String get displaySettingsShowGenUiHeader => 'Show interactive UI title bar';
+
+  @override
+  String get displaySettingsShowGenUiHeaderSubtitle =>
+      'Hide for a cleaner message. Source and actions remain in the menu below the UI.';
+
+  @override
+  String get genuiClearFilter => 'Clear filter';
+
+  @override
+  String get genuiClearSelection => 'Clear selection';
 }

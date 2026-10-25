@@ -294,6 +294,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
       'display_enable_reasoning_markdown_v1';
+  static const String _displayShowGenUiHeaderKey =
+      'display_show_genui_header_v1';
   static const String _displayEnableAssistantMarkdownKey =
       'display_enable_assistant_markdown_v1';
   static const String _displayShowChatListDateKey =
@@ -1145,6 +1147,7 @@ class SettingsProvider extends ChangeNotifier {
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
+    _showGenUiHeader = prefs.getBool(_displayShowGenUiHeaderKey) ?? true;
     _enableAssistantMarkdown =
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
@@ -5175,6 +5178,16 @@ Requirements:
     await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
   }
 
+  // Presentation only: changing chrome must preserve surface input state.
+  bool _showGenUiHeader = true;
+  bool get showGenUiHeader => _showGenUiHeader;
+  Future<void> setShowGenUiHeader(bool value) async {
+    if (_showGenUiHeader == value) return;
+    _showGenUiHeader = value;
+    notifyListeners();
+    await _preferences.setBool(_displayShowGenUiHeaderKey, value);
+  }
+
   // Display: render assistant messages with Markdown
   bool _enableAssistantMarkdown = true;
   bool get enableAssistantMarkdown => _enableAssistantMarkdown;
@@ -5874,6 +5887,7 @@ Requirements:
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;
+    copy._showGenUiHeader = _showGenUiHeader;
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;
     copy._autoCollapseCodeBlockLines = _autoCollapseCodeBlockLines;

@@ -8,10 +8,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
-import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import '../catalog/ui_budgets.dart';
-import 'genui_control_region.dart';
 import 'genui_surface.dart';
 import 'genui_theme.dart';
 
@@ -184,13 +182,9 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
     child: Builder(
       builder: (context) {
         if (_expanded) return const GenUiExpandedStub();
-        return GenUiInlineViewport(
-          maxHeight: ResponsiveHelper.isMobile(context)
-              ? MediaQuery.sizeOf(context).height * 1.4
-              : 900,
-          onExpand: _expand,
-          child: widget.surfaceBuilder(_expand, _expandFocus, false),
-        );
+        // The message timeline owns vertical scrolling. A native surface is
+        // laid out in full, so focus and gestures never enter a clipped viewport.
+        return widget.surfaceBuilder(_expand, _expandFocus, false);
       },
     ),
   );
@@ -283,98 +277,6 @@ class _ExpandedSurface extends StatelessWidget {
             ),
     );
   }
-}
-
-/// A clipped preview, never a second vertical gesture target in the message.
-/// The expanded route owns scrolling through the complete control tree.
-class GenUiInlineViewport extends StatefulWidget {
-  const GenUiInlineViewport({
-    super.key,
-    required this.maxHeight,
-    required this.onExpand,
-    required this.child,
-  });
-  final double maxHeight;
-  final Future<void> Function() onExpand;
-  final Widget child;
-  @override
-  State<GenUiInlineViewport> createState() => _GenUiInlineViewportState();
-}
-
-class _GenUiInlineViewportState extends State<GenUiInlineViewport> {
-  bool _overflow = false;
-  final _viewportKey = GlobalKey(debugLabel: 'GenUI inline viewport');
-  @override
-  Widget build(BuildContext context) {
-    final theme = GenUiTheme.of(context);
-    final viewport = KeyedSubtree(
-      key: _viewportKey,
-      child: SingleChildScrollView(
-        primary: false,
-        physics: const _InlinePreviewPhysics(),
-        child: widget.child,
-      ),
-    );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: widget.maxHeight - (_overflow ? 44 : 0),
-          ),
-          child: NotificationListener<ScrollMetricsNotification>(
-            onNotification: (notification) {
-              if (notification.depth != 0 ||
-                  notification.metrics.axis != Axis.vertical) {
-                return false;
-              }
-              final overflow =
-                  notification.metrics.maxScrollExtent +
-                      notification.metrics.viewportDimension >
-                  widget.maxHeight + .5;
-              if (_overflow != overflow) setState(() => _overflow = overflow);
-              return false;
-            },
-            child: _overflow
-                ? ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    shaderCallback: (rect) => LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        theme.ink,
-                        theme.ink,
-                        _overflow ? theme.transparent : theme.ink,
-                      ],
-                      stops: const [0, .92, 1],
-                    ).createShader(rect),
-                    child: viewport,
-                  )
-                : viewport,
-          ),
-        ),
-        if (_overflow)
-          GenUiControlRegion(
-            child: IosTextButton(
-              label: AppLocalizations.of(context)!.genuiExpand,
-              icon: LucideIcons.expand,
-              onPressed: widget.onExpand,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// User drags belong to the message, but caret/accessibility showOnScreen and
-// keyboard traversal must still be able to reveal a partly clipped field.
-class _InlinePreviewPhysics extends NeverScrollableScrollPhysics {
-  const _InlinePreviewPhysics({super.parent});
-  @override
-  bool get allowImplicitScrolling => true;
-  @override
-  _InlinePreviewPhysics applyTo(ScrollPhysics? ancestor) =>
-      _InlinePreviewPhysics(parent: buildParent(ancestor));
 }
 
 class _GenUiPageRoute extends CupertinoPageRoute<void> {
