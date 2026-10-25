@@ -49,6 +49,7 @@ final class RestoreBundlePreparation {
     required bool restoreFiles,
     BackupScope scope = const BackupScope(),
     bool useExistingLocalAttachments = false,
+    Directory? filesDirectory,
     DateTime? createdAtUtc,
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
@@ -83,6 +84,7 @@ final class RestoreBundlePreparation {
         sourceManifestSha256: sourceManifestSha256,
         validatedSettings: validatedSettings,
         useExistingLocalAttachments: useExistingLocalAttachments,
+        filesDirectory: filesDirectory,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );

@@ -39,7 +39,12 @@ AssistantToolHistory buildAssistantToolHistory(List<MessagePart> parts) {
                     ? tool['arguments']
                     : jsonEncode(tool['arguments'] ?? {}),
               },
-              if (tool['metadata'] != null) 'metadata': tool['metadata'],
+              if (tool['metadata'] is Map || tool['server'] == true)
+                'metadata': {
+                  if (tool['metadata'] is Map)
+                    ...(tool['metadata'] as Map).cast<String, dynamic>(),
+                  if (tool['server'] == true) 'server': true,
+                },
             },
         ],
       });

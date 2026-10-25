@@ -7,6 +7,7 @@ import '../storage/device_storage_probe.dart';
 import 'local_snapshot_retention.dart';
 import 'local_snapshot_schedule.dart';
 import 'restore_durability.dart';
+import '../../../utils/app_directories.dart';
 
 /// Why a local copy exists. Shown to the user, and consulted by pruning.
 enum LocalSnapshotOrigin {
@@ -59,7 +60,7 @@ final class LocalSnapshotEntry {
   );
 }
 
-/// Owns `<appData>/snapshots/`.
+/// Owns the public `Documents/snapshots/` on iOS, `<appData>/snapshots/` elsewhere.
 ///
 /// Publishing is write-then-rename, and pruning only ever runs after the new
 /// copy is durable and readable: the whole point of the directory is to hold
@@ -76,15 +77,17 @@ final class LocalSnapshotStore {
 
   static const _metadataVersion = 1;
 
-  Directory get directory => LocalSnapshotPaths.directoryIn(appDataDirectory);
+  Future<Directory> get directory async => LocalSnapshotPaths.directoryIn(
+    await AppDirectories.contentDirectoryFor(appDataDirectory),
+  );
 
   Future<Directory> ensureDirectory() async {
-    final target = directory;
+    final target = await directory;
     if (await FileSystemEntity.type(target.path, followLinks: false) !=
         FileSystemEntityType.directory) {
       await target.create(recursive: true);
       await durability.restrictDirectory(target);
-      await durability.syncDirectory(appDataDirectory);
+      await durability.syncDirectory(target.parent);
     }
     // Re-applied rather than set once at creation: a directory that predates
     // this call -- or that a restore recreated -- must not silently start
@@ -94,7 +97,7 @@ final class LocalSnapshotStore {
   }
 
   Future<List<LocalSnapshotEntry>> list() async {
-    final target = directory;
+    final target = await directory;
     if (await FileSystemEntity.type(target.path, followLinks: false) !=
         FileSystemEntityType.directory) {
       return const <LocalSnapshotEntry>[];
@@ -180,7 +183,7 @@ final class LocalSnapshotStore {
       );
     } catch (_) {
       await _deleteQuietly(staged);
-      await _deleteQuietly(_metadataFileFor(fileName));
+      await _deleteQuietly(await _metadataFileFor(fileName));
       rethrow;
     }
   }
@@ -189,10 +192,10 @@ final class LocalSnapshotStore {
     if (LocalSnapshotPaths.createdAtFromFileName(id) == null) {
       throw ArgumentError.value(id, 'id');
     }
-    final archive = File(p.join(directory.path, id));
+    final archive = File(p.join((await directory).path, id));
     // Metadata first: a sidecar left beside a missing archive is invisible to
     // [list], so failing the other way round would strand it forever.
-    await _deleteQuietly(_metadataFileFor(id));
+    await _deleteQuietly(await _metadataFileFor(id));
     await _deleteQuietly(archive);
     if (await FileSystemEntity.type(archive.path, followLinks: false) !=
         FileSystemEntityType.notFound) {
@@ -251,7 +254,7 @@ final class LocalSnapshotStore {
   /// the rename, so a crash in that window leaves one behind that [list] can
   /// never see and therefore never clean up.
   Future<void> sweepIncomplete() async {
-    final target = directory;
+    final target = await directory;
     if (await FileSystemEntity.type(target.path, followLinks: false) !=
         FileSystemEntityType.directory) {
       return;
@@ -279,8 +282,11 @@ final class LocalSnapshotStore {
     }
   }
 
-  File _metadataFileFor(String fileName) => File(
-    p.join(directory.path, '$fileName${LocalSnapshotPaths.metadataSuffix}'),
+  Future<File> _metadataFileFor(String fileName) async => File(
+    p.join(
+      (await directory).path,
+      '$fileName${LocalSnapshotPaths.metadataSuffix}',
+    ),
   );
 
   Future<void> _writeMetadata({
@@ -293,7 +299,7 @@ final class LocalSnapshotStore {
     required int messageCount,
     String? appVersion,
   }) async {
-    final file = _metadataFileFor(fileName);
+    final file = await _metadataFileFor(fileName);
     await file.writeAsString(
       jsonEncode({
         'version': _metadataVersion,
@@ -327,7 +333,7 @@ final class LocalSnapshotStore {
 
     Map<String, dynamic>? metadata;
     try {
-      final sidecar = _metadataFileFor(p.basename(file.path));
+      final sidecar = await _metadataFileFor(p.basename(file.path));
       if (await sidecar.exists()) {
         final decoded = jsonDecode(await sidecar.readAsString());
         if (decoded is Map<String, dynamic>) metadata = decoded;

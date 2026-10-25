@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -45,13 +46,19 @@ Widget _buildHarness({
   );
 }
 
-void expectAbove(WidgetTester tester, Finder upper, Finder lower) {
-  expect(upper, findsWidgets);
-  expect(lower, findsWidgets);
-  expect(
-    tester.getTopLeft(upper.first).dy,
-    lessThan(tester.getTopLeft(lower.first).dy),
-  );
+void expectAbove(WidgetTester tester, Object upper, Object lower) {
+  double top(Object item) {
+    if (item is String) {
+      final paragraphs = renderedParagraphsWith(item);
+      expect(paragraphs, isNotEmpty, reason: item);
+      return paragraphs.first.localToGlobal(Offset.zero).dy;
+    }
+    final finder = item as Finder;
+    expect(finder, findsWidgets);
+    return tester.getTopLeft(finder.first).dy;
+  }
+
+  expect(top(upper), lessThan(top(lower)));
 }
 
 void main() {
@@ -154,33 +161,57 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('FIRST_THOUGHT'), findsNothing);
-        expect(find.text('SECOND_THOUGHT'), findsNothing);
+        expect(renderedParagraphsWith('FIRST_THOUGHT', exact: true), isEmpty);
+        expect(renderedParagraphsWith('SECOND_THOUGHT', exact: true), isEmpty);
         final thoughts = find.text('Deep Thinking');
         expect(thoughts, findsNWidgets(2));
-        final before = tester.getTopLeft(find.text('FINAL_REPLY')).dy;
+        final before = markdownParagraph(
+          tester,
+          'FINAL_REPLY',
+        ).localToGlobal(Offset.zero).dy;
         await tester.tap(thoughts.last);
         await tester.pumpAndSettle();
-        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
         expect(
-          tester.getTopLeft(find.text('FINAL_REPLY')).dy,
+          renderedParagraphsWith('SECOND_THOUGHT', exact: true),
+          hasLength(1),
+        );
+        expect(
+          markdownParagraph(
+            tester,
+            'FINAL_REPLY',
+          ).localToGlobal(Offset.zero).dy,
           greaterThan(before),
         );
         // A parent update must not undo the second segment's local toggle.
         rebuild(() => reply = 'UPDATED_REPLY');
         await tester.pumpAndSettle();
-        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
+        expect(
+          renderedParagraphsWith('SECOND_THOUGHT', exact: true),
+          hasLength(1),
+        );
         await tester.tap(thoughts.last);
         await tester.pumpAndSettle();
-        expect(find.text('SECOND_THOUGHT'), findsNothing);
-        expect(tester.getTopLeft(find.text('UPDATED_REPLY')).dy, before);
+        expect(renderedParagraphsWith('SECOND_THOUGHT', exact: true), isEmpty);
+        expect(
+          markdownParagraph(
+            tester,
+            'UPDATED_REPLY',
+          ).localToGlobal(Offset.zero).dy,
+          before,
+        );
         await tester.tap(thoughts.first);
         await tester.pumpAndSettle();
-        expect(find.text('FIRST_THOUGHT'), findsOneWidget);
-        expect(find.text('SECOND_THOUGHT'), findsNothing);
+        expect(
+          renderedParagraphsWith('FIRST_THOUGHT', exact: true),
+          hasLength(1),
+        );
+        expect(renderedParagraphsWith('SECOND_THOUGHT', exact: true), isEmpty);
         await tester.tap(thoughts.last);
         await tester.pumpAndSettle();
-        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
+        expect(
+          renderedParagraphsWith('SECOND_THOUGHT', exact: true),
+          hasLength(1),
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -210,11 +241,7 @@ void main() {
     );
     await tester.pump();
 
-    expectAbove(
-      tester,
-      find.textContaining('plan'),
-      find.textContaining('hello'),
-    );
+    expectAbove(tester, 'plan', 'hello');
   });
 
   testWidgets('historical interleaved splits keep text around thinking', (
@@ -241,16 +268,8 @@ void main() {
     );
     await tester.pump();
 
-    expectAbove(
-      tester,
-      find.textContaining('before'),
-      find.textContaining('plan'),
-    );
-    expectAbove(
-      tester,
-      find.textContaining('plan'),
-      find.textContaining('AFTER'),
-    );
+    expectAbove(tester, 'before', 'plan');
+    expectAbove(tester, 'plan', 'AFTER');
   });
 
   testWidgets(
@@ -279,11 +298,7 @@ void main() {
       );
       await tester.pump();
 
-      expectAbove(
-        tester,
-        find.textContaining('lookup'),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, 'lookup', 'BODY_HELLO');
     },
   );
 
@@ -318,11 +333,7 @@ void main() {
         ),
         findsNothing,
       );
-      expectAbove(
-        tester,
-        find.byType(Image),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, find.byType(Image), 'BODY_HELLO');
     },
   );
 
@@ -350,25 +361,13 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('plan'), findsNothing);
+    expect(renderedParagraphsWith('plan', exact: true), isEmpty);
     await tester.tap(find.text('Deep Thinking'));
     await tester.pumpAndSettle();
 
-    expectAbove(
-      tester,
-      find.textContaining('plan'),
-      find.textContaining('hello'),
-    );
-    expectAbove(
-      tester,
-      find.textContaining('hello'),
-      find.textContaining('lookup'),
-    );
-    expectAbove(
-      tester,
-      find.textContaining('lookup'),
-      find.textContaining('done'),
-    );
+    expectAbove(tester, 'plan', 'hello');
+    expectAbove(tester, 'hello', 'lookup');
+    expectAbove(tester, 'lookup', 'done');
   });
 
   testWidgets(
@@ -399,11 +398,7 @@ void main() {
       );
       await tester.pump();
 
-      expectAbove(
-        tester,
-        find.textContaining('THINK_PLAN'),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, 'THINK_PLAN', 'BODY_HELLO');
     },
   );
 
@@ -426,15 +421,11 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('THINK_PLAN'), findsNothing);
+    expect(renderedParagraphsWith('THINK_PLAN', exact: true), isEmpty);
     await tester.tap(find.text('Deep Thinking'));
     await tester.pumpAndSettle();
 
-    expectAbove(
-      tester,
-      find.textContaining('THINK_PLAN'),
-      find.textContaining('BODY_HELLO'),
-    );
+    expectAbove(tester, 'THINK_PLAN', 'BODY_HELLO');
   });
 
   String toolNameAt(int index, int count) {
@@ -492,11 +483,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expectAbove(
-      tester,
-      find.textContaining('omega_search'),
-      find.textContaining('BODY_HELLO'),
-    );
+    expectAbove(tester, 'omega_search', 'BODY_HELLO');
   });
 
   testWidgets('incomplete 24-tool splits keep leftover cards above the body', (
@@ -529,11 +516,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expectAbove(
-      tester,
-      find.textContaining('omega_search'),
-      find.textContaining('BODY_HELLO'),
-    );
+    expectAbove(tester, 'omega_search', 'BODY_HELLO');
   });
 
   testWidgets(
@@ -566,11 +549,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expectAbove(
-        tester,
-        find.textContaining('omega_search'),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, 'omega_search', 'BODY_HELLO');
     },
   );
 
@@ -597,11 +576,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expectAbove(
-      tester,
-      find.textContaining('plan'),
-      find.textContaining('hello'),
-    );
+    expectAbove(tester, 'plan', 'hello');
   });
 
   testWidgets(
@@ -628,16 +603,8 @@ void main() {
         ),
       );
       await tester.pump();
-      expectAbove(
-        tester,
-        find.textContaining('before'),
-        find.textContaining('plan'),
-      );
-      expectAbove(
-        tester,
-        find.textContaining('omega_search'),
-        find.textContaining('AFTER'),
-      );
+      expectAbove(tester, 'before', 'plan');
+      expectAbove(tester, 'omega_search', 'AFTER');
     },
   );
 
@@ -669,14 +636,10 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('THINK_PLAN'), findsNothing);
+      expect(renderedParagraphsWith('THINK_PLAN', exact: true), isEmpty);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expectAbove(
-        tester,
-        find.textContaining('THINK_PLAN'),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, 'THINK_PLAN', 'BODY_HELLO');
     }
 
     await pumpIllegal(
@@ -767,11 +730,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expectAbove(
-        tester,
-        find.textContaining('THINK_PLAN'),
-        find.textContaining('BODY_HELLO'),
-      );
+      expectAbove(tester, 'THINK_PLAN', 'BODY_HELLO');
       reader.dispose();
     }
     writer.dispose();
@@ -797,13 +756,13 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.textContaining('first thought'), findsNothing);
+    expect(renderedParagraphsWith('first thought', exact: false), isEmpty);
     await tester.tap(find.text('Deep Thinking'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('first thought'), findsWidgets);
-    expect(find.textContaining('second thought'), findsWidgets);
-    expect(find.textContaining('Because.'), findsWidgets);
+    expect(renderedParagraphsWith('first thought', exact: false), isNotEmpty);
+    expect(renderedParagraphsWith('second thought', exact: false), isNotEmpty);
+    expect(renderedParagraphsWith('Because.', exact: false), isNotEmpty);
   });
 
   testWidgets(
@@ -827,13 +786,13 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.textContaining('think'), findsNothing);
+      expect(renderedParagraphsWith('think', exact: false), isEmpty);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('think'), findsWidgets);
-      expect(find.textContaining('before'), findsWidgets);
-      expect(find.textContaining('after'), findsWidgets);
+      expect(renderedParagraphsWith('think', exact: false), isNotEmpty);
+      expect(renderedParagraphsWith('before', exact: false), isNotEmpty);
+      expect(renderedParagraphsWith('after', exact: false), isNotEmpty);
     },
   );
 
@@ -920,11 +879,7 @@ void main() {
       find.descendant(of: attachmentsFinder, matching: find.byType(Image)),
       findsOneWidget,
     );
-    expectAbove(
-      tester,
-      find.textContaining('plan'),
-      find.textContaining('caption'),
-    );
+    expectAbove(tester, 'plan', 'caption');
   });
 
   testWidgets('standalone builtin_search historical message stays visible', (
@@ -946,7 +901,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.textContaining('Built-in Search'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('Built-in Search', exact: false),
+      hasLength(1),
+    );
     expect(
       tester.getSize(find.byType(ChatMessageWidget)).height,
       greaterThan(20),

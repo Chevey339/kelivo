@@ -12,6 +12,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../builtin_tools.dart';
 import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -272,6 +273,9 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   final requiresSignedReasoning =
       upstreamModelId.contains('claude') ||
       upstreamModelId.startsWith('anthropic/');
+  final prefersStructuredReasoning =
+      replayField == ReasoningReplayField.reasoningDetails ||
+      BuiltInToolsHelper.isOpenRouterProvider(nativeInputs.config);
   // Assistant turns cannot carry image_url/video_url; stash for the last user
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
@@ -372,29 +376,60 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           reasoningReplay == ReasoningReplayPolicy.all ||
           (reasoningReplay == ReasoningReplayPolicy.toolTurns &&
               toolTurnIds.contains(messageTurnIds[i]));
+      final details = keepReplay
+          ? normalizeReasoningDetailsForReplay(rawDetails)
+          : null;
+      final field = replayField.wireName;
+      Object? replayValue;
+      for (final key in [field, 'reasoning_content', 'reasoning']) {
+        final value = outMsg[key];
+        replayValue ??= value;
+        if (value is String && value.isNotEmpty) {
+          replayValue = value;
+          break;
+        }
+      }
+      // Plain history imported from another endpoint must still use the
+      // target's scalar field (e.g. native DeepSeek). An empty tool echo is
+      // not a replacement for details, and signed/opaque blocks stay intact.
+      final replayAsText =
+          !prefersStructuredReasoning &&
+          !signedDetails &&
+          replayValue is String &&
+          replayValue.isNotEmpty &&
+          details != null &&
+          details.every(
+            (entry) =>
+                entry['type'] == null ||
+                entry['type'] == 'reasoning.text' ||
+                entry['type'] == 'reasoning.summary',
+          );
       if (!keepReplay) {
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
         outMsg.remove('reasoning_details');
-      } else if (signedDetails) {
+      } else if (details != null && !replayAsText) {
+        // Structured reasoning is the complete replay representation. Sending
+        // its parallel plain text echo as well can duplicate the same thought.
+        outMsg['reasoning_details'] = details;
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
-        // Signed / Anthropic-tagged fragments must be rebuilt into whole
-        // blocks; other vendors replay the sequence verbatim.
-        final details = normalizeReasoningDetailsForReplay(rawDetails);
-        if (details == null) {
+      } else {
+        // An explicitly empty array can mark a non-thinking response. It has
+        // no duplicated prose, so retain it for providers that replay it.
+        if (rawDetails is! List || rawDetails.isNotEmpty) {
           outMsg.remove('reasoning_details');
-        } else {
-          outMsg['reasoning_details'] = details;
         }
-      } else if (replayField != ReasoningReplayField.reasoningDetails) {
-        final field = replayField.wireName;
-        final value =
-            outMsg[field] ?? outMsg['reasoning_content'] ?? outMsg['reasoning'];
-        outMsg.remove('reasoning_content');
-        outMsg.remove('reasoning');
-        if (value != null) {
-          outMsg[field] = value;
+        if (signedDetails) {
+          outMsg.remove('reasoning_details');
+          outMsg.remove('reasoning_content');
+          outMsg.remove('reasoning');
+        } else if (replayField != ReasoningReplayField.reasoningDetails) {
+          outMsg.remove('reasoning_content');
+          outMsg.remove('reasoning');
+          if (replayValue != null) {
+            outMsg[field] = replayValue;
+          }
         }
       }
     }
@@ -1036,7 +1071,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       ids: ids,
       content: visible.content,
       reasoning: openaiReasoningText(message),
-      reasoningDetails: message?['reasoning_details'],
+      reasoningDetails: mergeReasoningDetails(message?['reasoning_details']),
     );
     yield* emitImages(visible.images, ids: ids);
   }
@@ -1044,8 +1079,9 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   yield* emitToolRoundOutput();
 
   yield* runClientToolFollowUps(
-    reasoningDetailsOf: () =>
-        openaiFirstChoiceMessage(lastObj)?['reasoning_details'],
+    reasoningDetailsOf: () => mergeReasoningDetails(
+      openaiFirstChoiceMessage(lastObj)?['reasoning_details'],
+    ),
     initialCalls: initialCalls,
     onToolCall: onToolCall,
     emitCalls: true,
@@ -1144,7 +1180,9 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         ids: ids,
         content: visible.content,
         reasoning: openaiReasoningText(lastMessage),
-        reasoningDetails: lastMessage?['reasoning_details'],
+        reasoningDetails: mergeReasoningDetails(
+          lastMessage?['reasoning_details'],
+        ),
         usage: usage,
         totalTokens: usage?.totalTokens ?? 0,
         finishReason: (choice['finish_reason'] ?? '').toString().isEmpty

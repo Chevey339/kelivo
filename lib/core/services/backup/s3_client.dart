@@ -641,7 +641,9 @@ class S3BackupClient {
         .map((e) => e.cast<String, dynamic>())
         .where((e) {
           final key = (e['key'] as String?)?.trim() ?? '';
-          return key.isNotEmpty && key.toLowerCase().endsWith('.zip');
+          return key.isNotEmpty &&
+              (key.toLowerCase().endsWith('.zip') ||
+                  key.toLowerCase().endsWith('.kbackup'));
         })
         .map((e) => _itemFromManifestEntry(cfg, e))
         .toList();
@@ -759,7 +761,10 @@ class S3BackupClient {
         final size = int.tryParse(sizeStr.trim()) ?? 0;
         final mtime = _parseDateTime(mtimeStr);
         final name = _displayNameFromKey(key);
-        if (!name.toLowerCase().endsWith('.zip')) continue;
+        if (!name.toLowerCase().endsWith('.zip') &&
+            !name.toLowerCase().endsWith('.kbackup')) {
+          continue;
+        }
 
         items.add(
           BackupFileItem(
@@ -932,7 +937,11 @@ class S3BackupClient {
       cfg,
       method: 'PUT',
       uri: uri,
-      headers: {'content-type': 'application/zip'},
+      headers: {
+        'content-type': key.toLowerCase().endsWith('.kbackup')
+            ? 'application/octet-stream'
+            : 'application/zip',
+      },
       bodyBytes: bytes,
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -964,7 +973,11 @@ class S3BackupClient {
         method: 'PUT',
         uri: uri,
         bodyFile: file,
-        headers: {'content-type': 'application/zip'},
+        headers: {
+          'content-type': key.toLowerCase().endsWith('.kbackup')
+              ? 'application/octet-stream'
+              : 'application/zip',
+        },
         onProgress: onProgress,
         cancelToken: cancelToken,
       );

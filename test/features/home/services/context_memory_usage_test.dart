@@ -59,8 +59,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     await repository.updateConversationExtras(id, update);
     conversations[id] = (await repository.getConversation(id))!;
     revisions[id] = contextRevision(id) + 1;

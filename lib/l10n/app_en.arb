@@ -6,7 +6,13 @@
   "settingsSearchNoResults": "No settings found",
   "settingsSearchNoResultsHint": "Try a different name or a shorter keyword.",
   "settingsSearchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
-  "@settingsSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
+  "@settingsSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "helloWorld": "Hello World!",
   "settingsPageBackButton": "Back",
   "settingsPageTitle": "Settings",
@@ -687,6 +693,9 @@
   "restartAppFailedMessage": "Kelivo could not restart automatically. Fully close it, then open it again.",
   "backupRestoreRolledBackTitle": "Restore was rolled back",
   "backupRestoreRolledBackContent": "The restore could not be completed. Kelivo verified and kept your previous data.",
+  "backupRestoreDirectoryBlockedTitle": "Restore is waiting for a folder",
+  "backupRestoreDirectoryBlockedContent": "Windows could not move the folder below. Close terminals, editors, or other programs using it, then continue restoring. If it is still blocked, check that your account can move the folder. Your restore progress has been kept.",
+  "backupRestoreContinueButton": "Continue restore",
   "backupRestoreFailureTitle": "Restore requires attention",
   "backupRestoreFailureContent": "Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.",
   "backupRestoreBusinessLeaseUnavailableTitle": "Kelivo is already running",
@@ -717,10 +726,10 @@
   "startupRecoveryBusy": "Working…",
   "startupRecoveryExportSucceeded": "A copy of your data was saved.",
   "startupRecoveryExportFailed": "Could not export a copy of your data.",
-  "startupRecoveryRepairFailed": "Repair could not fix this. Export a copy of your data, then reset.",
+  "startupRecoveryRepairFailed": "Repair could not complete. Your data is preserved; choose a validated copy or export your data for further diagnosis.",
   "startupRecoveryResetFailed": "Reset failed. Fully close Kelivo, then open it again.",
   "startupRecoveryResetDialogTitle": "Reset all data?",
-  "startupRecoveryResetDialogContent": "This permanently deletes Kelivo's database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.",
+  "startupRecoveryResetDialogContent": "Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.",
   "startupRecoveryResetDialogConfirm": "Reset and restart",
   "startupRecoveryResetDialogCancel": "Cancel",
   "startupRecoveryWhatFailed": "What failed",
@@ -791,8 +800,8 @@
   "startupRecoveryIntegrityMissing": "No database file was found in the data folder.",
   "startupRecoveryIntegrityFailed": "The integrity check could not run.",
   "startupRecoveryDangerZone": "Danger zone",
-  "startupRecoveryDangerBody": "Resetting permanently deletes Kelivo's database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.",
-  "startupRecoveryResetAcknowledge": "I exported a copy, or I do not need this data.",
+  "startupRecoveryDangerBody": "A fresh start removes the current data from view. Kelivo will preserve the old database and existing copies for recovery. Export a data copy first if possible.",
+  "startupRecoveryResetAcknowledge": "I want to start with a new empty database.",
   "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
   "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
   "startupDatabaseUpdateRequiredDowngradeTitle": "If you need an older version",
@@ -837,8 +846,12 @@
   "backupPageForwardCompatBody": "This backup was created by a newer version of Kelivo (data format {backupVersion}; this version supports {currentVersion}), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating Kelivo first is the safer choice.",
   "@backupPageForwardCompatBody": {
     "placeholders": {
-      "backupVersion": { "type": "int" },
-      "currentVersion": { "type": "int" }
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
     }
   },
   "backupPageForwardCompatContinue": "Import anyway",
@@ -1170,7 +1183,9 @@
   "chatMessageWidgetWebFetch": "Read page: {target}",
   "@chatMessageWidgetWebFetch": {
     "placeholders": {
-      "target": { "type": "String" }
+      "target": {
+        "type": "String"
+      }
     }
   },
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
@@ -1617,8 +1632,12 @@
   "backgroundTaskFailed": "{task} failed: {error}",
   "@backgroundTaskFailed": {
     "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
     }
   },
   "defaultModelPageOcrModelSubtitle": "Used for extracting text and descriptions from images",
@@ -2089,13 +2108,17 @@
   "searchServicesPageWebFetchFollowValue": "Follow search · {name}",
   "@searchServicesPageWebFetchFollowValue": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchFollowSubtitle": "Currently {name}",
   "@searchServicesPageWebFetchFollowSubtitle": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchLocal": "Local",
@@ -2166,23 +2189,27 @@
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
   "searchApiKeysPageDescription": "Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.",
-
   "searchApiKeysPagePrimaryBadge": "Primary",
   "searchApiKeysPageBatchHint": "Paste one or more keys — one per line or comma-separated",
   "searchApiKeysPageBatchResult": "Added {added}, skipped {skipped} duplicate(s)",
   "@searchApiKeysPageBatchResult": {
     "placeholders": {
-      "added": { "type": "String" },
-      "skipped": { "type": "String" }
+      "added": {
+        "type": "String"
+      },
+      "skipped": {
+        "type": "String"
+      }
     }
   },
   "searchApiKeysPageAdd": "Add",
   "searchApiKeysPageEmpty": "No keys configured yet.",
   "searchServiceEditorMultiKeyCount": "{count} keys",
-
   "@searchServiceEditorMultiKeyCount": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageTitle": "Account usage",
@@ -2192,26 +2219,36 @@
   "searchServiceEditorUsageRemaining": "{remaining} credits remaining",
   "@searchServiceEditorUsageRemaining": {
     "placeholders": {
-      "remaining": { "type": "String" }
+      "remaining": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageBalance": "Balance: {balance}",
   "@searchServiceEditorUsageBalance": {
     "placeholders": {
-      "balance": { "type": "String" }
+      "balance": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageUsed": "{used} of {limit} credits used",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageFailed": "Could not query usage: {message}",
   "@searchServiceEditorUsageFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestTitle": "Test search",
@@ -2222,7 +2259,9 @@
   "searchServiceEditorTestFailed": "Search failed: {message}",
   "@searchServiceEditorTestFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestModeSearch": "Search",
@@ -2233,14 +2272,20 @@
   "searchServiceEditorTestFetchFailed": "Fetch failed: {message}",
   "@searchServiceEditorTestFetchFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestFetchStats": "{characters} characters · {seconds}s",
   "@searchServiceEditorTestFetchStats": {
     "placeholders": {
-      "characters": { "type": "String" },
-      "seconds": { "type": "String" }
+      "characters": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorResultOpenTooltip": "Open result",
@@ -2249,7 +2294,9 @@
   "searchServiceEditorDeleteMessage": "Delete {provider}? This cannot be undone.",
   "@searchServiceEditorDeleteMessage": {
     "placeholders": {
-      "provider": { "type": "String" }
+      "provider": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorDeleteConfirm": "Delete",
@@ -2335,6 +2382,8 @@
   "displaySettingsPageShowToolCardsSubtitle": "When off, tool-use cards are hidden in chat.",
   "displaySettingsShowReasoningLevelBadge": "Show reasoning level on the button",
   "displaySettingsShowReasoningLevelBadgeSubtitle": "Show the current level next to the reasoning icon in the input bar",
+  "displaySettingsPageIosNativeSelectionMenuTitle": "iOS 26+ native selection menu",
+  "displaySettingsPageIosNativeSelectionMenuSubtitle": "Applies to input and messages. Turn off if menus feel slow.",
   "displaySettingsPageAutoCollapseThinkingTitle": "Auto-collapse Thinking",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "Collapse reasoning after finish",
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",
@@ -2512,14 +2561,26 @@
   "asrServicesModelDownloadingLabel": "Downloading…",
   "asrServicesModelNotDownloadedLabel": "Not downloaded",
   "asrServicesDownloadFailed": "Model download failed: {error}",
-  "@asrServicesDownloadFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@asrServicesDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "asrServicesSystemChecking": "Checking…",
   "asrServicesSystemAvailable": "Available",
   "asrServicesSystemCheckFailed": "System speech recognition is unavailable on this device.",
   "asrServicesMicrophonePermissionDenied": "Microphone permission was not granted.",
   "asrServicesNoSpeechDetected": "No speech was detected.",
   "asrServicesRecognitionFailed": "Speech recognition failed: {error}",
-  "@asrServicesRecognitionFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@asrServicesRecognitionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "ttsServicesPageAddNotImplemented": "Add TTS service not implemented",
   "ttsServicesPageSystemTtsTitle": "System TTS",
   "ttsServicesPageSystemTtsAvailableSubtitle": "Use system built-in TTS",
@@ -2590,8 +2651,12 @@
   "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
   "@ttsServicesValidationSampleRate": {
     "placeholders": {
-      "format": {"type": "String"},
-      "rates": {"type": "String"}
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
     }
   },
   "ttsServicesViewDetailsButton": "View details",
@@ -2839,14 +2904,14 @@
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditLocalToolCalculateTitle": "Calculator",
   "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.",
-   "assistantEditLocalToolScreenTimeTitle": "Screen Time",
-   "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
-   "chatMessageWidgetScreenTimeTotal": "Total screen time",
-   "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
-   "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
-   "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
-   "assistantEditLocalToolCalendarCreateTitle": "Create Event",
-   "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
+  "assistantEditLocalToolScreenTimeTitle": "Screen Time",
+  "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
+  "chatMessageWidgetScreenTimeTotal": "Total screen time",
+  "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
+  "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
+  "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
+  "assistantEditLocalToolCalendarCreateTitle": "Create Event",
+  "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
   "assistantEditLocalToolLocationTitle": "Current Location",
   "assistantEditLocalToolLocationSubtitle": "Read a one-shot location from this device, requires the location permission.",
   "assistantEditLocalToolWeatherTitle": "Weather",
@@ -2856,8 +2921,12 @@
   "assistantEditLocalToolHealthSelectedCount": "{selected}/{total} selected",
   "@assistantEditLocalToolHealthSelectedCount": {
     "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "healthDataSettingsTitle": "Health Data",
@@ -2865,8 +2934,12 @@
   "healthDataSettingsBadge": "{selected}/{total} on",
   "@healthDataSettingsBadge": {
     "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "healthDataSettingsIosReadTitle": "iOS Health Read",
@@ -3221,7 +3294,9 @@
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memorySettingsInjectionMaxItemsCustomButton": "Custom",
@@ -3272,7 +3347,9 @@
   "memoryEntryScopeAssistantNamed": "{name}",
   "@memoryEntryScopeAssistantNamed": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "memoryEntrySourceManual": "Manual",
@@ -3284,7 +3361,9 @@
   "memoryEntryUpdatedAt": "Updated {date}",
   "@memoryEntryUpdatedAt": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "memoryEntryActionEdit": "Edit",
@@ -3299,7 +3378,9 @@
   "memoryEntryBatchDeleteConfirmTitle": "Delete {count} memories?",
   "@memoryEntryBatchDeleteConfirmTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryEntryBatchDeleteConfirmContent": "Selected memories will be permanently deleted.",
@@ -3326,7 +3407,9 @@
   "memoryOrphanBanner": "{count} orphaned assistant memories (assistant deleted)",
   "@memoryOrphanBanner": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrphanCleanupButton": "Clean up",
@@ -3334,7 +3417,9 @@
   "memoryOrphanConfirmContent": "Permanently delete {count} memories whose assistant no longer exists.",
   "@memoryOrphanConfirmContent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeButton": "Organize",
@@ -3344,26 +3429,34 @@
   "memoryOrganizeStatusLast": "Last organized: {when}",
   "@memoryOrganizeStatusLast": {
     "placeholders": {
-      "when": {"type": "String"}
+      "when": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusExtracted": "extracted {count}",
   "@memoryOrganizeStatusExtracted": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeStatusSkipped": "nothing to remember",
   "memoryOrganizeStatusFailed": "Failed: {reason}",
   "@memoryOrganizeStatusFailed": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusSkippedReason": "skipped: {reason}",
   "@memoryOrganizeStatusSkippedReason": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOutcomeTemporaryConversation": "Temporary chats are not saved to memory",
@@ -3395,19 +3488,25 @@
   "memoryOrganizeMinutesAgo": "{n} min ago",
   "@memoryOrganizeMinutesAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeHoursAgo": "{n} h ago",
   "@memoryOrganizeHoursAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeDaysAgo": "{n} d ago",
   "@memoryOrganizeDaysAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryModelMissingNotice": "Select a memory processing model in Settings → Memory first.",
@@ -3440,7 +3539,9 @@
   "legacyMemoryAssistantHeader": "Assistant: {name}",
   "@legacyMemoryAssistantHeader": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "legacyMemorySearchHint": "Search legacy memories",
@@ -3449,7 +3550,9 @@
   "legacyMemoryMigrationSubtitle": "Use a model to classify and clean up {count} legacy memories. The originals stay unchanged.",
   "@legacyMemoryMigrationSubtitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationModel": "Migration model",
@@ -3467,16 +3570,24 @@
   "legacyMemoryMigrationProgress": "{current} of {total}",
   "@legacyMemoryMigrationProgress": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationComplete": "Migration complete",
   "legacyMemoryMigrationResult": "{created} migrated · {skipped} already existed",
   "@legacyMemoryMigrationResult": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationFailed": "Migration stopped. You can retry; memories already saved will be skipped.",
@@ -3491,9 +3602,15 @@
   "legacyMemoryMigrationPartial": "{created} migrated · {skipped} skipped · {failed} failed",
   "@legacyMemoryMigrationPartial": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"},
-      "failed": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationContinue": "Continue migration",
@@ -3503,7 +3620,9 @@
   "legacyMemoryMigrationErrorOther": "Migration failed: {message}",
   "@legacyMemoryMigrationErrorOther": {
     "placeholders": {
-      "message": {"type": "String"}
+      "message": {
+        "type": "String"
+      }
     }
   },
   "legacyMemoryModeTitle": "Use legacy memory",
@@ -3562,7 +3681,9 @@
   "assistantEditOrganizeFrequencyOption": "Every {n}",
   "@assistantEditOrganizeFrequencyOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "assistantEditOrganizeFrequencyCustomButton": "Custom",
@@ -3571,6 +3692,36 @@
   "assistantEditOrganizeFrequencyCustomLabel": "Turns",
   "assistantEditOrganizeFrequencyCustomHint": "1–20",
   "assistantEditOrganizeFrequencyCustomInvalid": "Enter a number between 1 and 20",
+  "worldBookCopyEntries": "Copy to…",
+  "worldBookMoveEntries": "Move to…",
+  "worldBookSelectEntries": "Select entries",
+  "worldBookSelectedEntries": "{count} selected",
+  "@worldBookSelectedEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookSelectionDone": "Done",
+  "worldBookNoMoveTargets": "Create another world book to move entries into it.",
+  "worldBookEntriesCopied": "{count, plural, =1{Copied 1 entry} other{Copied {count} entries}}",
+  "@worldBookEntriesCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookEntriesMoved": "{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}",
+  "@worldBookEntriesMoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookTransferFailed": "Could not save the entries. Please try again.",
   "worldBookTitle": "World Book",
   "worldBookAdd": "Add World Book",
   "worldBookEmptyMessage": "No world books yet",
@@ -3648,7 +3799,6 @@
   "worldBookInjectionRoleAssistant": "Assistant",
   "mcpToolNeedsApproval": "Require approval",
   "toolApprovalPending": "Waiting for approval",
-  "toolApprovalApprove": "Approve",
   "toolApprovalDeny": "Deny",
   "toolApprovalDenyTitle": "Deny tool call",
   "toolApprovalDenyHint": "Reason (optional)",
@@ -3892,7 +4042,13 @@
   "migrationChatsExportDegradedNote": "The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.",
   "timelineJumpToLatest": "Jump to latest",
   "largeContentShowMore": "Show {count} more",
-  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "largeContentCollapse": "Collapse",
   "imageSettingsPageTitle": "Image Processing",
   "imageSettingsPageEditSectionTitle": "Editing",
@@ -4394,7 +4550,6 @@
   "workspaceToolUpdated": "updated",
   "workspaceToolTruncated": "truncated",
   "workspaceToolImageTag": "image",
-  "workspaceToolAllowAll": "Allow all this session",
   "workspaceToolStdout": "stdout",
   "workspaceToolStderr": "stderr",
   "workspaceToolOpenFullOutput": "Open full output",
@@ -4605,7 +4760,7 @@
       }
     }
   },
-  "workspaceEnvNativeShellApproval": "The shell tool needs approval unless this session allows all tools.",
+  "workspaceEnvNativeShellApproval": "The shell tool needs approval in Ask for approval mode.",
   "workspaceEnvDownloadProgress": "{downloaded} / {total} MB ({percent}%)",
   "@workspaceEnvDownloadProgress": {
     "placeholders": {
@@ -4719,8 +4874,6 @@
   "workspaceEntryOpenSystemTerminal": "Open in system terminal",
   "workspaceEntryReveal": "Reveal in file manager",
   "workspaceEntrySessionSkills": "Skills",
-  "workspaceEntryAllowAll": "Allow all this session",
-  "workspaceEntryAllowAllSubtitle": "Shell commands in this conversation will run without approval.",
   "workspaceEntryEnvironment": "Environment",
   "workspaceEntryManage": "Manage workspaces",
   "workspaceEntryCreate": "Create new workspace…",
@@ -4731,13 +4884,17 @@
   "workspaceBindingRememberedDefault": "Remembered as the default workspace for “{assistant}”. New conversations will use it.",
   "@workspaceBindingRememberedDefault": {
     "placeholders": {
-      "assistant": { "type": "String" }
+      "assistant": {
+        "type": "String"
+      }
     }
   },
   "workspaceBindingSuggestDefault": "Use this workspace for future conversations with “{assistant}” too?",
   "@workspaceBindingSuggestDefault": {
     "placeholders": {
-      "assistant": { "type": "String" }
+      "assistant": {
+        "type": "String"
+      }
     }
   },
   "workspaceBindingUndoDefault": "Undo",
@@ -5021,7 +5178,7 @@
       }
     }
   },
-  "workspaceEnvNativeUnsandboxed": "Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.",
+  "workspaceEnvNativeUnsandboxed": "Commands run on this computer without a sandbox and need approval unless this chat has full access.",
   "workspaceEnvRootfsTitle": "/",
   "workspaceEnvBrowserUnavailable": "The sandbox file system is not available.",
   "workspaceEnvMirrorNameOfficial": "Official",
@@ -5165,7 +5322,11 @@
   "incomingShareMoveFailed": "Could not switch conversations. Your draft has been kept.",
   "attachmentRequiresWorkspace": "To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.",
   "@attachmentRequiresWorkspace": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "storageSessionFilesUnlinked": "Unlinked conversation",
   "workspaceExternalMount": "Mount external folder",
@@ -5605,7 +5766,13 @@
   "oauthRequestFailed": "The provider could not complete the request.",
   "oauthQuotaAvailable": "Quota is available",
   "oauthSavedResets": "Available usage resets: {count}",
-  "@oauthSavedResets": { "placeholders": { "count": { "type": "String" } } },
+  "@oauthSavedResets": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "oauthPrimaryWindow": "Primary window",
   "oauthSecondaryWindow": "Secondary window",
   "oauthAuthorizationCode": "Authorization code or callback URL",
@@ -5652,8 +5819,20 @@
   "scheduledTasksShowPreviewTip": "Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.",
   "scheduledTasksHours": "{count, plural, =1{1 hour} other{{count} hours}}",
   "scheduledTasksMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
-  "@scheduledTasksHours": {"placeholders": {"count": {"type": "int"}}},
-  "@scheduledTasksMinutes": {"placeholders": {"count": {"type": "int"}}},
+  "@scheduledTasksHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "scheduledTasksPreparationOff": "Preparation off",
   "scheduledTasksPreparationQueued": "Queued",
   "scheduledTasksPreparationQueuedDetail": "Another task is being prepared. Eligible tasks continue in due-time order.",
@@ -5758,5 +5937,457 @@
   "mcpOAuthDiscovering": "Discovering authorization server…",
   "mcpOAuthRegistering": "Preparing authorization…",
   "mcpOAuthWaitingBrowser": "Waiting for browser authorization…",
-  "mcpOAuthExchangingToken": "Completing sign-in…"
+  "mcpOAuthExchangingToken": "Completing sign-in…",
+  "markdownPlaygroundTitle": "Markdown Playground",
+  "markdownPlaygroundSource": "Markdown source",
+  "markdownPlaygroundPreview": "Preview",
+  "markdownPlaygroundAst": "AST",
+  "markdownPlaygroundPlay": "Stream characters",
+  "markdownPlaygroundPause": "Pause",
+  "markdownPlaygroundResume": "Resume",
+  "markdownPlaygroundShowAll": "Show complete",
+  "markdownPlaygroundWidth": "Preview width",
+  "markdownPlaygroundTheme": "Preview theme",
+  "markdownPlaygroundPlain": "Selected plain text",
+  "markdownPlaygroundMarkdown": "Selected Markdown",
+  "markdownPlaygroundSelectionHint": "Select text in the preview to inspect copied content.",
+  "markdownPlaygroundEmpty": "Enter Markdown to preview it.",
+  "markdownPlaygroundProgress": "Input {shown} / {total}",
+  "@markdownPlaygroundProgress": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownCopyMarkdownAction": "Copy Markdown",
+  "markdownCopyCsvAction": "Copy CSV",
+  "markdownCopyImageAction": "Copy image",
+  "markdownCodeLabel": "Code",
+  "markdownDetailsLabel": "Details",
+  "markdownMoreRows": "Show {count} more rows",
+  "@markdownMoreRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownNoteLabel": "Note",
+  "markdownTipLabel": "Tip",
+  "markdownImportantLabel": "Important",
+  "markdownWarningLabel": "Warning",
+  "markdownCautionLabel": "Caution",
+  "markdownDangerLabel": "Danger",
+  "markdownCopyRichTextAction": "Copy rich text",
+  "markdownCopySelectionFailed": "Could not copy the selected text.",
+  "recoveryMissingDataTitle": "Previous data detected",
+  "recoveryMissingDataBody": "The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.",
+  "recoveryEmptyDataTitle": "Current chat history is empty",
+  "recoveryEmptyDataBody": "The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.",
+  "recoveryKeepCurrent": "Keep current data and continue",
+  "recoveryKeepCurrentConfirm": "Continue with the current empty database? Previous copies will remain available for recovery later.",
+  "recoverySearchingCopies": "Finding and validating local data copies…",
+  "recoveryFoundCopies": "Found {count} validated copies. Choose one to recover your chats and settings. The original files will be kept.",
+  "@recoveryFoundCopies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryInvalidCopy": "{name}: validation failed. The original file has been kept.",
+  "@recoveryInvalidCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverySearchFailed": "Some data locations could not be read. Your files have been kept; export a data copy before trying other recovery actions.",
+  "recoveryDiscoveredCopyBody": "Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.",
+  "recoveryStorageFailureTitle": "Data storage needs attention",
+  "recoveryStorageFailureBody": "Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.",
+  "recoveryProtectingTitle": "Protecting the chat database",
+  "recoveryProtectingData": "Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.",
+  "recoveryStorageReadyTitle": "Chat database moved to internal storage",
+  "recoveryStorageReadyBody": "The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.",
+  "recoveryRetainedData": "Retained original data",
+  "recoveryNoValidCopies": "Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.",
+  "recoveryStorageInsufficientSpaceBody": "There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.",
+  "migrationFreshStartTitle": "Fresh start is ready",
+  "migrationFreshStartSubtitle": "A new empty database is ready, and your previous data has been retained. Restart the app to continue.",
+  "migrationFreshStartFailedTitle": "Fresh start could not be completed",
+  "migrationFreshStartFailedSubtitle": "Your previous data has been retained. Retry starting fresh, or close and reopen the app.",
+  "imageExportPreparing": "Preparing image…",
+  "imageExportDiagrams": "Preparing diagrams {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "Capturing image {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "Combining image and preparing preview…",
+  "imageExportSaving": "Saving image…",
+  "backupEncryptionTitle": "Encrypt backups",
+  "backupEncryptionOffHint": "Unencrypted backups can be read by anyone with the file.",
+  "backupEncryptionOnHint": "Backups are encrypted while this page stays open.",
+  "backupEncryptionPasswordHint": "Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.",
+  "backupEncryptionPassword": "Password",
+  "backupEncryptionConfirmPassword": "Confirm password",
+  "backupEncryptionMismatch": "Passwords do not match.",
+  "backupEncryptionShowPassword": "Show password",
+  "backupEncryptionHidePassword": "Hide password",
+  "backupEncryptionUnlockTitle": "Encrypted backup",
+  "backupEncryptionUnlockHint": "Enter the password used to create this backup.",
+  "backupEncryptionUnlock": "Unlock",
+  "backupEncryptionFailed": "The password is incorrect, or the backup is damaged. Try again or cancel.",
+  "backupEncryptionInvalid": "The encrypted backup is incomplete or invalid.",
+  "backupEncryptionUnsupported": "This encrypted backup requires a newer version of Kelivo.",
+  "backupProgressEncrypting": "Encrypting backup",
+  "backupProgressDecrypting": "Decrypting backup",
+  "mcpPageStatusFailed": "Connection failed",
+  "mcpPageCardToolsShort": "Tools {enabled}/{total}",
+  "mcpPageSelectServer": "Select {name}",
+  "@mcpPageCardToolsShort": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@mcpPageSelectServer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "mcpIconTitle": "Server icon",
+  "mcpIconInvalid": "Unable to use this image. Choose a valid image up to 10 MB.",
+  "mcpSelectServers": "Select servers",
+  "mcpMoveToGroup": "Move to group",
+  "mcpRenameGroup": "Rename group",
+  "mcpDeleteGroupConfirm": "Servers in this group will be moved to Other. The servers will not be deleted.",
+  "mcpGroupNameInvalid": "Use a nonempty, unique group name.",
+  "mcpEnableSelected": "Enable",
+  "mcpDisableSelected": "Disable",
+  "mcpDeleteSelectedConfirm": "Delete {count} selected servers?",
+  "@mcpDeleteSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserTitle": "Browser",
+  "browserSearchHint": "Search or enter website",
+  "browserStartTitle": "Where to next?",
+  "browserStartSubtitle": "Browse freely. Let your agent help when you need it.",
+  "browserNewTab": "New tab",
+  "browserTabs": "Tabs",
+  "browserCloseTab": "Close tab",
+  "browserClose": "Close browser",
+  "browserBack": "Back",
+  "browserForward": "Forward",
+  "browserReload": "Reload",
+  "browserStop": "Stop loading",
+  "browserMore": "More",
+  "browserBookmarks": "Bookmarks",
+  "browserHistory": "History",
+  "browserSettings": "Browser settings",
+  "browserAddBookmark": "Add bookmark",
+  "browserRemoveBookmark": "Remove bookmark",
+  "browserNoBookmarks": "Your favorite places, all together.",
+  "browserNoHistory": "Your browsing history appears here.",
+  "browserSearchLibrary": "Search saved pages",
+  "browserClearHistory": "Clear history",
+  "browserClearHistoryConfirm": "Delete all browsing history? Bookmarks will be kept.",
+  "browserToday": "Today",
+  "browserYesterday": "Yesterday",
+  "browserDelete": "Delete",
+  "browserCancel": "Cancel",
+  "browserDone": "Done",
+  "browserFind": "Find on page",
+  "browserFindPreviousMatch": "Previous match",
+  "browserFindNextMatch": "Next match",
+  "browserFindHint": "Find text",
+  "browserSearchEngine": "Search engine",
+  "browserDesktopMode": "Desktop website",
+  "browserDesktopModeDescription": "Reload open pages with a desktop user agent.",
+  "browserRestoreTabs": "Restore tabs",
+  "browserRestoreTabsDescription": "Reopen your tabs when Kelivo starts.",
+  "browserSaveHistory": "Save history",
+  "browserSaveHistoryDescription": "Keep a local record of the pages you visit.",
+  "browserClearData": "Clear website data",
+  "browserClearDataConfirm": "Clear cookies, storage and cache, and close all tabs? You will be signed out of websites.",
+  "browserDataCleared": "Website data cleared",
+  "browserAgentControl": "Agent control",
+  "browserAgentWorking": "AI is working",
+  "browserTakeOver": "Take over",
+  "browserAgentPaused": "AI actions paused",
+  "browserAgentTimedOut": "Operation timed out; AI paused",
+  "browserAllowAgent": "Allow to continue",
+  "browserAgentDescription": "Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.",
+  "browserOpenExternal": "Open in default browser",
+  "browserCopyLink": "Copy link",
+  "browserLinkCopied": "Link copied",
+  "browserUnsupported": "The embedded browser is not available on this platform.",
+  "browserLoadFailed": "This page could not be loaded",
+  "browserRetry": "Try again",
+  "browserFavorites": "Favorites",
+  "browserEditBookmark": "Edit bookmark",
+  "browserBookmarkTitle": "Title",
+  "browserBookmarkUrl": "Website",
+  "browserSave": "Save",
+  "browserDownloads": "Downloads",
+  "browserNoDownloads": "Downloaded files appear here.",
+  "browserDownloadCancel": "Cancel download",
+  "browserOpenDownload": "Open file",
+  "browserDownloadFailed": "Download failed",
+  "browserAgentEnableHint": "Enable the Browser tool in chat tools, then allow control here.",
+  "browserSessionRequired": "Open the browser from a conversation to allow agent control.",
+  "browserDownloadCancelled": "Cancelled",
+  "browserAgentEnabled": "Allow assistant browser access",
+  "browserAgentEnabledDescription": "Enabled assistants can browse and interact with pages in this browser.",
+  "browserToolTitle": "Browser control",
+  "browserToolSubtitle": "Browse and interact with signed-in pages. Enable Agent control in browser settings first.",
+  "browserOpen": "Open browser",
+  "browserInvalidUrl": "Enter a valid HTTP or HTTPS website address.",
+  "browserClearDataUnavailable": "Clearing all website data is not supported by the Windows browser engine.",
+  "browserSurfaceStyle": "Surface style",
+  "browserSurfaceLiquid": "Liquid glass",
+  "browserSurfaceFrosted": "Frosted",
+  "browserSurfaceSolid": "Solid",
+  "browserPageOptions": "Page options",
+  "browserAskAi": "Let AI work on this page",
+  "browserAskAiHint": "Return to chat, add your request, then send.",
+  "browserAskAiCurrentPage": "the current browser page",
+  "browserAskAiUnavailable": "This chat is unavailable. Open the browser from a chat first.",
+  "browserAskAiEditing": "Finish or cancel editing the current message before adding a page task.",
+  "browserAskAiAssistantDisabled": "Enable Browser control in this assistant’s tools first.",
+  "browserAskAiBrowserDisabled": "Allow assistants to use the browser in browser settings first.",
+  "browserAskAiDraft": "Please use the browser to work on this page:\n{page}\n\nMy request: ",
+  "@browserAskAiDraft": {
+    "placeholders": {
+      "page": {
+        "type": "String"
+      }
+    }
+  },
+  "browserOpenFullPage": "Open in full page",
+  "browserClosePanel": "Close browser panel",
+  "browserSearchTabs": "Search tabs",
+  "browserTabsCount": "{count, plural, =1{1 tab} other{{count} tabs}}",
+  "@browserTabsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserOpenInSidebar": "Open in sidebar",
+  "browserUserAgent": "User agent",
+  "browserUserAgentMobile": "Mobile",
+  "browserUserAgentDesktop": "Desktop",
+  "browserUserAgentCustom": "Custom",
+  "browserUserAgentHint": "Enter a custom User-Agent",
+  "browserUserAgentInvalid": "Use a single line of up to 2048 printable ASCII characters.",
+  "browserUserAgentDescription": "Changes reload the current webpage.",
+  "browserStepsShowEarlier": "{count} earlier steps",
+  "browserOpenThisPage": "Open in browser",
+  "browserGroupToggleSemantics": "Show or hide browser steps",
+  "@browserStepsShowEarlier": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserStepGroupTitle": "Browsing",
+  "browserStepCount": "{count} steps",
+  "@browserStepCount": {
+    "description": "Browser page card browserStepCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserStepCurrent": "step {count}",
+  "@browserStepCurrent": {
+    "description": "Browser page card browserStepCurrent",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailedCount": "· {count} failed",
+  "@browserActionFailedCount": {
+    "description": "Browser page card browserActionFailedCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionFailed": "{action} failed",
+  "@browserActionFailed": {
+    "description": "Browser page card browserActionFailed",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardOpen": "Open",
+  "browserCardEnable": "Enable",
+  "browserCardRunning": "{action}…",
+  "@browserCardRunning": {
+    "description": "Browser page card browserCardRunning",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "browserCardLive": "Live",
+  "browserCardOpenFailed": "Couldn't open page",
+  "browserCardBlankPage": "Blank page",
+  "browserCardTabCount": "{count} tabs",
+  "@browserCardTabCount": {
+    "description": "Browser page card browserCardTabCount",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserActionOpen": "Open page",
+  "browserActionNewTab": "New tab",
+  "browserActionRender": "Render page",
+  "browserActionExtract": "Extract text",
+  "browserActionScreenshot": "Capture screenshot",
+  "browserActionSnapshot": "Read page structure",
+  "browserActionClick": "Click",
+  "browserActionType": "Type",
+  "browserActionSelect": "Select option",
+  "browserActionPress": "Press key",
+  "browserActionScroll": "Scroll",
+  "browserActionWait": "Wait",
+  "browserActionBack": "Back",
+  "browserActionForward": "Forward",
+  "browserActionReload": "Reload",
+  "browserActionEvaluate": "Run script",
+  "browserActionSwitchTab": "Switch tab",
+  "browserActionCloseTab": "Close tab",
+  "browserActionListTabs": "List tabs",
+  "browserActionUnknown": "Browser action",
+  "browserMetaChars": "{count} chars",
+  "@browserMetaChars": {
+    "description": "Browser page card browserMetaChars",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "browserMetaElements": "{count} elements",
+  "@browserMetaElements": {
+    "description": "Browser page card browserMetaElements",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserErrAgentDisabled": "Browser control is off",
+  "browserErrStaleRef": "Element is stale; page needs re-reading",
+  "browserErrNotVisible": "Element hidden or covered",
+  "browserErrNotFound": "Element not found",
+  "browserErrTimeout": "Page load timed out",
+  "browserErrActionTimeout": "Operation timed out; outcome unknown. Check the page before allowing AI to continue.",
+  "browserErrHumanControl": "You're controlling the browser",
+  "browserErrTabClosed": "Tab was closed",
+  "browserErrGeneric": "Action failed",
+  "browserDirectionUp": "Up",
+  "browserDirectionDown": "Down",
+  "browserDirectionLeft": "Left",
+  "browserDirectionRight": "Right",
+  "browserMetaTabs": "{count} tabs",
+  "@browserMetaTabs": {
+    "description": "Number of tabs returned by list_tabs",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserTabsCurrentConversation": "This chat",
+  "browserTabsAll": "All tabs",
+  "browserTabsUnassigned": "Personal tabs",
+  "browserTabsUnknownConversation": "Other chat",
+  "browserTabsEmptyConversation": "No tabs here yet. Open a page or choose a tab from All tabs.",
+  "browserTabsNoResults": "No matching tabs",
+  "browserMoveToConversation": "Move to this chat",
+  "browserReopenInConversation": "Reopen in this chat",
+  "browserTabBusy": "An assistant is still using this page. Wait for it to finish or stop the task before moving it.",
+  "browserLiveViewLimit": "All browser resources are in use. Try again when a task finishes, or close an unused page.",
+  "browserAskAiInOwnerConversation": "Ask AI in the owning chat",
+  "displaySettingsPageShowBrowserPageCardsTitle": "Show webpage cards",
+  "browserObserverHint": "AI is using this page. Select Take over to interact.",
+  "toolPermissionTitle": "Permissions",
+  "toolPermissionRequestApproval": "Ask for approval",
+  "toolPermissionFullAccess": "Full access",
+  "toolPermissionRequestApprovalDesc": "Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.",
+  "toolPermissionFullAccessDesc": "Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.",
+  "toolPermissionFullAccessDescMobile": "Lets this conversation run tools automatically inside the sandbox and authorized folders, without asking each time.",
+  "toolPermissionUnboundHint": "No workspace bound: this does not turn on file or shell tools.",
+  "toolPermissionScopeThisChat": "This chat only",
+  "toolApprovalSwitchToFullAccess": "Switch to full access",
+  "toolApprovalDenied": "Denied",
+  "toolApprovalPendingKind": "Awaiting approval · {kind}",
+  "toolApprovalRequestedPath": "Requested path",
+  "toolApprovalRealTarget": "Actual target",
+  "toolApprovalScopeOnce": "Applies to this call only",
+  "toolApprovalByFullAccess": "Ran automatically",
+  "toolApprovalDenyWithReason": "Deny with reason…",
+  "toolPermissionSaveFailed": "Couldn’t save. Permission unchanged.",
+  "toolPermissionEnabledSnack": "Full access enabled for this chat",
+  "toolPermissionResetSnack": "Workspace changed · permission reset to Ask for approval",
+  "toolPermissionUndo": "Undo",
+  "wsDeniedPathOutside": "Target is outside the authorized area. Denied.",
+  "wsDeniedMountReadonly": "Read-only mount. Can’t write.",
+  "wsDeniedSkillsReadonly": "Skills folder is read-only.",
+  "wsPathChanged": "Target changed while awaiting approval.",
+  "wsContextChanged": "Conversation context changed. Request expired.",
+  "@toolApprovalPendingKind": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  }
 }

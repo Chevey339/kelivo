@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'database_installation_gate.dart';
 
 import 'app_database.dart';
 import 'business_repository.dart';
@@ -86,7 +88,17 @@ final class ChatDatabaseGateway {
 
   Future<_DatabaseRepositories> _open(File databaseFile) async {
     return _observer.measure(ChatDatabaseOperation.gatewayOpen, () async {
-      final database = AppDatabase.open(file: databaseFile);
+      final installed =
+          p.basename(databaseFile.path) == AppDatabase.databaseFileName;
+      if (installed && !await databaseFile.exists()) {
+        await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: databaseFile.parent,
+        );
+      }
+      final database = AppDatabase.open(
+        file: databaseFile,
+        requireExisting: installed,
+      );
       final chatRepository = ChatDatabaseRepository(
         database,
         databaseFile: databaseFile,

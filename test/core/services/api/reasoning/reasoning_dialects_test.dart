@@ -178,7 +178,11 @@ Map<String, dynamic> _expectedBody({
         transport: transport,
       );
     case ReasoningDialect.openrouterReasoning:
-      if (effective == ReasoningLevel.auto) return {};
+      if (effective == ReasoningLevel.auto) {
+        return {
+          'reasoning': {'enabled': true},
+        };
+      }
       if (effective == ReasoningLevel.off) {
         return {
           'reasoning': {'enabled': false},
@@ -1103,6 +1107,29 @@ void main() {
   });
 
   group('extraBody survival', () {
+    test('OpenRouter auto preserves existing reasoning fields', () {
+      for (final enabled in [null, false, true]) {
+        final body = <String, dynamic>{
+          'reasoning': {
+            if (enabled != null) 'enabled': enabled,
+            'effort': 'low',
+            'exclude': true,
+          },
+        };
+        applyReasoning(
+          body,
+          _spec(dialect: ReasoningDialect.openrouterReasoning),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        );
+        expect(body['reasoning'], {
+          'enabled': enabled ?? true,
+          'effort': 'low',
+          'exclude': true,
+        });
+      }
+    });
+
     test('user-provided reasoning_effort survives auto', () {
       expect(
         applyReasoning(

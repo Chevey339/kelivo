@@ -9,7 +9,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../../shared/widgets/markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../database/business_preferences.dart';
 import '../services/tts/network_tts.dart';
 import '../services/mobile_background.dart';
@@ -1139,7 +1139,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   static String _stripMarkdown(String input) {
-    var s = markdownRemoveCode(input);
+    var s = removeCode(input);
     s = s.replaceAllMapped(
       RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
       (m) => m.group(1) ?? '',

@@ -112,12 +112,13 @@ final class BackupPortability {
             )
           THEN json_remove(extras_json, '\$."workspace.id"',
             '\$."workspace.cwd"', '\$."workspace.tools_used"',
-            '\$."workspace.allowAll"')
-          ELSE json_remove(extras_json, '\$."workspace.allowAll"')
+            '\$."workspace.allowAll"', '\$."tools.permission_mode"')
+          ELSE json_remove(extras_json, '\$."workspace.allowAll"', '\$."tools.permission_mode"')
         END
         WHERE json_valid(extras_json)
           AND (json_type(extras_json, '\$."workspace.id"') IS NOT NULL
-            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL);
+            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL
+            OR json_type(extras_json, '\$."tools.permission_mode"') IS NOT NULL);
       ''');
     });
   }

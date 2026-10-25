@@ -5,5 +5,6 @@ import 'package:Kelivo/utils/platform_utils.dart';
 
 /// Desktop windows keep mouse/keyboard dialogs even when resized below the
 /// large-screen breakpoint. Layouts still measure their own available space.
+/// This selects presentation only; platform/runtime capabilities gate features.
 bool useDesktopWorkspaceLayout(BuildContext context) =>
     PlatformUtils.isDesktopTarget || ResponsiveHelper.isDesktop(context);

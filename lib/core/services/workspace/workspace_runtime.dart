@@ -133,6 +133,7 @@ abstract class WorkspaceRuntime {
 
   bool get supportsPty => false;
   bool get supportsSystemTerminal => false;
+  bool get supportsFileManager => false;
 
   Future<PtySession> openPty({
     required List<Mount> mounts,

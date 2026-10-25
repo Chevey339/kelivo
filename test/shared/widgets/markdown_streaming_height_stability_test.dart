@@ -3,17 +3,17 @@ import 'dart:io';
 import "../../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:markstream/markstream.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A long reply is rendered block by block while it streams and as one whole
-/// document once it finishes. If the two render at different heights, the
+/// The AST renderer keeps its block layout when streaming completes. If the
+/// streaming and finished states render at different heights, the
 /// timeline — which is pinned to the tail during generation — jumps by the
 /// difference on the frame the reply ends. Every case here must measure the
 /// same height on both paths.
@@ -23,7 +23,7 @@ void main() {
     // hides the per-line rounding a real font goes through. Lay these cases out
     // with a real font so a separator that only matches on paper still fails.
     final bytes = File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytesSync();
     await (FontLoader(
       'markdown-metrics',
@@ -95,15 +95,15 @@ void main() {
         textScale: textScale,
         tag: '$label-streaming',
       );
-      final renderedBlocks = boundTester
-          .widgetList(find.byType(GptMarkdown))
+      expect(find.byType(BlockList), findsWidgets);
+      final renderedBlocks = const MarkdownParser()
+          .parse(text, streaming: true)
+          .children
           .length;
       expect(
         renderedBlocks,
         greaterThanOrEqualTo(minBlocks),
-        reason:
-            '$label: the streaming render was not split into blocks, so it '
-            'cannot say anything about block boundaries',
+        reason: '$label: the fixture must cross actual AST block boundaries',
       );
       final finishedHeight = await heightFor(
         text,
@@ -128,9 +128,6 @@ void main() {
       double textScale = 1.0,
       String terminator = '\n',
     }) {
-      // The splitter only closes a block once the next line is complete, so
-      // without the trailing newline the last boundary is never split and the
-      // case would measure a single block on both paths — passing for free.
       return expectStableText(
         label,
         '${blocks.join('\n\n')}$terminator',
@@ -139,8 +136,7 @@ void main() {
       );
     }
 
-    // Only replies over 512 characters are rendered block by block, so every
-    // case has to be padded past that threshold to be meaningful.
+    // Exercise both native paragraph and chunked long-paragraph layouts.
     String pad(int index) =>
         'Body $index. ${'The rain kept falling on the quiet street. ' * 16}';
 

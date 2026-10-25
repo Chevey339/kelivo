@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/utils/platform_utils.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_desktop_layout.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -108,7 +109,9 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                           ),
                         if (widget.showHeader) const SizedBox(height: 4),
                         Text(
-                          l10n.workspaceDesktopHostHint,
+                          PlatformUtils.isDesktopTarget
+                              ? l10n.workspaceDesktopHostHint
+                              : l10n.workspaceMgmtKindManagedSubtitle,
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurfaceVariant,

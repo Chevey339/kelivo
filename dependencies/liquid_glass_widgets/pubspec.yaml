@@ -1,0 +1,50 @@
+name: liquid_glass_widgets
+description: "iOS 26/27-style liquid glass widgets for Flutter. Built on a custom fragment shader for real blur, liquid interactions, specular highlights, and chromatic aberration."
+version: 1.12.0
+
+homepage: https://github.com/sdegenaar/liquid_glass_widgets
+repository: https://github.com/sdegenaar/liquid_glass_widgets
+issue_tracker: https://github.com/sdegenaar/liquid_glass_widgets/issues
+
+topics:
+  - liquid-glass
+  - widgets
+  - glassmorphism
+  - flutter
+  - apple
+
+# Platform support declaration for pub.dev
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  leak_tracker_flutter_testing: ^3.0.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: LiquidGlassWidgetsPlugin
+
+  shaders:
+    - shaders/lightweight_glass.frag
+    - shaders/interactive_indicator.frag
+    - shaders/liquid_glass_geometry_blended.frag
+    - shaders/liquid_glass_render.frag
+    - shaders/progressive_blur.frag

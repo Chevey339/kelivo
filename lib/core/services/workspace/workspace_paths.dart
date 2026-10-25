@@ -41,7 +41,7 @@ class WorkspacePaths {
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
-       tmpHostRoot = _canonHost(Directory.systemTemp.path);
+       tmpHostRoot = _canonHost(p.join(sessionHostDir, 'tmp'));
 
   WorkspacePaths.native({
     required String workspaceHostRoot,
@@ -53,7 +53,7 @@ class WorkspacePaths {
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
-       tmpHostRoot = _canonHost(Directory.systemTemp.path);
+       tmpHostRoot = _canonHost(p.join(sessionHostDir, 'tmp'));
 
   final bool sandboxed;
   final String workspaceHostRoot;
@@ -109,7 +109,7 @@ class WorkspacePaths {
     }
   }
 
-  /// Default [modelRoot]. Result always stays inside a zone (falls back).
+  /// Default [modelRoot]. Sandboxed cwd stays inside an authorized zone.
   String normalizeCwd(String? cwd) {
     return _normalizeCwd(cwd);
   }
@@ -139,9 +139,17 @@ class WorkspacePaths {
   /// Inverse of [resolve] for a host path that sits under a known root.
   String toModelPath(String hostPath) {
     if (!sandboxed) return _canonHost(hostPath);
+    final skillsRel = relativeToHostRoot(skillsHostDir, hostPath);
+    if (skillsRel != null) {
+      return _guestJoin(guestSkills, skillsRel);
+    }
     for (final mount in _externalMounts) {
       final rel = relativeToHostRoot(mount.host, hostPath);
       if (rel != null) return _guestJoin(mount.guest, rel);
+    }
+    final tmpRel = relativeToHostRoot(tmpHostRoot, hostPath);
+    if (tmpRel != null) {
+      return _guestJoin(guestTmp, tmpRel);
     }
     final workspaceRel = relativeToHostRoot(workspaceHostRoot, hostPath);
     if (workspaceRel != null) {
@@ -151,14 +159,6 @@ class WorkspacePaths {
     if (chatRel != null) {
       return _guestJoin(guestChat, chatRel);
     }
-    final skillsRel = relativeToHostRoot(skillsHostDir, hostPath);
-    if (skillsRel != null) {
-      return _guestJoin(guestSkills, skillsRel);
-    }
-    final tmpRel = relativeToHostRoot(tmpHostRoot, hostPath);
-    if (tmpRel != null) {
-      return _guestJoin(guestTmp, tmpRel);
-    }
     return _canonHost(hostPath);
   }
 
@@ -166,7 +166,7 @@ class WorkspacePaths {
     if (cwd == null || cwd.isEmpty) return modelRoot;
     try {
       final resolved = _resolveWithBase(cwd, modelRoot);
-      if (resolved.zone == WorkspaceZone.outside) return modelRoot;
+      if (sandboxed && resolved.zone == WorkspaceZone.outside) return modelRoot;
       return resolved.modelPath;
     } on PathResolutionException {
       return modelRoot;
@@ -209,22 +209,8 @@ class WorkspacePaths {
 
   ResolvedPath _resolveNative(String modelPath, String base) {
     final raw = p.isAbsolute(modelPath) ? modelPath : p.join(base, modelPath);
-    final intended = _classifyHost(
-      _canonHost(_lexicalAnchor(raw, posix: false)),
-    );
     final canonical = _canonHost(raw);
     final zone = _classifyHost(canonical);
-    if (intended == WorkspaceZone.outside) {
-      if (_usesDotDot(modelPath, raw) || zone != WorkspaceZone.outside) {
-        throw PathResolutionException(
-          'path escapes a workspace zone: $modelPath',
-        );
-      }
-    } else if (!_hostInsideZone(intended, canonical)) {
-      throw PathResolutionException(
-        'path escapes a workspace zone: $modelPath',
-      );
-    }
     return ResolvedPath(hostPath: canonical, modelPath: canonical, zone: zone);
   }
 
@@ -312,6 +298,9 @@ class WorkspacePaths {
   }
 
   WorkspaceZone _classifyHost(String hostPath) {
+    // A broad workspace or external mount must not make skills writable.
+    if (_hostInside(skillsHostDir, hostPath)) return WorkspaceZone.skills;
+    if (_hostInside(tmpHostRoot, hostPath)) return WorkspaceZone.tmp;
     if (_externalMounts.any((mount) => _hostInside(mount.host, hostPath))) {
       return WorkspaceZone.external;
     }
@@ -319,8 +308,6 @@ class WorkspacePaths {
       return WorkspaceZone.workspace;
     }
     if (_hostInside(sessionHostDir, hostPath)) return WorkspaceZone.chat;
-    if (_hostInside(skillsHostDir, hostPath)) return WorkspaceZone.skills;
-    if (_hostInside(tmpHostRoot, hostPath)) return WorkspaceZone.tmp;
     return WorkspaceZone.outside;
   }
 
@@ -328,10 +315,6 @@ class WorkspacePaths {
     if (value.contains('\u0000')) {
       throw const PathResolutionException('path contains NUL');
     }
-  }
-
-  static bool _usesDotDot(String a, String b) {
-    return a.contains('..') || b.contains('..');
   }
 
   static String _canonHost(String path) => p.canonicalize(path);
@@ -399,7 +382,7 @@ class WorkspacePaths {
         return p.canonicalize(await Link(hostPath).resolveSymbolicLinks());
       }
     } on FileSystemException {
-      // Fall through to file/dir/parent walk.
+      throw const PathResolutionException('symbolic link cannot be resolved');
     }
     try {
       if (await File(hostPath).exists()) {

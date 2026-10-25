@@ -230,6 +230,22 @@ class McpToolService extends ChangeNotifier {
     return route?.tool.needsApproval ?? true;
   }
 
+  bool isToolEnabledForAssistant(
+    McpProvider mcpProvider,
+    AssistantProvider assistants, {
+    required String? assistantId,
+    required String toolName,
+    required McpToolRouteSnapshot routeSnapshot,
+  }) {
+    final assistant = assistantId != null
+        ? assistants.getById(assistantId)
+        : assistants.currentAssistant;
+    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final published = routeSnapshot._find(toolName);
+    return published != null &&
+        _currentRouteForIdentity(mcpProvider, selected, published) != null;
+  }
+
   McpToolRouteSnapshot captureRoutesForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
@@ -270,21 +286,25 @@ class McpToolService extends ChangeNotifier {
         }
         if (c is mcp.ImageContent) {
           final data = (c.data ?? '').toString();
-          final mime = c.mimeType.toString();
           String? uri;
           if (data.isNotEmpty) {
-            uri = await McpImageSnapshot.save(mime, data);
+            uri = await McpImageSnapshot.save(data);
           } else {
             final url = (c.url ?? '').toString();
             uri = await remoteSnapshots.putIfAbsent(
               url,
-              () => McpImageSnapshot.download(url, mime: mime),
+              () => McpImageSnapshot.download(url),
             );
           }
           if (uri != null && uri.isNotEmpty) {
             if (seen.add(uri)) imageUris.add(uri);
             if (buf.isNotEmpty && !_endsWithLineBreak(buf)) buf.writeln();
             buf.writeln('![](${encodeMarkdownImageDestination(uri)})');
+          } else {
+            _writeEscapedToolText(
+              buf,
+              '(Image omitted: unavailable, invalid, unsupported, or too large.)',
+            );
           }
           continue;
         }

@@ -250,7 +250,14 @@ void main() {
               await tester.pump(const Duration(seconds: 1));
               scroll.jumpTo(scroll.position.maxScrollExtent);
               await tester.pump(const Duration(seconds: 1));
-              if (frosted) expect(find.byType(BackdropFilter), findsWidgets);
+              if (frosted) {
+                expect(
+                  find.byWidgetPredicate(
+                    (widget) => widget is BackdropFilter && widget.enabled,
+                  ),
+                  findsWidgets,
+                );
+              }
               frames.clear();
               final updates = <int>[];
               final elapsed = Stopwatch()..start();

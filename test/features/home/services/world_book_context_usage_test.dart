@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/conversation.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -61,8 +62,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     final before = beforeExtrasWrite;
     beforeExtrasWrite = null;
     await before?.call();
@@ -349,7 +351,7 @@ void main() {
               ),
             ],
           );
-          await books.updateBook(changed);
+          await books.updateBook(changed.id, (_) => changed);
           if (!force) expect(usage.current!.state, ContextUsageState.stale);
           await usage.refresh(conversationId, force: force);
           expect(
@@ -376,9 +378,12 @@ void main() {
           );
           expect(usage.snapshot(conversationId)!.usedTokens, 1);
 
-          await books.updateBook(changed);
+          await books.updateBook(changed.id, (_) => changed);
           await anchor();
-          await books.updateBook(changed.copyWith(enabled: false));
+          await books.updateBook(
+            changed.id,
+            (current) => current.copyWith(enabled: false),
+          );
           await usage.refresh(conversationId, force: force);
           expect(
             usage.snapshot(conversationId)!.state,

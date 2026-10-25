@@ -66,6 +66,20 @@ class _LocalToolsTab extends StatelessWidget {
       children: [
         SectionCard(
           children: [
+            if (LocalToolsService.isAvailableOnThisPlatform(
+              LocalToolNames.browser,
+            )) ...[
+              _LocalToolRow(
+                icon: Lucide.Globe,
+                title: l10n.browserToolTitle,
+                subtitle: l10n.browserToolSubtitle,
+                enabled: assistant.localToolIds.contains(
+                  LocalToolNames.browser,
+                ),
+                onChanged: (value) => toggleTool(LocalToolNames.browser, value),
+              ),
+              _iosDivider(context),
+            ],
             _LocalToolRow(
               icon: Lucide.clock,
               title: l10n.assistantEditLocalToolTimeInfoTitle,

@@ -22,6 +22,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
@@ -161,7 +162,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
           }
         : {for (final p in filteredItems) p.keyName};
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         leading: Tooltip(
           message: l10n.settingsPageBackButton,
@@ -483,6 +484,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
           ),
         ],
       ),
+    );
+    return SelectionBackScope(
+      selecting: _selectMode,
+      onCancel: () => setState(() {
+        _selectMode = false;
+        _selected.clear();
+      }),
+      child: page,
     );
   }
 

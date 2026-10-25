@@ -29,6 +29,7 @@ final class BusinessKeyRegistry {
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
+    'ios_native_selection_menu_enabled_v1',
     'flutter_log_enabled_v1',
     'model_catalog_auto_update_v1',
   };
@@ -149,6 +150,7 @@ final class BusinessKeyRegistry {
     'log_max_size_mb_v1',
     'app_launch_count_v1',
     'mcp_request_timeout_ms_v1',
+    'mcp_presentation_v1',
     'learning_mode_enabled_v1',
     'learning_mode_prompt_v1',
     'mobile_assistant_edit_tab_order_v1',

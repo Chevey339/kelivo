@@ -9,6 +9,7 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
+import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_tools_pane.dart';
 import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
@@ -172,14 +173,20 @@ class _DesktopWorkspaceFilesState extends State<DesktopWorkspaceFiles> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (runtime?.supportsSystemTerminal == true)
+                  if (runtime != null &&
+                      (runtime.supportsSystemTerminal || runtime.supportsPty))
                     DesktopWorkspaceButton(
-                      label: l10n.workspaceDeskOpenSystemTerminal,
+                      label: runtime.supportsSystemTerminal
+                          ? l10n.workspaceDeskOpenSystemTerminal
+                          : l10n.workspaceEntryTerminal,
                       icon: Lucide.Terminal,
-                      onPressed: () =>
-                          unawaited(_systemAction(runtime!, terminal: true)),
+                      onPressed: () => unawaited(
+                        runtime.supportsSystemTerminal
+                            ? _systemAction(runtime, terminal: true)
+                            : openTerminal(context, workspaceId: workspace.id),
+                      ),
                     ),
-                  if (runtime != null)
+                  if (runtime != null && runtime.supportsFileManager)
                     DesktopWorkspaceButton(
                       label: l10n.workspaceDeskReveal,
                       icon: Lucide.FolderOpen,

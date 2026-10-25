@@ -33,6 +33,9 @@ class AndroidProotRuntime implements WorkspaceStdioRuntime {
   bool get supportsSystemTerminal => false;
 
   @override
+  bool get supportsFileManager => false;
+
+  @override
   Future<RuntimeStatus> status() async {
     await env.loaded;
     if (!{

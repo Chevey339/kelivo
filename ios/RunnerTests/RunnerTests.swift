@@ -7,6 +7,89 @@ import UserNotifications
 import CoreLocation
 @testable import Runner
 
+private final class SelectionMenuTestMessenger: NSObject, FlutterBinaryMessenger {
+  var calls: [FlutterMethodCall] = []
+  func send(onChannel channel: String, message: Data?) {
+    if let message { calls.append(FlutterStandardMethodCodec.sharedInstance().decodeMethodCall(message)) }
+  }
+  func send(onChannel channel: String, message: Data?, binaryReply callback: FlutterBinaryReply?) {
+    send(onChannel: channel, message: message)
+    callback?(nil)
+  }
+  func setMessageHandlerOnChannel(_ channel: String, binaryMessageHandler handler: FlutterBinaryMessageHandler?) -> FlutterBinaryMessengerConnection { 0 }
+  func cleanUpConnection(_ connection: FlutterBinaryMessengerConnection) {}
+}
+
+@available(iOS 26.0, *)
+private final class SelectionMenuTestAnimator: NSObject, UIEditMenuInteractionAnimating {
+  var completion: (() -> Void)?
+  func addAnimations(_ animations: @escaping () -> Void) { animations() }
+  func addCompletion(_ completion: @escaping () -> Void) { self.completion = completion }
+}
+
+@MainActor
+final class IosSelectionMenuTests: XCTestCase {
+  func testReadOnlyViewUsesAppActionsAndOneInteraction() throws {
+    guard #available(iOS 26.0, *) else { throw XCTSkip("Native selection menus require iOS 26") }
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    let view = UIView(frame: window.bounds)
+    window.addSubview(view)
+    let messenger = SelectionMenuTestMessenger()
+    let handler = IosSelectionMenuHandler(view: view, channel: FlutterMethodChannel(name: "test", binaryMessenger: messenger))
+    let args: [String: Any] = ["session": 1, "revision": 1, "rect": [100.0, 200.0, 1.0, 20.0],
+                             "items": [["title": "Copy as Markdown", "enabled": true], ["title": "Disabled", "enabled": false]]]
+    var shown: Any?
+    handler.handle(FlutterMethodCall(methodName: "show", arguments: args)) { shown = $0 }
+    XCTAssertEqual(shown as? Bool, true)
+    XCTAssertFalse(view.isFirstResponder)
+    let interaction = try XCTUnwrap(view.interactions.first as? UIEditMenuInteraction)
+    let config = UIEditMenuConfiguration(identifier: NSNumber(value: 1), sourcePoint: .zero)
+    let menu = try XCTUnwrap(handler.editMenuInteraction(interaction, menuFor: config, suggestedActions: [UIAction(title: "Wrong responder action", handler: { _ in })]))
+    XCTAssertEqual(menu.children.map(\.title), ["Copy as Markdown", "Disabled"])
+    XCTAssertTrue(try XCTUnwrap(menu.children[1] as? UIAction).attributes.contains(.disabled))
+    handler.handle(FlutterMethodCall(methodName: "show", arguments: args)) { _ in }
+    XCTAssertEqual(view.interactions.filter { $0 is UIEditMenuInteraction }.count, 1)
+    handler.handle(FlutterMethodCall(methodName: "hide", arguments: ["session": 1])) { _ in }
+  }
+
+  func testOldDismissalAndHideCannotRetireNewSelection() throws {
+    guard #available(iOS 26.0, *) else { throw XCTSkip("Native selection menus require iOS 26") }
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    let view = UIView(frame: window.bounds)
+    window.addSubview(view)
+    let messenger = SelectionMenuTestMessenger()
+    let handler = IosSelectionMenuHandler(view: view, channel: FlutterMethodChannel(name: "test", binaryMessenger: messenger))
+    func show(_ session: Int) {
+      handler.handle(FlutterMethodCall(methodName: "show", arguments: [
+        "session": session, "revision": 1, "rect": [100.0, 200.0, 1.0, 20.0],
+        "items": [["title": "Copy", "enabled": true]],
+      ])) { XCTAssertEqual($0 as? Bool, true) }
+    }
+    show(1)
+    let interaction = try XCTUnwrap(view.interactions.first as? UIEditMenuInteraction)
+    let animator = SelectionMenuTestAnimator()
+    handler.editMenuInteraction(interaction, willDismissMenuFor: UIEditMenuConfiguration(identifier: NSNumber(value: 1), sourcePoint: .zero), animator: animator)
+    show(2)
+    handler.handle(FlutterMethodCall(methodName: "hide", arguments: ["session": 1])) { _ in }
+    animator.completion?()
+    let rect = handler.editMenuInteraction(interaction, targetRectFor: UIEditMenuConfiguration(identifier: NSNumber(value: 2), sourcePoint: .zero))
+    XCTAssertEqual(rect, CGRect(x: 100, y: 200, width: 1, height: 20))
+    XCTAssertTrue(messenger.calls.isEmpty)
+    handler.handle(FlutterMethodCall(methodName: "hide", arguments: ["session": 2])) { _ in }
+  }
+
+  func testDetachedViewCannotAcceptPresentation() throws {
+    guard #available(iOS 26.0, *) else { throw XCTSkip("Native selection menus require iOS 26") }
+    let view = UIView()
+    let handler = IosSelectionMenuHandler(view: view, channel: FlutterMethodChannel(name: "test", binaryMessenger: SelectionMenuTestMessenger()))
+    handler.handle(FlutterMethodCall(methodName: "show", arguments: [
+      "session": 1, "revision": 1, "rect": [100.0, 200.0, 1.0, 20.0],
+      "items": [["title": "Copy", "enabled": true]],
+    ])) { XCTAssertEqual($0 as? Bool, false) }
+    XCTAssertTrue(view.interactions.isEmpty)
+  }
+}
+
 private final class BackgroundTestMessenger: NSObject, FlutterBinaryMessenger {
   func send(onChannel channel: String, message: Data?) {}
   func send(onChannel channel: String, message: Data?, binaryReply callback: FlutterBinaryReply?) { callback?(nil) }

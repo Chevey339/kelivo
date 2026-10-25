@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import 'package:Kelivo/core/services/haptics.dart';
@@ -214,39 +215,62 @@ class _FormSheetOutlineButton extends StatefulWidget {
 
 class _FormSheetOutlineButtonState extends State<_FormSheetOutlineButton> {
   bool _pressed = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bg = context.appColors.surfaceFill;
-    final overlay = _pressed
+    final overlay = _pressed || _focused
         ? cs.onSurface.withValues(alpha: 0.12)
         : Colors.transparent;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: () {
-        Haptics.light();
-        widget.onTap();
+    return FocusableActionDetector(
+      enabled: true,
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(overlay, bg),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
         ),
-        alignment: Alignment.center,
-        child: Text(
-          widget.label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: AppFontWeights.semibold,
-            color: cs.onSurface,
+      },
+      child: Semantics(
+        button: true,
+        enabled: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTap: () {
+            Haptics.light();
+            widget.onTap();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(overlay, bg),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.35),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.onSurface,
+              ),
+            ),
           ),
         ),
       ),
@@ -273,6 +297,7 @@ class _FormSheetFilledButton extends StatefulWidget {
 
 class _FormSheetFilledButtonState extends State<_FormSheetFilledButton> {
   bool _pressed = false;
+  bool _focused = false;
 
   bool get _enabled => widget.onTap != null && !widget.busy;
 
@@ -282,48 +307,68 @@ class _FormSheetFilledButtonState extends State<_FormSheetFilledButton> {
     final fill = widget.destructive ? cs.error : cs.primary;
     final onFill = widget.destructive ? cs.onError : cs.onPrimary;
     final bg = _enabled ? fill : fill.withValues(alpha: 0.4);
-    final overlay = _pressed
+    final overlay = _pressed || _focused
         ? onFill.withValues(alpha: 0.12)
         : Colors.transparent;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: _enabled ? (_) => setState(() => _pressed = false) : null,
-      onTapCancel: _enabled ? () => setState(() => _pressed = false) : null,
-      onTap: _enabled
-          ? () {
-              Haptics.light();
-              widget.onTap!();
-            }
-          : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(overlay, bg),
-          borderRadius: BorderRadius.circular(12),
+    return FocusableActionDetector(
+      enabled: _enabled,
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
         ),
-        alignment: Alignment.center,
-        child: widget.busy
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: onFill.withValues(
-                    alpha: widget.onTap == null ? 0.6 : 1,
+      },
+      child: Semantics(
+        button: true,
+        enabled: _enabled,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
+          onTapUp: _enabled ? (_) => setState(() => _pressed = false) : null,
+          onTapCancel: _enabled ? () => setState(() => _pressed = false) : null,
+          onTap: _enabled
+              ? () {
+                  Haptics.light();
+                  widget.onTap!();
+                }
+              : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(overlay, bg),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: widget.busy
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: onFill.withValues(
+                        alpha: widget.onTap == null ? 0.6 : 1,
+                      ),
+                    ),
+                  )
+                : Text(
+                    widget.label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.emphasis,
+                      color: onFill.withValues(alpha: _enabled ? 1 : 0.6),
+                    ),
                   ),
-                ),
-              )
-            : Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: AppFontWeights.emphasis,
-                  color: onFill.withValues(alpha: _enabled ? 1 : 0.6),
-                ),
-              ),
+          ),
+        ),
       ),
     );
   }

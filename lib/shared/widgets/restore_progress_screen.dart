@@ -36,11 +36,16 @@ class RestoreProgressScreen extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   ),
                   const SizedBox(height: 28),
-                  Text(
-                    l10n.restoreProgressTitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  ValueListenableBuilder<RestoreStartupStage>(
+                    valueListenable: stage,
+                    builder: (context, value, _) => Text(
+                      value == RestoreStartupStage.protectingData
+                          ? l10n.recoveryProtectingTitle
+                          : l10n.restoreProgressTitle,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -74,6 +79,7 @@ class RestoreProgressScreen extends StatelessWidget {
 
   static String _stageLabel(AppLocalizations l10n, RestoreStartupStage stage) =>
       switch (stage) {
+        RestoreStartupStage.protectingData => l10n.recoveryProtectingData,
         RestoreStartupStage.checkingBackup =>
           l10n.restoreProgressStageCheckingBackup,
         RestoreStartupStage.preservingCurrentData =>

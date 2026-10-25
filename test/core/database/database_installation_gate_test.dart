@@ -138,7 +138,7 @@ void main() {
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            'database_missing',
+            'database_missing_with_prior_data',
           ),
         ),
       );
@@ -397,7 +397,7 @@ void main() {
         expect(withoutHive, DatabaseRecoveryAction.none);
       });
 
-      test('首启半成品库（userVersion=0）可自动重建', () async {
+      test('首启半成品库也必须显式恢复，不能自动重建', () async {
         final raw = sqlite.sqlite3.open(databaseFile(directory).path);
         raw.close();
 
@@ -407,7 +407,7 @@ void main() {
           legacyHiveDataPresent: false,
         );
 
-        expect(action, DatabaseRecoveryAction.rebuildAutomatically);
+        expect(action, DatabaseRecoveryAction.none);
       });
 
       test('列出改名副本时按时间倒序并算上整个 family', () async {
@@ -565,7 +565,7 @@ void main() {
           legacyHiveDataPresent: false,
         );
 
-        expect(action, DatabaseRecoveryAction.rebuildAutomatically);
+        expect(action, DatabaseRecoveryAction.none);
       });
 
       test('先前的 displaced 副本阻止再次自动重建', () async {
@@ -653,16 +653,18 @@ void main() {
         );
 
         final names = displacedNames(directory);
-        expect(names, hasLength(3));
+        expect(names, hasLength(1));
         final base = names.firstWhere(
           (name) => !name.endsWith('-wal') && !name.endsWith('-shm'),
         );
         expect(
-          await File(p.join(directory.path, base)).readAsString(),
+          await File(p.join(directory.path, base, 'kelivo.db')).readAsString(),
           'not a sqlite database',
         );
         expect(
-          await File(p.join(directory.path, '$base-wal')).readAsString(),
+          await File(
+            p.join(directory.path, base, 'kelivo.db-wal'),
+          ).readAsString(),
           'stale wal',
         );
       });
@@ -683,7 +685,7 @@ void main() {
         expect(displacedNames(directory), isEmpty);
       });
 
-      test('副本代数有上限，但最旧的那代永远保留', () async {
+      test('重复恢复保留所有历史数据库副本', () async {
         // The oldest generation holds what was on disk before anything started
         // displacing; a retrying caller must not be able to walk it off the
         // end of the window.
@@ -708,14 +710,16 @@ void main() {
         final bases = names
             .where((name) => !name.endsWith('-wal') && !name.endsWith('-shm'))
             .toList();
-        expect(bases, hasLength(3));
+        expect(bases, hasLength(5));
         final contents = <String>[
           for (final base in bases)
-            await File(p.join(directory.path, base)).readAsString(),
+            await File(
+              p.join(directory.path, base, 'kelivo.db'),
+            ).readAsString(),
         ];
         expect(contents, contains('generation 0'));
         expect(contents, contains('generation 4'));
-        expect(contents, isNot(contains('generation 1')));
+        expect(contents, contains('generation 1'));
       });
     });
 
@@ -921,12 +925,7 @@ void main() {
         expect(displaced, isNotEmpty);
         expect(
           await File(
-            p.join(
-              directory.path,
-              displaced.firstWhere(
-                (name) => !name.endsWith('-wal') && !name.endsWith('-shm'),
-              ),
-            ),
+            p.join(directory.path, displaced.single, 'kelivo.db'),
           ).readAsString(),
           'not a sqlite database',
         );
@@ -955,7 +954,7 @@ void main() {
                   '${AppDatabase.databaseFileName}'
                   '${DatabaseInstallationGate.displacedDatabasePrefix}',
                 ))
-              await File(entity.path).readAsString(),
+              await File(p.join(entity.path, 'kelivo.db')).readAsString(),
         ];
         expect(surviving, contains('ORIGINAL USER DATA'));
       });

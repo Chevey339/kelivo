@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -286,6 +287,7 @@ Future<void> _toolsEndToEnd({
     skillsHostDir: skillsDir.path,
   );
   final ctx = WorkspaceToolContext(
+    permissionMode: ToolPermissionMode.fullAccess,
     workspace: Workspace(
       id: 'ws-macos',
       name: 'macOS verify',
@@ -293,7 +295,7 @@ Future<void> _toolsEndToEnd({
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
     ),
-    binding: const WorkspaceBinding(workspaceId: 'ws-macos', allowAll: true),
+    binding: const WorkspaceBinding(workspaceId: 'ws-macos'),
     paths: paths,
     sessionDir: sessionDir,
     outputsDir: outputsDir,

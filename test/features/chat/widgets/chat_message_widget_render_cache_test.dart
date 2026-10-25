@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -67,8 +68,11 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.textContaining('visible think answer'), findsOneWidget);
-      expect(find.textContaining('<think>'), findsNothing);
+      expect(
+        renderedParagraphsWith('visible think answer', exact: false),
+        hasLength(1),
+      );
+      expect(renderedParagraphsWith('<think>', exact: false), isEmpty);
 
       // Reset after the initial builds; identical rebuilds must not reparse.
       ThinkingTagParser.debugParseCount = 0;
@@ -81,12 +85,18 @@ void main() {
         () => content = '<think>new reasoning</think>updated think answer',
       );
       await tester.pump();
-      expect(ThinkingTagParser.debugParseCount, greaterThan(0));
-      expect(find.textContaining('updated think answer'), findsOneWidget);
+      expect(ThinkingTagParser.debugParseCount, 1);
+      expect(
+        renderedParagraphsWith('updated think answer', exact: false),
+        hasLength(1),
+      );
 
       // The memoized result must match a fresh parse of the same source.
       final fresh = ThinkingTagParser.parseLegacyInlineBlocks(content);
-      expect(find.textContaining(fresh.visibleContent), findsOneWidget);
+      expect(
+        renderedParagraphsWith(fresh.visibleContent, exact: false),
+        hasLength(1),
+      );
     },
   );
 }
