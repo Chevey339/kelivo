@@ -115,6 +115,7 @@ class FileBrowser extends StatefulWidget {
     this.emptyTitle,
     this.emptyHint,
     this.onOpenTerminal,
+    this.onOpenFile,
     this.scrollController,
   });
 
@@ -132,6 +133,7 @@ class FileBrowser extends StatefulWidget {
   final String? emptyTitle;
   final String? emptyHint;
   final VoidCallback? onOpenTerminal;
+  final Future<void> Function(File file)? onOpenFile;
 
   /// The host's scroll controller, when it needs to read the list's offset —
   /// a bottom sheet decides from it whether a downward drag scrolls the list or
@@ -332,7 +334,11 @@ class FileBrowserState extends State<FileBrowser> {
     }
     if (widget.pickDirectoryMode) return;
     if (!mounted) return;
-    await showFilePreview(context, File(entry.hostPath), title: entry.name);
+    if (widget.onOpenFile case final open?) {
+      await open(File(entry.hostPath));
+    } else {
+      await showFilePreview(context, File(entry.hostPath), title: entry.name);
+    }
   }
 
   void _showSnack(String message, NotificationType type) {

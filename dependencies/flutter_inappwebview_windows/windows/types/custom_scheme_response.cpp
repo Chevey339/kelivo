@@ -32,9 +32,7 @@ namespace flutter_inappwebview_plugin
     if (webViewEnvironment) {
       wil::com_ptr<IStream> postDataStream = nullptr;
       if (!data.empty()) {
-        auto postData = std::string(data.begin(), data.end());
-        postDataStream = SHCreateMemStream(
-          reinterpret_cast<const BYTE*>(postData.data()), static_cast<UINT>(postData.length()));
+        postDataStream = SHCreateMemStream(data.data(), static_cast<UINT>(data.size()));
       }
 
       webViewEnvironment->CreateWebResourceResponse(
@@ -44,14 +42,15 @@ namespace flutter_inappwebview_plugin
         nullptr,
         &webResourceResponse);
 
+      if (!webResourceResponse) return nullptr;
       wil::com_ptr<ICoreWebView2HttpResponseHeaders> responseHeaders;
       if (SUCCEEDED(webResourceResponse->get_Headers(&responseHeaders))) {
         if (!contentType.empty()) {
-          responseHeaders->AppendHeader(L"Content-Type", utf8_to_wide(contentType).c_str());
+          const auto type = contentType + (contentEncoding.empty() ? "" : "; charset=" + contentEncoding);
+          responseHeaders->AppendHeader(L"Content-Type", utf8_to_wide(type).c_str());
         }
-        if (!contentEncoding.empty()) {
-          responseHeaders->AppendHeader(L"Content-Encoding", utf8_to_wide(contentEncoding).c_str());
-        }
+        responseHeaders->AppendHeader(L"Cache-Control", L"no-store");
+        responseHeaders->AppendHeader(L"X-Content-Type-Options", L"nosniff");
       }
 
       webResourceResponse->AddRef();

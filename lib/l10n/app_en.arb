@@ -6285,6 +6285,7 @@
   "browserActionSnapshot": "Read page structure",
   "browserActionClick": "Click",
   "browserActionType": "Type",
+  "browserActionSelect": "Select option",
   "browserActionPress": "Press key",
   "browserActionScroll": "Scroll",
   "browserActionWait": "Wait",

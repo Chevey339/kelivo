@@ -13844,6 +13844,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserActionType => 'Type';
 
   @override
+  String get browserActionSelect => 'Select option';
+
+  @override
   String get browserActionPress => 'Press key';
 
   @override

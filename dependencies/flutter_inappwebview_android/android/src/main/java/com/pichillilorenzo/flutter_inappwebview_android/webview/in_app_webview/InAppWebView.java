@@ -1056,11 +1056,12 @@ final public class InAppWebView extends InputAwareWebView implements InAppWebVie
       WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, newCustomSettings.requestedWithHeaderOriginAllowList);
     }
 
-    if (plugin != null) {
+    if (plugin != null && newSettingsMap.containsKey("webViewAssetLoader") &&
+            !Util.objEquals(customSettings.webViewAssetLoader, newCustomSettings.webViewAssetLoader)) {
       if (webViewAssetLoaderExt != null) {
         webViewAssetLoaderExt.dispose();
       }
-      webViewAssetLoaderExt = WebViewAssetLoaderExt.fromMap(customSettings.webViewAssetLoader, plugin, getContext());
+      webViewAssetLoaderExt = WebViewAssetLoaderExt.fromMap(newCustomSettings.webViewAssetLoader, plugin, getContext());
     }
 
     customSettings = newCustomSettings;

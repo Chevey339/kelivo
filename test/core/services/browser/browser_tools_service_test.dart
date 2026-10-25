@@ -35,6 +35,14 @@ void main() {
         {'action': 'click', 'x': 2},
         {'action': 'click', 'ref': 'e1', 'selector': 'button'},
         {'action': 'type', 'selector': 'input'},
+        {'action': 'select_option', 'selector': 'select'},
+        {
+          'action': 'select_option',
+          'selector': 'select',
+          'option_value': 'a',
+          'option_label': 'One',
+        },
+        {'action': 'extract', 'offset': -1},
         {'action': 'close_tab'},
         {'action': 'snapshot', 'max_elements': 201},
         {'action': 'wait', 'timeout': 99999},
@@ -112,7 +120,11 @@ void main() {
             required onNewWindow,
             required isAgentActive,
           }) async {
-            return engines[tab.id] = _Engine(onChanged, loadError: loadError);
+            return engines[tab.id] = _Engine(
+              onChanged,
+              loadError: loadError,
+              onNewWindow: onNewWindow,
+            );
           },
     );
     await browser.initialize();
@@ -375,6 +387,12 @@ void main() {
         );
         expect(result['ok'], isFalse);
         expect(result['error'], contains('TimeoutException'));
+        expect(
+          result['page']['tab_id'],
+          browser.selectedTabForSession('chat-a')!.id,
+        );
+        expect(result['page']['url'], isNotNull);
+        expect(result['page']['navigation_state'], isNotNull);
         expect(result['error'], isNot(contains('browser_human_control')));
         expect(browser.agentPaused, isFalse);
         expect(browser.agentPauseReason, isNull);
@@ -405,6 +423,123 @@ void main() {
       },
     );
   }
+
+  test(
+    'select, continuation and URL waits preserve the tool contract',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      final selected = payload(
+        await tools.handle('chat-a', {
+          'action': 'select_option',
+          'selector': 'select',
+          'option_value': 'b',
+        }),
+      );
+      expect(selected['ok'], true);
+      expect(engine.lastAwaitPromise, true);
+      expect(engine.scripts.last, contains('"option_value":"b"'));
+      final continued = payload(
+        await tools.handle('chat-a', {'action': 'extract', 'offset': 1000}),
+      );
+      expect(continued['ok'], true);
+      engine.waitReady = true;
+      engine.documentUrl = 'https://example.com/next';
+      final ready = payload(
+        await tools.handle('chat-a', {
+          'action': 'wait',
+          'wait_for_url': '/next',
+          'timeout': 100,
+        }),
+      );
+      expect(ready['ok'], true);
+      final timedOut = payload(
+        await tools.handle('chat-a', {
+          'action': 'wait',
+          'wait_for_url': '/missing',
+          'timeout': 100,
+        }),
+      );
+      expect(timedOut['ok'], false);
+      expect(browser.agentPaused, false);
+    },
+  );
+
+  test(
+    'rejected input reports current page and never claims success',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      engines.values.single.domError = 'input_value_rejected';
+      final result = await tools.handle('chat-a', {
+        'action': 'type',
+        'selector': 'input',
+        'text': 'x',
+      });
+      expect(payload(result)['ok'], false);
+      expect(payload(result)['page']['tab_id'], browser.tabs.single.id);
+      expect(result.metadata!['browser']['tabId'], browser.tabs.single.id);
+      expect(browser.agentPaused, false);
+    },
+  );
+
+  test(
+    'action results report popup ownership and bounded dialog events',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final parent = engines.values.single;
+      final parentId = browser.tabs.single.id;
+      parent.onEvaluation = () async {
+        parent.onEvaluation = null;
+        parent.onChanged(
+          const BrowserPageState(
+            agentEvent: {
+              'type': 'dialog',
+              'dialog': 'confirm',
+              'response': 'dismissed',
+            },
+          ),
+        );
+        unawaited(parent.onNewWindow!('https://example.com/child', 101));
+      };
+      final result = payload(
+        await tools.handle('chat-a', {
+          'action': 'click',
+          'selector': 'a',
+        }, capturePreview: false),
+      );
+      expect(result['ok'], true);
+      expect(result['page']['tab_id'], parentId);
+      expect(result['page']['events'], [
+        {'type': 'dialog', 'dialog': 'confirm', 'response': 'dismissed'},
+      ]);
+      expect(result['page']['opened_tabs'], hasLength(1));
+      expect(
+        result['page']['opened_tabs'][0]['url'],
+        'https://example.com/child',
+      );
+      expect(browser.tabs.last.ownerSessionId, 'chat-a');
+      final next = payload(
+        await tools.handle('chat-a', {
+          'action': 'snapshot',
+          'tab_id': parentId,
+        }, capturePreview: false),
+      );
+      expect(next['page'].containsKey('events'), false);
+      expect(next['page'].containsKey('opened_tabs'), false);
+    },
+  );
 
   test('selector wait timeout does not pause later browser actions', () async {
     await enable();
@@ -871,7 +1006,9 @@ void main() {
 }
 
 class _Engine extends BrowserEngine {
-  _Engine(this.onChanged, {this.loadError});
+  _Engine(this.onChanged, {this.loadError, this.onNewWindow});
+  final Future<bool> Function(String?, int)? onNewWindow;
+  Future<void> Function()? onEvaluation;
   final void Function(BrowserPageState) onChanged;
   final scripts = <String>[];
   String? domError;
@@ -881,6 +1018,8 @@ class _Engine extends BrowserEngine {
   TimeoutException? loadError;
   TimeoutException? evaluationError;
   bool waitReady = false;
+  bool lastAwaitPromise = false;
+  String documentUrl = 'https://example.com';
   int stopCalls = 0;
   @override
   Widget buildView() => const SizedBox.shrink();
@@ -895,6 +1034,8 @@ class _Engine extends BrowserEngine {
   @override
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async {
     scripts.add(source);
+    lastAwaitPromise = awaitPromise;
+    if (onEvaluation != null) await onEvaluation!();
     if (evaluationError case final error?) throw error;
     if (source == 'document.readyState') return 'complete';
     if (source.startsWith('JSON.stringify({width:innerWidth')) {
@@ -902,7 +1043,7 @@ class _Engine extends BrowserEngine {
     }
     if (domError != null) return jsonEncode({'ok': false, 'error': domError});
     if (source.contains('const action = "wait"')) {
-      return jsonEncode({'ok': true, 'ready': waitReady});
+      return jsonEncode({'ok': true, 'ready': waitReady, 'url': documentUrl});
     }
     if (source.contains('const action = "extract"')) {
       return '{"ok":true,"content":"A real page result"}';

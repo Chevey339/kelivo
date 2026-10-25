@@ -4952,6 +4952,7 @@
   "browserActionSnapshot": "讀取頁面結構",
   "browserActionClick": "點擊",
   "browserActionType": "輸入文字",
+  "browserActionSelect": "選擇選項",
   "browserActionPress": "按鍵",
   "browserActionScroll": "捲動頁面",
   "browserActionWait": "等待頁面",

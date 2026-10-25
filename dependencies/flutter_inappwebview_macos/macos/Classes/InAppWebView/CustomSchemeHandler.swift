@@ -20,7 +20,15 @@ public class CustomSchemeHandler: NSObject, WKURLSchemeHandler {
         let callback = WebViewChannelDelegate.LoadResourceWithCustomSchemeCallback()
         callback.nonNullSuccess = { (response: CustomSchemeResponse) in
             if (self.schemeHandlers[urlSchemeTask.hash] != nil) {
-                let urlResponse = URLResponse(url: request.url, mimeType: response.contentType, expectedContentLength: -1, textEncodingName: response.contentEncoding)
+                // A URLResponse produces fetch status 0 in WebKit. Local resources
+                // need an HTTP-shaped response for modules and fetch().ok.
+                let urlResponse = HTTPURLResponse(url: request.url, statusCode: 200,
+                    httpVersion: "HTTP/1.1", headerFields: [
+                        "Content-Type": response.contentType + "; charset=" + response.contentEncoding,
+                        "Content-Length": String(response.data.count),
+                        "Cache-Control": "no-store",
+                        "X-Content-Type-Options": "nosniff"
+                    ])!
                 urlSchemeTask.didReceive(urlResponse)
                 urlSchemeTask.didReceive(response.data)
                 urlSchemeTask.didFinish()
@@ -28,9 +36,12 @@ public class CustomSchemeHandler: NSObject, WKURLSchemeHandler {
             }
             return false
         }
-        callback.error = { (code: String, message: String?, details: Any?) in
-            print(code + ", " + (message ?? ""))
+        let fail = {
+            guard self.schemeHandlers.removeValue(forKey: urlSchemeTask.hash) != nil else { return }
+            urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
         }
+        callback.defaultBehaviour = { _ in fail() }
+        callback.error = { _, _, _ in fail() }
         
         if let channelDelegate = inAppWebView.channelDelegate {
             channelDelegate.onLoadResourceWithCustomScheme(request: request, callback: callback)

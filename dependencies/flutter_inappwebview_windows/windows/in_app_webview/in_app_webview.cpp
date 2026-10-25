@@ -18,6 +18,7 @@
 #include "../utils/strconv.h"
 #include "../utils/string.h"
 #include "../webview_environment/webview_environment_manager.h"
+#include "../webview_environment/kelivo_scheme.h"
 #include "in_app_webview.h"
 #include "in_app_webview_manager.h"
 
@@ -225,8 +226,10 @@ namespace flutter_inappwebview_plugin
       hr = callback(S_OK, webViewEnvironment->getEnvironment());
     }
     else {
+      auto options = Make<CoreWebView2EnvironmentOptions>();
+      registerKelivoScheme(options.Get());
       hr = CreateCoreWebView2EnvironmentWithOptions(
-        nullptr, nullptr, nullptr,
+        nullptr, nullptr, options.Get(),
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(callback).Get());
     }
 
@@ -851,24 +854,29 @@ namespace flutter_inappwebview_plugin
             auto url = request->url.has_value() ? request->url.value() : "";
             auto isCustomScheme = !url.empty() && !starts_with(url, std::string{ "file://" }) && !starts_with(url, std::string{ "http://" }) && !starts_with(url, std::string{ "https://" });
 
-            auto onLoadResourceWithCustomSchemeCallback = [this, deferral, request, args]()
+            // Resource I/O completes asynchronously in Dart. Retain COM
+            // arguments/environment and do not dereference a disposed view.
+            wil::com_ptr<ICoreWebView2WebResourceRequestedEventArgs> resourceArgs = args;
+            auto environment = webViewEnv;
+            auto onLoadResourceWithCustomSchemeCallback = [this, alive = alive_, deferral, request, resourceArgs, environment]()
               {
-                if (channelDelegate) {
+                if (*alive && channelDelegate) {
                   auto callback = std::make_unique<WebViewChannelDelegate::LoadResourceWithCustomSchemeCallback>();
-                  auto defaultBehaviour = [this, deferral, args](const std::optional<std::shared_ptr<CustomSchemeResponse>> response)
+                  auto defaultBehaviour = [deferral](const std::optional<std::shared_ptr<CustomSchemeResponse>> response)
                     {
                       failedLog(deferral->Complete());
                     };
-                  callback->nonNullSuccess = [this, deferral, args](const std::shared_ptr<CustomSchemeResponse> response)
+                  callback->nonNullSuccess = [deferral, resourceArgs, environment](const std::shared_ptr<CustomSchemeResponse> response)
                     {
-                      args->put_Response(response->toWebView2Response(webViewEnv));
+                      wil::com_ptr<ICoreWebView2WebResourceResponse> nativeResponse;
+                      nativeResponse.attach(response->toWebView2Response(environment));
+                      if (nativeResponse) resourceArgs->put_Response(nativeResponse.get());
                       failedLog(deferral->Complete());
                       return false;
                     };
                   callback->defaultBehaviour = defaultBehaviour;
-                  callback->error = [this, defaultBehaviour](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
+                  callback->error = [defaultBehaviour](const std::string&, const std::string&, const flutter::EncodableValue*)
                     {
-                      debugLog(error_code + ", " + error_message);
                       defaultBehaviour(std::nullopt);
                     };
                   channelDelegate->onLoadResourceWithCustomScheme(request, std::move(callback));

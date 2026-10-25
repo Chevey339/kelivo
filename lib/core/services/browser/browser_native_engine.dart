@@ -7,12 +7,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+// The wrapper does not expose path-handler disposal; own its Android channel.
+// ignore: depend_on_referenced_packages
+import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
+    show AndroidPathHandler;
 import '../../../features/browser/models/browser_models.dart';
 import 'browser_engine.dart';
 import 'browser_download_cookies.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
 import 'browser_scroll_observer.dart';
+import 'browser_workspace_resources.dart';
 
 const browserHistoryHandlerName = 'kelivoBrowserHistory';
 const browserHistoryDocumentScript =
@@ -70,8 +75,17 @@ class NativeBrowserEngine implements BrowserEngine {
     required this.onDownload,
     required this.onNewWindow,
     required this.isAgentActive,
-  });
+  }) : _ownerSessionId = tab.ownerSessionId;
   final BrowserTab tab;
+  String? _ownerSessionId;
+  int _workspaceEpoch = 0;
+  bool get hasWorkspaceScope => _workspace != null;
+  void updateOwnerSession(String sessionId) {
+    _workspaceEpoch++;
+    _ownerSessionId = sessionId;
+    _workspace?.close();
+  }
+
   BrowserSettings settings;
   final void Function(BrowserPageState) onChanged;
   final void Function(String, String?) onDownload;
@@ -85,10 +99,14 @@ class NativeBrowserEngine implements BrowserEngine {
       ? null
       : FindInteractionController();
   String _findText = '';
+  BrowserWorkspaceScope? _workspace;
+  WebViewAssetLoader? _workspaceLoader;
+  _WorkspacePathHandler? _workspacePathHandler;
   final Completer<InAppWebViewController> _created = Completer();
   HeadlessInAppWebView? _headless;
   InAppWebViewController? _controller;
   bool _disposed = false;
+  Future<void> _dialogBridgeReady = Future<void>.value();
   Completer<void>? _viewReady;
   bool _visible = true;
   Future<void> _visibilityUpdate = Future<void>.value();
@@ -197,6 +215,8 @@ class NativeBrowserEngine implements BrowserEngine {
     // each WebView scroll frame.
     useHybridComposition: _usesHybridComposition,
     javaScriptEnabled: true,
+    resourceCustomSchemes: const ['kelivo'],
+    webViewAssetLoader: _workspaceLoader,
     useShouldOverrideUrlLoading: true,
     useOnDownloadStart: true,
     supportMultipleWindows: true,
@@ -240,8 +260,9 @@ class NativeBrowserEngine implements BrowserEngine {
     // A new WebView already owns an empty document. Loading about:blank again
     // races the first loadData: its late stop can be mistaken for the rendered
     // document's completion before that document's start callback arrives.
+    final initialUrl = await _prepareWorkspaceUrl(tab.url);
     final initialRequest = tab.windowId == null && tab.url != 'about:blank'
-        ? URLRequest(url: WebUri(tab.url))
+        ? URLRequest(url: WebUri(initialUrl))
         : null;
     _headless = HeadlessInAppWebView(
       initialSize: Size(
@@ -266,6 +287,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onCreateWindow: _onCreateWindow,
       onCloseWindow: (_) => _emit(const BrowserPageState(closeRequested: true)),
       onDownloadStartRequest: _onDownload,
+      onLoadResourceWithCustomScheme: _onWorkspaceResource,
       onPermissionRequest: _onPermission,
       onJsAlert: _onAlert,
       onJsConfirm: _onConfirm,
@@ -275,6 +297,7 @@ class NativeBrowserEngine implements BrowserEngine {
     );
     await _headless!.run().timeout(const Duration(seconds: 20));
     await _created.future.timeout(const Duration(seconds: 20));
+    await _dialogBridgeReady;
     if (tab.windowId == null && initialRequest == null) {
       _emit(
         const BrowserPageState(
@@ -315,7 +338,51 @@ class NativeBrowserEngine implements BrowserEngine {
         callback: _scrollObserver.handle,
       );
     }
+    if (Platform.isWindows) {
+      _dialogBridgeReady = _installWindowsDialogs(_controller!);
+    }
     if (!_created.isCompleted) _created.complete(_controller);
+  }
+
+  String publicUrl(String url) => _workspace?.publicUrl(url) ?? url;
+
+  void _dialogEvent(String type, String? message, bool accept) {
+    final text = message ?? '';
+    _emit(
+      BrowserPageState(
+        agentEvent: {
+          'type': 'dialog',
+          'dialog': type,
+          'message': text.length > 512 ? text.substring(0, 512) : text,
+          'response': accept ? 'accepted' : 'dismissed',
+        },
+      ),
+    );
+  }
+
+  Future<void> _installWindowsDialogs(InAppWebViewController controller) async {
+    // CDP leaves the native human-facing dialogs intact. ScriptDialogOpening
+    // would require disabling every default dialog (including manual prompts).
+    await controller.addDevToolsProtocolEventListener(
+      eventName: 'Page.javascriptDialogOpening',
+      callback: (dynamic data) async {
+        if (_disposed || !isAgentActive() || data is! Map) return;
+        final type = data['type']?.toString() ?? 'confirm';
+        final accept = type == 'alert';
+        try {
+          await controller.callDevToolsProtocolMethod(
+            methodName: 'Page.handleJavaScriptDialog',
+            parameters: {'accept': accept},
+          );
+          if (!_disposed) {
+            _dialogEvent(type, data['message']?.toString(), accept);
+          }
+        } catch (_) {
+          // A human may already have dismissed it; never retry a confirmation.
+        }
+      },
+    );
+    await controller.callDevToolsProtocolMethod(methodName: 'Page.enable');
   }
 
   void _onLoadStart(InAppWebViewController controller, WebUri? url) {
@@ -352,7 +419,9 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   String? _pageUrl(WebUri? url) {
-    final value = url?.toString();
+    final value = url == null
+        ? null
+        : (_workspace?.publicUrl(url.toString()) ?? url.toString());
     final documentUrl = _renderedDocumentUrl;
     if (documentUrl == null || url == null) return value;
     // Android can report loadData's synthetic document as a data: URL even
@@ -698,6 +767,7 @@ class NativeBrowserEngine implements BrowserEngine {
   ) async {
     final url = action.request.url;
     if (url == null) return NavigationActionPolicy.CANCEL;
+    if (_workspace?.owns(url) == true) return NavigationActionPolicy.ALLOW;
     if (url.toString() == 'about:blank' ||
         url.scheme == 'http' ||
         url.scheme == 'https') {
@@ -728,10 +798,16 @@ class NativeBrowserEngine implements BrowserEngine {
     if (url != null &&
         url.toString() != 'about:blank' &&
         url.scheme != 'http' &&
-        url.scheme != 'https') {
+        url.scheme != 'https' &&
+        _workspace?.owns(url) != true) {
       return false;
     }
-    return onNewWindow(url?.toString(), action.windowId);
+    return onNewWindow(
+      url == null
+          ? null
+          : (_workspace?.publicUrl(url.toString()) ?? url.toString()),
+      action.windowId,
+    );
   }
 
   void _onDownload(
@@ -751,30 +827,39 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<JsAlertResponse?> _onAlert(
     InAppWebViewController controller,
     JsAlertRequest request,
-  ) async => isAgentActive()
-      ? JsAlertResponse(
-          handledByClient: true,
-          action: JsAlertResponseAction.CONFIRM,
-        )
-      : null;
+  ) async {
+    if (!isAgentActive()) return null;
+    _dialogEvent('alert', request.message, true);
+    return JsAlertResponse(
+      handledByClient: true,
+      action: JsAlertResponseAction.CONFIRM,
+    );
+  }
+
   Future<JsConfirmResponse?> _onConfirm(
     InAppWebViewController controller,
     JsConfirmRequest request,
-  ) async => isAgentActive()
-      ? JsConfirmResponse(
-          handledByClient: true,
-          action: JsConfirmResponseAction.CANCEL,
-        )
-      : null;
+  ) async {
+    if (!isAgentActive()) return null;
+    _dialogEvent('confirm', request.message, false);
+    return JsConfirmResponse(
+      handledByClient: true,
+      action: JsConfirmResponseAction.CANCEL,
+    );
+  }
+
   Future<JsPromptResponse?> _onPrompt(
     InAppWebViewController controller,
     JsPromptRequest request,
-  ) async => isAgentActive()
-      ? JsPromptResponse(
-          handledByClient: true,
-          action: JsPromptResponseAction.CANCEL,
-        )
-      : null;
+  ) async {
+    if (!isAgentActive()) return null;
+    _dialogEvent('prompt', request.message, false);
+    return JsPromptResponse(
+      handledByClient: true,
+      action: JsPromptResponseAction.CANCEL,
+    );
+  }
+
   void _onCrash() {
     _historyDocument = null;
     _historyCommandEpoch++;
@@ -842,6 +927,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onCreateWindow: _onCreateWindow,
       onCloseWindow: (_) => _emit(const BrowserPageState(closeRequested: true)),
       onDownloadStartRequest: _onDownload,
+      onLoadResourceWithCustomScheme: _onWorkspaceResource,
       onPermissionRequest: _onPermission,
       onJsAlert: _onAlert,
       onJsConfirm: _onConfirm,
@@ -853,8 +939,79 @@ class NativeBrowserEngine implements BrowserEngine {
 
   InAppWebViewController get _webView =>
       _controller ?? (throw StateError('browser_engine_not_ready'));
+  Future<String> _prepareWorkspaceUrl(String url) async {
+    if (!BrowserWorkspaceResources.isWorkspaceUrl(url)) return url;
+    final epoch = _workspaceEpoch;
+    final owner = _ownerSessionId;
+    void checkOwner() {
+      if (_disposed || epoch != _workspaceEpoch) {
+        throw StateError('browser_tab_owner_changed');
+      }
+    }
+
+    final next = await BrowserWorkspaceResources.instance.scope(owner);
+    try {
+      checkOwner();
+      await next.file(Uri.parse(url));
+      checkOwner();
+      if (_workspace?.host == next.host) {
+        next.close();
+      } else {
+        _workspace?.close();
+        _workspace = next;
+        if (Platform.isAndroid) {
+          _workspacePathHandler?.close();
+          _workspacePathHandler = _WorkspacePathHandler(next);
+          _workspaceLoader = WebViewAssetLoader(
+            domain: next.host,
+            httpAllowed: false,
+            pathHandlers: [_workspacePathHandler!],
+          );
+          if (_controller != null) {
+            await _webView.setSettings(settings: _viewSettings);
+            checkOwner();
+          }
+        }
+      }
+      return _workspace!
+          .internalUrl(url, android: Platform.isAndroid)
+          .toString();
+    } catch (_) {
+      next.close();
+      if (identical(_workspace, next)) _workspace = null;
+      rethrow;
+    }
+  }
+
+  Future<CustomSchemeResponse?> _onWorkspaceResource(
+    InAppWebViewController controller,
+    WebResourceRequest request,
+  ) async {
+    final scope = _workspace;
+    final uri = Uri.tryParse(request.url.toString());
+    if (scope == null ||
+        uri == null ||
+        uri.scheme != 'kelivo' ||
+        !scope.owns(uri) ||
+        request.method != 'GET') {
+      return null;
+    }
+    final resource = await scope.read(uri);
+    if (resource == null) return null;
+    return CustomSchemeResponse(
+      data: resource.bytes,
+      contentType: resource.mime,
+      contentEncoding: 'utf-8',
+    );
+  }
+
   @override
   Future<void> navigate(String url) async {
+    final epoch = _workspaceEpoch;
+    url = await _prepareWorkspaceUrl(url);
+    if (_disposed || epoch != _workspaceEpoch) {
+      throw StateError('browser_tab_owner_changed');
+    }
     _renderedDocumentUrl = null;
     _awaitingRenderedLoadStart = false;
     _replacingRenderedDocument = false;
@@ -1168,6 +1325,9 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _workspace?.close();
+    _workspacePathHandler?.close();
+    _workspacePathHandler = null;
     _composition.dispose();
     _historyCommandEpoch++;
     _finishHistoryTraversal();
@@ -1200,5 +1360,30 @@ class NativeBrowserEngine implements BrowserEngine {
     } else if (Platform.isAndroid) {
       await WebStorageManager.instance().deleteAllData();
     }
+  }
+}
+
+class _WorkspacePathHandler extends CustomPathHandler {
+  _WorkspacePathHandler(this.scope) : super(path: '/');
+  final BrowserWorkspaceScope scope;
+  void close() => (platform as AndroidPathHandler).dispose();
+
+  @override
+  Future<WebResourceResponse?> handle(String path) async {
+    // Android's asset loader supplies a decoded path, not a URL. Re-encode it
+    // once; the common resolver still rejects dot segments and symlink escapes.
+    final uri = Uri(scheme: 'https', host: scope.host, path: '/$path');
+    final resource = await scope.read(uri);
+    return WebResourceResponse(
+      data: resource?.bytes ?? Uint8List(0),
+      contentType: resource?.mime ?? 'text/plain',
+      contentEncoding: 'utf-8',
+      statusCode: resource == null ? 404 : 200,
+      reasonPhrase: resource == null ? 'Not Found' : 'OK',
+      headers: const {
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    );
   }
 }

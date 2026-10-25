@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:Kelivo/core/services/browser/browser_favicon_loader.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
+import 'package:Kelivo/core/services/browser/browser_workspace_resources.dart';
 import 'package:Kelivo/core/services/browser/browser_native_engine.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
@@ -41,6 +42,214 @@ void main() {
       InAppWebViewPlatform.instance = previousPlatform;
     }
   });
+
+  test(
+    'workspace resources use scoped URLs and reject other tab origins',
+    () async {
+      final root = await Directory.systemTemp.createTemp('native-workspace-');
+      await File('${root.path}/index.html').writeAsString('<h1>Local</h1>');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (id) async => id == 'chat-a' ? root : null;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'chat-a',
+        url: 'kelivo://workspace/index.html',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      final uri = view.params.initialUrlRequest!.url!;
+      expect(uri.host, startsWith('ws-'));
+      expect(
+        view.params.initialSettings!.resourceCustomSchemes,
+        contains('kelivo'),
+      );
+      final response = await view.params.onLoadResourceWithCustomScheme!(
+        view.callbackController,
+        WebResourceRequest(url: uri, method: 'GET'),
+      );
+      expect(utf8.decode(response!.data), '<h1>Local</h1>');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(
+            url: WebUri('kelivo://other/index.html'),
+            method: 'GET',
+          ),
+        ),
+        isNull,
+      );
+      await view.start(uri.toString());
+      await view.stop(uri.toString());
+      expect(service.tabs.single.url, 'kelivo://workspace/index.html');
+    },
+  );
+
+  test(
+    'handoff changes workspace authority for live and previously local tabs',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-handoff-');
+      final a = await Directory('${root.path}/a').create();
+      final b = await Directory('${root.path}/b').create();
+      await File('${a.path}/index.html').writeAsString('A');
+      await File('${b.path}/index.html').writeAsString('B');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (id) async => id == 'a' ? a : b;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      await service.moveTabToSession(tab.id, 'b');
+      await service.navigate('kelivo://workspace/index.html', tabId: tab.id);
+      final view = platform.views.single;
+      final scopeB = await resources.scope('b');
+      final uriB = scopeB.internalUrl(
+        'kelivo://workspace/index.html',
+        android: false,
+      );
+      final response = await view.params.onLoadResourceWithCustomScheme!(
+        view.callbackController,
+        WebResourceRequest(url: WebUri(uriB.toString()), method: 'GET'),
+      );
+      expect(utf8.decode(response!.data), 'B');
+      await service.moveTabToSession(tab.id, 'a');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(url: WebUri(uriB.toString()), method: 'GET'),
+        ),
+        isNull,
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final next = platform.views.last;
+      final scopeA = await resources.scope('a');
+      final responseA = await next.params.onLoadResourceWithCustomScheme!(
+        next.callbackController,
+        WebResourceRequest(
+          url: WebUri(
+            scopeA
+                .internalUrl('kelivo://workspace/index.html', android: false)
+                .toString(),
+          ),
+          method: 'GET',
+        ),
+      );
+      expect(utf8.decode(responseA!.data), 'A');
+      expect(view.disposed, true);
+    },
+  );
+
+  test(
+    'missing local entry preserves current document and loading state',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-missing-');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (_) async => root;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      await view.start('https://example.com');
+      await view.stop('https://example.com');
+      final before = service.tabs.single;
+      await expectLater(
+        service.navigate('kelivo://workspace/missing.html', tabId: tab.id),
+        throwsA(isA<FileSystemException>()),
+      );
+      final after = service.tabs.single;
+      expect(after.url, before.url);
+      expect(after.isLoading, before.isLoading);
+      expect(after.hasContent, before.hasContent);
+    },
+  );
+
+  test(
+    'handoff during existing engine workspace preparation rejects stale authority',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-race-');
+      await File('${root.path}/index.html').writeAsString('A');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      final blocked = Completer<Directory?>();
+      final preparing = Completer<void>();
+      var calls = 0;
+      resources.rootForSession = (id) async {
+        calls++;
+        // Service scope + service file preflight complete. Block the native
+        // existing-engine scope acquisition immediately before it is installed.
+        if (calls == 3) {
+          preparing.complete();
+          return blocked.future;
+        }
+        return root;
+      };
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final navigation = service.navigate(
+        'kelivo://workspace/index.html',
+        tabId: tab.id,
+      );
+      final failed = expectLater(
+        navigation,
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'browser_tab_owner_changed',
+          ),
+        ),
+      );
+      await preparing.future;
+      await service.moveTabToSession(tab.id, 'b');
+      blocked.complete(root);
+      await failed;
+      expect(service.tabs.single.ownerSessionId, 'b');
+      expect(service.tabs.single.url, 'https://example.com');
+      final view = platform.views.single;
+      final scopeA = await resources.scope('a');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(
+            url: WebUri(
+              scopeA
+                  .internalUrl('kelivo://workspace/index.html', android: false)
+                  .toString(),
+            ),
+            method: 'GET',
+          ),
+        ),
+        isNull,
+      );
+    },
+  );
 
   Future<void> evict(String tabId) async {
     for (var index = 0; index < BrowserService.maxLiveViews; index++) {

@@ -39,11 +39,11 @@ try {
   snap = await snapshot();
   const old = snap.elements.find(el=>el.name==='Change').ref;
   await page.evaluate(()=>{document.querySelector('#status').textContent='external mutation';});
-  assert.match((await run('click',{ref:old})).error,/stale_ref/); checks++;
+  assert.equal((await run('click',{ref:old})).ok,true); checks++;
   snap = await snapshot();
   assert.equal((await run('click',{ref:snap.elements.find(el=>el.name==='Change').ref})).ok,true);
   assert.equal(await page.locator('#status').innerText(),'changed');
-  assert.match((await run('click',{ref:snap.elements.find(el=>el.name==='Change').ref})).error,/stale_ref/); checks++;
+  assert.equal((await run('click',{ref:snap.elements.find(el=>el.name==='Change').ref})).ok,true); checks++;
   assert.equal((await run('type',{selector:'#name',text:'Kelivo',clear_first:true})).ok,true);
   assert.equal(await page.locator('#name').inputValue(),'Kelivo');
   await run('type',{selector:'#name',text:' browser',clear_first:false});
@@ -79,5 +79,45 @@ try {
   assert.match((await run('click',{ref:snap.elements[0].ref})).error,/stale_ref/); checks++;
   await page.evaluate(()=>{const text=document.createElement('p');text.textContent='x'.repeat(5000);document.body.append(text);});
   assert.equal((await snapshot()).text.length,4000); checks++;
+  await page.setContent(`<main><div id="ticker">0</div><input id="value" placeholder="Hint only">
+    <input id="reject" oninput="this.value=''">
+    <input id="date" type="date"><input id="readonly" readonly>
+    <select id="choice"><option value="a">One</option><option value="b">Two</option><option disabled value="c">Three</option></select>
+    <a id="link" href="https://example.com/a">Stable link</a><button id="replace">Before</button></main>`);
+  snap = await snapshot();
+  const valueRef = snap.elements.find(e=>e.placeholder==='Hint only').ref;
+  await page.locator('#ticker').evaluate(el=>el.textContent='1');
+  assert.equal((await run('type',{ref:valueRef,text:'hello'})).verified,true);
+  assert.equal((await run('type',{ref:valueRef,text:' again',clear_first:false})).verified,true); checks++;
+  assert.match((await run('type',{selector:'#reject',text:'no'})).error,/input_value_rejected/);
+  assert.match((await run('type',{selector:'#date',text:'invalid date'})).error,/input_value_rejected/);
+  assert.match((await run('type',{selector:'#readonly',text:'no'})).error,/element_not_editable/); checks++;
+  assert.equal((await run('select_option',{selector:'#choice',option_label:'Two'})).value,'b');
+  assert.match((await run('select_option',{selector:'#choice',option_value:'c'})).error,/option_disabled/); checks++;
+  snap = await snapshot();
+  const linkRef = snap.elements.find(e=>e.tag==='a').ref;
+  await page.locator('#link').evaluate(el=>el.href='https://example.com/b');
+  assert.match((await run('click',{ref:linkRef})).error,/stale_ref/);
+  const replacedRef = snap.elements.find(e=>e.name==='Before').ref;
+  await page.locator('#replace').evaluate(el=>el.outerHTML='<button id="replace">Before</button>');
+  assert.match((await run('click',{ref:replacedRef})).error,/stale_ref/); checks++;
+  await page.setContent('<main><p>'+ 'x'.repeat(2200) +'</p>'+Array.from({length:12},(_,i)=>`<button>Item ${i}</button>`).join('')+'<button style="display:none">Hidden</button></main>');
+  const first = await run('extract',{format:'text',max_chars:1000});
+  const rest = await run('extract',{format:'text',max_chars:30000,offset:first.next_offset});
+  assert.equal(first.truncated,true); assert.equal(rest.truncated,false);
+  assert.equal(first.content.length+rest.content.length,first.total_chars); checks++;
+  snap = await snapshot({max_elements:5,include_text:false});
+  const second = await snapshot({max_elements:20,include_text:false,offset:snap.next_offset});
+  assert.equal(snap.elements.length,5); assert.equal(second.elements.length,7);
+  assert.equal(second.truncated,false); assert.equal(second.next_offset,null); checks++;
+  await page.locator('main').evaluate(el=>el.innerHTML='<a href="https://example.com/?q='+ 'a'.repeat(12000)+'">Long</a>');
+  snap = await snapshot();
+  assert.equal(snap.elements[0].href.length,512); assert.equal(snap.elements[0].href_truncated,true);
+  assert.ok(JSON.stringify(snap).length<2000); checks++;
+  assert.equal((await snapshot({include_elements:false})).truncated,false); checks++;
+  await page.setContent('<div contenteditable="true" id="editor">Draft</div>');
+  const editor = (await snapshot()).elements[0].ref;
+  assert.equal((await run('type',{ref:editor,text:'New draft'})).verified,true);
+  assert.equal((await run('press',{ref:editor,key:'Enter'})).ok,true); checks++;
   console.log(`PASS: ${checks} browser automation checks in ${await browser.version()}`);
 } finally { await browser.close(); }

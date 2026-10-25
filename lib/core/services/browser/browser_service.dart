@@ -11,6 +11,7 @@ import '../../../features/browser/models/browser_models.dart';
 import '../../../features/browser/models/browser_agent_activity.dart';
 import '../api/tool_call_cancellation.dart';
 import 'browser_engine.dart';
+import 'browser_workspace_resources.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_engine.dart';
 import 'browser_store.dart';
@@ -265,7 +266,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   static bool _isPageUrl(String value) {
-    if (value == 'about:blank') return true;
+    if (value == 'about:blank' ||
+        BrowserWorkspaceResources.isWorkspaceUrl(value)) {
+      return true;
+    }
     final uri = Uri.tryParse(value);
     return uri != null &&
         (uri.scheme == 'https' || uri.scheme == 'http') &&
@@ -290,7 +294,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     ).hasMatch(value);
     if (explicit && !hostWithPort) {
       if (!_isPageUrl(value)) {
-        throw const FormatException('Only HTTP and HTTPS pages are supported');
+        throw const FormatException('Use HTTP(S) or kelivo://workspace/ pages');
       }
       return Uri.parse(value).toString();
     }
@@ -440,6 +444,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             _engineGroups[_agentTabId] == group)) {
       throw StateError('browser_tab_busy');
     }
+    var releaseWorkspace = false;
+    for (final member in ids) {
+      final engine = _engines[member];
+      if (engine is NativeBrowserEngine) {
+        releaseWorkspace |= engine.hasWorkspaceScope;
+        engine.updateOwnerSession(sessionId);
+      }
+    }
     _lastTabBySession.removeWhere((_, tabId) => ids.contains(tabId));
     for (var index = 0; index < _tabs.length; index++) {
       if (ids.contains(_tabs[index].id)) {
@@ -448,6 +460,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           error: _tabs[index].error,
         );
       }
+    }
+    if (releaseWorkspace) {
+      for (final member in ids) {
+        _invalidatePreview(member);
+      }
+      await _disposeEngineGroup(group);
     }
     _selectTab(requireTab(id));
     _changed();
@@ -543,6 +561,20 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     final id = _target(tabId);
     _checkAction(id);
     final url = normalizeAddress(input, searchEngine: _settings.searchEngine);
+    if (BrowserWorkspaceResources.isWorkspaceUrl(url)) {
+      final owner = requireTab(id).ownerSessionId;
+      final scope = await BrowserWorkspaceResources.instance.scope(owner);
+      try {
+        await scope.file(Uri.parse(url));
+      } finally {
+        scope.close();
+      }
+      _checkAction(id);
+      if (requireTab(id).ownerSessionId != owner) {
+        throw StateError('browser_tab_owner_changed');
+      }
+    }
+    final previous = requireTab(id);
     _htmlDocuments.remove(id);
     final index = _tabs.indexWhere((tab) => tab.id == id);
     if (index >= 0) _tabs[index] = _tabs[index].copyWith(hasContent: false);
@@ -555,7 +587,25 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     requireTab(id);
     if (_navigationRevisions[id] != revision) return;
     if (!created) {
-      await _runEngineOperation(id, () => engine.navigate(url));
+      try {
+        await _runEngineOperation(id, () => engine.navigate(url));
+      } catch (error) {
+        if (error is StateError &&
+            error.message == 'browser_tab_owner_changed' &&
+            identical(_engines[id], engine) &&
+            _navigationRevisions[id] == revision) {
+          _updateTab(
+            id,
+            BrowserPageState(
+              url: previous.url,
+              title: previous.title,
+              isLoading: previous.isLoading,
+              progress: previous.progress,
+            ),
+          );
+        }
+        rethrow;
+      }
     }
   }
 
@@ -615,6 +665,30 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stop({String? tabId}) =>
       _call(_target(tabId), (engine) => engine.stop());
+  final List<Map<String, dynamic>> _actionEvents = [];
+  final Map<String, Set<Future<void>>> _pendingPopups = {};
+
+  List<Map<String, dynamic>> get actionEvents =>
+      List.unmodifiable(_actionEvents);
+
+  String publicDocumentUrl(String tabId, String url) {
+    final engine = _engines[tabId];
+    return engine is NativeBrowserEngine ? engine.publicUrl(url) : url;
+  }
+
+  /// Drain only popup handoffs that actually started. Ordinary actions do not
+  /// pay a fixed navigation delay, nor wait for unrelated network activity.
+  Future<void> settleActionEvents(String tabId) async {
+    await Future<void>.delayed(Duration.zero);
+    final pending = _pendingPopups[tabId]?.toList() ?? const <Future<void>>[];
+    if (pending.isNotEmpty) {
+      await Future.wait(
+        pending,
+      ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+    }
+    _checkAction(tabId);
+  }
+
   Future<Object?> evaluateJavascript(
     String source, {
     required String tabId,
@@ -1049,6 +1123,16 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           },
           onDownload: (url, name) {
             if (isCurrent()) {
+              if (_isRunningAgentAction &&
+                  _agentTabId == id &&
+                  _actionEvents.length < 8) {
+                _actionEvents.add({
+                  'type': 'download',
+                  'url': url,
+                  'file_name': name,
+                  'status': 'started',
+                });
+              }
               unawaited(
                 download(
                   url,
@@ -1067,6 +1151,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
                 ? _runningAgentGuard
                 : null;
             BrowserTab? child;
+            final done = Completer<void>();
+            (_pendingPopups[id] ??= {}).add(done.future);
             try {
               // Native events outlive the action that created their engine.
               // Apply only the triggering action's tab quota and selection;
@@ -1086,6 +1172,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             } catch (_) {
               if (child != null) await closeTab(child.id);
               return false;
+            } finally {
+              done.complete();
+              _pendingPopups[id]?.remove(done.future);
+              if (_pendingPopups[id]?.isEmpty == true) {
+                _pendingPopups.remove(id);
+              }
             }
           },
           isAgentActive: () => _isRunningAgentAction && _agentTabId == id,
@@ -1118,6 +1210,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         await engine.dispose();
         throw StateError('browser_renderer_terminated');
       }
+      if (requireTab(id).ownerSessionId != tab.ownerSessionId) {
+        await engine.dispose();
+        throw StateError('browser_tab_owner_changed');
+      }
       _engines[id] = engine;
       _engineGroups[id] = tab.popupGroupId ?? id;
       final currentIndex = _tabs.indexWhere((candidate) => candidate.id == id);
@@ -1142,6 +1238,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _updateTab(String id, BrowserPageState state) {
     if (_disposed) return;
+    if (state.agentEvent != null) {
+      if (_isRunningAgentAction &&
+          _agentTabId == id &&
+          _actionEvents.length < 8) {
+        _actionEvents.add(state.agentEvent!);
+      }
+      return;
+    }
     if (state.scroll != null) {
       _scrollStates[id] = state.scroll!;
       scrollPosition.value = (tabId: id, state: state.scroll!);
@@ -1433,6 +1537,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         _agentSessionId = sessionId;
         _agentAction = label;
         _runningAgentGuard = guard;
+        _actionEvents.clear();
         _notify();
         final running = Future<T>.sync(action);
         var cancellationRelevant = true;

@@ -63,6 +63,7 @@ class BrowserPageState {
     this.scroll,
     this.favicon,
     this.faviconPageUrl,
+    this.agentEvent,
   });
   final String? url;
   final String? title;
@@ -82,6 +83,7 @@ class BrowserPageState {
   /// A bounded, rasterized icon from this exact main document's session.
   final Uint8List? favicon;
   final String? faviconPageUrl;
+  final Map<String, dynamic>? agentEvent;
 }
 
 typedef BrowserEngineFactory =

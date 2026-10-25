@@ -24654,6 +24654,12 @@ abstract class AppLocalizations {
   /// **'Type'**
   String get browserActionType;
 
+  /// No description provided for @browserActionSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select option'**
+  String get browserActionSelect;
+
   /// No description provided for @browserActionPress.
   ///
   /// In en, this message translates to:

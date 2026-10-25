@@ -13196,6 +13196,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserActionType => '输入文字';
 
   @override
+  String get browserActionSelect => '选择选项';
+
+  @override
   String get browserActionPress => '按键';
 
   @override
@@ -26518,6 +26521,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionSelect => '选择选项';
 
   @override
   String get browserActionPress => '按键';
@@ -39921,6 +39927,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserActionType => '輸入文字';
+
+  @override
+  String get browserActionSelect => '選擇選項';
 
   @override
   String get browserActionPress => '按鍵';
