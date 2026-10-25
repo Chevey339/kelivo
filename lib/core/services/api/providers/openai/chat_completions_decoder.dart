@@ -6,6 +6,7 @@ import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'openai_request_shaping.dart';
+import 'reasoning_details_replay.dart';
 
 /// Stateful OpenAI Chat Completions SSE decoder. One instance per HTTP response.
 class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
@@ -35,6 +36,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       <int, Map<String, dynamic>>{};
 
   final List<dynamic> _details = <dynamic>[];
+  List<Map<String, dynamic>>? _reasoningBlocks;
   final Map<String, Map<String, dynamic>> _citationItems = {};
   final Map<int, String> _toolIdsByIndex = <int, String>{};
   final Set<String> _openToolIds = <String>{};
@@ -43,7 +45,10 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   bool _closed = false;
   bool _completed = false;
 
-  List<dynamic>? get reasoningDetails => _details.isEmpty ? null : _details;
+  // Keep raw deltas for snapshot detection, but expose complete blocks for
+  // persistence and tool continuation. Normalization copies the input maps.
+  List<Map<String, dynamic>>? get reasoningDetails =>
+      _reasoningBlocks ??= mergeReasoningDetails(_details);
 
   @override
   DecodeResult accept(SseEvent event) {
@@ -469,6 +474,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
 
   void _addReasoningDetails(List<dynamic> incoming) {
     if (incoming.isEmpty) return;
+    _reasoningBlocks = null;
     if (_details.isEmpty) {
       _details.addAll(incoming);
       return;

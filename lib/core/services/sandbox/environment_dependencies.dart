@@ -232,12 +232,20 @@ class EnvironmentDependencies extends ChangeNotifier {
     bool showOutput = false,
   }) async {
     if (_cancelled) throw StateError('Cancelled');
+    final config = await env.loadExecutionConfig();
+    if (_cancelled) throw StateError('Cancelled');
     final id = _runId = 'dependency-${const Uuid().v4()}';
     final output = <int>[];
     CommandExited? exit;
     try {
       await for (final event in runtime.run(
-        CommandRequest(runId: id, command: script, cwd: '/', timeout: timeout),
+        CommandRequest(
+          runId: id,
+          command: script,
+          cwd: '/',
+          timeout: timeout,
+          env: config.variables,
+        ),
       )) {
         if (event is CommandOutput) {
           output.addAll(event.bytes);

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
@@ -58,8 +59,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     await repository.updateConversationExtras(id, update);
     conversations[id] = (await repository.getConversation(id))!;
     revisions[id] = contextRevision(id) + 1;
@@ -369,6 +371,36 @@ void main() {
     });
   });
 
+  testWidgets('full injection toggles refresh the cached memory bucket', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      await seedUser('hello');
+      await putMemory('one', List.filled(500, 'word').join(' '));
+      await putMemory('two', List.filled(500, 'word').join(' '));
+      await settings.setMemoryInjectionMaxItems(1);
+      final g = generation();
+      final usage = usageService(g)..setActiveConversation('one');
+      try {
+        await usage.refresh('one', force: true);
+        final limited = usage.current!.buckets.memory;
+        await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+        await usage.refresh('one');
+        expect(usage.current!.buckets.memory, greaterThan(limited + 400));
+        expect(
+          usage.current!.buckets.memory,
+          estimateTokens((await preview(g)).memoryText),
+        );
+        await settings.setMemoryFullInjectionTypes({});
+        await usage.refresh('one');
+        expect(usage.current!.buckets.memory, limited);
+      } finally {
+        usage.dispose();
+      }
+    });
+  });
+
   testWidgets('data URI in plain text is counted in full', (tester) async {
     await mount(tester);
     await tester.runAsync(() async {
@@ -430,6 +462,8 @@ void main() {
     'delete',
     'scope',
     'limit',
+    'fullInjection',
+    'limitedInjection',
   ]) {
     for (final force in [false, true]) {
       testWidgets(
@@ -442,6 +476,9 @@ void main() {
             await putMemory('m1', 'first fact');
             await putMemory('m2', 'second fact');
             await settings.setMemoryInjectionMaxItems(1);
+            if (change == 'limitedInjection') {
+              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+            }
             final g = generation();
             final usage = usageService(g);
             if (!force) usage.setActiveConversation('one');
@@ -467,6 +504,12 @@ void main() {
                   await putMemory('m1', 'first fact', assistantId: 'other');
                 case 'limit':
                   await settings.setMemoryInjectionMaxItems(2);
+                case 'fullInjection':
+                  await settings.setMemoryFullInjectionTypes({
+                    MemoryType.identity,
+                  });
+                case 'limitedInjection':
+                  await settings.setMemoryFullInjectionTypes({});
               }
               final rebuilt = await preview(g);
               await usage.refresh('one', force: force);

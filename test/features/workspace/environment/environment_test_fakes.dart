@@ -37,6 +37,7 @@ class FakeEnvironmentManager implements EnvironmentManager {
   int checkForUpdateCalls = 0;
 
   EnvironmentState? installResult;
+  Object? resetError;
   String? updateVersion;
 
   @override
@@ -44,6 +45,7 @@ class FakeEnvironmentManager implements EnvironmentManager {
     installCalls += 1;
     final result = installResult;
     if (result != null) {
+      await env.setState(result);
       onProgress?.call(result);
     }
   }
@@ -61,6 +63,8 @@ class FakeEnvironmentManager implements EnvironmentManager {
   @override
   Future<void> reset() async {
     resetCalls += 1;
+    final error = resetError;
+    if (error != null) throw error;
   }
 
   @override

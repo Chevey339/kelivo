@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:reel_text/reel_text.dart';
 
+import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_page.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
 import 'package:Kelivo/features/migration/widgets/migration_backup_options.dart';
@@ -15,6 +17,207 @@ import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 void main() {
+  for (final interruptedSkip in [false, true]) {
+    testWidgets(
+      interruptedSkip
+          ? 'interrupted fresh start retries reset and then only offers restart'
+          : 'failed restart after skipping migration only offers restart',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(800, 1000);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final directory = Directory.systemTemp.createTempSync(
+          'kelivo_skip_restart_',
+        );
+        addTearDown(() => directory.deleteSync(recursive: true));
+        final hive = File('${directory.path}/conversations.hive')
+          ..writeAsStringSync('retained original');
+        File(
+          '${directory.path}/hive_to_sqlite_migration_attempt_v1.json',
+        ).writeAsStringSync('{"attempts":2,"stage":"migrating/messages"}');
+        final blocker = Directory('${directory.path}/kelivo.db.migrating');
+        if (interruptedSkip) {
+          blocker.createSync();
+          File('${blocker.path}/evidence').writeAsStringSync('keep');
+        }
+        final service = HiveToSqliteMigrationService(
+          HiveToSqliteMigrationDecision(
+            needsMigration: true,
+            appDataDir: directory,
+            sqliteFile: File('${directory.path}/kelivo.db'),
+            hiveFiles: [hive],
+          ),
+        );
+        await tester.runAsync(service.loadAttemptState);
+        var restartCalls = 0;
+        final reportedErrors = <FlutterErrorDetails>[];
+        final previousOnError = FlutterError.onError;
+        FlutterError.onError = reportedErrors.add;
+        try {
+          await tester.pumpWidget(
+            MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => AppSnackBarOverlay(child: child!),
+              home: HiveToSqliteMigrationPage(
+                service: service,
+                restartApp: () async {
+                  restartCalls++;
+                  throw StateError('injected restart failure');
+                },
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final staleStart = _buttonForIcon(tester, Lucide.FolderPlus);
+          await tester.runAsync(() async {
+            tester
+                .widget<TextButton>(
+                  find.widgetWithText(TextButton, '跳过迁移并全新开始'),
+                )
+                .onPressed!();
+          });
+          await tester.pumpAndSettle();
+          await tester.runAsync(() async {
+            tester
+                .widget<TextButton>(find.widgetWithText(TextButton, '跳过并全新开始'))
+                .onPressed!();
+            await _waitUntil(
+              () => interruptedSkip
+                  ? service.initialStatus().stage ==
+                        HiveToSqliteMigrationStage.failed
+                  : reportedErrors.length == 1,
+            );
+          });
+          await tester.pumpAndSettle();
+          if (interruptedSkip) {
+            expect(
+              find.byWidgetPredicate(
+                (w) => w is ReelText && w.text == '重新开始未完成',
+              ),
+              findsOneWidget,
+            );
+            expect(find.text('重试迁移'), findsNothing);
+            expect(find.byType(MigrationBackupOptions), findsNothing);
+            expect(restartCalls, 0);
+            expect(hive.readAsStringSync(), 'retained original');
+            blocker.deleteSync(recursive: true);
+            await _waitForEnabledButton(tester, Lucide.RotateCcw);
+            await tester.runAsync(() async {
+              _buttonForIcon(tester, Lucide.RotateCcw).onTap!();
+              await _waitUntil(() => reportedErrors.length == 1);
+            });
+            await tester.pumpAndSettle();
+          }
+          expect(service.isComplete, isTrue);
+          expect(
+            find.byWidgetPredicate((w) => w is ReelText && w.text == '已重新开始'),
+            findsOneWidget,
+          );
+          expect(find.text('已新建空数据库，旧数据已保留。请重启 App 后继续使用。'), findsOneWidget);
+          expect(find.text('Kelivo 无法自动重启，请完全关闭后重新打开。'), findsOneWidget);
+          expect(find.text('重试迁移'), findsNothing);
+          expect(find.text('跳过迁移并全新开始'), findsNothing);
+          expect(find.byType(MigrationBackupOptions), findsNothing);
+          expect(find.text('对话'), findsNothing);
+          expect(find.text('消息'), findsNothing);
+          await _waitForEnabledButton(tester, Lucide.RefreshCw);
+          final database = File('${directory.path}/kelivo.db');
+          final databaseBytes = database.readAsBytesSync();
+          final receipt = await tester.runAsync(
+            () => DatabaseInstallationGate.ensureReady(
+              appDataDirectory: directory,
+            ),
+          );
+          await tester.runAsync(() async {
+            // A stale outgoing animation callback must also be harmless.
+            staleStart.onTap!();
+            _buttonForIcon(tester, Lucide.RefreshCw).onTap!();
+            await _waitUntil(() => reportedErrors.length == 2);
+          });
+          await tester.pumpAndSettle();
+          expect(restartCalls, 2);
+          expect(
+            reportedErrors,
+            everyElement(
+              isA<FlutterErrorDetails>().having(
+                (e) => e.exception.toString(),
+                'error',
+                'Bad state: injected restart failure',
+              ),
+            ),
+          );
+          expect(
+            service.initialStatus().stage,
+            HiveToSqliteMigrationStage.complete,
+          );
+          expect(hive.existsSync(), isFalse);
+          expect(
+            File('${hive.path}.retired').readAsStringSync(),
+            'retained original',
+          );
+          expect(database.readAsBytesSync(), databaseBytes);
+          final after = await tester.runAsync(
+            () => DatabaseInstallationGate.ensureReady(
+              appDataDirectory: directory,
+            ),
+          );
+          expect(after!.databaseId, receipt!.databaseId);
+        } finally {
+          AppSnackBarManager().dismissAll();
+          await tester.pumpAndSettle();
+          FlutterError.onError = previousOnError;
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pump();
+        }
+      },
+    );
+  }
+
+  testWidgets('post-publication cleanup failure keeps migration complete', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final directory = Directory.systemTemp.createTempSync(
+      'kelivo_complete_cleanup_',
+    );
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final service = _CleanupFailureMigrationService(
+      HiveToSqliteMigrationDecision(
+        needsMigration: true,
+        appDataDir: directory,
+        sqliteFile: File('${directory.path}/kelivo.db'),
+        hiveFiles: [],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HiveToSqliteMigrationPage(service: service),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('migration_skip_backup')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      _buttonForIcon(tester, Lucide.Database).onTap!();
+      await _waitUntil(() => service.isComplete);
+    });
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Lucide.RefreshCw), findsOneWidget);
+    expect(find.text('重试迁移'), findsNothing);
+    expect(find.text('对话'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('can skip backup and start migration immediately', (
     tester,
   ) async {
@@ -289,6 +492,17 @@ GestureDetector _buttonForIcon(WidgetTester tester, IconData icon) {
   return tester.widget<GestureDetector>(button);
 }
 
+Future<void> _waitForEnabledButton(WidgetTester tester, IconData icon) async {
+  for (var i = 0; i < 100; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    if (_buttonForIcon(tester, icon).onTap != null) return;
+  }
+  expect(_buttonForIcon(tester, icon).onTap, isNotNull);
+}
+
 Future<void> _waitUntil(bool Function() condition) async {
   for (var i = 0; i < 100 && !condition(); i++) {
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -318,6 +532,32 @@ final class _CompleteMigrationService extends HiveToSqliteMigrationService {
       title: 'complete',
       detail: 'done',
     );
+  }
+}
+
+final class _CleanupFailureMigrationService
+    extends HiveToSqliteMigrationService {
+  _CleanupFailureMigrationService(super.decision);
+
+  bool _published = false;
+
+  @override
+  bool get isComplete => _published;
+
+  @override
+  HiveToSqliteMigrationStatus initialStatus() => _published
+      ? const HiveToSqliteMigrationStatus(
+          stage: HiveToSqliteMigrationStage.complete,
+          progress: 1,
+          title: 'complete',
+          detail: 'done',
+        )
+      : super.initialStatus();
+
+  @override
+  Future<void> migrate({String? backupPath}) async {
+    _published = true;
+    throw const FileSystemException('injected post-publication close failure');
   }
 }
 

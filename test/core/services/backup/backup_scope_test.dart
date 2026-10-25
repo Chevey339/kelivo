@@ -68,6 +68,7 @@ Map<String, Object?> _fixture(String prefix) => {
   'assistants_v1': jsonEncode([
     {'id': prefix, 'name': '$prefix assistant'},
   ]),
+  'orphaned_conversations_assistant_id_v1': prefix,
   'mcp_servers_v1': jsonEncode([
     {'id': prefix, 'name': '$prefix MCP'},
   ]),
@@ -223,6 +224,10 @@ void main() {
                   )
                   as Map;
           if (filterExport) {
+            expect(
+              exported.containsKey('orphaned_conversations_assistant_id_v1'),
+              category == BackupCategory.assistants,
+            );
             for (final entry in keys.entries) {
               expect(
                 exported.containsKey(entry.value),
@@ -245,6 +250,10 @@ void main() {
           final after = await BusinessRestoreService(
             targetRepository,
           ).exportSettings();
+          expect(
+            after['orphaned_conversations_assistant_id_v1'],
+            category == BackupCategory.assistants ? 'source' : 'local',
+          );
           for (final entry in keys.entries) {
             expect(
               after[entry.value],

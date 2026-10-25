@@ -1,4 +1,4 @@
-import '../../../shared/widgets/markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 
 enum TtsTextSelectionMode {
   fullText,
@@ -31,7 +31,7 @@ class TtsTextSelection {
     if (original.isEmpty) return '';
     final source = mode == TtsTextSelectionMode.fullText
         ? original
-        : markdownRemoveCode(original).trim();
+        : removeCode(original).trim();
     if (source.isEmpty) return '';
 
     final selected = switch (mode) {

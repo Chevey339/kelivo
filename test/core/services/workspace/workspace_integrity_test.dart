@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import '../../../support/workspace_test_access.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -66,7 +68,7 @@ void main() {
       await File(
         '${temp.path}/ws/minified.json',
       ).writeAsString('x' * (128 * 1024));
-      final result = await HostFileTools(
+      final result = await authorizedHostFileTools(
         paths,
       ).readFile('/workspace/minified.json', limit: 1);
       expect(
@@ -191,13 +193,16 @@ void main() {
       extras = const WorkspaceBinding(
         workspaceId: 'ws-a',
         cwd: 'new-cwd',
-        allowAll: true,
       ).applyTo(extras);
+      extras = ToolPermissionMode.fullAccess.applyTo(extras);
       runtime.finish.complete();
       await running;
       expect(WorkspaceBinding.fromExtras(extras).workspaceId, 'ws-a');
       expect(WorkspaceBinding.fromExtras(extras).cwd, 'new-cwd');
-      expect(WorkspaceBinding.fromExtras(extras).allowAll, isTrue);
+      expect(
+        ToolPermissionMode.fromExtras(extras),
+        ToolPermissionMode.fullAccess,
+      );
       expect(WorkspaceBinding.fromExtras(extras).toolsUsed, isTrue);
     },
   );

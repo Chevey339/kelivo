@@ -19,6 +19,9 @@ class IosIshRuntime implements WorkspaceStdioRuntime {
   bool get supportsSystemTerminal => false;
 
   @override
+  bool get supportsFileManager => false;
+
+  @override
   Future<RuntimeStatus> status() async {
     final probe = await channel.probe();
     if (!probe.supported) {

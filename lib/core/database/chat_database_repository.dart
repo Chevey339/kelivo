@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import '../models/composer_draft.dart';
 import 'composer_draft_store.dart';
 import 'dart:convert';
@@ -21,6 +22,8 @@ import '../../utils/kelivo_file_uri.dart';
 import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
+import 'empty_database_recovery_guard.dart';
+import 'empty_database_permission.dart';
 import 'message_timeline_index.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
@@ -1725,7 +1728,8 @@ class ChatDatabaseRepository {
               EXISTS (
                 SELECT 1 FROM message_part_rows p
                 WHERE p.revision_id = m.id
-                  AND p.kind IN ('image', 'file')
+                  AND (p.kind IN ('image', 'file')
+                    OR (p.kind = 'tool_call' AND p.payload LIKE '%"previewImage"%'))
               ) OR
               EXISTS (
                 SELECT 1 FROM message_asset_rows a WHERE a.revision_id = m.id
@@ -3969,7 +3973,7 @@ class ChatDatabaseRepository {
             SELECT 1
             FROM asset_reference_dirty_rows d
             JOIN message_part_rows p ON p.revision_id = d.revision_id
-            WHERE p.kind IN ('text', 'image', 'file')
+            WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
               AND (
                 instr(p.payload, c.path_form) > 0
                 OR instr(p.payload, c.alt_form) > 0
@@ -3998,7 +4002,7 @@ class ChatDatabaseRepository {
             AND NOT EXISTS (
               SELECT 1 FROM asset_reference_dirty_rows d
               JOIN message_part_rows p ON p.revision_id = d.revision_id
-              WHERE p.kind IN ('text', 'image', 'file')
+              WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                 AND (
                   instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
                   OR instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4044,7 +4048,7 @@ class ChatDatabaseRepository {
               AND NOT EXISTS (
                 SELECT 1 FROM asset_reference_dirty_rows d
                 JOIN message_part_rows p ON p.revision_id = d.revision_id
-                WHERE p.kind IN ('text', 'image', 'file')
+                WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                   AND (
                     instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
                     OR instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4263,8 +4267,43 @@ class ChatDatabaseRepository {
     _messageSearchFtsReady = true;
   }
 
+  Future<void> _invalidateEmptyAcknowledgement() async {
+    final file = _databaseFile;
+    if (file != null) {
+      await EmptyDatabaseRecoveryGuard.invalidate(file.parent);
+    }
+  }
+
+  /// Called at the end of an explicit deletion/reset, inside its transaction.
+  Future<void> _acknowledgeIntentionalEmptyState() async {
+    final file = _databaseFile;
+    if (file == null) return;
+    final hasData = await _db
+        .customSelect(EmptyDatabasePermission.hasDataQuery)
+        .getSingle();
+    if (hasData.read<int>('present') != 0) return;
+    final identity = await getDatabaseIdentity();
+    if (identity == null) return;
+    for (final statement in EmptyDatabasePermission.invalidationTriggers) {
+      await _db.customStatement(statement);
+    }
+    final token = await EmptyDatabaseRecoveryGuard.recordEmptyState(
+      file.parent,
+      identity,
+    );
+    await _db
+        .into(_db.chatStorageMetaRows)
+        .insertOnConflictUpdate(
+          ChatStorageMetaRowsCompanion.insert(
+            key: EmptyDatabasePermission.tokenKey,
+            value: token,
+          ),
+        );
+  }
+
   Future<void> putConversation(Conversation conversation) async {
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       // Existing rows keep the database-owned hash written by prompt freeze;
       // cached Conversation instances may still hold an older value.
       final updated =
@@ -4289,14 +4328,19 @@ class ChatDatabaseRepository {
   /// in one transaction. [updatedAt] is bumped only when the map changes.
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) {
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    Conversation? expectedOwner,
+  }) {
     return _db.transaction(() async {
       final row = await (_db.select(
         _db.conversationRows,
       )..where((t) => t.id.equals(conversationId))).getSingleOrNull();
       if (row == null) {
         throw StateError('conversation_not_found');
+      }
+      if (expectedOwner != null &&
+          row.assistantId != expectedOwner.assistantId) {
+        throw StateError('context_changed');
       }
       final current = _decodeExtrasJson(row.extrasJson);
       final next = update(Map<String, dynamic>.from(current));
@@ -4346,6 +4390,7 @@ class ChatDatabaseRepository {
       );
       final duplicatedAt = DateTime.now();
       final duplicate = source.copyWith(
+        extras: ToolPermissionMode.withoutGrant(source.extras),
         id: targetId,
         createdAt: duplicatedAt,
         updatedAt: duplicatedAt,
@@ -4361,6 +4406,7 @@ class ChatDatabaseRepository {
             ? -1
             : sourceMessages.last.messageOrder,
       );
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insert(_conversationCompanion(duplicate));
@@ -4444,7 +4490,8 @@ class ChatDatabaseRepository {
       'SELECT revision_id FROM message_asset_rows WHERE conversation_id = ? '
       'UNION '
       'SELECT revision_id FROM message_part_rows '
-      "WHERE conversation_id = ? AND kind IN ('image', 'file');",
+      "WHERE conversation_id = ? AND (kind IN ('image', 'file') "
+      "OR (kind = 'tool_call' AND payload LIKE '%\"previewImage\"%'));",
       [targetConversationId, targetConversationId],
     );
   }
@@ -4539,6 +4586,7 @@ class ChatDatabaseRepository {
       selections[groupIdMap[targetGroupId]!] = target.version;
 
       final now = DateTime.now();
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insert(
@@ -4554,7 +4602,7 @@ class ChatDatabaseRepository {
                 messageIds: [
                   for (final message in kept) messageIdMap[message.id]!,
                 ],
-                extras: source.extras,
+                extras: ToolPermissionMode.withoutGrant(source.extras),
               ),
             ),
           );
@@ -4592,6 +4640,10 @@ class ChatDatabaseRepository {
                 ..limit(1))
               .getSingleOrNull();
       if (activeRun != null) return false;
+      await updateConversationExtras(
+        conversationId,
+        ToolPermissionMode.withoutGrant,
+      );
       await (_db.delete(_db.messagePromptRows)..where(
             (row) =>
                 row.conversationId.equals(conversationId) &
@@ -4616,6 +4668,7 @@ class ChatDatabaseRepository {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       // An upsert may be an update in disguise, so it bumps updated_at; a
       // fresh insert getting "updated_at = now ≈ timestamp" is harmless.
       await _db
@@ -4855,7 +4908,7 @@ class ChatDatabaseRepository {
     required bool selectVersion,
     required bool touchUpdatedAt,
     String? afterGroupId,
-  }) {
+  }) async {
     if (message.conversationId != conversation.id) {
       throw ArgumentError.value(
         message.conversationId,
@@ -4864,6 +4917,7 @@ class ChatDatabaseRepository {
       );
     }
     return _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       final existingRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(conversation.id))).getSingleOrNull();
@@ -4901,9 +4955,6 @@ class ChatDatabaseRepository {
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
   }) async {
-    if (_messageHasAttachmentParts(message)) {
-      await markMessageAssetReferencesDirty(message.id);
-    }
     // A mid-stream reasoning pause is not a reasoning removal: the checkpoint
     // snapshot still carries the pre-allocated reasoningStartAt timestamp, so
     // keep the persisted reasoning part until a timestamp-free message proves
@@ -4925,6 +4976,12 @@ class ChatDatabaseRepository {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
     final parts = _partsForPersistence(message, toolEvents);
+    if (_messageHasAttachmentParts(message) ||
+        parts.whereType<ToolCallPart>().any(
+          (part) => part.browserPreviewImage != null,
+        )) {
+      await markMessageAssetReferencesDirty(message.id);
+    }
     await (_db.delete(_db.messagePartRows)..where(
           (row) =>
               row.revisionId.equals(message.id) &
@@ -5009,6 +5066,7 @@ class ChatDatabaseRepository {
               .getSingleOrNull();
       if (conversationRow == null) return null;
 
+      await _invalidateEmptyAcknowledgement();
       // Metadata only — body text is written via message parts.
       final groupId = originalRow.groupId ?? originalRow.id;
       final maxVersion = _db.messageRows.version.max();
@@ -5262,6 +5320,7 @@ class ChatDatabaseRepository {
         transformBusiness,
         writeReceipt: true,
       );
+      if (overwrite) await _acknowledgeIntentionalEmptyState();
     });
   }
 
@@ -5280,6 +5339,7 @@ class ChatDatabaseRepository {
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
       );
       await _writeMigrationCompleteReceipt();
+      await _acknowledgeIntentionalEmptyState();
     });
   }
 
@@ -5852,6 +5912,7 @@ class ChatDatabaseRepository {
     required String targetId,
     required Map<String, String> messageIdMap,
   }) async {
+    await _invalidateEmptyAcknowledgement();
     final sourceMessages = await _db
         .customSelect(
           'SELECT id, group_id FROM merge_source.message_rows '
@@ -5965,7 +6026,8 @@ class ChatDatabaseRepository {
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT DISTINCT revision_id FROM main.message_part_rows '
-      "WHERE conversation_id = ? AND kind IN ('image', 'file');",
+      "WHERE conversation_id = ? AND (kind IN ('image', 'file') "
+      "OR (kind = 'tool_call' AND payload LIKE '%\"previewImage\"%'));",
       [targetId],
     );
   }
@@ -5976,6 +6038,9 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
+    if (conversations.isNotEmpty || messages.isNotEmpty) {
+      await _invalidateEmptyAcknowledgement();
+    }
     await _db.batch((batch) {
       for (final conversation in conversations) {
         batch.insert(
@@ -6042,13 +6107,15 @@ class ChatDatabaseRepository {
     final current = await (_db.select(
       _db.messageRows,
     )..where((t) => t.id.equals(message.id))).getSingleOrNull();
+    if (current == null) return;
+    await _invalidateEmptyAcknowledgement();
     await (_db.update(
       _db.messageRows,
     )..where((t) => t.id.equals(message.id))).write(
       _messageUpdate(message).copyWith(
         extrasJson: Value(
           _encodeTokenExtras(
-            current?.extrasJson ?? '{}',
+            current.extrasJson,
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
@@ -6116,21 +6183,21 @@ class ChatDatabaseRepository {
     );
     return _db.transaction(() async {
       var write = companion;
+      final current = await (_db.select(
+        _db.messageRows,
+      )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+      if (current == null) return null;
+      await _invalidateEmptyAcknowledgement();
       if (reasoningTokens != null || cacheWriteTokens != null) {
-        final current = await (_db.select(
-          _db.messageRows,
-        )..where((t) => t.id.equals(messageId))).getSingleOrNull();
-        if (current != null) {
-          write = companion.copyWith(
-            extrasJson: Value(
-              _encodeTokenExtras(
-                current.extrasJson,
-                reasoningTokens: reasoningTokens,
-                cacheWriteTokens: cacheWriteTokens,
-              ),
+        write = companion.copyWith(
+          extrasJson: Value(
+            _encodeTokenExtras(
+              current.extrasJson,
+              reasoningTokens: reasoningTokens,
+              cacheWriteTokens: cacheWriteTokens,
             ),
-          );
-        }
+          ),
+        );
       }
       await (_db.update(
         _db.messageRows,
@@ -6227,6 +6294,7 @@ class ChatDatabaseRepository {
     required List<String> messageIds,
   }) async {
     await _db.transaction(() async {
+      await _invalidateEmptyAcknowledgement();
       await _db
           .into(_db.conversationRows)
           .insertOnConflictUpdate(
@@ -6278,6 +6346,7 @@ class ChatDatabaseRepository {
               ),
             ))
             .go();
+        await _acknowledgeIntentionalEmptyState();
       },
     );
   }
@@ -6482,6 +6551,7 @@ class ChatDatabaseRepository {
   Future<void> clearAllData() async {
     await _db.transaction(() async {
       await _clearChatRows();
+      await _acknowledgeIntentionalEmptyState();
     });
   }
 
@@ -7206,6 +7276,7 @@ class ChatDatabaseRepository {
       (part) =>
           part is ImagePart ||
           part is FilePart ||
+          (part is ToolCallPart && part.browserPreviewImage != null) ||
           (part is MalformedPart && part.isAttachmentKind),
     );
   }

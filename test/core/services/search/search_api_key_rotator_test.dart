@@ -108,6 +108,7 @@ void main() {
         'brave',
         'metaso',
         'ollama',
+        'deepseek',
         'jina',
         'perplexity',
         'bocha',

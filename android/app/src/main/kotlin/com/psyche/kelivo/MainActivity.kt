@@ -109,6 +109,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
+        kelivo.messageInput.attachActivity(this)
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          OAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          kelivo.backgroundRuntime.attachActivity(this)
@@ -171,6 +172,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        kelivo.messageInput.detachActivity(this)
         deviceLocalToolsHandler?.detachActivity(this)
         kelivo.backgroundRuntime.detachActivity(this)
         OAuthHandler.detachActivity(this)

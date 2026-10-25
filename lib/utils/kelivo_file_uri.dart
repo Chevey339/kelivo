@@ -146,7 +146,8 @@ final class KelivoFileUri {
 
     // iOS device — must begin at /var/mobile/...
     final iosDevice = RegExp(
-      r'^/var/mobile/Containers/Data/Application/([^/]+)/Documents/',
+      r'^/var/mobile/Containers/Data/Application/([^/]+)/'
+      r'(?:Documents|Library/Application Support/kelivo-data)/',
       caseSensitive: false,
     ).firstMatch(raw);
     if (iosDevice != null && _iosUuid.hasMatch(iosDevice.group(1)!)) {
@@ -157,7 +158,8 @@ final class KelivoFileUri {
     if (tail == null) {
       final iosSim = RegExp(
         r'^/Users/[^/]+/Library/Developer/CoreSimulator/Devices/'
-        r'([^/]+)/data/Containers/Data/Application/([^/]+)/Documents/',
+        r'([^/]+)/data/Containers/Data/Application/([^/]+)/'
+        r'(?:Documents|Library/Application Support/kelivo-data)/',
         caseSensitive: false,
       ).firstMatch(raw);
       if (iosSim != null &&

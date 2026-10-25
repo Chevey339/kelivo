@@ -27,6 +27,7 @@ import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/shared/widgets/task_progress_dialog.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/utils/platform_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -45,18 +46,19 @@ class _CreateWorkspaceDraft {
 
 /// Opens the create-workspace sheet (mobile) or dialog (desktop).
 Future<Workspace?> showCreateWorkspaceFlow(BuildContext context) async {
-  if (useDesktopWorkspaceLayout(context)) {
+  final provider = context.read<WorkspaceProvider>();
+  if (PlatformUtils.isDesktopTarget) {
     return showAppDialog<Workspace>(
       context,
       maxWidth: 540,
-      child: DesktopWorkspaceCreateDialog(
-        provider: context.read<WorkspaceProvider>(),
-      ),
+      child: DesktopWorkspaceCreateDialog(provider: provider),
     );
   }
+  // The form and import can outlive the layout that launched them on rotation.
+  final navigator = Navigator.of(context, rootNavigator: true);
   final draft = await _promptCreateWorkspace(context);
-  if (draft == null || !context.mounted) return null;
-  return _materializeWorkspace(context, draft);
+  if (draft == null || !navigator.mounted) return null;
+  return _materializeWorkspace(navigator.context, provider, draft);
 }
 
 Future<void> openWorkspacesPage(BuildContext context) {
@@ -493,6 +495,13 @@ class _DeleteFilesToggleState extends State<_DeleteFilesToggle> {
 Future<_CreateWorkspaceDraft?> _promptCreateWorkspace(
   BuildContext context,
 ) async {
+  if (useDesktopWorkspaceLayout(context)) {
+    return showAppDialog<_CreateWorkspaceDraft>(
+      context,
+      maxWidth: 540,
+      child: const _CreateWorkspaceForm(dialog: true),
+    );
+  }
   return showFormSheet<_CreateWorkspaceDraft>(
     context,
     builder: (ctx) => const _CreateWorkspaceForm(),
@@ -500,7 +509,9 @@ Future<_CreateWorkspaceDraft?> _promptCreateWorkspace(
 }
 
 class _CreateWorkspaceForm extends StatefulWidget {
-  const _CreateWorkspaceForm();
+  const _CreateWorkspaceForm({this.dialog = false});
+
+  final bool dialog;
 
   @override
   State<_CreateWorkspaceForm> createState() => _CreateWorkspaceFormState();
@@ -580,6 +591,22 @@ class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
       onConfirm: canCreate ? _submit : null,
     );
 
+    if (widget.dialog) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppDialogHeader(title: l10n.workspacesCreateTitle),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(children: children),
+            ),
+          ),
+          Padding(padding: const EdgeInsets.all(16), child: actions),
+        ],
+      );
+    }
     return FormSheet(
       title: l10n.workspacesCreateTitle,
       actions: actions,
@@ -590,18 +617,22 @@ class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
 
 Future<Workspace?> _materializeWorkspace(
   BuildContext context,
+  WorkspaceProvider provider,
   _CreateWorkspaceDraft draft,
 ) async {
-  final provider = context.read<WorkspaceProvider>();
   switch (draft.mode) {
     case _CreateWorkspaceMode.managed:
       return provider.create(name: draft.name);
     case _CreateWorkspaceMode.importFromFolder:
-      return _importFromFolder(context, draft.name);
+      return _importFromFolder(context, provider, draft.name);
   }
 }
 
-Future<Workspace?> _importFromFolder(BuildContext context, String name) async {
+Future<Workspace?> _importFromFolder(
+  BuildContext context,
+  WorkspaceProvider provider,
+  String name,
+) async {
   final l10n = AppLocalizations.of(context)!;
   String? path;
   try {
@@ -621,7 +652,6 @@ Future<Workspace?> _importFromFolder(BuildContext context, String name) async {
     return null;
   }
 
-  final provider = context.read<WorkspaceProvider>();
   var fraction = 0.0;
   var outcome = TaskProgressOutcome.running;
   var phase = l10n.workspaceMgmtImportProgressPhase;

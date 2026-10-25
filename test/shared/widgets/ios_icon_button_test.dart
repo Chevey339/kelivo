@@ -4,6 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('tooltip and explicit label announce one button name', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IosIconButton(
+            icon: Lucide.Plus,
+            tooltip: 'Add',
+            semanticLabel: 'Add',
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+    final node = tester.getSemantics(find.byType(IosIconButton));
+    expect(node.label, 'Add');
+    expect(node.flagsCollection.isButton, isTrue);
+    semantics.dispose();
+  });
+
   Future<void> showTooltip(WidgetTester tester, Finder target) async {
     await tester.longPress(target);
     await tester.pump();

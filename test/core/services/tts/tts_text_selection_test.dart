@@ -2,6 +2,18 @@ import 'package:Kelivo/core/services/tts/tts_text_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('speech excludes an open fence after Unicode line separators', () {
+    for (final separator in ['\u2028', '\u2029']) {
+      expect(
+        TtsTextSelection.apply(
+          '“spoken”$separator```text$separator“hidden”',
+          mode: TtsTextSelectionMode.quotedOnly,
+        ),
+        'spoken',
+      );
+    }
+  });
+
   group('TtsTextSelection', () {
     test('keeps full text by default', () {
       expect(

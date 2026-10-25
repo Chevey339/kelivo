@@ -5,12 +5,16 @@ import android.system.Os
 import android.util.Log
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class PtySessions(
     private val events: WorkspaceEvents,
 ) {
     private val sessions = ConcurrentHashMap<String, PtySession>()
+    // Keep closing sessions until waitpid confirms exit, including replaced IDs.
+    private val liveSessions = ConcurrentHashMap.newKeySet<PtySession>()
 
     fun open(
         sessionId: String,
@@ -40,10 +44,19 @@ class PtySessions(
             extraArgs = prootArguments,
             shell = shell,
         )
-        val session = PtySession(sessionId, events)
-        val pid = session.start(launch, rows = rows, cols = cols)
+        val session = PtySession(sessionId, events, onExit = { finished ->
+            sessions.remove(sessionId, finished)
+            liveSessions.remove(finished)
+        })
         sessions[sessionId] = session
-        return pid
+        liveSessions.add(session)
+        try {
+            return session.start(launch, rows = rows, cols = cols)
+        } catch (error: Exception) {
+            sessions.remove(sessionId, session)
+            liveSessions.remove(session)
+            throw error
+        }
     }
 
     fun write(sessionId: String, data: ByteArray) {
@@ -58,19 +71,29 @@ class PtySessions(
         sessions.remove(sessionId)?.close()
     }
 
-    fun closeAll() {
-        sessions.keys.toList().forEach { close(it) }
+    fun closeAll(waitForExit: Boolean = false) {
+        val pending = liveSessions.toList()
+        pending.forEach { it.close() }
+        if (waitForExit) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            pending.forEach { it.awaitExit(deadline) }
+        }
     }
 }
 
 class PtySession(
     private val sessionId: String,
     private val events: WorkspaceEvents,
+    private val onExit: (PtySession) -> Unit = {},
+    private val signalExit: (Int) -> Unit = { requestProotExit(it.toLong()) },
+    private val waitForProcess: (Int) -> Int = { PtyJni.waitFor(it) },
 ) {
     private var masterFd: Int = -1
     private var masterPfd: ParcelFileDescriptor? = null
     private var pid: Int = -1
     private val closed = AtomicBoolean(false)
+    private val exited = CountDownLatch(1)
+    @Volatile private var exitConfirmed = false
 
     fun start(launch: ProotLaunch, rows: Int, cols: Int): Int {
         val pidOut = IntArray(1)
@@ -112,8 +135,12 @@ class PtySession(
         PtyJni.setPtyWindowSize(fd, rows, cols)
     }
 
-    fun close() {
-        if (!closed.compareAndSet(false, true)) return
+    @Synchronized fun close() {
+        if (closed.get()) return
+        // SIGHUP from closing the PTY can be ignored. PRoot handles SIGQUIT by
+        // killing all tracees and reaping them before its event loop returns.
+        if (pid > 0) signalExit(pid)
+        closed.set(true)
         val fd = masterFd
         masterFd = -1
         try {
@@ -127,6 +154,11 @@ class PtySession(
             } catch (_: Exception) {
             }
         }
+    }
+
+    fun awaitExit(deadlineNanos: Long) {
+        check(exited.await((deadlineNanos - System.nanoTime()).coerceAtLeast(0), TimeUnit.NANOSECONDS)
+            && exitConfirmed) { "workspace terminal did not stop" }
     }
 
     private fun readLoop() {
@@ -150,12 +182,26 @@ class PtySession(
                 )
             }
         } finally {
+            // Serialize termination before the sole waitpid call, so close can
+            // never signal a PID that this reader has already reaped.
+            try {
+                close()
+            } catch (error: Exception) {
+                Log.w(TAG, "failed to stop PTY", error)
+            }
             val exitCode = try {
-                if (pid > 0) PtyJni.waitFor(pid) else -1
+                if (pid > 0) waitForProcess(pid) else -1
             } catch (_: Exception) {
                 -1
             }
-            close()
+            synchronized(this) {
+                if (exitCode >= 0) {
+                    pid = -1
+                    exitConfirmed = true
+                }
+            }
+            if (exitConfirmed) onExit(this)
+            exited.countDown()
             events.emit(
                 mapOf(
                     "type" to "ptyExit",

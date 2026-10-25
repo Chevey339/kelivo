@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../models/message_edit_result.dart';
@@ -33,11 +34,28 @@ class _MessageEditSheet extends StatefulWidget {
 
 class _MessageEditSheetState extends State<_MessageEditSheet> {
   late final TextEditingController _controller;
+  bool _saving = false;
+
+  Future<void> _save({required bool send}) async {
+    if (_saving) return;
+    _saving = true;
+    Haptics.light();
+    try {
+      await _controller.retireMessageInput();
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      Navigator.of(context).pop<MessageEditResult>(
+        MessageEditResult(content: _controller.text.trim(), shouldSend: send),
+      );
+    } catch (_) {
+      _saving = false;
+      rethrow;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.message.content);
+    _controller = MessageEditingController(text: widget.message.content);
   }
 
   @override
@@ -81,13 +99,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: IosCardPress(
-                        onTap: () {
-                          Haptics.light();
-                          final text = _controller.text.trim();
-                          Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: true),
-                          );
-                        },
+                        onTap: () => _save(send: true),
                         borderRadius: BorderRadius.circular(20),
                         baseColor: Colors.transparent,
                         pressedBlendStrength:
@@ -122,13 +134,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: IosCardPress(
-                        onTap: () {
-                          Haptics.light();
-                          final text = _controller.text.trim();
-                          Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: false),
-                          );
-                        },
+                        onTap: () => _save(send: false),
                         borderRadius: BorderRadius.circular(20),
                         baseColor: Colors.transparent,
                         pressedBlendStrength:

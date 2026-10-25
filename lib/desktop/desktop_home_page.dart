@@ -154,6 +154,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       if (!mounted) return;
       switch (target) {
         case DesktopSettingsNavigationTarget.backup:
+        case DesktopSettingsNavigationTarget.mcp:
           setState(() {
             _tabIndex = 3;
             _globalSearchActive = false;

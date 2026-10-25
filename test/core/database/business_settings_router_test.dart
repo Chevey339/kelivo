@@ -745,6 +745,17 @@ void main() {
       }
     });
 
+    test('rejects a non-string OAuth model cache version', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({
+            'account': {'oauthModelsClientVersion': 159},
+          }),
+        }),
+        throwsFormatException,
+      );
+    });
+
     test('rejects entity fields that runtime models cannot decode', () {
       final invalidBySourceKey = <String, Object>{
         'assistants_v1': [
@@ -805,6 +816,37 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('accepts and preserves DeepSeek search credentials', () {
+      final service = {
+        'id': 'deepseek-1',
+        'type': 'deepseek',
+        'apiKey': 'primary-key',
+        'apiKeys': ['backup-key'],
+      };
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([service]),
+      });
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [service]);
+
+      for (final invalid in [
+        {'apiKey': 123},
+        {'apiKeys': 'not-a-list'},
+        {
+          'apiKeys': [123],
+        },
+      ]) {
+        expect(
+          () => BusinessSettingsRouter.normalizeAndRoute({
+            'search_services_v1': jsonEncode([
+              {...service, ...invalid},
+            ]),
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      }
     });
 
     test('accepts and preserves Kagi search credentials', () {

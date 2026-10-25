@@ -10,6 +10,55 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('desktop adds DeepSeek from its provider picker', (tester) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, 'DeepSeek');
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.enterText(find.byType(TextField), 'deepseek-key');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(created, isA<DeepSeekOptions>());
+    expect((created! as DeepSeekOptions).apiKey, 'deepseek-key');
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets('desktop edits DeepSeek without losing extra keys', (
+    tester,
+  ) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          DeepSeekOptions(
+            id: 'deepseek',
+            apiKey: 'old-key',
+            extraApiKeys: const ['extra-key'],
+          ),
+        );
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('old-key'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.enterText(find.byType(TextField), 'new-key');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final saved = updated! as DeepSeekOptions;
+    expect(saved.id, 'deepseek');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['extra-key']);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
   testWidgets('desktop changes page reader through a dropdown', (tester) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);

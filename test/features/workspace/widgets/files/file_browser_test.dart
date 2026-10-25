@@ -12,6 +12,7 @@ import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -35,6 +36,18 @@ Future<void> _pumpUi(WidgetTester tester) async {
   await _flushIo(tester);
   await tester.pump();
   await tester.pumpAndSettle();
+}
+
+Future<void> _waitForFileState(
+  WidgetTester tester,
+  bool Function() ready,
+) async {
+  for (var i = 0; i < 100; i++) {
+    await _flushIo(tester);
+    await tester.pump();
+    if (ready()) return;
+  }
+  fail('The filesystem operation and browser refresh did not complete');
 }
 
 Future<void> _tapFormConfirm(WidgetTester tester) async {
@@ -161,6 +174,65 @@ void main() {
       tempDir.deleteSync(recursive: true);
     }
   });
+
+  testWidgets(
+    'wide file rows support long press and touch rename/delete actions',
+    (tester) async {
+      const haptics = MethodChannel('haptic_feedback');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, (_) async => true);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, null),
+      );
+      Directory(p.join(tempDir.path, 'docs')).createSync();
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1366, 1024);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(_harness(child: _browser(tempDir)));
+      await _reload(tester);
+
+      await tester.longPress(find.byKey(FileBrowser.itemKey('docs')));
+      await _pumpUi(tester);
+      expect(find.text('Rename'), findsOneWidget);
+      await _tapVisible(tester, find.text('Rename'));
+      await tester.enterText(find.byType(TextField), 'renamed');
+      await _tapFormConfirm(tester);
+      await _waitForFileState(
+        tester,
+        () =>
+            Directory(p.join(tempDir.path, 'renamed')).existsSync() &&
+            find
+                .byKey(FileBrowser.itemMoreKey('renamed'))
+                .hitTestable()
+                .evaluate()
+                .isNotEmpty,
+      );
+      expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isTrue);
+      expect(Directory(p.join(tempDir.path, 'docs')).existsSync(), isFalse);
+
+      await tester.tap(find.byKey(FileBrowser.itemMoreKey('renamed')));
+      await _pumpUi(tester);
+      await _tapVisible(tester, find.text('Delete'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('workspace-confirm-accept')),
+      );
+      await _waitForFileState(
+        tester,
+        () =>
+            !Directory(p.join(tempDir.path, 'renamed')).existsSync() &&
+            find.byKey(FileBrowser.itemKey('renamed')).evaluate().isEmpty,
+      );
+      expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+      TargetPlatform.macOS,
+    }),
+  );
 
   test('refuses an escape path', () {
     expect(FileBrowserOps.joinInsideRoot(tempDir.path, '../escape'), isNull);

@@ -255,7 +255,7 @@ void main() {
       final l10n = AppLocalizations.of(
         tester.element(find.byType(FileBrowser)),
       )!;
-      Future<void> createFile() async {
+      Future<void> createFile({required bool readOnly}) async {
         await tester.tap(find.byKey(FileBrowser.newKey));
         await settle(tester);
         await tester.tap(find.byKey(FileBrowser.newFileKey));
@@ -272,10 +272,32 @@ void main() {
             .last;
         await tester.ensureVisible(confirm);
         await tester.tap(confirm);
-        await settle(tester);
+        // Permission checks resolve real filesystem paths. Fixed pump counts
+        // can finish before that I/O under suite load, while advancing the
+        // fake clock can also expire the toast before it is inspected.
+        bool completed() =>
+            File('${root.path}/new.txt').existsSync() ||
+            AppSnackBarManager().activeToasts.any(
+              (toast) => toast.notification.message.contains(
+                l10n.workspaceMountReadOnly,
+              ),
+            );
+        final wait = Stopwatch()..start();
+        while (!completed() && wait.elapsed < const Duration(seconds: 10)) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+        }
+        expect(
+          completed(),
+          isTrue,
+          reason: 'File creation must finish or report read-only access.',
+        );
+        await tester.pumpAndSettle();
       }
 
-      await createFile();
+      await createFile(readOnly: true);
       expect(File('${root.path}/new.txt').existsSync(), isFalse);
       expect(
         AppSnackBarManager().activeToasts.any(
@@ -305,7 +327,7 @@ void main() {
           readOnly: false,
         ),
       );
-      await createFile();
+      await createFile(readOnly: false);
       expect(File('${root.path}/new.txt').existsSync(), isTrue);
       debugDefaultTargetPlatformOverride = null;
       expect(tester.takeException(), isNull);

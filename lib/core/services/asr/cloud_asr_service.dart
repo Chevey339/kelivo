@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 
 import 'asr_service_options.dart';
@@ -67,6 +68,15 @@ class CloudAsrService {
     switch (options) {
       case OpenAiRealtimeAsrOptions():
         return _startOpenAi(options);
+      case AudioTranscriptionAsrOptions():
+        final endpoint = _audioTranscriptionEndpoint(options.baseUrl);
+        return _AudioTranscriptionAsrSession(
+          options: options,
+          endpoint: endpoint,
+          client: httpClient ?? http.Client(),
+          ownsClient: httpClient == null,
+          completionTimeout: completionTimeout,
+        );
       case DashScopeAsrOptions():
         return _startDashScope(options);
       case QwenAudioAsrOptions():
@@ -803,6 +813,192 @@ class _RealtimeAsrSession implements CloudAsrSession {
       // The session is already terminal; close failures cannot be recovered.
     }
     if (!_partialController.isClosed) await _partialController.close();
+  }
+}
+
+class _AudioTranscriptionAsrSession implements CloudAsrSession {
+  _AudioTranscriptionAsrSession({
+    required this._options,
+    required this._endpoint,
+    required this._client,
+    required this._ownsClient,
+    required this._completionTimeout,
+  });
+
+  final AudioTranscriptionAsrOptions _options;
+  final Uri _endpoint;
+  final http.Client _client;
+  final bool _ownsClient;
+  final Duration _completionTimeout;
+  final BytesBuilder _pcm = BytesBuilder(copy: false);
+  final Completer<void> _abort = Completer<void>();
+  final StreamController<String> _partialController =
+      StreamController<String>.broadcast(sync: true);
+  final List<String> _transcripts = [];
+  Future<String>? _finishFuture;
+  bool _cancelled = false;
+  bool _closed = false;
+  AsrException? _terminalError;
+
+  String get _label =>
+      _options.kind == AsrServiceKind.groq ? 'Groq' : 'Mistral';
+
+  @override
+  Stream<String> get partialTranscripts => _partialController.stream;
+
+  // Bound each upload even when one capture chunk crosses the segment limit.
+  int get _segmentByteLimit {
+    const maximumBytes = 6 * 1024 * 1024;
+    final seconds = _options.segmentDurationSec;
+    if (seconds <= 0) return maximumBytes;
+    return (_options.sampleRate * 2 * seconds).clamp(2, maximumBytes);
+  }
+
+  @override
+  Future<void> addPcm16(Uint8List chunk) async {
+    _ensureActive();
+    if (_finishFuture != null) {
+      throw AsrException('$_label ASR session is finishing');
+    }
+    try {
+      var offset = 0;
+      while (offset < chunk.length) {
+        _ensureActive();
+        final count = (_segmentByteLimit - _pcm.length).clamp(
+          0,
+          chunk.length - offset,
+        );
+        _pcm.add(Uint8List.sublistView(chunk, offset, offset + count));
+        offset += count;
+        if (_pcm.length == _segmentByteLimit) await _flushSegment();
+      }
+    } catch (error) {
+      throw await _terminate(error);
+    }
+  }
+
+  @override
+  Future<String> finish() => _finishFuture ??= _finishInternal();
+
+  Future<String> _finishInternal() async {
+    _ensureActive();
+    try {
+      await _flushSegment();
+      final result = _transcripts.join(' ');
+      await _cleanup();
+      return result;
+    } catch (error) {
+      throw await _terminate(error);
+    }
+  }
+
+  Future<void> _flushSegment() async {
+    var pcm = _pcm.takeBytes();
+    if (pcm.isEmpty) return;
+    if (pcm.length.isOdd) {
+      throw AsrException('$_label ASR received an incomplete PCM16 sample');
+    }
+    if (_options.kind == AsrServiceKind.groq) {
+      // Groq requires at least 10ms, even for the final slice of a recording.
+      // Preserve every captured sample and pad a shorter tail with silence.
+      final minimumBytes = ((_options.sampleRate + 99) ~/ 100) * 2;
+      if (pcm.length < minimumBytes) {
+        pcm = Uint8List(minimumBytes)..setAll(0, pcm);
+      }
+    }
+    final request =
+        http.AbortableMultipartRequest(
+            'POST',
+            _endpoint,
+            abortTrigger: _abort.future,
+          )
+          ..headers[HttpHeaders.authorizationHeader] =
+              'Bearer ${_options.apiKey.trim()}'
+          ..fields['model'] = _options.model.trim()
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              _pcm16MonoToWav(pcm, _options.sampleRate),
+              filename: 'recording.wav',
+              contentType: MediaType('audio', 'wav'),
+            ),
+          );
+    final language = _options.language.trim();
+    if (language.isNotEmpty && language.toLowerCase() != 'auto') {
+      request.fields['language'] = language;
+    }
+    if (_options.kind == AsrServiceKind.groq) {
+      request.fields['response_format'] = 'json';
+    }
+    final http.Response response;
+    try {
+      response = await Future.any<http.Response>([
+        _client.send(request).then(http.Response.fromStream),
+        _abort.future.then(
+          (_) => throw AsrException('$_label ASR session was cancelled'),
+        ),
+      ]).timeout(_completionTimeout);
+    } on TimeoutException {
+      throw AsrException('$_label ASR request timed out');
+    }
+    _ensureActive();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final detail = _responseError(
+        utf8.decode(response.bodyBytes, allowMalformed: true),
+      );
+      throw AsrException(
+        '$_label ASR request failed with HTTP ${response.statusCode}${detail.isEmpty ? '' : ': $detail'}',
+      );
+    }
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    } catch (_) {
+      throw AsrException('$_label ASR returned invalid JSON');
+    }
+    if (decoded is! Map || decoded['text'] is! String) {
+      throw AsrException('$_label ASR response did not contain a transcript');
+    }
+    final text = (decoded['text'] as String).trim();
+    if (text.isEmpty) return;
+    _transcripts.add(text);
+    _partialController.add(_transcripts.join(' '));
+  }
+
+  @override
+  Future<void> cancel() async {
+    if (_closed) return;
+    _cancelled = true;
+    await _cleanup();
+  }
+
+  void _ensureActive() {
+    if (_terminalError case final error?) throw error;
+    if (_cancelled) throw AsrException('$_label ASR session was cancelled');
+    if (_closed) throw AsrException('$_label ASR session is already closed');
+  }
+
+  Future<AsrException> _terminate(Object error) async {
+    if (_terminalError case final existing?) return existing;
+    final exception = AsrException(
+      _redact(
+        error is AsrException ? error.message : '$_label ASR request failed',
+        _options.apiKey.trim(),
+      ),
+    );
+    _terminalError = exception;
+    if (!_partialController.isClosed) _partialController.addError(exception);
+    await _cleanup();
+    return exception;
+  }
+
+  Future<void> _cleanup() async {
+    if (_closed) return;
+    _closed = true;
+    _pcm.clear();
+    if (!_abort.isCompleted) _abort.complete();
+    if (_ownsClient) _client.close();
+    await _partialController.close();
   }
 }
 
@@ -1563,6 +1759,21 @@ Uri _webSocketUri(String value, String label) {
     throw AsrException('$label ASR WebSocket URL is invalid');
   }
   return uri;
+}
+
+Uri _audioTranscriptionEndpoint(String value) {
+  final uri = Uri.tryParse(value.trim());
+  if (uri == null ||
+      (uri.scheme != 'http' && uri.scheme != 'https') ||
+      uri.host.isEmpty) {
+    throw const AsrException('Audio transcription base URL is invalid');
+  }
+  final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+  return uri.replace(
+    path: path.endsWith('/audio/transcriptions')
+        ? path
+        : '$path/audio/transcriptions',
+  );
 }
 
 Uri _mimoEndpoint(String value) {

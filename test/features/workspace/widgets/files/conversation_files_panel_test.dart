@@ -73,8 +73,9 @@ class _FakeChatService extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    Conversation? expectedOwner,
+  }) async {
     final current = getConversation(conversationId);
     if (current == null) return;
     conversation = current.copyWith(extras: update(Map.of(current.extras)));

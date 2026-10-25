@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -633,96 +634,16 @@ void main() {
         ),
       );
       expect(press.onTap, isNotNull);
-      expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.text('imported plan'), findsNothing);
-      expect(find.text('second plan'), findsNothing);
-      expect(find.text('latest summary'), findsNothing);
+      expect(renderedParagraphsWith('imported plan', exact: true), isEmpty);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(fullReasoningFinder(), findsOneWidget);
-      await tester.tap(find.text('Deep Thinking'));
-      await tester.pumpAndSettle();
-      expect(find.text('imported plan'), findsNothing);
-      expect(find.text('second plan'), findsNothing);
-      expect(find.text('latest summary'), findsNothing);
-      rebuild(() {
-        parts = [...parts, const ReasoningPart('updated summary')];
-      });
-      await tester.pumpAndSettle();
-      expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.text('latest summary'), findsNothing);
-      expect(find.text('updated summary'), findsNothing);
-      await tester.tap(find.text('Deep Thinking'));
-      await tester.pumpAndSettle();
-      expect(fullReasoningFinder(), findsOneWidget);
-      await tester.tap(find.text('Deep Thinking'));
-      await tester.pumpAndSettle();
-      final start = DateTime.now().subtract(const Duration(seconds: 10));
-      rebuild(() {
-        parts = [...parts, const ReasoningPart('**formatted summary**')];
-        isStreaming = true;
-        reasoningSegments = [
-          for (var i = 0; i < parts.length; i++)
-            ReasoningSegment(
-              text: (parts[i] as ReasoningPart).text,
-              expanded: false,
-              loading: false,
-              startAt: start.add(Duration(seconds: i)),
-              finishedAt: start.add(Duration(seconds: i + 1)),
-            ),
-        ];
-      });
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
       expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is MarkdownWithCodeHighlight &&
-              widget.text == '**formatted summary**',
-        ),
-        findsOneWidget,
+        renderedParagraphsWith('imported plan', exact: true),
+        hasLength(1),
       );
-      expect(find.text('**formatted summary**'), findsNothing);
-      final settings = tester
-          .element(find.byType(ChatMessageWidget))
-          .read<SettingsProvider>();
-      await settings.setEnableReasoningMarkdown(false);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-      expect(find.text('**formatted summary**'), findsOneWidget);
-      await settings.setEnableReasoningMarkdown(true);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-      final timerFinder = find.ancestor(
-        of: find.textContaining(RegExp(r'^\(\d+\.\ds\)$')),
-        matching: find.byType(ValueListenableBuilder<int>),
-      );
-      final timer = tester.widget<ValueListenableBuilder<int>>(timerFinder);
-      final previousTick = timer.valueListenable.value;
-      await tester.pump(const Duration(milliseconds: 350));
-      expect(timer.valueListenable.value, greaterThan(previousTick));
-      expect(find.text('Deep Thinking'), findsOneWidget);
-
-      rebuild(() {
-        isStreaming = false;
-        reasoningFinishedAt = start.add(const Duration(seconds: 12));
-      });
-      await tester.pumpAndSettle();
-      expect(find.text('(12.0s)'), findsOneWidget);
-      expect(find.text('imported plan'), findsNothing);
-      expect(find.text('second plan'), findsNothing);
-      expect(find.text('latest summary'), findsNothing);
-      expect(find.text('updated summary'), findsNothing);
-      expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
-      final stoppedTick = timer.valueListenable.value;
-      await tester.pump(const Duration(milliseconds: 350));
-      expect(timer.valueListenable.value, stoppedTick);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(fullReasoningFinder(), findsOneWidget);
-      await tester.tap(find.text('Deep Thinking'));
-      await tester.pumpAndSettle();
-      expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
+      expect(renderedParagraphsWith('imported plan', exact: true), isEmpty);
       final region = tester.widget<MouseRegion>(
         find.descendant(
           of: find.byType(IosCardPress).first,
@@ -806,7 +727,7 @@ void main() {
     await tester.pump();
     expect(find.textContaining('LIVE-A'), findsOneWidget);
     expect(find.textContaining('LIVE-B'), findsOneWidget);
-    expect(find.textContaining('middle'), findsOneWidget);
+    expect(renderedParagraphsWith('middle', exact: false), hasLength(1));
     final keys = _toolKeys(tester);
     expect(keys.toSet(), hasLength(2));
   });

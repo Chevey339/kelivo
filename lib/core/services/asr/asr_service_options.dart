@@ -4,6 +4,8 @@ enum AsrServiceKind {
   sherpaOnnx('sherpa_onnx'),
   system('system'),
   openAiRealtime('openai_realtime'),
+  groq('groq'),
+  mistral('mistral'),
   dashScope('dashscope'),
   qwenAudio('qwen_audio'),
   volcengine('volcengine'),
@@ -24,6 +26,10 @@ enum AsrServiceKind {
       case 'openai_realtime':
       case 'openAiRealtime':
         return AsrServiceKind.openAiRealtime;
+      case 'groq':
+        return AsrServiceKind.groq;
+      case 'mistral':
+        return AsrServiceKind.mistral;
       case 'dashscope':
       case 'dashScope':
         return AsrServiceKind.dashScope;
@@ -90,6 +96,19 @@ abstract class AsrServiceOptions {
           vadThreshold: _double(json['vadThreshold'], 0),
           prefixPaddingMs: _nonNegativeInt(json['prefixPaddingMs'], 300),
           silenceDurationMs: _nonNegativeInt(json['silenceDurationMs'], 500),
+        );
+      case AsrServiceKind.groq:
+      case AsrServiceKind.mistral:
+        return AudioTranscriptionAsrOptions(
+          id: id,
+          kind: kind,
+          name: json['name'] as String?,
+          apiKey: _string(json['apiKey']),
+          baseUrl: json['baseUrl'] as String?,
+          model: json['model'] as String?,
+          language: _string(json['language']),
+          sampleRate: _positiveInt(json['sampleRate'], 16000),
+          segmentDurationSec: _nonNegativeInt(json['segmentDurationSec'], 30),
         );
       case AsrServiceKind.dashScope:
         return DashScopeAsrOptions(
@@ -294,6 +313,108 @@ class OpenAiRealtimeAsrOptions extends AsrServiceOptions {
     'vadThreshold': vadThreshold,
     'prefixPaddingMs': prefixPaddingMs,
     'silenceDurationMs': silenceDurationMs,
+  };
+}
+
+/// File transcription settings shared by Groq Whisper and Mistral Voxtral.
+class AudioTranscriptionAsrOptions extends AsrServiceOptions {
+  factory AudioTranscriptionAsrOptions({
+    String? id,
+    required AsrServiceKind kind,
+    String? name,
+    String apiKey = '',
+    String? baseUrl,
+    String? model,
+    String language = '',
+    int sampleRate = 16000,
+    int segmentDurationSec = 30,
+  }) {
+    final defaults = switch (kind) {
+      AsrServiceKind.groq => (
+        name: 'Groq',
+        baseUrl: 'https://api.groq.com/openai/v1',
+        model: 'whisper-large-v3',
+      ),
+      AsrServiceKind.mistral => (
+        name: 'Mistral',
+        baseUrl: 'https://api.mistral.ai/v1',
+        model: 'voxtral-mini-latest',
+      ),
+      _ => throw ArgumentError.value(
+        kind,
+        'kind',
+        'Unsupported transcription provider',
+      ),
+    };
+    return AudioTranscriptionAsrOptions._(
+      id: id,
+      kind: kind,
+      name: name ?? defaults.name,
+      apiKey: apiKey,
+      baseUrl: baseUrl ?? defaults.baseUrl,
+      model: model ?? defaults.model,
+      language: language,
+      sampleRate: sampleRate,
+      segmentDurationSec: segmentDurationSec,
+    );
+  }
+
+  AudioTranscriptionAsrOptions._({
+    super.id,
+    required super.kind,
+    required super.name,
+    required this.apiKey,
+    required this.baseUrl,
+    required this.model,
+    required this.language,
+    required this.sampleRate,
+    required this.segmentDurationSec,
+  });
+
+  final String apiKey;
+  final String baseUrl;
+  final String model;
+  final String language;
+  final int sampleRate;
+  final int segmentDurationSec;
+
+  @override
+  bool get isConfigured =>
+      apiKey.trim().isNotEmpty &&
+      baseUrl.trim().isNotEmpty &&
+      model.trim().isNotEmpty &&
+      sampleRate > 0;
+
+  AudioTranscriptionAsrOptions copyWith({
+    String? id,
+    String? name,
+    String? apiKey,
+    String? baseUrl,
+    String? model,
+    String? language,
+    int? sampleRate,
+    int? segmentDurationSec,
+  }) => AudioTranscriptionAsrOptions(
+    id: id ?? this.id,
+    kind: kind,
+    name: name ?? this.name,
+    apiKey: apiKey ?? this.apiKey,
+    baseUrl: baseUrl ?? this.baseUrl,
+    model: model ?? this.model,
+    language: language ?? this.language,
+    sampleRate: sampleRate ?? this.sampleRate,
+    segmentDurationSec: segmentDurationSec ?? this.segmentDurationSec,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    ...baseJson(),
+    'apiKey': apiKey,
+    'baseUrl': baseUrl,
+    'model': model,
+    'language': language,
+    'sampleRate': sampleRate,
+    'segmentDurationSec': segmentDurationSec,
   };
 }
 

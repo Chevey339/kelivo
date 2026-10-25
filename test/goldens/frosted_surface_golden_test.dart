@@ -30,7 +30,7 @@ void main() {
     blurSigma: 14,
   );
 
-  testWidgets('tier 0 goldens: uniform backdrop never inserts BackdropFilter', (
+  testWidgets('tier 0 goldens: uniform backdrop never enables BackdropFilter', (
     tester,
   ) async {
     final assistants = AssistantProvider(
@@ -55,7 +55,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is BackdropFilter && widget.enabled,
+      ),
+      findsNothing,
+    );
     expect(_countLayers<BackdropFilterLayer>(tester), 0);
     expect(find.byType(CompositedTransformFollower), findsNothing);
   });

@@ -17,6 +17,7 @@ import 'package:Kelivo/core/services/api/providers/google/gemini_thought_signatu
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/features/home/services/ocr_service.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -70,7 +71,7 @@ ChatMessage _message({
 
 void main() {
   test(
-    'inlineLocalImages leaves view_image error text and snapshots to the provider',
+    'inlineLocalImages leaves all tool text and typed images to the provider',
     () async {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
@@ -88,12 +89,25 @@ void main() {
       final messages = <Map<String, dynamic>>[
         {'role': 'tool', 'name': 'view_image', 'content': error},
         {'role': 'tool', 'name': 'view_image', 'content': snapshot},
+        {
+          'role': 'tool',
+          'name': 'svguess__view_drawing',
+          'content': snapshot,
+          'metadata': {
+            kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+          },
+        },
+        {'role': 'tool', 'name': 'view_drawing', 'content': error},
+        {'role': 'tool', 'name': 'shell', 'content': snapshot},
         {'role': 'user', 'content': snapshot},
       ];
       await service.inlineLocalImages(messages);
       expect(messages[0]['content'], error);
       expect(messages[1]['content'], snapshot);
-      expect(messages[2]['content'], contains('data:image/png;base64,AQID'));
+      expect(messages[2]['content'], snapshot);
+      expect(messages[3]['content'], error);
+      expect(messages[4]['content'], snapshot);
+      expect(messages[5]['content'], contains('data:image/png;base64,AQID'));
     },
   );
 

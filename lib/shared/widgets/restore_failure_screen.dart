@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../../core/database/private_data_storage.dart';
+import 'package:crypto/crypto.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/database/startup_failure_report.dart';
+import '../../core/database/empty_database_recovery_guard.dart';
+import '../../core/database/chat_database_repository.dart';
 import '../../core/database/startup_recovery_service.dart';
 import '../../core/services/backup/local_copy_catalog.dart';
 import '../../core/services/backup/data_sync.dart';
@@ -37,14 +41,17 @@ class RestoreFailureScreen extends StatefulWidget {
     super.key,
     required this.report,
     required this.restart,
+    this.retryRestore,
     this.appDataDirectory,
     this.appVersionLoader,
     this.businessLease,
+    this.privateStorageSource,
   });
 
   final StartupFailureReport report;
   final RestoreBusinessLease? businessLease;
   final Future<void> Function() restart;
+  final Future<void> Function()? retryRestore;
 
   /// Overridable so widget tests do not have to wait on a platform channel.
   final StartupAppVersionLoader? appVersionLoader;
@@ -53,6 +60,7 @@ class RestoreFailureScreen extends StatefulWidget {
   /// offers file-level recovery actions so a fail-closed startup can never be
   /// a permanent lockout.
   final Directory? appDataDirectory;
+  final Directory? privateStorageSource;
 
   @override
   State<RestoreFailureScreen> createState() => _RestoreFailureScreenState();
@@ -77,6 +85,17 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   StartupIntegrityResult? _integrity;
   String? _integrityError;
   List<LocalCopy> _localCopies = const <LocalCopy>[];
+  final Map<String, ChatDatabaseSnapshotInfo> _verifiedCopies = {};
+  final Set<String> _invalidCopies = {};
+  bool _validatingCopies = true;
+  bool _copySearchFailed = false;
+
+  bool get _isEmptyDatabase =>
+      _report.diagnosticCode == 'database_empty_with_recovery_copies';
+  bool get _isMissingDatabase =>
+      _report.diagnosticCode == 'database_missing_with_prior_data';
+  bool get _isStorageActivationFailure =>
+      _report.step == 'private_storage_activation';
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
@@ -84,7 +103,12 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   bool get _isLeaseUnavailable =>
       _report.diagnosticCode == 'RestoreBusinessLeaseUnavailable';
 
-  bool get _busy => _restarting || _recoveryBusy;
+  String? get _blockedDirectory => _report.blockedRestoreDirectory;
+
+  bool get _canContinueRestore =>
+      _blockedDirectory != null && widget.retryRestore != null;
+
+  bool get _busy => _restarting || _recoveryBusy || _validatingCopies;
 
   @override
   void initState() {
@@ -105,6 +129,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           appDataDirectory: widget.appDataDirectory,
           appVersion: version,
           buildNumber: build,
+          inspectDatabase:
+              !_isStorageActivationFailure && _blockedDirectory == null,
         );
         report = _report.withEnvironment(environment);
       } catch (_) {
@@ -114,19 +140,31 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       final directory = widget.appDataDirectory;
       if (directory != null) {
         saved = await StartupDiagnosticsService.writeFailureReport(
-          appDataDirectory: directory,
+          appDataDirectory: _isStorageActivationFailure
+              ? PrivateDataStorage.diagnosticsDirectory(directory)
+              : directory,
           text: report.toText(),
         );
       }
       // Listing only reads names and sizes; nothing here opens a database,
       // which is exactly what this screen cannot assume is safe to do.
       var copies = const <LocalCopy>[];
-      if (directory != null) {
+      if (directory != null && _blockedDirectory == null) {
         try {
-          copies = await LocalCopyCatalog(appDataDirectory: directory).list();
+          final catalog = LocalCopyCatalog(
+            appDataDirectory: directory,
+            includeActiveDatabase: _isStorageActivationFailure,
+            additionalRoots: widget.privateStorageSource == null
+                ? const []
+                : await PrivateDataStorage.recoveryDirectories(
+                    source: widget.privateStorageSource!,
+                    target: directory,
+                  ),
+          );
+          copies = await catalog.list();
+          _copySearchFailed = catalog.hadReadErrors;
         } catch (_) {
-          // The reset warning is a courtesy; failing to build it must not
-          // take the recovery screen down with it.
+          _copySearchFailed = true;
         }
       }
       if (!mounted) return;
@@ -136,6 +174,34 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         _localCopies = copies;
         _collectingDiagnostics = false;
       });
+      final verifiedArchives = <String>{};
+      if (!_isLeaseUnavailable) {
+        for (final copy in copies) {
+          if (!mounted) break;
+          File? prepared;
+          try {
+            final digest = copy.isArchive
+                ? (await sha256.bind(copy.file.openRead()).first).toString()
+                : null;
+            if (digest != null && verifiedArchives.contains(digest)) continue;
+            final archive = copy.isArchive
+                ? copy.file
+                : (prepared = await DataSync.prepareRecoveryDatabaseArchive(
+                    copy.file,
+                  ));
+            final info = await DataSync.inspectRecoverySnapshot(archive);
+            if (digest != null) verifiedArchives.add(digest);
+            if (mounted) setState(() => _verifiedCopies[copy.id] = info);
+          } catch (_) {
+            if (mounted) setState(() => _invalidCopies.add(copy.id));
+          } finally {
+            if (prepared != null) {
+              await DataSync.cleanupTemporaryBackupFile(prepared);
+            }
+          }
+        }
+      }
+      if (mounted) setState(() => _validatingCopies = false);
     }();
   }
 
@@ -160,7 +226,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _restartFailed = false;
     });
     try {
-      await widget.restart();
+      await (_canContinueRestore ? widget.retryRestore! : widget.restart)();
     } catch (error, stackTrace) {
       _reportError(error, stackTrace, 'while restarting after restore failure');
       if (!mounted) return;
@@ -231,7 +297,13 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           return;
         }
         final target = await StartupRecoveryService.exportDataCopy(
-          appDataDirectory: directory,
+          appDataDirectory: widget.privateStorageSource == null
+              ? directory
+              : directory.parent,
+          additionalDataDirectories: [
+            if (widget.privateStorageSource != null)
+              widget.privateStorageSource!,
+          ],
           destinationParent: Directory(destination),
         );
         _finishRecovery(l10n.startupRecoveryExportSavedTo(target.path));
@@ -240,7 +312,12 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       // Mobile has no folder to hand back, so the copy leaves as one archive
       // through the share sheet. The temporary file is removed either way.
       final archive = await StartupDiagnosticsService.createDataArchive(
-        appDataDirectory: directory,
+        appDataDirectory: widget.privateStorageSource == null
+            ? directory
+            : directory.parent,
+        additionalDataDirectories: [
+          if (widget.privateStorageSource != null) widget.privateStorageSource!,
+        ],
         workingDirectory: Directory(
           '${Directory.systemTemp.path}/kelivo-recovery',
         ),
@@ -319,7 +396,20 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final directory = widget.appDataDirectory;
     if (directory == null || _busy || _snapshotPrepared) return;
     final l10n = AppLocalizations.of(context)!;
-    final snapshots = _localCopies.where((copy) => copy.isArchive).toList();
+    final snapshots = _localCopies
+        .where((copy) => _verifiedCopies.containsKey(copy.id))
+        .toList();
+    // A reset may have produced newer, valid but empty copies. Put retained
+    // conversations first, while keeping empty copies available for settings.
+    bool hasChats(LocalCopy copy) {
+      final info = _verifiedCopies[copy.id]!;
+      return info.conversationCount > 0 || info.messageCount > 0;
+    }
+
+    final ordered = [
+      ...snapshots.where(hasChats),
+      ...snapshots.where((copy) => !hasChats(copy)),
+    ];
     final selected = await showDialog<LocalCopy>(
       context: context,
       builder: (context) => AlertDialog(
@@ -328,17 +418,17 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           width: 420,
           child: ListView.separated(
             shrinkWrap: true,
-            itemCount: snapshots.length,
+            itemCount: ordered.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final copy = snapshots[index];
+              final copy = ordered[index];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(_localCopyDate(copy)),
                 subtitle: Text(
                   l10n.localSnapshotCopyContents(
-                    copy.conversationCount!,
-                    copy.messageCount!,
+                    _verifiedCopies[copy.id]!.conversationCount,
+                    _verifiedCopies[copy.id]!.messageCount,
                   ),
                 ),
                 trailing: const Icon(Lucide.ChevronRight, size: 18),
@@ -382,12 +472,26 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _snapshotError = null;
       _recoveryMessage = null;
     });
+    File? prepared;
     try {
-      await DataSync.prepareStartupSnapshotRestore(
-        appDataDirectory: directory,
-        snapshot: selected.file,
-        businessLease: widget.businessLease,
-      );
+      final archive = selected.isArchive
+          ? selected.file
+          : (prepared = await DataSync.prepareRecoveryDatabaseArchive(
+              selected.file,
+            ));
+      if (widget.privateStorageSource != null) {
+        await PrivateDataStorage.recover(
+          source: widget.privateStorageSource!,
+          target: directory,
+          snapshot: archive,
+        );
+      } else {
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: directory,
+          snapshot: archive,
+          businessLease: widget.businessLease,
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -396,6 +500,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         _snapshotError = l10n.startupRecoverySnapshotFailed('$error');
       });
       return;
+    } finally {
+      if (prepared != null) await DataSync.cleanupTemporaryBackupFile(prepared);
     }
     if (!mounted) return;
     setState(() {
@@ -404,6 +510,38 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     });
     _finishRecovery(l10n.startupRecoverySnapshotReady);
     await _restart();
+  }
+
+  Future<void> _keepCurrentData() async {
+    final directory = widget.appDataDirectory;
+    if (directory == null || _busy) return;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.recoveryKeepCurrent),
+        content: Text(l10n.recoveryKeepCurrentConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.startupRecoveryResetDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.recoveryKeepCurrent),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _recoveryBusy = true);
+    try {
+      await EmptyDatabaseRecoveryGuard.acknowledge(directory);
+      _recoveryBusy = false;
+      await _restart();
+    } catch (_) {
+      _finishRecovery(l10n.startupRecoveryRepairFailed, isError: true);
+    }
   }
 
   Future<void> _resetAndRestart() async {
@@ -421,10 +559,17 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _restartFailed = false;
     });
     try {
-      await StartupRecoveryService.reset(
-        appDataDirectory: directory,
-        businessLease: widget.businessLease,
-      );
+      if (widget.privateStorageSource != null) {
+        await PrivateDataStorage.recover(
+          source: widget.privateStorageSource!,
+          target: directory,
+        );
+      } else {
+        await StartupRecoveryService.reset(
+          appDataDirectory: directory,
+          businessLease: widget.businessLease,
+        );
+      }
       await widget.restart();
       if (!mounted) return;
       setState(() {
@@ -466,7 +611,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final showRecoveryActions =
-        widget.appDataDirectory != null && !_isLeaseUnavailable;
+        widget.appDataDirectory != null &&
+        !_isLeaseUnavailable &&
+        _blockedDirectory == null;
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -478,25 +625,66 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
               children: [
                 _Header(
-                  title: _isLeaseUnavailable
+                  title: _blockedDirectory != null
+                      ? l10n.backupRestoreDirectoryBlockedTitle
+                      : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableTitle
+                      : _isStorageActivationFailure
+                      ? l10n.recoveryStorageFailureTitle
+                      : _isMissingDatabase
+                      ? l10n.recoveryMissingDataTitle
+                      : _isEmptyDatabase
+                      ? l10n.recoveryEmptyDataTitle
                       : l10n.backupRestoreFailureTitle,
-                  body: _isLeaseUnavailable
+                  body: _blockedDirectory != null
+                      ? l10n.backupRestoreDirectoryBlockedContent
+                      : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableContent
+                      : _isStorageActivationFailure
+                      ? (_report.diagnosticCode ==
+                                'private_storage_insufficient_space'
+                            ? l10n.recoveryStorageInsufficientSpaceBody
+                            : l10n.recoveryStorageFailureBody)
+                      : _isMissingDatabase
+                      ? l10n.recoveryMissingDataBody
+                      : _isEmptyDatabase
+                      ? l10n.recoveryEmptyDataBody
                       : l10n.backupRestoreFailureContent,
                 ),
+                if (_blockedDirectory != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(_blockedDirectory!),
+                ],
                 const SizedBox(height: 24),
                 if (showRecoveryActions) ...[
                   _Section(
                     icon: Lucide.History,
                     title: l10n.startupRecoverySnapshotTitle,
-                    description: _collectingDiagnostics
-                        ? l10n.startupRecoveryBusy
-                        : _localCopies.any((copy) => copy.isArchive)
-                        ? l10n.startupRecoverySnapshotBody
+                    description: _collectingDiagnostics || _validatingCopies
+                        ? l10n.recoverySearchingCopies
+                        : _verifiedCopies.isNotEmpty
+                        ? l10n.recoveryFoundCopies(_verifiedCopies.length)
+                        : _copySearchFailed
+                        ? l10n.recoverySearchFailed
+                        : _invalidCopies.isNotEmpty
+                        ? l10n.recoveryNoValidCopies
                         : l10n.startupRecoverySnapshotEmpty,
                     children: [
-                      if (_localCopies.any((copy) => copy.isArchive))
+                      if (_validatingCopies)
+                        LinearProgressIndicator(
+                          value: _localCopies.isEmpty
+                              ? 0
+                              : (_verifiedCopies.length +
+                                        _invalidCopies.length) /
+                                    _localCopies.length,
+                        ),
+                      for (final copy in _localCopies.where(
+                        (copy) => _invalidCopies.contains(copy.id),
+                      ))
+                        Text(
+                          l10n.recoveryInvalidCopy(_basename(copy.file.path)),
+                        ),
+                      if (_verifiedCopies.isNotEmpty)
                         _ActionTile(
                           icon: Lucide.RotateCcw,
                           label: _restoringSnapshot
@@ -547,7 +735,11 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                             ),
                           )
                         : const Icon(Lucide.RefreshCw, size: 18),
-                    label: Text(l10n.backupRestoreFailureRestartButton),
+                    label: Text(
+                      _canContinueRestore
+                          ? l10n.backupRestoreContinueButton
+                          : l10n.backupRestoreFailureRestartButton,
+                    ),
                   ),
                 ),
                 if (_restartFailed) ...[
@@ -569,34 +761,44 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _Section(
-                    icon: Lucide.Wrench,
-                    title: l10n.startupRecoverySectionRepairTitle,
-                    description: l10n.startupRecoverySectionRepairBody,
-                    children: [
-                      _ActionTile(
-                        icon: Lucide.Activity,
-                        label: l10n.startupRecoveryIntegrityButton,
-                        onPressed: _busy ? null : _checkIntegrity,
-                      ),
-                      if (_integrity != null || _integrityError != null) ...[
+                  if (_isEmptyDatabase) ...[
+                    const SizedBox(height: 16),
+                    _ActionTile(
+                      icon: Lucide.Play,
+                      label: l10n.recoveryKeepCurrent,
+                      onPressed: _busy ? null : _keepCurrentData,
+                    ),
+                  ],
+                  if (!_isStorageActivationFailure) ...[
+                    const SizedBox(height: 16),
+                    _Section(
+                      icon: Lucide.Wrench,
+                      title: l10n.startupRecoverySectionRepairTitle,
+                      description: l10n.startupRecoverySectionRepairBody,
+                      children: [
+                        _ActionTile(
+                          icon: Lucide.Activity,
+                          label: l10n.startupRecoveryIntegrityButton,
+                          onPressed: _busy ? null : _checkIntegrity,
+                        ),
+                        if (_integrity != null || _integrityError != null) ...[
+                          const SizedBox(height: 10),
+                          _IntegrityResultView(
+                            result: _integrity,
+                            error: _integrityError,
+                          ),
+                        ],
                         const SizedBox(height: 10),
-                        _IntegrityResultView(
-                          result: _integrity,
-                          error: _integrityError,
+                        _ActionTile(
+                          icon: Lucide.RotateCcw,
+                          label: l10n.startupRecoveryRepairButton,
+                          onPressed: _busy || _snapshotPrepared
+                              ? null
+                              : _repairAndRestart,
                         ),
                       ],
-                      const SizedBox(height: 10),
-                      _ActionTile(
-                        icon: Lucide.RotateCcw,
-                        label: l10n.startupRecoveryRepairButton,
-                        onPressed: _busy || _snapshotPrepared
-                            ? null
-                            : _repairAndRestart,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   _DangerZone(
                     expanded: _dangerExpanded,
@@ -1069,20 +1271,8 @@ class _DangerZone extends StatelessWidget {
   final bool expanded;
   final bool busy;
 
-  /// Shown before the reset button so nobody discards data that is still
-  /// sitting on the device, recoverable, a restart away.
-  ///
-  /// Split by kind because reset treats them differently: snapshots survive
-  /// it, and database families set aside by an earlier repair do not. Telling
-  /// the user "your copies are safe" while the button is about to delete half
-  /// of them would be the same mistake this screen exists to prevent.
+  /// All existing snapshots and database copies survive an explicit reset.
   final List<LocalCopy> localCopies;
-
-  Iterable<LocalCopy> get _survivingCopies =>
-      localCopies.where((copy) => copy.kind == LocalCopyKind.snapshot);
-
-  Iterable<LocalCopy> get _copiesResetWillDelete =>
-      localCopies.where((copy) => copy.kind == LocalCopyKind.displaced);
   final VoidCallback onToggle;
   final Future<void> Function() onReset;
 
@@ -1127,28 +1317,15 @@ class _DangerZone extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
-                if (_survivingCopies.isNotEmpty) ...[
+                if (localCopies.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
                     l10n.startupRecoveryLocalCopiesAvailable(
-                      _survivingCopies.length,
-                      _localCopyDate(_survivingCopies.first),
+                      localCopies.length,
+                      _localCopyDate(localCopies.first),
                     ),
                     style: textTheme.bodySmall?.copyWith(
                       color: colors.onSurface,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                if (_copiesResetWillDelete.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    l10n.startupRecoveryRecoveredCopiesDeleted(
-                      _copiesResetWillDelete.length,
-                    ),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colors.error,
                       height: 1.45,
                       fontWeight: FontWeight.w600,
                     ),

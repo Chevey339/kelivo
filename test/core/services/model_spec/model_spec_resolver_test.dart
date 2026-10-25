@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -76,6 +77,135 @@ void main() {
         ]);
       },
     );
+
+    group('GPT-5 reasoning', () {
+      const ids = ['gpt-5', 'gpt-5-mini', 'gpt-5-nano'];
+      const defaultLevels = [
+        ReasoningLevel.minimal,
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+      ];
+
+      void expectReasoning(
+        ResolvedModelSpec resolved, {
+        List<ReasoningLevel> levels = defaultLevels,
+        SpecSource source = SpecSource.guess,
+      }) {
+        final spec = resolved.spec;
+        expect(spec.supportsReasoning, isTrue, reason: spec.id);
+        expect(spec.reasoning.levels, levels, reason: spec.id);
+        expect(spec.reasoning.canDisable, isFalse, reason: spec.id);
+        expect(resolved.sources[ModelSpecField.reasoningLevels], source);
+        expect(resolved.sources[ModelSpecField.reasoningCanDisable], source);
+        expect(
+          applyReasoning(
+            <String, dynamic>{},
+            spec,
+            ReasoningRequest.off,
+            transport: ReasoningTransport.chatCompletions,
+          ),
+          {'reasoning_effort': levels.first.name},
+          reason: spec.id,
+        );
+        expect(
+          applyReasoning(
+            <String, dynamic>{},
+            spec,
+            ReasoningRequest.off,
+            transport: ReasoningTransport.responses,
+          ),
+          {
+            'reasoning': {'effort': levels.first.name, 'summary': 'auto'},
+          },
+          reason: spec.id,
+        );
+      }
+
+      test('uses minimal before the catalog loads', () async {
+        final pendingCatalog = ModelCatalogService(
+          loadBundledJson: () async => jsonEncode(_catalogData().toJson()),
+          cacheDirectory: () async => tempDir,
+          prefs: SharedPreferences.getInstance,
+        );
+        final pendingResolver = ModelSpecResolver(catalog: pendingCatalog);
+        try {
+          for (final id in ids) {
+            final resolved = pendingResolver.resolve(_openai(), id);
+            expect(resolved.catalog, isNull);
+            expectReasoning(resolved);
+          }
+          expect(pendingCatalog.isLoaded, isFalse);
+        } finally {
+          await pendingCatalog.ensureLoaded();
+          pendingCatalog.dispose();
+        }
+      });
+
+      test('uses minimal when the catalog has no matching model', () {
+        for (final id in ids) {
+          final resolved = resolver.resolve(_openai(), id);
+          expect(resolved.catalog, isNull);
+          expectReasoning(resolved);
+        }
+      });
+
+      for (final hasEffortOptions in [false, true]) {
+        test(
+          hasEffortOptions
+              ? 'provider effort options take precedence over defaults'
+              : 'uses minimal when the provider entry has no effort options',
+          () {
+            catalog.debugSetData(
+              ModelCatalogData(
+                schemaVersion: 1,
+                generatedAt: DateTime.utc(2026, 9, 15),
+                providers: {
+                  'abacus': _provider(
+                    'abacus',
+                    api: 'https://routellm.abacus.ai/v1',
+                    models: [
+                      for (final id in ids)
+                        _model(
+                          id,
+                          reasoning: true,
+                          reasoningOptions: hasEffortOptions
+                              ? const [
+                                  CatalogReasoningOption(
+                                    type: 'effort',
+                                    values: ['low', 'high'],
+                                  ),
+                                ]
+                              : const [],
+                        ),
+                    ],
+                  ),
+                },
+              ),
+            );
+            final cfg = _cfg(
+              id: 'abacus',
+              kind: ProviderKind.openai,
+              baseUrl: 'https://routellm.abacus.ai/v1',
+            );
+            for (final id in ids) {
+              final resolved = resolver.resolve(cfg, id);
+              expect(resolved.catalog?.provider.id, 'abacus');
+              expect(resolved.catalog?.kind, CatalogMatchKind.providerExact);
+              expectReasoning(
+                resolved,
+                levels: hasEffortOptions
+                    ? const [ReasoningLevel.low, ReasoningLevel.high]
+                    : defaultLevels,
+                source: hasEffortOptions
+                    ? SpecSource.catalog
+                    : SpecSource.guess,
+              );
+            }
+          },
+        );
+      }
+    });
 
     test('catalog beats guesser for gpt-5.1 levels and limits', () {
       final resolved = resolver.resolve(_openai(), 'gpt-5.1');

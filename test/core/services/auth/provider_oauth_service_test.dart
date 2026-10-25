@@ -382,6 +382,7 @@ void main() {
       final sent = requests.single;
       expect(sent.headers['Authorization'], 'Bearer access');
       expect(sent.headers['chatgpt-account-id'], 'workspace');
+      expect(sent.headers['version'], '0.159.0');
       expect(sent.url.toString(), '${OAuthProvider.chatgpt.baseUrl}/responses');
       final body = jsonDecode(sent.body) as Map;
       expect(body['stream'], true);

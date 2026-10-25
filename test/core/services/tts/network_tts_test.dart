@@ -459,6 +459,151 @@ void main() {
       expect(result.mime, 'audio/wav');
       expect(result.sampleRate, 24000);
       expect(utf8.decode(result.bytes.take(4).toList()), 'RIFF');
+      expect(_riffChunkData(result.bytes, 'data'), pcm);
+    });
+
+    test('Qwen keeps PCM samples split across SSE events', () async {
+      final result = await _synthesizeQwenAudio([
+        [0, 1, 2],
+        [3, 4, 5],
+      ]);
+      expect(_riffChunkData(result.bytes, 'data'), [0, 1, 2, 3, 4, 5]);
+      expect(result.sampleRate, 24000);
+    });
+
+    test('Qwen extracts WAV chunks and preserves the actual format', () async {
+      final format = _pcmFormat(16000);
+      ByteData.sublistView(format)
+        ..setUint16(2, 2, Endian.little)
+        ..setUint32(8, 64000, Endian.little)
+        ..setUint16(12, 4, Endian.little);
+      final samples = <int>[1, 2, 3, 4, ...ascii.encode('RIFF'), 5, 6, 7, 8];
+      final upstream = _buildWav([
+        ('JUNK', [9, 8, 7]),
+        ('fmt ', format),
+        ('LIST', [1, 2]),
+        ('data', samples.sublist(0, 4)),
+        ('data', samples.sublist(4)),
+      ]);
+      final result = await _synthesizeQwenAudio([upstream]);
+
+      expect(result.mime, 'audio/wav');
+      expect(result.sampleRate, 16000);
+      expect(_riffChunkData(result.bytes, 'fmt '), format);
+      expect(_riffChunkData(result.bytes, 'data'), samples);
+      expect(result.bytes.length, 44 + samples.length);
+    });
+
+    for (final sizes in <(int?, int?)>[
+      (null, null),
+      (0x7fffffbf, 0x7fffff9b), // Header reported in issue #1232.
+      (0x7fffffff, 0x7fffffff),
+      (0xffffffff, 0xffffffff),
+      (0x7fffffff, 0x7fffffdb),
+      (0xffffffff, 0xffffffdb),
+      (0xffffffff, null),
+      (null, 0xffffffff),
+    ]) {
+      test('Qwen normalizes WAV lengths $sizes across SSE events', () async {
+        final samples = Uint8List(480);
+        final upstream = _buildWav([
+          ('fmt ', _pcmFormat(24000)),
+          ('data', samples),
+        ]);
+        final view = ByteData.sublistView(upstream);
+        if (sizes.$1 != null) view.setUint32(4, sizes.$1!, Endian.little);
+        if (sizes.$2 != null) view.setUint32(40, sizes.$2!, Endian.little);
+        final result = await _synthesizeQwenAudio([
+          upstream.sublist(0, 2),
+          upstream.sublist(2, 9),
+          upstream.sublist(9, 39),
+          upstream.sublist(39),
+        ]);
+
+        expect(result.sampleRate, 24000);
+        expect(_riffChunkData(result.bytes, 'data'), samples);
+        expect(
+          ByteData.sublistView(result.bytes).getUint32(4, Endian.little),
+          result.bytes.length - 8,
+        );
+        final exported = combineWavAudio(List.filled(5, result.bytes));
+        expect(_riffChunkData(exported, 'data'), Uint8List(5 * samples.length));
+        expect(exported.length, 44 + 5 * samples.length);
+      });
+    }
+
+    test('Qwen preserves odd-sized 8-bit WAV data with RIFF padding', () async {
+      final format = _pcmFormat(8000);
+      ByteData.sublistView(format)
+        ..setUint32(8, 8000, Endian.little)
+        ..setUint16(12, 1, Endian.little)
+        ..setUint16(14, 8, Endian.little);
+      final result = await _synthesizeQwenAudio([
+        _buildWav([
+          ('fmt ', format),
+          ('data', [128, 129, 127]),
+        ]),
+      ]);
+      expect(_riffChunkData(result.bytes, 'data'), [128, 129, 127]);
+      expect(result.bytes.length, 48);
+      expect(result.sampleRate, 8000);
+    });
+
+    final validQwenWav = _buildWav([
+      ('fmt ', _pcmFormat(24000)),
+      ('data', [0, 1, 2, 3]),
+    ]);
+    final invalidQwenAudio = <String, List<int>>{
+      'odd PCM byte count': [1, 2, 3],
+      'truncated RIFF header': ascii.encode('RIFF'),
+      'wrong RIFF form': _replaceWavUint32(validQwenWav, 8, 0),
+      'truncated RIFF body': _replaceWavUint32(validQwenWav, 4, 100),
+      'bytes outside RIFF': [...validQwenWav, 0, 0],
+      'truncated chunk header': _replaceWavUint32(
+        Uint8List.fromList([..._buildWav([]), ...ascii.encode('fmt ')]),
+        4,
+        8,
+      ),
+      'truncated data chunk': _replaceWavUint32(validQwenWav, 40, 6),
+      'unknown fmt length': _replaceWavUint32(validQwenWav, 16, 0xffffffff),
+      'missing fmt': _buildWav([
+        ('data', [0, 0]),
+      ]),
+      'missing data': _buildWav([('fmt ', _pcmFormat(24000))]),
+      'empty data': _buildWav([('fmt ', _pcmFormat(24000)), ('data', [])]),
+      'short fmt': _buildWav([
+        ('fmt ', [1, 0]),
+        ('data', [0, 0]),
+      ]),
+      'zero sample rate': _replaceWavUint32(validQwenWav, 24, 0),
+      'wrong byte rate': _replaceWavUint32(validQwenWav, 28, 100),
+      'zero block alignment': _replaceWavUint32(validQwenWav, 32, 16 << 16),
+      'wrong block alignment': _replaceWavUint32(
+        validQwenWav,
+        32,
+        (16 << 16) | 4,
+      ),
+      'unsupported format': _replaceWavUint32(validQwenWav, 20, (1 << 16) | 2),
+      'unaligned individual data chunks': _buildWav([
+        ('fmt ', _pcmFormat(24000)),
+        ('data', [1]),
+        ('data', [2]),
+      ]),
+    };
+    for (final entry in invalidQwenAudio.entries) {
+      test('Qwen rejects ${entry.key}', () async {
+        await expectLater(
+          _synthesizeQwenAudio([entry.value]),
+          throwsFormatException,
+        );
+      });
+    }
+
+    test('WAV concatenation still rejects streaming placeholder lengths', () {
+      expect(
+        () => combineWavAudio([_replaceWavUint32(validQwenWav, 4, 0x7fffffbf)]),
+        throwsFormatException,
+      );
     });
 
     test('synthesizes Groq audio speech response as wav', () async {
@@ -1335,6 +1480,48 @@ Future<HttpServer> _bindServer(
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   server.listen(handler);
   return server;
+}
+
+Future<NetworkTtsResult> _synthesizeQwenAudio(
+  List<List<int>> audioParts,
+) async {
+  final server = await _bindServer((request) async {
+    await request.drain<void>();
+    request.response.headers.contentType = ContentType('text', 'event-stream');
+    for (final part in audioParts) {
+      request.response.write(
+        'data: ${jsonEncode({
+          'output': {
+            'audio': {'data': base64Encode(part)},
+          },
+        })}\n\n',
+      );
+    }
+    request.response.write('data: [DONE]\n\n');
+    await request.response.close();
+  });
+  try {
+    return await NetworkTtsService.synthesize(
+      options: QwenTtsOptions(
+        enabled: true,
+        name: 'Qwen',
+        apiKey: 'qwen-key',
+        baseUrl: _baseUrl(server),
+        model: 'qwen3-tts-flash',
+        voice: 'Cherry',
+        languageType: 'Chinese',
+      ),
+      text: '你好',
+    );
+  } finally {
+    await server.close(force: true);
+  }
+}
+
+Uint8List _replaceWavUint32(Uint8List wav, int offset, int value) {
+  final bytes = Uint8List.fromList(wav);
+  ByteData.sublistView(bytes).setUint32(offset, value, Endian.little);
+  return bytes;
 }
 
 String _baseUrl(HttpServer server) {

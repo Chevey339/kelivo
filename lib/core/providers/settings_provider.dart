@@ -32,6 +32,7 @@ import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../models/assistant.dart';
+import '../models/memory_entry.dart';
 import '../models/model_spec.dart';
 import '../models/reasoning_request.dart';
 import '../services/model_spec/model_spec_resolver.dart';
@@ -182,6 +183,8 @@ class SettingsProvider extends ChangeNotifier {
   static const int maxMemoryMigrationBatchSize = 24;
   static const String _memoryInjectionMaxItemsKey =
       'memory_injection_max_items_v1';
+  static const String _memoryFullInjectionTypesKey =
+      'memory_full_injection_types_v1';
   static const int defaultMemoryInjectionMaxItems = 10;
   static const int minMemoryInjectionMaxItems = 1;
   static const int maxMemoryInjectionMaxItems = 100;
@@ -209,6 +212,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_produced_files_v1';
   static const String _displayShowReasoningLevelBadgeKey =
       'display_show_reasoning_level_badge_v1';
+  static const String _iosNativeSelectionMenuEnabledKey =
+      'ios_native_selection_menu_enabled_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -217,6 +222,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_tool_result_summary_v1';
   static const String _displayHideToolResultImagesKey =
       'display_hide_tool_result_images_v1';
+  static const String _displayShowBrowserPageCardsKey =
+      'display_show_browser_page_cards_v1';
   static const String _displayRegenerateDeleteTrailingMessagesKey =
       'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
@@ -968,6 +975,13 @@ class SettingsProvider extends ChangeNotifier {
         (prefs.getInt(_memoryInjectionMaxItemsKey) ??
                 defaultMemoryInjectionMaxItems)
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
+    final fullInjectionTypes =
+        prefs.getStringList(_memoryFullInjectionTypesKey) ?? const <String>[];
+    _memoryFullInjectionTypes = Set<MemoryType>.unmodifiable(
+      MemoryType.values.where(
+        (type) => fullInjectionTypes.contains(MemoryEntry.typeToString(type)),
+      ),
+    );
 
     // display settings
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
@@ -995,6 +1009,8 @@ class SettingsProvider extends ChangeNotifier {
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
     _showReasoningLevelBadge =
         prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? false;
+    _iosNativeSelectionMenuEnabled =
+        localPreferences.getBool(_iosNativeSelectionMenuEnabledKey) ?? true;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -1003,6 +1019,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
     _hideToolResultImages =
         prefs.getBool(_displayHideToolResultImagesKey) ?? false;
+    _showBrowserPageCards =
+        prefs.getBool(_displayShowBrowserPageCardsKey) ?? true;
     _regenerateDeleteTrailingMessages =
         prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
@@ -4193,6 +4211,9 @@ Requirements:
   String _memoryMigratePromptEn = MemoryPrompts.migrateEn;
   int _memoryMigrationBatchSize = defaultMemoryMigrationBatchSize;
   int _memoryInjectionMaxItems = defaultMemoryInjectionMaxItems;
+  Set<MemoryType> _memoryFullInjectionTypes = const {};
+
+  Set<MemoryType> get memoryFullInjectionTypes => _memoryFullInjectionTypes;
 
   String get memoryRulesPromptZh => _memoryRulesPromptZh;
   String get memoryRulesPromptEn => _memoryRulesPromptEn;
@@ -4457,6 +4478,19 @@ Requirements:
     await _preferences.setInt(_memoryInjectionMaxItemsKey, next);
   }
 
+  Future<void> setMemoryFullInjectionTypes(Set<MemoryType> types) async {
+    final next = Set<MemoryType>.unmodifiable(
+      MemoryType.values.where(types.contains),
+    );
+    if (setEquals(_memoryFullInjectionTypes, next)) return;
+    _memoryFullInjectionTypes = next;
+    notifyListeners();
+    await _preferences.setStringList(
+      _memoryFullInjectionTypesKey,
+      next.map(MemoryEntry.typeToString).toList(),
+    );
+  }
+
   Future<void> resetMemoryRulesPromptZh() async =>
       setMemoryRulesPromptZh(MemoryPrompts.rulesZh);
   Future<void> resetMemoryRulesPromptEn() async =>
@@ -4670,6 +4704,17 @@ Requirements:
     await prefs.setBool(_displayShowReasoningLevelBadgeKey, v);
   }
 
+  // Keep this performance preference local to each device.
+  bool _iosNativeSelectionMenuEnabled = true;
+  bool get iosNativeSelectionMenuEnabled => _iosNativeSelectionMenuEnabled;
+  Future<void> setIosNativeSelectionMenuEnabled(bool value) async {
+    if (_iosNativeSelectionMenuEnabled == value) return;
+    _iosNativeSelectionMenuEnabled = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iosNativeSelectionMenuEnabledKey, value);
+  }
+
   // Display: auto-collapse reasoning/thinking section
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
@@ -4709,6 +4754,15 @@ Requirements:
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayHideToolResultImagesKey, v);
+  }
+
+  bool _showBrowserPageCards = true;
+  bool get showBrowserPageCards => _showBrowserPageCards;
+  Future<void> setShowBrowserPageCards(bool v) async {
+    if (_showBrowserPageCards == v) return;
+    _showBrowserPageCards = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowBrowserPageCardsKey, v);
   }
 
   bool _regenerateDeleteTrailingMessages = false;
@@ -5768,6 +5822,7 @@ Requirements:
     copy._memoryMigratePromptEn = _memoryMigratePromptEn;
     copy._memoryMigrationBatchSize = _memoryMigrationBatchSize;
     copy._memoryInjectionMaxItems = _memoryInjectionMaxItems;
+    copy._memoryFullInjectionTypes = _memoryFullInjectionTypes;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;
@@ -5783,10 +5838,12 @@ Requirements:
     copy._showToolCards = _showToolCards;
     copy._showProducedFiles = _showProducedFiles;
     copy._showReasoningLevelBadge = _showReasoningLevelBadge;
+    copy._iosNativeSelectionMenuEnabled = _iosNativeSelectionMenuEnabled;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
     copy._hideToolResultImages = _hideToolResultImages;
+    copy._showBrowserPageCards = _showBrowserPageCards;
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._forkKeepMessageVersions = _forkKeepMessageVersions;
@@ -6085,6 +6142,7 @@ class ProviderConfig {
   final OAuthProvider? oauthProvider;
   final ProviderOAuthCredentials? oauthCredentials;
   final DateTime? oauthModelsSyncedAt;
+  final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
   final String baseUrl;
   final ProviderKind?
@@ -6179,6 +6237,7 @@ class ProviderConfig {
     this.oauthProvider,
     this.oauthCredentials,
     this.oauthModelsSyncedAt,
+    this.oauthModelsClientVersion,
     required this.baseUrl,
     this.providerType,
     this.chatPath,
@@ -6232,6 +6291,7 @@ class ProviderConfig {
     OAuthProvider? oauthProvider,
     Object? oauthCredentials = _sentinel,
     DateTime? oauthModelsSyncedAt,
+    Object? oauthModelsClientVersion = _sentinel,
     String? baseUrl,
     ProviderKind? providerType,
     String? chatPath,
@@ -6272,6 +6332,9 @@ class ProviderConfig {
         ? this.oauthCredentials
         : oauthCredentials as ProviderOAuthCredentials?,
     oauthModelsSyncedAt: oauthModelsSyncedAt ?? this.oauthModelsSyncedAt,
+    oauthModelsClientVersion: identical(oauthModelsClientVersion, _sentinel)
+        ? this.oauthModelsClientVersion
+        : oauthModelsClientVersion as String?,
     baseUrl: baseUrl ?? this.baseUrl,
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
@@ -6321,6 +6384,8 @@ class ProviderConfig {
       'oauthCredentials': oauthCredentials!.toJson(),
     if (oauthModelsSyncedAt != null)
       'oauthModelsSyncedAt': oauthModelsSyncedAt!.toIso8601String(),
+    if (oauthModelsClientVersion != null)
+      'oauthModelsClientVersion': oauthModelsClientVersion,
     'baseUrl': baseUrl,
     'providerType': providerType?.name,
     'chatPath': chatPath,
@@ -6371,6 +6436,7 @@ class ProviderConfig {
     oauthModelsSyncedAt: DateTime.tryParse(
       json['oauthModelsSyncedAt'] as String? ?? '',
     ),
+    oauthModelsClientVersion: json['oauthModelsClientVersion'] as String?,
     baseUrl: json['baseUrl'] as String? ?? '',
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(

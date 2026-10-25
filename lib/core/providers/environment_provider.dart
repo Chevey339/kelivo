@@ -6,6 +6,8 @@ import '../database/business_preferences.dart';
 import '../models/environment_state.dart';
 import '../models/environment_variable.dart';
 import '../services/sandbox/rootfs_source.dart';
+import '../services/sandbox/sandbox_proxy_environment.dart';
+import 'settings_provider.dart';
 
 class EnvironmentProvider extends ChangeNotifier {
   static const String stateKey = 'environment_state_v1';
@@ -16,11 +18,12 @@ class EnvironmentProvider extends ChangeNotifier {
   static const String rootfsSelectionKey = 'environment_rootfs_selection_v1';
   static const String prootOptionsKey = 'environment_proot_options_v1';
 
-  EnvironmentProvider({required this.preferences}) {
+  EnvironmentProvider({required this.preferences, this.proxySettings}) {
     loaded = _load();
   }
 
   final BusinessPreferences preferences;
+  final SettingsProvider? proxySettings;
   List<EnvironmentVariable> _variables = [];
   bool _privacyMode = true;
   Future<void> _variablesWrite = Future<void>.value();
@@ -28,12 +31,20 @@ class EnvironmentProvider extends ChangeNotifier {
   List<EnvironmentVariable> get variables => List.unmodifiable(_variables);
   bool get privacyMode => _privacyMode;
 
-  Future<EnvironmentExecutionConfig> loadExecutionConfig() async {
+  Future<EnvironmentExecutionConfig> loadExecutionConfig({
+    Map<String, String> overrides = const {},
+  }) async {
     await loaded;
+    final settings = proxySettings;
+    await settings?.loaded;
+    final variables = {
+      for (final variable in _variables) variable.name: variable.value,
+      ...overrides,
+    };
     return EnvironmentExecutionConfig(
-      variables: {
-        for (final variable in _variables) variable.name: variable.value,
-      },
+      variables: settings == null
+          ? variables
+          : sandboxProxyEnvironment(settings, variables),
       privacyMode: _privacyMode,
     );
   }

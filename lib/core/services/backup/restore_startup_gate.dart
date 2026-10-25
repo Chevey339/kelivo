@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../database/database_family_preserver.dart';
 
 import 'package:path/path.dart' as p;
 
@@ -17,6 +18,7 @@ import 'restore_workspace_lock.dart';
 /// nothing is indistinguishable from a hang. These are what a pre-business
 /// progress screen can show without touching any business data.
 enum RestoreStartupStage {
+  protectingData,
   checkingBackup,
   preservingCurrentData,
   installingBackup,
@@ -26,6 +28,36 @@ enum RestoreStartupStage {
 }
 
 typedef RestoreStartupStageSink = void Function(RestoreStartupStage stage);
+
+/// In-memory observations for a failure report, never used to decide recovery.
+/// Receipt data comes from the existing locked reads, not a later disk scan.
+final class RestoreStartupDiagnostics {
+  final _details = <String, String>{};
+
+  Map<String, String> get details => Map.unmodifiable(_details);
+
+  void reset() => _details.clear();
+
+  void recordRun(String runId, String markerFileName) {
+    _details['run id'] = runId;
+    _details['observed marker'] = markerFileName;
+  }
+
+  void recordStage(RestoreStartupStage stage) {
+    _details['restore stage'] = stage.name;
+  }
+
+  void recordReceipt(RestoreReceipt receipt) {
+    _details.addAll({
+      'run id': receipt.runId,
+      'last observed receipt state': receipt.state.name,
+      'last observed receipt sequence': '${receipt.sequence}',
+      'receipt created UTC': receipt.createdAtUtc.toIso8601String(),
+      'receipt checksum': receipt.checksum,
+      'candidate manifest SHA-256': receipt.candidateManifestSha256,
+    });
+  }
+}
 
 final class PendingRestoreRun {
   const PendingRestoreRun({
@@ -121,6 +153,7 @@ final class RestoreStartupGate {
     required Directory appDataDirectory,
     required RestoreWorkspaceLock workspaceLock,
     RestoreStartupStageSink? onStage,
+    RestoreStartupDiagnostics? diagnostics,
   }) async {
     final workspaceRoot = workspaceLock.workspaceRoot;
     final rootType = await FileSystemEntity.type(
@@ -180,6 +213,7 @@ final class RestoreStartupGate {
       throw StateError('restore_startup_run_topology');
     }
     final markerRunId = await _readRunId(markerFile);
+    diagnostics?.recordRun(markerRunId, markerFileName);
     if (runDirectory == null || directoryRunId == null) {
       if (markerFileName != RestoreWorkspaceLock.archivingRunFileName ||
           completedRunsRoot == null) {
@@ -201,6 +235,7 @@ final class RestoreStartupGate {
         archived: true,
       );
       final receipt = await store.readLatestWhileWorkspaceLocked();
+      if (receipt != null) diagnostics?.recordReceipt(receipt);
       if (receipt == null ||
           (receipt.state != RestoreReceiptState.committed &&
               receipt.state != RestoreReceiptState.rolledBack)) {
@@ -237,6 +272,7 @@ final class RestoreStartupGate {
     );
     final receipt = await store.readLatestWhileWorkspaceLocked();
     if (receipt == null) throw StateError('restore_startup_receipt');
+    diagnostics?.recordReceipt(receipt);
     final terminal =
         receipt.state == RestoreReceiptState.committed ||
         receipt.state == RestoreReceiptState.rolledBack;
@@ -278,7 +314,14 @@ final class RestoreStartupGate {
     RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
     RestoreStartupStageSink? onStage,
+    RestoreStartupDiagnostics? diagnostics,
   }) async {
+    diagnostics?.reset();
+    void reportStage(RestoreStartupStage stage) {
+      diagnostics?.recordStage(stage);
+      onStage?.call(stage);
+    }
+
     final resolvedDurability = durability ?? RestorePlatformDurability();
     final ownedBusinessLease = businessLease == null
         ? await RestoreBusinessLease.acquire(
@@ -306,6 +349,10 @@ final class RestoreStartupGate {
       durability: resolvedDurability,
     );
     try {
+      await DatabaseFamilyPreserver.resume(
+        appDataDirectory,
+        durability: resolvedDurability,
+      );
       if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
         throw StateError('restore_startup_snapshot_preparation_incomplete');
       }
@@ -333,7 +380,8 @@ final class RestoreStartupGate {
         final pending = await _inspectLocked(
           appDataDirectory: appDataDirectory,
           workspaceLock: workspaceLock,
-          onStage: onStage,
+          onStage: reportStage,
+          diagnostics: diagnostics,
         );
         if (pending == null) return null;
         final executor = RestoreCutoverExecutor(
@@ -343,7 +391,8 @@ final class RestoreStartupGate {
           durability: resolvedDurability,
           archived: pending.runInCompletedDirectory,
           validatedCandidate: pending.validatedCandidate,
-          onStage: onStage,
+          onStage: reportStage,
+          diagnostics: diagnostics,
         );
         if (pending.receipt.state == RestoreReceiptState.committed ||
             pending.receipt.state == RestoreReceiptState.rolledBack) {
@@ -355,7 +404,7 @@ final class RestoreStartupGate {
               durability: resolvedDurability,
             );
           }
-          onStage?.call(RestoreStartupStage.finishing);
+          reportStage(RestoreStartupStage.finishing);
           await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
             runId: pending.runId,
             observedMarkerFileName: pending.markerFileName,
@@ -378,7 +427,7 @@ final class RestoreStartupGate {
             durability: resolvedDurability,
           );
         }
-        onStage?.call(RestoreStartupStage.finishing);
+        reportStage(RestoreStartupStage.finishing);
         await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
           runId: pending.runId,
           observedMarkerFileName: RestoreWorkspaceLock.publishingRunFileName,

@@ -296,6 +296,12 @@ class _CodeEditableState extends State<_CodeEditable> with AutomaticKeepAliveCli
       showCursorNotifier: _cursorController,
       floatingCursorNotifier: widget.floatingCursorController,
       onRenderParagraphsChanged: (paragraphs) {
+        // Opening can precede the first layout. Refresh the input geometry after
+        // every installed layout so its independent navigation snapshot exists
+        // before a later widget disposal (which clears the controller key).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.inputController._updateRemoteEditableSizeAndTransform();
+        });
         _codeIndicatorValueNotifier.value = CodeIndicatorValue(
           paragraphs: paragraphs,
           focusedIndex: widget.controller.selection.extentIndex

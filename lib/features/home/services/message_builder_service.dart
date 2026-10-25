@@ -455,8 +455,12 @@ class MessageBuilderService {
                 'id': id,
                 'type': 'function',
                 'function': {'name': name, 'arguments': argumentsJson},
-                if (e['metadata'] is Map)
-                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+                if (e['metadata'] is Map || e['server'] == true)
+                  'metadata': {
+                    if (e['metadata'] is Map)
+                      ...(e['metadata'] as Map).cast<String, dynamic>(),
+                    if (e['server'] == true) 'server': true,
+                  },
               });
 
               final c = e['content'];
@@ -1758,6 +1762,8 @@ class MessageBuilderService {
       assistantId: assistant.id,
       lang: lang,
       maxItems: maxItems,
+      fullInjectionTypes:
+          resolvedSettings?.memoryFullInjectionTypes ?? const {},
     );
   }
 
@@ -2537,10 +2543,9 @@ class MessageBuilderService {
   /// Convert local Markdown image links to inline base64 for model context.
   Future<void> inlineLocalImages(List<Map<String, dynamic>> apiMessages) async {
     for (int i = 0; i < apiMessages.length; i++) {
-      // view_image snapshots are resolved from successful result metadata at
-      // the provider boundary. Error text can contain untrusted image links.
-      if (apiMessages[i]['role'] == 'tool' &&
-          apiMessages[i]['name'] == 'view_image') {
+      // Typed tool images are resolved from result metadata at the provider
+      // boundary. Keep their Markdown intact; tool text never authorizes reads.
+      if (apiMessages[i]['role'] == 'tool') {
         continue;
       }
       final s = (apiMessages[i]['content'] ?? '').toString();

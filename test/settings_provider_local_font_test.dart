@@ -8,8 +8,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
-const _fixtureFontPath =
-    'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf';
+const _fixtureFontPath = 'test/fixtures/fonts/JetBrainsMono-Regular.ttf';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);

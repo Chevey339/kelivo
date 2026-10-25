@@ -32,6 +32,18 @@ class NotificationService {
   static Future<void>? _initialization;
   static String? _pendingConversationId;
   static final Map<String, String> _pendingMessageIds = {};
+  static final Map<String, String> _pendingComposerText = {};
+  static String? takePendingComposerText(String conversationId) =>
+      _pendingComposerText.remove(conversationId);
+
+  /// Retains a draft interrupted by navigation without reopening its chat.
+  static void restorePendingComposerText(String conversationId, String text) {
+    final pending = _pendingComposerText[conversationId];
+    _pendingComposerText[conversationId] = pending == null
+        ? text
+        : '$text\n\n$pending';
+  }
+
   static String? takePendingMessageId(String conversationId) =>
       _pendingMessageIds.remove(conversationId);
   static const String _chatCompletionPayloadPrefix = 'chat-complete:';
@@ -187,10 +199,21 @@ class NotificationService {
   }
 
   /// Also receives taps from the native ongoing notification, overlay and
-  /// ActivityKit. Keep the target until the home route has initialized.
-  static void openConversation(String conversationId, {String? messageId}) {
+  /// ActivityKit, and browser-to-chat draft requests. Keep the target until the
+  /// home route has initialized. Composer text is only a draft, never a send.
+  static void openConversation(
+    String conversationId, {
+    String? messageId,
+    String? composerText,
+  }) {
     if (messageId != null) _pendingMessageIds[conversationId] = messageId;
     if (conversationId.trim().isEmpty) return;
+    if (composerText != null && composerText.trim().isNotEmpty) {
+      final previous = _pendingComposerText[conversationId];
+      _pendingComposerText[conversationId] = previous == null
+          ? composerText
+          : '$previous\n\n$composerText';
+    }
     if (_conversationTapController.hasListener) {
       _conversationTapController.add(conversationId);
     } else {

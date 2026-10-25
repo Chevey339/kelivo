@@ -2731,93 +2731,60 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           child: GestureDetector(
                             key: avatarKey,
                             onTapDown: (_) async {
-                              // Open avatar menu (anchored)
-                              final l10n2 = AppLocalizations.of(context)!;
-                              await showDesktopAnchoredMenu(
+                              final source = await showProviderAvatarSourceMenu(
                                 context,
+                                desktop: true,
                                 anchorKey: avatarKey,
-                                offset: const Offset(0, 8),
-                                items: [
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Image,
-                                    label: l10n2.sideDrawerChooseImage,
-                                    onTap: () async {
-                                      try {
-                                        final res = await FilePicker.platform
-                                            .pickFiles(
-                                              allowMultiple: false,
-                                              withData: false,
-                                              type: FileType.custom,
-                                              allowedExtensions: const [
-                                                'png',
-                                                'jpg',
-                                                'jpeg',
-                                                'gif',
-                                                'webp',
-                                                'heic',
-                                                'heif',
-                                              ],
-                                            );
-                                        final f =
-                                            (res != null &&
-                                                res.files.isNotEmpty)
-                                            ? res.files.first
-                                            : null;
-                                        final path = f?.path;
-                                        if (path != null && path.isNotEmpty) {
-                                          await sp.setProviderAvatarFilePath(
-                                            widget.providerKey,
-                                            path,
-                                          );
-                                        }
-                                      } catch (_) {}
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Bot,
-                                    label:
-                                        l10n2.providerAvatarChooseBuiltInIcon,
-                                    onTap: () async {
-                                      await _pickProviderBuiltinIcon(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.ImageDown,
-                                    label:
-                                        l10n2.providerAvatarChooseLobehubIcon,
-                                    onTap: () async {
-                                      await _inputLobehubIcon(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Link,
-                                    label: l10n2.sideDrawerEnterLink,
-                                    onTap: () async {
-                                      await _inputProviderAvatarUrl(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.RotateCw,
-                                    label: l10n2.desktopAvatarMenuReset,
-                                    onTap: () async {
-                                      await context
-                                          .read<SettingsProvider>()
-                                          .resetProviderAvatar(
-                                            widget.providerKey,
-                                          );
-                                    },
-                                  ),
-                                ],
                               );
+                              if (source == null || !context.mounted) return;
+                              switch (source) {
+                                case AvatarSource.builtin:
+                                  await _pickProviderBuiltinIcon(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.lobehub:
+                                  await _inputLobehubIcon(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.url:
+                                  await _inputProviderAvatarUrl(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.reset:
+                                  await sp.resetProviderAvatar(
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.image:
+                                  try {
+                                    final files = await FilePicker.platform
+                                        .pickFiles(
+                                          allowMultiple: false,
+                                          withData: false,
+                                          type: FileType.custom,
+                                          allowedExtensions: const [
+                                            'png',
+                                            'jpg',
+                                            'jpeg',
+                                            'gif',
+                                            'webp',
+                                            'heic',
+                                            'heif',
+                                          ],
+                                        );
+                                    final path = files?.files.firstOrNull?.path;
+                                    if (path != null && path.isNotEmpty) {
+                                      await sp.setProviderAvatarFilePath(
+                                        widget.providerKey,
+                                        path,
+                                      );
+                                    }
+                                  } catch (_) {}
+                                case AvatarSource.emoji:
+                                  break;
+                              }
                             },
                             child: ProviderAvatar(
                               key: ValueKey(
@@ -4016,109 +3983,14 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     BuildContext context,
     String providerKey,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
-    final icons = BrandAssets.selectableIcons;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cfg = settings.getProviderConfig(providerKey);
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: context.overlaySurface,
-          title: Text(l10n.providerAvatarIconDialogTitle),
-          content: SizedBox(
-            width: 360,
-            height: 400,
-            child: GridView.builder(
-              itemCount: icons.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 5,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1,
-              ),
-              itemBuilder: (ctx, i) {
-                final opt = icons[i];
-                final selected =
-                    cfg.avatarType == 'icon' && cfg.avatarValue == opt.asset;
-                final isSvg = opt.asset.endsWith('.svg');
-                final needsMono =
-                    isDark && BrandAssets.assetNeedsDarkInvert(opt.asset);
-                return Semantics(
-                  label: opt.label,
-                  child: Tooltip(
-                    message: opt.label,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        Future.microtask(() async {
-                          await settings.setProviderAvatarIcon(
-                            providerKey,
-                            opt.asset,
-                          );
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(
-                                  alpha: isDark ? 0.18 : 0.1,
-                                ),
-                                shape: BoxShape.circle,
-                                border: selected
-                                    ? Border.all(color: cs.primary, width: 2)
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: FractionallySizedBox(
-                                widthFactor: 0.65,
-                                heightFactor: 0.65,
-                                child: isSvg
-                                    ? SvgPicture.asset(
-                                        opt.asset,
-                                        fit: BoxFit.contain,
-                                        colorFilter: needsMono
-                                            ? ColorFilter.mode(
-                                                cs.onSurface,
-                                                BlendMode.srcIn,
-                                              )
-                                            : null,
-                                      )
-                                    : Image.asset(
-                                        opt.asset,
-                                        fit: BoxFit.contain,
-                                        color: needsMono ? cs.onSurface : null,
-                                        colorBlendMode: needsMono
-                                            ? BlendMode.srcIn
-                                            : null,
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(l10n.sideDrawerCancel),
-            ),
-          ],
-        );
-      },
+    final asset = await showProviderIconPicker(
+      context,
+      desktop: true,
+      selectedAsset: cfg.avatarType == 'icon' ? cfg.avatarValue : null,
     );
+    if (asset != null) await settings.setProviderAvatarIcon(providerKey, asset);
   }
 
   bool _isAihubmix(ProviderConfig cfg) {

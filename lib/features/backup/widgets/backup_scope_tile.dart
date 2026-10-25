@@ -147,7 +147,7 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                   onPressed: () => Navigator.of(context).pop(_scope),
                   style: TextButton.styleFrom(
                     minimumSize: const Size(56, 44),
-                    textStyle: TextStyle(
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontSize: 15,
                       fontWeight: AppFontWeights.semibold,
                     ),

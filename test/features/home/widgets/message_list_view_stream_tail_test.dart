@@ -12,7 +12,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -53,7 +53,7 @@ void main() {
     expect(position.maxScrollExtent - position.pixels, lessThan(1));
     final markdown = find.descendant(
       of: find.byKey(const ValueKey<String>('timeline-slot:$_streamingId')),
-      matching: find.byType(MarkdownWithCodeHighlight),
+      matching: find.byType(MarkstreamView),
     );
     expect(markdown, findsOneWidget);
     final renderer = tester.state(markdown);

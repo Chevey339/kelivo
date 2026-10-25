@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
+import '../../../core/models/memory_entry.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import '../../../desktop/setting/memory_dialogs.dart';
@@ -178,6 +179,38 @@ class MemorySettingsContent extends StatelessWidget {
             tip: l10n.memorySettingsInjectionMaxItemsSubtitle,
             detailText: '${settings.memoryInjectionMaxItems}',
             onTap: () => _pickMemoryInjectionMaxItems(context),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RowText(
+                  title: l10n.memorySettingsFullInjectionTypesTitle,
+                  subtitle: l10n.memorySettingsFullInjectionTypesSubtitle,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final type in MemoryType.values)
+                      MemorySelectChip(
+                        label: memoryTypeLabel(l10n, type),
+                        selected: settings.memoryFullInjectionTypes.contains(
+                          type,
+                        ),
+                        onTap: () {
+                          final types = settings.memoryFullInjectionTypes
+                              .toSet();
+                          if (!types.remove(type)) types.add(type);
+                          settings.setMemoryFullInjectionTypes(types);
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

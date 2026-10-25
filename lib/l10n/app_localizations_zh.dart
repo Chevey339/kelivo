@@ -1624,6 +1624,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle => '还原正在等待目录释放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 无法移动下方目录。请关闭正在使用该目录的终端、编辑器或其他程序，然后继续还原。如果仍然受阻，请检查当前账户是否有移动该目录的权限。此前的还原进度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '继续还原';
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -1697,7 +1707,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryExportFailed => '无法导出数据副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+  String get startupRecoveryRepairFailed =>
+      '修复未能完成。数据已保留，可以选择通过校验的副本恢复，或导出数据进一步排查。';
 
   @override
   String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
@@ -1707,7 +1718,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '开始使用新的空数据库？当前数据库及其日志文件、已有副本都会保留，供之后恢复。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -1819,10 +1830,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+      '重新开始后，当前数据将不再显示。Kelivo 会保留旧数据库和已有副本以供恢复，建议先导出一份数据副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+  String get startupRecoveryResetAcknowledge => '我确认开始使用新的空数据库。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
@@ -3266,7 +3277,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpPageStatusAuthorizing => '授权中…';
 
   @override
-  String get mcpPageStatusDisabled => '已禁用';
+  String get mcpPageStatusDisabled => '已停用';
 
   @override
   String get mcpPageOAuthRequired => '需要 OAuth 登录';
@@ -5074,6 +5085,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '在输入栏的推理图标旁显示当前档位';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -5494,6 +5512,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';
@@ -6031,6 +6055,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'Ollama 网络搜索 API。为模型补充最新信息，减少幻觉并提升准确性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方网页搜索与抓取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription => '适合开发者和企业用于 AI 搜索应用。支持多语言与多模态。';
 
   @override
@@ -6065,6 +6093,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -7266,7 +7297,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -8026,6 +8064,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
 
   @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
+
+  @override
   String get worldBookTitle => '世界书';
 
   @override
@@ -8179,9 +8250,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolApprovalPending => '等待审批';
-
-  @override
-  String get toolApprovalApprove => '批准';
 
   @override
   String get toolApprovalDeny => '拒绝';
@@ -9530,9 +9598,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -9790,6 +9855,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
 
   @override
+  String get workspaceEnvErrorCleanupFailed => '无法清理旧沙箱文件，请重试。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就绪，但部分旧文件未能清理，仍占用存储空间。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重置，请重试。';
+
+  @override
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
 
   @override
@@ -9825,7 +9899,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -10098,12 +10172,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -10592,7 +10660,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -12449,6 +12517,895 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登录…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 源码';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染预览';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 语法树';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字输入';
+
+  @override
+  String get markdownPlaygroundPause => '暂停';
+
+  @override
+  String get markdownPlaygroundResume => '继续';
+
+  @override
+  String get markdownPlaygroundShowAll => '显示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '预览宽度';
+
+  @override
+  String get markdownPlaygroundTheme => '预览主题';
+
+  @override
+  String get markdownPlaygroundPlain => '选区纯文本';
+
+  @override
+  String get markdownPlaygroundMarkdown => '选区 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在预览中选择文本，查看复制结果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '输入 Markdown 开始预览。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已输入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
+
+  @override
+  String get recoveryMissingDataTitle => '检测到已有数据';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '当前数据库缺失，但设备上仍有旧数据。Kelivo 已暂停启动，没有新建空数据库，并保留现有文件和副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '当前聊天记录为空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '当前数据库没有对话，但发现了历史副本。Kelivo 已暂停启动，你可以恢复副本，也可以明确选择保留当前数据。应用不会自动覆盖数据。';
+
+  @override
+  String get recoveryKeepCurrent => '保留当前数据并继续';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '继续使用当前空数据库？历史副本仍会保留，可以稍后恢复。';
+
+  @override
+  String get recoverySearchingCopies => '正在查找并校验本机数据副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通过校验的副本。可以选择恢复聊天与设置，原文件会保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：校验未通过，原文件已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分数据位置无法读取。现有文件已保留，请先导出数据副本再尝试其他恢复操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原存储目录或其他位置发现的副本。原文件会保留，恢复前会进行完整校验。';
+
+  @override
+  String get recoveryStorageFailureTitle => '数据存储需要检查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原数据';
+
+  @override
+  String get recoveryNoValidCopies => '找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
+
+  @override
+  String get mcpPageStatusFailed => '连接失败';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '选择 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '服务器图标';
+
+  @override
+  String get mcpIconInvalid => '无法使用此图片，请选择不超过 10 MB 的有效图片。';
+
+  @override
+  String get mcpSelectServers => '选择服务器';
+
+  @override
+  String get mcpMoveToGroup => '移到分组';
+
+  @override
+  String get mcpRenameGroup => '重命名分组';
+
+  @override
+  String get mcpDeleteGroupConfirm => '组内服务器将移至「其他」，不会删除服务器。';
+
+  @override
+  String get mcpGroupNameInvalid => '请输入非空且不重复的分组名称。';
+
+  @override
+  String get mcpEnableSelected => '启用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '删除选中的 $count 个服务器？';
+  }
+
+  @override
+  String get browserTitle => '浏览器';
+
+  @override
+  String get browserSearchHint => '搜索或输入网址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪里？';
+
+  @override
+  String get browserStartSubtitle => '自由浏览，也可以让 Agent 帮你探索。';
+
+  @override
+  String get browserNewTab => '新建标签页';
+
+  @override
+  String get browserTabs => '标签页';
+
+  @override
+  String get browserCloseTab => '关闭标签页';
+
+  @override
+  String get browserClose => '关闭浏览器';
+
+  @override
+  String get browserBack => '后退';
+
+  @override
+  String get browserForward => '前进';
+
+  @override
+  String get browserReload => '重新加载';
+
+  @override
+  String get browserStop => '停止加载';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '书签';
+
+  @override
+  String get browserHistory => '历史记录';
+
+  @override
+  String get browserSettings => '浏览器设置';
+
+  @override
+  String get browserAddBookmark => '添加书签';
+
+  @override
+  String get browserRemoveBookmark => '移除书签';
+
+  @override
+  String get browserNoBookmarks => '收藏的网站会显示在这里。';
+
+  @override
+  String get browserNoHistory => '浏览记录会显示在这里。';
+
+  @override
+  String get browserSearchLibrary => '搜索已保存的页面';
+
+  @override
+  String get browserClearHistory => '清空历史记录';
+
+  @override
+  String get browserClearHistoryConfirm => '删除全部浏览记录？书签会保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '删除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在页面中查找';
+
+  @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
+
+  @override
+  String get browserFindHint => '查找文字';
+
+  @override
+  String get browserSearchEngine => '搜索引擎';
+
+  @override
+  String get browserDesktopMode => '桌面版网站';
+
+  @override
+  String get browserDesktopModeDescription => '使用桌面版用户代理重新加载页面。';
+
+  @override
+  String get browserRestoreTabs => '恢复标签页';
+
+  @override
+  String get browserRestoreTabsDescription => '启动 Kelivo 时恢复上次的标签页。';
+
+  @override
+  String get browserSaveHistory => '保存浏览记录';
+
+  @override
+  String get browserSaveHistoryDescription => '在本地记录访问过的页面。';
+
+  @override
+  String get browserClearData => '清除网站数据';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、网站存储和缓存，并关闭全部标签页？网站登录状态也会清除。';
+
+  @override
+  String get browserDataCleared => '已清除网站数据';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暂停';
+
+  @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
+  String get browserAllowAgent => '允许继续';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中发送任务后，AI 才会操作浏览器。允许继续只解除暂停，不会自动发送消息或启动任务。';
+
+  @override
+  String get browserOpenExternal => '在默认浏览器打开';
+
+  @override
+  String get browserCopyLink => '复制链接';
+
+  @override
+  String get browserLinkCopied => '已复制链接';
+
+  @override
+  String get browserUnsupported => '此平台暂不支持内置浏览器。';
+
+  @override
+  String get browserLoadFailed => '无法加载此页面';
+
+  @override
+  String get browserRetry => '重试';
+
+  @override
+  String get browserFavorites => '个人收藏';
+
+  @override
+  String get browserEditBookmark => '编辑书签';
+
+  @override
+  String get browserBookmarkTitle => '标题';
+
+  @override
+  String get browserBookmarkUrl => '网址';
+
+  @override
+  String get browserSave => '保存';
+
+  @override
+  String get browserDownloads => '下载';
+
+  @override
+  String get browserNoDownloads => '下载的文件会显示在这里。';
+
+  @override
+  String get browserDownloadCancel => '取消下载';
+
+  @override
+  String get browserOpenDownload => '打开文件';
+
+  @override
+  String get browserDownloadFailed => '下载失败';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
+
+  @override
+  String get browserSessionRequired => '从一个对话中打开浏览器，即可允许 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允许助手使用浏览器';
+
+  @override
+  String get browserAgentEnabledDescription => '开启后，助手可以浏览并操作这个浏览器中的页面。';
+
+  @override
+  String get browserToolTitle => '浏览器控制';
+
+  @override
+  String get browserToolSubtitle => '浏览并操作浏览器中已登录的网页。请先在浏览器设置中开启 Agent 控制。';
+
+  @override
+  String get browserOpen => '打开浏览器';
+
+  @override
+  String get browserInvalidUrl => '请输入有效的 HTTP 或 HTTPS 网址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 浏览器引擎暂不支持清除全部网站数据。';
+
+  @override
+  String get browserSurfaceStyle => '表面样式';
+
+  @override
+  String get browserSurfaceLiquid => '液态玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '纯色';
+
+  @override
+  String get browserPageOptions => '页面选项';
+
+  @override
+  String get browserAskAi => '让 AI 处理此页';
+
+  @override
+  String get browserAskAiHint => '返回聊天，补充需求后发送。';
+
+  @override
+  String get browserAskAiCurrentPage => '浏览器当前页面';
+
+  @override
+  String get browserAskAiUnavailable => '当前会话不可用，请先从聊天中打开浏览器。';
+
+  @override
+  String get browserAskAiEditing => '请先完成或取消正在编辑的消息，再添加网页任务。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '请先在此助手的工具中开启“浏览器控制”。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '请先在浏览器设置中允许助手使用浏览器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '请使用浏览器处理这个页面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整页面打开';
+
+  @override
+  String get browserClosePanel => '关闭浏览器面板';
+
+  @override
+  String get browserSearchTabs => '搜索标签页';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionScreenshot => '截取页面';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionSelect => '选择选项';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -14071,6 +15028,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle => '还原正在等待目录释放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 无法移动下方目录。请关闭正在使用该目录的终端、编辑器或其他程序，然后继续还原。如果仍然受阻，请检查当前账户是否有移动该目录的权限。此前的还原进度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '继续还原';
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -14144,7 +15111,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryExportFailed => '无法导出数据副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+  String get startupRecoveryRepairFailed =>
+      '修复未能完成。数据已保留，可以选择通过校验的副本恢复，或导出数据进一步排查。';
 
   @override
   String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
@@ -14154,7 +15122,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '开始使用新的空数据库？当前数据库及其日志文件、已有副本都会保留，供之后恢复。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -14266,10 +15234,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+      '重新开始后，当前数据将不再显示。Kelivo 会保留旧数据库和已有副本以供恢复，建议先导出一份数据副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+  String get startupRecoveryResetAcknowledge => '我确认开始使用新的空数据库。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
@@ -15713,7 +16681,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpPageStatusAuthorizing => '授权中…';
 
   @override
-  String get mcpPageStatusDisabled => '已禁用';
+  String get mcpPageStatusDisabled => '已停用';
 
   @override
   String get mcpPageOAuthRequired => '需要 OAuth 登录';
@@ -17521,6 +18489,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在输入栏的推理图标旁显示当前档位';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -17941,6 +18916,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';
@@ -18404,6 +19385,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Ollama 网络搜索 API。为模型补充最新信息，减少幻觉并提升准确性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方网页搜索与抓取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription => '适合开发者和企业用于 AI 搜索应用。支持多语言与多模态。';
 
   @override
@@ -18438,6 +19423,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -19639,7 +20627,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -20399,6 +21394,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
 
   @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
+
+  @override
   String get worldBookTitle => '世界书';
 
   @override
@@ -20552,9 +21580,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get toolApprovalPending => '等待审批';
-
-  @override
-  String get toolApprovalApprove => '批准';
 
   @override
   String get toolApprovalDeny => '拒绝';
@@ -21903,9 +22928,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -22163,6 +23185,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
 
   @override
+  String get workspaceEnvErrorCleanupFailed => '无法清理旧沙箱文件，请重试。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就绪，但部分旧文件未能清理，仍占用存储空间。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重置，请重试。';
+
+  @override
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
 
   @override
@@ -22198,7 +23229,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -22471,12 +23502,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -22965,7 +23990,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -24822,6 +25847,895 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登录…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 源码';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染预览';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 语法树';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字输入';
+
+  @override
+  String get markdownPlaygroundPause => '暂停';
+
+  @override
+  String get markdownPlaygroundResume => '继续';
+
+  @override
+  String get markdownPlaygroundShowAll => '显示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '预览宽度';
+
+  @override
+  String get markdownPlaygroundTheme => '预览主题';
+
+  @override
+  String get markdownPlaygroundPlain => '选区纯文本';
+
+  @override
+  String get markdownPlaygroundMarkdown => '选区 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在预览中选择文本，查看复制结果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '输入 Markdown 开始预览。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已输入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
+
+  @override
+  String get markdownCopyRichTextAction => '复制富文本';
+
+  @override
+  String get markdownCopySelectionFailed => '复制所选内容失败。';
+
+  @override
+  String get recoveryMissingDataTitle => '检测到已有数据';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '当前数据库缺失，但设备上仍有旧数据。Kelivo 已暂停启动，没有新建空数据库，并保留现有文件和副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '当前聊天记录为空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '当前数据库没有对话，但发现了历史副本。Kelivo 已暂停启动，你可以恢复副本，也可以明确选择保留当前数据。应用不会自动覆盖数据。';
+
+  @override
+  String get recoveryKeepCurrent => '保留当前数据并继续';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '继续使用当前空数据库？历史副本仍会保留，可以稍后恢复。';
+
+  @override
+  String get recoverySearchingCopies => '正在查找并校验本机数据副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通过校验的副本。可以选择恢复聊天与设置，原文件会保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：校验未通过，原文件已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分数据位置无法读取。现有文件已保留，请先导出数据副本再尝试其他恢复操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原存储目录或其他位置发现的副本。原文件会保留，恢复前会进行完整校验。';
+
+  @override
+  String get recoveryStorageFailureTitle => '数据存储需要检查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能启用受保护的数据存储，已暂停启动并保留原数据。可以导出数据副本或重试，应用不会因此新建空数据库。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保护聊天数据库';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天数据库已转存至 App 内部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原数据';
+
+  @override
+  String get recoveryNoValidCopies => '找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩余空间不足，无法在保留原数据库的同时建立经过校验的内部副本。现有数据和快照均未改动，请腾出一些空间后重试。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新开始';
+
+  @override
+  String get migrationFreshStartSubtitle => '已新建空数据库，旧数据已保留。请重启 App 后继续使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新开始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '旧数据已保留。请重试重新开始，或关闭并重新打开 App。';
+
+  @override
+  String get imageExportPreparing => '正在准备图片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在准备图表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在截图 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成图片并准备预览…';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get backupEncryptionTitle => '加密备份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
+
+  @override
+  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '确认口令';
+
+  @override
+  String get backupEncryptionMismatch => '两次输入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '显示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隐藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密备份';
+
+  @override
+  String get backupEncryptionUnlockHint => '请输入创建这份备份时使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解锁';
+
+  @override
+  String get backupEncryptionFailed => '口令错误或备份已损坏，请重试或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密备份不完整或格式无效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密备份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密备份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密备份';
+
+  @override
+  String get mcpPageStatusFailed => '连接失败';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '选择 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '服务器图标';
+
+  @override
+  String get mcpIconInvalid => '无法使用此图片，请选择不超过 10 MB 的有效图片。';
+
+  @override
+  String get mcpSelectServers => '选择服务器';
+
+  @override
+  String get mcpMoveToGroup => '移到分组';
+
+  @override
+  String get mcpRenameGroup => '重命名分组';
+
+  @override
+  String get mcpDeleteGroupConfirm => '组内服务器将移至「其他」，不会删除服务器。';
+
+  @override
+  String get mcpGroupNameInvalid => '请输入非空且不重复的分组名称。';
+
+  @override
+  String get mcpEnableSelected => '启用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '删除选中的 $count 个服务器？';
+  }
+
+  @override
+  String get browserTitle => '浏览器';
+
+  @override
+  String get browserSearchHint => '搜索或输入网址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪里？';
+
+  @override
+  String get browserStartSubtitle => '自由浏览，也可以让 Agent 帮你探索。';
+
+  @override
+  String get browserNewTab => '新建标签页';
+
+  @override
+  String get browserTabs => '标签页';
+
+  @override
+  String get browserCloseTab => '关闭标签页';
+
+  @override
+  String get browserClose => '关闭浏览器';
+
+  @override
+  String get browserBack => '后退';
+
+  @override
+  String get browserForward => '前进';
+
+  @override
+  String get browserReload => '重新加载';
+
+  @override
+  String get browserStop => '停止加载';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '书签';
+
+  @override
+  String get browserHistory => '历史记录';
+
+  @override
+  String get browserSettings => '浏览器设置';
+
+  @override
+  String get browserAddBookmark => '添加书签';
+
+  @override
+  String get browserRemoveBookmark => '移除书签';
+
+  @override
+  String get browserNoBookmarks => '收藏的网站会显示在这里。';
+
+  @override
+  String get browserNoHistory => '浏览记录会显示在这里。';
+
+  @override
+  String get browserSearchLibrary => '搜索已保存的页面';
+
+  @override
+  String get browserClearHistory => '清空历史记录';
+
+  @override
+  String get browserClearHistoryConfirm => '删除全部浏览记录？书签会保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '删除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在页面中查找';
+
+  @override
+  String get browserFindPreviousMatch => '上一个匹配项';
+
+  @override
+  String get browserFindNextMatch => '下一个匹配项';
+
+  @override
+  String get browserFindHint => '查找文字';
+
+  @override
+  String get browserSearchEngine => '搜索引擎';
+
+  @override
+  String get browserDesktopMode => '桌面版网站';
+
+  @override
+  String get browserDesktopModeDescription => '使用桌面版用户代理重新加载页面。';
+
+  @override
+  String get browserRestoreTabs => '恢复标签页';
+
+  @override
+  String get browserRestoreTabsDescription => '启动 Kelivo 时恢复上次的标签页。';
+
+  @override
+  String get browserSaveHistory => '保存浏览记录';
+
+  @override
+  String get browserSaveHistoryDescription => '在本地记录访问过的页面。';
+
+  @override
+  String get browserClearData => '清除网站数据';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、网站存储和缓存，并关闭全部标签页？网站登录状态也会清除。';
+
+  @override
+  String get browserDataCleared => '已清除网站数据';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暂停';
+
+  @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
+  String get browserAllowAgent => '允许继续';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中发送任务后，AI 才会操作浏览器。允许继续只解除暂停，不会自动发送消息或启动任务。';
+
+  @override
+  String get browserOpenExternal => '在默认浏览器打开';
+
+  @override
+  String get browserCopyLink => '复制链接';
+
+  @override
+  String get browserLinkCopied => '已复制链接';
+
+  @override
+  String get browserUnsupported => '此平台暂不支持内置浏览器。';
+
+  @override
+  String get browserLoadFailed => '无法加载此页面';
+
+  @override
+  String get browserRetry => '重试';
+
+  @override
+  String get browserFavorites => '个人收藏';
+
+  @override
+  String get browserEditBookmark => '编辑书签';
+
+  @override
+  String get browserBookmarkTitle => '标题';
+
+  @override
+  String get browserBookmarkUrl => '网址';
+
+  @override
+  String get browserSave => '保存';
+
+  @override
+  String get browserDownloads => '下载';
+
+  @override
+  String get browserNoDownloads => '下载的文件会显示在这里。';
+
+  @override
+  String get browserDownloadCancel => '取消下载';
+
+  @override
+  String get browserOpenDownload => '打开文件';
+
+  @override
+  String get browserDownloadFailed => '下载失败';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中启用浏览器工具，再在这里允许控制。';
+
+  @override
+  String get browserSessionRequired => '从一个对话中打开浏览器，即可允许 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允许助手使用浏览器';
+
+  @override
+  String get browserAgentEnabledDescription => '开启后，助手可以浏览并操作这个浏览器中的页面。';
+
+  @override
+  String get browserToolTitle => '浏览器控制';
+
+  @override
+  String get browserToolSubtitle => '浏览并操作浏览器中已登录的网页。请先在浏览器设置中开启 Agent 控制。';
+
+  @override
+  String get browserOpen => '打开浏览器';
+
+  @override
+  String get browserInvalidUrl => '请输入有效的 HTTP 或 HTTPS 网址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 浏览器引擎暂不支持清除全部网站数据。';
+
+  @override
+  String get browserSurfaceStyle => '表面样式';
+
+  @override
+  String get browserSurfaceLiquid => '液态玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '纯色';
+
+  @override
+  String get browserPageOptions => '页面选项';
+
+  @override
+  String get browserAskAi => '让 AI 处理此页';
+
+  @override
+  String get browserAskAiHint => '返回聊天，补充需求后发送。';
+
+  @override
+  String get browserAskAiCurrentPage => '浏览器当前页面';
+
+  @override
+  String get browserAskAiUnavailable => '当前会话不可用，请先从聊天中打开浏览器。';
+
+  @override
+  String get browserAskAiEditing => '请先完成或取消正在编辑的消息，再添加网页任务。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '请先在此助手的工具中开启“浏览器控制”。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '请先在浏览器设置中允许助手使用浏览器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '请使用浏览器处理这个页面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整页面打开';
+
+  @override
+  String get browserClosePanel => '关闭浏览器面板';
+
+  @override
+  String get browserSearchTabs => '搜索标签页';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在侧栏打开';
+
+  @override
+  String get browserUserAgent => '用户代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '移动端';
+
+  @override
+  String get browserUserAgentDesktop => '桌面端';
+
+  @override
+  String get browserUserAgentCustom => '自定义';
+
+  @override
+  String get browserUserAgentHint => '输入自定义 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。';
+
+  @override
+  String get browserUserAgentDescription => '更改后将重新加载当前网页。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在浏览器中打开';
+
+  @override
+  String get browserGroupToggleSemantics => '展开或收起浏览步骤';
+
+  @override
+  String get browserStepGroupTitle => '浏览网页';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失败';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失败';
+  }
+
+  @override
+  String get browserCardOpen => '打开';
+
+  @override
+  String get browserCardEnable => '去开启';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '实时';
+
+  @override
+  String get browserCardOpenFailed => '未能打开页面';
+
+  @override
+  String get browserCardBlankPage => '空白页';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 个标签页';
+  }
+
+  @override
+  String get browserActionOpen => '打开网页';
+
+  @override
+  String get browserActionNewTab => '新建标签页';
+
+  @override
+  String get browserActionRender => '渲染页面';
+
+  @override
+  String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionScreenshot => '截取页面';
+
+  @override
+  String get browserActionSnapshot => '读取页面结构';
+
+  @override
+  String get browserActionClick => '点击';
+
+  @override
+  String get browserActionType => '输入文字';
+
+  @override
+  String get browserActionSelect => '选择选项';
+
+  @override
+  String get browserActionPress => '按键';
+
+  @override
+  String get browserActionScroll => '滚动页面';
+
+  @override
+  String get browserActionWait => '等待页面';
+
+  @override
+  String get browserActionBack => '后退';
+
+  @override
+  String get browserActionForward => '前进';
+
+  @override
+  String get browserActionReload => '刷新页面';
+
+  @override
+  String get browserActionEvaluate => '执行脚本';
+
+  @override
+  String get browserActionSwitchTab => '切换标签页';
+
+  @override
+  String get browserActionCloseTab => '关闭标签页';
+
+  @override
+  String get browserActionListTabs => '查看标签页';
+
+  @override
+  String get browserActionUnknown => '浏览器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 个元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '浏览器控制未开启';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新读取页面';
+
+  @override
+  String get browserErrNotVisible => '元素不可见或被遮挡';
+
+  @override
+  String get browserErrNotFound => '未找到元素';
+
+  @override
+  String get browserErrTimeout => '页面加载超时';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+
+  @override
+  String get browserErrHumanControl => '你正在接管浏览器';
+
+  @override
+  String get browserErrTabClosed => '标签页已关闭';
+
+  @override
+  String get browserErrGeneric => '操作失败';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 个';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '当前对话';
+
+  @override
+  String get browserTabsAll => '全部标签';
+
+  @override
+  String get browserTabsUnassigned => '个人标签';
+
+  @override
+  String get browserTabsUnknownConversation => '其他对话';
+
+  @override
+  String get browserTabsEmptyConversation => '这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。';
+
+  @override
+  String get browserTabsNoResults => '没有匹配的标签页';
+
+  @override
+  String get browserMoveToConversation => '移到当前对话';
+
+  @override
+  String get browserReopenInConversation => '在当前对话重新打开';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此页面，请等待任务完成或停止任务后再移动。';
+
+  @override
+  String get browserLiveViewLimit => '浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '让所属对话的 AI 处理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '显示网页卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -26444,6 +28358,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle => '還原正在等待資料夾釋放';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows 無法移動下方資料夾。請關閉正在使用該資料夾的終端機、編輯器或其他程式，然後繼續還原。如果仍然受阻，請檢查目前帳戶是否有移動該資料夾的權限。先前的還原進度已保留。';
+
+  @override
+  String get backupRestoreContinueButton => '繼續還原';
+
+  @override
   String get backupRestoreFailureTitle => '還原需要處理';
 
   @override
@@ -26518,7 +28442,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryExportFailed => '無法匯出資料副本。';
 
   @override
-  String get startupRecoveryRepairFailed => '修復未能解決問題。請先匯出資料副本，然後重設。';
+  String get startupRecoveryRepairFailed =>
+      '修復未能完成。資料已保留，可選擇通過驗證的副本還原，或匯出資料進一步檢查。';
 
   @override
   String get startupRecoveryResetFailed => '重設失敗。請完全關閉 Kelivo 後再重新開啟。';
@@ -26528,7 +28453,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。';
+      '開始使用新的空資料庫？目前資料庫及其日誌檔案、既有副本都會保留，以供日後還原。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重設並重新啟動';
@@ -26640,10 +28565,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryDangerBody =>
-      '重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。';
+      '重新開始後，目前資料將不再顯示。Kelivo 會保留舊資料庫與既有副本以供還原，建議先匯出一份資料副本。';
 
   @override
-  String get startupRecoveryResetAcknowledge => '我已匯出副本，或不需要這些資料。';
+  String get startupRecoveryResetAcknowledge => '我確認開始使用新的空資料庫。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
@@ -29893,6 +31818,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '在輸入欄的推理圖示旁顯示目前檔位';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生選取選單';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用於輸入框和訊息選取範圍；如遇卡頓可關閉，恢復原選單。';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';
 
   @override
@@ -30313,6 +32245,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
+
+  @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段雲端轉寫';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段雲端轉寫';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';
@@ -30850,6 +32788,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Ollama 網路搜尋 API。為模型補充最新資訊，降低幻覺並提升準確性。';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek 官方網頁搜尋與擷取 API，使用 DeepSeek API Key。';
+
+  @override
   String get searchProviderJinaDescription =>
       'AI 搜尋基礎設施：提供 Embeddings、重排序、Web Reader、DeepSearch 與小語言模型。支援多語言與多模態。';
 
@@ -30885,6 +32827,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -32087,7 +34032,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+      '此限制僅適用於未選擇全量注入的類型。某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入類型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多選。選中類型會注入全域及目前助手的全部有效記憶，不受條數限制，會增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -32847,6 +34799,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditOrganizeFrequencyCustomInvalid => '請輸入 1 到 20 之間的整數';
 
   @override
+  String get worldBookCopyEntries => '複製到…';
+
+  @override
+  String get worldBookMoveEntries => '移動到…';
+
+  @override
+  String get worldBookSelectEntries => '多選條目';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已選擇 $count 項';
+  }
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get worldBookNoMoveTargets => '請先建立另一本世界書，再移動條目。';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已複製 $count 個條目';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移動 $count 個條目';
+  }
+
+  @override
+  String get worldBookTransferFailed => '儲存條目失敗，請重試。';
+
+  @override
   String get worldBookTitle => '世界書';
 
   @override
@@ -33000,9 +34985,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get toolApprovalPending => '等待審批';
-
-  @override
-  String get toolApprovalApprove => '批准';
 
   @override
   String get toolApprovalDeny => '拒絕';
@@ -34351,9 +36333,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceToolImageTag => '圖片';
 
   @override
-  String get workspaceToolAllowAll => '本工作階段全部允許';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -34611,6 +36590,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEnvErrorExtractFailed => '無法解壓沙箱映像。';
 
   @override
+  String get workspaceEnvErrorCleanupFailed => '無法清理舊沙箱檔案，請重試。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就緒，但部分舊檔案未能清理，仍佔用儲存空間。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重設，請重試。';
+
+  @override
   String get workspaceEnvErrorPatchFailed => '無法完成沙箱設定。';
 
   @override
@@ -34646,8 +36634,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval =>
-      '除非此工作階段允許全部工具，否則 shell 工具需要核准。';
+  String get workspaceEnvNativeShellApproval => '請求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -34920,12 +36907,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本工作階段全部允許';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此對話中的 Shell 命令將不再需要核准。';
 
   @override
   String get workspaceEntryEnvironment => '環境';
@@ -35414,7 +37395,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '指令在本機直接執行（無沙盒），除非允許本工作階段全部工具，否則需要核准。';
+      '指令在本機直接執行（無沙盒），除非此對話已啟用完全存取，否則需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -37274,4 +39255,894 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登入…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown 原始碼';
+
+  @override
+  String get markdownPlaygroundPreview => '渲染預覽';
+
+  @override
+  String get markdownPlaygroundAst => 'AST 語法樹';
+
+  @override
+  String get markdownPlaygroundPlay => '逐字輸入';
+
+  @override
+  String get markdownPlaygroundPause => '暫停';
+
+  @override
+  String get markdownPlaygroundResume => '繼續';
+
+  @override
+  String get markdownPlaygroundShowAll => '顯示全文';
+
+  @override
+  String get markdownPlaygroundWidth => '預覽寬度';
+
+  @override
+  String get markdownPlaygroundTheme => '預覽主題';
+
+  @override
+  String get markdownPlaygroundPlain => '選取範圍純文字';
+
+  @override
+  String get markdownPlaygroundMarkdown => '選取範圍 Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint => '在預覽中選取文字，檢視複製結果。';
+
+  @override
+  String get markdownPlaygroundEmpty => '輸入 Markdown 開始預覽。';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return '已輸入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '複製為 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '複製 CSV';
+
+  @override
+  String get markdownCopyImageAction => '複製圖片';
+
+  @override
+  String get markdownCodeLabel => '程式碼';
+
+  @override
+  String get markdownDetailsLabel => '詳情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再顯示 $count 行';
+  }
+
+  @override
+  String get markdownNoteLabel => '備註';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危險';
+
+  @override
+  String get markdownCopyRichTextAction => '複製富文字';
+
+  @override
+  String get markdownCopySelectionFailed => '複製所選內容失敗。';
+
+  @override
+  String get recoveryMissingDataTitle => '偵測到既有資料';
+
+  @override
+  String get recoveryMissingDataBody =>
+      '目前資料庫遺失，但裝置上仍有舊資料。Kelivo 已暫停啟動，沒有建立空資料庫，並保留現有檔案與副本。';
+
+  @override
+  String get recoveryEmptyDataTitle => '目前聊天記錄為空';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      '目前資料庫沒有對話，但發現了歷史副本。Kelivo 已暫停啟動，你可以還原副本，也可以明確選擇保留目前資料。應用程式不會自動覆寫資料。';
+
+  @override
+  String get recoveryKeepCurrent => '保留目前資料並繼續';
+
+  @override
+  String get recoveryKeepCurrentConfirm => '繼續使用目前的空資料庫？歷史副本仍會保留，可稍後還原。';
+
+  @override
+  String get recoverySearchingCopies => '正在尋找並驗證本機資料副本…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return '找到 $count 份通過驗證的副本。可選擇還原聊天與設定，原始檔案會保留。';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name：驗證未通過，原始檔案已保留。';
+  }
+
+  @override
+  String get recoverySearchFailed => '部分資料位置無法讀取。現有檔案已保留，請先匯出資料副本再嘗試其他還原操作。';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      '在原儲存目錄或其他位置發現的副本。原始檔案會保留，還原前會進行完整驗證。';
+
+  @override
+  String get recoveryStorageFailureTitle => '資料儲存需要檢查';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo 未能啟用受保護的資料儲存，已暫停啟動並保留原資料。可匯出資料副本或重試，應用程式不會因此建立空資料庫。';
+
+  @override
+  String get recoveryProtectingTitle => '正在保護聊天資料庫';
+
+  @override
+  String get recoveryProtectingData =>
+      '正在複製並驗證資料庫。圖片、附件和快照留在 Documents，不會重複複製；原資料庫也會保留。';
+
+  @override
+  String get recoveryStorageReadyTitle => '聊天資料庫已轉存至 App 內部';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      '存放聊天、助手和設定的資料庫已轉存至 App 內部。快照、圖片和附件仍在系統「檔案」App 可存取的 Documents 中，原資料庫也已保留。若先前的聊天仍然遺失，可前往「設定 → 備份與還原 → 本機副本」查看還原副本。';
+
+  @override
+  String get recoveryRetainedData => '保留的原資料';
+
+  @override
+  String get recoveryNoValidCopies => '找到了資料副本，但沒有副本通過驗證。原始檔案均已保留，可匯出資料進一步檢查。';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      '剩餘空間不足，無法在保留原資料庫的同時建立經過驗證的內部副本。現有資料和快照均未更動，請釋放一些空間後重試。';
+
+  @override
+  String get migrationFreshStartTitle => '已重新開始';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      '已建立新的空白資料庫，舊資料已保留。請重新啟動 App 後繼續使用。';
+
+  @override
+  String get migrationFreshStartFailedTitle => '重新開始未完成';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      '舊資料已保留。請重試重新開始，或關閉並重新開啟 App。';
+
+  @override
+  String get imageExportPreparing => '正在準備圖片…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return '正在準備圖表 $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return '正在擷取圖片 $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => '正在合成圖片並準備預覽…';
+
+  @override
+  String get imageExportSaving => '正在儲存圖片…';
+
+  @override
+  String get backupEncryptionTitle => '加密備份';
+
+  @override
+  String get backupEncryptionOffHint => '未加密的備份可被直接讀取。';
+
+  @override
+  String get backupEncryptionOnHint => '目前頁面內的備份均會加密。';
+
+  @override
+  String get backupEncryptionPasswordHint => '請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。';
+
+  @override
+  String get backupEncryptionPassword => '口令';
+
+  @override
+  String get backupEncryptionConfirmPassword => '確認口令';
+
+  @override
+  String get backupEncryptionMismatch => '兩次輸入的口令不一致。';
+
+  @override
+  String get backupEncryptionShowPassword => '顯示口令';
+
+  @override
+  String get backupEncryptionHidePassword => '隱藏口令';
+
+  @override
+  String get backupEncryptionUnlockTitle => '加密備份';
+
+  @override
+  String get backupEncryptionUnlockHint => '請輸入建立這份備份時使用的口令。';
+
+  @override
+  String get backupEncryptionUnlock => '解鎖';
+
+  @override
+  String get backupEncryptionFailed => '口令錯誤或備份已損壞，請重試或取消。';
+
+  @override
+  String get backupEncryptionInvalid => '加密備份不完整或格式無效。';
+
+  @override
+  String get backupEncryptionUnsupported => '此加密備份需要更新版本的 Kelivo。';
+
+  @override
+  String get backupProgressEncrypting => '正在加密備份';
+
+  @override
+  String get backupProgressDecrypting => '正在解密備份';
+
+  @override
+  String get mcpPageStatusFailed => '連線失敗';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return '工具 $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return '選擇 $name';
+  }
+
+  @override
+  String get mcpIconTitle => '伺服器圖示';
+
+  @override
+  String get mcpIconInvalid => '無法使用此圖片，請選擇不超過 10 MB 的有效圖片。';
+
+  @override
+  String get mcpSelectServers => '選擇伺服器';
+
+  @override
+  String get mcpMoveToGroup => '移到群組';
+
+  @override
+  String get mcpRenameGroup => '重新命名群組';
+
+  @override
+  String get mcpDeleteGroupConfirm => '群組內的伺服器將移至「其他」，不會刪除伺服器。';
+
+  @override
+  String get mcpGroupNameInvalid => '請輸入非空且不重複的群組名稱。';
+
+  @override
+  String get mcpEnableSelected => '啟用';
+
+  @override
+  String get mcpDisableSelected => '停用';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return '刪除選取的 $count 個伺服器？';
+  }
+
+  @override
+  String get browserTitle => '瀏覽器';
+
+  @override
+  String get browserSearchHint => '搜尋或輸入網址';
+
+  @override
+  String get browserStartTitle => '下一站，去哪裡？';
+
+  @override
+  String get browserStartSubtitle => '自由瀏覽，也可以讓 Agent 幫你探索。';
+
+  @override
+  String get browserNewTab => '新增分頁';
+
+  @override
+  String get browserTabs => '分頁';
+
+  @override
+  String get browserCloseTab => '關閉分頁';
+
+  @override
+  String get browserClose => '關閉瀏覽器';
+
+  @override
+  String get browserBack => '上一頁';
+
+  @override
+  String get browserForward => '下一頁';
+
+  @override
+  String get browserReload => '重新載入';
+
+  @override
+  String get browserStop => '停止載入';
+
+  @override
+  String get browserMore => '更多';
+
+  @override
+  String get browserBookmarks => '書籤';
+
+  @override
+  String get browserHistory => '歷史記錄';
+
+  @override
+  String get browserSettings => '瀏覽器設定';
+
+  @override
+  String get browserAddBookmark => '新增書籤';
+
+  @override
+  String get browserRemoveBookmark => '移除書籤';
+
+  @override
+  String get browserNoBookmarks => '收藏的網站會顯示在這裡。';
+
+  @override
+  String get browserNoHistory => '瀏覽記錄會顯示在這裡。';
+
+  @override
+  String get browserSearchLibrary => '搜尋已儲存的頁面';
+
+  @override
+  String get browserClearHistory => '清除歷史記錄';
+
+  @override
+  String get browserClearHistoryConfirm => '刪除全部瀏覽記錄？書籤會保留。';
+
+  @override
+  String get browserToday => '今天';
+
+  @override
+  String get browserYesterday => '昨天';
+
+  @override
+  String get browserDelete => '刪除';
+
+  @override
+  String get browserCancel => '取消';
+
+  @override
+  String get browserDone => '完成';
+
+  @override
+  String get browserFind => '在頁面中尋找';
+
+  @override
+  String get browserFindPreviousMatch => '上一個符合項目';
+
+  @override
+  String get browserFindNextMatch => '下一個符合項目';
+
+  @override
+  String get browserFindHint => '尋找文字';
+
+  @override
+  String get browserSearchEngine => '搜尋引擎';
+
+  @override
+  String get browserDesktopMode => '電腦版網站';
+
+  @override
+  String get browserDesktopModeDescription => '使用電腦版使用者代理重新載入頁面。';
+
+  @override
+  String get browserRestoreTabs => '還原分頁';
+
+  @override
+  String get browserRestoreTabsDescription => '啟動 Kelivo 時還原上次的分頁。';
+
+  @override
+  String get browserSaveHistory => '儲存瀏覽記錄';
+
+  @override
+  String get browserSaveHistoryDescription => '在本機記錄造訪過的頁面。';
+
+  @override
+  String get browserClearData => '清除網站資料';
+
+  @override
+  String get browserClearDataConfirm =>
+      '清除 Cookie、網站儲存空間和快取，並關閉全部分頁？網站登入狀態也會清除。';
+
+  @override
+  String get browserDataCleared => '已清除網站資料';
+
+  @override
+  String get browserAgentControl => 'Agent 控制';
+
+  @override
+  String get browserAgentWorking => 'AI 正在操作';
+
+  @override
+  String get browserTakeOver => '接管';
+
+  @override
+  String get browserAgentPaused => 'AI 操作已暫停';
+
+  @override
+  String get browserAgentTimedOut => '操作逾時，AI 已暫停';
+
+  @override
+  String get browserAllowAgent => '允許繼續';
+
+  @override
+  String get browserAgentDescription =>
+      '在聊天中傳送任務後，AI 才會操作瀏覽器。允許繼續只解除暫停，不會自動傳送訊息或啟動任務。';
+
+  @override
+  String get browserOpenExternal => '在預設瀏覽器開啟';
+
+  @override
+  String get browserCopyLink => '複製連結';
+
+  @override
+  String get browserLinkCopied => '已複製連結';
+
+  @override
+  String get browserUnsupported => '此平台暫不支援內建瀏覽器。';
+
+  @override
+  String get browserLoadFailed => '無法載入此頁面';
+
+  @override
+  String get browserRetry => '重試';
+
+  @override
+  String get browserFavorites => '個人收藏';
+
+  @override
+  String get browserEditBookmark => '編輯書籤';
+
+  @override
+  String get browserBookmarkTitle => '標題';
+
+  @override
+  String get browserBookmarkUrl => '網址';
+
+  @override
+  String get browserSave => '儲存';
+
+  @override
+  String get browserDownloads => '下載';
+
+  @override
+  String get browserNoDownloads => '下載的檔案會顯示在這裡。';
+
+  @override
+  String get browserDownloadCancel => '取消下載';
+
+  @override
+  String get browserOpenDownload => '開啟檔案';
+
+  @override
+  String get browserDownloadFailed => '下載失敗';
+
+  @override
+  String get browserAgentEnableHint => '在聊天工具中啟用瀏覽器工具，再在這裡允許控制。';
+
+  @override
+  String get browserSessionRequired => '從一個對話中開啟瀏覽器，即可允許 Agent 控制。';
+
+  @override
+  String get browserDownloadCancelled => '已取消';
+
+  @override
+  String get browserAgentEnabled => '允許助手使用瀏覽器';
+
+  @override
+  String get browserAgentEnabledDescription => '開啟後，助手可以瀏覽並操作這個瀏覽器中的頁面。';
+
+  @override
+  String get browserToolTitle => '瀏覽器控制';
+
+  @override
+  String get browserToolSubtitle => '瀏覽並操作瀏覽器中已登入的網頁。請先在瀏覽器設定中開啟 Agent 控制。';
+
+  @override
+  String get browserOpen => '開啟瀏覽器';
+
+  @override
+  String get browserInvalidUrl => '請輸入有效的 HTTP 或 HTTPS 網址。';
+
+  @override
+  String get browserClearDataUnavailable => 'Windows 瀏覽器引擎暫不支援清除全部網站資料。';
+
+  @override
+  String get browserSurfaceStyle => '表面樣式';
+
+  @override
+  String get browserSurfaceLiquid => '液態玻璃';
+
+  @override
+  String get browserSurfaceFrosted => '磨砂';
+
+  @override
+  String get browserSurfaceSolid => '純色';
+
+  @override
+  String get browserPageOptions => '頁面選項';
+
+  @override
+  String get browserAskAi => '讓 AI 處理此頁';
+
+  @override
+  String get browserAskAiHint => '返回聊天，補充需求後傳送。';
+
+  @override
+  String get browserAskAiCurrentPage => '瀏覽器目前頁面';
+
+  @override
+  String get browserAskAiUnavailable => '目前對話無法使用，請先從聊天中開啟瀏覽器。';
+
+  @override
+  String get browserAskAiEditing => '請先完成或取消正在編輯的訊息，再加入網頁任務。';
+
+  @override
+  String get browserAskAiAssistantDisabled => '請先在此助理的工具中開啟「瀏覽器控制」。';
+
+  @override
+  String get browserAskAiBrowserDisabled => '請先在瀏覽器設定中允許助理使用瀏覽器。';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return '請使用瀏覽器處理這個頁面：\n$page\n\n我的需求：';
+  }
+
+  @override
+  String get browserOpenFullPage => '完整頁面開啟';
+
+  @override
+  String get browserClosePanel => '關閉瀏覽器面板';
+
+  @override
+  String get browserSearchTabs => '搜尋分頁';
+
+  @override
+  String browserTabsCount(int count) {
+    return '$count 個分頁';
+  }
+
+  @override
+  String get browserOpenInSidebar => '在側欄開啟';
+
+  @override
+  String get browserUserAgent => '使用者代理（UA）';
+
+  @override
+  String get browserUserAgentMobile => '行動版';
+
+  @override
+  String get browserUserAgentDesktop => '桌面版';
+
+  @override
+  String get browserUserAgentCustom => '自訂';
+
+  @override
+  String get browserUserAgentHint => '輸入自訂 User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'UA 僅支援可列印 ASCII 字元（英文字母、數字和英文符號），最多 2048 個字元。';
+
+  @override
+  String get browserUserAgentDescription => '變更後將重新載入目前網頁。';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '更早的 $count 步';
+  }
+
+  @override
+  String get browserOpenThisPage => '在瀏覽器中開啟';
+
+  @override
+  String get browserGroupToggleSemantics => '展開或收合瀏覽步驟';
+
+  @override
+  String get browserStepGroupTitle => '瀏覽網頁';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count 步';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return '第 $count 步';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count 步失敗';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action失敗';
+  }
+
+  @override
+  String get browserCardOpen => '打開';
+
+  @override
+  String get browserCardEnable => '去開啟';
+
+  @override
+  String browserCardRunning(String action) {
+    return '正在$action…';
+  }
+
+  @override
+  String get browserCardLive => '即時';
+
+  @override
+  String get browserCardOpenFailed => '無法開啟頁面';
+
+  @override
+  String get browserCardBlankPage => '空白頁';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count 個分頁';
+  }
+
+  @override
+  String get browserActionOpen => '開啟網頁';
+
+  @override
+  String get browserActionNewTab => '新增分頁';
+
+  @override
+  String get browserActionRender => '渲染頁面';
+
+  @override
+  String get browserActionExtract => '擷取正文';
+
+  @override
+  String get browserActionScreenshot => '擷取畫面';
+
+  @override
+  String get browserActionSnapshot => '讀取頁面結構';
+
+  @override
+  String get browserActionClick => '點擊';
+
+  @override
+  String get browserActionType => '輸入文字';
+
+  @override
+  String get browserActionSelect => '選擇選項';
+
+  @override
+  String get browserActionPress => '按鍵';
+
+  @override
+  String get browserActionScroll => '捲動頁面';
+
+  @override
+  String get browserActionWait => '等待頁面';
+
+  @override
+  String get browserActionBack => '上一頁';
+
+  @override
+  String get browserActionForward => '下一頁';
+
+  @override
+  String get browserActionReload => '重新整理';
+
+  @override
+  String get browserActionEvaluate => '執行指令碼';
+
+  @override
+  String get browserActionSwitchTab => '切換分頁';
+
+  @override
+  String get browserActionCloseTab => '關閉分頁';
+
+  @override
+  String get browserActionListTabs => '檢視分頁';
+
+  @override
+  String get browserActionUnknown => '瀏覽器操作';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count 字';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count 個元素';
+  }
+
+  @override
+  String get browserErrAgentDisabled => '瀏覽器控制未開啟';
+
+  @override
+  String get browserErrStaleRef => '元素已失效，需重新讀取頁面';
+
+  @override
+  String get browserErrNotVisible => '元素不可見或被遮擋';
+
+  @override
+  String get browserErrNotFound => '找不到元素';
+
+  @override
+  String get browserErrTimeout => '頁面載入逾時';
+
+  @override
+  String get browserErrActionTimeout => '操作逾時，結果未確認，請檢查頁面後允許繼續';
+
+  @override
+  String get browserErrHumanControl => '你正在接管瀏覽器';
+
+  @override
+  String get browserErrTabClosed => '分頁已關閉';
+
+  @override
+  String get browserErrGeneric => '操作失敗';
+
+  @override
+  String get browserDirectionUp => '上';
+
+  @override
+  String get browserDirectionDown => '下';
+
+  @override
+  String get browserDirectionLeft => '左';
+
+  @override
+  String get browserDirectionRight => '右';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count 個';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => '目前對話';
+
+  @override
+  String get browserTabsAll => '所有分頁';
+
+  @override
+  String get browserTabsUnassigned => '個人分頁';
+
+  @override
+  String get browserTabsUnknownConversation => '其他對話';
+
+  @override
+  String get browserTabsEmptyConversation => '這裡還沒有分頁。開啟網頁，或從「所有分頁」選擇現有頁面。';
+
+  @override
+  String get browserTabsNoResults => '沒有符合的分頁';
+
+  @override
+  String get browserMoveToConversation => '移到目前對話';
+
+  @override
+  String get browserReopenInConversation => '在目前對話重新開啟';
+
+  @override
+  String get browserTabBusy => '助手仍在操作此頁面，請等待任務完成或停止任務後再移動。';
+
+  @override
+  String get browserLiveViewLimit => '瀏覽器資源正在使用中，請等待任務結束後重試，或關閉不需要的頁面。';
+
+  @override
+  String get browserAskAiInOwnerConversation => '讓所屬對話的 AI 處理';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle => '顯示網頁卡片';
+
+  @override
+  String get browserObserverHint => 'AI 正在操作此頁面，點選「接管」後可以操作網頁。';
+
+  @override
+  String get toolPermissionTitle => '權限';
+
+  @override
+  String get toolPermissionRequestApproval => '請求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全存取';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作區外檔案存取、桌面命令和其他需要授權的工具將在執行前詢問。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允許此對話直接存取本機檔案、執行命令及使用已啟用的聯網工具，不再逐次詢問。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允許此對話在沙盒和已授權資料夾內自動執行工具，不再逐次詢問。';
+
+  @override
+  String get toolPermissionUnboundHint => '未綁定工作區：不會因此開啟檔案或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '僅此對話';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切換到完全存取';
+
+  @override
+  String get toolApprovalDenied => '已拒絕';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待審批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '請求路徑';
+
+  @override
+  String get toolApprovalRealTarget => '實際目標';
+
+  @override
+  String get toolApprovalScopeOnce => '僅授權本次呼叫';
+
+  @override
+  String get toolApprovalByFullAccess => '已自動執行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒絕並說明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '儲存失敗，權限未變更。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已為此對話啟用完全存取';
+
+  @override
+  String get toolPermissionResetSnack => '已更換工作區 · 此對話權限已恢復為請求批准';
+
+  @override
+  String get toolPermissionUndo => '復原';
+
+  @override
+  String get wsDeniedPathOutside => '目標不在授權區域內，已拒絕。';
+
+  @override
+  String get wsDeniedMountReadonly => '唯讀掛載，無法寫入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目錄唯讀。';
+
+  @override
+  String get wsPathChanged => '審批期間目標已變化。';
+
+  @override
+  String get wsContextChanged => '對話上下文已變化，請求失效。';
 }

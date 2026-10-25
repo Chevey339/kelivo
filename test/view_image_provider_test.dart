@@ -2,18 +2,27 @@ import 'package:Kelivo/core/services/api/native_input_attachments.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
+import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 import 'support/collect_generation.dart';
+import 'support/claude_test_api.dart' show FakePathProviderPlatform;
 
 enum _Api { chat, responses, claude, vertexClaude, gemini, gemini3 }
 
@@ -24,11 +33,15 @@ String _model(_Api api) => switch (api) {
   _Api.gemini3 => 'gemini-3-flash-preview',
 };
 
-Map<String, dynamic> _response(_Api api, bool callTool) {
+Map<String, dynamic> _response(
+  _Api api,
+  bool callTool, {
+  String toolName = 'view_image',
+}) {
   final call = {
     'id': 'call_image',
     'type': 'function',
-    'function': {'name': 'view_image', 'arguments': '{"path":"plot.png"}'},
+    'function': {'name': toolName, 'arguments': '{"path":"plot.png"}'},
   };
   return switch (api) {
     _Api.chat => {
@@ -52,7 +65,7 @@ Map<String, dynamic> _response(_Api api, bool callTool) {
             'type': 'function_call',
             'id': 'fc_image',
             'call_id': 'call_image',
-            'name': 'view_image',
+            'name': toolName,
             'arguments': '{"path":"plot.png"}',
           }
         else
@@ -74,7 +87,7 @@ Map<String, dynamic> _response(_Api api, bool callTool) {
           {
             'type': 'tool_use',
             'id': 'call_image',
-            'name': 'view_image',
+            'name': toolName,
             'input': {'path': 'plot.png'},
           }
         else
@@ -93,7 +106,7 @@ Map<String, dynamic> _response(_Api api, bool callTool) {
                 {
                   'functionCall': {
                     'id': 'call_image',
-                    'name': 'view_image',
+                    'name': toolName,
                     'args': {'path': 'plot.png'},
                   },
                   'thoughtSignature': 'test-signature',
@@ -109,8 +122,8 @@ Map<String, dynamic> _response(_Api api, bool callTool) {
   };
 }
 
-String _sse(_Api api, bool callTool) {
-  final obj = _response(api, callTool);
+String _sse(_Api api, bool callTool, {String toolName = 'view_image'}) {
+  final obj = _response(api, callTool, toolName: toolName);
   final events = switch (api) {
     _Api.chat => [
       {
@@ -164,7 +177,7 @@ String _sse(_Api api, bool callTool) {
             ? {
                 'type': 'tool_use',
                 'id': 'call_image',
-                'name': 'view_image',
+                'name': toolName,
                 'input': {},
               }
             : {'type': 'text', 'text': ''},
@@ -228,7 +241,87 @@ final _nativeInputs = NativeInputAttachments(
   protocol: NativeInputProtocol.chatCompletions,
 );
 
+class _UnusedBuildContext extends Fake implements BuildContext {}
+
+List<Map<String, dynamic>> _imageTools(String name) => [
+  for (final definition in WorkspaceToolsService.definitions())
+    if ((definition['function'] as Map)['name'] == 'view_image')
+      {
+        ...definition,
+        'function': <String, dynamic>{
+          ...(definition['function'] as Map).cast<String, dynamic>(),
+          'name': name,
+        },
+      },
+];
+
+Future<List<Map<String, dynamic>>> _replayMessages(
+  String toolName,
+  ToolCallResult tool, {
+  required bool preserveToolTurns,
+  String toolCallId = 'call_image',
+}) async {
+  final chat = ChatService();
+  addTearDown(chat.dispose);
+  final builder = MessageBuilderService(
+    chatService: chat,
+    contextProvider: _UnusedBuildContext(),
+  );
+  final messages = builder.buildApiMessages(
+    messages: [
+      ChatMessage(
+        role: 'user',
+        conversationId: 'image-test',
+        content: 'Inspect plot.png.',
+      ),
+      ChatMessage(
+        role: 'assistant',
+        conversationId: 'image-test',
+        parts: [
+          ToolCallPart(
+            jsonEncode({
+              'id': toolCallId,
+              'name': toolName,
+              'arguments': {'path': 'plot.png'},
+              'content': tool.output,
+              'metadata': tool.metadata,
+            }),
+          ),
+          const TextPart('red image'),
+        ],
+      ),
+      ChatMessage(
+        role: 'user',
+        conversationId: 'image-test',
+        content: 'Describe it again.',
+      ),
+    ],
+    versionSelections: const {},
+    currentConversation: null,
+    includeToolMessages: true,
+    preserveToolTurns: preserveToolTurns,
+  );
+  await builder.inlineLocalImages(messages);
+  return messages;
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
+  late Directory imageRoot;
+  late PathProviderPlatform originalPaths;
+  setUp(() async {
+    imageRoot = await Directory.systemTemp.createTemp('tool_images_');
+    await Directory('${imageRoot.path}/images').create();
+    originalPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = FakePathProviderPlatform(imageRoot.path);
+    SandboxPathResolver.debugSetDirs(docsDir: imageRoot.path);
+  });
+  tearDown(() async {
+    PathProviderPlatform.instance = originalPaths;
+    SandboxPathResolver.debugSetDirs();
+    await imageRoot.delete(recursive: true);
+  });
   test(
     'Responses non-stream tool round resets omitted usage details',
     () async {
@@ -290,27 +383,49 @@ void main() {
   );
 
   for (final api in _Api.values) {
-    for (final stream in [false, true]) {
+    for (final (stream, mcp, browser) in [
+      (false, false, false),
+      (true, false, false),
+      (false, true, false),
+      (true, true, false),
+      (false, false, true),
+      (true, false, true),
+    ]) {
+      final toolName = browser
+          ? 'browser'
+          : mcp
+          ? 'svguess__view_drawing'
+          : 'view_image';
       test(
-        '${api.name} stream=$stream sends image pixels on continuation and replay',
+        '${api.name} stream=$stream mcp=$mcp browser=$browser sends image pixels on continuation and replay',
         () async {
-          final dir = await Directory.systemTemp.createTemp('tool_image_wire_');
-          addTearDown(() => dir.delete(recursive: true));
-          final file = File('${dir.path}/snapshot.png');
+          final file = File('${imageRoot.path}/images/mcp_img_drawing (1).png');
           final pixels = img.Image(width: 8, height: 4);
           img.fill(pixels, color: img.ColorRgb8(255, 0, 0));
           final png = img.encodePng(pixels);
           await file.writeAsBytes(png);
-          final result = ClientToolResult(
-            'Image (8 x 4).\n![](${file.path})',
-            metadata: {
-              ...const WorkspaceToolMetadata(
-                tool: 'view_image',
-                status: 'ok',
-              ).toJson(),
-              kMcpResultMetadataKey: mcpResultMetadata([file.path]),
-            },
-          );
+          final markdown =
+              'Image (8 x 4).\n![](${encodeMarkdownImageDestination(file.path)})';
+          final rawResult = mcp
+              ? McpToolResult(markdown: markdown, imageUris: [file.path])
+              : ClientToolResult(
+                  markdown,
+                  metadata: {
+                    if (browser)
+                      'browser': {
+                        'action': 'snapshot',
+                        'status': 'ok',
+                        'sessionId': 'test-chat',
+                      }
+                    else
+                      ...const WorkspaceToolMetadata(
+                        tool: 'view_image',
+                        status: 'ok',
+                      ).toJson(),
+                    kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+                  },
+                );
+          final result = ClientToolResult.fromHandler(rawResult);
           final requests = <Map<String, dynamic>>[];
           var requestTool = true;
           final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -330,8 +445,8 @@ void main() {
             request.response.write(
               request.response.headers.contentType!.mimeType ==
                       'text/event-stream'
-                  ? _sse(api, callTool)
-                  : jsonEncode(_response(api, callTool)),
+                  ? _sse(api, callTool, toolName: toolName)
+                  : jsonEncode(_response(api, callTool, toolName: toolName)),
             );
             await request.response.close();
           });
@@ -365,15 +480,14 @@ void main() {
             messages: const [
               {'role': 'user', 'content': 'Inspect plot.png.'},
             ],
-            tools: WorkspaceToolsService.definitions()
-                .where((d) => (d['function'] as Map)['name'] == 'view_image')
-                .toList(),
+            tools: _imageTools(toolName),
             stream: stream,
+            skipImageParsing: mcp,
             onToolCall: (name, args, {toolCallId}) async {
               calls++;
-              expect(name, 'view_image');
+              expect(name, toolName);
               expect(args['path'], 'plot.png');
-              return result;
+              return rawResult;
             },
           ).toList();
           expect(calls, 1);
@@ -381,43 +495,54 @@ void main() {
           expect(chunks.isGenerationDone, isTrue);
           expect(requests.length, 2);
           expect(_imagePayloads(requests[1]), [base64Encode(png)]);
+          expect(jsonEncode(requests[1]), isNot(contains(file.path)));
+          if (api == _Api.chat) {
+            expect(
+              jsonEncode(requests[1]),
+              contains('Image returned by $toolName (call_image)'),
+            );
+          }
           final tool = chunks.whereType<ToolCallResult>().single;
           expect(tool.metadata![kMcpResultMetadataKey], isNotNull);
-          await ChatApiService.sendMessageStream(
-            config: config,
-            modelId: model,
-            stream: stream,
-            messages: [
-              {'role': 'user', 'content': 'Inspect plot.png.'},
-              {
-                'role': 'assistant',
-                'content': '',
-                'tool_calls': [
-                  {
-                    'id': 'call_image',
-                    'type': 'function',
-                    'function': {
-                      'name': 'view_image',
-                      'arguments': '{"path":"plot.png"}',
-                    },
-                  },
-                ],
+          for (final preserveToolTurns in [false, true]) {
+            final replay = await _replayMessages(
+              toolName,
+              tool,
+              preserveToolTurns: preserveToolTurns,
+              toolCallId: 'previous_image',
+            );
+            expect(
+              replay.singleWhere((m) => m['role'] == 'tool')['content'],
+              result.content,
+            );
+            final replayStart = requests.length;
+            var replayCalls = 0;
+            requestTool = true;
+            await ChatApiService.sendMessageStream(
+              config: config,
+              modelId: model,
+              stream: stream,
+              skipImageParsing: mcp,
+              messages: replay,
+              tools: _imageTools(toolName),
+              onToolCall: (name, args, {toolCallId}) async {
+                replayCalls++;
+                return 'Checked again.';
               },
-              {
-                'role': 'tool',
-                'tool_call_id': 'call_image',
-                'name': 'view_image',
-                'content': tool.output,
-                'metadata': tool.metadata,
-              },
-              {'role': 'assistant', 'content': 'red image'},
-              {'role': 'user', 'content': 'Describe it again.'},
-            ],
-          ).toList();
-          expect(requests.length, 3);
-          expect(_imagePayloads(requests[2]), [base64Encode(png)]);
-          // Paths/Markdown are UI persistence, never the model's image payload.
-          expect(jsonEncode(requests[2]), isNot(contains(file.path)));
+            ).toList();
+            expect(replayCalls, 1);
+            expect(requests.length, replayStart + 2);
+            // Historical images must survive both the initial replay and a
+            // subsequent tool round, without exposing persistence metadata.
+            for (final request in requests.skip(replayStart)) {
+              expect(_imagePayloads(request), [base64Encode(png)]);
+              expect(jsonEncode(request), isNot(contains(file.path)));
+              expect(
+                jsonEncode(request),
+                isNot(contains(kMcpResultMetadataKey)),
+              );
+            }
+          }
           await ChatApiService.sendMessageStream(
             config: config.copyWith(
               modelOverrides: {
@@ -438,14 +563,14 @@ void main() {
                   {
                     'id': 'call_image',
                     'type': 'function',
-                    'function': {'name': 'view_image', 'arguments': '{}'},
+                    'function': {'name': toolName, 'arguments': '{}'},
                   },
                 ],
               },
               {
                 'role': 'tool',
                 'tool_call_id': 'call_image',
-                'name': 'view_image',
+                'name': toolName,
                 'content': result.content,
                 'metadata': result.metadata,
               },
@@ -461,11 +586,13 @@ void main() {
           });
           final errorResult = ClientToolResult(
             errorText,
-            metadata: const WorkspaceToolMetadata(
-              tool: 'view_image',
-              status: 'error',
-              code: 'path_error',
-            ).toJson(),
+            metadata: mcp || browser
+                ? {kMcpResultMetadataKey: mcpResultMetadata([])}
+                : const WorkspaceToolMetadata(
+                    tool: 'view_image',
+                    status: 'error',
+                    code: 'path_error',
+                  ).toJson(),
           );
           requestTool = true;
           final failedChunks = await ChatApiService.sendMessageStream(
@@ -475,9 +602,7 @@ void main() {
             messages: const [
               {'role': 'user', 'content': 'Inspect a rejected path.'},
             ],
-            tools: WorkspaceToolsService.definitions()
-                .where((d) => (d['function'] as Map)['name'] == 'view_image')
-                .toList(),
+            tools: _imageTools(toolName),
             onToolCall: (name, args, {toolCallId}) async => errorResult,
           ).toList();
           expect(
@@ -499,14 +624,14 @@ void main() {
                   {
                     'id': 'call_image',
                     'type': 'function',
-                    'function': {'name': 'view_image', 'arguments': '{}'},
+                    'function': {'name': toolName, 'arguments': '{}'},
                   },
                 ],
               },
               {
                 'role': 'tool',
                 'tool_call_id': 'call_image',
-                'name': 'view_image',
+                'name': toolName,
                 'content': errorText,
                 'metadata': errorResult.metadata,
               },
@@ -522,14 +647,21 @@ void main() {
   test(
     'Chat Completions keeps parallel tool replies adjacent before images',
     () async {
-      final dir = await Directory.systemTemp.createTemp('parallel_image_');
-      addTearDown(() => dir.delete(recursive: true));
-      final uri = '${dir.path}/snapshot.png';
+      final uri = '${imageRoot.path}/images/mcp_img_parallel.png';
       await File(
         uri,
       ).writeAsBytes(img.encodePng(img.Image(width: 2, height: 2)));
       final messages = await buildOpenAIChatCompletionMessages(
         [
+          {
+            'role': 'tool',
+            'tool_call_id': 'mcp_image',
+            'name': 'view_drawing',
+            'content': '![]($uri)',
+            'metadata': {
+              kMcpResultMetadataKey: mcpResultMetadata([uri]),
+            },
+          },
           {
             'role': 'tool',
             'tool_call_id': 'image',
@@ -555,8 +687,13 @@ void main() {
         allowRemoteImages: false,
         reasoningReplay: ReasoningReplayPolicy.none,
       );
-      expect(messages.map((m) => m['role']), ['tool', 'tool', 'user']);
-      expect(messages[2]['content'][0]['text'], contains('(image)'));
+      expect(messages.map((m) => m['role']), ['tool', 'tool', 'tool', 'user']);
+      expect(
+        messages[3]['content'][0]['text'],
+        contains('view_drawing (mcp_image)'),
+      );
+      expect(messages[3]['content'][2]['text'], contains('view_image (image)'));
+      expect(_imagePayloads(messages[3]), hasLength(2));
     },
   );
 }

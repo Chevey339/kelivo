@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../../utils/app_directories.dart';
 import '../../database/chat_database_repository.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
@@ -72,7 +73,9 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       await _moveAssetRoots(
         sourceContainer: candidateDirectory,
-        targetContainer: appDataDirectory,
+        targetContainer: await AppDirectories.contentDirectoryFor(
+          appDataDirectory,
+        ),
         expected: expected,
       );
     }
@@ -128,7 +131,7 @@ final class RestoreBundleMover {
         rootNames: candidate.assetRoots,
       );
       final target = await RestorePreviousBuilder.inspectAssets(
-        appDataDirectory,
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
         rootNames: candidate.assetRoots,
       );
       for (final root in candidate.assetRoots) {
@@ -171,7 +174,7 @@ final class RestoreBundleMover {
         rootNames: candidate.assetRoots,
       );
       final liveActual = await RestorePreviousBuilder.inspectAssets(
-        appDataDirectory,
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
         rootNames: candidate.assetRoots,
       );
       for (final root in candidate.assetRoots) {
@@ -384,7 +387,7 @@ final class RestoreBundleMover {
       rootNames: newAssets.rootStates.keys,
     );
     final liveActual = await RestorePreviousBuilder.inspectAssets(
-      appDataDirectory,
+      await AppDirectories.contentDirectoryFor(appDataDirectory),
       rootNames: newAssets.rootStates.keys,
     );
     final previousActual = await RestorePreviousBuilder.inspectAssets(
@@ -410,7 +413,12 @@ final class RestoreBundleMover {
       );
       if (liveHasNew) {
         await durability.renameAndSync(
-          source: Directory(p.join(appDataDirectory.path, root)),
+          source: Directory(
+            p.join(
+              (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+              root,
+            ),
+          ),
           targetPath: p.join(candidateDirectory.path, root),
         );
       }
@@ -426,13 +434,21 @@ final class RestoreBundleMover {
       );
       if (liveHasNew) {
         await durability.renameAndSync(
-          source: Directory(p.join(appDataDirectory.path, root)),
+          source: Directory(
+            p.join(
+              (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+              root,
+            ),
+          ),
           targetPath: p.join(candidateDirectory.path, root),
         );
       }
       await durability.renameAndSync(
         source: Directory(p.join(previousStore.previousDirectory.path, root)),
-        targetPath: p.join(appDataDirectory.path, root),
+        targetPath: p.join(
+          (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+          root,
+        ),
       );
       return;
     }
@@ -534,7 +550,9 @@ final class RestoreBundleMover {
 
   Future<void> _movePreviousAssets(RestorePreviousAssetsPlan expected) async {
     await _moveAssetRoots(
-      sourceContainer: appDataDirectory,
+      sourceContainer: await AppDirectories.contentDirectoryFor(
+        appDataDirectory,
+      ),
       targetContainer: previousStore.pendingDirectory,
       expected: expected,
       syncSourceBeforeMove: true,

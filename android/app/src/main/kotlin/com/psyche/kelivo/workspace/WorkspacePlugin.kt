@@ -59,10 +59,14 @@ class WorkspacePlugin(private val context: Context) {
                     "setEnvironmentBusy" -> {
                         environmentBusy = asMap(call.arguments)["busy"] == true
                         if (environmentBusy) {
-                            execRunner.cancelAll()
-                            ptySessions.closeAll()
+                            runAsync(result) {
+                                execRunner.cancelAll(waitForExit = true)
+                                ptySessions.closeAll(waitForExit = true)
+                                null
+                            }
+                        } else {
+                            result.success(null)
                         }
-                        result.success(null)
                     }
                     "inspectRootfs" -> runAsync(result, "invalid_rootfs") {
                         val args = asMap(call.arguments)
@@ -120,6 +124,13 @@ class WorkspacePlugin(private val context: Context) {
                         result.success(null)
                     }
                     "extractRootfs" -> runAsync(result) { extractRootfs(asMap(call.arguments)) }
+                    "deleteEnvironmentDirectory" -> {
+                        require(environmentBusy) { "environment must be stopped before cleanup" }
+                        runAsync(result, "cleanup_failed") {
+                            EnvironmentDirectoryCleaner.delete(File(requiredString(asMap(call.arguments), "path")))
+                            null
+                        }
+                    }
                     "patchRootfs" -> runAsync(result) { patchRootfs(asMap(call.arguments)) }
                     "sha256File" -> runAsync(result) {
                         Sha256.file(asMap(call.arguments)["path"]?.toString().orEmpty())

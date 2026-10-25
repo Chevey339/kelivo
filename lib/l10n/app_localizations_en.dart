@@ -1685,6 +1685,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'The restore could not be completed. Kelivo verified and kept your previous data.';
 
   @override
+  String get backupRestoreDirectoryBlockedTitle =>
+      'Restore is waiting for a folder';
+
+  @override
+  String get backupRestoreDirectoryBlockedContent =>
+      'Windows could not move the folder below. Close terminals, editors, or other programs using it, then continue restoring. If it is still blocked, check that your account can move the folder. Your restore progress has been kept.';
+
+  @override
+  String get backupRestoreContinueButton => 'Continue restore';
+
+  @override
   String get backupRestoreFailureTitle => 'Restore requires attention';
 
   @override
@@ -1763,7 +1774,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryRepairFailed =>
-      'Repair could not fix this. Export a copy of your data, then reset.';
+      'Repair could not complete. Your data is preserved; choose a validated copy or export your data for further diagnosis.';
 
   @override
   String get startupRecoveryResetFailed =>
@@ -1774,7 +1785,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryResetDialogContent =>
-      'This permanently deletes Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
+      'Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.';
 
   @override
   String get startupRecoveryResetDialogConfirm => 'Reset and restart';
@@ -1889,11 +1900,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryDangerBody =>
-      'Resetting permanently deletes Kelivo\'s database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.';
+      'A fresh start removes the current data from view. Kelivo will preserve the old database and existing copies for recovery. Export a data copy first if possible.';
 
   @override
   String get startupRecoveryResetAcknowledge =>
-      'I exported a copy, or I do not need this data.';
+      'I want to start with a new empty database.';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => 'Update Kelivo to continue';
@@ -5259,6 +5270,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show the current level next to the reasoning icon in the input bar';
 
   @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle =>
+      'iOS 26+ native selection menu';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      'Applies to input and messages. Turn off if menus feel slow.';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle =>
       'Auto-collapse Thinking';
 
@@ -5719,6 +5738,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get asrServicesOpenAiSubtitle => 'Low-latency streaming transcription';
+
+  @override
+  String get asrServicesGroqSubtitle => 'Whisper segmented transcription';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral segmented transcription';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';
@@ -6277,6 +6302,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Ollama web search API. Augments models with up-to-date information.';
 
   @override
+  String get searchProviderDeepSeekDescription =>
+      'DeepSeek official web search and page fetch APIs. Uses a DeepSeek API key.';
+
+  @override
   String get searchProviderJinaDescription =>
       'AI search foundation with embeddings, rerankers, web reader, deepsearch, and small language models. Multilingual and multimodal.';
 
@@ -6312,6 +6341,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameOllama => 'Ollama';
+
+  @override
+  String get searchServiceNameDeepSeek => 'DeepSeek';
 
   @override
   String get searchServiceNameJina => 'Jina';
@@ -7556,7 +7588,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+      'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle =>
+      'Always inject these types';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -8372,6 +8412,53 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a number between 1 and 20';
 
   @override
+  String get worldBookCopyEntries => 'Copy to…';
+
+  @override
+  String get worldBookMoveEntries => 'Move to…';
+
+  @override
+  String get worldBookSelectEntries => 'Select entries';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get worldBookSelectionDone => 'Done';
+
+  @override
+  String get worldBookNoMoveTargets =>
+      'Create another world book to move entries into it.';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Copied $count entries',
+      one: 'Copied 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Moved $count entries',
+      one: 'Moved 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get worldBookTransferFailed =>
+      'Could not save the entries. Please try again.';
+
+  @override
   String get worldBookTitle => 'World Book';
 
   @override
@@ -8528,9 +8615,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolApprovalPending => 'Waiting for approval';
-
-  @override
-  String get toolApprovalApprove => 'Approve';
 
   @override
   String get toolApprovalDeny => 'Deny';
@@ -9952,9 +10036,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceToolImageTag => 'image';
 
   @override
-  String get workspaceToolAllowAll => 'Allow all this session';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -10220,6 +10301,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not extract the sandbox image.';
 
   @override
+  String get workspaceEnvErrorCleanupFailed =>
+      'Could not remove old sandbox files. Please try again.';
+
+  @override
+  String get workspaceEnvCleanupIncomplete =>
+      'The sandbox is ready, but some old files could not be removed. They still take up storage space.';
+
+  @override
+  String get workspaceEnvErrorResetFailed =>
+      'Could not finish resetting the sandbox. Please try again.';
+
+  @override
   String get workspaceEnvErrorPatchFailed =>
       'Could not finish setting up the sandbox.';
 
@@ -10258,7 +10351,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellApproval =>
-      'The shell tool needs approval unless this session allows all tools.';
+      'The shell tool needs approval in Ask for approval mode.';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -10536,13 +10629,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEntrySessionSkills => 'Skills';
-
-  @override
-  String get workspaceEntryAllowAll => 'Allow all this session';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle =>
-      'Shell commands in this conversation will run without approval.';
 
   @override
   String get workspaceEntryEnvironment => 'Environment';
@@ -11048,7 +11134,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      'Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.';
+      'Commands run on this computer without a sandbox and need approval unless this chat has full access.';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -13039,4 +13125,943 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => 'Completing sign-in…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown source';
+
+  @override
+  String get markdownPlaygroundPreview => 'Preview';
+
+  @override
+  String get markdownPlaygroundAst => 'AST';
+
+  @override
+  String get markdownPlaygroundPlay => 'Stream characters';
+
+  @override
+  String get markdownPlaygroundPause => 'Pause';
+
+  @override
+  String get markdownPlaygroundResume => 'Resume';
+
+  @override
+  String get markdownPlaygroundShowAll => 'Show complete';
+
+  @override
+  String get markdownPlaygroundWidth => 'Preview width';
+
+  @override
+  String get markdownPlaygroundTheme => 'Preview theme';
+
+  @override
+  String get markdownPlaygroundPlain => 'Selected plain text';
+
+  @override
+  String get markdownPlaygroundMarkdown => 'Selected Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint =>
+      'Select text in the preview to inspect copied content.';
+
+  @override
+  String get markdownPlaygroundEmpty => 'Enter Markdown to preview it.';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return 'Input $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => 'Copy Markdown';
+
+  @override
+  String get markdownCopyCsvAction => 'Copy CSV';
+
+  @override
+  String get markdownCopyImageAction => 'Copy image';
+
+  @override
+  String get markdownCodeLabel => 'Code';
+
+  @override
+  String get markdownDetailsLabel => 'Details';
+
+  @override
+  String markdownMoreRows(int count) {
+    return 'Show $count more rows';
+  }
+
+  @override
+  String get markdownNoteLabel => 'Note';
+
+  @override
+  String get markdownTipLabel => 'Tip';
+
+  @override
+  String get markdownImportantLabel => 'Important';
+
+  @override
+  String get markdownWarningLabel => 'Warning';
+
+  @override
+  String get markdownCautionLabel => 'Caution';
+
+  @override
+  String get markdownDangerLabel => 'Danger';
+
+  @override
+  String get markdownCopyRichTextAction => 'Copy rich text';
+
+  @override
+  String get markdownCopySelectionFailed => 'Could not copy the selected text.';
+
+  @override
+  String get recoveryMissingDataTitle => 'Previous data detected';
+
+  @override
+  String get recoveryMissingDataBody =>
+      'The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.';
+
+  @override
+  String get recoveryEmptyDataTitle => 'Current chat history is empty';
+
+  @override
+  String get recoveryEmptyDataBody =>
+      'The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.';
+
+  @override
+  String get recoveryKeepCurrent => 'Keep current data and continue';
+
+  @override
+  String get recoveryKeepCurrentConfirm =>
+      'Continue with the current empty database? Previous copies will remain available for recovery later.';
+
+  @override
+  String get recoverySearchingCopies =>
+      'Finding and validating local data copies…';
+
+  @override
+  String recoveryFoundCopies(int count) {
+    return 'Found $count validated copies. Choose one to recover your chats and settings. The original files will be kept.';
+  }
+
+  @override
+  String recoveryInvalidCopy(String name) {
+    return '$name: validation failed. The original file has been kept.';
+  }
+
+  @override
+  String get recoverySearchFailed =>
+      'Some data locations could not be read. Your files have been kept; export a data copy before trying other recovery actions.';
+
+  @override
+  String get recoveryDiscoveredCopyBody =>
+      'Found outside the managed copy folder. This original is preserved and will be fully validated before recovery.';
+
+  @override
+  String get recoveryStorageFailureTitle => 'Data storage needs attention';
+
+  @override
+  String get recoveryStorageFailureBody =>
+      'Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.';
+
+  @override
+  String get recoveryProtectingTitle => 'Protecting the chat database';
+
+  @override
+  String get recoveryProtectingData =>
+      'Copying and verifying the database. Images, attachments and snapshots stay in Documents and are not copied again. The original database will be kept.';
+
+  @override
+  String get recoveryStorageReadyTitle =>
+      'Chat database moved to internal storage';
+
+  @override
+  String get recoveryStorageReadyBody =>
+      'The database containing chats, assistants and settings now uses internal app storage. Snapshots, images and attachments remain accessible in the Files app under Documents. The original database is retained. If older chats are missing, open Settings → Backup → Local Copies.';
+
+  @override
+  String get recoveryRetainedData => 'Retained original data';
+
+  @override
+  String get recoveryNoValidCopies =>
+      'Copies were found, but none passed validation. The originals have been kept. You can export your data for further diagnosis.';
+
+  @override
+  String get recoveryStorageInsufficientSpaceBody =>
+      'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.';
+
+  @override
+  String get migrationFreshStartTitle => 'Fresh start is ready';
+
+  @override
+  String get migrationFreshStartSubtitle =>
+      'A new empty database is ready, and your previous data has been retained. Restart the app to continue.';
+
+  @override
+  String get migrationFreshStartFailedTitle =>
+      'Fresh start could not be completed';
+
+  @override
+  String get migrationFreshStartFailedSubtitle =>
+      'Your previous data has been retained. Retry starting fresh, or close and reopen the app.';
+
+  @override
+  String get imageExportPreparing => 'Preparing image…';
+
+  @override
+  String imageExportDiagrams(int completed, int total) {
+    return 'Preparing diagrams $completed/$total…';
+  }
+
+  @override
+  String imageExportCapturing(int completed, int total) {
+    return 'Capturing image $completed/$total…';
+  }
+
+  @override
+  String get imageExportProcessing => 'Combining image and preparing preview…';
+
+  @override
+  String get imageExportSaving => 'Saving image…';
+
+  @override
+  String get backupEncryptionTitle => 'Encrypt backups';
+
+  @override
+  String get backupEncryptionOffHint =>
+      'Unencrypted backups can be read by anyone with the file.';
+
+  @override
+  String get backupEncryptionOnHint =>
+      'Backups are encrypted while this page stays open.';
+
+  @override
+  String get backupEncryptionPasswordHint =>
+      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.';
+
+  @override
+  String get backupEncryptionPassword => 'Password';
+
+  @override
+  String get backupEncryptionConfirmPassword => 'Confirm password';
+
+  @override
+  String get backupEncryptionMismatch => 'Passwords do not match.';
+
+  @override
+  String get backupEncryptionShowPassword => 'Show password';
+
+  @override
+  String get backupEncryptionHidePassword => 'Hide password';
+
+  @override
+  String get backupEncryptionUnlockTitle => 'Encrypted backup';
+
+  @override
+  String get backupEncryptionUnlockHint =>
+      'Enter the password used to create this backup.';
+
+  @override
+  String get backupEncryptionUnlock => 'Unlock';
+
+  @override
+  String get backupEncryptionFailed =>
+      'The password is incorrect, or the backup is damaged. Try again or cancel.';
+
+  @override
+  String get backupEncryptionInvalid =>
+      'The encrypted backup is incomplete or invalid.';
+
+  @override
+  String get backupEncryptionUnsupported =>
+      'This encrypted backup requires a newer version of Kelivo.';
+
+  @override
+  String get backupProgressEncrypting => 'Encrypting backup';
+
+  @override
+  String get backupProgressDecrypting => 'Decrypting backup';
+
+  @override
+  String get mcpPageStatusFailed => 'Connection failed';
+
+  @override
+  String mcpPageCardToolsShort(int enabled, int total) {
+    return 'Tools $enabled/$total';
+  }
+
+  @override
+  String mcpPageSelectServer(String name) {
+    return 'Select $name';
+  }
+
+  @override
+  String get mcpIconTitle => 'Server icon';
+
+  @override
+  String get mcpIconInvalid =>
+      'Unable to use this image. Choose a valid image up to 10 MB.';
+
+  @override
+  String get mcpSelectServers => 'Select servers';
+
+  @override
+  String get mcpMoveToGroup => 'Move to group';
+
+  @override
+  String get mcpRenameGroup => 'Rename group';
+
+  @override
+  String get mcpDeleteGroupConfirm =>
+      'Servers in this group will be moved to Other. The servers will not be deleted.';
+
+  @override
+  String get mcpGroupNameInvalid => 'Use a nonempty, unique group name.';
+
+  @override
+  String get mcpEnableSelected => 'Enable';
+
+  @override
+  String get mcpDisableSelected => 'Disable';
+
+  @override
+  String mcpDeleteSelectedConfirm(int count) {
+    return 'Delete $count selected servers?';
+  }
+
+  @override
+  String get browserTitle => 'Browser';
+
+  @override
+  String get browserSearchHint => 'Search or enter website';
+
+  @override
+  String get browserStartTitle => 'Where to next?';
+
+  @override
+  String get browserStartSubtitle =>
+      'Browse freely. Let your agent help when you need it.';
+
+  @override
+  String get browserNewTab => 'New tab';
+
+  @override
+  String get browserTabs => 'Tabs';
+
+  @override
+  String get browserCloseTab => 'Close tab';
+
+  @override
+  String get browserClose => 'Close browser';
+
+  @override
+  String get browserBack => 'Back';
+
+  @override
+  String get browserForward => 'Forward';
+
+  @override
+  String get browserReload => 'Reload';
+
+  @override
+  String get browserStop => 'Stop loading';
+
+  @override
+  String get browserMore => 'More';
+
+  @override
+  String get browserBookmarks => 'Bookmarks';
+
+  @override
+  String get browserHistory => 'History';
+
+  @override
+  String get browserSettings => 'Browser settings';
+
+  @override
+  String get browserAddBookmark => 'Add bookmark';
+
+  @override
+  String get browserRemoveBookmark => 'Remove bookmark';
+
+  @override
+  String get browserNoBookmarks => 'Your favorite places, all together.';
+
+  @override
+  String get browserNoHistory => 'Your browsing history appears here.';
+
+  @override
+  String get browserSearchLibrary => 'Search saved pages';
+
+  @override
+  String get browserClearHistory => 'Clear history';
+
+  @override
+  String get browserClearHistoryConfirm =>
+      'Delete all browsing history? Bookmarks will be kept.';
+
+  @override
+  String get browserToday => 'Today';
+
+  @override
+  String get browserYesterday => 'Yesterday';
+
+  @override
+  String get browserDelete => 'Delete';
+
+  @override
+  String get browserCancel => 'Cancel';
+
+  @override
+  String get browserDone => 'Done';
+
+  @override
+  String get browserFind => 'Find on page';
+
+  @override
+  String get browserFindPreviousMatch => 'Previous match';
+
+  @override
+  String get browserFindNextMatch => 'Next match';
+
+  @override
+  String get browserFindHint => 'Find text';
+
+  @override
+  String get browserSearchEngine => 'Search engine';
+
+  @override
+  String get browserDesktopMode => 'Desktop website';
+
+  @override
+  String get browserDesktopModeDescription =>
+      'Reload open pages with a desktop user agent.';
+
+  @override
+  String get browserRestoreTabs => 'Restore tabs';
+
+  @override
+  String get browserRestoreTabsDescription =>
+      'Reopen your tabs when Kelivo starts.';
+
+  @override
+  String get browserSaveHistory => 'Save history';
+
+  @override
+  String get browserSaveHistoryDescription =>
+      'Keep a local record of the pages you visit.';
+
+  @override
+  String get browserClearData => 'Clear website data';
+
+  @override
+  String get browserClearDataConfirm =>
+      'Clear cookies, storage and cache, and close all tabs? You will be signed out of websites.';
+
+  @override
+  String get browserDataCleared => 'Website data cleared';
+
+  @override
+  String get browserAgentControl => 'Agent control';
+
+  @override
+  String get browserAgentWorking => 'AI is working';
+
+  @override
+  String get browserTakeOver => 'Take over';
+
+  @override
+  String get browserAgentPaused => 'AI actions paused';
+
+  @override
+  String get browserAgentTimedOut => 'Operation timed out; AI paused';
+
+  @override
+  String get browserAllowAgent => 'Allow to continue';
+
+  @override
+  String get browserAgentDescription =>
+      'Send a task in chat to let AI use the browser. Allowing it to continue only removes the pause; it does not send a message or start a task.';
+
+  @override
+  String get browserOpenExternal => 'Open in default browser';
+
+  @override
+  String get browserCopyLink => 'Copy link';
+
+  @override
+  String get browserLinkCopied => 'Link copied';
+
+  @override
+  String get browserUnsupported =>
+      'The embedded browser is not available on this platform.';
+
+  @override
+  String get browserLoadFailed => 'This page could not be loaded';
+
+  @override
+  String get browserRetry => 'Try again';
+
+  @override
+  String get browserFavorites => 'Favorites';
+
+  @override
+  String get browserEditBookmark => 'Edit bookmark';
+
+  @override
+  String get browserBookmarkTitle => 'Title';
+
+  @override
+  String get browserBookmarkUrl => 'Website';
+
+  @override
+  String get browserSave => 'Save';
+
+  @override
+  String get browserDownloads => 'Downloads';
+
+  @override
+  String get browserNoDownloads => 'Downloaded files appear here.';
+
+  @override
+  String get browserDownloadCancel => 'Cancel download';
+
+  @override
+  String get browserOpenDownload => 'Open file';
+
+  @override
+  String get browserDownloadFailed => 'Download failed';
+
+  @override
+  String get browserAgentEnableHint =>
+      'Enable the Browser tool in chat tools, then allow control here.';
+
+  @override
+  String get browserSessionRequired =>
+      'Open the browser from a conversation to allow agent control.';
+
+  @override
+  String get browserDownloadCancelled => 'Cancelled';
+
+  @override
+  String get browserAgentEnabled => 'Allow assistant browser access';
+
+  @override
+  String get browserAgentEnabledDescription =>
+      'Enabled assistants can browse and interact with pages in this browser.';
+
+  @override
+  String get browserToolTitle => 'Browser control';
+
+  @override
+  String get browserToolSubtitle =>
+      'Browse and interact with signed-in pages. Enable Agent control in browser settings first.';
+
+  @override
+  String get browserOpen => 'Open browser';
+
+  @override
+  String get browserInvalidUrl =>
+      'Enter a valid HTTP or HTTPS website address.';
+
+  @override
+  String get browserClearDataUnavailable =>
+      'Clearing all website data is not supported by the Windows browser engine.';
+
+  @override
+  String get browserSurfaceStyle => 'Surface style';
+
+  @override
+  String get browserSurfaceLiquid => 'Liquid glass';
+
+  @override
+  String get browserSurfaceFrosted => 'Frosted';
+
+  @override
+  String get browserSurfaceSolid => 'Solid';
+
+  @override
+  String get browserPageOptions => 'Page options';
+
+  @override
+  String get browserAskAi => 'Let AI work on this page';
+
+  @override
+  String get browserAskAiHint => 'Return to chat, add your request, then send.';
+
+  @override
+  String get browserAskAiCurrentPage => 'the current browser page';
+
+  @override
+  String get browserAskAiUnavailable =>
+      'This chat is unavailable. Open the browser from a chat first.';
+
+  @override
+  String get browserAskAiEditing =>
+      'Finish or cancel editing the current message before adding a page task.';
+
+  @override
+  String get browserAskAiAssistantDisabled =>
+      'Enable Browser control in this assistant’s tools first.';
+
+  @override
+  String get browserAskAiBrowserDisabled =>
+      'Allow assistants to use the browser in browser settings first.';
+
+  @override
+  String browserAskAiDraft(String page) {
+    return 'Please use the browser to work on this page:\n$page\n\nMy request: ';
+  }
+
+  @override
+  String get browserOpenFullPage => 'Open in full page';
+
+  @override
+  String get browserClosePanel => 'Close browser panel';
+
+  @override
+  String get browserSearchTabs => 'Search tabs';
+
+  @override
+  String browserTabsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tabs',
+      one: '1 tab',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get browserOpenInSidebar => 'Open in sidebar';
+
+  @override
+  String get browserUserAgent => 'User agent';
+
+  @override
+  String get browserUserAgentMobile => 'Mobile';
+
+  @override
+  String get browserUserAgentDesktop => 'Desktop';
+
+  @override
+  String get browserUserAgentCustom => 'Custom';
+
+  @override
+  String get browserUserAgentHint => 'Enter a custom User-Agent';
+
+  @override
+  String get browserUserAgentInvalid =>
+      'Use a single line of up to 2048 printable ASCII characters.';
+
+  @override
+  String get browserUserAgentDescription =>
+      'Changes reload the current webpage.';
+
+  @override
+  String browserStepsShowEarlier(int count) {
+    return '$count earlier steps';
+  }
+
+  @override
+  String get browserOpenThisPage => 'Open in browser';
+
+  @override
+  String get browserGroupToggleSemantics => 'Show or hide browser steps';
+
+  @override
+  String get browserStepGroupTitle => 'Browsing';
+
+  @override
+  String browserStepCount(int count) {
+    return '$count steps';
+  }
+
+  @override
+  String browserStepCurrent(int count) {
+    return 'step $count';
+  }
+
+  @override
+  String browserActionFailedCount(int count) {
+    return '· $count failed';
+  }
+
+  @override
+  String browserActionFailed(String action) {
+    return '$action failed';
+  }
+
+  @override
+  String get browserCardOpen => 'Open';
+
+  @override
+  String get browserCardEnable => 'Enable';
+
+  @override
+  String browserCardRunning(String action) {
+    return '$action…';
+  }
+
+  @override
+  String get browserCardLive => 'Live';
+
+  @override
+  String get browserCardOpenFailed => 'Couldn\'t open page';
+
+  @override
+  String get browserCardBlankPage => 'Blank page';
+
+  @override
+  String browserCardTabCount(int count) {
+    return '$count tabs';
+  }
+
+  @override
+  String get browserActionOpen => 'Open page';
+
+  @override
+  String get browserActionNewTab => 'New tab';
+
+  @override
+  String get browserActionRender => 'Render page';
+
+  @override
+  String get browserActionExtract => 'Extract text';
+
+  @override
+  String get browserActionScreenshot => 'Capture screenshot';
+
+  @override
+  String get browserActionSnapshot => 'Read page structure';
+
+  @override
+  String get browserActionClick => 'Click';
+
+  @override
+  String get browserActionType => 'Type';
+
+  @override
+  String get browserActionSelect => 'Select option';
+
+  @override
+  String get browserActionPress => 'Press key';
+
+  @override
+  String get browserActionScroll => 'Scroll';
+
+  @override
+  String get browserActionWait => 'Wait';
+
+  @override
+  String get browserActionBack => 'Back';
+
+  @override
+  String get browserActionForward => 'Forward';
+
+  @override
+  String get browserActionReload => 'Reload';
+
+  @override
+  String get browserActionEvaluate => 'Run script';
+
+  @override
+  String get browserActionSwitchTab => 'Switch tab';
+
+  @override
+  String get browserActionCloseTab => 'Close tab';
+
+  @override
+  String get browserActionListTabs => 'List tabs';
+
+  @override
+  String get browserActionUnknown => 'Browser action';
+
+  @override
+  String browserMetaChars(String count) {
+    return '$count chars';
+  }
+
+  @override
+  String browserMetaElements(int count) {
+    return '$count elements';
+  }
+
+  @override
+  String get browserErrAgentDisabled => 'Browser control is off';
+
+  @override
+  String get browserErrStaleRef => 'Element is stale; page needs re-reading';
+
+  @override
+  String get browserErrNotVisible => 'Element hidden or covered';
+
+  @override
+  String get browserErrNotFound => 'Element not found';
+
+  @override
+  String get browserErrTimeout => 'Page load timed out';
+
+  @override
+  String get browserErrActionTimeout =>
+      'Operation timed out; outcome unknown. Check the page before allowing AI to continue.';
+
+  @override
+  String get browserErrHumanControl => 'You\'re controlling the browser';
+
+  @override
+  String get browserErrTabClosed => 'Tab was closed';
+
+  @override
+  String get browserErrGeneric => 'Action failed';
+
+  @override
+  String get browserDirectionUp => 'Up';
+
+  @override
+  String get browserDirectionDown => 'Down';
+
+  @override
+  String get browserDirectionLeft => 'Left';
+
+  @override
+  String get browserDirectionRight => 'Right';
+
+  @override
+  String browserMetaTabs(int count) {
+    return '$count tabs';
+  }
+
+  @override
+  String get browserTabsCurrentConversation => 'This chat';
+
+  @override
+  String get browserTabsAll => 'All tabs';
+
+  @override
+  String get browserTabsUnassigned => 'Personal tabs';
+
+  @override
+  String get browserTabsUnknownConversation => 'Other chat';
+
+  @override
+  String get browserTabsEmptyConversation =>
+      'No tabs here yet. Open a page or choose a tab from All tabs.';
+
+  @override
+  String get browserTabsNoResults => 'No matching tabs';
+
+  @override
+  String get browserMoveToConversation => 'Move to this chat';
+
+  @override
+  String get browserReopenInConversation => 'Reopen in this chat';
+
+  @override
+  String get browserTabBusy =>
+      'An assistant is still using this page. Wait for it to finish or stop the task before moving it.';
+
+  @override
+  String get browserLiveViewLimit =>
+      'All browser resources are in use. Try again when a task finishes, or close an unused page.';
+
+  @override
+  String get browserAskAiInOwnerConversation => 'Ask AI in the owning chat';
+
+  @override
+  String get displaySettingsPageShowBrowserPageCardsTitle =>
+      'Show webpage cards';
+
+  @override
+  String get browserObserverHint =>
+      'AI is using this page. Select Take over to interact.';
+
+  @override
+  String get toolPermissionTitle => 'Permissions';
+
+  @override
+  String get toolPermissionRequestApproval => 'Ask for approval';
+
+  @override
+  String get toolPermissionFullAccess => 'Full access';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      'Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      'Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      'Lets this conversation run tools automatically inside the sandbox and authorized folders, without asking each time.';
+
+  @override
+  String get toolPermissionUnboundHint =>
+      'No workspace bound: this does not turn on file or shell tools.';
+
+  @override
+  String get toolPermissionScopeThisChat => 'This chat only';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => 'Switch to full access';
+
+  @override
+  String get toolApprovalDenied => 'Denied';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return 'Awaiting approval · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => 'Requested path';
+
+  @override
+  String get toolApprovalRealTarget => 'Actual target';
+
+  @override
+  String get toolApprovalScopeOnce => 'Applies to this call only';
+
+  @override
+  String get toolApprovalByFullAccess => 'Ran automatically';
+
+  @override
+  String get toolApprovalDenyWithReason => 'Deny with reason…';
+
+  @override
+  String get toolPermissionSaveFailed => 'Couldn’t save. Permission unchanged.';
+
+  @override
+  String get toolPermissionEnabledSnack => 'Full access enabled for this chat';
+
+  @override
+  String get toolPermissionResetSnack =>
+      'Workspace changed · permission reset to Ask for approval';
+
+  @override
+  String get toolPermissionUndo => 'Undo';
+
+  @override
+  String get wsDeniedPathOutside =>
+      'Target is outside the authorized area. Denied.';
+
+  @override
+  String get wsDeniedMountReadonly => 'Read-only mount. Can’t write.';
+
+  @override
+  String get wsDeniedSkillsReadonly => 'Skills folder is read-only.';
+
+  @override
+  String get wsPathChanged => 'Target changed while awaiting approval.';
+
+  @override
+  String get wsContextChanged =>
+      'Conversation context changed. Request expired.';
 }

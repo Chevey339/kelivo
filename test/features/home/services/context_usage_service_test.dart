@@ -482,6 +482,40 @@ void main() {
   );
 
   test(
+    'missing owners use the same assistant model for context usage',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final first = await providers.assistants.addAssistant(name: 'First');
+      await providers.assistants.updateAssistant(
+        providers.assistants
+            .getById(first)!
+            .copyWith(
+              chatModelProvider: 'TestProvider',
+              chatModelId: 'plain-model',
+            ),
+      );
+      final second = await providers.assistants.addAssistant(name: 'Second');
+      await providers.assistants.setCurrentAssistant(second);
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+      );
+      final conversation = await chat.createConversation(
+        title: 'Orphaned topic',
+        assistantId: 'missing-assistant',
+      );
+      usage.setActiveConversation(conversation.id);
+      await usage.refresh(conversation.id, force: true);
+
+      expect(usage.current!.modelId, 'plain-model');
+      expect(usage.current!.assistantId, first);
+      expect(conversation.assistantId, 'missing-assistant');
+    },
+  );
+
+  test(
     'late responses cannot anchor a changed assistant configuration',
     () async {
       final chat = await createChat();

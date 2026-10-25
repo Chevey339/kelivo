@@ -1,5 +1,8 @@
 package com.psyche.kelivo.workspace
 
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import java.io.File
 import java.io.InputStream
@@ -24,8 +27,10 @@ data class ExecRequest(
 
 class ExecRunner(
     private val events: WorkspaceEvents,
+    private val stopProcess: (Process) -> Unit = ::stopProotProcess,
 ) {
     private val runs = ConcurrentHashMap<String, Running>()
+    private val liveRuns = ConcurrentHashMap.newKeySet<Running>()
 
     fun start(request: ExecRequest) {
         cancel(request.runId)
@@ -55,6 +60,7 @@ class ExecRunner(
 
         val running = Running(process)
         runs[request.runId] = running
+        liveRuns.add(running)
         val startedAt = System.nanoTime()
         if (request.keepStdinOpen) events.emit(mapOf("type" to "started", "runId" to request.runId))
 
@@ -78,14 +84,24 @@ class ExecRunner(
             val cancelled = running.cancelled.get()
             val timedOut = !finished && !cancelled
             if (!finished || cancelled) {
-                killProcessTree(process)
+                try {
+                    stopProcess(process)
+                } catch (error: Exception) {
+                    // Still report the command's timeout/cancellation. Keep the
+                    // live run registered so environment cleanup cannot proceed.
+                    Log.w(TAG, "failed to stop workspace command", error)
+                }
             }
             val exitCode = when {
                 cancelled || timedOut -> -1
                 else -> try {
                     process.exitValue()
                 } catch (_: IllegalThreadStateException) {
-                    killProcessTree(process)
+                    try {
+                        stopProcess(process)
+                    } catch (error: Exception) {
+                        Log.w(TAG, "failed to stop workspace command", error)
+                    }
                     -1
                 }
             }
@@ -106,6 +122,7 @@ class ExecRunner(
             try { process.outputStream.close() } catch (_: Exception) {}
             events.emit(payload)
             runs.remove(request.runId, running)
+            if (!process.isAlive) liveRuns.remove(running)
         }, "ws-wait-${request.runId}").apply { isDaemon = true; start() }
     }
 
@@ -121,12 +138,25 @@ class ExecRunner(
     fun cancel(runId: String): Boolean {
         val running = runs[runId] ?: return false
         running.cancelled.set(true)
-        killProcessTree(running.process)
+        stopProcess(running.process)
         return true
     }
 
-    fun cancelAll() {
-        runs.keys.toList().forEach { cancel(it) }
+    fun cancelAll(waitForExit: Boolean = false) {
+        val pending = liveRuns.toList()
+        pending.forEach {
+            it.cancelled.set(true)
+            stopProcess(it.process)
+        }
+        if (waitForExit) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            pending.forEach {
+                check(it.process.waitFor((deadline - System.nanoTime()).coerceAtLeast(0), TimeUnit.NANOSECONDS)) {
+                    "workspace command did not stop"
+                }
+                liveRuns.remove(it)
+            }
+        }
     }
 
     private fun drain(stream: InputStream, runId: String, type: String) {
@@ -177,45 +207,20 @@ internal fun processPid(process: Process): Long? {
     return Regex("pid[= ](\\d+)").find(process.toString())?.groupValues?.get(1)?.toLongOrNull()
 }
 
-internal fun killProcessTree(process: Process) {
+internal fun stopProotProcess(process: Process) {
+    if (!process.isAlive) return
     val pid = processPid(process)
-    if (pid != null) {
-        killDescendants(pid)
-    }
-    try {
-        process.destroyForcibly()
-    } catch (_: Exception) {
-    }
+    check(pid != null) { "cannot determine workspace process ID" }
+    requestProotExit(pid)
 }
 
-private fun killDescendants(pid: Long) {
-    val children = mutableListOf<Long>()
-    val proc = File("/proc")
-    if (!proc.isDirectory) return
-    proc.listFiles()?.forEach { dir ->
-        val child = dir.name.toLongOrNull() ?: return@forEach
-        try {
-            val stat = File(dir, "stat")
-            if (!stat.isFile) return@forEach
-            val text = stat.readText()
-            val close = text.lastIndexOf(')')
-            if (close < 0) return@forEach
-            val fields = text.substring(close + 1).trim().split(Regex("\\s+"))
-            // /proc/pid/stat: after comm, field 2 is state, field 3 is ppid
-            val ppid = fields.getOrNull(1)?.toLongOrNull() ?: return@forEach
-            if (ppid == pid) children += child
-        } catch (_: Exception) {
-        }
-    }
-    children.forEach { child ->
-        killDescendants(child)
-        try {
-            android.os.Process.sendSignal(child.toInt(), 9)
-        } catch (_: Exception) {
-        }
-    }
+internal fun requestProotExit(pid: Long) {
+    // SIGKILL on the tracer can orphan tracees (including daemonized guests).
+    // SIGQUIT asks PRoot to kill and reap the complete traced process set.
+    if (!awaitProotSignalHandler(File("/proc/$pid"))) return
     try {
-        android.os.Process.sendSignal(pid.toInt(), 9)
-    } catch (_: Exception) {
+        Os.kill(pid.toInt(), OsConstants.SIGQUIT)
+    } catch (error: ErrnoException) {
+        if (error.errno != OsConstants.ESRCH) throw error
     }
 }

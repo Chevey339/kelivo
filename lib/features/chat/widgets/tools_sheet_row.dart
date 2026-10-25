@@ -15,19 +15,25 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 class ToolsSheetRow extends StatelessWidget {
   const ToolsSheetRow({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.label,
     this.subtitle,
+    this.subtitleMaxLines = 1,
+    this.detailColor,
     this.detail,
     this.selected = false,
     this.onTap,
     this.onLongPress,
     this.trailing,
-  });
+  }) : assert(icon != null || leading != null);
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String label;
   final String? subtitle;
+  final int subtitleMaxLines;
+  final Color? detailColor;
   final String? detail;
   final bool selected;
   final VoidCallback? onTap;
@@ -47,8 +53,12 @@ class ToolsSheetRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final onColor = selected ? cs.primary : cs.onSurface;
     final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
+    final subtitleScale = hasSubtitle && subtitleMaxLines > 1
+        ? MediaQuery.textScalerOf(context).scale(13) / 13
+        : 1.0;
     return SizedBox(
-      height: hasSubtitle ? 56 : 48,
+      height:
+          (hasSubtitle ? 56.0 : 48.0) * (subtitleScale > 1 ? subtitleScale : 1),
       child: IosCardPress(
         borderRadius: BorderRadius.circular(14),
         baseColor: sheetTileColor(context),
@@ -58,7 +68,7 @@ class ToolsSheetRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: onColor),
+            leading ?? Icon(icon, size: 20, color: onColor),
             const SizedBox(width: 10),
             Expanded(
               child: hasSubtitle
@@ -78,10 +88,11 @@ class ToolsSheetRow extends StatelessWidget {
                         ),
                         Text(
                           subtitle!,
-                          maxLines: 1,
+                          maxLines: subtitleMaxLines,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
+                            height: subtitleMaxLines > 1 ? 1.2 : null,
                             color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
@@ -105,7 +116,7 @@ class ToolsSheetRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  color: cs.onSurface.withValues(alpha: 0.6),
+                  color: detailColor ?? cs.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(width: 6),

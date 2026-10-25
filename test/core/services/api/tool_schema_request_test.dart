@@ -7,6 +7,8 @@ import 'package:http/testing.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
+import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 
 import '../../../support/tool_schema_reference_cases.dart';
@@ -158,13 +160,19 @@ void main() {
   final schemas = {
     'submit': _schema,
     'constraints': _constraintsSchema,
+    for (final tool in [
+      ...WorkspaceToolsService.definitions(),
+      LocalToolsService.definitionFor(LocalToolNames.phoneControl),
+    ])
+      (tool['function'] as Map)['name'] as String:
+          (tool['function'] as Map)['parameters'] as Map<String, dynamic>,
     for (final (index, example) in toolSchemaReferenceCases().indexed)
       'reference_$index': example.schema,
   };
 
   for (final transport in ['chat', 'responses', 'claude']) {
     test(
-      '$transport preserves composed MCP schemas across tool rounds',
+      '$transport preserves MCP and built-in schemas across tool rounds',
       () async {
         final requests = <Map<String, dynamic>>[];
         final client = MockClient((request) async {
