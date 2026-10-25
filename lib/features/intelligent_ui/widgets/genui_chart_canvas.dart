@@ -88,7 +88,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
     for (var i = 0; i <= 4; i++) {
       final width = _textWidths.measure(
         genUiChartTick(
-          axis.value(axis.minimum + (axis.maximum - axis.minimum) * i / 4),
+          axis.tickValue(axis.minimum + (axis.maximum - axis.minimum) * i / 4),
         ),
         labelStyle,
         scale,
@@ -264,7 +264,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
             child: SizedBox(
               width: math.max(0, left - 8),
               child: Text(
-                genUiChartTick(data.yAxis.value(value)),
+                genUiChartTick(data.yAxis.tickValue(value)),
                 style: style,
                 textDirection: TextDirection.ltr,
                 textAlign: TextAlign.end,
@@ -286,7 +286,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
                     (data.xAxis.maximum - data.xAxis.minimum) / 4
               : categoryStep / data.xAxis.factor,
           getTitlesWidget: (value, meta) {
-            final raw = data.xAxis.value(value);
+            final raw = data.xAxis.tickValue(value);
             String label;
             if (data.numericX) {
               label = genUiChartTick(raw);
@@ -342,12 +342,17 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
       // overlap; space those marks along X while retaining gap endpoints,
       // isolated values and the active point. Scatter points are never thinned.
       final marked = Set<FlSpot>.identity();
+      final isolated = Set<FlSpot>.identity();
       double? previousX;
       for (var i = 0; i < spots.length; i++) {
         final spot = spots[i];
         if (spot.isNull()) {
           previousX = null;
           continue;
+        }
+        if ((i == 0 || spots[i - 1].isNull()) &&
+            (i == spots.length - 1 || spots[i + 1].isNull())) {
+          isolated.add(spot);
         }
         final x =
             (spot.x - data.xAxis.minimum) /
@@ -370,7 +375,8 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
           isCurved: false,
           dashArray: genUiChartDashes[s],
           dotData: FlDotData(
-            checkToShowDot: (spot, bar) => marked.contains(spot),
+            checkToShowDot: (spot, bar) =>
+                data.sampled ? isolated.contains(spot) : marked.contains(spot),
             getDotPainter: (spot, percent, bar, index) => normalDot,
           ),
         ),
@@ -513,7 +519,14 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
       final radius =
           math.min(constraints.maxWidth, constraints.maxHeight) / 2 - 8;
       final donut = properties['donut'] == true;
-      final center = donut ? radius * .53 : 0.0;
+      final centerTextScale =
+          MediaQuery.textScalerOf(
+            context,
+          ).scale(theme.chartCenterValue.fontSize!) /
+          18;
+      final center = donut
+          ? radius * (.53 * centerTextScale).clamp(.53, .74)
+          : 0.0;
       final selected = active == null ? null : data.rows[active!.row];
       return Directionality(
         textDirection: TextDirection.ltr,
@@ -573,24 +586,42 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      selected == null
-                          ? genUiDisplayTotal(rows.map((row) => row.y.single!))
-                          : genUiDisplayNumber(selected.y.single),
-                      style: theme.header,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            selected == null
+                                ? genUiDisplayTotal(
+                                    rows.map((row) => row.y.single!),
+                                  )
+                                : genUiDisplayNumber(selected.y.single),
+                            style: theme.chartCenterValue,
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.ltr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (properties['unit'] case final String unit) ...[
+                          SizedBox(width: theme.xxs),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: center * .55),
+                            child: Text(
+                              unit,
+                              style: theme.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (properties['unit'] != null ||
-                        selected?.y.single != null)
+                    if (selected?.y.single != null)
                       Text(
-                        [
-                          if (properties['unit'] case final String unit) unit,
-                          if (selected?.y.single != null)
-                            '${genUiChartTick(selected!.y.single! / visibleTotal * 100)}%',
-                        ].join(' · '),
+                        '${genUiChartTick(selected!.y.single! / visibleTotal * 100)}%',
                         style: theme.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

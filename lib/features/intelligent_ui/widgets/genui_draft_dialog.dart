@@ -132,13 +132,32 @@ class GenUiDraftDialog extends StatelessWidget {
                 children: [
                   IosTextButton(
                     label: l10n.homePageCancel,
+                    color: theme.secondaryInk,
                     onPressed: () => Navigator.of(context).pop(false),
                   ),
-                  IosTextButton(
-                    label: merged == null
-                        ? l10n.genuiReplaceConfirm
-                        : l10n.genuiMergeConfirm,
-                    onPressed: () => Navigator.of(context).pop(true),
+                  Stack(
+                    children: [
+                      Positioned.fill(
+                        top: theme.xxs,
+                        bottom: theme.xxs,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.primary,
+                            borderRadius: BorderRadius.circular(
+                              theme.controlRadius,
+                            ),
+                          ),
+                        ),
+                      ),
+                      IosTextButton(
+                        label: merged == null
+                            ? l10n.genuiReplaceConfirm
+                            : l10n.genuiMergeConfirm,
+                        color: theme.onPrimary,
+                        padding: EdgeInsets.symmetric(horizontal: theme.md),
+                        onPressed: () => Navigator.of(context).pop(true),
+                      ),
+                    ],
                   ),
                 ],
               ),

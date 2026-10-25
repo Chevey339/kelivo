@@ -25734,6 +25734,12 @@ abstract class AppLocalizations {
   /// **'Export HTML'**
   String get genuiWebExportHtml;
 
+  /// No description provided for @genuiWebInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview information'**
+  String get genuiWebInfo;
+
   /// No description provided for @genuiWebCspNote.
   ///
   /// In en, this message translates to:

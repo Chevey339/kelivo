@@ -426,7 +426,14 @@ class GenUiBadge extends StatelessWidget {
               SizedBox(width: theme.xxs),
             ],
             Flexible(
-              child: Text(text, style: theme.badge.copyWith(color: colors.ink)),
+              child: Text(
+                text,
+                style: theme.badge.copyWith(color: colors.ink),
+                textHeightBehavior: const TextHeightBehavior(
+                  applyHeightToFirstAscent: false,
+                  applyHeightToLastDescent: false,
+                ),
+              ),
             ),
           ],
         ),
@@ -458,31 +465,43 @@ class GenUiCallout extends StatelessWidget {
           border: Border.all(color: colors.border),
           borderRadius: BorderRadius.circular(theme.controlRadius),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ExcludeSemantics(
-              child: Icon(genUiToneIcon(tone), size: 16, color: colors.ink),
+            Row(
+              children: [
+                ExcludeSemantics(
+                  child: Icon(genUiToneIcon(tone), size: 16, color: colors.ink),
+                ),
+                SizedBox(width: theme.xs),
+                Expanded(
+                  child: title?.isNotEmpty == true
+                      ? Text(
+                          title!,
+                          style: theme.sectionTitle.copyWith(color: colors.ink),
+                          textHeightBehavior: const TextHeightBehavior(
+                            applyHeightToFirstAscent: false,
+                            applyHeightToLastDescent: false,
+                          ),
+                        )
+                      : _GenUiSelectableText(
+                          text,
+                          style: theme.body.copyWith(color: colors.ink),
+                        ),
+                ),
+              ],
             ),
-            SizedBox(width: theme.xs),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (title?.isNotEmpty == true) ...[
-                    Text(
-                      title!,
-                      style: theme.sectionTitle.copyWith(color: colors.ink),
-                    ),
-                    SizedBox(height: theme.xxs),
-                  ],
-                  _GenUiSelectableText(
-                    text,
-                    style: theme.body.copyWith(color: colors.ink),
-                  ),
-                ],
+            if (title?.isNotEmpty == true)
+              Padding(
+                padding: EdgeInsetsDirectional.only(
+                  start: 16 + theme.xs,
+                  top: theme.xxs,
+                ),
+                child: _GenUiSelectableText(
+                  text,
+                  style: theme.body.copyWith(color: colors.ink),
+                ),
               ),
-            ),
           ],
         ),
       ),

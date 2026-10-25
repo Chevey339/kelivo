@@ -417,34 +417,55 @@ class _GenUiChartState extends State<GenUiChart> {
                 child: Container(
                   key: ValueKey('genui-chart-tooltip-${widget.id}'),
                   margin: EdgeInsets.only(top: theme.xs),
-                  padding: EdgeInsets.all(theme.xs),
-                  decoration: BoxDecoration(
-                    color: theme.cardFill,
-                    border: Border.all(color: theme.hairline),
-                    borderRadius: BorderRadius.circular(theme.controlRadius),
-                  ),
                   // A normal text subtree keeps the exact values reachable to assistive
                   // technology and large text, unlike a clipped canvas tooltip.
-                  child: Row(
+                  child: Stack(
                     children: [
-                      Expanded(
-                        child: Text(
-                          _tooltip(active, l10n).replaceAll('\n', ' · '),
-                          style: theme.caption.copyWith(
-                            color: theme.secondaryInk,
+                      Positioned.fill(
+                        top: theme.xxs,
+                        bottom: theme.xxs,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.cardFill,
+                            borderRadius: BorderRadius.circular(
+                              theme.controlRadius,
+                            ),
                           ),
                         ),
                       ),
-                      IosIconButton(
-                        icon: LucideIcons.x,
-                        size: 14,
-                        minSize: 44,
-                        visualSize: 28,
-                        tooltip: l10n.genuiClearSelection,
-                        onTap: () => setState(() {
-                          _selected = null;
-                          _hover = null;
-                        }),
+                      Padding(
+                        padding: EdgeInsetsDirectional.only(start: theme.sm),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: theme.xs,
+                                ),
+                                child: Text(
+                                  _tooltip(
+                                    active,
+                                    l10n,
+                                  ).replaceAll('\n', ' · '),
+                                  style: theme.caption.copyWith(
+                                    color: theme.secondaryInk,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IosIconButton(
+                              icon: LucideIcons.x,
+                              size: 14,
+                              minSize: 44,
+                              visualSize: 28,
+                              tooltip: l10n.genuiClearSelection,
+                              onTap: () => setState(() {
+                                _selected = null;
+                                _hover = null;
+                              }),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -494,7 +515,7 @@ class _GenUiChartState extends State<GenUiChart> {
       children: [
         ExcludeSemantics(
           child: CustomPaint(
-            size: Size(_pie ? 16 : 24, 14),
+            size: Size(_pie ? 10 : 24, 12),
             painter: GenUiChartLegendPainter(
               series: series,
               color: hidden ? theme.disabledInk : color,
@@ -507,6 +528,10 @@ class _GenUiChartState extends State<GenUiChart> {
         Flexible(
           child: Text(
             label,
+            textHeightBehavior: const TextHeightBehavior(
+              applyHeightToFirstAscent: false,
+              applyHeightToLastDescent: false,
+            ),
             style: theme.label.copyWith(
               color: ink,
               decoration: hidden ? TextDecoration.lineThrough : null,
@@ -531,7 +556,7 @@ class _GenUiChartState extends State<GenUiChart> {
                 child: ExcludeSemantics(
                   child: IosIconButton(
                     key: ValueKey('genui-chart-legend-${widget.id}-$series'),
-                    minSize: 44,
+                    minSize: ResponsiveHelper.isDesktop(context) ? 32 : 44,
                     padding: EdgeInsets.symmetric(horizontal: theme.xxs),
                     color: hidden ? theme.captionInk : theme.secondaryInk,
                     tooltip: action,

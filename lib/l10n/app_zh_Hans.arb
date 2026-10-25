@@ -5324,6 +5324,7 @@
   "genuiWebSandboxNote": "沙盒预览 · 关闭后不保留",
   "genuiWebUnsupported": "此平台暂不支持内嵌网页预览，可导出后在浏览器中打开",
   "genuiWebExportHtml": "导出 HTML",
+  "genuiWebInfo": "预览说明",
   "genuiWebCspNote": "CSP: default-src 'none' · 限制网络访问 · 独立页面状态",
   "genuiWebFailed": "预览初始化或加载失败。可查看或复制源码。",
   "genuiWebEmpty": "元信息后没有 HTML 内容",

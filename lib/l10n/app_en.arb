@@ -6684,6 +6684,7 @@
   "genuiWebSandboxNote": "Sandboxed preview · discarded on close",
   "genuiWebUnsupported": "Web previews aren't supported on this platform. Export to open in a browser.",
   "genuiWebExportHtml": "Export HTML",
+  "genuiWebInfo": "Preview information",
   "genuiWebCspNote": "CSP: default-src 'none' · Restricted network access · Isolated page state",
   "genuiWebFailed": "Preview initialization or loading failed. View or copy its source.",
   "genuiWebEmpty": "No HTML document after the header",

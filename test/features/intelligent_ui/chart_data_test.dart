@@ -34,6 +34,51 @@ double _nextUp(double value) {
 }
 
 void main() {
+  test(
+    'tick labels suppress cancellation residue without erasing tiny data',
+    () {
+      final axis = UiChartAxis([-1.997, 1.994], niceTicks: true);
+      final zero = axis.coordinate(0) - 1e-16;
+      expect(axis.value(zero), isNot(0));
+      expect(axis.tickValue(zero), 0);
+      final tiny = UiChartAxis([-2e-20, 2e-20], niceTicks: true);
+      expect(tiny.tickValue(tiny.coordinate(1e-20)), closeTo(1e-20, 1e-35));
+      expect(tiny.tickValue(tiny.coordinate(-1e-20)), closeTo(-1e-20, 1e-35));
+    },
+  );
+
+  test(
+    'sample provenance follows value aliases without classifying ordinary numbers as a function',
+    () {
+      final c = UiSurfaceController(
+        owner: const UiSurfaceOwner(revisionId: 'samples', surfaceKey: '0:0'),
+      );
+      addTearDown(c.dispose);
+      c.updateSource(
+        r'''ui 1 catalog "kelivo.native/1"
+$sample: boolean = false
+$title: string = "Curve"
+let sampled = @sample(x => x * x, -2, 2, 21)
+let points = $sample ? sampled : [{"x":0,"y":3},{"x":1,"y":7}]
+let alias = points
+root = Column(children=[curve,observations])
+curve = Chart(kind="line",title=$title,data=alias,x="x",y=["y"])
+observations = Chart(kind="line",data=[{"x":0,"y":1},{"x":1,"y":2}],x="x",y=["y"])
+''',
+        closed: true,
+        generation: UiGenerationStatus.complete,
+      );
+      expect(c.phase, SurfacePhase.complete);
+      expect(c.nodes['curve']!.chartData!.sampled, isFalse);
+      c.setInputs({'sample': true}, token: c.token);
+      expect(c.nodes['curve']!.chartData!.sampled, isTrue);
+      c.setInputs({'title': 'Cached values'}, token: c.token);
+      expect(c.nodes['curve']!.chartData!.sampled, isTrue);
+      c.setInputs({'sample': false}, token: c.token);
+      expect(c.nodes['curve']!.chartData!.sampled, isFalse);
+      expect(c.nodes['observations']!.chartData!.sampled, isFalse);
+    },
+  );
   for (final kind in UiChartKind.values) {
     test('${kind.name} retains raw finite values and accepts empty data', () {
       final d = UiChartData.read(_props(kind: kind.name));

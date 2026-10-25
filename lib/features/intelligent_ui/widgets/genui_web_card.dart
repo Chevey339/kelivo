@@ -98,7 +98,7 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   ExcludeSemantics(
                     child: Container(
@@ -119,43 +119,62 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                   ),
                   SizedBox(width: theme.xs),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ExcludeSemantics(
-                          child: Text(
-                            title,
-                            style: theme.header,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (document.summary.isNotEmpty) ...[
-                          SizedBox(height: theme.xxs),
-                          Text(
-                            document.summary,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.caption.copyWith(
-                              color: theme.secondaryInk,
-                            ),
-                          ),
-                        ],
-                      ],
+                    child: ExcludeSemantics(
+                      child: Text(
+                        title,
+                        style: theme.header,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                  if (streaming)
-                    GenUiBadge(
-                      text: l10n.genuiStatusStreaming,
-                      tone: 'primary',
+                  if (actions && widget.supported) ...[
+                    GenUiControlRegion(
+                      child: IosIconButton(
+                        icon: LucideIcons.codeXml,
+                        size: 17,
+                        minSize: 44,
+                        visualSize: 28,
+                        color: theme.secondaryInk,
+                        tooltip: l10n.genuiViewSource,
+                        onTap: () => setState(() => _source = !_source),
+                      ),
                     ),
-                  if (interrupted)
-                    GenUiBadge(
-                      text: l10n.genuiStatusInterrupted,
-                      tone: 'warning',
-                    ),
+                    if (!invalid)
+                      GenUiWebOpenButton(
+                        label: l10n.genuiWebOpen,
+                        focusNode: _openFocus,
+                        reason: document.canOpen ? null : reason,
+                        enabled:
+                            document.canOpen && !_busy && widget.onOpen != null,
+                        onTap: _open,
+                      ),
+                  ],
                 ],
               ),
+              if (document.summary.isNotEmpty)
+                Padding(
+                  padding: EdgeInsetsDirectional.only(
+                    start: 32 + theme.xs,
+                    top: theme.xxs,
+                  ),
+                  child: Text(
+                    document.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.caption.copyWith(color: theme.secondaryInk),
+                  ),
+                ),
+              if (streaming || interrupted)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: GenUiBadge(
+                    text: streaming
+                        ? l10n.genuiStatusStreaming
+                        : l10n.genuiStatusInterrupted,
+                    tone: streaming ? 'primary' : 'warning',
+                  ),
+                ),
               if (invalid ||
                   (!widget.supported && !widget.exporting) ||
                   (streaming && actions)) ...[
@@ -171,7 +190,7 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                   ),
                 ),
               ],
-              if (actions) ...[
+              if (actions && !widget.supported) ...[
                 SizedBox(height: theme.xs),
                 Wrap(
                   spacing: theme.xs,
@@ -209,15 +228,6 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                           ),
                         ),
                     ],
-                    if (widget.supported && !invalid)
-                      GenUiWebOpenButton(
-                        label: l10n.genuiWebOpen,
-                        focusNode: _openFocus,
-                        reason: document.canOpen ? null : reason,
-                        enabled:
-                            document.canOpen && !_busy && widget.onOpen != null,
-                        onTap: _open,
-                      ),
                   ],
                 ),
               ],
@@ -317,12 +327,6 @@ class _GenUiWebOpenButtonState extends State<GenUiWebOpenButton> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          LucideIcons.externalLink,
-                          size: 15,
-                          color: disabled ? theme.disabledInk : theme.onPrimary,
-                        ),
-                        SizedBox(width: theme.xs),
                         Flexible(
                           child: Text(
                             widget.label,

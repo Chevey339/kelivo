@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -24,7 +25,19 @@ import 'scenario_sources.dart';
 
 /// Isolated native visual review entry. Never imported by the production app.
 /// All data is synthetic; changing a fixture cannot send a provider request.
-void main() => runApp(const GenUiReviewGalleryApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(GenUiReviewGalleryApp(fontFamily: await loadGenUiReviewFont()));
+}
+
+/// Optional local QA asset; production imports neither this entry nor the font.
+Future<String?> loadGenUiReviewFont() async {
+  const asset = String.fromEnvironment('GENUI_REVIEW_FONT_ASSET');
+  if (asset.isEmpty) return null;
+  final loader = FontLoader('GenUIReviewFont')..addFont(rootBundle.load(asset));
+  await loader.load();
+  return 'GenUIReviewFont';
+}
 
 const genUiReviewCases = [
   '内容与布局',
@@ -58,7 +71,8 @@ const genUiReviewCases = [
 ];
 
 class GenUiReviewGalleryApp extends StatefulWidget {
-  const GenUiReviewGalleryApp({super.key});
+  const GenUiReviewGalleryApp({super.key, this.fontFamily});
+  final String? fontFamily;
   @override
   State<GenUiReviewGalleryApp> createState() => _GenUiReviewGalleryAppState();
 }
@@ -107,10 +121,21 @@ class _GenUiReviewGalleryAppState extends State<GenUiReviewGalleryApp> {
     if (mounted && value != null) _select(value);
   }
 
+  ThemeData _reviewTheme() {
+    final theme = _dark ? buildDarkTheme(null) : buildLightTheme(null);
+    final font = widget.fontFamily;
+    return font == null
+        ? theme
+        : theme.copyWith(
+            textTheme: theme.textTheme.apply(fontFamily: font),
+            primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: font),
+          );
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: _dark ? buildDarkTheme(null) : buildLightTheme(null),
+    theme: _reviewTheme(),
     locale: const Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

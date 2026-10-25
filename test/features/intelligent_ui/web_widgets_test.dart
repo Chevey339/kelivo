@@ -12,7 +12,7 @@ import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../support/genui_web_platform.dart';
 
@@ -24,10 +24,14 @@ UiWebDocument document({
   generation: status,
 );
 
-Widget app(Widget child) => MaterialApp(
+Widget app(Widget child, {EdgeInsets padding = EdgeInsets.zero}) => MaterialApp(
   theme: buildLightTheme(null),
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(padding: padding),
+    child: child!,
+  ),
   home: Scaffold(body: GenUiThemeScope(child: child)),
 );
 
@@ -121,6 +125,7 @@ void main() {
                 onOpen: (value) => showUiWebPreview(context, value),
               ),
             ),
+            padding: const EdgeInsets.only(bottom: 34),
           ),
         );
         await tester.pumpAndSettle();
@@ -131,6 +136,22 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
         expect(platform.controllers, hasLength(1));
+        expect(find.text('Native preview test double'), findsOneWidget);
+        if (width == 390) {
+          expect(tester.getRect(find.byType(WebViewWidget)).bottom, 900 - 34);
+        }
+        final l10n = AppLocalizations.of(
+          tester.element(find.text('Native preview test double')),
+        )!;
+        expect(find.text(l10n.genuiWebSandboxNote), findsNothing);
+        expect(find.text(l10n.genuiWebCspNote), findsNothing);
+        await tester.tap(find.byTooltip(l10n.genuiWebInfo));
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.genuiWebSandboxNote), findsOneWidget);
+        expect(find.text(l10n.genuiWebCspNote), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.genuiWebCspNote), findsNothing);
         expect(find.text('Native preview test double'), findsOneWidget);
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
@@ -203,6 +224,9 @@ void main() {
       );
       final first = showUiWebPreview(context, document());
       await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Preview information'));
+      await tester.pumpAndSettle();
+      expect(find.text('Preview information'), findsOneWidget);
       final wait = Completer<void>();
       platform.cleanupWait = wait;
       final second = showUiWebPreview(context, document());
@@ -211,6 +235,7 @@ void main() {
       wait.complete();
       await tester.pumpAndSettle();
       await first;
+      expect(find.text('Preview information'), findsNothing);
       expect(platform.controllers, hasLength(2));
       expect(
         platform.controllers.first.documents.last,

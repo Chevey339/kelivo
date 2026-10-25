@@ -13789,6 +13789,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get genuiWebExportHtml => '导出 HTML';
 
   @override
+  String get genuiWebInfo => '预览说明';
+
+  @override
   String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制网络访问 · 独立页面状态';
 
   @override
@@ -27526,6 +27529,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiWebExportHtml => '导出 HTML';
+
+  @override
+  String get genuiWebInfo => '预览说明';
 
   @override
   String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制网络访问 · 独立页面状态';
@@ -41345,6 +41351,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiWebExportHtml => '匯出 HTML';
+
+  @override
+  String get genuiWebInfo => '預覽說明';
 
   @override
   String get genuiWebCspNote => 'CSP: default-src \'none\' · 限制網路存取 · 獨立頁面狀態';

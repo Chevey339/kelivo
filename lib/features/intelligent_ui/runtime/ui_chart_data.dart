@@ -94,6 +94,16 @@ final class UiChartAxis {
     return result.isFinite ? result : null;
   }
 
+  /// Tick conversion can cancel two near-equal terms around zero. Only labels
+  /// snap that rounding residue; data coordinates and source values are intact.
+  double? tickValue(double coordinate) {
+    final result = value(coordinate);
+    final step = tickInterval == null ? null : tickInterval! * factor;
+    return result != null && step != null && result.abs() < step.abs() * 1e-9
+        ? 0
+        : result;
+  }
+
   double fraction(double value) =>
       (coordinate(value) - minimum) / (maximum - minimum);
 }
@@ -128,6 +138,7 @@ final class UiChartData {
     required this.yAxis,
     required this.gaps,
     required this.total,
+    required this.sampled,
   });
   final UiChartKind kind;
   final String xKey;
@@ -139,6 +150,7 @@ final class UiChartData {
   final UiChartAxis xAxis, yAxis;
   final List<UiChartGap> gaps;
   final double total;
+  final bool sampled;
   bool get isEmpty =>
       rows.isEmpty || rows.every((r) => r.y.every((v) => v == null));
   double x(UiChartRow row) => xAxis.coordinate(
@@ -148,6 +160,7 @@ final class UiChartData {
   factory UiChartData.read(
     Map<String, Object?> properties, {
     Iterable<UiSampleGap> sampleGaps = const [],
+    bool sampled = false,
   }) {
     Never invalid(String detail) =>
         throw UiChartDataException(UiDiagnosticCode.invalidValue, detail);
@@ -283,6 +296,7 @@ final class UiChartData {
       yAxis: yAxis,
       gaps: List.unmodifiable(gaps),
       total: total,
+      sampled: sampled,
     );
   }
 }

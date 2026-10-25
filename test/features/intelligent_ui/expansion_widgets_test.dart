@@ -6,6 +6,7 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dar
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_expansion.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_node.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -83,6 +84,69 @@ void main() {
     (w) => w is IosIconButton && w.tooltip == 'Expand',
   );
 
+  for (final reduced in [false, true]) {
+    testWidgets(
+      'return highlights only changed results and preserves editors; reduced=$reduced',
+      (tester) async {
+        final source = _source.replaceFirst(
+          'children=[nameField,numberField]',
+          'children=[nameField,numberField,result,unchanged]',
+        );
+        controller.updateSource(
+          '$source\nresult = Metric(label="Result",value=\$n)\nunchanged = Text(text="Unchanged")\n',
+          closed: true,
+          generation: UiGenerationStatus.complete,
+        );
+        expect(
+          controller.phase,
+          SurfacePhase.complete,
+          reason: controller.parsed.program.diagnostics.toString(),
+        );
+        await tester.pumpWidget(app(reduceMotion: reduced));
+        await tester.pumpAndSettle();
+        final editor = tester.state<EditableTextState>(
+          find.byType(EditableText).first,
+        );
+        await tester.tap(expandButton());
+        await tester.pumpAndSettle();
+        controller.setInputs({'n': 9}, token: controller.token);
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pump();
+        for (
+          var i = 0;
+          i < 30 &&
+              find
+                  .text('Shares the same state as the message')
+                  .evaluate()
+                  .isNotEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        Finder fade(String id) => find.descendant(
+          of: find.byWidgetPredicate((w) => w is GenUiNode && w.id == id),
+          matching: find.byType(FadeTransition),
+        );
+        expect(
+          find.byWidgetPredicate((w) => w is GenUiNode && w.id == 'result'),
+          findsOneWidget,
+        );
+        expect(fade('result'), reduced ? findsNothing : findsOneWidget);
+        expect(fade('nameField'), findsNothing);
+        expect(fade('unchanged'), findsNothing);
+        expect(
+          tester.state<EditableTextState>(find.byType(EditableText).first),
+          same(editor),
+        );
+        await tester.pumpAndSettle();
+        expect(fade('result'), findsNothing);
+        expect(controller.captureRead().inputs['n'], 9);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final width in [390.0, 1200.0]) {
     testWidgets('one active tree, shared values and focus return at $width', (
       tester,
@@ -94,6 +158,10 @@ void main() {
       await tester.pumpWidget(app(reduceMotion: false));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(EditableText).at(1), '-');
+      final originalEditor = tester.state<EditableTextState>(
+        find.byType(EditableText).first,
+      );
+      final originalHeight = tester.getSize(find.byType(GenUiExpansion)).height;
       await tester.tap(expandButton());
       for (var i = 0; i < 20; i++) {
         await tester.pump(const Duration(milliseconds: 20));
@@ -111,6 +179,14 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Shares the same state as the message'), findsOneWidget);
+      expect(
+        tester.state<EditableTextState>(find.byType(EditableText).first),
+        same(originalEditor),
+      );
+      expect(
+        tester.getSize(find.byType(GenUiExpansion, skipOffstage: false)).height,
+        originalHeight,
+      );
       expect(
         tester
             .widget<EditableText>(find.byType(EditableText).at(1))
@@ -136,6 +212,10 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.text('Being edited in expanded view'), findsNothing);
+      expect(
+        tester.state<EditableTextState>(find.byType(EditableText).first),
+        same(originalEditor),
+      );
       expect(
         tester
             .widget<EditableText>(find.byType(EditableText).first)

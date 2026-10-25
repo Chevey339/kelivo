@@ -19,11 +19,15 @@ final class UiComputedValue {
   UiComputedValue._({
     this.value,
     this.error,
+    this.sampled = false,
     Iterable<UiSampleGap> gaps = const [],
     this._shape,
   }) : gaps = List.unmodifiable(gaps);
   final Object? value;
   final UiDiagnostic? error;
+
+  /// The returned array itself was produced by @sample on the evaluated branch.
+  final bool sampled;
   final List<UiSampleGap> gaps;
   final _ValueShape? _shape;
   bool get valid => error == null;
@@ -133,6 +137,7 @@ final class UiEvaluationBatch {
   // use value hashes. identityHashCode is not a suitable hash for doubles and
   // turns large numeric datasets into repeated collision-chain scans.
   final Map<Object, _ValueShape> _shapes = {};
+  final Set<Object> _sampledArrays = Set.identity();
   final Set<String> _dirty = {};
   bool _resolved = false;
   int _operations = 0;
@@ -186,6 +191,7 @@ final class UiEvaluationBatch {
       final value = _eval(expression, const {}, gaps);
       return UiComputedValue._(
         value: value,
+        sampled: _sampledArrays.contains(value),
         gaps: gaps,
         shape: _valueShape(value),
       );
@@ -322,6 +328,9 @@ final class UiEvaluationBatch {
           _shapes[value.value!] = value._shape;
         }
         gaps.addAll(value.gaps);
+        if (value.sampled && value.value != null) {
+          _sampledArrays.add(value.value!);
+        }
         return value.value;
       case UiUnary(:final operator, :final operand):
         _tick();
@@ -451,7 +460,9 @@ final class UiEvaluationBatch {
         } finally {
           _sampling--;
         }
-        return List<Map<String, Object?>>.unmodifiable(points);
+        final result = List<Map<String, Object?>>.unmodifiable(points);
+        _sampledArrays.add(result);
+        return result;
     }
   }
 

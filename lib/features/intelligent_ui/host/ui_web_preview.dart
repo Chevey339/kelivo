@@ -77,6 +77,7 @@ final class _UiWebPreviewLease {
   final UiWebDocument document;
   final UiWebController controller = UiWebController();
   TransitionRoute<void>? route;
+  RawDialogRoute<void>? infoRoute;
   Future<void>? _closing;
   Future<void>? _releasing;
   Future<void> release() => _releasing ??= _release();
@@ -90,6 +91,10 @@ final class _UiWebPreviewLease {
 
   Future<void> close() => _closing ??= _close();
   Future<void> _close() async {
+    final info = infoRoute;
+    if (info != null && info.isActive) {
+      info.navigator?.removeRoute(info);
+    }
     await controller.close();
     final current = route;
     if (current == null) return;
@@ -126,6 +131,7 @@ class _UiWebPreviewWindow extends StatefulWidget {
 class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
   bool _source = false;
   final _closeFocus = FocusNode(debugLabel: 'Web preview Close');
+  final _infoFocus = FocusNode(debugLabel: 'Web preview Info');
   UiWebController get _controller => widget.lease.controller;
   @override
   void initState() {
@@ -147,7 +153,58 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
     // must also run when the containing app/router is replaced outright.
     unawaited(widget.lease.release());
     _closeFocus.dispose();
+    _infoFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _showInfo() async {
+    if (widget.lease.infoRoute != null) return;
+    final l10n = AppLocalizations.of(context)!;
+    await showAppDialog<void>(
+      context,
+      maxWidth: 420,
+      waitForExit: true,
+      onRoute: (route) => widget.lease.infoRoute = route,
+      child: GenUiThemeScope(
+        child: Builder(
+          builder: (context) {
+            final theme = GenUiTheme.of(context);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppDialogHeader(title: l10n.genuiWebInfo),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      theme.md,
+                      0,
+                      theme.md,
+                      theme.md,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          widget.lease.document.title,
+                          style: theme.sectionTitle,
+                        ),
+                        SizedBox(height: theme.xs),
+                        Text(l10n.genuiWebSandboxNote, style: theme.body),
+                        SizedBox(height: theme.xs),
+                        Text(l10n.genuiWebCspNote, style: theme.caption),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    widget.lease.infoRoute = null;
+    if (mounted) _infoFocus.requestFocus();
   }
 
   @override
@@ -160,7 +217,7 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
         final headerColor = widget.desktop ? theme.card : theme.previewHeader;
         final headerInk = widget.desktop ? theme.ink : theme.previewHeaderInk;
         Widget shell = Material(
-          color: theme.card,
+          color: widget.desktop ? theme.card : theme.previewHeader,
           child: SafeArea(
             top: false,
             bottom: !widget.desktop,
@@ -173,12 +230,7 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
                     top: !widget.desktop,
                     bottom: false,
                     child: Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                        theme.xs,
-                        theme.xs,
-                        theme.md,
-                        theme.xs,
-                      ),
+                      padding: EdgeInsets.symmetric(horizontal: theme.xs),
                       child: Row(
                         children: [
                           IosIconButton(
@@ -191,25 +243,21 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
                           ),
                           SizedBox(width: theme.xs),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  document.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.header.copyWith(
-                                    color: headerInk,
-                                  ),
-                                ),
-                                Text(
-                                  l10n.genuiWebSandboxNote,
-                                  style: theme.caption.copyWith(
-                                    color: headerInk,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              document.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.header.copyWith(color: headerInk),
                             ),
+                          ),
+                          IosIconButton(
+                            icon: LucideIcons.info,
+                            size: 18,
+                            minSize: 44,
+                            color: headerInk,
+                            focusNode: _infoFocus,
+                            tooltip: l10n.genuiWebInfo,
+                            onTap: _showInfo,
                           ),
                         ],
                       ),
@@ -270,16 +318,6 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
                       }
                       return _controller.buildView();
                     },
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.fill,
-                    border: Border(top: BorderSide(color: theme.hairline)),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(theme.sm),
-                    child: Text(l10n.genuiWebCspNote, style: theme.caption),
                   ),
                 ),
               ],

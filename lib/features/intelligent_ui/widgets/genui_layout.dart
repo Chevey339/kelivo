@@ -151,21 +151,28 @@ class GenUiDivider extends StatelessWidget {
     return ExcludeSemantics(
       child: label?.isNotEmpty != true
           ? rule()
-          : Row(
-              children: [
-                Expanded(child: rule()),
-                SizedBox(width: theme.xs),
-                Flexible(
-                  flex: 4,
-                  child: Text(
-                    label!,
-                    textAlign: TextAlign.center,
-                    style: theme.label,
+          : LayoutBuilder(
+              builder: (context, constraints) => Row(
+                children: [
+                  Expanded(child: rule()),
+                  SizedBox(width: theme.xs),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: math.max(
+                        0,
+                        (constraints.maxWidth - theme.xs * 2) * .7,
+                      ),
+                    ),
+                    child: Text(
+                      label!,
+                      textAlign: TextAlign.center,
+                      style: theme.label,
+                    ),
                   ),
-                ),
-                SizedBox(width: theme.xs),
-                Expanded(child: rule()),
-              ],
+                  SizedBox(width: theme.xs),
+                  Expanded(child: rule()),
+                ],
+              ),
             ),
     );
   }

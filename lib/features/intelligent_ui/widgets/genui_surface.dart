@@ -223,44 +223,58 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       maxWidth: 360,
       child: Builder(
         builder: (dialogContext) => GenUiThemeScope(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AppDialogHeader(title: l10n.genuiMore),
-              if (!widget.surface.showHeader) ...[
-                IosTextButton(
-                  label: l10n.genuiViewSource,
-                  icon: LucideIcons.codeXml,
-                  onPressed: () => Navigator.of(dialogContext).pop('source'),
-                ),
-                if (widget.surface.onExpand != null)
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppDialogHeader(title: l10n.genuiMore),
+                if (!widget.surface.showHeader) ...[
                   IosTextButton(
-                    label: l10n.genuiExpand,
-                    icon: LucideIcons.expand,
-                    onPressed: () => Navigator.of(dialogContext).pop('expand'),
+                    label: l10n.genuiViewSource,
+                    icon: LucideIcons.codeXml,
+                    color: GenUiTheme.of(context).ink,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    onPressed: () => Navigator.of(dialogContext).pop('source'),
                   ),
+                  if (widget.surface.onExpand != null)
+                    IosTextButton(
+                      label: l10n.genuiExpand,
+                      icon: LucideIcons.expand,
+                      color: GenUiTheme.of(context).ink,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      onPressed: () =>
+                          Navigator.of(dialogContext).pop('expand'),
+                    ),
+                ],
+                if (widget.surface.onAttach != null && !controller.readOnly)
+                  IosTextButton(
+                    label: l10n.genuiAttachState,
+                    icon: LucideIcons.paperclip,
+                    color: GenUiTheme.of(context).ink,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    onPressed: () => Navigator.of(dialogContext).pop('attach'),
+                  ),
+                if (widget.surface.onExport != null)
+                  IosTextButton(
+                    label: l10n.genuiExportSnapshot,
+                    icon: LucideIcons.image,
+                    color: GenUiTheme.of(context).ink,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    onPressed: () => Navigator.of(dialogContext).pop('export'),
+                  ),
+                IosTextButton(
+                  label: l10n.genuiReset,
+                  icon: LucideIcons.rotateCcw,
+                  color: GenUiTheme.of(context).secondaryInk,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  onPressed: controller.readOnly
+                      ? null
+                      : () => Navigator.of(dialogContext).pop('reset'),
+                ),
               ],
-              if (widget.surface.onAttach != null && !controller.readOnly)
-                IosTextButton(
-                  label: l10n.genuiAttachState,
-                  icon: LucideIcons.paperclip,
-                  onPressed: () => Navigator.of(dialogContext).pop('attach'),
-                ),
-              if (widget.surface.onExport != null)
-                IosTextButton(
-                  label: l10n.genuiExportSnapshot,
-                  icon: LucideIcons.image,
-                  onPressed: () => Navigator.of(dialogContext).pop('export'),
-                ),
-              IosTextButton(
-                label: l10n.genuiReset,
-                icon: LucideIcons.rotateCcw,
-                onPressed: controller.readOnly
-                    ? null
-                    : () => Navigator.of(dialogContext).pop('reset'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

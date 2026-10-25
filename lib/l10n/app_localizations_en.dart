@@ -14507,6 +14507,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get genuiWebExportHtml => 'Export HTML';
 
   @override
+  String get genuiWebInfo => 'Preview information';
+
+  @override
   String get genuiWebCspNote =>
       'CSP: default-src \'none\' · Restricted network access · Isolated page state';
 

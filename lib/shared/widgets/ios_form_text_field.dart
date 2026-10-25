@@ -159,12 +159,23 @@ class IosFormTextField extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         isDense: true,
+        constraints: compact && maxLines == 1
+            ? const BoxConstraints(minHeight: 44)
+            : null,
         isCollapsed: maxLines > 1,
         hintText: hintText,
-        prefixIcon: prefix,
-        prefixIconConstraints: prefix == null
+        // InputDecorator's dense layout ignores a minimum height when placing
+        // text. A zero-width accessory strut centers the line in the full tap
+        // area, including fields without a visible prefix or suffix.
+        prefixIcon:
+            prefix ??
+            (compact && maxLines == 1 ? const SizedBox.shrink() : null),
+        prefixIconConstraints: prefix == null && !(compact && maxLines == 1)
             ? null
-            : const BoxConstraints(minWidth: 28, minHeight: 36),
+            : BoxConstraints(
+                minWidth: prefix == null ? 0 : 28,
+                minHeight: compact ? 44 : 36,
+              ),
         suffixIcon: suffix,
         suffixIconConstraints: suffix == null
             ? null
@@ -180,7 +191,7 @@ class IosFormTextField extends StatelessWidget {
             ),
         border: InputBorder.none,
         contentPadding: maxLines == 1
-            ? EdgeInsets.symmetric(vertical: compact ? 8 : 10)
+            ? EdgeInsets.symmetric(vertical: compact ? 0 : 10)
             : EdgeInsets.zero,
       ),
     );

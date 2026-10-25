@@ -57,7 +57,9 @@ class GenUiSegments extends StatelessWidget {
               duration: MediaQuery.disableAnimationsOf(context)
                   ? Duration.zero
                   : const Duration(milliseconds: 160),
-              padding: EdgeInsets.symmetric(horizontal: theme.sm),
+              padding: EdgeInsets.symmetric(
+                horizontal: radioGroup ? theme.sm : theme.xs,
+              ),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: i == index ? theme.card : theme.transparent,

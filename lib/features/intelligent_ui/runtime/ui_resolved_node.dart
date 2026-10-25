@@ -68,6 +68,7 @@ UiResolvedNode uiResolveNode(
   }
   String? askText;
   Map<String, Object?>? askContext;
+  var sampledData = false;
 
   Object? evaluate(
     String key,
@@ -75,6 +76,7 @@ UiResolvedNode uiResolveNode(
     UiPropertySpec property,
   ) {
     final computed = batch.readExpression(node.name, expression);
+    if (key == 'data') sampledData = computed.sampled;
     if (computed.error case final error?) {
       if (error.code == UiDiagnosticCode.missingReference &&
           program.pendingSymbols.contains(error.detail)) {
@@ -230,7 +232,11 @@ UiResolvedNode uiResolveNode(
   UiTableData? tableData;
   if (!pending && diagnostics.isEmpty && node.component == 'Chart') {
     try {
-      chartData = UiChartData.read(properties, sampleGaps: gaps);
+      chartData = UiChartData.read(
+        properties,
+        sampleGaps: gaps,
+        sampled: sampledData,
+      );
       tableData = UiTableData.fromChart(chartData, properties);
     } on UiChartDataException catch (error) {
       diagnostics.add(

@@ -21,9 +21,10 @@ Future<List<String>> exerciseGenUiReview(
   WidgetTester tester, {
   Future<void> Function(String)? capture,
   bool openWeb = false,
+  String? fontFamily,
 }) async {
   final visited = <String>[];
-  await tester.pumpWidget(const GenUiReviewGalleryApp());
+  await tester.pumpWidget(GenUiReviewGalleryApp(fontFamily: fontFamily));
   await tester.pumpAndSettle();
   Future<void> shot(String name) async {
     await tester.pump(const Duration(milliseconds: 250));
@@ -242,6 +243,10 @@ Future<List<String>> exerciseGenUiReview(
       await tap(find.text('打开').first);
       await tester.pump(const Duration(seconds: 2));
       await shot('web-sandbox-preview');
+      await tap(find.byTooltip('预览说明'));
+      await shot('web-preview-information');
+      await tester.tap(find.byTooltip('关闭').last);
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.tap(find.byTooltip('关闭').first);
       await tester.pump(const Duration(milliseconds: 350));
     }

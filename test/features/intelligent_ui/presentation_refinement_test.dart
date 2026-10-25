@@ -30,17 +30,42 @@ UiSurfaceController controller(String body) {
   return c;
 }
 
-Widget app(Widget child) => MaterialApp(
+Widget app(Widget child, {double scale = 1}) => MaterialApp(
   theme: buildLightTheme(null),
   locale: const Locale('en'),
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+    child: child!,
+  ),
   home: Scaffold(
     body: SingleChildScrollView(child: SizedBox(width: 390, child: child)),
   ),
 );
 
 void main() {
+  for (final scale in [1.0, 1.3]) {
+    testWidgets('donut constrains long units without overflowing at $scale', (
+      tester,
+    ) async {
+      final c = controller(
+        'root = Chart(kind="pie",donut=true,unit="千克二氧化碳当量/人/年",data=[{"x":"A","y":3500},{"x":"B","y":1500}],x="x",y=["y"])',
+      );
+      await tester.pumpWidget(app(GenUiSurface(controller: c), scale: scale));
+      await tester.pumpAndSettle();
+      final focus = find.byWidgetPredicate(
+        (w) => w is Focus && w.focusNode?.debugLabel == 'GenUI chart',
+      );
+      tester.widget<Focus>(focus).focusNode!.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      await tester.pumpAndSettle();
+      expect(find.text('3500'), findsOneWidget);
+      expect(tester.getSize(find.text('3500')).width, greaterThan(20));
+      expect(tester.takeException(), isNull);
+    });
+  }
   test(
     'presentation removes arithmetic noise but preserves distinct integers and meaningful decimals',
     () {
@@ -205,7 +230,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('B'), findsOneWidget);
       expect(find.text('250'), findsOneWidget);
-      expect(find.textContaining('USD ·'), findsOneWidget);
+      expect(find.text('USD'), findsOneWidget);
+      expect(find.text('71.43%'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('genui-chart-tooltip-root')),
         findsNothing,

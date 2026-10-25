@@ -112,6 +112,22 @@ class _GenUiNodeState extends State<GenUiNode>
     // Reparent this same subtree when the short-lived transition disappears;
     // field elements, focus nodes and active composing ranges stay alive.
     final child = KeyedSubtree(key: _contentKey, child: _buildNode(context));
+    final returning = GenUiReturnMotion.maybeOf(context);
+    final component = widget.controller.nodes[widget.id]?.declaration.component;
+    if (!_reduceMotion &&
+        returning?.changed.contains(widget.id) == true &&
+        const {
+          'Text',
+          'Markdown',
+          'Formula',
+          'Metric',
+          'Badge',
+          'Callout',
+          'Chart',
+          'DataTable',
+        }.contains(component)) {
+      return FadeTransition(opacity: returning!.animation, child: child);
+    }
     return !_reduceMotion && _reveal?.isAnimating == true
         ? FadeTransition(opacity: _reveal!, child: child)
         : child;

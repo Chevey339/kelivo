@@ -601,11 +601,25 @@ root = Chart(kind=$kind,x="x",y=["A"],data=[{"x":0,"A":1},{"x":2,"A":3}])''');
     await tester.pumpWidget(_app(c));
     await tester.pumpAndSettle();
     final d = c.nodes['curve']!.chartData!;
+    expect(d.sampled, isTrue);
     expect(d.domainRows, hasLength(19));
     final line = tester.widget<LineChart>(find.byType(LineChart)).data;
     expect(
       line.lineBarsData.single.spots.where((p) => p == FlSpot.nullSpot),
       hasLength(19),
+    );
+    final bar = line.lineBarsData.single;
+    expect(
+      bar.spots.where(
+        (p) => p.isNotNull() && bar.dotData.checkToShowDot(p, bar),
+      ),
+      isEmpty,
+    );
+    await tester.tapAt(_linePoint(tester, 8, 0));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('genui-chart-tooltip-curve')),
+      findsOneWidget,
     );
     expect(
       find.byWidgetPredicate(

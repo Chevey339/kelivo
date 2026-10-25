@@ -1,5 +1,6 @@
 import '../runtime/ui_surface_controller.dart';
 import 'dart:async';
+import 'package:collection/collection.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,8 @@ import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import '../catalog/ui_budgets.dart';
 import 'genui_surface.dart';
 import 'genui_theme.dart';
+import 'genui_motion.dart';
+import '../runtime/ui_resolved_node.dart';
 
 typedef GenUiSurfaceBuilder =
     GenUiSurface Function(
@@ -20,8 +23,8 @@ typedef GenUiSurfaceBuilder =
       bool expanded,
     );
 
-/// A single active input tree. Inline content is removed before the route can
-/// mount, and restored only after its reverse transition has disposed content.
+/// Move the same input tree between the message and its expanded route. The
+/// handoff happens in one frame; the message retains its measured height.
 class GenUiExpansion extends StatefulWidget {
   const GenUiExpansion({super.key, required this.surfaceBuilder});
   final GenUiSurfaceBuilder surfaceBuilder;
@@ -29,8 +32,23 @@ class GenUiExpansion extends StatefulWidget {
   State<GenUiExpansion> createState() => _GenUiExpansionState();
 }
 
-class _GenUiExpansionState extends State<GenUiExpansion> {
+class _GenUiExpansionState extends State<GenUiExpansion>
+    with SingleTickerProviderStateMixin {
   final _expandFocus = FocusNode(debugLabel: 'GenUI expansion trigger');
+  final _contentKey = GlobalKey(debugLabel: 'GenUI shared control tree');
+  late final _returnReveal =
+      AnimationController(
+        vsync: this,
+        value: 1,
+        duration: const Duration(milliseconds: 160),
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _changed = const {});
+        }
+      });
+  Map<String, UiResolvedNode> _before = const {};
+  Set<String> _changed = const {};
+  double? _inlineHeight;
   final _updates = ValueNotifier<int>(0);
   TransitionRoute<void>? _route;
   UiRuntimeToken? _activeToken;
@@ -103,6 +121,7 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
     _stopSource?.call();
     _close();
     _expandFocus.dispose();
+    _returnReveal.dispose();
     // The route can finish removal at frame end after the inline host unmounts.
     final route = _route;
     if (route == null) {
@@ -113,21 +132,71 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
     super.dispose();
   }
 
+  Widget _sharedContent(GenUiSurface surface) => KeyedSubtree(
+    key: _contentKey,
+    child: GenUiReturnMotion(
+      animation: _returnReveal,
+      changed: _changed,
+      child: surface,
+    ),
+  );
+
+  void _watchRoute(TransitionRoute<void> route) {
+    _route = route;
+    void listen() => route.animation?.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && identical(_route, route)) {
+        _restoreInline();
+      }
+    });
+    if (route.animation == null) {
+      scheduleMicrotask(listen);
+    } else {
+      listen();
+    }
+  }
+
+  void _restoreInline() {
+    if (!mounted || !_expanded) return;
+    const equality = DeepCollectionEquality();
+    _changed = {
+      for (final entry in _surface.controller.nodes.entries)
+        if (!equality.equals(
+          _before[entry.key]?.properties,
+          entry.value.properties,
+        ))
+          entry.key,
+    };
+    if (_changed.isNotEmpty && !(_media?.disableAnimations ?? false)) {
+      _returnReveal.forward(from: .65);
+    } else {
+      _changed = const {};
+    }
+    setState(() => _expanded = false);
+    // The outgoing route releases the key before this frame is finalized.
+    _updates.value++;
+  }
+
   Widget _routeContent(bool desktop) => ListenableBuilder(
     listenable: _updates,
-    builder: (context, _) => Theme(
-      data: _theme!,
-      child: MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          textScaler: _media!.textScaler,
-          disableAnimations: _media!.disableAnimations,
-        ),
-        child: Directionality(
-          textDirection: _direction!,
-          child: _ExpandedSurface(surface: _surface, desktop: desktop),
-        ),
-      ),
-    ),
+    builder: (context, _) => !_expanded
+        ? const SizedBox.shrink()
+        : Theme(
+            data: _theme!,
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: _media!.textScaler,
+                disableAnimations: _media!.disableAnimations,
+              ),
+              child: Directionality(
+                textDirection: _direction!,
+                child: _ExpandedSurface(
+                  surface: _surface,
+                  content: _sharedContent(_surface),
+                  desktop: desktop,
+                ),
+              ),
+            ),
+          ),
   );
 
   Future<void> _expand() async {
@@ -137,11 +206,15 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
     final token = controller.token;
     _activeToken = token;
     final navigator = Navigator.of(context, rootNavigator: true);
+    final render = _contentKey.currentContext?.findRenderObject();
+    _inlineHeight = render is RenderBox && render.hasSize
+        ? render.size.height
+        : null;
+    _before = Map.of(controller.nodes);
+    _changed = const {};
+    _returnReveal.stop();
+    _returnReveal.value = 1;
     setState(() => _expanded = true);
-    // Let disposal release TextEditingController/FocusNode registrations before
-    // the route creates their replacement against the same interaction owner.
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
     if (!controller.accepts(token) || controller != _surface.controller) {
       _activeToken = null;
       setState(() => _expanded = false);
@@ -153,7 +226,7 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
           context,
           maxWidth: 960,
           waitForExit: true,
-          onRoute: (route) => _route = route,
+          onRoute: _watchRoute,
           child: _routeContent(true),
         );
       } else {
@@ -161,15 +234,17 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
           reduceMotion: MediaQuery.disableAnimationsOf(context),
           builder: (_) => _routeContent(false),
         );
-        _route = route;
-        await navigator.push(route);
+        // Navigator installs the animation before the first route build.
+        final pushed = navigator.push(route);
+        _watchRoute(route);
+        await pushed;
         await route.completed;
       }
     } finally {
+      _restoreInline();
       _route = null;
       _activeToken = null;
       if (mounted) {
-        setState(() => _expanded = false);
         await WidgetsBinding.instance.endOfFrame;
         if (mounted) _expandFocus.requestFocus();
       }
@@ -181,10 +256,23 @@ class _GenUiExpansionState extends State<GenUiExpansion> {
     markdownTheme: _surface.markdownTheme,
     child: Builder(
       builder: (context) {
-        if (_expanded) return const GenUiExpandedStub();
-        // The message timeline owns vertical scrolling. A native surface is
-        // laid out in full, so focus and gestures never enter a clipped viewport.
-        return widget.surfaceBuilder(_expand, _expandFocus, false);
+        final content = _expanded
+            ? SizedBox(
+                height: _inlineHeight,
+                child: const Align(
+                  alignment: AlignmentDirectional.topStart,
+                  child: GenUiExpandedStub(),
+                ),
+              )
+            : _sharedContent(
+                widget.surfaceBuilder(_expand, _expandFocus, false),
+              );
+        if (MediaQuery.disableAnimationsOf(context)) return content;
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 160),
+          alignment: AlignmentDirectional.topStart,
+          child: content,
+        );
       },
     ),
   );
@@ -214,19 +302,24 @@ class GenUiExpandedStub extends StatelessWidget {
 }
 
 class _ExpandedSurface extends StatelessWidget {
-  const _ExpandedSurface({required this.surface, required this.desktop});
+  const _ExpandedSurface({
+    required this.surface,
+    required this.content,
+    required this.desktop,
+  });
   final GenUiSurface surface;
+  final Widget content;
   final bool desktop;
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = GenUiTheme.of(context);
     final title = surface.title ?? l10n.genuiSurfaceTitle;
-    final content = SingleChildScrollView(
+    final scrollContent = SingleChildScrollView(
       padding: EdgeInsets.all(theme.md),
       child: AppSelectionArea(
         copyByteLimit: UiBudgets.copyBytes,
-        child: surface,
+        child: content,
       ),
     );
     return CallbackShortcuts(
@@ -234,47 +327,52 @@ class _ExpandedSurface extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
             Navigator.of(context).maybePop(),
       },
-      child: desktop
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppDialogHeader(title: title),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: theme.md),
-                  child: Text(
-                    l10n.genuiExpandedSharedState,
-                    style: theme.caption,
+      child: Focus(
+        autofocus: true,
+        child: desktop
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppDialogHeader(title: title),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: theme.md),
+                    child: Text(
+                      l10n.genuiExpandedSharedState,
+                      style: theme.caption,
+                    ),
+                  ),
+                  Flexible(child: scrollContent),
+                ],
+              )
+            : Scaffold(
+                appBar: AppBar(
+                  title: Text(title),
+                  leading: IosIconButton(
+                    icon: LucideIcons.chevronLeft,
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).backButtonTooltip,
+                    onTap: () => Navigator.of(context).maybePop(),
                   ),
                 ),
-                Flexible(child: content),
-              ],
-            )
-          : Scaffold(
-              appBar: AppBar(
-                title: Text(title),
-                leading: IosIconButton(
-                  icon: LucideIcons.chevronLeft,
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onTap: () => Navigator.of(context).maybePop(),
-                ),
-              ),
-              body: SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(theme.md),
-                      child: Text(
-                        l10n.genuiExpandedSharedState,
-                        style: theme.caption,
+                body: SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(theme.md),
+                        child: Text(
+                          l10n.genuiExpandedSharedState,
+                          style: theme.caption,
+                        ),
                       ),
-                    ),
-                    Expanded(child: content),
-                  ],
+                      Expanded(child: scrollContent),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

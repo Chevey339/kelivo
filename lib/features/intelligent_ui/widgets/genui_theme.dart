@@ -100,6 +100,7 @@ final class GenUiTheme {
       color: primary,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    chartCenterValue = metric.copyWith(fontSize: 18 * scale, color: ink);
     // GenUI cards are opaque even on wallpaper/tinted messages. Preserve the
     // inherited Markdown font choices while pairing its ink with this card.
     markdown = MarkstreamTheme.fromColorScheme(
@@ -152,6 +153,7 @@ final class GenUiTheme {
       tableBody,
       badge,
       metric,
+      chartCenterValue,
       mono;
   late final MarkstreamTheme markdown;
   late final List<Color> chartColors;

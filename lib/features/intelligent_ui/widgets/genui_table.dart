@@ -269,10 +269,18 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
           padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final count in [10, 20])
                 IosTextButton(
                   label: l10n.genuiTablePerPage(count),
+                  icon: count == _page().pageSize
+                      ? LucideIcons.circleCheck
+                      : LucideIcons.circle,
+                  color: count == _page().pageSize
+                      ? GenUiTheme.of(context).primary
+                      : GenUiTheme.of(context).ink,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   onPressed: () => Navigator.of(dialogContext).pop(count),
                 ),
             ],
@@ -456,59 +464,72 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       width: _viewportFocused ? 2 : 1,
                     ),
                   ),
-                  child: Scrollbar(
-                    controller: _scroll,
-                    thumbVisibility: width > constraints.maxWidth,
-                    child: SingleChildScrollView(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    removeBottom: true,
+                    removeLeft: true,
+                    removeRight: true,
+                    child: Scrollbar(
                       controller: _scroll,
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(
-                        bottom: width > constraints.maxWidth ? theme.sm : 0,
-                      ),
-                      child: SizedBox(
-                        width: width,
-                        child: Table(
-                          defaultVerticalAlignment:
-                              TableCellVerticalAlignment.middle,
-                          columnWidths: {
-                            for (var c = 0; c < minimums.length; c++)
-                              c: FixedColumnWidth(
-                                minimums[c] + (width - sum) / minimums.length,
+                      thumbVisibility: width > constraints.maxWidth,
+                      child: SingleChildScrollView(
+                        controller: _scroll,
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.only(
+                          bottom: width > constraints.maxWidth ? theme.sm : 0,
+                        ),
+                        child: SizedBox(
+                          width: width,
+                          child: Table(
+                            defaultVerticalAlignment:
+                                TableCellVerticalAlignment.middle,
+                            columnWidths: {
+                              for (var c = 0; c < minimums.length; c++)
+                                c: FixedColumnWidth(
+                                  minimums[c] + (width - sum) / minimums.length,
+                                ),
+                            },
+                            border: TableBorder(
+                              horizontalInside: BorderSide(
+                                color: theme.hairline,
                               ),
-                          },
-                          border: TableBorder(
-                            horizontalInside: BorderSide(color: theme.hairline),
-                          ),
-                          children: [
-                            TableRow(
-                              decoration: BoxDecoration(
-                                color: theme.headerFill,
-                              ),
-                              children: [
-                                for (final col in _data.columns)
-                                  _header(
-                                    col,
-                                    page,
-                                    theme,
-                                    l10n,
-                                    exporting: exporting,
-                                  ),
-                              ],
                             ),
-                            for (final row in page.rows)
+                            children: [
                               TableRow(
-                                key: ValueKey((widget.id, row.key)),
+                                decoration: BoxDecoration(
+                                  color: theme.headerFill,
+                                ),
                                 children: [
-                                  for (var c = 0; c < _data.columns.length; c++)
-                                    _cell(
-                                      _data.columns[c],
-                                      row.values[c],
-                                      matcher,
+                                  for (final col in _data.columns)
+                                    _header(
+                                      col,
+                                      page,
                                       theme,
+                                      l10n,
+                                      exporting: exporting,
                                     ),
                                 ],
                               ),
-                          ],
+                              for (final row in page.rows)
+                                TableRow(
+                                  key: ValueKey((widget.id, row.key)),
+                                  children: [
+                                    for (
+                                      var c = 0;
+                                      c < _data.columns.length;
+                                      c++
+                                    )
+                                      _cell(
+                                        _data.columns[c],
+                                        row.values[c],
+                                        matcher,
+                                        theme,
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
