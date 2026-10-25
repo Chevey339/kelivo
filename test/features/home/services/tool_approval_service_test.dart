@@ -12,7 +12,7 @@ Future<void> expectStillPending(Future<dynamic> future) async {
 
 void main() {
   test(
-    'session grant releases only matching workspace shell requests',
+    'full access releases matching conversation tools and rejects stale workspaces',
     () async {
       final service = ToolApprovalService();
       addTearDown(service.dispose);
@@ -36,17 +36,18 @@ void main() {
           ),
       ];
 
-      service.approveWorkspaceShells(conversationId: 'a', workspaceId: 'ws1');
+      service.approveConversationTools(conversationId: 'a', workspaceId: 'ws1');
       expect((await requests[0]).approved, isTrue);
       expect((await requests[1]).approved, isTrue);
-      expect(service.pendingRequests, hasLength(5));
-      for (final request in requests.skip(2)) {
-        await expectStillPending(request);
-      }
+      expect((await requests[3]).denyReason, 'context_changed');
+      expect((await requests[4]).byFullAccess, isTrue);
+      expect((await requests[5]).byFullAccess, isTrue);
+      expect(service.pendingRequests, hasLength(2));
+      await expectStillPending(requests[2]);
+      await expectStillPending(requests[6]);
       service.cancelAll();
-      for (final request in requests.skip(2)) {
-        expect((await request).approved, isFalse);
-      }
+      expect((await requests[2]).approved, isFalse);
+      expect((await requests[6]).approved, isFalse);
     },
   );
 

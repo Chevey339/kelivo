@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/conversation.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -61,8 +62,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     final before = beforeExtrasWrite;
     beforeExtrasWrite = null;
     await before?.call();

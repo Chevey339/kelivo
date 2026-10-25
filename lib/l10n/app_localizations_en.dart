@@ -8617,9 +8617,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolApprovalPending => 'Waiting for approval';
 
   @override
-  String get toolApprovalApprove => 'Approve';
-
-  @override
   String get toolApprovalDeny => 'Deny';
 
   @override
@@ -10039,9 +10036,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceToolImageTag => 'image';
 
   @override
-  String get workspaceToolAllowAll => 'Allow all this session';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -10357,7 +10351,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellApproval =>
-      'The shell tool needs approval unless this session allows all tools.';
+      'The shell tool needs approval in Ask for approval mode.';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -10635,13 +10629,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEntrySessionSkills => 'Skills';
-
-  @override
-  String get workspaceEntryAllowAll => 'Allow all this session';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle =>
-      'Shell commands in this conversation will run without approval.';
 
   @override
   String get workspaceEntryEnvironment => 'Environment';
@@ -11147,7 +11134,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      'Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.';
+      'Commands run on this computer without a sandbox and need approval unless this chat has full access.';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -13987,4 +13974,88 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browserObserverHint =>
       'AI is using this page. Select Take over to interact.';
+
+  @override
+  String get toolPermissionTitle => 'Permissions';
+
+  @override
+  String get toolPermissionRequestApproval => 'Ask for approval';
+
+  @override
+  String get toolPermissionFullAccess => 'Full access';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      'Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      'Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      'Lets this conversation run tools automatically inside the sandbox and authorized folders, without asking each time.';
+
+  @override
+  String get toolPermissionUnboundHint =>
+      'No workspace bound: this does not turn on file or shell tools.';
+
+  @override
+  String get toolPermissionScopeThisChat => 'This chat only';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => 'Switch to full access';
+
+  @override
+  String get toolApprovalDenied => 'Denied';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return 'Awaiting approval · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => 'Requested path';
+
+  @override
+  String get toolApprovalRealTarget => 'Actual target';
+
+  @override
+  String get toolApprovalScopeOnce => 'Applies to this call only';
+
+  @override
+  String get toolApprovalByFullAccess => 'Ran automatically';
+
+  @override
+  String get toolApprovalDenyWithReason => 'Deny with reason…';
+
+  @override
+  String get toolPermissionSaveFailed => 'Couldn’t save. Permission unchanged.';
+
+  @override
+  String get toolPermissionEnabledSnack => 'Full access enabled for this chat';
+
+  @override
+  String get toolPermissionResetSnack =>
+      'Workspace changed · permission reset to Ask for approval';
+
+  @override
+  String get toolPermissionUndo => 'Undo';
+
+  @override
+  String get wsDeniedPathOutside =>
+      'Target is outside the authorized area. Denied.';
+
+  @override
+  String get wsDeniedMountReadonly => 'Read-only mount. Can’t write.';
+
+  @override
+  String get wsDeniedSkillsReadonly => 'Skills folder is read-only.';
+
+  @override
+  String get wsPathChanged => 'Target changed while awaiting approval.';
+
+  @override
+  String get wsContextChanged =>
+      'Conversation context changed. Request expired.';
 }

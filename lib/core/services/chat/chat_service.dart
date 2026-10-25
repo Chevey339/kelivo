@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import '../../models/composer_draft.dart';
 import '../../database/composer_draft_store.dart';
 import '../../models/conversation_prompt_settings.dart';
@@ -197,7 +198,7 @@ class ChatService extends ChangeNotifier {
     if (extras == null || extras.isEmpty) {
       return const <String, dynamic>{};
     }
-    return Map<String, dynamic>.from(extras);
+    return ToolPermissionMode.withoutGrant(extras);
   }
 
   Future<void> _copyConversationSettingsFrom(
@@ -210,7 +211,6 @@ class ChatService extends ChangeNotifier {
         WorkspaceBinding(
           workspaceId: source.workspaceId,
           cwd: source.cwd,
-          allowAll: source.allowAll,
         ).applyTo({
           if (sourceExtras.containsKey(WorldBookActivation.extrasKey))
             WorldBookActivation.extrasKey:
@@ -2822,19 +2822,38 @@ class ChatService extends ChangeNotifier {
   /// Reads extras, applies [update], writes the result, and refreshes the cache.
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    Conversation? expectedOwner,
+  }) async {
     final draft = _draftConversations[conversationId];
     if (draft != null) {
-      _draftConversations[conversationId] = draft.copyWith(
-        extras: update(Map<String, dynamic>.from(draft.extras)),
-      );
+      if (expectedOwner != null &&
+          draft.assistantId != expectedOwner.assistantId) {
+        throw StateError('context_changed');
+      }
+      final extras =
+          _initialized &&
+              !_temporaryConversationIds.contains(conversationId) &&
+              _repo.composerDrafts.isNewEntry(conversationId)
+          ? await _repo.composerDrafts.updateNewEntryExtras(
+              conversationId,
+              update,
+              expectedOwner: expectedOwner,
+            )
+          : update(Map<String, dynamic>.from(draft.extras));
+      final current = _draftConversations[conversationId];
+      if (current == null) throw StateError('conversation_not_found');
+      _draftConversations[conversationId] = current.copyWith(extras: extras);
       _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
     if (!_initialized) return;
-    await _repo.updateConversationExtras(conversationId, update);
+    await _repo.updateConversationExtras(
+      conversationId,
+      update,
+      expectedOwner: expectedOwner,
+    );
     await _refreshConversation(conversationId);
     _bumpContextRevision(conversationId);
     notifyListeners();
@@ -4516,8 +4535,11 @@ class ChatService extends ChangeNotifier {
       )) {
         return false;
       }
-      draft.assistantId = assistantId;
-      draft.updatedAt = DateTime.now();
+      _draftConversations[conversationId] = draft.copyWith(
+        assistantId: assistantId,
+        updatedAt: DateTime.now(),
+        extras: ToolPermissionMode.withoutGrant(draft.extras),
+      );
       _bumpContextRevision(conversationId);
       if (notify) notifyListeners();
       return true;
@@ -4536,9 +4558,12 @@ class ChatService extends ChangeNotifier {
       ),
     );
     if (!moved) return false;
-    c.assistantId = assistantId;
-    c.updatedAt = updatedAt;
-    c.injectedMemoryHash = null;
+    _conversationsCache[conversationId] = c.copyWith(
+      assistantId: assistantId,
+      updatedAt: updatedAt,
+      clearInjectedMemoryHash: true,
+      extras: ToolPermissionMode.withoutGrant(c.extras),
+    );
     _bumpContextRevision(conversationId);
     if (notify) {
       _bumpConversationListRevision();

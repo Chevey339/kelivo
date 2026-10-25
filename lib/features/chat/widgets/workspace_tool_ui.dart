@@ -1,3 +1,4 @@
+import 'tool_permission_widgets.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -6,10 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/core/services/workspace/shell_output_buffer.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
@@ -229,8 +227,20 @@ int? workspaceDurationMs(WorkspaceToolMetadata? meta, ToolRun? run) {
 
 String? workspaceErrorMessage(
   WorkspaceToolPart part,
-  WorkspaceToolMetadata? meta,
-) {
+  WorkspaceToolMetadata? meta, {
+  AppLocalizations? l10n,
+}) {
+  if (l10n != null) {
+    final translated = switch (meta?.code) {
+      'path_outside' => l10n.wsDeniedPathOutside,
+      'mount_readonly' => l10n.wsDeniedMountReadonly,
+      'skills_readonly' => l10n.wsDeniedSkillsReadonly,
+      'path_changed' => l10n.wsPathChanged,
+      'context_changed' => l10n.wsContextChanged,
+      _ => null,
+    };
+    if (translated != null) return translated;
+  }
   final content = part.content?.trim() ?? '';
   if (content.isNotEmpty) {
     try {
@@ -295,55 +305,6 @@ T? maybeRead<T>(BuildContext context) {
     return context.read<T>();
   } on ProviderNotFoundException {
     return null;
-  }
-}
-
-/// Tactile button for tool approval actions (approve / deny).
-///
-/// Shared by the generic (non-timeline) approval card.
-class ToolApprovalButton extends StatelessWidget {
-  const ToolApprovalButton({
-    super.key,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.filled = false,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final enabled = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled
-              ? color.withValues(alpha: isDark ? 0.25 : 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: color.withValues(alpha: filled ? 0.5 : 0.35),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: AppFontWeights.semibold,
-            color: enabled ? color : color.withValues(alpha: 0.45),
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -871,6 +832,10 @@ class WorkspaceToolStatusText extends StatelessWidget {
       l10n,
       workspaceDurationMs(meta, liveRun),
     );
+    if ((label == null || (part.toolName == 'shell' && exitCode == 0)) &&
+        part.metadata?['toolPermission'] == 'fullAccess') {
+      label = l10n.toolApprovalByFullAccess;
+    }
     final pieces = <String>[
       if (label != null) label,
       if (duration.isNotEmpty) duration,
@@ -896,8 +861,8 @@ class WorkspaceToolCardBody extends StatelessWidget {
   static const ValueKey<String> installButtonKey = ValueKey<String>(
     'workspace-tool-install',
   );
-  static const ValueKey<String> allowAllKey = ValueKey<String>(
-    'workspace-tool-allow-all',
+  static const ValueKey<String> fullAccessKey = ValueKey<String>(
+    'workspace-tool-full-access',
   );
 
   final WorkspaceToolPart part;
@@ -946,6 +911,9 @@ class WorkspaceToolCardBody extends StatelessWidget {
         );
       }
     }
+    final error = (meta?.status == 'denied' || meta?.status == 'error')
+        ? workspaceErrorMessage(part, meta, l10n: AppLocalizations.of(context))
+        : null;
     final extra = pending == null ? _extra(context, liveRun, meta) : null;
     final showEnv =
         meta?.status == 'error' && meta?.code == 'environment_not_ready';
@@ -961,13 +929,25 @@ class WorkspaceToolCardBody extends StatelessWidget {
             request: pending,
             conversationId: conversationId,
           );
-    if (summary == null && pendingBlock == null && extra == null && !showEnv) {
+    if (summary == null &&
+        pendingBlock == null &&
+        extra == null &&
+        !showEnv &&
+        error == null) {
       return const SizedBox.shrink();
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (pendingBlock != null) pendingBlock,
+        if (error != null)
+          Text(
+            error,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
         if (summary != null) summary,
         if (extra != null) ...[const SizedBox(height: 6), extra],
         if (showEnv) ...[
@@ -1054,7 +1034,6 @@ class _WorkspacePendingBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final fg = chatSurfaceForegroundPalette(context);
-    final approval = maybeRead<ToolApprovalService>(context);
     final preview = part.toolName == 'shell'
         ? workspaceCommandOf(part, meta: meta, run: run)
         : workspacePathOf(part, meta: meta);
@@ -1073,63 +1052,29 @@ class _WorkspacePendingBody extends StatelessWidget {
               color: fg.body,
             ),
           ),
-        IosCardPress(
-          key: WorkspaceToolCardBody.allowAllKey,
-          baseColor: Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
-          onTap: approval == null
-              ? null
-              : () => unawaited(
-                  allowAllWorkspaceToolsInChat(
-                    context,
-                    approval: approval,
-                    request: request,
-                    conversationId: conversationId,
-                  ),
-                ),
-          child: Text(
-            l10n.workspaceToolAllowAll,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: AppFontWeights.medium,
-              color: fg.accent,
-            ),
+        if (request.realTarget != null &&
+            request.realTarget != request.requestedPath) ...[
+          Text(
+            '${l10n.toolApprovalRequestedPath}: ${request.requestedPath}',
+            style: TextStyle(fontSize: 12, color: fg.body),
           ),
+          Text(
+            '${l10n.toolApprovalRealTarget}: ${request.realTarget}',
+            style: TextStyle(fontSize: 12, color: fg.body),
+          ),
+        ],
+        if (['list_dir', 'glob', 'grep'].contains(part.toolName))
+          Text(
+            l10n.toolApprovalScopeOnce,
+            style: TextStyle(fontSize: 12, color: fg.muted),
+          ),
+        SwitchToFullAccess(
+          key: WorkspaceToolCardBody.fullAccessKey,
+          conversationId: conversationId,
         ),
       ],
     );
   }
-}
-
-Future<void> allowAllWorkspaceToolsInChat(
-  BuildContext context, {
-  required ToolApprovalService approval,
-  required ToolApprovalRequest request,
-  required String conversationId,
-}) async {
-  final chat = maybeRead<ChatService>(context);
-  final id = conversationId.isNotEmpty
-      ? conversationId
-      : (request.conversationId ?? '');
-  if (chat != null && id.isNotEmpty) {
-    try {
-      final conversation = chat.getConversation(id);
-      if (conversation != null) {
-        final binding = WorkspaceBinding.fromExtras(conversation.extras);
-        if (binding.isBound && binding.workspaceId == request.workspaceId) {
-          await setConversationWorkspaceAllowAll(
-            chat,
-            conversationId: id,
-            workspaceId: binding.workspaceId!,
-            allowAll: true,
-            approvals: approval,
-          );
-        }
-      }
-    } catch (_) {}
-  }
-  approval.approve(request.toolCallId, conversationId: request.conversationId);
 }
 
 class _ShellTail extends StatelessWidget {

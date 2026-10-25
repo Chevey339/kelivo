@@ -132,7 +132,7 @@ void main() {
       browserPart('b'),
     ], streaming: true);
     expect(find.byType(BrowserPageCard), findsNWidgets(2));
-    expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+    expect(find.bySemanticsLabel('Allow'), findsOneWidget);
     expect(find.bySemanticsLabel('Deny'), findsOneWidget);
     approval.approve('pending', conversationId: 'chat');
     await decision;
@@ -222,7 +222,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BrowserPageCard), findsNWidgets(2));
-    expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+    expect(find.bySemanticsLabel('Allow'), findsOneWidget);
     approval.approve('later', conversationId: 'chat');
     await decision;
     await tester.pump();

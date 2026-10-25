@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
@@ -3105,11 +3106,14 @@ class _ChatInputBarState extends State<ChatInputBar>
           actions.add(
             _OverflowAction(
               width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.workspaceEntryTooltip,
-                icon: Lucide.FolderCode,
-                active: widget.workspaceActive,
-                onTap: lockTap(widget.onOpenWorkspace),
+              builder: () => ToolPermissionDot(
+                conversationId: widget.conversationId,
+                child: _CompactIconButton(
+                  tooltip: l10n.workspaceEntryTooltip,
+                  icon: Lucide.FolderCode,
+                  active: widget.workspaceActive,
+                  onTap: lockTap(widget.onOpenWorkspace),
+                ),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.FolderCode,
@@ -3144,12 +3148,17 @@ class _ChatInputBarState extends State<ChatInputBar>
           actions.add(
             _OverflowAction(
               width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarToolsTooltip,
-                icon: Lucide.ToolCase,
-                active: widget.toolsActive,
-                onTap: lockTap(widget.onOpenTools),
-                onLongPress: lockTap(widget.onLongPressTools),
+              builder: () => ToolPermissionDot(
+                conversationId: widget.showWorkspaceButton
+                    ? null
+                    : widget.conversationId,
+                child: _CompactIconButton(
+                  tooltip: l10n.chatInputBarToolsTooltip,
+                  icon: Lucide.ToolCase,
+                  active: widget.toolsActive,
+                  onTap: lockTap(widget.onOpenTools),
+                  onLongPress: lockTap(widget.onLongPressTools),
+                ),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.ToolCase,

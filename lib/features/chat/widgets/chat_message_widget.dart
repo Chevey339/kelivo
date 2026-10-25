@@ -1,3 +1,4 @@
+import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -6329,12 +6330,17 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             ),
           )
         : null;
-    final Widget? content = (summaryContent == null && imageThumbnails == null)
+    final Widget? content =
+        (summaryContent == null &&
+            imageThumbnails == null &&
+            !(isPendingApproval && !isWorkspace))
         ? null
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (summaryContent != null) summaryContent,
+              if (isPendingApproval && !isWorkspace)
+                SwitchToFullAccess(conversationId: widget.conversationId),
               if (summaryContent != null && imageThumbnails != null)
                 const SizedBox(height: 8),
               if (imageThumbnails != null) imageThumbnails,
@@ -6351,7 +6357,11 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                 color: cs.error,
                 semanticLabel: AppLocalizations.of(context)!.toolApprovalDeny,
                 builder: (color) => Icon(Lucide.X, size: 14, color: color),
-                onTap: () => showToolApprovalDenyDialog(
+                onTap: () => approvalService.deny(
+                  approvalRequest.toolCallId,
+                  conversationId: approvalRequest.conversationId,
+                ),
+                onLongPress: () => showToolApprovalDenyDialog(
                   context,
                   approvalService,
                   approvalRequest.toolCallId,
@@ -6365,7 +6375,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                 color: fg.accent,
                 semanticLabel: AppLocalizations.of(
                   context,
-                )!.toolApprovalApprove,
+                )!.workspaceToolApprove,
                 builder: (color) => Icon(Lucide.Check, size: 14, color: color),
                 onTap: () => approvalService.approve(
                   approvalRequest.toolCallId,
@@ -6379,6 +6389,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             part: workspacePart,
             conversationId: widget.conversationId,
           )
+        : ToolPermissionResultStatus.isVisible(widget.part.metadata)
+        ? ToolPermissionResultStatus(metadata: widget.part.metadata)
         : null;
 
     return _TimelineStepShell(
@@ -6630,7 +6642,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     ],
                   ),
                 ),
-                if (isWorkspace && isPendingApproval) ...[
+                if (isPendingApproval) ...[
                   IosIconButton(
                     size: 14,
                     padding: const EdgeInsets.all(7),
@@ -6638,6 +6650,12 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     semanticLabel: l10n.toolApprovalDeny,
                     builder: (color) => Icon(Lucide.X, size: 14, color: color),
                     onTap: pendingToolCallId == null
+                        ? null
+                        : () => approvalService.deny(
+                            pendingToolCallId,
+                            conversationId: pendingRequest.conversationId,
+                          ),
+                    onLongPress: pendingToolCallId == null
                         ? null
                         : () => showToolApprovalDenyDialog(
                             context,
@@ -6651,7 +6669,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     size: 14,
                     padding: const EdgeInsets.all(7),
                     color: fg.accent,
-                    semanticLabel: l10n.toolApprovalApprove,
+                    semanticLabel: l10n.workspaceToolApprove,
                     builder: (color) =>
                         Icon(Lucide.Check, size: 14, color: color),
                     onTap: pendingToolCallId == null
@@ -6665,7 +6683,19 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                   WorkspaceToolStatusText(
                     part: workspacePart,
                     conversationId: widget.conversationId,
-                  ),
+                  )
+                else if (ToolPermissionResultStatus.isVisible(
+                  widget.part.metadata,
+                ))
+                  ToolPermissionResultStatus(metadata: widget.part.metadata),
+                IosIconButton(
+                  size: 14,
+                  padding: const EdgeInsets.all(7),
+                  semanticLabel: l10n.mcpPageDetails,
+                  builder: (color) =>
+                      Icon(Lucide.ChevronRight, size: 14, color: color),
+                  onTap: () => _showDetail(context),
+                ),
               ],
             ),
             if (isWorkspace) ...[
@@ -6773,41 +6803,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 ),
               ),
             ],
-            // Approval action buttons
-            if (!isWorkspace &&
-                isPendingApproval &&
-                pendingToolCallId != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: ToolApprovalButton(
-                      label: l10n.toolApprovalDeny,
-                      color: cs.error,
-                      filled: false,
-                      onTap: () => _showDenyDialog(
-                        context,
-                        approvalService,
-                        pendingToolCallId,
-                        conversationId: pendingRequest.conversationId,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ToolApprovalButton(
-                      label: l10n.toolApprovalApprove,
-                      color: fg.accent,
-                      filled: true,
-                      onTap: () => approvalService.approve(
-                        pendingToolCallId,
-                        conversationId: pendingRequest.conversationId,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            if (!isWorkspace && isPendingApproval)
+              SwitchToFullAccess(conversationId: widget.conversationId),
             // Show image thumbnails if available
             if (hasImages) ...[
               const SizedBox(height: 10),
@@ -6835,47 +6832,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  void _showDenyDialog(
-    BuildContext context,
-    ToolApprovalService approvalService,
-    String toolCallId, {
-    String? conversationId,
-  }) {
-    final l10n = AppLocalizations.of(context)!;
-    final reasonCtrl = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.toolApprovalDenyTitle),
-        content: TextField(
-          controller: reasonCtrl,
-          decoration: InputDecoration(hintText: l10n.toolApprovalDenyHint),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          TextButton(
-            onPressed: () {
-              final reason = reasonCtrl.text.trim().isEmpty
-                  ? null
-                  : reasonCtrl.text.trim();
-              approvalService.deny(
-                toolCallId,
-                reason: reason,
-                conversationId: conversationId,
-              );
-              Navigator.of(ctx).pop();
-            },
-            child: Text(l10n.toolApprovalDeny),
-          ),
-        ],
       ),
     );
   }

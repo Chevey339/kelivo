@@ -15595,12 +15595,6 @@ abstract class AppLocalizations {
   /// **'Waiting for approval'**
   String get toolApprovalPending;
 
-  /// No description provided for @toolApprovalApprove.
-  ///
-  /// In en, this message translates to:
-  /// **'Approve'**
-  String get toolApprovalApprove;
-
   /// No description provided for @toolApprovalDeny.
   ///
   /// In en, this message translates to:
@@ -17989,12 +17983,6 @@ abstract class AppLocalizations {
   /// **'image'**
   String get workspaceToolImageTag;
 
-  /// No description provided for @workspaceToolAllowAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow all this session'**
-  String get workspaceToolAllowAll;
-
   /// No description provided for @workspaceToolStdout.
   ///
   /// In en, this message translates to:
@@ -18526,7 +18514,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvNativeShellApproval.
   ///
   /// In en, this message translates to:
-  /// **'The shell tool needs approval unless this session allows all tools.'**
+  /// **'The shell tool needs approval in Ask for approval mode.'**
   String get workspaceEnvNativeShellApproval;
 
   /// No description provided for @workspaceEnvDownloadProgress.
@@ -19048,18 +19036,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skills'**
   String get workspaceEntrySessionSkills;
-
-  /// No description provided for @workspaceEntryAllowAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow all this session'**
-  String get workspaceEntryAllowAll;
-
-  /// No description provided for @workspaceEntryAllowAllSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Shell commands in this conversation will run without approval.'**
-  String get workspaceEntryAllowAllSubtitle;
 
   /// No description provided for @workspaceEntryEnvironment.
   ///
@@ -19938,7 +19914,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvNativeUnsandboxed.
   ///
   /// In en, this message translates to:
-  /// **'Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.'**
+  /// **'Commands run on this computer without a sandbox and need approval unless this chat has full access.'**
   String get workspaceEnvNativeUnsandboxed;
 
   /// No description provided for @workspaceEnvRootfsTitle.
@@ -24917,6 +24893,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI is using this page. Select Take over to interact.'**
   String get browserObserverHint;
+
+  /// No description provided for @toolPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get toolPermissionTitle;
+
+  /// No description provided for @toolPermissionRequestApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for approval'**
+  String get toolPermissionRequestApproval;
+
+  /// No description provided for @toolPermissionFullAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Full access'**
+  String get toolPermissionFullAccess;
+
+  /// No description provided for @toolPermissionRequestApprovalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.'**
+  String get toolPermissionRequestApprovalDesc;
+
+  /// No description provided for @toolPermissionFullAccessDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.'**
+  String get toolPermissionFullAccessDesc;
+
+  /// No description provided for @toolPermissionFullAccessDescMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets this conversation run tools automatically inside the sandbox and authorized folders, without asking each time.'**
+  String get toolPermissionFullAccessDescMobile;
+
+  /// No description provided for @toolPermissionUnboundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace bound: this does not turn on file or shell tools.'**
+  String get toolPermissionUnboundHint;
+
+  /// No description provided for @toolPermissionScopeThisChat.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat only'**
+  String get toolPermissionScopeThisChat;
+
+  /// No description provided for @toolApprovalSwitchToFullAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to full access'**
+  String get toolApprovalSwitchToFullAccess;
+
+  /// No description provided for @toolApprovalDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get toolApprovalDenied;
+
+  /// No description provided for @toolApprovalPendingKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting approval · {kind}'**
+  String toolApprovalPendingKind(String kind);
+
+  /// No description provided for @toolApprovalRequestedPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested path'**
+  String get toolApprovalRequestedPath;
+
+  /// No description provided for @toolApprovalRealTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual target'**
+  String get toolApprovalRealTarget;
+
+  /// No description provided for @toolApprovalScopeOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to this call only'**
+  String get toolApprovalScopeOnce;
+
+  /// No description provided for @toolApprovalByFullAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Ran automatically'**
+  String get toolApprovalByFullAccess;
+
+  /// No description provided for @toolApprovalDenyWithReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny with reason…'**
+  String get toolApprovalDenyWithReason;
+
+  /// No description provided for @toolPermissionSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save. Permission unchanged.'**
+  String get toolPermissionSaveFailed;
+
+  /// No description provided for @toolPermissionEnabledSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Full access enabled for this chat'**
+  String get toolPermissionEnabledSnack;
+
+  /// No description provided for @toolPermissionResetSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace changed · permission reset to Ask for approval'**
+  String get toolPermissionResetSnack;
+
+  /// No description provided for @toolPermissionUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get toolPermissionUndo;
+
+  /// No description provided for @wsDeniedPathOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'Target is outside the authorized area. Denied.'**
+  String get wsDeniedPathOutside;
+
+  /// No description provided for @wsDeniedMountReadonly.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only mount. Can’t write.'**
+  String get wsDeniedMountReadonly;
+
+  /// No description provided for @wsDeniedSkillsReadonly.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills folder is read-only.'**
+  String get wsDeniedSkillsReadonly;
+
+  /// No description provided for @wsPathChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Target changed while awaiting approval.'**
+  String get wsPathChanged;
+
+  /// No description provided for @wsContextChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation context changed. Request expired.'**
+  String get wsContextChanged;
 }
 
 class _AppLocalizationsDelegate

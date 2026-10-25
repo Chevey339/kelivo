@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/desktop/workspace_dialog.dart';
@@ -16,6 +18,7 @@ import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
+import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
@@ -60,6 +63,8 @@ class _FakeChatService extends ChatService {
   _FakeChatService(this.conversation);
 
   Conversation? conversation;
+  bool failSave = false;
+  Completer<void>? saveBarrier;
   final Map<String, Conversation> _conversations = <String, Conversation>{};
 
   void setConversation(Conversation? next) {
@@ -80,8 +85,11 @@ class _FakeChatService extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    Conversation? expectedOwner,
+  }) async {
+    await saveBarrier?.future;
+    if (failSave) throw StateError('disk full');
     final current = getConversation(conversationId);
     if (current == null) return;
     final next = current.copyWith(
@@ -190,6 +198,7 @@ void main() {
     required _FakeChatService chat,
     AssistantProvider? assistants,
     ToolApprovalService? approvals,
+    double textScale = 1,
   }) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -218,6 +227,12 @@ void main() {
           Provider<EnvironmentManager?>.value(value: null),
         ],
         child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: AppSnackBarOverlay(
@@ -377,8 +392,8 @@ void main() {
     expect(find.byKey(WorkspaceSection.unbindKey), findsOneWidget);
     expect(find.text(l10n.workspaceEntryChange), findsNothing);
     expect(find.text(l10n.workspaceEntryUnbind), findsNothing);
-    expect(find.text(l10n.workspaceEntryAllowAll), findsOneWidget);
-    expect(find.text(l10n.workspaceEntryAllowAllSubtitle), findsOneWidget);
+    expect(find.text(l10n.toolPermissionTitle), findsOneWidget);
+    expect(find.text(l10n.toolPermissionRequestApprovalDesc), findsOneWidget);
     // Files rides on the name row as an icon button, and session skills live
     // in the ＋ sheet now.
     expect(find.text(l10n.workspaceEntryFiles), findsNothing);
@@ -461,46 +476,219 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('allow-all switch writes keyAllowAll', (tester) async {
-    final workspace = await tester.runAsync(
-      () => workspaces.create(name: 'Tools'),
-    );
-    if (workspace == null) fail('workspace create failed');
-    final chat = _FakeChatService(
-      Conversation(
-        title: 'Chat',
-        extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
-      ),
-    );
-    final approvals = ToolApprovalService();
-    addTearDown(approvals.dispose);
-    final pending = [
-      for (final id in ['first', 'second'])
-        approvals.requestApproval(
-          toolCallId: id,
-          toolName: 'shell',
-          arguments: const {'command': 'ls'},
-          conversationId: chat.conversation!.id,
-          workspaceId: workspace.id,
+  testWidgets(
+    'permission selector saves full access and releases pending calls',
+    (tester) async {
+      final workspace = await tester.runAsync(
+        () => workspaces.create(name: 'Tools'),
+      );
+      if (workspace == null) fail('workspace create failed');
+      final chat = _FakeChatService(
+        Conversation(
+          title: 'Chat',
+          extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
         ),
-    ];
+      );
+      final approvals = ToolApprovalService();
+      addTearDown(approvals.dispose);
+      final pending = [
+        for (final id in ['first', 'second'])
+          approvals.requestApproval(
+            toolCallId: id,
+            toolName: 'shell',
+            arguments: const {'command': 'ls'},
+            conversationId: chat.conversation!.id,
+            workspaceId: workspace.id,
+          ),
+      ];
+      await pumpSection(tester, chat: chat, approvals: approvals);
+      expect(
+        ToolPermissionMode.fromExtras(chat.conversation!.extras) ==
+            ToolPermissionMode.fullAccess,
+        isFalse,
+      );
+      await tester.ensureVisible(find.byKey(WorkspaceSection.permissionKey));
+      await tester.tap(find.byKey(WorkspaceSection.permissionKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Full access'));
+      await tester.pumpAndSettle();
+      expect(
+        ToolPermissionMode.fromExtras(chat.conversation!.extras) ==
+            ToolPermissionMode.fullAccess,
+        isTrue,
+      );
+      expect(approvals.hasPending, isFalse);
+      for (final request in pending) {
+        expect((await request).approved, isTrue);
+      }
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(
+        ToolPermissionMode.fromExtras(chat.conversation!.extras),
+        ToolPermissionMode.requestApproval,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 400));
+    },
+  );
+
+  for (final reset in [false, true]) {
+    testWidgets('permission undo survives closing its dialog (reset: $reset)', (
+      tester,
+    ) async {
+      final chat = _FakeChatService(Conversation(title: 'Chat'));
+      final approvals = ToolApprovalService();
+      addTearDown(chat.dispose);
+      addTearDown(approvals.dispose);
+      final nav = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+            ChangeNotifierProvider.value(value: approvals),
+          ],
+          child: MaterialApp(
+            navigatorKey: nav,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AppSnackBarOverlay(
+              child: Scaffold(
+                body: Builder(
+                  builder: (context) => TextButton(
+                    child: const Text('open'),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        content: TextButton(
+                          child: const Text('change'),
+                          onPressed: () async {
+                            if (reset) {
+                              showToolPermissionReset(
+                                dialogContext,
+                                chat.conversation!.id,
+                              );
+                            } else {
+                              await setToolPermissionFromUi(
+                                dialogContext,
+                                chat.conversation!.id,
+                                ToolPermissionMode.fullAccess,
+                              );
+                            }
+                            nav.currentState!.pop();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('change'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(
+        ToolPermissionMode.fromExtras(chat.conversation!.extras),
+        reset
+            ? ToolPermissionMode.fullAccess
+            : ToolPermissionMode.requestApproval,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+    });
+  }
+
+  testWidgets('a superseded enable does not show an enabled notification', (
+    tester,
+  ) async {
+    final chat = _FakeChatService(Conversation(title: 'Chat'))
+      ..saveBarrier = Completer<void>();
+    final approvals = ToolApprovalService();
+    addTearDown(chat.dispose);
+    addTearDown(approvals.dispose);
     await pumpSection(tester, chat: chat, approvals: approvals);
-    expect(
-      WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
-      isFalse,
+    final context = tester.element(find.byType(WorkspaceSection));
+    final enabled = setToolPermissionFromUi(
+      context,
+      chat.conversation!.id,
+      ToolPermissionMode.fullAccess,
     );
-    await tester.ensureVisible(find.byKey(WorkspaceSection.allowAllKey));
-    await tester.tap(find.byKey(WorkspaceSection.allowAllKey));
+    final revoked = setToolPermissionFromUi(
+      context,
+      chat.conversation!.id,
+      ToolPermissionMode.requestApproval,
+    );
     await tester.pump();
+    chat.saveBarrier!.complete();
+    await tester.pumpAndSettle();
+    expect(await enabled, isTrue);
+    expect(await revoked, isTrue);
     expect(
-      WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
-      isTrue,
+      ToolPermissionMode.fromExtras(chat.conversation!.extras),
+      ToolPermissionMode.requestApproval,
     );
-    expect(approvals.hasPending, isFalse);
-    for (final request in pending) {
-      expect((await request).approved, isTrue);
-    }
+    expect(find.text('Full access enabled for this chat'), findsNothing);
+    expect(find.text('Undo'), findsNothing);
   });
+
+  testWidgets('permission save failure leaves pending calls waiting', (
+    tester,
+  ) async {
+    final chat = _FakeChatService(Conversation(title: 'Chat'))..failSave = true;
+    final approvals = ToolApprovalService();
+    addTearDown(chat.dispose);
+    addTearDown(approvals.dispose);
+    final pending = approvals.requestApproval(
+      toolCallId: 'tool',
+      toolName: 'mcp',
+      arguments: {},
+      conversationId: chat.conversation!.id,
+    );
+    await pumpSection(tester, chat: chat, approvals: approvals);
+    await tester.tap(find.byKey(WorkspaceSection.permissionKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Full access'));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t save. Permission unchanged.'), findsOneWidget);
+    expect(
+      ToolPermissionMode.fromExtras(chat.conversation!.extras),
+      ToolPermissionMode.requestApproval,
+    );
+    expect(approvals.hasPending, isTrue);
+    approvals.cancelAll();
+    expect((await pending).approved, isFalse);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+  });
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    testWidgets('wide $platform keeps sandbox wording with enlarged text', (
+      tester,
+    ) async {
+      final chat = _FakeChatService(
+        Conversation(
+          title: 'Chat',
+          extras: ToolPermissionMode.fullAccess.applyTo({}),
+        ),
+      );
+      addTearDown(chat.dispose);
+      final l10n = await pumpSection(tester, chat: chat, textScale: 1.6);
+      tester.view.physicalSize = const Size(1200, 800);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(l10n.toolPermissionFullAccessDescMobile),
+        findsOneWidget,
+      );
+      expect(find.text(l10n.toolPermissionFullAccessDesc), findsNothing);
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant.only(platform));
+  }
 
   testWidgets('cwd folder picker sets a relative path', (tester) async {
     final workspace = await tester.runAsync(

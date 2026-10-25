@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, listEquals;
@@ -4482,6 +4483,7 @@ class _ChatTileState extends State<_ChatTile> {
                         ),
                       ),
                     ],
+                    ToolPermissionBadge(conversationId: widget.chat.id),
                     if (widget.loading) ...[
                       const SizedBox(width: 8),
                       _LoadingDot(),

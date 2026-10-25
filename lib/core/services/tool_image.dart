@@ -19,7 +19,10 @@ class ToolImage {
   // Base64 stays below the 5 MB image limit used by hosted providers.
   static const maxEncodedBytes = 3 * 1024 * 1024;
 
-  static Future<ToolImage> read(String hostPath) async {
+  static Future<ToolImage> read(String hostPath) async =>
+      fromBytes(await readBytes(hostPath));
+
+  static Future<Uint8List> readBytes(String hostPath) async {
     if (await FileSystemEntity.type(hostPath) != FileSystemEntityType.file) {
       throw const ToolImageException(
         'Image path must refer to an existing file',
@@ -38,7 +41,7 @@ class ToolImage {
     } finally {
       await handle.close();
     }
-    return fromBytes(bytes);
+    return bytes;
   }
 
   /// Sniff the encoding; filenames and remote MIME declarations are not proof.

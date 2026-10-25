@@ -8252,9 +8252,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolApprovalPending => '等待审批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒绝';
 
   @override
@@ -9601,9 +9598,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -9905,7 +9899,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -10178,12 +10172,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -10672,7 +10660,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -13332,6 +13320,86 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -21508,9 +21576,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get toolApprovalPending => '等待审批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒绝';
 
   @override
@@ -22857,9 +22922,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -23161,7 +23223,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -23434,12 +23496,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -23928,7 +23984,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -26588,6 +26644,86 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserObserverHint => 'AI 正在操作此页面，点击“接管”后可以操作网页。';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -34839,9 +34975,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get toolApprovalPending => '等待審批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒絕';
 
   @override
@@ -36188,9 +36321,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceToolImageTag => '圖片';
 
   @override
-  String get workspaceToolAllowAll => '本工作階段全部允許';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -36492,8 +36622,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval =>
-      '除非此工作階段允許全部工具，否則 shell 工具需要核准。';
+  String get workspaceEnvNativeShellApproval => '請求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -36766,12 +36895,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本工作階段全部允許';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此對話中的 Shell 命令將不再需要核准。';
 
   @override
   String get workspaceEntryEnvironment => '環境';
@@ -37260,7 +37383,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '指令在本機直接執行（無沙盒），除非允許本工作階段全部工具，否則需要核准。';
+      '指令在本機直接執行（無沙盒），除非此對話已啟用完全存取，否則需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -39924,4 +40047,84 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserObserverHint => 'AI 正在操作此頁面，點選「接管」後可以操作網頁。';
+
+  @override
+  String get toolPermissionTitle => '權限';
+
+  @override
+  String get toolPermissionRequestApproval => '請求批准';
+
+  @override
+  String get toolPermissionFullAccess => '完全存取';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作區外檔案存取、桌面命令和其他需要授權的工具將在執行前詢問。';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允許此對話直接存取本機檔案、執行命令及使用已啟用的聯網工具，不再逐次詢問。';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允許此對話在沙盒和已授權資料夾內自動執行工具，不再逐次詢問。';
+
+  @override
+  String get toolPermissionUnboundHint => '未綁定工作區：不會因此開啟檔案或 Shell 工具。';
+
+  @override
+  String get toolPermissionScopeThisChat => '僅此對話';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切換到完全存取';
+
+  @override
+  String get toolApprovalDenied => '已拒絕';
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待審批 · $kind';
+  }
+
+  @override
+  String get toolApprovalRequestedPath => '請求路徑';
+
+  @override
+  String get toolApprovalRealTarget => '實際目標';
+
+  @override
+  String get toolApprovalScopeOnce => '僅授權本次呼叫';
+
+  @override
+  String get toolApprovalByFullAccess => '已自動執行';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒絕並說明原因…';
+
+  @override
+  String get toolPermissionSaveFailed => '儲存失敗，權限未變更。';
+
+  @override
+  String get toolPermissionEnabledSnack => '已為此對話啟用完全存取';
+
+  @override
+  String get toolPermissionResetSnack => '已更換工作區 · 此對話權限已恢復為請求批准';
+
+  @override
+  String get toolPermissionUndo => '復原';
+
+  @override
+  String get wsDeniedPathOutside => '目標不在授權區域內，已拒絕。';
+
+  @override
+  String get wsDeniedMountReadonly => '唯讀掛載，無法寫入。';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目錄唯讀。';
+
+  @override
+  String get wsPathChanged => '審批期間目標已變化。';
+
+  @override
+  String get wsContextChanged => '對話上下文已變化，請求失效。';
 }

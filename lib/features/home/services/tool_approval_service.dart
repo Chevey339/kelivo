@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 /// Result of a tool approval request.
 class ToolApprovalResult {
   final bool approved;
+  final bool byFullAccess;
   final String? denyReason;
 
-  const ToolApprovalResult({required this.approved, this.denyReason});
+  const ToolApprovalResult({
+    required this.approved,
+    this.denyReason,
+    this.byFullAccess = false,
+  });
 
-  factory ToolApprovalResult.approved() =>
-      const ToolApprovalResult(approved: true);
+  factory ToolApprovalResult.approved({bool byFullAccess = false}) =>
+      ToolApprovalResult(approved: true, byFullAccess: byFullAccess);
   factory ToolApprovalResult.denied([String? reason]) =>
       ToolApprovalResult(approved: false, denyReason: reason);
 }
@@ -23,6 +28,9 @@ class ToolApprovalRequest {
   final Map<String, dynamic> arguments;
   final String? conversationId;
   final String? workspaceId;
+  final String? assistantId;
+  final String? requestedPath;
+  final String? realTarget;
   final Completer<ToolApprovalResult> _completer;
 
   ToolApprovalRequest({
@@ -31,6 +39,9 @@ class ToolApprovalRequest {
     required this.arguments,
     this.conversationId,
     this.workspaceId,
+    this.assistantId,
+    this.requestedPath,
+    this.realTarget,
     required this._completer,
   });
 
@@ -106,6 +117,9 @@ class ToolApprovalService extends ChangeNotifier {
     required Map<String, dynamic> arguments,
     String? conversationId,
     String? workspaceId,
+    String? assistantId,
+    String? requestedPath,
+    String? realTarget,
   }) {
     final key = _storageKey(conversationId, toolCallId);
     final existing = _pending[key];
@@ -119,6 +133,9 @@ class ToolApprovalService extends ChangeNotifier {
       arguments: arguments,
       conversationId: _storedConversationId(conversationId),
       workspaceId: workspaceId,
+      assistantId: assistantId,
+      requestedPath: requestedPath,
+      realTarget: realTarget,
       completer: completer,
     );
     notifyListeners();
@@ -137,24 +154,29 @@ class ToolApprovalService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Release pending Shell calls covered by a saved workspace session grant.
-  void approveWorkspaceShells({
+  /// Release only this conversation's ordinary approvals after persisting its grant.
+  void approveConversationTools({
     required String conversationId,
-    required String workspaceId,
+    String? workspaceId,
+    String? assistantId,
   }) {
-    if (conversationId.trim().isEmpty || workspaceId.isEmpty) return;
+    if (conversationId.isEmpty) return;
     final matches = _pending.entries
-        .where(
-          (entry) =>
-              entry.value.conversationId == conversationId.trim() &&
-              entry.value.workspaceId == workspaceId &&
-              entry.value.toolName == 'shell',
-        )
+        .where((e) => e.value.conversationId == conversationId)
         .toList();
-    if (matches.isEmpty) return;
     for (final entry in matches) {
+      final req = entry.value;
+      final stale =
+          (req.workspaceId != null && req.workspaceId != workspaceId) ||
+          (req.assistantId != null && req.assistantId != assistantId);
       _pending.remove(entry.key);
-      entry.value._completer.complete(ToolApprovalResult.approved());
+      if (!req._completer.isCompleted) {
+        req._completer.complete(
+          stale
+              ? ToolApprovalResult.denied('context_changed')
+              : ToolApprovalResult.approved(byFullAccess: true),
+        );
+      }
     }
     notifyListeners();
   }

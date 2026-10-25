@@ -3,35 +3,6 @@ import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/features/home/services/tool_approval_service.dart';
-
-/// Save the current binding's grant before releasing matching pending Shells.
-Future<void> setConversationWorkspaceAllowAll(
-  ChatService chat, {
-  required String conversationId,
-  required String workspaceId,
-  required bool allowAll,
-  ToolApprovalService? approvals,
-}) async {
-  await chat.updateConversationExtras(conversationId, (extras) {
-    final binding = WorkspaceBinding.fromExtras(extras);
-    if (binding.workspaceId != workspaceId) return extras;
-    return WorkspaceBinding(
-      workspaceId: workspaceId,
-      cwd: binding.cwd,
-      toolsUsed: binding.toolsUsed,
-      allowAll: allowAll,
-    ).applyTo(extras);
-  });
-  final current = chat.getConversation(conversationId);
-  if (!allowAll || current == null) return;
-  final binding = WorkspaceBinding.fromExtras(current.extras);
-  if (binding.workspaceId != workspaceId || !binding.allowAll) return;
-  approvals?.approveWorkspaceShells(
-    conversationId: conversationId,
-    workspaceId: workspaceId,
-  );
-}
 
 /// Conversation extras applied when starting a chat with [assistant].
 Map<String, dynamic> workspaceExtrasForNewConversation({

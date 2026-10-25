@@ -13,6 +13,7 @@ import '../../utils/sandbox_path_resolver.dart';
 import '../models/chat_input_data.dart';
 import '../models/composer_draft.dart';
 import '../models/conversation.dart';
+import '../models/tool_permission_mode.dart';
 import 'app_database.dart';
 
 /// Device-local editor state. All mutations have an owner, including writes
@@ -237,6 +238,33 @@ class ComposerDraftStore extends ChangeNotifier {
     if (!isNewEntry(conversation.id)) return;
     registerNewEntry(conversation);
   }
+
+  /// Permission changes must be durable before a caller releases tools. Keep
+  /// the live seed unchanged if writing fails; ordinary typing still debounces.
+  Future<Map<String, dynamic>> updateNewEntryExtras(
+    String id,
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) => _serialize(() async {
+    final entry = _entries.entries
+        .where((entry) => entry.value.id == id)
+        .firstOrNull;
+    if (entry == null || _deleted.contains(id) || suspended) {
+      throw StateError('composer_owner_deleted');
+    }
+    if (expectedOwner != null &&
+        entry.value.assistantId != expectedOwner.assistantId) {
+      throw StateError('context_changed');
+    }
+    final next = entry.value.copyWith(
+      extras: update(Map<String, dynamic>.from(entry.value.extras)),
+    );
+    await _db.transaction(
+      () => _put(entryKind, entry.key, next.toJson(), ownerId: id),
+    );
+    _entries[entry.key] = next;
+    return next.extras;
+  });
 
   Future<ComposerDraft> load(String id, {String? assistantId}) async {
     await initialize();
@@ -969,7 +997,12 @@ class ComposerDraftStore extends ChangeNotifier {
           await _put(
             entryKind,
             entryId(assistantId),
-            old.value.copyWith(assistantId: assistantId).toJson(),
+            old.value
+                .copyWith(
+                  assistantId: assistantId,
+                  extras: ToolPermissionMode.withoutGrant(old.value.extras),
+                )
+                .toJson(),
             ownerId: id,
           );
         }
@@ -981,6 +1014,7 @@ class ComposerDraftStore extends ChangeNotifier {
         _entries.remove(old.key);
         _entries[entryId(assistantId)] = old.value.copyWith(
           assistantId: assistantId,
+          extras: ToolPermissionMode.withoutGrant(old.value.extras),
         );
       }
       _changed(draft);
