@@ -3967,6 +3967,17 @@ class ChatDatabaseRepository {
     return {for (final row in rows) row.read<String>('asset_id')};
   }
 
+  /// Keep an active appearance asset out of the next bounded GC batch so it
+  /// cannot repeatedly displace other files that are ready for collection.
+  Future<void> deferAssetGc(
+    AssetGcCandidate candidate, {
+    required DateTime notBefore,
+  }) => _db.customStatement(
+    'UPDATE asset_gc_rows SET not_before = ?, generation = generation + 1 '
+    'WHERE asset_id = ? AND generation = ?;',
+    [notBefore.microsecondsSinceEpoch, candidate.assetId, candidate.generation],
+  );
+
   Future<bool> isAssetGcClaimStillValid(AssetGcCandidate candidate) async {
     final pathForm = candidate.path.isEmpty ? ' ' : candidate.path;
     final altForm = _alternateAssetPathForm(pathForm);

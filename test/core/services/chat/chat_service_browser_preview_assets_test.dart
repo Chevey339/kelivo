@@ -55,6 +55,53 @@ void main() {
     return file;
   }
 
+  test(
+    'a preview reused as an assistant background survives conversation GC',
+    () async {
+      final file = await image();
+      final uri = SandboxPathResolver.canonicalize(file.path);
+      final conversation = await service.createConversation(title: 'Browser');
+      await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        parts: [ToolCallPart(jsonEncode(event(uri)))],
+      );
+      final database = sqlite.sqlite3.open(
+        '${root.path}/${AppDatabase.databaseFileName}',
+      );
+      try {
+        database.execute(
+          'INSERT INTO assistant_rows (id, sort_order, payload, updated_at) VALUES (?, ?, ?, ?)',
+          [
+            'appearance',
+            0,
+            jsonEncode({'id': 'appearance', 'name': 'A', 'background': uri}),
+            1,
+          ],
+        );
+        await service.deleteConversation(conversation.id);
+        await service.runAssetMaintenance(
+          now: DateTime.now().toUtc().add(const Duration(days: 8)),
+        );
+        expect(await file.exists(), isTrue);
+        expect(
+          await service.chatRepositoryOrNull!.claimAssetGc(
+            now: DateTime.now().toUtc().add(const Duration(days: 8)),
+          ),
+          isEmpty,
+          reason: 'Protected images must not monopolize the next GC batch',
+        );
+        database.execute("DELETE FROM assistant_rows WHERE id = 'appearance'");
+        await service.runAssetMaintenance(
+          now: DateTime.now().toUtc().add(const Duration(days: 9)),
+        );
+        expect(await file.exists(), isFalse);
+      } finally {
+        database.close();
+      }
+    },
+  );
+
   for (final writer in ['parts', 'events', 'upsert']) {
     test('$writer registers preview ownership and delayed deletion', () async {
       final file = await image();

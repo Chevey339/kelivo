@@ -76,7 +76,6 @@
   "storageSpaceClearDisplacedDatabasesButton": "Delete Set-Aside Databases",
   "storageSpaceClearRestoreTracesConfirmMessage": "Clear completed restore snapshots? Your current database, settings, and files will not be affected.",
   "storageSpaceSubCompletedRestoreRuns": "Completed restore snapshots",
-  "storageSpaceCategoryAssistantData": "Assistants",
   "storageSpaceCategoryCache": "Cache",
   "storageSpaceCategoryLogs": "Logs",
   "storageSpaceCategoryOther": "Other",
@@ -90,8 +89,6 @@
   "storageSpaceSubChatDatabase": "Chat database",
   "storageSpaceSubChatWriteAheadLog": "Write-ahead log",
   "storageSpaceSubChatSharedMemory": "Shared memory index",
-  "storageSpaceSubAssistantAvatars": "Avatars",
-  "storageSpaceSubAssistantImages": "Images",
   "storageSpaceSubCacheAvatars": "Avatar cache",
   "storageSpaceSubCacheOther": "Other cache",
   "storageSpaceSubCacheSystem": "System cache",
@@ -170,10 +167,34 @@
       }
     }
   },
-  "storageSpaceSourceLabel": "Source",
-  "storageSpaceSourceAll": "All",
-  "storageSpaceSourceUserUpload": "User uploads",
-  "storageSpaceSourceAssistant": "Assistant",
+  "storageSpaceImageTypeLabel": "Type",
+  "storageSpaceImageTypeAll": "All",
+  "storageSpaceImageTypeChat": "Chat images",
+  "storageSpaceImageTypeTool": "Tool images",
+  "storageSpaceImageTypeAvatar": "Avatars & backgrounds",
+  "storageSpaceImageInUse": "In use",
+  "storageSpaceImageInUseHint": "Change or remove this avatar, background, or icon in its settings before deleting it.",
+  "storageSpaceImagesHint": "Deleting images affects chat history and tool results. Avatars and backgrounds in use are protected.",
+  "storageSpaceLoadFailed": "Could not load files or check which images are in use. Please refresh and try again.",
+  "storageSpaceDeleteImagesConfirmMessage": "Delete {count} images? Related chat images, tool screenshots, and conversation copies will no longer be available. Avatars and backgrounds in use will be kept.",
+  "storageSpaceDeletedUploadsPartial": "Deleted {deleted} items; kept {kept} items that are in use or could not be deleted.",
+  "@storageSpaceDeleteImagesConfirmMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@storageSpaceDeletedUploadsPartial": {
+    "placeholders": {
+      "deleted": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      }
+    }
+  },
   "storageSpaceSortLabel": "Sort",
   "storageSpaceSortNewest": "Newest",
   "storageSpaceSortOldest": "Oldest",
