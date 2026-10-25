@@ -102,11 +102,13 @@ void main() {
       const types = [
         'tavily',
         'exa',
+        'exa_mcp',
         'zhipu',
         'linkup',
         'brave',
         'metaso',
         'ollama',
+        'deepseek',
         'jina',
         'perplexity',
         'bocha',

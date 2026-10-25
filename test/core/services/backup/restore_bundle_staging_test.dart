@@ -16,6 +16,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/startup_failure_report.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
@@ -668,6 +669,92 @@ void main() {
       );
     });
 
+    for (final includeFiles in [false, true]) {
+      test('reopens a v2 staged candidate ($includeFiles)', () async {
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: includeFiles,
+        );
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: includeFiles,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        );
+        final file = File(
+          p.join(staged.payloadDirectory.path, 'manifest.json'),
+        );
+        final manifest = jsonDecode(await file.readAsString()) as Map;
+        manifest['formatVersion'] = 2;
+        manifest.remove('assetRoots');
+        final originalBytes = utf8.encode(jsonEncode(manifest));
+        await file.writeAsBytes(originalBytes, flush: true);
+        final hash = sha256.convert(originalBytes).toString();
+
+        final reopened = await RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: hash,
+        );
+
+        expect(reopened.manifestSha256, hash);
+        expect(
+          reopened.assetRoots,
+          includeFiles
+              ? {
+                  'upload',
+                  'images',
+                  'avatars',
+                  'fonts',
+                  'skills',
+                  'workspaces',
+                  'sessions',
+                }
+              : <String>{},
+        );
+        expect(await file.readAsBytes(), originalBytes);
+      });
+    }
+
+    test(
+      'requires the exact staged schema for each supported version',
+      () async {
+        final extracted = await _createExtractedBundle(root);
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        );
+        final file = File(
+          p.join(staged.payloadDirectory.path, 'manifest.json'),
+        );
+        final current =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final old = {...current, 'formatVersion': 2}..remove('assetRoots');
+        for (final invalid in [
+          {...current}..remove('assetRoots'),
+          {...old, 'assetRoots': <String>[]},
+          {...old, 'unknown': true},
+          for (final version in [1, 4, 2.0, '2'])
+            {...old, 'formatVersion': version},
+        ]) {
+          await file.writeAsString(jsonEncode(invalid), flush: true);
+          await expectLater(
+            RestoreBundleStaging.readCandidateManifest(
+              candidateDirectory: staged.payloadDirectory,
+              expectedManifestSha256: await _manifestSha256(
+                staged.payloadDirectory,
+              ),
+            ),
+            throwsFormatException,
+            reason: '$invalid',
+          );
+        }
+      },
+    );
+
     test('rejects unknown candidate manifest fields', () async {
       final extracted = await _createExtractedBundle(root);
       final manifestFile = File(p.join(extracted.path, 'manifest.json'));
@@ -857,7 +944,16 @@ void main() {
           candidateDirectory: staged.payloadDirectory,
           expectedManifestSha256: staged.candidateManifestSha256,
         ),
-        throwsA(isA<FormatException>()),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+            ).causes.single.details,
+            'directory differences',
+            containsPair('missing directories (first 10)', '["fonts"]'),
+          ),
+        ),
       );
     });
 
@@ -879,8 +975,59 @@ void main() {
           candidateDirectory: staged.payloadDirectory,
           expectedManifestSha256: staged.candidateManifestSha256,
         ),
-        throwsA(isA<FormatException>()),
+        throwsA(
+          isA<FormatException>()
+              .having(
+                (error) => restoreFailureDiagnosticCode(error),
+                'unchanged diagnostic code',
+                'restore_staging_candidate_directory',
+              )
+              .having(
+                (error) => StartupFailureReport.capture(
+                  stage: StartupFailureStage.restoreGate,
+                  error: error,
+                ).causes.single.details,
+                'details transported from validation isolate',
+                containsPair('unexpected directory', 'upload/unexpected'),
+              ),
+        ),
       );
+    });
+
+    test('reports bounded unexpected file names on revalidation', () async {
+      final extracted = await _createExtractedBundle(root, includeFiles: true);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: true,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+      for (var index = 0; index < 12; index++) {
+        await File(
+          p.join(staged.payloadDirectory.path, 'upload', 'extra_$index.txt'),
+        ).writeAsString('extra');
+      }
+      try {
+        await RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: staged.candidateManifestSha256,
+        );
+        fail('Extra files must still be rejected');
+      } on FormatException catch (error) {
+        final report = StartupFailureReport.capture(
+          stage: StartupFailureStage.restoreGate,
+          error: error,
+        );
+        expect(report.diagnosticCode, 'restore_staging_candidate_entries');
+        final details = report.causes.single.details;
+        expect(details['unexpected files count'], '12');
+        expect(details['missing files count'], '0');
+        expect(
+          jsonDecode(details['unexpected files (first 10)']!) as List,
+          hasLength(10),
+        );
+      }
     });
 
     test(
@@ -1163,7 +1310,7 @@ void main() {
 
       final token = BackupCancelToken();
       addTearDown(token.dispose);
-      final started = DateTime.now();
+      final cancellation = Stopwatch();
 
       await expectLater(
         RestoreBundleStaging.create(
@@ -1175,22 +1322,26 @@ void main() {
           cancelToken: token,
           onProgress: (progress) {
             if (progress.detail == 'candidate-revalidate') {
+              cancellation.start();
               token.cancel();
             }
           },
         ),
         throwsA(isA<BackupCancelledException>()),
       );
-      expect(
-        DateTime.now().difference(started) < const Duration(seconds: 2),
-        isTrue,
-      );
+      // Measure cancellation latency, not the unrelated database/file
+      // preparation that happens before the cancellation is requested.
+      expect(cancellation.isRunning, isTrue);
+      expect(cancellation.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
     test(
       'does not delete candidate while the revalidation isolate has not exited',
       () async {
         final extracted = await _createExtractedBundle(root);
+        // Preparation may take longer than the cancellation deadline. Only
+        // cancel once the revalidation isolate has actually started.
+        RestoreBundleStaging.debugCandidateDbStallMs = 350;
         RestoreBundleStaging.debugCandidateValidateHangSeconds = 2;
         RestoreBundleStaging.debugIsolateKillGrace = const Duration(
           milliseconds: 40,
@@ -1198,11 +1349,9 @@ void main() {
         RestoreBundleStaging.debugIsolateExitDeadline = const Duration(
           milliseconds: 80,
         );
-        RestoreBundleStaging.debugIsolateTimeout = const Duration(
-          milliseconds: 150,
-        );
         debugSkipBackupIsolateKill = true;
         addTearDown(() {
+          RestoreBundleStaging.debugCandidateDbStallMs = 0;
           RestoreBundleStaging.debugCandidateValidateHangSeconds = 0;
           RestoreBundleStaging.debugIsolateKillGrace = null;
           RestoreBundleStaging.debugIsolateExitDeadline = null;
@@ -1214,6 +1363,7 @@ void main() {
         addTearDown(token.dispose);
         Directory? workspaceRoot;
         Object? error;
+        var revalidationStarted = false;
         try {
           await RestoreBundleStaging.create(
             appDataDirectory: root,
@@ -1224,6 +1374,7 @@ void main() {
             cancelToken: token,
             onProgress: (progress) {
               if (progress.detail == 'candidate-revalidate') {
+                revalidationStarted = true;
                 token.cancel();
               }
             },
@@ -1232,6 +1383,7 @@ void main() {
           error = e;
         }
 
+        expect(revalidationStarted, isTrue);
         expect(error, isNotNull);
         expect(backupIsolateStillAlive(error!), isTrue);
         workspaceRoot = Directory(

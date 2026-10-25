@@ -29,4 +29,23 @@ void main() {
     expect(loud, greaterThan(speech));
     expect(loud, lessThanOrEqualTo(1));
   });
+
+  test('wraps mono PCM16 in a canonical WAV header', () {
+    final pcm = Uint8List.fromList([1, 2, 3, 4]);
+    final wav = pcm16MonoToWav(pcm, sampleRate: 24000);
+    final header = ByteData.sublistView(wav);
+
+    expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
+    expect(header.getUint32(4, Endian.little), 36 + pcm.length);
+    expect(String.fromCharCodes(wav.sublist(8, 16)), 'WAVEfmt ');
+    expect(header.getUint16(20, Endian.little), 1);
+    expect(header.getUint16(22, Endian.little), 1);
+    expect(header.getUint32(24, Endian.little), 24000);
+    expect(header.getUint32(28, Endian.little), 48000);
+    expect(header.getUint16(32, Endian.little), 2);
+    expect(header.getUint16(34, Endian.little), 16);
+    expect(String.fromCharCodes(wav.sublist(36, 40)), 'data');
+    expect(header.getUint32(40, Endian.little), pcm.length);
+    expect(wav.sublist(44), pcm);
+  });
 }

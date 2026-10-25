@@ -150,7 +150,11 @@ Java_com_psyche_kelivo_workspace_PtyJni_setPtyWindowSize(
 extern "C" JNIEXPORT jint JNICALL
 Java_com_psyche_kelivo_workspace_PtyJni_waitFor(JNIEnv *, jclass, jint pid) {
     int status = 0;
-    if (waitpid(pid, &status, 0) < 0) return -1;
+    int result;
+    do {
+        result = waitpid(pid, &status, 0);
+    } while (result < 0 && errno == EINTR);
+    if (result < 0) return -1;
     if (WIFEXITED(status)) return WEXITSTATUS(status);
     if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
     return status;

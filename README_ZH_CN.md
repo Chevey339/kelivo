@@ -78,7 +78,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 | --- | --- | --- | --- |
 | iOS / iPadOS | [App Store](https://apps.apple.com/us/app/kelivo/id6752122930) · [TestFlight](https://testflight.apple.com/join/erbGGykR)（测试版） | App Store；[Releases](https://github.com/Chevey339/kelivo/releases/latest) 另提供未签名 IPA | iOS 15.0 及以上 |
 | Android | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | APK（`arm64-v8a`、`armeabi-v7a`、`x86_64`） | Android 7.0 及以上 |
-| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 11.0 及以上，支持 Apple 芯片与 Intel |
+| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 12.0 及以上，支持 Apple 芯片与 Intel |
 | Windows | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | 安装程序（`setup.exe`）或免安装 ZIP | Windows 10 / 11 |
 | Linux | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | AppImage、DEB、RPM、tar.gz | x86_64 |
 | HarmonyOS | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) | 在独立仓库中维护 | — |
@@ -108,7 +108,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 
 ### 🤖 智能体与工作区
 
-- **工作区**：为对话绑定工作区后，模型可以使用 `shell`、`read_file`、`write_file`、`edit_file`、`list_dir`、`glob` 和 `grep` 七个工具。命令输出实时显示，文件修改以 diff 呈现；Shell 命令可以设为需要审批，按单条命令批准或在本次会话中全部允许。
+- **工作区**：为对话绑定工作区后，模型可以使用 `shell`、`read_file`、`view_image`、`write_file`、`edit_file`、`list_dir`、`glob` 和 `grep` 八个工具。命令输出实时显示，文件修改以 diff 呈现；默认询问授权区域外的文件访问和桌面命令，也可为当前对话启用“完全访问”，免除需要授权的工具的常规审批。
 - **手机上的 Linux 沙盒**：Android 通过 PRoot 运行 Ubuntu、Debian 或 Alpine Linux，也可以导入自己的 rootfs 镜像；iOS 内置基于 iSH 的 Alpine Linux，无需额外下载。可在应用内安装 Python、Node.js、Git、SSH 等常用工具，并通过测速为 apt/apk、pip 和 npm 选择最快的镜像源。
 - **桌面端原生运行**：在 macOS、Windows 和 Linux 上，工具直接在系统 Shell 中运行，工作区可以是应用托管的文件夹，也可以链接电脑上的任意文件夹。
 - **文件与终端**：内置文件浏览器，可预览 Markdown、HTML、CSV、图片和文本。手机端提供应用内终端，桌面端可在系统终端中打开工作区。手机端还可以把最多 10 个外部文件夹以只读或读写方式挂载到沙盒中。
@@ -179,13 +179,13 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 | 平台专属设备工具 | 日历、定位、屏幕使用时间 | 日历、定位、天气、提醒事项、健康数据 | — |
 | 全局快捷键与系统托盘 | — | — | ✓ |
 
-桌面端的工作区命令以当前用户的权限运行，没有沙盒隔离。对于存放重要文件的工作区，建议保持命令审批开启。
+桌面端的工作区命令以当前用户的权限运行，没有沙盒隔离。默认“请求批准”模式会询问桌面命令和授权区域外的文件访问；可为当前对话主动选择“完全访问”，免除常规工具审批。完全访问不会获得额外系统权限或开启已禁用的工具。
 
 ## 🔧 从源码构建
 
 **环境要求**
 
-- Flutter 3.44.9 及以上（Dart 3.12）
+- Flutter 3.47.6（Dart 3.13，与 CI 保持一致）
 - 目标平台的工具链：Android SDK、Xcode，或安装了“使用 C++ 的桌面开发”工作负载的 Visual Studio
 - 仅 Linux（Debian/Ubuntu 包名）：`clang cmake ninja-build pkg-config libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libkeybinder-3.0-dev libayatana-appindicator3-dev`
 - 仅 iOS：`brew install meson ninja llvm lld`。Xcode 构建时会自动编译 iSH 沙盒并准备 Alpine Linux 镜像。

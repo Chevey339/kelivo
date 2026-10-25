@@ -1,5 +1,5 @@
 import '../widgets/settings_search_target.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'mobile_background_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +16,7 @@ import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../widgets/memory_ui.dart';
+import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -1317,7 +1317,7 @@ Widget _iosSwitchRow(
             },
           ),
         ),
-        if (tip != null) MemoryTipIcon(message: tip),
+        if (tip != null) TipIcon(message: tip),
         const SizedBox(width: 12),
         IosSwitch(value: value, onChanged: onChanged),
       ],
@@ -1550,6 +1550,16 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Calculator,
+                label: l10n.displaySettingsPageShowTotalTokensTitle,
+                tip: l10n.displaySettingsPageShowTotalTokensSubtitle,
+                value: sp.showTotalTokens,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowTotalTokens(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Sparkles,
                 label: l10n.displaySettingsPageShowThinkingCardsTitle,
                 tip: l10n.displaySettingsPageShowThinkingCardsSubtitle,
@@ -1576,6 +1586,17 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 value: sp.showProducedFiles,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowProducedFiles(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Lightbulb,
+                label: l10n.displaySettingsShowReasoningLevelBadge,
+                tip: l10n.displaySettingsShowReasoningLevelBadgeSubtitle,
+                value: sp.showReasoningLevelBadge,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setShowReasoningLevelBadge(v),
               ),
             ],
           ),
@@ -1863,6 +1884,20 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
         children: [
           SectionCard(
             children: [
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.TextSelect,
+                  label: l10n.displaySettingsPageIosNativeSelectionMenuTitle,
+                  subtitle:
+                      l10n.displaySettingsPageIosNativeSelectionMenuSubtitle,
+                  value: sp.iosNativeSelectionMenuEnabled,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setIosNativeSelectionMenuEnabled(v),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Brain,
@@ -1912,6 +1947,15 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.hideToolResultImages,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setHideToolResultImages(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.AppWindow,
+                label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+                value: sp.showBrowserPageCards,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowBrowserPageCards(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

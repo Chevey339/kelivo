@@ -42,6 +42,15 @@ class InstructionInjectionProvider with ChangeNotifier {
     return _items.where((e) => ids.contains(e.id)).toList(growable: false);
   }
 
+  String promptFor(String? assistantId, {List<String>? instructionIds}) {
+    final ids = (instructionIds ?? activeIdsFor(assistantId)).toSet();
+    return _items
+        .where((item) => ids.contains(item.id))
+        .map((item) => item.prompt.trim())
+        .where((prompt) => prompt.isNotEmpty)
+        .join('\n\n');
+  }
+
   String? get activeId => activeIdFor(null);
   String? activeIdFor(String? assistantId) {
     final ids = activeIdsFor(assistantId);

@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../database/backup_content_filter.dart';
+import '../../models/backup_scope.dart';
 import '../../database/backup_portability.dart';
 import '../../database/extension_entity_store.dart';
 import '../../database/schema_migrations.dart';
@@ -20,6 +22,8 @@ import 'backup_isolate_runner.dart';
 import 'backup_settings_validator.dart';
 import 'backup_task_progress.dart';
 import 'restore_durability.dart';
+import 'restore_diagnostic_exception.dart';
+import '../../../utils/app_directories.dart';
 import 'restore_workspace_lock.dart';
 
 typedef ValidatedRestoreEntry = ({int bytes, String sha256});
@@ -29,13 +33,16 @@ final class ValidatedRestoreCandidate {
   ValidatedRestoreCandidate({
     required this.includeChats,
     required this.includeFiles,
+    required Set<String> assetRoots,
     required this.manifestSha256,
     required Map<String, ValidatedRestoreEntry> entries,
     required this.databaseInfo,
-  }) : entries = Map.unmodifiable(entries);
+  }) : entries = Map.unmodifiable(entries),
+       assetRoots = Set.unmodifiable(assetRoots);
 
   final bool includeChats;
   final bool includeFiles;
+  final Set<String> assetRoots;
   final String manifestSha256;
   final Map<String, ValidatedRestoreEntry> entries;
   final ChatDatabaseSnapshotInfo? databaseInfo;
@@ -55,7 +62,7 @@ final class StagedRestoreBundle {
   final String candidateManifestSha256;
 }
 
-/// Copies a validated v2 restore payload into the app-data filesystem.
+/// Copies a validated portable restore payload into the app-data filesystem.
 ///
 /// The candidate remains immutable under its run workspace until the startup
 /// gate either commits the whole bundle or restores the previous bundle.
@@ -64,11 +71,11 @@ final class RestoreBundleStaging {
 
   static const workspaceRootName = RestoreWorkspaceLock.workspaceRootName;
   static const _backupFormat = 'kelivo-backup';
-  static const _backupFormatVersion = 2;
+  // Candidates explicitly bind the asset roots selected for cutover.
+  static const _backupFormatVersion = 3;
 
-  /// Mirrors DataSync's constant of the same name. Duplicated rather than
-  /// imported, as _backupFormatVersion above already is, because DataSync
-  /// depends on this file.
+  /// The source archive's declaration key. DataSync depends on this file, so
+  /// importing its definition here would introduce a cycle.
   static const _minimumReadableFormatKey = 'minimumReadableFormatVersion';
   static const _assetRoots = [
     'upload',
@@ -115,7 +122,9 @@ final class RestoreBundleStaging {
     required Directory extractedDirectory,
     required bool includeChats,
     required bool includeFiles,
+    BackupScope scope = const BackupScope(),
     bool useExistingLocalAttachments = false,
+    Directory? filesDirectory,
     bool? sourceIncludesChats,
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
@@ -126,6 +135,7 @@ final class RestoreBundleStaging {
   }) async {
     final declaredIncludeChats = sourceIncludesChats ?? includeChats;
     final declaredIncludeFiles = sourceIncludesFiles ?? includeFiles;
+    final selectedAssetRoots = includeFiles ? scope.assetRoots : <String>{};
     if (!includeChats ||
         !declaredIncludeChats ||
         (includeFiles && !declaredIncludeFiles)) {
@@ -190,7 +200,10 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_manifest_fields');
       }
       final manifest = decodedManifest;
-      final businessEntityRowIds = _parseBusinessEntityRowIds(manifest);
+      final rawBusinessEntityRowIds = _parseBusinessEntityRowIds(manifest);
+      final businessEntityRowIds = rawBusinessEntityRowIds == null
+          ? null
+          : BackupContentFilter.select(rawBusinessEntityRowIds, scope);
       final declaredEntries = _parseDeclaredEntries(
         manifest,
         includeChats: declaredIncludeChats,
@@ -257,13 +270,19 @@ final class RestoreBundleStaging {
             ? null
             : p.join(appDataDirectory.path, AppDatabase.databaseFileName),
         settings: settings,
+        scope: scope,
         entityRowIds: businessEntityRowIds,
         preserveExplicitEmptyInstructionList: businessEntityRowIds == null,
         expectedDatabaseInfo: declaredDatabaseInfo,
         durability: resolvedDurability,
-        recomputeAttachmentsUnavailable: !includeFiles,
+        recomputeAttachmentsUnavailable:
+            !includeFiles || !scope.includes(BackupCategory.files),
         localSnapshotAppDataPath: useExistingLocalAttachments
-            ? appDataDirectory.path
+            ? (filesDirectory ??
+                      await AppDirectories.contentDirectoryFor(
+                        appDataDirectory,
+                      ))
+                  .path
             : null,
         onProgress: onProgress,
         cancelToken: cancelToken,
@@ -273,7 +292,7 @@ final class RestoreBundleStaging {
         sha256: await _sha256(stagedDatabaseFile, cancelToken: cancelToken),
       );
       if (includeFiles) {
-        for (final rootName in _assetRoots) {
+        for (final rootName in selectedAssetRoots) {
           await _ensureDurableDirectory(
             directory: Directory(p.join(payloadDirectory.path, rootName)),
             boundary: payloadDirectory,
@@ -281,7 +300,7 @@ final class RestoreBundleStaging {
           );
         }
         final assetEntries = declaredEntries.keys.where(
-          (name) => _assetRoots.any((root) => name.startsWith('$root/')),
+          (name) => selectedAssetRoots.any((root) => name.startsWith('$root/')),
         );
         var processed = 1;
         for (final entryName in assetEntries) {
@@ -310,7 +329,8 @@ final class RestoreBundleStaging {
         _databaseEntry,
         if (includeFiles)
           ...declaredEntries.keys.where(
-            (name) => _assetRoots.any((root) => name.startsWith('$root/')),
+            (name) =>
+                selectedAssetRoots.any((root) => name.startsWith('$root/')),
           ),
       };
       if (expectedEntryNames.length != stagedEntries.length ||
@@ -318,9 +338,12 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_entries');
       }
       final sortedEntryNames = stagedEntries.keys.toList()..sort();
+      manifest['formatVersion'] = _backupFormatVersion;
+      manifest.remove('scope');
       manifest['payloadKind'] = 'sqlite';
       manifest['includeChats'] = true;
       manifest['includeFiles'] = includeFiles;
+      manifest['assetRoots'] = selectedAssetRoots.toList()..sort();
       manifest.remove('secretsIncluded');
       manifest.remove('businessEntityRowIds');
       // A forward-compatibility declaration describes the SOURCE archive. The
@@ -451,8 +474,10 @@ final class RestoreBundleStaging {
     final includeChats = manifest['includeChats'];
     final includeFiles = manifest['includeFiles'];
     final payloadKind = manifest['payloadKind'];
+    final formatVersion = manifest['formatVersion'];
     if (manifest['format'] != _backupFormat ||
-        manifest['formatVersion'] != _backupFormatVersion ||
+        formatVersion is! int ||
+        (formatVersion != 2 && formatVersion != _backupFormatVersion) ||
         includeChats != true ||
         includeFiles is! bool ||
         payloadKind != 'sqlite' ||
@@ -468,6 +493,7 @@ final class RestoreBundleStaging {
       'appVersion',
       'includeChats',
       'includeFiles',
+      if (formatVersion == _backupFormatVersion) 'assetRoots',
       'database',
       'entries',
     };
@@ -479,6 +505,27 @@ final class RestoreBundleStaging {
       manifest,
       includeFiles: includeFiles,
     );
+    // v1.3.0 staged all asset roots together. Interpret that exact schema in
+    // memory without rewriting the manifest bound by the existing receipts.
+    final rawAssetRoots = formatVersion == 2
+        ? (includeFiles ? _assetRoots : const <String>[])
+        : manifest['assetRoots'];
+    if (rawAssetRoots is! List ||
+        rawAssetRoots.any(
+          (root) => root is! String || !_assetRoots.contains(root),
+        ) ||
+        rawAssetRoots.toSet().length != rawAssetRoots.length ||
+        includeFiles != rawAssetRoots.isNotEmpty) {
+      throw const FormatException('restore_staging_asset_roots');
+    }
+    final assetRoots = rawAssetRoots.cast<String>().toSet();
+    if (declaredEntries.keys.any(
+      (name) =>
+          name != _databaseEntry &&
+          !assetRoots.any((root) => name.startsWith('$root/')),
+    )) {
+      throw const FormatException('restore_staging_asset_roots');
+    }
     final databaseInfo = _parseDatabaseInfo(
       manifest['database'],
       includeChats: true,
@@ -489,6 +536,7 @@ final class RestoreBundleStaging {
     return ValidatedRestoreCandidate(
       includeChats: true,
       includeFiles: includeFiles,
+      assetRoots: assetRoots,
       manifestSha256: manifestSha256,
       entries: declaredEntries,
       databaseInfo: databaseInfo,
@@ -908,6 +956,7 @@ final class RestoreBundleStaging {
     required File databaseFile,
     required String? deviceDatabasePath,
     required Map<String, dynamic> settings,
+    required BackupScope scope,
     required Map<String, Object?>? entityRowIds,
     required bool preserveExplicitEmptyInstructionList,
     required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
@@ -927,6 +976,7 @@ final class RestoreBundleStaging {
             databasePath: databaseFile.path,
             deviceDatabasePath: deviceDatabasePath,
             settings: settings,
+            scope: scope,
             entityRowIds: entityRowIds,
             preserveExplicitEmptyInstructionList:
                 preserveExplicitEmptyInstructionList,
@@ -992,7 +1042,7 @@ final class RestoreBundleStaging {
       candidateDirectory,
       expectedFiles: {...candidate.entries.keys, 'manifest.json'},
       includeChats: candidate.includeChats,
-      includeFiles: candidate.includeFiles,
+      assetRoots: candidate.assetRoots,
     );
     ctx.throwIfCancelled();
     await _validateCandidateEntries(candidateDirectory, candidate.entries);
@@ -1050,7 +1100,7 @@ final class RestoreBundleStaging {
     try {
       await BackupPortability.sanitizeDatabase(database);
       await BusinessRestoreService(BusinessRepository(database)).overwrite(
-        args.settings,
+        BackupContentFilter.select(args.settings, args.scope),
         entityRowIds: args.entityRowIds,
         preserveExplicitEmptyInstructionList:
             args.preserveExplicitEmptyInstructionList,
@@ -1061,8 +1111,14 @@ final class RestoreBundleStaging {
         try {
           final local = await BusinessRepository(localDatabase).readSnapshot();
           await BusinessRepository(database).transformSnapshot(
-            (incoming) =>
-                BackupPortability.preserveDeviceState(incoming, local),
+            (incoming) => BackupPortability.preserveDeviceState(
+              BackupContentFilter.preserveUnselected(
+                incoming,
+                local,
+                args.scope,
+              ),
+              local,
+            ),
             writeReceipt: true,
           );
           final mounts = await ExtensionEntityStore(
@@ -1189,7 +1245,7 @@ final class RestoreBundleStaging {
     Directory candidate, {
     required Set<String> expectedFiles,
     required bool includeChats,
-    required bool includeFiles,
+    required Set<String> assetRoots,
   }) async {
     final actualFiles = <String>{};
     final actualDirectories = <String>{};
@@ -1200,7 +1256,7 @@ final class RestoreBundleStaging {
         expectedDirectories.add(segments.take(index).join('/'));
       }
     }
-    if (includeFiles) expectedDirectories.addAll(_assetRoots);
+    expectedDirectories.addAll(assetRoots);
     await for (final entity in candidate.list(
       recursive: true,
       followLinks: false,
@@ -1211,25 +1267,63 @@ final class RestoreBundleStaging {
           .replaceAll('\\', '/');
       if (type == FileSystemEntityType.directory) {
         if (!expectedDirectories.contains(relativePath)) {
-          throw const FormatException('restore_staging_candidate_directory');
+          throw RestoreFormatException('restore_staging_candidate_directory', {
+            'candidate directory': candidate.path,
+            'unexpected directory': relativePath,
+            'entry path': entity.path,
+          });
         }
         actualDirectories.add(relativePath);
         continue;
       }
       if (type != FileSystemEntityType.file) {
-        throw const FormatException('restore_staging_candidate_type');
+        throw RestoreFormatException('restore_staging_candidate_type', {
+          'candidate directory': candidate.path,
+          'relative path': relativePath,
+          'entry path': entity.path,
+          'entry type': '$type',
+        });
       }
       actualFiles.add(relativePath);
     }
     if (actualFiles.length != expectedFiles.length ||
         !actualFiles.containsAll(expectedFiles)) {
-      throw const FormatException('restore_staging_candidate_entries');
+      throw RestoreFormatException('restore_staging_candidate_entries', {
+        'candidate directory': candidate.path,
+        ..._topologyDifferenceDetails('files', actualFiles, expectedFiles),
+      });
     }
     if (actualDirectories.length != expectedDirectories.length ||
         !actualDirectories.containsAll(expectedDirectories) ||
         (includeChats != expectedDirectories.contains('database'))) {
-      throw const FormatException('restore_staging_candidate_directories');
+      throw RestoreFormatException('restore_staging_candidate_directories', {
+        'candidate directory': candidate.path,
+        'include chats': '$includeChats',
+        ..._topologyDifferenceDetails(
+          'directories',
+          actualDirectories,
+          expectedDirectories,
+        ),
+      });
     }
+  }
+
+  static Map<String, String> _topologyDifferenceDetails(
+    String kind,
+    Set<String> actual,
+    Set<String> expected,
+  ) {
+    final missing = expected.difference(actual);
+    final unexpected = actual.difference(expected);
+    return {
+      'expected $kind': '${expected.length}',
+      'actual $kind': '${actual.length}',
+      'missing $kind count': '${missing.length}',
+      'unexpected $kind count': '${unexpected.length}',
+      // Limit listed paths even when the whole payload is missing or unexpected.
+      'missing $kind (first 10)': jsonEncode(missing.take(10).toList()),
+      'unexpected $kind (first 10)': jsonEncode(unexpected.take(10).toList()),
+    };
   }
 
   static Future<void> _validateCandidateEntries(
@@ -1379,6 +1473,7 @@ final class _CandidateDbIsolateArgs {
     required this.databasePath,
     required this.deviceDatabasePath,
     required this.settings,
+    required this.scope,
     required this.entityRowIds,
     required this.preserveExplicitEmptyInstructionList,
     required this.expectedDatabaseInfo,
@@ -1391,6 +1486,7 @@ final class _CandidateDbIsolateArgs {
   final String databasePath;
   final String? deviceDatabasePath;
   final Map<String, dynamic> settings;
+  final BackupScope scope;
   final Map<String, Object?>? entityRowIds;
   final bool preserveExplicitEmptyInstructionList;
   final ChatDatabaseSnapshotInfo expectedDatabaseInfo;

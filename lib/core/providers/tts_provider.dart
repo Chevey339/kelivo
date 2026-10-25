@@ -9,7 +9,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../../shared/widgets/markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../database/business_preferences.dart';
 import '../services/tts/network_tts.dart';
 import '../services/mobile_background.dart';
@@ -801,11 +801,15 @@ class TtsProvider extends ChangeNotifier {
     return _networkCache.putIfAbsent(index, () {
       final resolved = _resolvedNetworkChunks[index];
       if (resolved != null) return Future<NetworkTtsResult>.value(resolved);
-      return NetworkTtsService.synthesize(
+      final synthesis = NetworkTtsService.synthesize(
         options: service,
         text: _chunks[index].text,
         cancelled: () => session != _sessionId,
       );
+      // Prefetch may fail before playback awaits it, or outlive its session.
+      // Keep the original future so the queue still receives failures on await.
+      synthesis.ignore();
+      return synthesis;
     });
   }
 
@@ -909,11 +913,9 @@ class TtsProvider extends ChangeNotifier {
     await _claimSpeechAudio();
     if (io.Platform.isIOS) {
       await _tts.autoStopSharedSession(false);
-      await _tts.setIosAudioCategory(
-        IosTextToSpeechAudioCategory.playback,
-        [IosTextToSpeechAudioCategoryOptions.mixWithOthers],
-        IosTextToSpeechAudioMode.spokenAudio,
-      );
+      await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
+        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+      ], IosTextToSpeechAudioMode.spokenAudio);
       await _tts.setSharedInstance(true);
     }
     await _ensureBound();
@@ -1137,7 +1139,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   static String _stripMarkdown(String input) {
-    var s = markdownRemoveCode(input);
+    var s = removeCode(input);
     s = s.replaceAllMapped(
       RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
       (m) => m.group(1) ?? '',

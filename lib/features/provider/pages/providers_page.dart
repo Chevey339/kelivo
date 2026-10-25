@@ -9,8 +9,10 @@ import '../widgets/add_provider_sheet.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_catalog/model_catalog_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import 'model_catalog_page.dart';
 import '../../../core/services/haptics.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -20,6 +22,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
@@ -46,6 +49,12 @@ class _ProvidersPageState extends State<ProvidersPage> {
   bool _groupHeaderDragActive = false;
   bool _groupHeaderReorderInFlight = false;
   bool _groupHeaderRestorePending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
 
   @override
   void dispose() {
@@ -153,7 +162,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
           }
         : {for (final p in filteredItems) p.keyName};
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         leading: Tooltip(
           message: l10n.settingsPageBackButton,
@@ -166,6 +175,19 @@ class _ProvidersPageState extends State<ProvidersPage> {
         ),
         title: Text(l10n.providersPageTitle),
         actions: [
+          Tooltip(
+            message: l10n.modelCatalogTitle,
+            child: _TactileIconButton(
+              icon: Lucide.BookOpen,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(builder: (_) => ModelCatalogPage()),
+                );
+              },
+            ),
+          ),
           Tooltip(
             message: _selectMode
                 ? l10n.searchServicesPageDone
@@ -463,6 +485,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
         ],
       ),
     );
+    return SelectionBackScope(
+      selecting: _selectMode,
+      onCancel: () => setState(() {
+        _selectMode = false;
+        _selected.clear();
+      }),
+      child: page,
+    );
   }
 
   List<_Provider> _providers({required AppLocalizations l10n}) => [
@@ -475,6 +505,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     ),
     _p('Gemini', 'Gemini', enabled: true, models: 0),
     _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
+    _p('Vercel AI Gateway', 'Vercel', enabled: false, models: 0),
     _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
     _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
     _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),

@@ -567,6 +567,139 @@ void main() {
     expect(spokenTexts.last, '保留');
   });
 
+  for (final kind in [NetworkTtsKind.openai, NetworkTtsKind.mimo]) {
+    for (final replaceSession in [false, true]) {
+      test(
+        '${kind.name} prefetch cancellation is handled after '
+        '${replaceSession ? 'starting another session' : 'stopping'}',
+        () async {
+          final provider = TtsProvider(preferences: session.preferences);
+          addTearDown(provider.dispose);
+          await _waitUntil(() => provider.isAvailable);
+          final requests = <HttpRequest>[];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            await request.drain<void>();
+            requests.add(request);
+          });
+          final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+          final TtsServiceOptions service = kind == NetworkTtsKind.mimo
+              ? MimoTtsOptions(
+                  enabled: true,
+                  name: 'test',
+                  apiKey: '',
+                  baseUrl: baseUrl,
+                  model: 'mimo-v2.5-tts',
+                  voice: 'mimo_default',
+                )
+              : OpenAiTtsOptions(
+                  enabled: true,
+                  name: 'test',
+                  apiKey: '',
+                  baseUrl: baseUrl,
+                  model: 'tts',
+                  voice: 'alloy',
+                );
+          unawaited(
+            provider.speakWithNetworkService(
+              service,
+              List.filled(650, 'a').join(),
+            ),
+          );
+          await _waitUntil(() => requests.length == 3);
+
+          if (replaceSession) {
+            await provider.speak(
+              'replacement session',
+              waitForCompletion: false,
+            );
+            await _waitUntil(
+              () => provider.playbackState.status == TtsPlaybackStatus.playing,
+            );
+          } else {
+            await provider.stop();
+          }
+          for (final request in requests) {
+            request.response.add([1, 2, 3, 4]);
+            await request.response.close();
+          }
+          // Let the cancelled synthesis futures settle, including the two
+          // prefetched chunks that the playback queue will never await.
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          expect(networkSources, 0);
+          expect(provider.error, isNull);
+          expect(
+            provider.playbackState.status,
+            replaceSession ? TtsPlaybackStatus.playing : TtsPlaybackStatus.idle,
+          );
+          await provider.stop();
+        },
+      );
+    }
+  }
+
+  test('prefetch failures remain available to the playback queue', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'kelivo_tts_prefetch_error_',
+    );
+    final previousPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _FakePathProviderPlatform(directory.path);
+    addTearDown(() async {
+      PathProviderPlatform.instance = previousPaths;
+      await directory.delete(recursive: true);
+    });
+    final provider = TtsProvider(preferences: session.preferences);
+    addTearDown(provider.dispose);
+    await _waitUntil(() => provider.isAvailable);
+    final requests = <String, HttpRequest>{};
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+      requestCount++;
+      requests[(body['input'] as String)[0]] = request;
+    });
+    final playback = provider.speakWithNetworkService(
+      OpenAiTtsOptions(
+        enabled: true,
+        name: 'test',
+        apiKey: '',
+        baseUrl: 'http://${server.address.address}:${server.port}/v1',
+        model: 'tts',
+        voice: 'alloy',
+      ),
+      ['a', 'b', 'c'].map((letter) => List.filled(220, letter).join()).join(),
+    );
+    await _waitUntil(() => requests.length == 3);
+    for (final letter in ['b', 'c']) {
+      requests[letter]!.response
+        ..statusCode = HttpStatus.serviceUnavailable
+        ..write('temporary provider failure');
+      await requests[letter]!.response.close();
+    }
+    // The future must handle an error even before its chunk is consumed.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(provider.playbackState.status, TtsPlaybackStatus.buffering);
+    expect(provider.error, isNull);
+
+    requests['a']!.response.add([1, 2, 3, 4]);
+    await requests['a']!.response.close();
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+    await _emitAudioEvent(audioPlayerEventChannel!, {
+      'event': 'audio.onComplete',
+    });
+    await playback;
+    expect(provider.playbackState.status, TtsPlaybackStatus.error);
+    expect(provider.error, contains('503'));
+    expect(provider.error, contains('temporary provider failure'));
+    expect(networkSources, 1);
+    expect(requestCount, 3);
+  });
+
   test('network replay uses cached audio only when enabled', () async {
     final originalPathProvider = PathProviderPlatform.instance;
     final tempDirectory = await Directory.systemTemp.createTemp(

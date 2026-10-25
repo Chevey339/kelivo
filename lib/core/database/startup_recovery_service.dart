@@ -4,12 +4,16 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:uuid/uuid.dart';
 
 import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_business_lease.dart';
 import '../services/backup/restore_workspace_lock.dart';
 import 'app_database.dart';
+import '../../utils/app_directories.dart';
+import 'empty_database_recovery_guard.dart';
 import 'database_installation_gate.dart';
+import 'database_family_preserver.dart';
 
 /// User-initiated recovery actions for the pre-initialization failure screen.
 ///
@@ -41,16 +45,23 @@ final class StartupRecoveryService {
     required Directory appDataDirectory,
     required Directory destinationParent,
     DateTime Function()? clock,
+    List<Directory> additionalDataDirectories = const [],
   }) async {
-    if (!await appDataDirectory.exists()) {
+    final roots = await _exportRoots(
+      appDataDirectory,
+      additionalDataDirectories,
+    );
+    if (roots.isEmpty) {
       throw StateError('startup_recovery_source_missing');
     }
     // A destination inside the data directory would make the copy recurse
     // into itself (the target shows up while the source is being listed).
-    final sourcePath = p.normalize(appDataDirectory.absolute.path);
     final destinationPath = p.normalize(destinationParent.absolute.path);
-    if (destinationPath == sourcePath ||
-        p.isWithin(sourcePath, destinationPath)) {
+    if (roots.any(
+      (root) =>
+          p.equals(root.absolute.path, destinationPath) ||
+          p.isWithin(root.absolute.path, destinationPath),
+    )) {
       throw StateError('startup_recovery_export_inside_source');
     }
     await destinationParent.create(recursive: true);
@@ -65,7 +76,12 @@ final class StartupRecoveryService {
       throw StateError('startup_recovery_export_collision');
     }
     await target.create(recursive: true);
-    await _copyDirectory(appDataDirectory, target);
+    for (var i = 0; i < roots.length; i++) {
+      final destination = additionalDataDirectories.isEmpty && roots.length == 1
+          ? target
+          : await Directory(p.join(target.path, 'data-$i')).create();
+      await _copyDirectory(roots[i], destination);
+    }
     return target;
   }
 
@@ -84,11 +100,21 @@ final class StartupRecoveryService {
     if (!await appDataDirectory.exists()) {
       throw StateError('startup_recovery_source_missing');
     }
+    if (await FileSystemEntity.type(
+          p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+          followLinks: false,
+        ) !=
+        FileSystemEntityType.file) {
+      throw StateError('database_missing_with_prior_data');
+    }
     await _sweepReceiptTemporaries(appDataDirectory);
     await _sweepRestoreWorkspaceJunk(appDataDirectory);
-    await _deleteUnparseableReceipts(appDataDirectory);
-    // Adopting the identity lets a receipt that was deleted (because it was
-    // unparseable) or that mismatches be rewritten from the live database. A
+    await _archiveUnparseableReceipts(
+      appDataDirectory,
+      durability ?? RestorePlatformDurability(),
+    );
+    // Adopting the identity lets an archived unreadable receipt or an identity
+    // mismatch be repaired from the live database without discarding evidence. A
     // user electing to repair is implicitly trusting the database on disk.
     await DatabaseInstallationGate.ensureReady(
       appDataDirectory: appDataDirectory,
@@ -97,8 +123,8 @@ final class StartupRecoveryService {
     );
   }
 
-  /// Deletes the installed database family and installation receipts and
-  /// re-runs first-launch setup. Destructive: the current database is lost.
+  /// Preserves the installed database family and receipts, then explicitly
+  /// starts a new database. Retained copies remain available for recovery.
   /// Callers must confirm with the user and should offer [exportDataCopy]
   /// first.
   static Future<void> reset({
@@ -134,25 +160,99 @@ final class StartupRecoveryService {
         // the fresh database on the next launch. Keep admission blocked until
         // both the new database and installation receipt are durable.
         await workspaceLock.beginSnapshotRecoveryWhileLocked();
+        // A process exit between Hive renames must remain behind the durable
+        // barrier. A later explicit reset resumes retirement before admission,
+        // instead of migrating the remaining, incomplete set of legacy boxes.
+        await _retainLegacyHiveFiles(appDataDirectory, resolvedDurability);
+        await DatabaseFamilyPreserver.prepareExplicitRecovery(
+          appDataDirectory,
+          recoveryBarrier: File(
+            p.join(
+              appDataDirectory.path,
+              RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+            ),
+          ),
+          durability: resolvedDurability,
+          retireExistingFamilies: true,
+        );
         await _sweepReceiptTemporaries(appDataDirectory);
+        final receipts = Directory(
+          p.join(
+            appDataDirectory.path,
+            '.kelivo_retained_receipts_${DateTime.now().microsecondsSinceEpoch}',
+          ),
+        );
         await for (final entity in appDataDirectory.list(followLinks: false)) {
           final name = p.basename(entity.path);
-          if (name.startsWith(_receiptPrefix) &&
+          if (entity is File &&
+              name.startsWith(_receiptPrefix) &&
               name.endsWith(_receiptSuffix)) {
-            await _deleteFileIfPresent(entity.path);
+            await receipts.create(recursive: true);
+            await resolvedDurability.renameAndSync(
+              source: entity,
+              targetPath: p.join(receipts.path, name),
+            );
           }
         }
-        // Reset deletes the installed family instead of making another copy.
+        // An explicit fresh start still preserves the previous database family.
         await DatabaseInstallationGate.rebuildFresh(
           appDataDirectory: appDataDirectory,
           durability: resolvedDurability,
-          preserveDisplacedCopy: false,
+          preserveDisplacedCopy: true,
         );
+        await EmptyDatabaseRecoveryGuard.acknowledge(appDataDirectory);
         await workspaceLock.finishSnapshotRecoveryWhileLocked();
       });
     } finally {
       await ownedLease?.close();
     }
+  }
+
+  static Future<void> _retainLegacyHiveFiles(
+    Directory root,
+    RestoreDurability durability,
+  ) async {
+    for (final name in ['conversations', 'messages', 'tool_events_v1']) {
+      for (final extension in ['hive', 'lock']) {
+        final file = File(p.join(root.path, '$name.$extension'));
+        final type = await FileSystemEntity.type(file.path, followLinks: false);
+        if (type == FileSystemEntityType.notFound) continue;
+        if (type != FileSystemEntityType.file) {
+          throw StateError('startup_recovery_hive_type');
+        }
+        var destination = '${file.path}.retired';
+        if (await FileSystemEntity.type(destination, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+          destination = '$destination-${const Uuid().v4()}';
+        }
+        await durability.renameAndSync(source: file, targetPath: destination);
+      }
+    }
+  }
+
+  static Future<List<Directory>> _exportRoots(
+    Directory root,
+    List<Directory> additional,
+  ) async {
+    final paths = <String>{};
+    final result = <Directory>[];
+    for (final directory in [
+      root,
+      await AppDirectories.contentDirectoryFor(root),
+      ...additional,
+    ]) {
+      if (!paths.add(p.normalize(directory.absolute.path))) continue;
+      final type = await FileSystemEntity.type(
+        directory.path,
+        followLinks: false,
+      );
+      if (type == FileSystemEntityType.notFound) continue;
+      if (type != FileSystemEntityType.directory) {
+        throw StateError('startup_recovery_source_type');
+      }
+      result.add(directory);
+    }
+    return result;
   }
 
   static Future<void> _copyDirectory(Directory source, Directory target) async {
@@ -193,7 +293,16 @@ final class StartupRecoveryService {
     }
   }
 
-  static Future<void> _deleteUnparseableReceipts(Directory directory) async {
+  static Future<void> _archiveUnparseableReceipts(
+    Directory directory,
+    RestoreDurability durability,
+  ) async {
+    final archive = Directory(
+      p.join(
+        directory.path,
+        '.kelivo_retained_receipts_${DateTime.now().microsecondsSinceEpoch}',
+      ),
+    );
     await for (final entity in directory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       if (!name.startsWith(_receiptPrefix) || !name.endsWith(_receiptSuffix)) {
@@ -214,7 +323,11 @@ final class StartupRecoveryService {
         valid = false;
       }
       if (!valid) {
-        await _deleteFileIfPresent(entity.path);
+        await archive.create(recursive: true);
+        await durability.renameAndSync(
+          source: file,
+          targetPath: p.join(archive.path, name),
+        );
       }
     }
   }
@@ -266,7 +379,10 @@ final class StartupDiagnosticsService {
   }) async {
     try {
       final directory = Directory(
-        p.join(appDataDirectory.path, _logDirectoryName),
+        p.join(
+          (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+          _logDirectoryName,
+        ),
       );
       await directory.create(recursive: true);
       final stamp = (clock?.call() ?? DateTime.now())
@@ -318,13 +434,21 @@ final class StartupDiagnosticsService {
     required Directory appDataDirectory,
     required Directory workingDirectory,
     DateTime Function()? clock,
+    List<Directory> additionalDataDirectories = const [],
   }) async {
-    if (!await appDataDirectory.exists()) {
+    final roots = await StartupRecoveryService._exportRoots(
+      appDataDirectory,
+      additionalDataDirectories,
+    );
+    if (roots.isEmpty) {
       throw StateError('startup_recovery_source_missing');
     }
-    final sourcePath = p.normalize(appDataDirectory.absolute.path);
     final workingPath = p.normalize(workingDirectory.absolute.path);
-    if (workingPath == sourcePath || p.isWithin(sourcePath, workingPath)) {
+    if (roots.any(
+      (root) =>
+          p.equals(root.absolute.path, workingPath) ||
+          p.isWithin(root.absolute.path, workingPath),
+    )) {
       throw StateError('startup_recovery_export_inside_source');
     }
     await workingDirectory.create(recursive: true);
@@ -339,11 +463,32 @@ final class StartupDiagnosticsService {
       throw StateError('startup_recovery_export_collision');
     }
     final encoder = ZipFileEncoder();
-    await encoder.zipDirectory(
-      appDataDirectory,
-      filename: archive.path,
-      followLinks: false,
-    );
+    if (additionalDataDirectories.isEmpty && roots.length == 1) {
+      await encoder.zipDirectory(
+        roots.single,
+        filename: archive.path,
+        followLinks: false,
+      );
+    } else {
+      encoder.create(archive.path);
+      try {
+        for (var i = 0; i < roots.length; i++) {
+          await for (final file in roots[i].list(
+            recursive: true,
+            followLinks: false,
+          )) {
+            if (file is File) {
+              await encoder.addFile(
+                file,
+                'data-$i/${p.relative(file.path, from: roots[i].path)}',
+              );
+            }
+          }
+        }
+      } finally {
+        await encoder.close();
+      }
+    }
     return archive;
   }
 
@@ -366,11 +511,20 @@ final class StartupDiagnosticsService {
         foreignKeyViolations: null,
       );
     }
-    final database = sqlite.sqlite3.open(
-      file.absolute.path,
-      mode: sqlite.OpenMode.readOnly,
+    final temporary = await Directory.systemTemp.createTemp(
+      'kelivo-integrity-',
     );
+    sqlite.Database? database;
     try {
+      final copied = File(p.join(temporary.path, AppDatabase.databaseFileName));
+      for (final suffix in ['', '-wal', '-shm', '-journal']) {
+        final member = File('${file.path}$suffix');
+        if (await FileSystemEntity.type(member.path, followLinks: false) ==
+            FileSystemEntityType.file) {
+          await member.copy('${copied.path}$suffix');
+        }
+      }
+      database = sqlite.sqlite3.open(copied.path);
       final quickCheck = database
           .select('PRAGMA quick_check;')
           .map((row) => row.values.first?.toString() ?? '')
@@ -383,7 +537,8 @@ final class StartupDiagnosticsService {
         foreignKeyViolations: foreignKeys,
       );
     } finally {
-      database.close();
+      database?.close();
+      await temporary.delete(recursive: true);
     }
   }
 }

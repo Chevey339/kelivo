@@ -3,10 +3,11 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/health_data_type.dart';
+import '../../../core/services/browser/browser_tools_service.dart';
+import 'calculator_service.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
 
@@ -23,6 +24,7 @@ class LocalToolNames {
   static const String calendarCreate = 'calendar_create';
   static const String currentLocation = 'get_current_location';
   static const String phoneControl = 'phone_control';
+  static const String browser = BrowserToolsService.toolName;
   static const String weather = 'get_weather';
   static const String healthSummary = 'get_health_summary';
   static const String remindersQuery = 'reminders_query';
@@ -40,6 +42,7 @@ class LocalToolNames {
     calendarCreate,
     currentLocation,
     phoneControl,
+    browser,
     weather,
     healthSummary,
     remindersQuery,
@@ -405,6 +408,14 @@ class LocalToolsService {
   /// assistant "Local tools" tab.
   static bool isAvailableOnThisPlatform(String name) {
     switch (name) {
+      case LocalToolNames.browser:
+        return !kIsWeb &&
+            const {
+              TargetPlatform.android,
+              TargetPlatform.iOS,
+              TargetPlatform.macOS,
+              TargetPlatform.windows,
+            }.contains(defaultTargetPlatform);
       case LocalToolNames.phoneControl:
         return DeviceLocalTools.phoneControlSupported;
       case LocalToolNames.screenTime:
@@ -435,6 +446,8 @@ class LocalToolsService {
 
   static Map<String, dynamic> definitionFor(String name) {
     switch (name) {
+      case LocalToolNames.browser:
+        return BrowserToolsService.getToolDefinition();
       case LocalToolNames.phoneControl:
         return _phoneControlDefinition;
       case LocalToolNames.timeInfo:
@@ -604,6 +617,11 @@ class LocalToolsService {
           'from x,y to end_x,end_y. All of these require the latest snapshot_id, '
           'valid for 30 seconds and consumed by an action. Read the screen again '
           'after each action to verify the result, and after stale-screen errors. '
+          'Node actions are rejected if the screen content changed since the '
+          'read; on constantly changing screens (video feeds, live streams) '
+          'use x,y gestures, which only require the same app window and are '
+          'not checked against screen content, so read again if the screen may '
+          'have moved on. '
           'list_apps discovers launchable package names; open_app opens one. '
           'System navigation: back, home, recents, notifications, quick_settings. '
           'Ask the user to enable this service if unavailable; never change '
@@ -764,7 +782,10 @@ class LocalToolsService {
     'function': {
       'name': LocalToolNames.calculate,
       'description':
-          'Evaluate a mathematical expression. Supports: + - * / ^ % !, sin() cos() tan() sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
+          'Evaluate a mathematical expression. Decimal/integer arithmetic, division, integer powers, factorial, modulo and rounding use exact rational arithmetic. '
+          'Repeating decimal outputs and calculations using pi, e, roots, non-integer powers, or transcendental functions are marked approximate and rounded to 15 significant digits. '
+          'Supports: + - * / ^ % !, sin() cos() tan() (radians), sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. '
+          'Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -1253,19 +1274,12 @@ class LocalToolsService {
     }
 
     try {
-      final parsed = GrammarParser().parse(expression);
-      final result = parsed.evaluate(EvaluationType.REAL, ContextModel());
-      if (!result.isFinite) {
-        return jsonEncode({
-          'error': 'math_error',
-          'message':
-              'The result is not a finite number. Please check your expression (e.g. division by zero).',
-        });
-      }
       return jsonEncode({
         'expression': expression,
-        'result': result.toString(),
+        ...CalculatorService.evaluate(expression),
       });
+    } on CalculatorException catch (e) {
+      return jsonEncode({'error': 'math_error', 'message': e.message});
     } catch (e) {
       return jsonEncode({
         'error': 'parse_error',

@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class OllamaSearchService extends SearchService<OllamaOptions> {
+class OllamaSearchService extends SearchService<OllamaOptions>
+    implements WebFetchCapable<OllamaOptions> {
+  OllamaSearchService({super.client});
+
+  static const String fetchUrl = 'https://ollama.com/api/web_fetch';
+
   @override
   String get name => 'Ollama';
 
@@ -60,6 +66,32 @@ class OllamaSearchService extends SearchService<OllamaOptions> {
       return SearchResult(items: results);
     } catch (e) {
       throw Exception('Ollama search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required OllamaOptions serviceOptions,
+  }) async {
+    try {
+      final data = await postFetchJson(
+        Uri.parse(fetchUrl),
+        headers: {
+          'Authorization':
+              'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
+        },
+        body: {'url': url},
+        commonOptions: commonOptions,
+      );
+      return WebFetchPage(
+        url: url,
+        title: (data['title'] ?? '').toString(),
+        content: (data['content'] ?? '').toString(),
+      );
+    } catch (e) {
+      throw Exception('Ollama fetch failed: $e');
     }
   }
 }

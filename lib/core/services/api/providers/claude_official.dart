@@ -1,3 +1,4 @@
+import '../../custom_request_merger.dart';
 import '../../../models/provider_oauth.dart';
 import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
@@ -7,12 +8,16 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../models/token_usage.dart';
-import '../../../providers/model_provider.dart';
+import '../../../models/model_spec.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../native_input_attachments.dart';
+import '../tool_result_content.dart';
+import '../../model_spec/model_spec_resolver.dart';
+import '../reasoning/reasoning_dialects.dart';
 import '../generation/tool_loop_runner.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
@@ -22,6 +27,7 @@ import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
+import 'claude/claude_thinking_recovery.dart';
 
 export 'claude/claude_history.dart'
     show
@@ -29,24 +35,13 @@ export 'claude/claude_history.dart'
         isClaudeSupportedImageMime,
         claudeToolResultContent;
 
-int _defaultClaudeMaxOutputTokens(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  if (RegExp(
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-8)|sonnet-5)(?:$|[._:@/-])',
-    caseSensitive: false,
-  ).hasMatch(lower)) {
-    return 128000;
-  }
-  return 64000;
-}
-
 Stream<StreamChunk> sendClaudeStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -66,16 +61,12 @@ Stream<StreamChunk> sendClaudeStream(
       : config.baseUrl;
   final url = Uri.parse('$base/messages');
 
-  final isReasoning = effectiveModelInfo(
-    config,
-    modelId,
-  ).abilities.contains(ModelAbility.reasoning);
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
-  final replayServerToolBlocks = BuiltInToolsHelper.isOfficialAnthropicEndpoint(
-    config,
-  );
+  final replayServerToolBlocks =
+      BuiltInToolsHelper.isOfficialAnthropicEndpoint(config) ||
+      BuiltInToolsHelper.isVercelProvider(config);
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -99,13 +90,24 @@ Stream<StreamChunk> sendClaudeStream(
     );
   }
 
+  final spec = ModelSpecResolver.instance.spec(config, modelId);
+  final canImageInput = spec.input.contains(Modality.image);
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    reasoningReplay: spec.reasoning.replay,
     skipImageParsing: skipImageParsing,
+    canImageInput: canImageInput,
+    nativeInputs: NativeInputAttachments(
+      config: config,
+      spec: spec,
+      protocol: NativeInputProtocol.claude,
+    ),
     userImagePaths: userImagePaths,
   );
   final initialMessages = await history.build(nonSystemMessages);
+  final thinkingRecovery = ClaudeThinkingRecovery()..readMessages(messages);
+  var recoveredThinking = false;
 
   // Map OpenAI-style tools to Anthropic custom tools (client tools)
   List<Map<String, dynamic>>? anthropicTools;
@@ -165,6 +167,15 @@ Stream<StreamChunk> sendClaudeStream(
         ).where((name) => name == BuiltInToolNames.search).toSet()
       : builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
+    if (BuiltInToolsHelper.isVercelProvider(config) &&
+        !BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: config,
+          modelId: modelId,
+        )) {
+      throw UnsupportedError(
+        'Vercel Messages native web search requires an Anthropic model.',
+      );
+    }
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
       final ov = config.modelOverrides[modelId];
@@ -253,15 +264,20 @@ Stream<StreamChunk> sendClaudeStream(
   // pause — and stored after each so the next turn resumes in it too.
   ClaudeContainerRef? container = history.storedContainer;
   // Every response of this turn so far, stored against the message after each
-  // so the turn replays as the responses it was. A turn without a tool call
-  // replays from its text alone and stores nothing.
+  // so the turn replays as the responses it was, including thinking and its
+  // signature when no tool was called. Replay policy never discards storage.
   final turnResponses = <List<Map<String, dynamic>>>[];
   Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
     turnResponses.add(response);
-    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
+    yield ProviderArtifact(
+      kind: claudeTurnArtifactKind,
+      payload: encodeClaudeTurn(turnResponses),
+    );
+    final recoveryArtifact = thinkingRecovery.artifact;
+    if (recoveryArtifact != null) {
       yield ProviderArtifact(
-        kind: claudeTurnArtifactKind,
-        payload: encodeClaudeTurn(turnResponses),
+        kind: claudeThinkingRecoveryArtifactKind,
+        payload: recoveryArtifact,
       );
     }
     // Stored against this turn's message so the next turn can resume in the
@@ -277,7 +293,6 @@ Stream<StreamChunk> sendClaudeStream(
 
   final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
-  final nonStreamText = StringBuffer();
   var pauseTurn = false;
 
   // A container the conversation goes on using gets the files it has not
@@ -330,86 +345,88 @@ Stream<StreamChunk> sendClaudeStream(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
-      final omitSamplingParams = claudeShouldOmitSamplingParams(
-        upstreamModelId,
-        thinkingBudget,
-      );
-      final compatibleTopP = claudeCompatibleTopP(
-        upstreamModelId,
-        thinkingBudget,
-        topP,
-      );
-      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
-          ? modelId
-          : upstreamModelId;
-      final thinking = isReasoning
-          ? claudeThinkingConfig(
-              thinkingModelId,
-              thinkingBudget,
-              config: config,
-            )
-          : null;
-      final outputConfig = isReasoning
-          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
-          : null;
-
-      // Prepare request body per round
-      final body = <String, dynamic>{
-        'model': upstreamModelId,
-        'max_tokens':
-            maxTokens ??
-            (config.oauthProvider == OAuthProvider.kimi
-                ? 32000
-                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
-        'messages': convo,
-        'stream': stream,
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-        if (config.claudePromptCachingEnabled == true)
-          'cache_control': ProviderConfig.claudePromptCacheControl(
-            config.claudePromptCachingTtl,
-          ),
-        if (!omitSamplingParams &&
-            !isClaudeReasoningEnabled(thinkingBudget) &&
-            temperature != null)
-          'temperature': temperature,
-        if (compatibleTopP != null) 'top_p': compatibleTopP,
-        if (allTools.isNotEmpty) 'tools': allTools,
-        if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (thinking != null) 'thinking': thinking,
-        if (outputConfig != null) 'output_config': outputConfig,
-        if (hasCodeExecution && container != null) 'container': container!.id,
-      };
-      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
-      if (extraClaude.isNotEmpty) {
-        body.addAll(extraClaude);
+      totalUsage = null;
+      final spec = ModelSpecResolver.instance.spec(config, modelId);
+      var retriedContainer = false;
+      Map<String, dynamic> buildBody() {
+        final body = <String, dynamic>{
+          'model': upstreamModelId,
+          'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
+          if (config.claudePromptCachingEnabled == true)
+            'cache_control': ProviderConfig.claudePromptCacheControl(
+              config.claudePromptCachingTtl,
+            ),
+          if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+          'messages': convo,
+          'stream': stream,
+          if (temperature != null) 'temperature': temperature,
+          if (topP != null) 'top_p': topP,
+          if (allTools.isNotEmpty) 'tools': allTools,
+          if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
+          if (hasCodeExecution && container != null) 'container': container!.id,
+        };
+        applyReasoning(
+          body,
+          spec,
+          reasoning,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        final resolution = resolveReasoning(spec, reasoning);
+        applySamplingPolicy(
+          body,
+          spec,
+          resolution,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        // Custom body keys win over the reasoning dialect.
+        final extraClaude = customBody(
+          config,
+          modelId,
+          assistantBody: extraBody,
+        );
+        CustomRequestMerger.applyBody(body, extraClaude);
+        applyAnthropicMessagesProtocolConstraints(body);
+        if (retriedContainer) body.remove('container');
+        thinkingRecovery.filterRequest(body);
+        return body;
       }
 
-      http.Request buildRequest() {
+      http.Request buildRequest(Map<String, dynamic> body) {
         final request = http.Request('POST', url);
         request.headers.addAll(baseHeaders);
         request.body = jsonEncode(body);
         return request;
       }
 
-      var response = await client.send(buildRequest());
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      late http.StreamedResponse response;
+      while (true) {
+        final body = buildBody();
+        response = await client.send(buildRequest(body));
+        if (response.statusCode >= 200 && response.statusCode < 300) break;
         final errorBody = await response.stream.bytesToString();
+        if (!recoveredThinking &&
+            thinkingRecovery.recover(body, response.statusCode, errorBody)) {
+          recoveredThinking = true;
+          // Save before retrying: even a cancelled or failed retry must not
+          // put the rejected blocks back into a subsequent request.
+          yield ProviderArtifact(
+            kind: claudeThinkingRecoveryArtifactKind,
+            payload: thinkingRecovery.artifact!,
+          );
+          continue;
+        }
         // A stored container can have expired since the last turn; forget
         // it and let this round start a fresh one.
         final staleContainer =
+            !retriedContainer &&
             body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
+        retriedContainer = true;
         container = null;
-        body.remove('container');
         await uploadDataFiles();
-        response = await client.send(buildRequest());
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          final retryBody = await response.stream.bytesToString();
-          throw HttpException('HTTP ${response.statusCode}: $retryBody');
-        }
       }
 
       pendingCalls = [];
@@ -425,9 +442,8 @@ Stream<StreamChunk> sendClaudeStream(
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              claudeUsageFromMap(u),
-            );
+            final next = claudeUsageFromMap(u);
+            if (next.hasReportedTokens) totalUsage = next.asSnapshot();
           }
         } catch (_) {}
         container =
@@ -437,13 +453,17 @@ Stream<StreamChunk> sendClaudeStream(
             <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses =
             <String, Map<String, dynamic>>{}; // id -> {name,args}
-        for (final it in content) {
+        final roundId = 'round-${streamRound++}';
+        for (var index = 0; index < content.length; index++) {
+          final it = content[index];
           if (it is! Map) continue;
+          final ids = StreamChunkIds('$roundId-block-$index');
           final type = (it['type'] ?? '').toString();
           if (type == 'text') {
             final t = (it['text'] ?? '').toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
+              yield* emitDelta(ids: ids, content: t);
             }
           } else if (type == 'thinking' ||
               (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
@@ -455,6 +475,12 @@ Stream<StreamChunk> sendClaudeStream(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
               );
             } catch (_) {}
+            if (type == 'thinking') {
+              yield* emitDelta(
+                ids: ids,
+                reasoning: (it['thinking'] ?? '').toString(),
+              );
+            }
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
             final rawName = (it['name'] ?? '').toString();
@@ -497,11 +523,10 @@ Stream<StreamChunk> sendClaudeStream(
         // The continuation round sends these, so they go through the same
         // sanitising as replayed history; the stored copy stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
-        nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
-          sourceId: 'round-${streamRound++}',
+          sourceId: roundId,
         );
         for (final chunk in decoder.decodeCompleteServerTools(
           assistantBlocks,
@@ -586,7 +611,10 @@ Stream<StreamChunk> sendClaudeStream(
                 if (resultChunk is ToolCallResult) {
                   decoder.recordToolResult(
                     tool.id,
-                    (resultChunk.output ?? '').toString(),
+                    ClientToolResult(
+                      (resultChunk.output ?? '').toString(),
+                      metadata: resultChunk.metadata,
+                    ),
                   );
                 }
                 yield resultChunk;
@@ -641,20 +669,25 @@ Stream<StreamChunk> sendClaudeStream(
           ),
       ];
       for (final tool in decoder.clientTools.values) {
-        var res = toolResultsContent[tool.id] ?? '';
-        if (res.isEmpty && onToolCall != null) {
+        var res = toolResultsContent[tool.id];
+        if (res == null && onToolCall != null) {
           res = ClientToolResult.fromHandler(
             await onToolCall(
               tool.name,
               tool.decodedArguments,
               toolCallId: tool.id,
             ),
-          ).content;
+          );
         }
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          'content': claudeToolResultContent(res),
+          'content': (await ToolResultContent.read(
+            tool.name,
+            res?.content ?? '',
+            metadata: res?.metadata,
+            canImageInput: canImageInput,
+          )).claudeContent,
         });
       }
     },
@@ -663,7 +696,7 @@ Stream<StreamChunk> sendClaudeStream(
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (pauseTurn) {
         convo = [
           ...convo,
@@ -678,7 +711,12 @@ Stream<StreamChunk> sendClaudeStream(
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': claudeToolResultContent(item.content),
+                  'content': (await ToolResultContent.read(
+                    item.call.name,
+                    item.content,
+                    metadata: item.metadata,
+                    canImageInput: canImageInput,
+                  )).claudeContent,
                 },
             ];
       convo = [
@@ -690,7 +728,6 @@ Stream<StreamChunk> sendClaudeStream(
     finish: () async* {
       yield* emitDone(
         ids: StreamChunkIds('finish'),
-        content: nonStreamText.toString(),
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       );

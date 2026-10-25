@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
+import 'package:Kelivo/core/services/logging/flutter_logger.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/features/workspace/pages/external_mounts_page.dart';
 import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
@@ -255,8 +256,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
       await manager.install();
       await _refreshRuntime();
       if (!mounted) return;
-      if (manager is EnvironmentInstaller &&
-          manager.env.state.phase == EnvironmentPhase.ready &&
+      if (manager.env.state.phase == EnvironmentPhase.ready &&
           manager.env.state.errorMessage != null) {
         showAppSnackBar(
           context,
@@ -264,7 +264,11 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
             AppLocalizations.of(context)!,
             manager.env.state.errorMessage,
           ),
-          type: NotificationType.error,
+          type:
+              manager.env.state.errorMessage ==
+                  EnvironmentError.cleanupIncomplete
+              ? NotificationType.warning
+              : NotificationType.error,
         );
       }
     } finally {
@@ -307,6 +311,15 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           _diskUsageTimedOut = false;
         });
         unawaited(_loadDiskUsage(force: true));
+      }
+    } catch (error, stack) {
+      FlutterLogger.log('Reset failed: $error\n$stack', tag: 'Environment');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.workspaceEnvErrorResetFailed,
+          type: NotificationType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

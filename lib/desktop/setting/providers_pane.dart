@@ -24,6 +24,13 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   bool _temporarilyCollapseGroupedProviders = false;
   bool _groupHeaderDragActive = false;
   bool _groupHeaderRestorePending = false;
+  final GlobalKey _catalogAnchorKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
 
   @override
   void dispose() {
@@ -300,6 +307,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'Gemini', key: 'Gemini'),
       (name: 'OpenRouter', key: 'OpenRouter'),
+      (name: 'Vercel AI Gateway', key: 'Vercel'),
       (name: 'KelivoIN', key: 'KelivoIN'),
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: 'DeepSeek', key: 'DeepSeek'),
@@ -385,21 +393,62 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 width: 256,
                 child: Column(
                   children: [
-                    _DesktopProvidersSearchField(
-                      controller: _searchController,
-                      hintText: l10n.providersPageSearchHint,
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = _normalizeSearchQuery(value);
-                        });
-                      },
-                      onClear: () {
-                        if (_searchController.text.isEmpty) return;
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DesktopProvidersSearchField(
+                            controller: _searchController,
+                            hintText: l10n.providersPageSearchHint,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = _normalizeSearchQuery(value);
+                              });
+                            },
+                            onClear: () {
+                              if (_searchController.text.isEmpty) return;
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: l10n.modelCatalogTitle,
+                          child: KeyedSubtree(
+                            key: _catalogAnchorKey,
+                            child: _IconBtn(
+                              icon: lucide.Lucide.BookOpen,
+                              onTap: () {
+                                unawaited(
+                                  showDesktopModelCatalogPopover(
+                                    context,
+                                    anchorKey: _catalogAnchorKey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: l10n.providersPageImportTooltip,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.cloudDownload,
+                            onTap: () async {
+                              final keys =
+                                  await showDesktopImportProviderDialog(
+                                    context,
+                                  );
+                              if (!mounted || keys == null || keys.isEmpty) {
+                                return;
+                              }
+                              setState(() => _selectedKey = keys.first);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Expanded(
@@ -1257,13 +1306,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       Text.rich(
                         TextSpan(
                           text: '官网：',
@@ -2689,93 +2731,60 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           child: GestureDetector(
                             key: avatarKey,
                             onTapDown: (_) async {
-                              // Open avatar menu (anchored)
-                              final l10n2 = AppLocalizations.of(context)!;
-                              await showDesktopAnchoredMenu(
+                              final source = await showProviderAvatarSourceMenu(
                                 context,
+                                desktop: true,
                                 anchorKey: avatarKey,
-                                offset: const Offset(0, 8),
-                                items: [
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Image,
-                                    label: l10n2.sideDrawerChooseImage,
-                                    onTap: () async {
-                                      try {
-                                        final res = await FilePicker.platform
-                                            .pickFiles(
-                                              allowMultiple: false,
-                                              withData: false,
-                                              type: FileType.custom,
-                                              allowedExtensions: const [
-                                                'png',
-                                                'jpg',
-                                                'jpeg',
-                                                'gif',
-                                                'webp',
-                                                'heic',
-                                                'heif',
-                                              ],
-                                            );
-                                        final f =
-                                            (res != null &&
-                                                res.files.isNotEmpty)
-                                            ? res.files.first
-                                            : null;
-                                        final path = f?.path;
-                                        if (path != null && path.isNotEmpty) {
-                                          await sp.setProviderAvatarFilePath(
-                                            widget.providerKey,
-                                            path,
-                                          );
-                                        }
-                                      } catch (_) {}
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Bot,
-                                    label:
-                                        l10n2.providerAvatarChooseBuiltInIcon,
-                                    onTap: () async {
-                                      await _pickProviderBuiltinIcon(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.ImageDown,
-                                    label:
-                                        l10n2.providerAvatarChooseLobehubIcon,
-                                    onTap: () async {
-                                      await _inputLobehubIcon(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.Link,
-                                    label: l10n2.sideDrawerEnterLink,
-                                    onTap: () async {
-                                      await _inputProviderAvatarUrl(
-                                        context,
-                                        widget.providerKey,
-                                      );
-                                    },
-                                  ),
-                                  DesktopContextMenuItem(
-                                    icon: lucide.Lucide.RotateCw,
-                                    label: l10n2.desktopAvatarMenuReset,
-                                    onTap: () async {
-                                      await context
-                                          .read<SettingsProvider>()
-                                          .resetProviderAvatar(
-                                            widget.providerKey,
-                                          );
-                                    },
-                                  ),
-                                ],
                               );
+                              if (source == null || !context.mounted) return;
+                              switch (source) {
+                                case AvatarSource.builtin:
+                                  await _pickProviderBuiltinIcon(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.lobehub:
+                                  await _inputLobehubIcon(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.url:
+                                  await _inputProviderAvatarUrl(
+                                    context,
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.reset:
+                                  await sp.resetProviderAvatar(
+                                    widget.providerKey,
+                                  );
+                                case AvatarSource.image:
+                                  try {
+                                    final files = await FilePicker.platform
+                                        .pickFiles(
+                                          allowMultiple: false,
+                                          withData: false,
+                                          type: FileType.custom,
+                                          allowedExtensions: const [
+                                            'png',
+                                            'jpg',
+                                            'jpeg',
+                                            'gif',
+                                            'webp',
+                                            'heic',
+                                            'heif',
+                                          ],
+                                        );
+                                    final path = files?.files.firstOrNull?.path;
+                                    if (path != null && path.isNotEmpty) {
+                                      await sp.setProviderAvatarFilePath(
+                                        widget.providerKey,
+                                        path,
+                                      );
+                                    }
+                                  } catch (_) {}
+                                case AvatarSource.emoji:
+                                  break;
+                              }
                             },
                             child: ProviderAvatar(
                               key: ValueKey(
@@ -3071,6 +3080,45 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               ),
                               const SizedBox(height: 4),
                               if (kindNow == ProviderKind.openai) ...[
+                                row(
+                                  l10n.providerDetailPagePromptCacheKeyTitle,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Tooltip(
+                                        message: l10n
+                                            .providerDetailPagePromptCacheKeyHelp,
+                                        child: Icon(
+                                          LucideIcons.circleHelp,
+                                          size: 16,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IosSwitch(
+                                        value: cfgNow.promptCacheKeyEnabled,
+                                        semanticLabel: l10n
+                                            .providerDetailPagePromptCacheKeyTitle,
+                                        onChanged: (value) async {
+                                          final current = spWatch
+                                              .getProviderConfig(
+                                                widget.providerKey,
+                                                defaultName: widget.displayName,
+                                              );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            current.copyWith(
+                                              promptCacheKeyEnabled: value,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
                                 row(
                                   l10n.providerDetailPageBalanceInfo,
                                   Align(
@@ -3935,109 +3983,14 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     BuildContext context,
     String providerKey,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
-    final icons = BrandAssets.selectableIcons;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cfg = settings.getProviderConfig(providerKey);
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: context.overlaySurface,
-          title: Text(l10n.providerAvatarIconDialogTitle),
-          content: SizedBox(
-            width: 360,
-            height: 400,
-            child: GridView.builder(
-              itemCount: icons.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 5,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1,
-              ),
-              itemBuilder: (ctx, i) {
-                final opt = icons[i];
-                final selected =
-                    cfg.avatarType == 'icon' && cfg.avatarValue == opt.asset;
-                final isSvg = opt.asset.endsWith('.svg');
-                final needsMono =
-                    isDark && BrandAssets.assetNeedsDarkInvert(opt.asset);
-                return Semantics(
-                  label: opt.label,
-                  child: Tooltip(
-                    message: opt.label,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        Future.microtask(() async {
-                          await settings.setProviderAvatarIcon(
-                            providerKey,
-                            opt.asset,
-                          );
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(
-                                  alpha: isDark ? 0.18 : 0.1,
-                                ),
-                                shape: BoxShape.circle,
-                                border: selected
-                                    ? Border.all(color: cs.primary, width: 2)
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: FractionallySizedBox(
-                                widthFactor: 0.65,
-                                heightFactor: 0.65,
-                                child: isSvg
-                                    ? SvgPicture.asset(
-                                        opt.asset,
-                                        fit: BoxFit.contain,
-                                        colorFilter: needsMono
-                                            ? ColorFilter.mode(
-                                                cs.onSurface,
-                                                BlendMode.srcIn,
-                                              )
-                                            : null,
-                                      )
-                                    : Image.asset(
-                                        opt.asset,
-                                        fit: BoxFit.contain,
-                                        color: needsMono ? cs.onSurface : null,
-                                        colorBlendMode: needsMono
-                                            ? BlendMode.srcIn
-                                            : null,
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(l10n.sideDrawerCancel),
-            ),
-          ],
-        );
-      },
+    final asset = await showProviderIconPicker(
+      context,
+      desktop: true,
+      selectedAsset: cfg.avatarType == 'icon' ? cfg.avatarValue : null,
     );
+    if (asset != null) await settings.setProviderAvatarIcon(providerKey, asset);
   }
 
   bool _isAihubmix(ProviderConfig cfg) {
@@ -4748,7 +4701,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   // }
 
   Future<void> _createModel(BuildContext context) async {
-    final res = await showDesktopCreateModelDialog(
+    final res = await showDesktopCreateModelSpecDialog(
       context,
       providerKey: widget.providerKey,
     );
@@ -7047,49 +7000,19 @@ class _ModelRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
-    ModelInfo infer(String id) =>
-        ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-    // Resolve upstream/api model id for inference + capsules
-    String baseId = modelId;
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov = rawOv is Map
-        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-        : null;
-    if (ov != null) {
-      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (apiId != null && apiId.isNotEmpty) {
-        baseId = apiId;
-      }
-    }
-
-    ModelInfo effective() {
-      final base = infer(baseId);
-      if (ov == null) return base;
-      return ModelOverrideResolver.applyModelOverride(base, ov);
-    }
-
-    final info = effective();
-    // Display label: prefer override name, then upstream model id, then logical key
-    String displayName = modelId;
-    if (ov != null) {
-      final overrideName = ov['name']?.toString().trim();
-      if (overrideName != null && overrideName.isNotEmpty) {
-        displayName = overrideName;
-      } else {
-        displayName = baseId;
-      }
-    } else {
-      displayName = baseId;
-    }
+    final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+    final info = resolved.spec;
+    final baseId = info.upstreamId;
+    final displayName = resolved.override.displayName ?? baseId;
 
     return GestureDetector(
       onTap: isSelectionMode
           ? () => onSelectionChanged?.call(!isSelected)
           : cfg.isOAuth
-          ? () => showDesktopModelEditDialog(
+          ? () => showDesktopModelSpecEditDialog(
               context,
               providerKey: providerKey,
-              modelId: modelId,
+              modelKey: modelId,
             )
           : null,
       child: Container(
@@ -7161,55 +7084,61 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            if (!isSelectionMode) ...[
-              ModelCapsulesRow(model: info),
-              const SizedBox(width: 8),
-              _IconBtn(
-                icon: lucide.Lucide.Settings2,
-                onTap: () async {
-                  await showDesktopModelEditDialog(
-                    context,
-                    providerKey: providerKey,
-                    modelId: modelId,
-                  );
-                },
-              ),
-              if (!cfg.isOAuth) ...[
-                const SizedBox(width: 4),
-                _IconBtn(
-                  icon: lucide.Lucide.Minus,
-                  onTap: () async {
-                    final sp = context.read<SettingsProvider>();
-                    final ap = context.read<AssistantProvider>();
-                    final chatService = context.read<ChatService>();
-                    final old = sp.getProviderConfig(providerKey);
-                    final list = List<String>.from(old.models)
-                      ..removeWhere((e) => e == modelId);
-                    await sp.setProviderConfig(
-                      providerKey,
-                      old.copyWith(models: list),
-                    );
-                    // Clear global and assistant-level model selections that reference the deleted model
-                    await sp.clearSelectionsForModel(providerKey, modelId);
-                    try {
-                      for (final a in ap.assistants) {
-                        if (a.chatModelProvider == providerKey &&
-                            a.chatModelId == modelId) {
-                          await ap.updateAssistant(
-                            a.copyWith(clearChatModel: true),
-                          );
-                        }
-                      }
-                      // Conversations can pin a model too.
-                      await chatService.clearConversationModelOverrides(
+            if (!isSelectionMode)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ModelCapsulesRow(model: info, alignment: WrapAlignment.end),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                    key: ValueKey('desktop-provider-model-settings-$modelId'),
+                    icon: lucide.Lucide.Settings2,
+                    onTap: () async {
+                      await showDesktopModelSpecEditDialog(
+                        context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
-                    } catch (_) {}
-                  },
-                ),
-              ],
-            ],
+                    },
+                  ),
+                  if (!cfg.isOAuth) ...[
+                    const SizedBox(width: 4),
+                    _IconBtn(
+                      key: ValueKey('desktop-provider-model-remove-$modelId'),
+                      icon: lucide.Lucide.Minus,
+                      onTap: () async {
+                        final sp = context.read<SettingsProvider>();
+                        final ap = context.read<AssistantProvider>();
+                        final chatService = context.read<ChatService>();
+                        final old = sp.getProviderConfig(providerKey);
+                        final list = List<String>.from(old.models)
+                          ..removeWhere((e) => e == modelId);
+                        await sp.setProviderConfig(
+                          providerKey,
+                          old.copyWith(models: list),
+                        );
+                        // Clear global and assistant-level model selections that reference the deleted model
+                        await sp.clearSelectionsForModel(providerKey, modelId);
+                        try {
+                          for (final a in ap.assistants) {
+                            if (a.chatModelProvider == providerKey &&
+                                a.chatModelId == modelId) {
+                              await ap.updateAssistant(
+                                a.copyWith(clearChatModel: true),
+                              );
+                            }
+                          }
+                          // Conversations can pin a model too.
+                          await chatService.clearConversationModelOverrides(
+                            providerKey: providerKey,
+                            modelId: modelId,
+                          );
+                        } catch (_) {}
+                      },
+                    ),
+                  ],
+                ],
+              ),
           ],
         ),
       ),

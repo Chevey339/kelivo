@@ -67,6 +67,35 @@ void main() {
   });
 
   group('ProviderBalanceService', () {
+    test(
+      'MaruCode defaults support manual balance queries while disabled',
+      () async {
+        final requests = <HttpRequest>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          requests.add(request);
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode({'remaining': 606.26}));
+          await request.response.close();
+        });
+
+        final config = ProviderConfig.defaultsFor('MaruCode').copyWith(
+          baseUrl: 'http://${server.address.address}:${server.port}/v1',
+          apiKey: 'balance-key',
+        );
+        expect(config.enabled, isFalse);
+        expect(config.balanceEnabled, isTrue);
+        expect(await ProviderBalanceService.fetchBalance(config), '606.26');
+        expect(requests, hasLength(1));
+        expect(requests.single.uri.path, '/v1/usage');
+        expect(
+          requests.single.headers.value(HttpHeaders.authorizationHeader),
+          'Bearer balance-key',
+        );
+      },
+    );
+
     test('requests configured balance path with bearer auth', () async {
       final requests = <HttpRequest>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -155,23 +184,23 @@ void main() {
         final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
         final moonshot = ProviderConfig.defaultsFor('Moonshot');
 
-        expect(aihubmix.balanceEnabled, isTrue);
+        expect(aihubmix.balanceEnabled, isFalse);
         expect(aihubmix.balanceApiPath, '/user/balance');
         expect(aihubmix.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(openRouter.balanceEnabled, isTrue);
+        expect(openRouter.balanceEnabled, isFalse);
         expect(openRouter.balanceApiPath, '/credits');
         expect(
           openRouter.balanceResultPath,
           'data.total_credits - data.total_usage',
         );
         expect(siliconFlow.balanceEnabled, isFalse);
-        expect(vercel.balanceEnabled, isTrue);
+        expect(vercel.balanceEnabled, isFalse);
         expect(vercel.balanceApiPath, '/credits');
         expect(vercel.balanceResultPath, 'balance');
-        expect(deepSeek.balanceEnabled, isTrue);
+        expect(deepSeek.balanceEnabled, isFalse);
         expect(deepSeek.balanceApiPath, '/user/balance');
         expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(moonshot.balanceEnabled, isTrue);
+        expect(moonshot.balanceEnabled, isFalse);
         expect(moonshot.balanceApiPath, '/users/me/balance');
         expect(moonshot.balanceResultPath, 'data.available_balance');
       },

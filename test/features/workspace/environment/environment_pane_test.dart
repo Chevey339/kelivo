@@ -9,6 +9,7 @@ import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
+import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/mirror_page.dart';
@@ -18,6 +19,7 @@ import 'package:Kelivo/features/workspace/widgets/environment/environment_labels
 import 'package:Kelivo/features/workspace/widgets/environment/environment_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -126,6 +128,7 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => AppSnackBarOverlay(child: child!),
           home: const Scaffold(body: EnvironmentPane()),
         ),
       ),
@@ -346,6 +349,67 @@ void main() {
       expect(harness.manager.resetCalls, 1);
     });
   });
+
+  testWidgets('reset failure is visible and releases the button for retry', (
+    tester,
+  ) async {
+    await withPlatform(TargetPlatform.android, () async {
+      final harness = await createHarness(
+        tester,
+        state: const EnvironmentState(phase: EnvironmentPhase.ready),
+      );
+      harness.manager.resetError = StateError('permission denied');
+      final l10n = await pumpPane(tester, harness);
+      await tester.scrollUntilVisible(find.byKey(EnvironmentPane.resetKey), 80);
+      await tester.tap(find.byKey(EnvironmentPane.resetKey));
+      await tester.pump();
+      await tester.tap(find.byKey(EnvironmentDialogKeys.resetConfirm));
+      await flushIo(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(l10n.workspaceEnvErrorResetFailed), findsOneWidget);
+      expect(
+        AppSnackBarManager().activeToasts.single.notification.type,
+        NotificationType.error,
+      );
+      expect(harness.runtime.refreshCalls, 0);
+      harness.manager.resetError = null;
+      await tester.tap(find.byKey(EnvironmentPane.resetKey));
+      await tester.pump();
+      await tester.tap(find.byKey(EnvironmentDialogKeys.resetConfirm));
+      await flushIo(tester);
+      expect(harness.manager.resetCalls, 2);
+      expect(harness.runtime.refreshCalls, 1);
+
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 400));
+    });
+  });
+
+  testWidgets(
+    'post-install cleanup is shown as a warning while remaining ready',
+    (tester) async {
+      await withPlatform(TargetPlatform.android, () async {
+        final harness = await createHarness(tester);
+        harness.manager.installResult = const EnvironmentState(
+          phase: EnvironmentPhase.ready,
+          errorMessage: EnvironmentError.cleanupIncomplete,
+        );
+        final l10n = await pumpPane(tester, harness);
+        await tester.tap(find.byKey(EnvironmentPane.installKey));
+        await flushIo(tester);
+        expect(find.text(l10n.workspaceEnvCleanupIncomplete), findsOneWidget);
+        expect(
+          AppSnackBarManager().activeToasts.single.notification.type,
+          NotificationType.warning,
+        );
+        expect(harness.env.state.phase, EnvironmentPhase.ready);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump(const Duration(milliseconds: 400));
+      });
+    },
+  );
 
   testWidgets('check for update reveals Update that runs install', (
     tester,

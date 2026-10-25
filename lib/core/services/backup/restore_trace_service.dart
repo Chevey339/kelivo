@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -100,11 +101,15 @@ final class RestoreTraceService {
     )) {
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
       if (type == FileSystemEntityType.directory) continue;
-      if (type != FileSystemEntityType.file) {
+      if (type == FileSystemEntityType.file) {
+        bytes += await File(entity.path).length();
+      } else if (type == FileSystemEntityType.link) {
+        bytes += utf8.encode(await Link(entity.path).target()).length;
+      } else if (type != FileSystemEntityType.pipe &&
+          type != FileSystemEntityType.unixDomainSock) {
         throw StateError('restore_trace_archive_topology');
       }
       fileCount++;
-      bytes += await File(entity.path).length();
     }
     return RestoreTraceSnapshot(
       visible: fileCount > 0,

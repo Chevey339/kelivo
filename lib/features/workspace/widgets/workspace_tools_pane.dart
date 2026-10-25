@@ -124,6 +124,7 @@ class _WorkspaceToolsPaneState extends State<WorkspaceToolsPane> {
   String _description(AppLocalizations l10n, String name) => switch (name) {
     'shell' => l10n.workspaceToolHelpShell,
     'read_file' => l10n.workspaceToolHelpRead,
+    'view_image' => l10n.workspaceToolHelpViewImage,
     'write_file' => l10n.workspaceToolHelpWrite,
     'edit_file' => l10n.workspaceToolHelpEdit,
     'list_dir' => l10n.workspaceToolHelpList,

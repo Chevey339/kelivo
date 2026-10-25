@@ -1,8 +1,11 @@
 Kelivo Android workspace sandbox — third-party native code
 ==========================================================
 
-This directory packages prebuilt Termux binaries (fetched by
+This directory packages prebuilt Termux binaries (restored by
 `tool/fetch_proot.sh`, gitignored) and JNI derived from Termux.
+The pinned binaries are stored in the repository at
+`dependencies/termux/proot-5.1.107.92.tar.xz`; their upstream packages may
+no longer be available in Termux's rolling pool.
 
 PRoot (libproot_exec.so, libproot_loader.so)
 --------------------------------------------

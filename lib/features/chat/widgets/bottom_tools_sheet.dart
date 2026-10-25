@@ -28,6 +28,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import 'tools_sheet_row.dart';
+import '../../browser/browser_navigation.dart';
 
 /// Row that opens the session skills picker, and pushes the skills library on
 /// a long press.
@@ -139,26 +140,25 @@ class BottomToolsSheet extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        roundedAction(
-                          icon: Lucide.Camera,
-                          label: l10n.bottomToolsSheetCamera,
-                          onTap: onCamera,
-                        ),
-                        const SizedBox(width: 12),
-                        roundedAction(
-                          icon: Lucide.Image,
-                          label: l10n.bottomToolsSheetPhotos,
-                          onTap: onPhotos,
-                        ),
-                        const SizedBox(width: 12),
-                        roundedAction(
-                          icon: Lucide.Paperclip,
-                          label: l10n.bottomToolsSheetUpload,
-                          onTap: onUpload,
-                        ),
-                      ],
+                    ..._attachmentActions(
+                      l10n: l10n,
+                      roundedAction: roundedAction,
+                    ),
+                    ToolsSheetRow(
+                      key: const ValueKey('bottom-tools-browser'),
+                      icon: Lucide.AppWindow,
+                      label: l10n.browserTitle,
+                      onTap: () {
+                        final navigatorContext = Navigator.of(context).context;
+                        onClose?.call();
+                        unawaited(
+                          openBrowserPage(
+                            navigatorContext,
+                            conversationId: conversationId,
+                            assistantId: assistantId,
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                     _LearningAndClearSection(
@@ -176,6 +176,49 @@ class BottomToolsSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _attachmentActions({
+    required AppLocalizations l10n,
+    required Widget Function({
+      required IconData icon,
+      required String label,
+      VoidCallback? onTap,
+    })
+    roundedAction,
+  }) {
+    final actions = <Widget>[
+      if (onCamera != null)
+        roundedAction(
+          icon: Lucide.Camera,
+          label: l10n.bottomToolsSheetCamera,
+          onTap: onCamera,
+        ),
+      if (onPhotos != null)
+        roundedAction(
+          icon: Lucide.Image,
+          label: l10n.bottomToolsSheetPhotos,
+          onTap: onPhotos,
+        ),
+      if (onUpload != null)
+        roundedAction(
+          icon: Lucide.Paperclip,
+          label: l10n.bottomToolsSheetUpload,
+          onTap: onUpload,
+        ),
+    ];
+    if (actions.isEmpty) return const [];
+    return [
+      Row(
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i > 0) const SizedBox(width: 12),
+            actions[i],
+          ],
+        ],
+      ),
+      const SizedBox(height: 12),
+    ];
   }
 }
 

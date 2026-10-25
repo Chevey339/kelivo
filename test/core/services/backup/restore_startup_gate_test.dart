@@ -8,14 +8,18 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/startup_failure_report.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
+import 'package:Kelivo/core/services/backup/restore_diagnostic_exception.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_store.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
+import '../../../support/windows_directory_holder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +39,136 @@ void main() {
     tearDown(() async {
       if (await root.exists()) await root.delete(recursive: true);
     });
+
+    test(
+      'Windows occupied workspace resumes the same partially preserved restore',
+      () async {
+        final database = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(database, conversationId: 'old');
+        final oldSkill = File(p.join(appData.path, 'skills', 'old.txt'));
+        final oldWorkspace = File(
+          p.join(appData.path, 'workspaces', 'project', 'files', 'old.txt'),
+        );
+        for (final file in [oldSkill, oldWorkspace]) {
+          await file.parent.create(recursive: true);
+          await file.writeAsString(
+            'retained ${p.basename(p.dirname(file.path))}',
+            flush: true,
+          );
+        }
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'windows_occupied_source',
+          includeFiles: true,
+        );
+        final holder = await WindowsDirectoryHolder.start(
+          directory: oldWorkspace.parent,
+          controls: Directory(p.join(root.path, 'holder')),
+        );
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
+        try {
+          final diagnostics = RestoreStartupDiagnostics();
+          final pending = Directory(
+            p.join(prepared.workspace.path, 'previous.pending'),
+          );
+          final plan = File(p.join(pending.path, 'manifest.json'));
+          List<int>? originalPlan;
+          for (var attempt = 0; attempt < 2; attempt++) {
+            try {
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appData,
+                businessLease: lease,
+                diagnostics: diagnostics,
+              );
+              fail('A real occupied directory must block the move');
+            } on FileSystemException catch (error, stack) {
+              final report = StartupFailureReport.capture(
+                stage: StartupFailureStage.restoreGate,
+                error: error,
+                stackTrace: stack,
+                restoreDetails: diagnostics.details,
+              );
+              expect(
+                report.blockedRestoreDirectory,
+                p.join(appData.path, 'workspaces'),
+              );
+              expect(report.restoreDetails['run id'], prepared.runId);
+              expect(report.toText(), contains('Windows error code: 5'));
+            }
+            final bytes = await plan.readAsBytes();
+            originalPlan ??= bytes;
+            expect(bytes, originalPlan);
+            expect(await _conversationIds(database), ['old']);
+            expect(await oldWorkspace.readAsString(), 'retained files');
+            expect(
+              await File(
+                p.join(pending.path, 'skills', 'old.txt'),
+              ).readAsString(),
+              'retained skills',
+            );
+            expect(
+              await Directory(p.join(pending.path, 'workspaces')).exists(),
+              isFalse,
+            );
+            expect(
+              (await RestoreReceiptStore(
+                appDataDirectory: appData,
+                runId: prepared.runId,
+              ).readLatest())!.checksum,
+              prepared.receipt.checksum,
+            );
+          }
+          await holder.close();
+          final result =
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appData,
+                businessLease: lease,
+                diagnostics: diagnostics,
+              );
+          expect(result!.runId, prepared.runId);
+          expect(result.state, RestoreReceiptState.committed);
+          expect(await _conversationIds(database), ['new']);
+          expect(
+            await File(
+              p.join(appData.path, 'upload', 'new.txt'),
+            ).readAsString(),
+            'new asset',
+          );
+          final previous = Directory(
+            p.join(
+              appData.path,
+              RestoreWorkspaceLock.workspaceRootName,
+              RestoreWorkspaceLock.completedRunsDirectoryName,
+              'run_${prepared.runId}',
+              'previous',
+            ),
+          );
+          expect(
+            await File(p.join(previous.path, 'manifest.json')).readAsBytes(),
+            originalPlan,
+          );
+          expect(
+            await File(
+              p.join(
+                previous.path,
+                'workspaces',
+                'project',
+                'files',
+                'old.txt',
+              ),
+            ).readAsString(),
+            'retained files',
+          );
+        } finally {
+          await holder.close();
+          await lease.close();
+        }
+      },
+      skip: !Platform.isWindows,
+    );
 
     test('allows startup when no restore run exists', () async {
       expect(
@@ -64,6 +198,183 @@ void main() {
       );
       expect(await marker.exists(), isFalse);
     });
+
+    test(
+      'captures the failing run before validation and clears stale context',
+      () async {
+        final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(liveDatabase, conversationId: 'old');
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'diagnostics_source',
+          includeFiles: true,
+        );
+        final unexpected = Directory(
+          p.join(prepared.candidateDirectory.path, 'upload', 'unexpected'),
+        );
+        await unexpected.create();
+        final manifest = File(
+          p.join(prepared.candidateDirectory.path, 'manifest.json'),
+        );
+        final manifestBytes = await manifest.readAsBytes();
+        final diagnostics = RestoreStartupDiagnostics();
+        try {
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: appData,
+            diagnostics: diagnostics,
+          );
+          fail('Invalid candidate must still block startup');
+        } on FormatException catch (error, stack) {
+          final report = StartupFailureReport.capture(
+            stage: StartupFailureStage.restoreGate,
+            error: error,
+            stackTrace: stack,
+            restoreDetails: diagnostics.details,
+          );
+          expect(report.diagnosticCode, 'restore_staging_candidate_directory');
+          expect(report.restoreDetails, containsPair('run id', prepared.runId));
+          expect(
+            report.restoreDetails,
+            containsPair('restore stage', 'checkingBackup'),
+          );
+          expect(
+            report.restoreDetails,
+            containsPair('last observed receipt state', 'prepared'),
+          );
+          expect(
+            report.restoreDetails,
+            containsPair('last observed receipt sequence', '1'),
+          );
+          expect(
+            report.restoreDetails,
+            containsPair(
+              'candidate manifest SHA-256',
+              prepared.receipt.candidateManifestSha256,
+            ),
+          );
+          expect(
+            report.toText(),
+            contains('unexpected directory: upload/unexpected'),
+          );
+        }
+        expect(await manifest.readAsBytes(), manifestBytes);
+        expect(await _conversationIds(liveDatabase), ['old']);
+        expect(
+          await Directory(
+            p.join(prepared.workspace.path, 'previous.pending'),
+          ).exists(),
+          isFalse,
+        );
+        expect(
+          (await RestoreReceiptStore(
+            appDataDirectory: appData,
+            runId: prepared.runId,
+          ).readLatest())!.checksum,
+          prepared.receipt.checksum,
+        );
+
+        await unexpected.delete();
+        final terminal =
+            await RestoreStartupGate.recoverAndRequireBusinessReady(
+              appDataDirectory: appData,
+              diagnostics: diagnostics,
+            );
+        expect(terminal!.state, RestoreReceiptState.committed);
+        expect(diagnostics.details['last observed receipt state'], 'committed');
+        expect(
+          diagnostics.details['last observed receipt sequence'],
+          '${terminal.sequence}',
+        );
+        expect(diagnostics.details['restore stage'], 'finishing');
+        expect(await _conversationIds(liveDatabase), ['new']);
+        await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: appData,
+          diagnostics: diagnostics,
+        );
+        expect(diagnostics.details, isEmpty);
+      },
+    );
+
+    test(
+      'reports a partial preservation failure and still resumes it',
+      () async {
+        final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(liveDatabase, conversationId: 'old');
+        for (final name in ['skills', 'workspaces', 'sessions']) {
+          final file = File(p.join(appData.path, name, 'old.txt'));
+          await file.parent.create();
+          await file.writeAsString('old $name');
+        }
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'partial_preservation_source',
+          includeFiles: true,
+        );
+        final source = p.join(appData.path, 'workspaces');
+        final target = p.join(
+          prepared.workspace.path,
+          'previous.pending',
+          'workspaces',
+        );
+        final diagnostics = RestoreStartupDiagnostics();
+        final durability = _DenyWorkspaceRename(source);
+        try {
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: appData,
+            diagnostics: diagnostics,
+            durability: durability,
+          );
+          fail('The injected rename failure must still stop preservation');
+        } on FileSystemException catch (error, stack) {
+          expect(error, same(durability.failure));
+          final report = StartupFailureReport.capture(
+            stage: StartupFailureStage.restoreGate,
+            error: error,
+            stackTrace: stack,
+            restoreDetails: diagnostics.details,
+          );
+          expect(report.restoreDetails['run id'], prepared.runId);
+          expect(
+            report.restoreDetails['restore stage'],
+            'preservingCurrentData',
+          );
+          expect(
+            report.restoreDetails['last observed receipt state'],
+            'prepared',
+          );
+          expect(report.toText(), contains('source path: $source'));
+          expect(report.toText(), contains('target path: $target'));
+          expect(report.toText(), contains('Windows error code: 32'));
+        }
+        expect(
+          await File(
+            p.join(
+              prepared.workspace.path,
+              'previous.pending',
+              'skills',
+              'old.txt',
+            ),
+          ).readAsString(),
+          'old skills',
+        );
+        expect(
+          await File(p.join(source, 'old.txt')).readAsString(),
+          'old workspaces',
+        );
+        expect(await Directory(target).exists(), isFalse);
+        expect(await _conversationIds(liveDatabase), ['old']);
+
+        final result = await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: appData,
+          diagnostics: diagnostics,
+        );
+        expect(result!.state, RestoreReceiptState.committed);
+        expect(await _conversationIds(liveDatabase), ['new']);
+        expect(diagnostics.details['last observed receipt state'], 'committed');
+      },
+    );
 
     test('commits, revalidates, and archives in one startup pass', () async {
       final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
@@ -117,6 +428,145 @@ void main() {
         isFalse,
       );
     });
+
+    for (final includeFiles in [false, true]) {
+      test(
+        'resumes a v1.3.0 prepared restore with a local link ($includeFiles)',
+        () async {
+          final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+          await _createDatabase(liveDatabase, conversationId: 'old');
+          final external = File(p.join(root.path, 'external.txt'));
+          await external.writeAsString('untouched');
+          final link = Link(p.join(appData.path, 'workspaces', 'local-link'));
+          await link.parent.create();
+          await link.create(external.path);
+          final prepared = await _prepareV130Bundle(
+            root: root,
+            appData: appData,
+            includeFiles: includeFiles,
+          );
+          final manifestBytes = await File(
+            p.join(prepared.candidateDirectory.path, 'manifest.json'),
+          ).readAsBytes();
+
+          final terminal =
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appData,
+              );
+
+          expect(terminal?.state, RestoreReceiptState.committed);
+          expect(await _conversationIds(liveDatabase), ['new']);
+          final archived = _archivedRun(appData, prepared.runId);
+          final preservedLink = includeFiles
+              ? Link(
+                  p.join(archived.path, 'previous', 'workspaces', 'local-link'),
+                )
+              : link;
+          expect(await preservedLink.target(), external.path);
+          expect(await external.readAsString(), 'untouched');
+          expect(
+            await File(
+              p.join(archived.path, 'candidate', 'manifest.json'),
+            ).readAsBytes(),
+            manifestBytes,
+          );
+          expect(
+            await RestoreStartupGate.hasPendingWork(appDataDirectory: appData),
+            isFalse,
+          );
+        },
+        skip: Platform.isWindows
+            ? 'Creating links requires Windows privileges'
+            : false,
+      );
+    }
+
+    for (final phase in [
+      'preserving',
+      'preserved',
+      'installing',
+      'installed',
+      'verified',
+      'rollingBack',
+      'committed',
+      'rolledBack',
+    ]) {
+      test('resumes v1.3.0 evidence interrupted while $phase', () async {
+        final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(liveDatabase, conversationId: 'old');
+        final oldUpload = File(p.join(appData.path, 'upload', 'old.txt'));
+        await oldUpload.parent.create();
+        await oldUpload.writeAsString('old asset');
+        final prepared = await _prepareV130Bundle(
+          root: root,
+          appData: appData,
+          includeFiles: true,
+        );
+        final previousBytes = await _interruptV130Cutover(
+          prepared: prepared,
+          appData: appData,
+          phase: phase,
+        );
+        final originalReceipts = <String, List<int>>{};
+        await for (final file in Directory(
+          p.join(prepared.workspace.path, 'receipts'),
+        ).list()) {
+          originalReceipts[p.basename(file.path)] = await File(
+            file.path,
+          ).readAsBytes();
+        }
+
+        final terminal =
+            await RestoreStartupGate.recoverAndRequireBusinessReady(
+              appDataDirectory: appData,
+            );
+
+        final rolledBack = phase == 'rollingBack' || phase == 'rolledBack';
+        expect(
+          terminal?.state,
+          rolledBack
+              ? RestoreReceiptState.rolledBack
+              : RestoreReceiptState.committed,
+        );
+        expect(await _conversationIds(liveDatabase), [
+          rolledBack ? 'old' : 'new',
+        ]);
+        final archived = _archivedRun(appData, prepared.runId);
+        expect(
+          await File(
+            p.join(archived.path, 'previous', 'manifest.json'),
+          ).readAsBytes(),
+          previousBytes,
+        );
+        for (final entry in originalReceipts.entries) {
+          expect(
+            await File(
+              p.join(archived.path, 'receipts', entry.key),
+            ).readAsBytes(),
+            entry.value,
+          );
+        }
+        expect(
+          await File(
+            p.join(appData.path, 'upload', rolledBack ? 'old.txt' : 'new.txt'),
+          ).readAsString(),
+          rolledBack ? 'old asset' : 'new asset',
+        );
+        final history = await RestoreReceiptStore(
+          appDataDirectory: appData,
+          runId: prepared.runId,
+          archived: true,
+        ).readHistory();
+        expect(history.first.checksum, prepared.receipt.checksum);
+        expect(history.last.checksum, terminal!.checksum);
+        expect(
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: appData,
+          ),
+          isNull,
+        );
+      });
+    }
 
     test('reports every cutover stage in order for a pending run', () async {
       final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
@@ -342,6 +792,226 @@ void main() {
       expect(await marker.exists(), isTrue);
     });
   });
+}
+
+const _v130AssetRoots = [
+  'upload',
+  'images',
+  'avatars',
+  'fonts',
+  'skills',
+  'workspaces',
+  'sessions',
+];
+
+/// Injects a Windows-shaped failure; this does not exercise Windows filesystem
+/// APIs on a non-Windows host.
+final class _DenyWorkspaceRename implements RestoreDurability {
+  _DenyWorkspaceRename(this.sourcePath);
+
+  final String sourcePath;
+  final delegate = RestorePlatformDurability();
+  RestoreFileSystemException? failure;
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    if (p.equals(source.path, sourcePath)) {
+      final error = RestoreFileSystemException(
+        FileSystemException(
+          'restore_durability_rename:32:$targetPath',
+          source.path,
+        ),
+        {
+          'operation': 'MoveFileExW',
+          'Windows error code': '32',
+          'source path': source.path,
+          'target path': targetPath,
+        },
+      );
+      failure = error;
+      throw error;
+    }
+    await delegate.renameAndSync(source: source, targetPath: targetPath);
+  }
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+
+  @override
+  Future<void> syncDirectory(Directory directory, {bool fullBarrier = false}) =>
+      delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) =>
+      delegate.syncFile(file, fullBarrier: fullBarrier);
+}
+
+Directory _archivedRun(Directory appData, String runId) => Directory(
+  p.join(
+    appData.path,
+    RestoreWorkspaceLock.workspaceRootName,
+    RestoreWorkspaceLock.completedRunsDirectoryName,
+    'run_$runId',
+  ),
+);
+
+Future<void> _writeFixtureReceipt(Directory run, RestoreReceipt receipt) async {
+  await File(
+    p.join(
+      run.path,
+      'receipts',
+      'receipt_${receipt.sequence.toString().padLeft(16, '0')}.json',
+    ),
+  ).writeAsString(jsonEncode(receipt.toJson()), flush: true);
+}
+
+Future<PreparedRestoreBundle> _prepareV130Bundle({
+  required Directory root,
+  required Directory appData,
+  required bool includeFiles,
+}) async {
+  final current = await _prepareBundle(
+    root: root,
+    appData: appData,
+    directoryName: 'v130_source',
+    includeFiles: includeFiles,
+  );
+  // v1.3.0 persisted version 2, without an assetRoots declaration. Its
+  // receipt format is unchanged; bind the fixture receipt to the old bytes.
+  final manifestFile = File(
+    p.join(current.candidateDirectory.path, 'manifest.json'),
+  );
+  final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+  manifest['formatVersion'] = 2;
+  manifest.remove('assetRoots');
+  final bytes = utf8.encode(jsonEncode(manifest));
+  await manifestFile.writeAsBytes(bytes, flush: true);
+  final receipt = RestoreReceipt.prepared(
+    runId: current.runId,
+    createdAtUtc: current.receipt.createdAtUtc,
+    restoreFiles: includeFiles,
+    candidateManifestSha256: sha256.convert(bytes).toString(),
+  );
+  await _writeFixtureReceipt(current.workspace, receipt);
+  await File(
+    p.join(
+      current.workspace.parent.path,
+      RestoreWorkspaceLock.activeRunFileName,
+    ),
+  ).rename(
+    p.join(
+      current.workspace.parent.path,
+      RestoreWorkspaceLock.publishingRunFileName,
+    ),
+  );
+  return PreparedRestoreBundle(
+    runId: current.runId,
+    workspace: current.workspace,
+    candidateDirectory: current.candidateDirectory,
+    receipt: receipt,
+  );
+}
+
+Future<List<int>> _interruptV130Cutover({
+  required PreparedRestoreBundle prepared,
+  required Directory appData,
+  required String phase,
+}) async {
+  final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+  final liveUpload = Directory(p.join(appData.path, 'upload'));
+  final previous = Directory(
+    p.join(
+      prepared.workspace.path,
+      phase == 'preserving' ? 'previous.pending' : 'previous',
+    ),
+  );
+  await Directory(p.join(previous.path, 'database')).create(recursive: true);
+  // Frozen v1.3.0 previous schema: entries have bytes/sha256 directly.
+  final payload = {
+    'format': 'kelivo.restore-previous-plan',
+    'formatVersion': 2,
+    'runId': prepared.runId,
+    'preparedReceiptChecksum': prepared.receipt.checksum,
+    'candidateManifestSha256': prepared.receipt.candidateManifestSha256,
+    'selectedComponents': ['database', 'assets'],
+    'createdAtUtc': prepared.receipt.createdAtUtc.toIso8601String(),
+    'database': {
+      'state': 'file',
+      'path': 'database/kelivo.db',
+      'descriptor': await _descriptor(liveDatabase),
+    },
+    'assets': {
+      'roots': {
+        for (final root in _v130AssetRoots)
+          root: root == 'upload' ? 'directory' : 'missing',
+      },
+      'entries': {
+        'upload/old.txt': await _descriptor(
+          File(p.join(liveUpload.path, 'old.txt')),
+        ),
+      },
+    },
+  };
+  final bytes = utf8.encode(
+    jsonEncode({
+      ...payload,
+      'checksum': sha256.convert(utf8.encode(jsonEncode(payload))).toString(),
+    }),
+  );
+  await File(
+    p.join(previous.path, 'manifest.json'),
+  ).writeAsBytes(bytes, flush: true);
+  await liveUpload.rename(p.join(previous.path, 'upload'));
+  if (phase == 'preserving') return bytes;
+  final oldDatabase = File(p.join(previous.path, 'database', 'kelivo.db'));
+  await liveDatabase.rename(oldDatabase.path);
+  if (phase == 'preserved') return bytes;
+  var receipt = prepared.receipt.advance(
+    RestoreReceiptState.oldRenamed,
+    previousManifestSha256: sha256.convert(bytes).toString(),
+  );
+  await _writeFixtureReceipt(prepared.workspace, receipt);
+  final newDatabase = File(
+    p.join(prepared.candidateDirectory.path, 'database', 'kelivo.db'),
+  );
+  await newDatabase.rename(liveDatabase.path);
+  if (phase == 'installing') return bytes;
+  for (final root in _v130AssetRoots) {
+    await Directory(
+      p.join(prepared.candidateDirectory.path, root),
+    ).rename(p.join(appData.path, root));
+  }
+  receipt = receipt.advance(RestoreReceiptState.newInstalled);
+  await _writeFixtureReceipt(prepared.workspace, receipt);
+  if (phase == 'installed') return bytes;
+  if (phase == 'rollingBack' || phase == 'rolledBack') {
+    receipt = receipt.advance(RestoreReceiptState.rollingBack);
+    await _writeFixtureReceipt(prepared.workspace, receipt);
+    await liveDatabase.rename(newDatabase.path);
+    await oldDatabase.rename(liveDatabase.path);
+    if (phase == 'rollingBack') return bytes;
+    for (final root in _v130AssetRoots) {
+      await Directory(
+        p.join(appData.path, root),
+      ).rename(p.join(prepared.candidateDirectory.path, root));
+    }
+    await Directory(p.join(previous.path, 'upload')).rename(liveUpload.path);
+    receipt = receipt.advance(RestoreReceiptState.rolledBack);
+  } else {
+    receipt = receipt.advance(RestoreReceiptState.verified);
+    await _writeFixtureReceipt(prepared.workspace, receipt);
+    if (phase == 'verified') return bytes;
+    receipt = receipt.advance(RestoreReceiptState.committed);
+  }
+  await _writeFixtureReceipt(prepared.workspace, receipt);
+  return bytes;
 }
 
 Future<PreparedRestoreBundle> _prepareBundle({

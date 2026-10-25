@@ -5,6 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/search/search_service.dart';
 import '../../core/services/search/search_api_key_rotator.dart';
+import '../../core/services/search/web_fetch_service.dart';
+import '../../features/search/widgets/web_fetch_mode.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
@@ -166,6 +168,23 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
+                child: SectionCard(children: [_WebFetchModeRow()]),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Text(
+                    l10n.searchServicesPageWebFetchFooter,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              SliverToBoxAdapter(
                 child: SectionCard(
                   children: [
                     _ToggleRow(
@@ -217,7 +236,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                                   ),
                                 )
                           : null,
-                      onPlus: common.timeout < 30000
+                      onPlus: common.timeout < 300000
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
@@ -340,14 +359,31 @@ class _ServiceCardState extends State<_ServiceCard> {
               _BrandBadge.forService(widget.service, size: 24),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: AppFontWeights.emphasis,
-                  ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                    ),
+                    if (WebFetchService.supports(widget.service)) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.searchServicesPageWebFetchSupported,
+                        child: Icon(
+                          lucide.Lucide.FileText,
+                          size: 14,
+                          color: cs.onSurface.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (widget.service is! BingLocalOptions &&
@@ -399,6 +435,58 @@ class _ServiceCardState extends State<_ServiceCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WebFetchModeRow extends StatelessWidget {
+  const _WebFetchModeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    final labelColor = cs.onSurface.withValues(alpha: 0.9);
+    final mode = effectiveWebFetchMode(settings);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            child: Icon(lucide.Lucide.FileText, size: 18, color: labelColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              l10n.searchServicesPageWebFetchModeTitle,
+              style: TextStyle(fontSize: 15, color: labelColor),
+            ),
+          ),
+          DesktopSelectDropdown<String>(
+            key: const ValueKey('desktop-web-fetch-mode'),
+            value: mode,
+            minWidth: 168,
+            options: [
+              for (final choice in webFetchModeChoices(l10n, settings))
+                DesktopSelectOption(
+                  value: choice.value,
+                  // The follow choice names its current target inline, so the
+                  // trigger shows which service reads pages right now.
+                  label: choice.value == WebFetchMode.follow
+                      ? webFetchFollowLabel(l10n, settings)
+                      : choice.label,
+                  subtitle: choice.value == WebFetchMode.follow
+                      ? null
+                      : choice.subtitle,
+                ),
+            ],
+            onSelected: (value) =>
+                context.read<SettingsProvider>().setWebFetchMode(value),
+          ),
+        ],
       ),
     );
   }
@@ -594,12 +682,14 @@ class _BrandBadge extends StatelessWidget {
     if (s is DuckDuckGoOptions) return 'duckduckgo';
     if (s is TavilyOptions) return 'tavily';
     if (s is ExaOptions) return 'exa';
+    if (s is ExaMcpOptions) return 'exa';
     if (s is ZhipuOptions) return 'zhipu';
     if (s is SearXNGOptions) return 'searxng';
     if (s is LinkUpOptions) return 'linkup';
     if (s is BraveOptions) return 'brave';
     if (s is MetasoOptions) return 'metaso';
     if (s is OllamaOptions) return 'ollama';
+    if (s is DeepSeekOptions) return 'deepseek';
     if (s is JinaOptions) return 'jina';
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
@@ -770,6 +860,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'url': TextEditingController(),
     'tavilyUrl': TextEditingController(),
     'exaUrl': TextEditingController(),
+    'exaMcpUrl': TextEditingController(),
     'engines': TextEditingController(),
     'language': TextEditingController(),
     'username': TextEditingController(),
@@ -935,11 +1026,27 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             ),
           ),
         ];
+      case 'exa_mcp':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['exaMcpUrl'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: ExaMcpOptions.defaultUrl,
+            ),
+          ),
+        ];
       case 'zhipu':
       case 'linkup':
       case 'metaso':
       case 'jina':
       case 'ollama':
+      case 'deepseek':
       case 'perplexity':
       case 'bocha':
       case 'doubao':
@@ -1327,6 +1434,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           apiKey: _controllers['apiKey']!.text,
           url: _controllers['exaUrl']!.text.trim(),
         );
+      case 'exa_mcp':
+        return ExaMcpOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          url: _controllers['exaMcpUrl']!.text.trim(),
+        );
       case 'zhipu':
         return ZhipuOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'searxng':
@@ -1355,6 +1468,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         return JinaOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'ollama':
         return OllamaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+      case 'deepseek':
+        return DeepSeekOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'perplexity':
         return PerplexityOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'bocha':
@@ -1484,6 +1599,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is ExaOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
+    } else if (s is ExaMcpOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['url'] = TextEditingController(text: s.url);
     } else if (s is ZhipuOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is SearXNGOptions) {
@@ -1503,6 +1621,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is MetasoOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is OllamaOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+    } else if (s is DeepSeekOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is JinaOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
@@ -1686,11 +1806,29 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           ),
         ),
       ];
+    } else if (s is ExaMcpOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: ExaMcpOptions.defaultUrl,
+          ),
+        ),
+      ];
     } else if (s is ZhipuOptions ||
         s is LinkUpOptions ||
         s is MetasoOptions ||
         s is JinaOptions ||
         s is OllamaOptions ||
+        s is DeepSeekOptions ||
         s is PerplexityOptions ||
         s is BochaOptions ||
         s is DoubaoOptions ||
@@ -2175,6 +2313,14 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         extraApiKeys: _extraApiKeys,
       );
     }
+    if (s is ExaMcpOptions) {
+      return ExaMcpOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        url: _controllers['url']!.text.trim(),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
     if (s is ZhipuOptions) {
       return ZhipuOptions(
         id: s.id,
@@ -2226,6 +2372,13 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     }
     if (s is OllamaOptions) {
       return OllamaOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is DeepSeekOptions) {
+      return DeepSeekOptions(
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         extraApiKeys: _extraApiKeys,
@@ -2624,6 +2777,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'duckduckgo', brand: 'duckduckgo'),
     (type: 'tavily', brand: 'tavily'),
     (type: 'exa', brand: 'exa'),
+    (type: 'exa_mcp', brand: 'exa'),
     (type: 'zhipu', brand: 'zhipu'),
     (type: 'searxng', brand: 'searxng'),
     (type: 'linkup', brand: 'linkup'),
@@ -2631,6 +2785,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'metaso', brand: 'metaso'),
     (type: 'jina', brand: 'jina'),
     (type: 'ollama', brand: 'ollama'),
+    (type: 'deepseek', brand: 'deepseek'),
     (type: 'perplexity', brand: 'perplexity'),
     (type: 'bocha', brand: 'bocha'),
     (type: 'doubao', brand: 'doubao'),
@@ -2705,6 +2860,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTavily;
     case 'exa':
       return l10n.searchServiceNameExa;
+    case 'exa_mcp':
+      return l10n.searchServiceNameExaMcp;
     case 'zhipu':
       return l10n.searchServiceNameZhipu;
     case 'searxng':
@@ -2719,6 +2876,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameJina;
     case 'ollama':
       return l10n.searchServiceNameOllama;
+    case 'deepseek':
+      return l10n.searchServiceNameDeepSeek;
     case 'perplexity':
       return l10n.searchServiceNamePerplexity;
     case 'bocha':

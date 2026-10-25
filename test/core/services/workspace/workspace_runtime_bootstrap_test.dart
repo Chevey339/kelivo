@@ -18,26 +18,18 @@ void main() {
     env = EnvironmentProvider(preferences: createBusinessTestPreferences());
   });
 
-  test(
-    'createWorkspaceStack uses DesktopProcessRuntime on desktop',
-    () async {
-      final stack = await createWorkspaceStack(env: env);
-      expect(stack.runtime, isA<DesktopProcessRuntime>());
-      expect(stack.environmentManager, isNull);
-      expect(stack.mirrors, isNull);
-    },
-    skip: isDesktop ? false : 'host is not desktop',
-  );
+  test('createWorkspaceStack uses DesktopProcessRuntime on desktop', () async {
+    final stack = await createWorkspaceStack(env: env);
+    expect(stack.runtime, isA<DesktopProcessRuntime>());
+    expect(stack.environmentManager, isNull);
+    expect(stack.mirrors, isNull);
+  }, skip: isDesktop ? false : 'host is not desktop');
 
-  test(
-    'applyWorkspaceStack registers runtime',
-    () async {
-      final stack = await createWorkspaceStack(env: env);
-      final provider = WorkspaceRuntimeProvider();
-      applyWorkspaceStack(provider, stack);
-      expect(provider.runtime, same(stack.runtime));
-      expect(provider.runtime, isA<DesktopProcessRuntime>());
-    },
-    skip: isDesktop ? false : 'host is not desktop',
-  );
+  test('applyWorkspaceStack registers runtime', () async {
+    final stack = await createWorkspaceStack(env: env);
+    final provider = WorkspaceRuntimeProvider();
+    applyWorkspaceStack(provider, stack);
+    expect(provider.runtime, same(stack.runtime));
+    expect(provider.runtime, isA<DesktopProcessRuntime>());
+  }, skip: isDesktop ? false : 'host is not desktop');
 }

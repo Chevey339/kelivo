@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/backup/restore_receipt.dart';
 import '../../l10n/app_localizations.dart';
 
-/// Shows the one startup outcome that requires explicit user acknowledgement.
+/// Explains an automatic rollback before normal use.
 class RestoreOutcomeNotice extends StatefulWidget {
   const RestoreOutcomeNotice({
     super.key,
@@ -24,7 +24,9 @@ class _RestoreOutcomeNoticeState extends State<RestoreOutcomeNotice> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_scheduled || widget.outcome != RestoreReceiptState.rolledBack) return;
+    if (_scheduled || widget.outcome != RestoreReceiptState.rolledBack) {
+      return;
+    }
     _scheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;

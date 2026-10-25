@@ -138,9 +138,9 @@ void main() {
         )!;
         for (final title in [
           l10n.backupPageBackupManagement,
+          l10n.backupPageLocalBackup,
           l10n.backupReminderSectionTitle,
           l10n.localSnapshotSectionTitle,
-          l10n.backupPageLocalBackup,
           l10n.backupPageWebDavServerSettings,
           l10n.backupPageS3ServerSettings,
         ]) {

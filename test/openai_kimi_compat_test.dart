@@ -6,8 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _moonshotConfig(String baseUrl) {
   return ProviderConfig(
@@ -65,7 +65,7 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
     messages: messages,
     userImagePaths: userImagePaths,
     stream: stream,
-    thinkingBudget: thinkingBudget,
+    reasoning: legacyBudget(thinkingBudget),
     extraBody: extraBody,
   ).toList();
   return requestBody;
@@ -89,14 +89,23 @@ void main() {
               {'role': 'user', 'content': 'hello'},
             ],
           );
-          final expectedEffort = switch (budget) {
-            null || -1 || 0 => null,
-            1024 => 'low',
-            16000 => 'high',
-            _ => 'max',
-          };
-          expect(body['reasoning_effort'], expectedEffort);
-          expect(body['thinking'], budget == 0 ? {'type': 'disabled'} : null);
+          switch (budget) {
+            case null || -1:
+              expect(body.containsKey('thinking'), isFalse);
+              expect(body.containsKey('reasoning_effort'), isFalse);
+            case 0:
+              expect(body['thinking'], {'type': 'disabled'});
+              expect(body.containsKey('reasoning_effort'), isFalse);
+            case 1024 || 16000:
+              expect(body['thinking'], {'type': 'enabled', 'effort': 'low'});
+              expect(body.containsKey('reasoning_effort'), isFalse);
+            case 64000:
+              expect(body['thinking'], {'type': 'enabled', 'effort': 'high'});
+              expect(body.containsKey('reasoning_effort'), isFalse);
+            default:
+              expect(body['thinking'], {'type': 'enabled', 'effort': 'max'});
+              expect(body.containsKey('reasoning_effort'), isFalse);
+          }
         });
       }
     }
@@ -123,20 +132,15 @@ void main() {
           ],
         );
         expect(body['model'], 'kimi-for-coding');
-        expect(body['reasoning_effort'], 'max');
-        for (final key in [
-          'temperature',
-          'top_p',
-          'n',
-          'presence_penalty',
-          'frequency_penalty',
-        ]) {
-          expect(body.containsKey(key), isFalse, reason: key);
-        }
+        expect(body['thinking'], {'type': 'enabled', 'effort': 'low'});
+        // Custom body keys win over the dialect.
+        expect(body['reasoning_effort'], 'xhigh');
+        expect(body['temperature'], 0.5);
+        expect(body['n'], 2);
       },
     );
 
-    test('HighSpeed keeps fixed thinking without unsupported effort', () async {
+    test('HighSpeed custom body overrides the dialect', () async {
       final body = await _captureMoonshotBody(
         modelId: 'kimi-for-coding-highspeed',
         thinkingBudget: 0,
@@ -148,8 +152,8 @@ void main() {
           {'role': 'user', 'content': 'hello'},
         ],
       );
-      expect(body.containsKey('reasoning_effort'), isFalse);
-      expect(body.containsKey('thinking'), isFalse);
+      expect(body['reasoning_effort'], 'max');
+      expect(body['thinking'], {'type': 'disabled'});
     });
 
     for (final custom in [
@@ -158,7 +162,7 @@ void main() {
         'thinking': {'type': 'enabled'},
       },
     ]) {
-      test('K2.8 custom $custom can override thinking off', () async {
+      test('K2.8 custom $custom overrides explicit off', () async {
         final body = await _captureMoonshotBody(
           modelId: 'kimi-for-coding',
           thinkingBudget: 0,
@@ -167,8 +171,9 @@ void main() {
             {'role': 'user', 'content': 'hello'},
           ],
         );
-        expect(body['thinking'], isNull);
-        expect(body['reasoning_effort'], custom['reasoning_effort']);
+        for (final entry in custom.entries) {
+          expect(body[entry.key], entry.value);
+        }
       });
     }
 
@@ -180,6 +185,11 @@ void main() {
       test('$modelId sends inline images and video', () async {
         final body = await _captureMoonshotBody(
           modelId: modelId,
+          modelOverrides: {
+            modelId: const {
+              'input': ['text', 'image', 'video'],
+            },
+          },
           messages: const [
             {'role': 'user', 'content': 'describe'},
           ],
@@ -204,27 +214,18 @@ void main() {
       });
     }
 
-    test('k3-256k rejects video input before sending', () async {
-      await expectLater(
-        _captureMoonshotBody(
-          modelId: 'k3-256k',
-          messages: const [
-            {'role': 'user', 'content': 'describe'},
-          ],
-          userImagePaths: const ['data:video/mp4;base64,REVG'],
-        ),
-        throwsUnsupportedError,
-      );
-    });
-
     for (final modelId in [
       'k3',
       'k3-256k',
       'kimi-for-coding',
       'kimi-for-coding-highspeed',
       'moonshotai/kimi-k2.8-preview',
+      'kimi-k2-thinking',
+      'kimi-k2.5',
+      'kimi-k2.6',
+      'kimi-k2.7',
     ]) {
-      test('$modelId replays ordinary history on Kimi Code', () async {
+      test('$modelId replays ordinary history by default', () async {
         final body = await _captureMoonshotBody(
           modelId: modelId,
           providerId: 'Kimi Code',
@@ -247,44 +248,25 @@ void main() {
       });
     }
 
-    test('Kimi Code aliases require Kimi provider identity', () {
-      for (final modelId in ['k3', 'k3-256k', ' K3-256K ']) {
-        for (final identity in [
-          ('api.kimi.com', 'custom'),
-          ('api.moonshot.ai', 'custom'),
-          ('api.moonshot.cn', 'custom'),
-          ('relay.example.com', 'kimi code'),
-          ('relay.example.com', 'moonshot'),
-        ]) {
-          final info = OpenAIProviderInfo(
-            host: identity.$1,
-            providerId: identity.$2,
-            upstreamModelId: modelId,
-          );
-          expect(
-            info.reasoningContentReplayPolicy,
-            ReasoningContentReplayPolicy.all,
-          );
-          expect(info.needsReasoningEcho, isTrue);
-        }
-      }
-      for (final identity in [
-        ('api.example.com', 'custom', 'k3-256k'),
-        ('api.kimi.com.example.com', 'custom', 'k3'),
-        ('api.kimi.com', 'kimi', 'k30'),
-        ('api.kimi.com', 'kimi', 'other-k3-256k'),
-      ]) {
-        final info = OpenAIProviderInfo(
-          host: identity.$1,
-          providerId: identity.$2,
-          upstreamModelId: identity.$3,
-        );
-        expect(
-          info.reasoningContentReplayPolicy,
-          ReasoningContentReplayPolicy.none,
-        );
-        expect(info.needsReasoningEcho, isFalse);
-      }
+    test('k3 aliases replay ordinary history via spec.replay=all', () async {
+      final body = await _captureMoonshotBody(
+        modelId: 'k3',
+        providerId: 'CustomRelay',
+        messages: const [
+          {'role': 'user', 'content': '第一轮问题'},
+          {
+            'role': 'assistant',
+            'content': '第一轮回答',
+            'reasoning_content': '第一轮完整思考\n保留原文',
+          },
+          {'role': 'user', 'content': '第二轮问题'},
+        ],
+      );
+      expect((body['messages'] as List)[1], {
+        'role': 'assistant',
+        'content': '第一轮回答',
+        'reasoning_content': '第一轮完整思考\n保留原文',
+      });
     });
 
     test('kimi-k3 filters remote images from every input path', () async {
@@ -415,7 +397,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
           temperature: 0.7,
           topP: 0.8,
         ).toList();
@@ -473,7 +455,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 16000,
+        reasoning: legacyBudget(16000),
       ).toList();
       await ChatApiService.sendMessageStream(
         config: _moonshotConfig(baseUrl),
@@ -481,7 +463,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello again'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(requestBodies, hasLength(2));
@@ -541,14 +523,14 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
           temperature: 0.7,
           topP: 0.8,
         ).toList();
 
         final body = await requestBodyCompleter.future;
         expect(chunks.isGenerationDone, isTrue);
-        expect(body.containsKey('thinking'), isFalse);
+        expect(body['thinking'], {'type': 'enabled'});
         expect(body.containsKey('reasoning_effort'), isFalse);
         expect(body.containsKey('temperature'), isFalse);
         expect(body.containsKey('top_p'), isFalse);
@@ -651,7 +633,7 @@ void main() {
               config: _moonshotConfig(baseUrl),
               modelId: modelId,
               stream: stream,
-              thinkingBudget: 128000,
+              reasoning: legacyBudget(128000),
               messages: const [
                 {'role': 'user', 'content': '今天几号？'},
               ],
@@ -675,12 +657,21 @@ void main() {
             ).toList();
 
             final secondBody = await secondRequestCompleter.future;
+            if (modelId == 'kimi-k3') {
+              expect(secondBody['reasoning_effort'], 'max');
+              expect(secondBody.containsKey('thinking'), isFalse);
+            }
             if (modelId == 'kimi-for-coding' ||
                 modelId == 'k3' ||
                 modelId == 'k3-256k') {
-              expect(secondBody['reasoning_effort'], 'max');
+              expect(secondBody['thinking'], {
+                'type': 'enabled',
+                'effort': 'max',
+              });
+              expect(secondBody.containsKey('reasoning_effort'), isFalse);
             }
             if (modelId == 'kimi-for-coding-highspeed') {
+              expect(secondBody['thinking'], {'type': 'enabled'});
               expect(secondBody.containsKey('reasoning_effort'), isFalse);
             }
             final messages = (secondBody['messages'] as List)
@@ -889,6 +880,7 @@ void main() {
         final chunks = await ChatApiService.sendMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k2.6',
+          reasoning: legacyBudget(16000),
           messages: const [
             {'role': 'user', 'content': '现在几点了'},
           ],

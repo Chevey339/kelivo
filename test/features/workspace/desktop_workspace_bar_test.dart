@@ -128,21 +128,19 @@ void main() {
     );
   }
 
-  testWidgets(
-    'settings shortcut opens the desktop workspace manager',
-    (tester) async {
-      await tester.pumpWidget(harness(conversation: null));
-      await tester.pumpAndSettle();
-      final action = find.byKey(DesktopWorkspaceBar.manageKey);
-      expect(action, findsOneWidget);
-      await tester.tap(action);
-      await tester.pumpAndSettle();
-      expect(find.byType(WorkspacesPane), findsOneWidget);
-      expect(find.byType(BottomSheet), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('settings shortcut opens the desktop workspace manager', (
+    tester,
+  ) async {
+    await tester.pumpWidget(harness(conversation: null));
+    await tester.pumpAndSettle();
+    final action = find.byKey(DesktopWorkspaceBar.manageKey);
+    expect(action, findsOneWidget);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byType(WorkspacesPane), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('unbound conversation can bind directly from the workspace tab', (
     tester,

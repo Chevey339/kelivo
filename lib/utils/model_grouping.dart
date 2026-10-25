@@ -1,15 +1,16 @@
 import '../core/providers/model_provider.dart';
+import '../core/services/model_spec/model_defaults_guesser.dart';
 import 'model_brand.dart';
 
 class ModelGrouping {
   static String groupFor(
-    ModelInfo m, {
+    ModelSpec m, {
     required String embeddingsLabel,
     required String otherLabel,
   }) {
     final id = m.id.trim().toLowerCase();
     if (m.type == ModelType.embedding ||
-        ModelRegistry.isLikelyEmbeddingId(id)) {
+        ModelDefaultsGuesser.isLikelyEmbeddingId(id)) {
       return embeddingsLabel;
     }
     final brand = ModelBrand.match(id);

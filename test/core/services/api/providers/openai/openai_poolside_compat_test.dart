@@ -1,131 +1,144 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import '../../../../../support/collect_generation.dart';
+import '../../../../../support/legacy_reasoning.dart';
 
-OpenAIProviderInfo _info({
-  String host = '',
-  String providerId = 'poolside',
-  String modelId = 'poolside/laguna-s-2.1',
-}) {
-  return OpenAIProviderInfo(
-    host: host,
-    providerId: providerId,
-    upstreamModelId: modelId,
+ProviderConfig _poolsideConfig(String baseUrl, {bool useResponseApi = false}) {
+  return ProviderConfig(
+    id: 'Poolside',
+    enabled: true,
+    name: 'Poolside',
+    apiKey: 'test-key',
+    baseUrl: baseUrl,
+    providerType: ProviderKind.openai,
+    useResponseApi: useResponseApi,
   );
+}
+
+Future<Map<String, dynamic>> _captureBody({
+  required String modelId,
+  required int? thinkingBudget,
+  bool useResponseApi = false,
+  Map<String, dynamic>? extraBody,
+}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    if (useResponseApi) {
+      request.response.headers.contentType = ContentType(
+        'text',
+        'event-stream',
+        charset: 'utf-8',
+      );
+      request.response.write(
+        'data: ${jsonEncode({'type': 'response.output_text.delta', 'delta': 'ok'})}\n\n',
+      );
+      request.response.write(
+        'data: ${jsonEncode({
+          'type': 'response.completed',
+          'response': {
+            'output': const [],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          },
+        })}\n\n',
+      );
+      request.response.write('data: [DONE]\n\n');
+    } else {
+      request.response.headers.contentType = ContentType(
+        'text',
+        'event-stream',
+        charset: 'utf-8',
+      );
+      request.response.write(
+        'data: ${jsonEncode({
+          'choices': [
+            {
+              'delta': {'content': 'ok'},
+              'finish_reason': 'stop',
+            },
+          ],
+        })}\n\n',
+      );
+      request.response.write('data: [DONE]\n\n');
+    }
+    await request.response.close();
+  });
+
+  final chunks = await ChatApiService.sendMessageStream(
+    config: _poolsideConfig(
+      'http://${server.address.address}:${server.port}/v1',
+      useResponseApi: useResponseApi,
+    ),
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    reasoning: legacyBudget(thinkingBudget),
+    extraBody: extraBody,
+  ).toList();
+  expect(chunks.isGenerationDone, isTrue);
+  return requestBody;
 }
 
 void main() {
   group('Poolside Laguna thinking knobs', () {
-    test('recognizes official Laguna ids and Poolside hosts', () {
-      expect(_info(modelId: 'poolside/laguna-s-2.1').isLaguna, isTrue);
-      expect(_info(modelId: 'poolside/laguna-xs-2.1').isLaguna, isTrue);
-      expect(_info(modelId: 'laguna-s-2.1').isLaguna, isTrue);
-      expect(
-        _info(
-          host: 'inference.poolside.ai',
-          modelId: 'custom-id',
-        ).isPoolsideHost,
-        isTrue,
-      );
-      expect(
-        _info(
-          host: 'inference.poolside.ai',
-          modelId: 'custom-id',
-        ).usesPoolsideThinking,
-        isTrue,
-      );
-      expect(
-        _info(host: 'api.openai.com', modelId: 'gpt-5').usesPoolsideThinking,
-        isFalse,
-      );
-    });
-
-    test('always sends enable_thinking for Laguna', () {
-      final enabled = <String, dynamic>{'reasoning_effort': 'high'};
-      applyVendorReasoningKnobs(
-        enabled,
-        info: _info(),
-        isReasoning: true,
+    test('Laguna chat completions map budget to enable_thinking', () async {
+      final enabled = await _captureBody(
+        modelId: 'poolside/laguna-s-2.1',
         thinkingBudget: 128000,
       );
-      expect(enabled['chat_template_kwargs'], {'enable_thinking': true});
-      expect(enabled.containsKey('reasoning_effort'), isFalse);
-
-      final disabled = <String, dynamic>{};
-      applyVendorReasoningKnobs(
-        disabled,
-        info: _info(),
-        isReasoning: true,
+      final disabled = await _captureBody(
+        modelId: 'laguna-xs-2.1',
         thinkingBudget: 0,
       );
-      expect(disabled['chat_template_kwargs'], {'enable_thinking': false});
-
-      final unmarked = <String, dynamic>{};
-      applyVendorReasoningKnobs(
-        unmarked,
-        info: _info(),
-        isReasoning: false,
-        thinkingBudget: 128000,
+      final auto = await _captureBody(
+        modelId: 'poolside/laguna-s-2.1',
+        thinkingBudget: -1,
       );
-      expect(unmarked['chat_template_kwargs'], {'enable_thinking': false});
+
+      expect(enabled['chat_template_kwargs'], {'enable_thinking': true});
+      expect(enabled.containsKey('reasoning_effort'), isFalse);
+      expect(disabled['chat_template_kwargs'], {'enable_thinking': false});
+      expect(auto.containsKey('chat_template_kwargs'), isFalse);
+    });
+
+    test('custom body merges into the dialect object', () async {
+      final body = await _captureBody(
+        modelId: 'poolside/laguna-s-2.1',
+        thinkingBudget: 128000,
+        extraBody: const {
+          'chat_template_kwargs': {'foo': 'bar'},
+        },
+      );
+      expect(body['chat_template_kwargs'], {
+        'foo': 'bar',
+        'enable_thinking': true,
+      });
     });
 
     test(
-      'keeps extra chat_template_kwargs and fills missing enable_thinking',
-      () {
-        final body = <String, dynamic>{
-          'chat_template_kwargs': {'foo': 'bar'},
-        };
-        applyPoolsideThinkingIfNeeded(
-          body,
-          info: _info(),
-          isReasoning: true,
+      'Responses path uses chat_template_kwargs instead of reasoning',
+      () async {
+        final body = await _captureBody(
+          modelId: 'poolside/laguna-s-2.1',
           thinkingBudget: 128000,
+          useResponseApi: true,
         );
-        expect(body['chat_template_kwargs'], {
-          'foo': 'bar',
-          'enable_thinking': true,
-        });
-
-        final overridden = <String, dynamic>{
-          'chat_template_kwargs': {'enable_thinking': false, 'foo': 'bar'},
-        };
-        applyPoolsideThinkingIfNeeded(
-          overridden,
-          info: _info(),
-          isReasoning: true,
-          thinkingBudget: 128000,
-        );
-        expect(overridden['chat_template_kwargs'], {
-          'enable_thinking': false,
-          'foo': 'bar',
-        });
+        expect(body['chat_template_kwargs'], {'enable_thinking': true});
+        expect(body.containsKey('reasoning'), isFalse);
       },
     );
-
-    test('Responses path uses chat_template_kwargs instead of reasoning', () {
-      final body = <String, dynamic>{
-        'reasoning': {'effort': 'high', 'summary': 'auto'},
-      };
-      applyCompatibleResponsesReasoning(
-        body,
-        config: ProviderConfig(
-          id: 'Poolside',
-          enabled: true,
-          name: 'Poolside',
-          apiKey: 'k',
-          baseUrl: 'https://inference.poolside.ai/v1',
-          providerType: ProviderKind.openai,
-          useResponseApi: true,
-        ),
-        modelId: 'poolside/laguna-s-2.1',
-        upstreamModelId: 'poolside/laguna-s-2.1',
-        isReasoning: true,
-        thinkingBudget: 128000,
-      );
-      expect(body['chat_template_kwargs'], {'enable_thinking': true});
-      expect(body.containsKey('reasoning'), isFalse);
-    });
   });
 }

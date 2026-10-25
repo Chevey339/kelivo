@@ -68,6 +68,12 @@ void main() {
     final desktop = ids(TargetPlatform.macOS);
     for (final platform in TargetPlatform.values) {
       expect(
+        ids(
+          platform,
+        ).contains('displaySettingsPageIosNativeSelectionMenuTitle'),
+        platform == TargetPlatform.iOS,
+      );
+      expect(
         ids(platform).contains('linuxHideTitleBarTitle'),
         platform == TargetPlatform.linux,
         reason: 'The title bar setting is Linux-only.',
@@ -104,6 +110,21 @@ void main() {
       expect(desktop, isNot(contains(id)), reason: id);
     }
   });
+
+  test(
+    'native menu rollback is searchable by its appearance and destination',
+    () {
+      for (final query in ['liquid glass', '液态玻璃', '原生選取選單']) {
+        final result = index.search(query).first;
+        expect(result.id, 'displaySettingsPageIosNativeSelectionMenuTitle');
+        expect(result.destination, SettingsSearchDestination.behavior);
+        expect(
+          result.targetLabel,
+          en.displaySettingsPageIosNativeSelectionMenuTitle,
+        );
+      }
+    },
+  );
 
   test(
     'entries have stable unique ids, paths and localized destination labels',

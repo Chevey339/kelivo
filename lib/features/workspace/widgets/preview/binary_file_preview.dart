@@ -132,7 +132,7 @@ class BinaryFilePreview extends StatelessWidget {
                       label: l10n.workspaceFilesExportItem,
                       onTap: () => unawaited(exportPreviewFile(context, file)),
                     ),
-                    if (desktop)
+                    if (canRevealPreviewFileInFileManager)
                       IosTileButton(
                         key: revealKey,
                         icon: Lucide.FolderOpen,

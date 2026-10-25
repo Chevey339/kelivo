@@ -116,14 +116,16 @@ class HighRefreshRateControllerTest {
     private fun assertRequested(rate: Float) {
         val attributes = host.get().window.attributes
         assertEquals(0f, attributes.preferredRefreshRate, 0f)
-        if (Build.VERSION.SDK_INT < 30) {
+        if (Build.VERSION.SDK_INT <= 30) {
             val requestedMode = view.display.supportedModes.first { it.modeId == attributes.preferredDisplayModeId }
             assertEquals(view.display.mode.physicalWidth, requestedMode.physicalWidth)
             assertEquals(view.display.mode.physicalHeight, requestedMode.physicalHeight)
             assertEquals(rate, requestedMode.refreshRate, 0f)
+        }
+        if (Build.VERSION.SDK_INT < 30) {
             assertTrue(surface.votes.isEmpty())
         } else {
-            assertEquals(0, attributes.preferredDisplayModeId)
+            if (Build.VERSION.SDK_INT > 30) assertEquals(0, attributes.preferredDisplayModeId)
             val vote = surface.votes.last()
             assertEquals(rate, vote.rate, 0f)
             assertEquals(if (Build.VERSION.SDK_INT >= 36) 2 else 0, vote.compatibility)
@@ -139,6 +141,15 @@ class HighRefreshRateControllerTest {
         }
         controller.resume()
         assertRequested(expectedRate)
+    }
+
+    @Test @Config(sdk = [30])
+    fun android11RequestsBothTheWindowModeAndSurfaceRate() {
+        controller.resume()
+        assertRequested(120f)
+        controller.stop()
+        assertEquals(0, host.get().window.attributes.preferredDisplayModeId)
+        assertEquals(0f, surface.votes.last().rate, 0f)
     }
 
     @Test @Config(sdk = [24])

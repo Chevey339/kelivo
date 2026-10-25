@@ -252,6 +252,12 @@ class _UsageBar extends StatelessWidget {
     final color = percent != null && percent >= 90
         ? context.appColors.warning
         : cs.primary;
+    final value = window.unit == 'usd'
+        ? '\$${window.used?.toStringAsFixed(2) ?? '—'}${window.limit == null ? '' : ' / \$${window.limit!.toStringAsFixed(2)}'}'
+        : percent == null
+        ? null
+        : '${percent.toStringAsFixed(0)}%';
+    final usedText = value == null ? '—' : l.oauthUsedValue(value);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -267,11 +273,7 @@ class _UsageBar extends StatelessWidget {
               ),
             ),
             Text(
-              window.unit == 'usd'
-                  ? '\$${window.used?.toStringAsFixed(2) ?? '—'}${window.limit == null ? '' : ' / \$${window.limit!.toStringAsFixed(2)}'}'
-                  : percent == null
-                  ? '—'
-                  : '${percent.toStringAsFixed(0)}%',
+              usedText,
               style: TextStyle(fontSize: 12, fontWeight: AppFontWeights.medium),
             ),
           ],
@@ -279,7 +281,7 @@ class _UsageBar extends StatelessWidget {
         const SizedBox(height: 7),
         if (percent != null)
           Semantics(
-            label: '$label ${percent.toStringAsFixed(0)}%',
+            label: '$label $usedText',
             child: ClipRRect(
               borderRadius: BorderRadius.circular(99),
               child: SizedBox(

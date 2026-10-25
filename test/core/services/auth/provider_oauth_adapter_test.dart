@@ -75,6 +75,163 @@ void main() {
     },
   );
 
+  test('Grok merges both OAuth catalogs and prefers Build metadata', () async {
+    final urls = <String>[];
+    final client = MockClient((request) async {
+      urls.add(request.url.toString());
+      expect(request.method, 'GET');
+      expect(request.headers['Authorization'], 'Bearer access');
+      expect(request.headers['X-XAI-Token-Auth'], 'xai-grok-cli');
+      if (request.url.host == 'api.x.ai') {
+        expect(request.url.path, '/v1/models');
+        return response({
+          'data': [
+            {
+              'id': 'grok-4.7',
+              'name': 'API catalog name',
+              'supported_reasoning_levels': ['low', 'high'],
+            },
+            {'id': 'grok-4.7-build-fast', 'name': 'API Fast'},
+            {'id': 'grok-4.20-0309-reasoning'},
+            {'id': 'grok-4.20-0309-reasoning'},
+            {'id': 'grok-build-0.1'},
+          ],
+        });
+      }
+      expect(
+        request.url.toString(),
+        'https://cli-chat-proxy.grok.com/v1/models-v2',
+      );
+      return response({
+        'data': [
+          {
+            'id': 'grok-4.7',
+            'name': 'Grok 4.7',
+            'reasoningEfforts': ['low', 'medium', 'high', 'xhigh'],
+          },
+          {
+            'id': 'fast-picker-key',
+            'model': 'grok-4.7-build-fast',
+            'name': 'Grok 4.7 Fast',
+            'contextWindow': 500000,
+            'supportedInApi': false,
+            'reasoningEfforts': [
+              {'id': 'quick', 'value': 'low', 'label': 'Low'},
+              {'value': 'high', 'default': true},
+              {'value': 'xhigh', 'label': 'Extra High'},
+            ],
+          },
+          {
+            'modelId': 'grok-4.6',
+            'context_window': 500000,
+            'reasoning_efforts': ['low', 'high'],
+          },
+          {
+            '_meta': {
+              'model': 'grok-build',
+              'totalContextTokens': 512000,
+              'reasoningEfforts': ['high'],
+            },
+          },
+          {'model': 'hidden-model', 'hidden': true},
+          {
+            'model': 'hidden-meta-model',
+            '_meta': {'hidden': true},
+          },
+          {'name': 'Missing model id'},
+          null,
+        ],
+      });
+    });
+    addTearDown(client.close);
+    final models = await GrokOAuthAdapter().models(
+      OAuthWire(client),
+      ProviderOAuthCredentials(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        sessionId: 'session',
+      ),
+    );
+    expect(
+      urls,
+      unorderedEquals([
+        'https://cli-chat-proxy.grok.com/v1/models-v2',
+        'https://api.x.ai/v1/models',
+      ]),
+    );
+    expect(models.map((row) => row['id']), [
+      'grok-4.7',
+      'grok-4.7-build-fast',
+      'grok-4.6',
+      'grok-build',
+      'grok-4.20-0309-reasoning',
+      'grok-build-0.1',
+    ]);
+    expect(models[0]['name'], 'Grok 4.7');
+    expect(models[0]['supported_reasoning_levels'], [
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+    ]);
+    expect(models[1]['name'], 'Grok 4.7 Fast');
+    expect(models[1]['context_window'], 500000);
+    expect(models[2]['context_window'], 500000);
+    expect(models[3]['context_window'], 512000);
+    expect(models[1]['supported_reasoning_levels'], ['low', 'high', 'xhigh']);
+    expect(models[2]['supported_reasoning_levels'], ['low', 'high']);
+    expect(models[3]['supported_reasoning_levels'], ['high']);
+  });
+
+  test(
+    'Grok catalog merge rejects partial results and propagates auth errors',
+    () async {
+      for (final failingHost in ['cli-chat-proxy.grok.com', 'api.x.ai']) {
+        for (final scenario in [
+          (
+            {'data': <String, dynamic>{}},
+            200,
+            ProviderOAuthFailure.invalidResponse,
+          ),
+          ({'error': 'unauthorized'}, 401, ProviderOAuthFailure.loginRequired),
+        ]) {
+          var requests = 0;
+          final client = MockClient((request) async {
+            requests++;
+            return request.url.host == failingHost
+                ? response(scenario.$1, scenario.$2)
+                : response({
+                    'data': [
+                      {'id': 'grok-4.7'},
+                    ],
+                  });
+          });
+          addTearDown(client.close);
+          await expectLater(
+            GrokOAuthAdapter().models(
+              OAuthWire(client),
+              ProviderOAuthCredentials(
+                accessToken: 'access',
+                refreshToken: 'refresh',
+                expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                sessionId: 'session',
+              ),
+            ),
+            throwsA(
+              isA<ProviderOAuthException>().having(
+                (e) => e.kind,
+                'kind',
+                scenario.$3,
+              ),
+            ),
+          );
+          expect(requests, 2);
+        }
+      }
+    },
+  );
+
   test('cancelled polling has no remaining delay timer or token request', () {
     fakeAsync((async) {
       final cancellation = OAuthCancellation();

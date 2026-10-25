@@ -19,6 +19,17 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
   );
 }
 
+ProviderConfig _withVideoInput(ProviderConfig config, String modelId) {
+  return config.copyWith(
+    modelOverrides: {
+      ...config.modelOverrides,
+      modelId: const {
+        'input': ['text', 'image', 'video'],
+      },
+    },
+  );
+}
+
 Future<Map<String, dynamic>> _sendAndCaptureRequestBody(
   Future<List<dynamic>> Function(String baseUrl) sendRequest,
 ) async {
@@ -63,6 +74,60 @@ Future<Map<String, dynamic>> _sendAndCaptureRequestBody(
     fail('expected request body to be captured');
   }
   return captured;
+}
+
+Future<Map<String, dynamic>> _captureStreamingChatBody({String? host}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(
+    host == null ? InternetAddress.loopbackIPv4 : InternetAddress.loopbackIPv6,
+    0,
+  );
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+  final baseUrl = host == null
+      ? 'http://${server.address.address}:${server.port}/v1'
+      : 'http://$host:${server.port}/v1';
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType(
+      'text',
+      'event-stream',
+      charset: 'utf-8',
+    );
+    request.response.write(
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'index': 0,
+            'delta': {'role': 'assistant', 'content': 'ok'},
+            'finish_reason': 'stop',
+          },
+        ],
+      })}\n\n',
+    );
+    request.response.write('data: [DONE]\n\n');
+    await request.response.close();
+  });
+
+  await ChatApiService.sendMessageStream(
+    config: ProviderConfig(
+      id: 'OpenAITest',
+      enabled: true,
+      name: 'OpenAITest',
+      apiKey: 'test-key',
+      baseUrl: baseUrl,
+      providerType: ProviderKind.openai,
+    ),
+    modelId: 'gpt-4o',
+    messages: const [
+      {'role': 'user', 'content': 'hi'},
+    ],
+  ).toList();
+  return requestBody;
 }
 
 ProviderConfig _claudeConfig(String baseUrl) {
@@ -927,124 +992,36 @@ void main() {
   });
 
   group('ChatApiService Responses API structured media paths', () {
-    test('local video/mp4 is not encoded as input_image', () async {
-      final body = await _sendAndCaptureResponsesBody((baseUrl) async {
-        final dir = await Directory.systemTemp.createTemp('kelivo_resp_vid_');
-        addTearDown(() async {
-          if (await dir.exists()) {
-            await dir.delete(recursive: true);
-          }
-        });
-        final file = File('${dir.path}/clip.mp4');
-        await file.writeAsBytes(const [1, 2, 3, 4]);
-
-        return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
-          modelId: 'gpt-4.1',
-          messages: [
-            {
-              'role': 'user',
-              'content': 'watch this',
-              multimodalInternalMediaPathsKey: [
-                {'uri': file.path, 'mime': 'video/mp4'},
-              ],
-            },
-          ],
-          stream: false,
-        ).toList();
-      });
-
-      final encoded = jsonEncode(body);
-      expect(encoded, isNot(contains('"type":"input_image"')));
-      final input = (body['input'] as List).cast<Map>();
-      final content = input.single['content'];
-      if (content is List) {
-        expect(
-          content.any((part) => (part as Map)['type'] == 'input_image'),
-          isFalse,
+    for (final uri in ['/tmp/clip.mp4', 'https://example.com/clip.mp4']) {
+      test('Responses rejects unsupported video input: $uri', () async {
+        await expectLater(
+          ChatApiService.sendMessageStream(
+            config: _withVideoInput(
+              _openAiConfig('http://127.0.0.1:1', useResponseApi: true),
+              'gpt-4.1',
+            ),
+            modelId: 'gpt-4.1',
+            messages: [
+              {
+                'role': 'user',
+                'content': '',
+                multimodalInternalMediaPathsKey: [
+                  {'uri': uri, 'mime': 'video/mp4'},
+                ],
+              },
+            ],
+            stream: false,
+          ).toList(),
+          throwsA(
+            isA<UnsupportedError>().having(
+              (error) => error.message,
+              'message',
+              contains('Responses API does not support video input'),
+            ),
+          ),
         );
-      }
-    });
-
-    test('pure local video attachment keeps non-empty text content', () async {
-      late final String videoPath;
-      final body = await _sendAndCaptureResponsesBody((baseUrl) async {
-        final dir = await Directory.systemTemp.createTemp(
-          'kelivo_resp_pure_vid_',
-        );
-        addTearDown(() async {
-          if (await dir.exists()) {
-            await dir.delete(recursive: true);
-          }
-        });
-        final file = File('${dir.path}/clip.mp4');
-        await file.writeAsBytes(const [1, 2, 3, 4]);
-        videoPath = file.path;
-
-        return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
-          modelId: 'gpt-4.1',
-          messages: [
-            {
-              'role': 'user',
-              'content': '',
-              multimodalInternalMediaPathsKey: [
-                {'uri': file.path, 'mime': 'video/mp4'},
-              ],
-            },
-          ],
-          stream: false,
-        ).toList();
       });
-
-      final encoded = jsonEncode(body);
-      expect(encoded, isNot(contains('"type":"input_image"')));
-      final input = (body['input'] as List).cast<Map>();
-      final content = input.single['content'];
-      expect(content, isA<List>());
-      final parts = (content as List).cast<Map<String, dynamic>>();
-      expect(parts, isNotEmpty, reason: 'pure video must not emit content: []');
-      expect(parts.any((part) => part['type'] == 'input_image'), isFalse);
-      expect(
-        parts.any(
-          (part) => part['type'] == 'input_text' && part['text'] == videoPath,
-        ),
-        isTrue,
-      );
-    });
-
-    test('remote video URL stays as text, not input_image', () async {
-      final body = await _sendAndCaptureResponsesBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
-          modelId: 'gpt-4.1',
-          messages: [
-            {
-              'role': 'user',
-              'content': 'watch this',
-              multimodalInternalMediaPathsKey: const [
-                {'uri': 'https://example.com/clip.mp4', 'mime': 'video/mp4'},
-              ],
-            },
-          ],
-          stream: false,
-        ).toList();
-      });
-
-      final input = (body['input'] as List).cast<Map>();
-      final content = input.single['content'];
-      expect(content, isA<List>());
-      final parts = (content as List).cast<Map<String, dynamic>>();
-      expect(parts.any((part) => part['type'] == 'input_image'), isFalse);
-      expect(
-        parts.any(
-          (part) =>
-              part['type'] == 'input_text' &&
-              part['text'] == 'https://example.com/clip.mp4',
-        ),
-        isTrue,
-      );
-    });
+    }
 
     test('encodes multimodalInternalMediaPathsKey as input_image', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
@@ -1469,105 +1446,36 @@ void main() {
       },
     );
 
-    test(
-      'video/mp4 supplemental ref does not become Claude image block',
-      () async {
-        final dir = await Directory.systemTemp.createTemp(
-          'kelivo_claude_video_',
-        );
-        addTearDown(() async {
-          if (await dir.exists()) await dir.delete(recursive: true);
-        });
-        final file = File('${dir.path}/clip.mp4');
-        await file.writeAsBytes(const [1, 2, 3, 4]);
-
-        final body = await _captureProviderBody(
-          (baseUrl) {
-            return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
-              modelId: 'claude-sonnet-4-6',
-              messages: [
-                {
-                  'role': 'user',
-                  'content': 'watch this',
-                  multimodalInternalMediaPathsKey: [
-                    encodeInternalMediaRef(uri: file.path, mime: 'video/mp4'),
-                  ],
-                },
-              ],
-              stream: false,
-            ).toList();
-          },
-          responseBody: const <String, dynamic>{
-            'id': 'msg_1',
-            'content': [
-              {'type': 'text', 'text': 'ok'},
-            ],
-            'usage': {'input_tokens': 1, 'output_tokens': 1},
-          },
-        );
-
-        final messages = (body['messages'] as List).cast<Map>();
-        final content = messages.single['content'];
-        if (content is List) {
-          final parts = content.cast<Map>();
-          expect(parts.any((part) => part['type'] == 'image'), isFalse);
-          expect(
-            parts.any(
-              (part) =>
-                  part['type'] == 'image' &&
-                  (part['source'] as Map?)?['media_type'] == 'video/mp4',
+    for (final uri in ['/tmp/clip.mp4', 'https://cdn.example.com/clip.mp4']) {
+      test('Claude rejects unsupported video input: $uri', () async {
+        await expectLater(
+          ChatApiService.sendMessageStream(
+            config: _withVideoInput(
+              _claudeConfig('http://127.0.0.1:1'),
+              'claude-sonnet-4-6',
             ),
-            isFalse,
-          );
-          expect(parts.first['text'], 'watch this');
-        } else {
-          expect(content, 'watch this');
-        }
-        expect(jsonEncode(body), isNot(contains('"media_type":"video/mp4"')));
-      },
-    );
-
-    test(
-      'remote video/mp4 supplemental ref is kept as text, not image',
-      () async {
-        const remote = 'https://cdn.example.com/clip.mp4';
-        final body = await _captureProviderBody(
-          (baseUrl) {
-            return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
-              modelId: 'claude-sonnet-4-6',
-              messages: [
-                {
-                  'role': 'user',
-                  'content': 'remote clip',
-                  multimodalInternalMediaPathsKey: [
-                    encodeInternalMediaRef(uri: remote, mime: 'video/mp4'),
-                  ],
-                },
-              ],
-              stream: false,
-            ).toList();
-          },
-          responseBody: const <String, dynamic>{
-            'id': 'msg_1',
-            'content': [
-              {'type': 'text', 'text': 'ok'},
+            modelId: 'claude-sonnet-4-6',
+            messages: [
+              {
+                'role': 'user',
+                'content': 'watch this',
+                multimodalInternalMediaPathsKey: [
+                  encodeInternalMediaRef(uri: uri, mime: 'video/mp4'),
+                ],
+              },
             ],
-            'usage': {'input_tokens': 1, 'output_tokens': 1},
-          },
+            stream: false,
+          ).toList(),
+          throwsA(
+            isA<UnsupportedError>().having(
+              (error) => error.message,
+              'message',
+              contains('Claude API does not support video input'),
+            ),
+          ),
         );
-
-        final messages = (body['messages'] as List).cast<Map>();
-        final parts = (messages.single['content'] as List).cast<Map>();
-        expect(parts.any((part) => part['type'] == 'image'), isFalse);
-        expect(
-          parts.any((part) => part['type'] == 'text' && part['text'] == remote),
-          isTrue,
-        );
-        expect(jsonEncode(body), isNot(contains('"media_type":"video/mp4"')));
-      },
-    );
+      });
+    }
   });
 
   group('Gemini structured media paths (ticket 10)', () {
@@ -1689,35 +1597,24 @@ void main() {
     });
   });
 
-  group('LongCat host / streaming usage detection', () {
-    test('recognizes bare hostname and full URL', () {
-      expect(ChatApiService.isLongCatHostForTest('api.longcat.chat'), isTrue);
-      expect(
-        ChatApiService.isLongCatHostForTest('https://api.longcat.chat/v1'),
-        isTrue,
-      );
-      expect(ChatApiService.isLongCatHostForTest('api.openai.com'), isFalse);
+  group('streaming usage options', () {
+    test('includes stream_options on typical OpenAI hosts', () async {
+      final body = await _captureStreamingChatBody();
+      expect(body['stream_options'], {'include_usage': true});
     });
 
-    test('streaming usage options disabled for LongCat hostnames', () {
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'api.longcat.chat',
-        ),
-        isFalse,
+    test('omits stream_options for LongCat hosts', () async {
+      final body = await _captureStreamingChatBody(
+        host: 'api.longcat.localhost',
       );
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'https://api.longcat.chat',
-        ),
-        isFalse,
+      expect(body.containsKey('stream_options'), isFalse);
+    });
+
+    test('omits stream_options for OpenRouter hosts', () async {
+      final body = await _captureStreamingChatBody(
+        host: 'openrouter.localhost',
       );
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'api.openai.com',
-        ),
-        isTrue,
-      );
+      expect(body.containsKey('stream_options'), isFalse);
     });
   });
 }

@@ -257,6 +257,19 @@ class DioHttpClient extends http.BaseClient {
 
       final logChunks =
           (logRequests && RequestLogger.enabled) && RequestLogger.saveOutput;
+      // Keep partial UTF-8 characters between transport chunks without
+      // buffering or transforming the bytes delivered to the caller.
+      ByteConversionSink? logDecoder = logChunks
+          ? const Utf8Decoder(
+              allowMalformed: true,
+            ).startChunkedConversion(_ResponseLogSink(reqId))
+          : null;
+      void closeLogDecoder() {
+        final decoder = logDecoder;
+        logDecoder = null;
+        decoder?.close();
+      }
+
       final controller = StreamController<List<int>>(sync: true);
       final responseState = _ResponseStreamState(body.stream, controller);
       controller.onListen = () {
@@ -280,18 +293,14 @@ class DioHttpClient extends http.BaseClient {
         }
         responseState.subscription = source.listen(
           (chunk) {
+            // A synchronous consumer can cancel and close the decoder from
+            // controller.add, so log this chunk before forwarding it.
+            logDecoder?.add(chunk);
             controller.add(chunk);
-            if (logChunks) {
-              final s = RequestLogger.safeDecodeUtf8(chunk);
-              if (s.isNotEmpty) {
-                RequestLogger.logLine(
-                  '[RES $reqId] chunk=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(s)))}',
-                );
-              }
-            }
           },
           onError: (Object error, StackTrace stack) {
             responseState.finished = true;
+            closeLogDecoder();
             if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine(
                 '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(error.toString()))}',
@@ -302,6 +311,7 @@ class DioHttpClient extends http.BaseClient {
           },
           onDone: () {
             responseState.finished = true;
+            closeLogDecoder();
             if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
@@ -314,6 +324,7 @@ class DioHttpClient extends http.BaseClient {
       controller.onResume = () => responseState.subscription?.resume();
       controller.onCancel = () async {
         responseState.finished = true;
+        closeLogDecoder();
         final subscription = responseState.subscription;
         responseState.subscription = null;
         await subscription?.cancel();
@@ -379,6 +390,23 @@ class DioHttpClient extends http.BaseClient {
   }
 }
 
+class _ResponseLogSink implements Sink<String> {
+  _ResponseLogSink(this.requestId);
+
+  final int requestId;
+
+  @override
+  void add(String text) {
+    if (text.isEmpty) return;
+    RequestLogger.logLine(
+      '[RES $requestId] chunk=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(text)))}',
+    );
+  }
+
+  @override
+  void close() {}
+}
+
 Future<ResponseBody> _awaitResponseOrCancel(
   Future<ResponseBody> response,
   CancelToken token,
@@ -436,13 +464,15 @@ class _ResponseStreamState {
   Future<void> cancel(Object error) async {
     if (finished || controller.isClosed) return;
     finished = true;
-    controller.addError(error);
-    unawaited(controller.close());
     // A caller can cancel between receiving headers and listening to the body.
     // Cancel that unopened body too, rather than leaving its socket alive.
     final active =
         subscription ?? source.listen((_) {}, onError: (Object _) {});
+    // addError can synchronously invoke onCancel. Detach the subscription
+    // first so that reentrant cancellation cannot make us listen again.
     subscription = null;
+    controller.addError(error);
+    unawaited(controller.close());
     await active.cancel();
   }
 }

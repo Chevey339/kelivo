@@ -55,7 +55,7 @@ void main() {
       });
     });
 
-    test('does not merge validation siblings of a \$ref', () {
+    test('retains validation siblings of a ref as a conjunction', () {
       final resolved = resolveJsonSchemaRefs({
         r'$defs': {
           'Base': {
@@ -83,9 +83,20 @@ void main() {
       final target =
           (resolved['properties'] as Map)['target'] as Map<String, dynamic>;
       expect(target['description'], 'sibling annotation');
-      expect((target['properties'] as Map).keys.toSet(), {'id'});
-      expect(target['required'], ['id']);
-      expect(target, isNot(contains('minLength')));
+      expect(target['properties'], {
+        'tag': {'type': 'string'},
+      });
+      expect(target['required'], ['tag']);
+      expect(target['minLength'], 10);
+      expect(target['allOf'], [
+        {
+          'type': 'object',
+          'properties': {
+            'id': {'type': 'string'},
+          },
+          'required': ['id'],
+        },
+      ]);
     });
 
     test('resolves nested refs inside the referenced target', () {
@@ -138,7 +149,10 @@ void main() {
         'properties': {
           'body': {
             'type': 'object',
-            'default': {r'$ref': r'#/$defs/Payload'},
+            'default': {
+              r'$ref': r'#/$defs/Payload',
+              r'$dynamicRef': '#not-a-schema',
+            },
             'enum': [
               {'definitions': 1},
             ],
@@ -148,11 +162,42 @@ void main() {
       });
 
       final body = (resolved['properties'] as Map)['body'] as Map;
-      expect(body['default'], {r'$ref': r'#/$defs/Payload'});
+      expect(body['default'], {
+        r'$ref': r'#/$defs/Payload',
+        r'$dynamicRef': '#not-a-schema',
+      });
+      expect(resolved, isNot(contains(r'$defs')));
       expect(body['enum'], [
         {'definitions': 1},
       ]);
       expect(body['const'], {r'$ref': 'anything'});
+    });
+
+    test('pointer ancestors distinguish schema names from scope keywords', () {
+      final resolved = resolveJsonSchemaRefs({
+        r'$defs': {
+          r'$id': false,
+          'id': {'type': 'integer'},
+          'Box': {
+            'properties': {
+              r'$id': false,
+              'id': true,
+              'value': {r'$ref': r'#/$defs/id'},
+            },
+          },
+        },
+        'properties': {
+          'value': {r'$ref': r'#/$defs/Box/properties/value'},
+          'blocked': {r'$ref': r'#/$defs/Box/properties/$id'},
+        },
+      });
+
+      expect(resolved, {
+        'properties': {
+          'value': {'type': 'integer'},
+          'blocked': false,
+        },
+      });
     });
 
     test('resolves references inside union members and items', () {
@@ -182,7 +227,60 @@ void main() {
       expect((props['b'] as Map)['items'], {'type': 'string'});
     });
 
-    test('does not inline a boolean schema target', () {
+    for (final keyword in ['anyOf', 'oneOf', 'allOf']) {
+      test('resolves references after the first $keyword branch', () {
+        final resolved = resolveJsonSchemaRefs({
+          r'$defs': {
+            'Text': {'type': 'string'},
+            'Count': {'type': 'integer'},
+          },
+          'properties': {
+            'value': {
+              keyword: [
+                {r'$ref': r'#/$defs/Text'},
+                {r'$ref': r'#/$defs/Count'},
+              ],
+            },
+          },
+        });
+
+        expect(resolved['properties']['value'][keyword], [
+          {'type': 'string'},
+          {'type': 'integer'},
+        ]);
+        expect(resolved, isNot(contains(r'$defs')));
+      });
+    }
+
+    test('retains recursive refs in later branches with their definitions', () {
+      final resolved = resolveJsonSchemaRefs({
+        r'$defs': {
+          'Node': {
+            'type': 'object',
+            'properties': {
+              'child': {
+                'anyOf': [
+                  {'type': 'null'},
+                  {r'$ref': r'#/$defs/Node'},
+                ],
+              },
+            },
+          },
+        },
+        'type': 'object',
+        'properties': {
+          'root': {r'$ref': r'#/$defs/Node'},
+        },
+      });
+
+      expect(resolved['properties']['root'], {r'$ref': r'#/$defs/Node'});
+      expect(resolved[r'$defs']['Node']['properties']['child']['anyOf'], [
+        {'type': 'null'},
+        {r'$ref': r'#/$defs/Node'},
+      ]);
+    });
+
+    test('inlines boolean schema targets without losing their constraints', () {
       final resolved = resolveJsonSchemaRefs({
         r'$defs': {'Anything': true, 'Nothing': false},
         'properties': {
@@ -192,11 +290,11 @@ void main() {
       });
 
       final props = resolved['properties'] as Map;
-      expect(props['ok'], {'description': 'kept'});
-      expect(props['never'], isA<Map>());
-      expect(props['never'], isEmpty);
-      expect(props['ok'], isNot(isTrue));
-      expect(props['never'], isNot(isFalse));
+      expect(props['ok'], {
+        'description': 'kept',
+        'allOf': [true],
+      });
+      expect(props['never'], isFalse);
     });
 
     test('percent-decodes the fragment before splitting the pointer', () {
@@ -225,7 +323,7 @@ void main() {
       });
     });
 
-    test('does not spend the expansion budget on discarded keywords', () {
+    test('skips discarded Google schema keywords', () {
       Map<String, dynamic> fanout(String next) => {
         'type': 'object',
         'properties': {
@@ -255,7 +353,7 @@ void main() {
         'properties': {
           'payload': {r'$ref': r'#/$defs/Payload'},
         },
-      });
+      }, preserveJsonSchema: false);
 
       final payload =
           (resolved['properties'] as Map)['payload'] as Map<String, dynamic>;
@@ -263,7 +361,7 @@ void main() {
       expect((payload['properties'] as Map).containsKey('post'), isTrue);
     });
 
-    test('does not spend the expansion budget on unused tuple-form items', () {
+    test('skips discarded Google tuple entries', () {
       Map<String, dynamic> fanout(String next) => {
         'type': 'object',
         'properties': {
@@ -296,7 +394,7 @@ void main() {
           },
           'payload': {r'$ref': r'#/$defs/Payload'},
         },
-      });
+      }, preserveJsonSchema: false);
 
       final payload =
           (resolved['properties'] as Map)['payload'] as Map<String, dynamic>;
@@ -342,10 +440,7 @@ void main() {
           },
         };
 
-        final google = resolveJsonSchemaRefs(
-          schema,
-          expandAdditionalProperties: false,
-        );
+        final google = resolveJsonSchemaRefs(schema, preserveJsonSchema: false);
         final googlePayload =
             (google['properties'] as Map)['payload'] as Map<String, dynamic>;
         expect(googlePayload['type'], 'object');
@@ -356,9 +451,7 @@ void main() {
         expect(google['additionalProperties'], {r'$ref': r'#/$defs/A'});
 
         final openai = resolveJsonSchemaRefs(schema);
-        final extra = openai['additionalProperties'] as Map;
-        expect(extra['type'], 'object');
-        expect(extra.containsKey(r'$ref'), isFalse);
+        expect(openai, schema);
       },
     );
 
@@ -396,10 +489,10 @@ void main() {
         },
       });
 
-      expect((resolved['properties'] as Map)['x'], isEmpty);
+      expect((resolved['properties'] as Map)['x'], {r'$ref': '#/'});
     });
 
-    test('passes unresolvable references through untyped', () {
+    test('preserves unresolved references instead of empty schemas', () {
       final resolved = resolveJsonSchemaRefs({
         'properties': {
           'remote': {
@@ -412,9 +505,12 @@ void main() {
       });
 
       final props = resolved['properties'] as Map;
-      expect(props['remote'], {'description': 'kept'});
-      expect(props['anchor'], isEmpty);
-      expect(props['missing'], isEmpty);
+      expect(props['remote'], {
+        r'$ref': 'https://example.com/schema.json',
+        'description': 'kept',
+      });
+      expect(props['anchor'], {r'$ref': '#Payload'});
+      expect(props['missing'], {r'$ref': r'#/$defs/Nope'});
     });
 
     test('terminates on a self-referencing schema', () {
@@ -432,17 +528,10 @@ void main() {
         },
       });
 
-      var node =
-          (resolved['properties'] as Map)['root'] as Map<String, dynamic>;
-      expect(node['type'], 'object');
-      var depth = 0;
-      while ((node['properties'] as Map?)?['child'] is Map &&
-          ((node['properties'] as Map)['child'] as Map).isNotEmpty) {
-        node = (node['properties'] as Map)['child'] as Map<String, dynamic>;
-        depth++;
-        if (depth > 64) break;
-      }
-      expect(depth, lessThan(64));
+      expect(resolved['properties']['root'], {r'$ref': r'#/$defs/Node'});
+      expect(resolved[r'$defs']['Node']['properties']['child'], {
+        r'$ref': r'#/$defs/Node',
+      });
     });
 
     test('stays bounded when every level fans out into more references', () {
@@ -472,10 +561,9 @@ void main() {
 
       expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
       expect(_countNodes(resolved), lessThan(5000));
-      // The budget stops expansion; it never corrupts what it did expand.
-      final root =
-          (resolved['properties'] as Map)['root'] as Map<String, dynamic>;
-      expect(root['type'], 'object');
+      // The budget stops expansion and retains the whole original graph.
+      expect(resolved['properties']['root'], {r'$ref': r'#/$defs/A'});
+      expect((resolved[r'$defs'] as Map).keys, ['A', 'B', 'C', 'D', 'E']);
     });
   });
 }

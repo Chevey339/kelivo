@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class YouSearchService extends SearchService<YouSearchOptions> {
+class YouSearchService extends SearchService<YouSearchOptions>
+    implements WebFetchCapable<YouSearchOptions> {
+  static const String contentsEndpoint = 'https://ydc-index.io/v1/contents';
+
   YouSearchService({super.client});
 
   static const String endpoint = 'https://ydc-index.io/v1/search';
@@ -94,5 +98,36 @@ class YouSearchService extends SearchService<YouSearchOptions> {
           .join('\n\n');
     }
     return (value ?? '').toString().trim();
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required YouSearchOptions serviceOptions,
+  }) async {
+    try {
+      final data = await postFetchJson(
+        Uri.parse(contentsEndpoint),
+        headers: {
+          'X-API-Key': serviceOptions.effectiveApiKey(serviceOptions.apiKey),
+        },
+        body: {
+          'urls': [url],
+          'formats': ['markdown'],
+        },
+        commonOptions: commonOptions,
+      );
+      final results = data is List ? data : const [];
+      if (results.isEmpty) throw Exception('no content returned');
+      final page = (results.first as Map).cast<String, dynamic>();
+      return WebFetchPage(
+        url: (page['url'] ?? url).toString(),
+        title: (page['title'] ?? '').toString(),
+        content: (page['markdown'] ?? '').toString(),
+      );
+    } catch (e) {
+      throw Exception('You.com fetch failed: $e');
+    }
   }
 }

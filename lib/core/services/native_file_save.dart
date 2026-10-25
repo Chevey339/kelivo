@@ -54,7 +54,9 @@ class NativeFileSave {
     required String sourcePath,
     String? fileName,
   }) async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
       throw UnsupportedError(
         'Native file save is only supported on Android and iOS.',
       );
@@ -62,8 +64,7 @@ class NativeFileSave {
 
     final result = await _channel.invokeMethod<dynamic>('saveFileFromPath', {
       'sourcePath': sourcePath,
-      if (fileName != null && fileName.trim().isNotEmpty)
-        'fileName': fileName.trim(),
+      if (fileName != null && fileName.isNotEmpty) 'fileName': fileName,
     });
     if (result is bool) return result;
     return result == true;

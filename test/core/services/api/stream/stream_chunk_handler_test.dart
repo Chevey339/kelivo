@@ -10,6 +10,69 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'response boundaries close text ids and retain only that round metadata',
+    () {
+      const details = [
+        {'type': 'reasoning.text', 'text': 'first', 'signature': 'sig'},
+      ];
+      final handler = StreamChunkHandler();
+      handler.handle(
+        const ReasoningDelta(id: 'r', text: 'first', details: details),
+      );
+      handler.handle(const TextDelta(id: 't', text: 'before'));
+      handler.handle(const AssistantRoundEnd(reasoningDetails: details));
+      handler.handle(const ReasoningDelta(id: 'r', text: 'second'));
+      handler.handle(const TextDelta(id: 't', text: 'after'));
+      handler.handle(const Finish());
+      expect(handler.parts, const [
+        ReasoningPart('first'),
+        TextPart('before'),
+        AssistantRoundEndPart(reasoningDetails: details),
+        ReasoningPart('second'),
+        TextPart('after'),
+      ]);
+      expect(handler.reasoningDetails, isNull);
+    },
+  );
+  test(
+    'sum requests once while merging partial and repeated usage updates',
+    () {
+      final handler = StreamChunkHandler();
+      handler.handle(
+        const Usage(
+          TokenUsage(promptTokens: 100, cachedTokens: 10, cacheWriteTokens: 30),
+        ),
+      );
+      handler.handle(
+        const Usage(TokenUsage(completionTokens: 20, reasoningTokens: 5)),
+      );
+      handler.handle(
+        const Usage(TokenUsage(completionTokens: 20, reasoningTokens: 5)),
+      );
+      handler.handle(
+        const Usage(TokenUsage(promptTokens: 200), startsRequest: true),
+      );
+      handler.handle(const Usage(TokenUsage(completionTokens: 30)));
+      handler.handle(const Finish());
+      final result = handler.toResult();
+      expect(result.usage!.totalTokens, 230);
+      expect(result.usage!.cacheWriteTokens, 0);
+      expect(result.usage!.reasoningTokens, 0);
+      expect(result.totalUsage!.toJson(), {
+        'promptTokens': 300,
+        'completionTokens': 50,
+        'cachedTokens': 10,
+        'cacheWriteTokens': 30,
+        'reasoningTokens': 5,
+        'totalTokens': 350,
+      });
+      final nonStreamHandler = StreamChunkHandler()..handleResult(result);
+      expect(nonStreamHandler.totalUsage!.totalTokens, 350);
+      expect(nonStreamHandler.usage!.totalTokens, 230);
+    },
+  );
+
   test('materialized snapshots survive later appends and text boundaries', () {
     final handler = StreamChunkHandler();
     handler.handle(const ReasoningDelta(id: 'r', text: 'plan'));

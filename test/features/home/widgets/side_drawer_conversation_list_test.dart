@@ -3,6 +3,7 @@ import 'dart:io';
 
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
@@ -10,6 +11,9 @@ import 'package:Kelivo/core/providers/tag_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
+import 'package:Kelivo/features/home/pages/home_mobile_layout.dart';
+import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
+import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -167,10 +171,15 @@ void main() {
     Locale locale = const Locale('en'),
     ValueNotifier<Locale>? localeListenable,
     bool showChatListDate = false,
+    AssistantProvider? assistantProvider,
+    InteractiveDrawerController? mobileDrawer,
+    SettingsProvider? settingsProvider,
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
-    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.physicalSize = mobileDrawer == null
+        ? const Size(1200, 900)
+        : const Size(400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -178,36 +187,78 @@ void main() {
     final assistantPrefs = createBusinessTestPreferences();
     final backupPrefs = createBusinessTestPreferences();
     final tagPrefs = createBusinessTestPreferences();
-    final settings = SettingsProvider(settingsPrefs);
+    final settings = settingsProvider ?? SettingsProvider(settingsPrefs);
+    final scaffoldKey = GlobalKey<ScaffoldState>();
+    final closeTick = ValueNotifier(0);
+    addTearDown(closeTick.dispose);
     Widget materialFor(Locale currentLocale) {
       return MaterialApp(
         locale: currentLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SideDrawer(
-            userName: 'User',
-            assistantName: 'Assistant',
-            embedded: true,
-            desktopTopicsOnly: desktopTopicsOnly,
-            desktopAssistantsOnly: desktopAssistantsOnly,
-            globalSearchMode: globalSearchMode,
-            globalSearchQuery: globalSearchQuery,
-            showBottomBar: false,
-            onSelectConversation: onSelectConversation,
-          ),
-        ),
+        home: mobileDrawer != null
+            ? VisibleRouteTheme(
+                child: HomeMobileScaffold(
+                  scaffoldKey: scaffoldKey,
+                  drawerController: mobileDrawer,
+                  assistantPickerCloseTick: closeTick,
+                  loadingConversationIds: const {},
+                  title: 'Conversation',
+                  providerName: null,
+                  modelDisplay: null,
+                  onToggleDrawer: mobileDrawer.toggle,
+                  onDismissKeyboard: () {},
+                  onSelectConversation: (id) => onSelectConversation?.call(id),
+                  onNewConversation: () {},
+                  onOpenMiniMap: () {},
+                  onCreateNewConversation: () async {},
+                  onToggleTemporaryConversation: () async {},
+                  onSelectModel: () {},
+                  canToggleTemporaryConversation: false,
+                  temporaryConversationEnabled: false,
+                  globalSearchMode: false,
+                  globalSearchQuery: '',
+                  onGlobalSearchQueryChanged: (_) {},
+                  onEnterGlobalSearch: () {},
+                  onExitGlobalSearch: () {},
+                  onOpenGlobalSearchResult: (_, _) async {},
+                  body: const SizedBox.expand(),
+                ),
+              )
+            : Scaffold(
+                body: SideDrawer(
+                  userName: 'User',
+                  assistantName: 'Assistant',
+                  embedded: true,
+                  desktopTopicsOnly: desktopTopicsOnly,
+                  desktopAssistantsOnly: desktopAssistantsOnly,
+                  globalSearchMode: globalSearchMode,
+                  globalSearchQuery: globalSearchQuery,
+                  showBottomBar: false,
+                  onSelectConversation: onSelectConversation,
+                ),
+              ),
       );
     }
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          if (mobileDrawer != null)
+            ChangeNotifierProvider(
+              create: (_) =>
+                  UserProvider(preferences: createBusinessTestPreferences()),
+            ),
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider(
-            create: (_) => AssistantProvider(preferences: assistantPrefs),
-          ),
+          if (assistantProvider != null)
+            ChangeNotifierProvider<AssistantProvider>.value(
+              value: assistantProvider,
+            )
+          else
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(preferences: assistantPrefs),
+            ),
           ChangeNotifierProvider(
             create: (_) => BackupReminderProvider(preferences: backupPrefs),
           ),
@@ -238,6 +289,72 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 400));
   }
+
+  testWidgets(
+    'mobile topic taps close the drawer unless keep-open is enabled',
+    (tester) async {
+      final service = createService();
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        await service.init();
+        settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+      });
+      service.seedConversationsForTest([
+        Conversation(id: 'one', title: 'Topic one'),
+        Conversation(id: 'two', title: 'Topic two'),
+      ]);
+      final drawer = InteractiveDrawerController();
+      String? selected;
+      await pumpDrawer(
+        tester,
+        service,
+        mobileDrawer: drawer,
+        settingsProvider: settings,
+        onSelectConversation: (id, {closeDrawer = true}) => selected = id,
+      );
+      for (final keepOpen in [false, true, false]) {
+        await tester.runAsync(
+          () => settings.setKeepSidebarOpenOnTopicTap(keepOpen),
+        );
+        await drawer.open();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Topic two'));
+        await tester.pumpAndSettle();
+        expect(selected, 'two');
+        expect(drawer.isOpen, keepOpen);
+        expect(drawer.isClosed, !keepOpen);
+      }
+      // Covering the page freezes its theme but must not act like a user
+      // request to close the drawer or collapse the inline assistant list.
+      await tester.runAsync(
+        () => settings.setKeepAssistantListExpandedOnSidebarClose(true),
+      );
+      await drawer.open();
+      await tester.pumpAndSettle();
+      final sideDrawer = tester.widget<SideDrawer>(find.byType(SideDrawer));
+      await tester.tap(find.text(sideDrawer.assistantName).first);
+      await tester.pumpAndSettle();
+      final inlineAssistants = find.byKey(const ValueKey('assistants-inline'));
+      expect(inlineAssistants, findsOneWidget);
+      final drawerState = tester.state(find.byType(InteractiveDrawer));
+      final navigator = Navigator.of(tester.element(find.byType(SideDrawer)));
+      navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
+      await tester.pumpAndSettle();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(InteractiveDrawer)), same(drawerState));
+      expect(drawer.isOpen, isTrue);
+      expect(inlineAssistants, findsOneWidget);
+      await tester.tap(find.text('Topic one'));
+      await tester.pumpAndSettle();
+      expect(selected, 'one');
+      expect(drawer.isClosed, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      drawer.dispose();
+    },
+  );
 
   Finder drawerScrollable(WidgetTester tester) {
     // Prefer the onstage conversation ListView. PageTransitionSwitcher can
@@ -272,6 +389,84 @@ void main() {
         )
         .first;
   }
+
+  testWidgets('orphaned topics remain visible after switching assistants', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      late AssistantProvider assistants;
+      late String first;
+      late String second;
+      await tester.runAsync(() async {
+        await service.init();
+        await service.createConversation(
+          title: 'Orphaned topic',
+          assistantId: 'missing-assistant',
+        );
+        assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        await assistants.loaded;
+        first = await assistants.addAssistant(name: 'First');
+        second = await assistants.addAssistant(name: 'Second');
+        await assistants.setCurrentAssistant(first);
+        await service.createConversation(
+          title: 'First topic',
+          assistantId: first,
+        );
+        await service.createConversation(
+          title: 'Second topic',
+          assistantId: second,
+        );
+      });
+      await pumpDrawer(tester, service, assistantProvider: assistants);
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('First topic'), findsOneWidget);
+      expect(find.text('Second topic'), findsNothing);
+
+      await tester.runAsync(() => assistants.setCurrentAssistant(second));
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsNothing);
+      expect(find.text('First topic'), findsNothing);
+      expect(find.text('Second topic'), findsOneWidget);
+      await tester.runAsync(() => assistants.setCurrentAssistant(first));
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(
+        service
+            .getAllConversations()
+            .singleWhere((c) => c.title == 'Orphaned topic')
+            .assistantId,
+        'missing-assistant',
+      );
+      // Reordering must not move recovered history away from the selected
+      // assistant, including after reopening the persisted assistant snapshot.
+      await tester.runAsync(() => assistants.reorderAssistants(1, 0));
+      await tester.pumpAndSettle();
+      expect(assistants.currentAssistantId, first);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('First topic'), findsOneWidget);
+      final originalAssistants = assistants;
+      await tester.runAsync(() async {
+        assistants = AssistantProvider(
+          preferences: originalAssistants.preferences,
+        );
+        await assistants.loaded;
+      });
+      await pumpDrawer(tester, service, assistantProvider: assistants);
+      await tester.pumpAndSettle();
+      expect(assistants.assistants.first.id, second);
+      expect(assistants.currentAssistantId, first);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      await tester.runAsync(() => assistants.deleteAssistant(first));
+      await tester.pumpAndSettle();
+      expect(assistants.currentAssistantId, second);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('Second topic'), findsOneWidget);
+    });
+  });
 
   testWidgets('list does not rebuild on unrelated ChatService notify', (
     tester,
@@ -379,7 +574,7 @@ void main() {
     tester,
   ) async {
     await asDesktop(() async {
-      final service = createService();
+      var service = createService();
       late final String alphaId;
       await tester.runAsync(() async {
         await service.init();
@@ -395,6 +590,9 @@ void main() {
         // The most recently created conversation becomes the current one, so
         // Alpha is a non-current hover target.
         await service.createConversation(title: 'Beta');
+        await service.close();
+        service = createService();
+        await service.init();
       });
       await pumpDrawer(tester, service);
       expect(service.isConversationFullyCached(alphaId), isFalse);
@@ -408,17 +606,23 @@ void main() {
       expect(service.timelineCalls, contains(alphaId));
       expect(service.notifyCount, notifyBefore);
 
-      // The prefetch chains several sequential database hops; each hop needs
+      // The cold index install and prefetch chain sequential database hops; each needs
       // a real-async window (isolate round trip) followed by a pump (fake-zone
       // continuation microtasks).
-      for (var i = 0; i < 20; i++) {
+      for (var i = 0; i < 80; i++) {
         if (service.isConversationFullyCached(alphaId)) break;
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 100)),
         );
         await tester.pump();
       }
-      expect(service.isConversationFullyCached(alphaId), isTrue);
+      expect(
+        service.isConversationFullyCached(alphaId),
+        isTrue,
+        reason:
+            'count=${service.getMessageCount(alphaId)}, '
+            'cached=${service.getMessages(alphaId).length}',
+      );
       expect(service.notifyCount, notifyBefore);
 
       await gesture.removePointer();

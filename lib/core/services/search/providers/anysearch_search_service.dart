@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
 /// AnySearch unified search API. Authentication is optional; anonymous
 /// requests use the provider's shared per-IP quota.
-class AnySearchSearchService extends SearchService<AnySearchOptions> {
+class AnySearchSearchService extends SearchService<AnySearchOptions>
+    implements WebFetchCapable<AnySearchOptions> {
   AnySearchSearchService({super.client});
 
   @override
@@ -82,6 +84,39 @@ class AnySearchSearchService extends SearchService<AnySearchOptions> {
       return SearchResult(items: items);
     } catch (e) {
       throw Exception('AnySearch search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required AnySearchOptions serviceOptions,
+  }) async {
+    try {
+      final apiKey = serviceOptions
+          .effectiveApiKey(serviceOptions.apiKey)
+          .trim();
+      final endpoint = siblingFetchEndpoint(
+        serviceOptions.resolvedUrl,
+        searchPath: '/search',
+        fetchPath: '/extract',
+      );
+      final data = await postFetchJson(
+        Uri.parse(endpoint),
+        headers: {if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey'},
+        body: {'url': url},
+        commonOptions: commonOptions,
+      );
+      if (data['code'] != 0) throw Exception(data['message'] ?? data['code']);
+      final page = (data['data'] as Map).cast<String, dynamic>();
+      return WebFetchPage(
+        url: (page['url'] ?? url).toString(),
+        title: (page['title'] ?? '').toString(),
+        content: (page['content'] ?? '').toString(),
+      );
+    } catch (e) {
+      throw Exception('AnySearch fetch failed: $e');
     }
   }
 }

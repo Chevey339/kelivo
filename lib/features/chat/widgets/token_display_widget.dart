@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show SchedulerPhase;
 import '../../../l10n/app_localizations.dart';
 import 'token_detail_popup.dart';
 
@@ -16,14 +19,26 @@ class TokenDisplayWidget extends StatefulWidget {
     this.promptTokens,
     this.completionTokens,
     this.cachedTokens,
+    this.reasoningTokens,
+    this.cacheWriteTokens,
     this.durationMs,
+    this.firstTokenMs,
+    this.totalCompletionTokens,
+    this.providerId,
+    this.modelId,
   });
 
   final int totalTokens;
   final int? promptTokens;
   final int? completionTokens;
   final int? cachedTokens;
+  final int? reasoningTokens;
+  final int? cacheWriteTokens;
   final int? durationMs;
+  final int? firstTokenMs;
+  final int? totalCompletionTokens;
+  final String? providerId;
+  final String? modelId;
 
   @override
   State<TokenDisplayWidget> createState() => _TokenDisplayWidgetState();
@@ -31,11 +46,8 @@ class TokenDisplayWidget extends StatefulWidget {
 
 class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-  OverlayEntry? _barrierEntry;
+  final OverlayPortalController _popupController = OverlayPortalController();
   bool _isShowing = false;
-  bool _showBelow = false;
 
   AnimationController? _animController;
   CurvedAnimation? _curvedAnim;
@@ -55,9 +67,10 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
   bool get _hasDetailData =>
       (widget.promptTokens != null && widget.promptTokens! > 0) ||
       (widget.completionTokens != null && widget.completionTokens! > 0) ||
-      (widget.durationMs != null && widget.durationMs! > 0);
-
-  static const double _estimatedPopupHeight = 120;
+      (widget.reasoningTokens != null && widget.reasoningTokens! > 0) ||
+      (widget.cacheWriteTokens != null && widget.cacheWriteTokens! > 0) ||
+      (widget.durationMs != null && widget.durationMs! > 0) ||
+      (widget.firstTokenMs != null && widget.firstTokenMs! >= 0);
 
   /// Lazily create animation controller on first use (when popup actually opens).
   CurvedAnimation _ensureAnimation() {
@@ -81,7 +94,8 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   @override
   void dispose() {
-    _removeOverlayImmediate();
+    // The portal removes its overlay child when this subtree is disposed.
+    _detachScrollListener();
     _curvedAnim?.dispose();
     _animController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -90,93 +104,83 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   @override
   void didChangeMetrics() {
-    if (_isShowing) _removeOverlayImmediate();
+    // Refresh root-overlay bounds even if the message's position and its
+    // Scaffold-adjusted MediaQuery did not change. Metrics must not dismiss it.
+    if (_isShowing) setState(() {});
   }
 
   void _showPopup() {
     if (_isShowing || !mounted) return;
-    _isShowing = true;
-
-    final box = context.findRenderObject() as RenderBox?;
-    _showBelow = _shouldShowBelow(box);
-
-    final Alignment tAnchor;
-    final Alignment fAnchor;
-    final Offset offset;
-    if (_showBelow) {
-      tAnchor = Alignment.bottomRight;
-      fAnchor = Alignment.topRight;
-      offset = const Offset(0, 8);
-    } else {
-      tAnchor = Alignment.topRight;
-      fAnchor = Alignment.bottomRight;
-      offset = const Offset(0, -8);
-    }
-
-    // Listen to scroll position to dismiss popup on scroll
-    _attachScrollListener();
-
-    final overlay = Overlay.of(context, rootOverlay: true);
-
-    if (!_isDesktop) {
-      // Use Listener (onPointerDown) instead of GestureDetector (onTap)
-      // so that scroll gestures (which start with pointerDown) also dismiss
-      _barrierEntry = OverlayEntry(
-        builder: (_) => Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => _hidePopup(),
-          child: const SizedBox.expand(),
-        ),
-      );
-      overlay.insert(_barrierEntry!);
-    }
-
-    _overlayEntry = OverlayEntry(
-      builder: (_) => UnconstrainedBox(
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          targetAnchor: tAnchor,
-          followerAnchor: fAnchor,
-          offset: offset,
-          child: Material(
-            type: MaterialType.transparency,
-            child: _AnimatedPopupContent(
-              animation: _ensureAnimation(),
-              showBelow: _showBelow,
-              isDesktop: _isDesktop,
-              onHoverEnter: () {
-                _isHoveringPopup = true;
-                _cancelHideTimer();
-              },
-              onHoverExit: () {
-                _isHoveringPopup = false;
-                _scheduleHide();
-              },
-              child: TokenDetailPopup(
-                promptTokens: widget.promptTokens,
-                completionTokens: widget.completionTokens,
-                cachedTokens: widget.cachedTokens,
-                durationMs: widget.durationMs,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    overlay.insert(_overlayEntry!);
     _ensureAnimation();
+    _isShowing = true;
+    _attachScrollListener();
+    _popupController.show();
     _animController!.forward(from: 0);
   }
 
-  bool _shouldShowBelow(RenderBox? box) {
-    if (box == null || !box.attached) return false;
-    try {
-      final topY = box.localToGlobal(Offset.zero).dy;
-      final padding = MediaQuery.of(context).padding.top;
-      return topY - padding < _estimatedPopupHeight + 16;
-    } catch (_) {
-      return false;
-    }
+  Widget _buildPopup(BuildContext context, OverlayChildLayoutInfo info) {
+    final animation = _curvedAnim!;
+    // Match the root overlay's bounds, including keyboard insets that the
+    // message's Scaffold may already have removed from its own MediaQuery.
+    final overlayContext = Overlay.of(context, rootOverlay: true).context;
+    final mediaQuery = MediaQuery.of(overlayContext);
+    // The portal supplies the current transform after the message is laid out,
+    // even when only a preceding image resized and this widget did not rebuild.
+    // Window metrics changes use this layout too; they need not close the popup.
+    final anchor = MatrixUtils.transformRect(
+      info.childPaintTransform,
+      Offset.zero & info.childSize,
+    );
+    return Positioned.fill(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (!_isDesktop)
+            Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => _hidePopup(),
+              child: const SizedBox.expand(),
+            ),
+          CustomSingleChildLayout(
+            delegate: _TokenPopupLayout(
+              anchor: anchor,
+              padding:
+                  mediaQuery.padding +
+                  mediaQuery.viewInsets +
+                  const EdgeInsets.all(8),
+              animation: animation,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: _AnimatedPopupContent(
+                animation: animation,
+                isDesktop: _isDesktop,
+                onHoverEnter: () {
+                  _isHoveringPopup = true;
+                  _cancelHideTimer();
+                },
+                onHoverExit: () {
+                  _isHoveringPopup = false;
+                  _scheduleHide();
+                },
+                child: TokenDetailPopup(
+                  promptTokens: widget.promptTokens,
+                  completionTokens: widget.completionTokens,
+                  cachedTokens: widget.cachedTokens,
+                  reasoningTokens: widget.reasoningTokens,
+                  cacheWriteTokens: widget.cacheWriteTokens,
+                  durationMs: widget.durationMs,
+                  firstTokenMs: widget.firstTokenMs,
+                  totalCompletionTokens: widget.totalCompletionTokens,
+                  providerId: widget.providerId,
+                  modelId: widget.modelId,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _hidePopup() async {
@@ -189,13 +193,19 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   void _removeOverlayImmediate() {
     _detachScrollListener();
-    _barrierEntry?.remove();
-    _barrierEntry = null;
-    _overlayEntry?.remove();
-    _overlayEntry = null;
     _isShowing = false;
     _isHoveringTarget = false;
     _isHoveringPopup = false;
+    // Scroll-position corrections can notify during layout; portal visibility
+    // changes must wait until that frame has completed.
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isShowing) _popupController.hide();
+      });
+    } else {
+      _popupController.hide();
+    }
   }
 
   void _togglePopup() {
@@ -267,10 +277,10 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
     );
 
     if (!_hasDetailData) {
-      return CompositedTransformTarget(link: _layerLink, child: label);
+      return label;
     }
 
-    Widget child = CompositedTransformTarget(link: _layerLink, child: label);
+    Widget child = label;
 
     if (_isDesktop) {
       child = MouseRegion(
@@ -294,14 +304,65 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
       );
     }
 
-    return child;
+    return OverlayPortal.overlayChildLayoutBuilder(
+      controller: _popupController,
+      overlayLocation: OverlayChildLocation.rootOverlay,
+      overlayChildBuilder: _buildPopup,
+      child: child,
+    );
   }
+}
+
+class _TokenPopupLayout extends SingleChildLayoutDelegate {
+  _TokenPopupLayout({
+    required this.anchor,
+    required this.padding,
+    required this.animation,
+  }) : super(relayout: animation);
+
+  final Rect anchor;
+  final EdgeInsets padding;
+  final Animation<double> animation;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      constraints.loosen().deflate(padding);
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    const gap = 8.0;
+    final above = anchor.top - padding.top - gap;
+    final below = size.height - padding.bottom - anchor.bottom - gap;
+    final showBelow = childSize.height > above && below > above;
+    final top = showBelow
+        ? anchor.bottom + gap
+        : anchor.top - gap - childSize.height;
+    final slide =
+        (showBelow ? -1 : 1) * 0.15 * childSize.height * (1 - animation.value);
+    // Use the laid-out card size, including the current text scale. Clamp the
+    // animation too, so neither opening nor closing can cross the safe bounds.
+    return Offset(
+      (anchor.right - childSize.width).clamp(
+        padding.left,
+        math.max(padding.left, size.width - padding.right - childSize.width),
+      ),
+      (top + slide).clamp(
+        padding.top,
+        math.max(padding.top, size.height - padding.bottom - childSize.height),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRelayout(_TokenPopupLayout oldDelegate) =>
+      anchor != oldDelegate.anchor ||
+      padding != oldDelegate.padding ||
+      animation != oldDelegate.animation;
 }
 
 class _AnimatedPopupContent extends StatelessWidget {
   const _AnimatedPopupContent({
     required this.animation,
-    required this.showBelow,
     required this.isDesktop,
     required this.onHoverEnter,
     required this.onHoverExit,
@@ -309,7 +370,6 @@ class _AnimatedPopupContent extends StatelessWidget {
   });
 
   final Animation<double> animation;
-  final bool showBelow;
   final bool isDesktop;
   final VoidCallback onHoverEnter;
   final VoidCallback onHoverExit;
@@ -317,15 +377,7 @@ class _AnimatedPopupContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final begin = Offset(0, showBelow ? -0.15 : 0.15);
-
-    Widget content = SlideTransition(
-      position: Tween<Offset>(
-        begin: begin,
-        end: Offset.zero,
-      ).animate(animation),
-      child: FadeTransition(opacity: animation, child: child),
-    );
+    Widget content = FadeTransition(opacity: animation, child: child);
 
     if (isDesktop) {
       content = MouseRegion(

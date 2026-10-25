@@ -1,11 +1,25 @@
+import 'package:Kelivo/core/services/api/native_input_attachments.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _extraContent = <String, dynamic>{
   'google': <String, dynamic>{'thought_signature': 'sig-create-memory'},
 };
+
+final _nativeInputs = NativeInputAttachments(
+  config: ProviderConfig(
+    id: 'test',
+    enabled: true,
+    name: 'test',
+    apiKey: '',
+    baseUrl: 'https://api.example.com/v1',
+  ),
+  spec: ModelSpec(id: 'test', displayName: 'test'),
+  protocol: NativeInputProtocol.chatCompletions,
+);
 
 void main() {
   test('same-turn follow-up echoes extra_content from streamed tool acc', () {
@@ -124,10 +138,10 @@ void main() {
             'content': 'what did you remember?',
           },
         ],
+        nativeInputs: _nativeInputs,
         canImageInput: false,
         allowRemoteImages: false,
-        reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
-        supportsGoogleOpenAIThoughtSignatures: true,
+        reasoningReplay: ReasoningReplayPolicy.none,
       );
 
       final assistant = messages.firstWhere(
@@ -144,53 +158,57 @@ void main() {
     },
   );
 
-  test('non-Google history replay drops Gemini extra_content', () async {
-    final messages = await buildOpenAIChatCompletionMessages(
-      [
-        <String, dynamic>{'role': 'user', 'content': 'remember this'},
-        <String, dynamic>{
-          'role': 'assistant',
-          'content': '\n\n',
-          'tool_calls': [
-            <String, dynamic>{
-              'id': 'call_mem',
-              'type': 'function',
-              'function': <String, dynamic>{
-                'name': 'create_memory',
-                'arguments': '{"content":"note"}',
+  test(
+    'history replay keeps extra_content whenever a signature is present',
+    () async {
+      final messages = await buildOpenAIChatCompletionMessages(
+        [
+          <String, dynamic>{'role': 'user', 'content': 'remember this'},
+          <String, dynamic>{
+            'role': 'assistant',
+            'content': '\n\n',
+            'tool_calls': [
+              <String, dynamic>{
+                'id': 'call_mem',
+                'type': 'function',
+                'function': <String, dynamic>{
+                  'name': 'create_memory',
+                  'arguments': '{"content":"note"}',
+                },
+                'metadata': <String, dynamic>{
+                  'google': <String, dynamic>{'extra_content': _extraContent},
+                },
               },
-              'metadata': <String, dynamic>{
-                'google': <String, dynamic>{'extra_content': _extraContent},
-              },
-            },
-          ],
-        },
-        <String, dynamic>{
-          'role': 'tool',
-          'tool_call_id': 'call_mem',
-          'name': 'create_memory',
-          'content': '{"ok":true}',
-          'metadata': <String, dynamic>{
-            'google': <String, dynamic>{'extra_content': _extraContent},
+            ],
           },
-        },
-      ],
-      canImageInput: false,
-      allowRemoteImages: false,
-      reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
-    );
+          <String, dynamic>{
+            'role': 'tool',
+            'tool_call_id': 'call_mem',
+            'name': 'create_memory',
+            'content': '{"ok":true}',
+            'metadata': <String, dynamic>{
+              'google': <String, dynamic>{'extra_content': _extraContent},
+            },
+          },
+        ],
+        nativeInputs: _nativeInputs,
+        canImageInput: false,
+        allowRemoteImages: false,
+        reasoningReplay: ReasoningReplayPolicy.none,
+      );
 
-    final assistant = messages.firstWhere(
-      (message) => message['tool_calls'] is List,
-    );
-    final toolCall = (assistant['tool_calls'] as List).single as Map;
+      final assistant = messages.firstWhere(
+        (message) => message['tool_calls'] is List,
+      );
+      final toolCall = (assistant['tool_calls'] as List).single as Map;
 
-    expect(toolCall.containsKey('extra_content'), isFalse);
-    expect(
-      messages.every((message) => !message.containsKey('metadata')),
-      isTrue,
-    );
-  });
+      expect(toolCall['extra_content'], _extraContent);
+      expect(
+        messages.every((message) => !message.containsKey('metadata')),
+        isTrue,
+      );
+    },
+  );
 
   test('does not invent extra_content when the provider never sent one', () {
     final calls = openaiCallsFromCompletionMessage(<String, dynamic>{

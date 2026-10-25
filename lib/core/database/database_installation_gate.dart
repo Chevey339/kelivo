@@ -1,14 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'database_family_preserver.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
-import '../services/backup/local_snapshot_schedule.dart';
+import '../services/backup/recovery_file_discovery.dart';
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'chat_database_repository.dart';
+import '../../utils/app_directories.dart';
 
 final class DatabaseInstallationReceipt {
   const DatabaseInstallationReceipt({
@@ -46,15 +48,9 @@ final class DatabaseInstallationReceipt {
   }
 }
 
-/// Recovery route for a failed startup admission. Only
-/// [rebuildAutomatically] may run without further user confirmation; every
-/// other route must be confirmed by the user first.
-enum DatabaseRecoveryAction {
-  none,
-  rebuildAutomatically,
-  promptRemigration,
-  promptUpgrade,
-}
+/// Recovery route for a failed startup admission. Existing data is never
+/// replaced automatically after an admission failure.
+enum DatabaseRecoveryAction { none, promptRemigration, promptUpgrade }
 
 /// A database family that [DatabaseInstallationGate.rebuildFresh] moved aside
 /// instead of deleting.
@@ -82,6 +78,8 @@ final class DisplacedDatabaseCopy {
 final class DatabaseInstallationGate {
   DatabaseInstallationGate._();
 
+  static const historyFileName = '.kelivo_database_history.json';
+
   static const _receiptPrefix = 'database_installation_receipt_';
   static const _receiptSuffix = '.json';
   // A crash between creating the temp file and renaming it must not brick the
@@ -98,7 +96,6 @@ final class DatabaseInstallationGate {
   /// chronologically; every sidecar keeps its suffix so the whole set stays
   /// openable, uncheckpointed transactions included.
   static const displacedDatabasePrefix = '.displaced-';
-  static const _maximumDisplacedGenerations = 3;
 
   /// The database and every sidecar SQLite may leave beside it. Must stay in
   /// step with ChatDatabaseRepository's own family handling: moving a database
@@ -110,27 +107,18 @@ final class DatabaseInstallationGate {
     '-journal',
   ];
 
-  /// Directories whose contents outlive the database family and therefore
-  /// prove a prior install even after the database and its receipt are gone.
-  ///
-  /// The snapshot directory is the strongest of these: a local copy only ever
-  /// exists because a database was there to copy, and unlike the asset
-  /// directories it is never written on first launch.
-  static const _priorUseDirectoryNames = <String>[
-    LocalSnapshotPaths.directoryName,
-    'images',
-    'upload',
-    'avatars',
-    'fonts',
-  ];
-
   static Future<DatabaseInstallationReceipt> ensureReady({
     required Directory appDataDirectory,
     bool allowDatabaseIdentityChange = false,
+    bool allowEmptyInitialization = false,
     RestoreDurability? durability,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     await appDataDirectory.create(recursive: true);
+    await DatabaseFamilyPreserver.resume(
+      appDataDirectory,
+      durability: resolvedDurability,
+    );
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
@@ -147,8 +135,14 @@ final class DatabaseInstallationGate {
       databaseFile.path,
       followLinks: false,
     );
-    if (receipts.isNotEmpty && databaseType == FileSystemEntityType.notFound) {
-      throw StateError('database_missing');
+    if (databaseType == FileSystemEntityType.notFound &&
+        (receipts.isNotEmpty ||
+            (!allowEmptyInitialization &&
+                (await (await _historyFile(appDataDirectory)).exists() ||
+                    await RecoveryFileDiscovery.hasPriorData(
+                      appDataDirectory,
+                    ))))) {
+      throw StateError('database_missing_with_prior_data');
     }
     if (databaseType != FileSystemEntityType.notFound &&
         databaseType != FileSystemEntityType.file) {
@@ -209,6 +203,11 @@ final class DatabaseInstallationGate {
         receipts.where((entry) => entry.file.path != matching.single.file.path),
         durability: resolvedDurability,
       );
+      await _recordHistory(
+        appDataDirectory,
+        matching.single.receipt,
+        resolvedDurability,
+      );
       return matching.single.receipt;
     }
     if (receipts.isNotEmpty) {
@@ -234,7 +233,28 @@ final class DatabaseInstallationGate {
     );
     await _publishReceipt(receiptFile, updated, durability: resolvedDurability);
     await _removeStaleReceipts(receipts, durability: resolvedDurability);
+    await _recordHistory(appDataDirectory, updated, resolvedDurability);
     return updated;
+  }
+
+  static Future<File> _historyFile(Directory root) async {
+    final retained = await AppDirectories.documentsDirectoryFor(root);
+    return File(
+      p.join(retained == null ? root.path : root.parent.path, historyFileName),
+    );
+  }
+
+  static Future<void> _recordHistory(
+    Directory root,
+    DatabaseInstallationReceipt receipt,
+    RestoreDurability durability,
+  ) async {
+    final file = await _historyFile(root);
+    if (await file.exists()) return;
+    final temporary = File('${file.path}.tmp');
+    await temporary.writeAsString(jsonEncode(receipt.toJson()), flush: true);
+    await durability.syncFile(temporary, fullBarrier: true);
+    await durability.renameAndSync(source: temporary, targetPath: file.path);
   }
 
   /// Reconciles installation metadata with a committed, verified restore.
@@ -310,18 +330,7 @@ final class DatabaseInstallationGate {
     );
   }
 
-  /// Maps a startup admission failure to the strongest safe recovery route.
-  ///
-  /// Automatic rebuild is the only route that runs unattended, so it is the
-  /// only one that can destroy data without anybody agreeing to it first. It
-  /// is returned only when every one of these holds: no installation receipt,
-  /// no legacy Hive source, no trace of prior use ([_priorUseEvidence]), and
-  /// an installed file that reads back as half-created (userVersion 0).
-  ///
-  /// A file we merely failed to read is deliberately NOT enough. "Unreadable
-  /// right now" is what a perfectly healthy database looks like while the OS
-  /// denies the read, and treating that as "never finished being created"
-  /// turns a transient fault into a silent factory reset.
+  /// Offers explicit recovery or an upgrade; never rebuilds a failed database.
   static Future<DatabaseRecoveryAction> recoveryActionFor({
     required Directory appDataDirectory,
     required Object error,
@@ -338,115 +347,23 @@ final class DatabaseInstallationGate {
     if (!isSchemaOrCorrupt && !isRawSqliteFailure) {
       return DatabaseRecoveryAction.none;
     }
-    // A receipt that exists but cannot be parsed still proves a previous
-    // install, so it must block automatic rebuild like a valid one.
-    final bool hasReceipts;
+    // A receipt, including a malformed receipt, proves this is not first use.
     try {
-      hasReceipts = (await _readReceipts(appDataDirectory)).isNotEmpty;
+      if ((await _readReceipts(appDataDirectory)).isNotEmpty) {
+        return DatabaseRecoveryAction.none;
+      }
     } catch (_) {
       return DatabaseRecoveryAction.none;
     }
-    if (hasReceipts) return DatabaseRecoveryAction.none;
-    if (legacyHiveDataPresent) {
-      return DatabaseRecoveryAction.promptRemigration;
-    }
-    if (isRawSqliteFailure) {
-      // A raw sqlite error never justifies deleting data automatically.
-      return DatabaseRecoveryAction.none;
-    }
-    final databaseFile = File(
-      p.join(appDataDirectory.path, AppDatabase.databaseFileName),
-    );
-    if (await FileSystemEntity.type(databaseFile.path, followLinks: false) !=
-        FileSystemEntityType.file) {
-      return DatabaseRecoveryAction.none;
-    }
-    // Collected before anything opens the database: opening it -- even
-    // read-only -- lets SQLite checkpoint and remove the WAL, which would
-    // erase one of the signals being read here.
-    if (await _priorUseEvidence(appDataDirectory)) {
-      return DatabaseRecoveryAction.none;
-    }
-    // Anything other than a readable userVersion 0 -- including null, which
-    // only ever means "could not classify" -- leaves the file to the recovery
-    // screen rather than to an unattended delete.
-    if (_tryReadUserVersion(databaseFile) != 0) {
-      return DatabaseRecoveryAction.none;
-    }
-    return DatabaseRecoveryAction.rebuildAutomatically;
+    return legacyHiveDataPresent
+        ? DatabaseRecoveryAction.promptRemigration
+        : DatabaseRecoveryAction.none;
   }
 
-  /// Whether anything in [appDataDirectory] proves the install has been used
-  /// before, independently of the database and its receipt.
+  /// Starts a fresh database only after an explicit reset request.
   ///
-  /// The receipt is the primary proof, but it is a 121-byte file living in the
-  /// same directory, on the same filesystem, exposed through the same
-  /// (file-sharing enabled) container as the database — so whatever takes one
-  /// can take the other, and the pair going missing together must not read as
-  /// a first launch. These signals outlive a rebuild, so they are checked
-  /// before one is allowed.
-  ///
-  /// Fails toward "used": a signal we cannot read is not a signal we may
-  /// ignore when the alternative is deleting the user's data.
-  static Future<bool> _priorUseEvidence(Directory appDataDirectory) async {
-    // The strongest one. SQLite only ever writes a WAL for a database that was
-    // opened and written to, and it survives the database being unreadable.
-    final wal = File(
-      p.join(appDataDirectory.path, '${AppDatabase.databaseFileName}-wal'),
-    );
-    try {
-      if (await FileSystemEntity.type(wal.path, followLinks: false) ==
-              FileSystemEntityType.file &&
-          await wal.length() > 0) {
-        return true;
-      }
-    } catch (_) {
-      return true;
-    }
-    try {
-      final displacedPrefix =
-          '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
-      await for (final entity in appDataDirectory.list(followLinks: false)) {
-        final name = p.basename(entity.path);
-        if (name.startsWith(displacedPrefix)) return true;
-        if (name.startsWith(
-          '${AppDatabase.databaseFileName}'
-          '${ChatDatabaseRepository.premigrationBackupPrefix}',
-        )) {
-          return true;
-        }
-      }
-    } catch (_) {
-      return true;
-    }
-    for (final name in _priorUseDirectoryNames) {
-      final directory = Directory(p.join(appDataDirectory.path, name));
-      try {
-        if (await FileSystemEntity.type(directory.path, followLinks: false) !=
-            FileSystemEntityType.directory) {
-          continue;
-        }
-        await for (final _ in directory.list(followLinks: false)) {
-          return true;
-        }
-      } catch (_) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /// Clears the installed database family and repeats first-launch setup.
-  /// Only safe where [recoveryActionFor] returned
-  /// [DatabaseRecoveryAction.rebuildAutomatically], or where the user asked
-  /// for a reset.
-  ///
-  /// With [preserveDisplacedCopy] the old family is renamed aside instead of
-  /// deleted, so a rebuild that turns out to have been wrong is recoverable
-  /// and leaves the evidence needed to explain it. Unattended rebuilds must
-  /// keep the copy; a reset the user confirmed must not, because the dialog
-  /// promises the data is gone. At most [_maximumDisplacedGenerations] copies
-  /// are kept, oldest dropped first.
+  /// Preserves every previous family by default. Explicit deletion is only
+  /// available to callers that specifically requested removal of those files.
   static Future<DatabaseInstallationReceipt> rebuildFresh({
     required Directory appDataDirectory,
     RestoreDurability? durability,
@@ -454,6 +371,10 @@ final class DatabaseInstallationGate {
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     await appDataDirectory.create(recursive: true);
+    await DatabaseFamilyPreserver.resume(
+      appDataDirectory,
+      durability: resolvedDurability,
+    );
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
@@ -480,6 +401,7 @@ final class DatabaseInstallationGate {
     return ensureReady(
       appDataDirectory: appDataDirectory,
       durability: resolvedDurability,
+      allowEmptyInitialization: true,
     );
   }
 
@@ -507,11 +429,24 @@ final class DatabaseInstallationGate {
   }) async {
     final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
     final bytesByStamp = <String, int>{};
+    final directoryCopies = <String>{};
     try {
       await for (final entity in appDataDirectory.list(followLinks: false)) {
-        if (entity is! File) continue;
         final name = p.basename(entity.path);
-        if (!name.startsWith(prefix)) continue;
+        if (entity is Directory &&
+            DatabaseFamilyPreserver.isCopyDirectory(name)) {
+          final stamp = name.substring(prefix.length);
+          directoryCopies.add(stamp);
+          bytesByStamp[stamp] = 0;
+          await for (final member in entity.list(followLinks: false)) {
+            if (member is File) {
+              bytesByStamp[stamp] =
+                  bytesByStamp[stamp]! + await member.length();
+            }
+          }
+          continue;
+        }
+        if (entity is! File || !name.startsWith(prefix)) continue;
         var stamp = name.substring(prefix.length);
         for (final suffix in _databaseFamilySuffixes) {
           if (suffix.isEmpty) continue;
@@ -534,7 +469,11 @@ final class DatabaseInstallationGate {
 
     final copies = <DisplacedDatabaseCopy>[];
     for (final entry in bytesByStamp.entries) {
-      final base = File(p.join(appDataDirectory.path, '$prefix${entry.key}'));
+      final base = File(
+        directoryCopies.contains(entry.key)
+            ? p.join(appDataDirectory.path, '$prefix${entry.key}', 'kelivo.db')
+            : p.join(appDataDirectory.path, '$prefix${entry.key}'),
+      );
       if (await FileSystemEntity.type(base.path, followLinks: false) !=
           FileSystemEntityType.file) {
         // The family exists but its database does not; there is nothing a
@@ -566,6 +505,17 @@ final class DatabaseInstallationGate {
       throw ArgumentError.value(stamp, 'stamp');
     }
     final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+    if (await File(
+      p.join(appDataDirectory.path, DatabaseFamilyPreserver.pendingName),
+    ).exists()) {
+      throw StateError('database_preservation_pending');
+    }
+    final directory = Directory(p.join(appDataDirectory.path, '$prefix$stamp'));
+    if (await FileSystemEntity.type(directory.path, followLinks: false) ==
+        FileSystemEntityType.directory) {
+      await directory.delete(recursive: true);
+      return;
+    }
     // Sidecars first, database last. [listDisplacedDatabases] only surfaces a
     // family whose database still exists, so removing the database first would
     // hide any sidecar that then failed to delete -- leaving debris the user
@@ -620,7 +570,6 @@ final class DatabaseInstallationGate {
     await _displaceDatabaseFamily(
       File(p.join(appDataDirectory.path, AppDatabase.databaseFileName)),
       durability: durability,
-      prune: false,
     );
   }
 
@@ -629,36 +578,11 @@ final class DatabaseInstallationGate {
   static Future<String?> _displaceDatabaseFamily(
     File databaseFile, {
     required RestoreDurability durability,
-    bool prune = true,
   }) async {
-    // Zero-padded so a lexical sort of the stamps is a chronological one.
-    final stamp = DateTime.now()
-        .toUtc()
-        .microsecondsSinceEpoch
-        .toString()
-        .padLeft(16, '0');
-    final base = '${databaseFile.path}$displacedDatabasePrefix$stamp';
-    String? displaced;
-    for (final suffix in _databaseFamilySuffixes) {
-      final source = File('${databaseFile.path}$suffix');
-      if (await FileSystemEntity.type(source.path, followLinks: false) !=
-          FileSystemEntityType.file) {
-        continue;
-      }
-      await durability.renameAndSync(
-        source: source,
-        targetPath: '$base$suffix',
-      );
-      displaced = base;
-    }
-    if (prune) {
-      await _pruneDisplacedGenerations(
-        databaseFile.parent,
-        keep: _maximumDisplacedGenerations,
-        durability: durability,
-      );
-    }
-    return displaced;
+    return DatabaseFamilyPreserver.preserve(
+      databaseFile,
+      durability: durability,
+    );
   }
 
   /// Bounds the displaced generations, always keeping the oldest.
@@ -703,6 +627,17 @@ final class DatabaseInstallationGate {
     final expiring = ordered.where((stamp) => !retained.contains(stamp));
     var removed = false;
     for (final stamp in expiring) {
+      final preserved = Directory(p.join(directory.path, '$prefix$stamp'));
+      if (DatabaseFamilyPreserver.isCopyDirectory(p.basename(preserved.path)) &&
+          await FileSystemEntity.type(preserved.path, followLinks: false) ==
+              FileSystemEntityType.directory) {
+        await deleteDisplacedDatabase(
+          appDataDirectory: directory,
+          stamp: stamp,
+        );
+        removed = true;
+        continue;
+      }
       for (final suffix in _databaseFamilySuffixes) {
         final file = File(p.join(directory.path, '$prefix$stamp$suffix'));
         try {
@@ -809,7 +744,11 @@ final class DatabaseInstallationGate {
     switch (ChatDatabaseRepository.classifyInstalledDatabase(databaseFile)) {
       case InstalledDatabaseDisposition.usable:
         for (final backup in backups) {
-          await backup.delete();
+          await durability.renameAndSync(
+            source: backup,
+            targetPath:
+                '${databaseFile.path}$displacedDatabasePrefix${DateTime.now().microsecondsSinceEpoch}',
+          );
         }
         await durability.syncDirectory(appDataDirectory, fullBarrier: true);
 

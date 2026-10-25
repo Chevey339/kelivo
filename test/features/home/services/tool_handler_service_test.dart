@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
@@ -51,8 +54,9 @@ void main() {
         expect(
           (properties['config'] as Map)['additionalProperties'],
           <String, dynamic>{
+            r'$schema': 'https://json-schema.org/draft/2020-12/schema',
             'type': 'string',
-            'enum': ['enabled'],
+            'const': 'enabled',
           },
         );
         expect(
@@ -115,7 +119,7 @@ void main() {
       });
     });
 
-    test('passes an unresolvable \$ref through without inventing a type', () {
+    test('preserves unresolved refs without inventing a type', () {
       final output = ToolHandlerService.sanitizeToolParametersForProvider({
         'type': 'object',
         'properties': {
@@ -129,12 +133,15 @@ void main() {
       }, ProviderKind.openai);
 
       final props = output['properties'] as Map<String, dynamic>;
-      expect(props['remote'], {'description': 'kept'});
-      expect(props['dangling'], isEmpty);
-      expect(props['anchor'], isEmpty);
+      expect(props['remote'], {
+        r'$ref': 'https://example.com/s.json',
+        'description': 'kept',
+      });
+      expect(props['dangling'], {r'$ref': r'#/$defs/Missing'});
+      expect(props['anchor'], {r'$ref': '#Payload'});
     });
 
-    test('cuts a recursive \$ref without inventing a type', () {
+    test('preserves recursive refs and their definitions', () {
       final output = ToolHandlerService.sanitizeToolParametersForProvider({
         'type': 'object',
         r'$defs': {
@@ -150,17 +157,10 @@ void main() {
         },
       }, ProviderKind.openai);
 
-      var node = output['properties']['root'] as Map<String, dynamic>;
-      expect(node['type'], 'object');
-      var depth = 0;
-      while (node['properties'] is Map &&
-          (node['properties'] as Map)['child'] is Map &&
-          ((node['properties'] as Map)['child'] as Map).isNotEmpty) {
-        node = (node['properties'] as Map)['child'] as Map<String, dynamic>;
-        depth++;
-        if (depth > 40) break;
-      }
-      expect(depth, lessThan(40));
+      expect(output['properties']['root'], {r'$ref': r'#/$defs/Node'});
+      expect(output[r'$defs']['Node']['properties']['child'], {
+        r'$ref': r'#/$defs/Node',
+      });
     });
 
     test('keeps a parameter that is named like a schema keyword', () {
@@ -188,9 +188,9 @@ void main() {
     });
 
     test(
-      'does not advertise a boolean property from a \$ref to true or false',
+      'Google does not advertise a boolean property from a ref to true or false',
       () {
-        for (final kind in const [ProviderKind.google, ProviderKind.openai]) {
+        for (final kind in const [ProviderKind.google]) {
           final output = ToolHandlerService.sanitizeToolParametersForProvider({
             'type': 'object',
             r'$defs': {'Denied': false, 'Anything': true},
@@ -212,7 +212,7 @@ void main() {
       },
     );
 
-    test('tuple-form items fan-out still advertises a later payload', () {
+    test('Google skips refs in discarded tuple items', () {
       Map<String, dynamic> fanout(String next) => {
         'type': 'object',
         'properties': {
@@ -248,7 +248,7 @@ void main() {
         },
       };
 
-      for (final kind in ProviderKind.values) {
+      for (final kind in const [ProviderKind.google]) {
         final output = ToolHandlerService.sanitizeToolParametersForProvider(
           schema,
           kind,
@@ -315,9 +315,11 @@ void main() {
             schema,
             kind,
           );
-          final extra = output['additionalProperties'] as Map;
-          expect(extra['type'], 'object', reason: '$kind');
-          expect(extra.containsKey(r'$ref'), isFalse, reason: '$kind');
+          expect(
+            output,
+            schema,
+            reason: '$kind retains refs at the budget limit',
+          );
         }
       },
     );
@@ -340,83 +342,124 @@ void main() {
   });
 
   group('ToolHandlerService MCP approval identity', () {
-    testWidgets('requestApproval uses the provider toolCallId for MCP tools', (
-      tester,
-    ) async {
-      final mcpProvider = _RecordingMcpProvider([
-        McpServerConfig(
-          id: 'srv-id',
-          enabled: true,
-          name: 'Test MCP',
-          transport: McpTransportType.http,
-          tools: [
-            McpToolConfig(enabled: true, name: 'echo', needsApproval: true),
-          ],
-        ),
-      ]);
-      final assistants = AssistantProvider(
-        preferences: createBusinessTestPreferences(),
-      );
-      final toolSvc = McpToolService();
-      final settings = SettingsProvider(createBusinessTestPreferences());
-      final approval = ToolApprovalService();
-      addTearDown(mcpProvider.dispose);
-      addTearDown(assistants.dispose);
-      addTearDown(toolSvc.dispose);
-      addTearDown(settings.dispose);
-      addTearDown(approval.dispose);
+    for (final full in [false, true]) {
+      testWidgets('MCP approval uses the conversation mode (full: $full)', (
+        tester,
+      ) async {
+        final mcpProvider = _RecordingMcpProvider([
+          McpServerConfig(
+            id: 'srv-id',
+            enabled: true,
+            name: 'Test MCP',
+            transport: McpTransportType.http,
+            tools: [
+              McpToolConfig(enabled: true, name: 'echo', needsApproval: true),
+            ],
+          ),
+        ]);
+        final assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        final toolSvc = McpToolService();
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        final approval = ToolApprovalService();
+        addTearDown(mcpProvider.dispose);
+        addTearDown(assistants.dispose);
+        addTearDown(toolSvc.dispose);
+        addTearDown(settings.dispose);
+        addTearDown(approval.dispose);
 
-      await assistants.loaded;
-      await settings.loaded;
-      final assistantId = await assistants.addAssistant(name: 'Test');
-      await assistants.updateAssistant(
-        assistants
-            .getById(assistantId)!
-            .copyWith(mcpServerIds: const ['srv-id']),
-      );
+        await assistants.loaded;
+        await settings.loaded;
+        final assistantId = await assistants.addAssistant(name: 'Test');
+        await assistants.updateAssistant(
+          assistants
+              .getById(assistantId)!
+              .copyWith(mcpServerIds: const ['srv-id']),
+        );
 
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
-            ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
-            ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
-          ],
-          child: const SizedBox.shrink(),
-        ),
-      );
+        final chat = _PermissionChat(
+          Conversation(
+            id: 'conv-1',
+            title: 'Chat',
+            assistantId: assistantId,
+            extras:
+                (full
+                        ? ToolPermissionMode.fullAccess
+                        : ToolPermissionMode.requestApproval)
+                    .applyTo({}),
+          ),
+        );
+        addTearDown(chat.dispose);
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider<ChatService>.value(value: chat),
+              ChangeNotifierProvider<AssistantProvider>.value(
+                value: assistants,
+              ),
+              ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+              ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+            ],
+            child: const SizedBox.shrink(),
+          ),
+        );
 
-      final service = ToolHandlerService(
-        contextProvider: tester.element(find.byType(SizedBox)),
-      );
-      final handler = service.buildToolCallHandler(
-        settings,
-        assistants.getById(assistantId),
-        approvalService: approval,
-        conversationId: 'conv-1',
-      );
-      expect(handler, isNotNull);
+        final service = ToolHandlerService(
+          contextProvider: tester.element(find.byType(SizedBox)),
+        );
+        final handler = service.buildToolCallHandler(
+          settings,
+          assistants.getById(assistantId),
+          approvalService: approval,
+          conversationId: 'conv-1',
+        );
+        expect(handler, isNotNull);
 
-      final future = handler!('echo', <String, dynamic>{
-        'city': 'Seattle',
-      }, toolCallId: 'provider-call-99');
-      await tester.pump();
+        final future = handler!('echo', <String, dynamic>{
+          'city': 'Seattle',
+        }, toolCallId: 'provider-call-99');
+        await tester.pump();
 
-      final pending = approval.pendingFor(
-        toolCallId: 'provider-call-99',
-        conversationId: 'conv-1',
-      );
-      expect(pending, isNotNull);
-      expect(pending!.toolName, 'echo');
-      expect(pending.conversationId, 'conv-1');
-      expect(mcpProvider.calls, isEmpty);
+        final pending = approval.pendingFor(
+          toolCallId: 'provider-call-99',
+          conversationId: 'conv-1',
+        );
+        if (!full) {
+          expect(pending, isNotNull);
+          expect(pending!.toolName, 'echo');
+          expect(pending.conversationId, 'conv-1');
+          expect(mcpProvider.calls, isEmpty);
 
-      approval.approve('provider-call-99', conversationId: 'conv-1');
-      final result = await future;
-      expect(result, isA<McpToolResult>());
-      expect((result as McpToolResult).markdown, 'srv-id:echo');
-      expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
-    });
+          approval.approve('provider-call-99', conversationId: 'conv-1');
+        } else {
+          expect(pending, isNull);
+        }
+        final result = ClientToolResult.fromHandler(await future);
+        expect(result.content, 'srv-id:echo');
+        expect(
+          result.metadata?['toolPermission'],
+          full ? 'fullAccess' : isNull,
+        );
+        expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
+        Future<Object?> blocked;
+        if (full) {
+          mcpProvider._servers.clear();
+          blocked = handler('echo', {}, toolCallId: 'disabled');
+        } else {
+          blocked = handler('echo', {}, toolCallId: 'disabled');
+          await tester.pump();
+          expect(approval.hasPending, isTrue);
+          mcpProvider._servers.clear();
+          approval.approve('disabled', conversationId: 'conv-1');
+        }
+        final denied = ClientToolResult.fromHandler(await blocked);
+        expect(denied.metadata?['toolPermissionError'], 'tool_disabled');
+        expect(denied.metadata?['toolPermission'], isNull);
+        expect(mcpProvider.calls, hasLength(1));
+        expect(approval.hasPending, isFalse);
+      });
+    }
   });
 
   group('ToolHandlerService schema overrides', () {
@@ -536,4 +579,12 @@ class _StubMcpToolService extends McpToolService {
   }) {
     return _tools;
   }
+}
+
+class _PermissionChat extends ChatService {
+  _PermissionChat(this.conversation);
+  final Conversation conversation;
+  @override
+  Conversation? getConversation(String id) =>
+      id == conversation.id ? conversation : null;
 }

@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/file_upload_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:file_picker/file_picker.dart';
@@ -47,7 +48,20 @@ void main() {
       );
       await service.onPickFiles();
       expect(picker.type, FileType.custom);
-      expect(picker.extensions, containsAll(['pdf', 'docx', 'txt']));
+      expect(
+        picker.extensions,
+        containsAll([
+          'pdf',
+          'docx',
+          'txt',
+          'm4a',
+          'aac',
+          'flac',
+          'ogg',
+          'opus',
+          'aiff',
+        ]),
+      );
       expect(picker.extensions, isNot(contains('apk')));
       bound = true;
       await service.onPickFiles();
@@ -57,6 +71,24 @@ void main() {
       expect(
         service.inferMimeByExtension('Dockerfile'),
         'application/octet-stream',
+      );
+      expect(service.inferMimeByExtension('Voice.M4A'), 'audio/mp4');
+      expect(service.inferMimeByExtension('recording.flac'), 'audio/flac');
+      expect(
+        resolveDocumentAttachmentMime(
+          const DocumentAttachment(
+            path: '/upload/opaque',
+            fileName: 'Voice.M4A',
+            mime: 'application/octet-stream',
+          ),
+        ),
+        'audio/mp4',
+      );
+      expect(
+        inferMediaMimeFromSource(
+          'https://example.com/voice.m4a?token=redacted',
+        ),
+        'audio/mp4',
       );
     },
   );

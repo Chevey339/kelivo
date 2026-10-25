@@ -53,6 +53,7 @@ class _DraftService extends ChatService {
     String? title,
     String? assistantId,
     bool temporary = false,
+    bool reuseNewEntry = false,
   }) async {
     await createGate?.future;
     final draft = Conversation(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
+import 'macos_window_drag_area.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../utils/brand_assets.dart';
@@ -178,8 +179,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         messages: [
           {'role': 'user', 'content': prompt},
         ],
-        thinkingBudget: settings.translateGenerationThinkingBudgetFor(
-          context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
+        reasoning: settings.translateGenerationReasoningFor(
+          context.read<AssistantProvider>().currentAssistant,
         ),
         requestId: _requestId,
         parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,
@@ -262,7 +263,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          topBar,
+          MacosWindowDragArea(child: topBar),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

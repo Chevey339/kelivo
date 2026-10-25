@@ -83,7 +83,10 @@ Cite: append [cite:id] immediately after each statement a result supports, using
         0,
         services.length - 1,
       );
-      final service = SearchService.getService(services[selectedIndex]);
+      final service = SearchService.getService(
+        services[selectedIndex],
+        locale: settings.effectiveLocale,
+      );
 
       // Execute search
       final result = await service.search(

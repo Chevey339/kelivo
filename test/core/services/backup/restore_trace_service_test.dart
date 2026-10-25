@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +48,57 @@ void main() {
     expect(await completedRun.exists(), isFalse);
     expect((await service.inspect()).visible, isFalse);
   });
+
+  test(
+    'clears local special entries without following archived links',
+    () async {
+      if (Platform.isWindows) return;
+      final external = Directory(p.join(root.path, 'external'));
+      await external.create();
+      final outside = File(p.join(external.path, 'file'));
+      await outside.writeAsString('keep me');
+      final previous = Directory(
+        p.join(completedRun.path, 'previous', 'workspaces'),
+      );
+      await previous.create();
+      final targets = [outside.path, external.path, 'missing'];
+      for (var index = 0; index < targets.length; index++) {
+        await Link(p.join(previous.path, 'link$index')).create(targets[index]);
+      }
+      expect(
+        (await Process.run('mkfifo', [p.join(previous.path, 'pipe')])).exitCode,
+        0,
+      );
+      final socketRoot = await Directory.systemTemp.createTemp('ks_');
+      final socketPath = p.join(socketRoot.path, 's');
+      final socket = await ServerSocket.bind(
+        InternetAddress(socketPath, type: InternetAddressType.unix),
+        0,
+      );
+      addTearDown(() async {
+        await socket.close();
+        await socketRoot.delete(recursive: true);
+      });
+      await File(socketPath).rename(p.join(previous.path, 'socket'));
+
+      final service = RestoreTraceService(root);
+      final before = await service.inspect();
+      expect(before.fileCount, 7);
+      expect(
+        before.bytes,
+        7 +
+            targets.fold<int>(
+              0,
+              (sum, target) => sum + utf8.encode(target).length,
+            ),
+      );
+      await service.clear();
+      expect(await completedRun.exists(), isFalse);
+      expect(await external.exists(), isTrue);
+      expect(await outside.readAsString(), 'keep me');
+      expect((await service.inspect()).visible, isFalse);
+    },
+  );
 
   test('hides and refuses cleanup while a restore run is active', () async {
     final workspace = Directory(

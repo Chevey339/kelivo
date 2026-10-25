@@ -1,5 +1,9 @@
 import "../../../support/business_test_harness.dart";
+import 'dart:async';
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/features/home/utils/model_display_helper.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -25,6 +29,7 @@ void main() {
     AssistantProvider? assistantProvider,
     ChatInputBarController? mediaController,
     bool loading = false,
+    VoidCallback? onStop,
     bool hasQueuedInput = false,
     String? queuedPreviewText,
     VoidCallback? onCancelQueuedInput,
@@ -34,6 +39,9 @@ void main() {
     bool backgroundImageActive = false,
     double inputBackgroundOpacityLight = 0.8236,
     double inputBackgroundOpacityDark = 0.7396,
+    bool supportsReasoning = false,
+    ReasoningRequest? reasoning,
+    bool reasoningActive = false,
   }) {
     final settings =
         settingsProvider ?? SettingsProvider(createBusinessTestPreferences());
@@ -68,6 +76,7 @@ void main() {
             mediaController: mediaController,
             onSend: onSend,
             loading: loading,
+            onStop: onStop,
             hasQueuedInput: hasQueuedInput,
             queuedPreviewText: queuedPreviewText,
             onCancelQueuedInput: onCancelQueuedInput,
@@ -76,6 +85,9 @@ void main() {
             backgroundImageActive: backgroundImageActive,
             inputBackgroundOpacityLight: inputBackgroundOpacityLight,
             inputBackgroundOpacityDark: inputBackgroundOpacityDark,
+            supportsReasoning: supportsReasoning,
+            reasoning: reasoning,
+            reasoningActive: reasoningActive,
           ),
         ),
       ),
@@ -125,6 +137,136 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('输出中根据草稿切换停止和排队发送按钮 width=$width', (tester) async {
+      await tester.binding.setSurfaceSize(Size(width, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final controller = TextEditingController();
+      final focusNode = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+      final submitted = <ChatInputData>[];
+      var stopCount = 0;
+
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focusNode,
+          loading: true,
+          onStop: () => stopCount++,
+          onSend: (input) async {
+            submitted.add(input);
+            return ChatInputSubmissionResult.queued;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'draft');
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
+      expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+      await tester.enterText(find.byType(TextField), ' \n ');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('stop')));
+      await tester.pumpAndSettle();
+      expect(stopCount, 1);
+      expect(submitted, isEmpty);
+
+      await tester.enterText(find.byType(TextField), 'queued message');
+      await tester.pumpAndSettle();
+      await tapSendButton(tester);
+
+      expect(submitted.single.text, 'queued message');
+      expect(controller.text, isEmpty);
+      expect(stopCount, 1);
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+    });
+  }
+
+  testWidgets('输出中仅有附件时也可点击发送进入排队', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    ChatInputData? submitted;
+    var stopCount = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        loading: true,
+        onStop: () => stopCount++,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.queued;
+        },
+      ),
+    );
+    mediaController.addFiles(const [
+      DocumentAttachment(
+        path: '/tmp/queued.pdf',
+        fileName: 'queued.pdf',
+        mime: 'application/pdf',
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+    await tapSendButton(tester);
+
+    expect(submitted?.text, isEmpty);
+    expect(submitted?.documents.single.fileName, 'queued.pdf');
+    expect(mediaController.hasDraftMedia, isFalse);
+    expect(stopCount, 0);
+    expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+  });
+
+  testWidgets('已有排队消息时非空的锁定输入框仍可停止输出', (tester) async {
+    final controller = TextEditingController(text: 'editing history');
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    var sendCount = 0;
+    var stopCount = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        hasQueuedInput: true,
+        onStop: () => stopCount++,
+        onSend: (_) async {
+          sendCount++;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+    expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('stop')));
+    await tester.pumpAndSettle();
+
+    expect(stopCount, 1);
+    expect(sendCount, 0);
+    expect(controller.text, 'editing history');
   });
 
   testWidgets('发送按钮可显示编辑态保存并发送提示', (tester) async {
@@ -231,6 +373,76 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  testWidgets('draft persistence freezes image routing before navigation', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'from A');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    addTearDown(settings.dispose);
+    addTearDown(assistants.dispose);
+    await settings.setProviderConfig(
+      'OpenAITest',
+      ProviderConfig(
+        id: 'OpenAITest',
+        enabled: true,
+        name: 'OpenAITest',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+      ),
+    );
+    await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
+    final saved = Completer<DraftSubmission?>();
+    ComposerDraftInput? snapshot;
+    ChatInputData? submitted;
+    mediaController.onBeginSubmission = (input) {
+      snapshot = input;
+      return saved.future;
+    };
+    Future<void> show(String id) => tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settingsProvider: settings,
+        assistantProvider: assistants,
+        conversationId: id,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+    await show('a');
+    await tester.tap(find.byIcon(Lucide.X));
+    await tester.pump();
+    expect(mediaController.allowImagesApiRouting, isFalse);
+    await tester.tap(find.byIcon(Lucide.ArrowUp));
+    await tester.pump();
+    expect(snapshot!.allowImagesApiRouting, isFalse);
+    expect(submitted, isNull);
+
+    controller.text = 'B draft';
+    await show('b');
+    expect(mediaController.allowImagesApiRouting, isTrue);
+    saved.complete(
+      const DraftSubmission(conversationId: 'a', id: 'submission-a'),
+    );
+    await tester.pumpAndSettle();
+    expect(submitted!.text, 'from A');
+    expect(submitted!.draftSubmission!.conversationId, 'a');
+    expect(submitted!.allowImagesApiRouting, isFalse);
+    expect(controller.text, 'B draft');
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('绘图模式关闭后切换对话会重新显示', (tester) async {
@@ -538,6 +750,58 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  testWidgets('reasoning button hides level badge by default', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('Reasoning Strength'), findsOneWidget);
+    expect(find.text('low'), findsNothing);
+  });
+
+  testWidgets('reasoning button shows level badge when enabled', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setShowReasoningLevelBadge(true);
+
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        settingsProvider: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('Reasoning Strength'), findsOneWidget);
+    expect(find.text('low'), findsOneWidget);
   });
 }
 

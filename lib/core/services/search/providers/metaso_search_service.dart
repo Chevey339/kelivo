@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class MetasoSearchService extends SearchService<MetasoOptions> {
+class MetasoSearchService extends SearchService<MetasoOptions>
+    implements WebFetchCapable<MetasoOptions> {
+  MetasoSearchService({super.client});
+
+  static const String readerUrl = 'https://metaso.cn/api/v1/reader';
+
   @override
   String get name => 'Metaso (秘塔)';
 
@@ -62,6 +68,43 @@ class MetasoSearchService extends SearchService<MetasoOptions> {
       return SearchResult(items: results);
     } catch (e) {
       throw Exception('Metaso search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required MetasoOptions serviceOptions,
+  }) async {
+    try {
+      // The reader answers `text/plain` with the page as Markdown.
+      final response = await withWebFetchClient(
+        (client) => client.post(
+          Uri.parse(readerUrl),
+          headers: {
+            'Authorization':
+                'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
+            'Accept': 'text/plain',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'url': url}),
+        ),
+        commonOptions: commonOptions,
+        client: client,
+      );
+      final text = utf8.decode(response.bodyBytes, allowMalformed: true);
+      if (response.statusCode != 200) {
+        final detail = fetchErrorDetail(text);
+        throw Exception('HTTP ${response.statusCode}: $detail');
+      }
+      return WebFetchPage(
+        url: url,
+        title: firstMarkdownHeading(text),
+        content: text,
+      );
+    } catch (e) {
+      throw Exception('Metaso fetch failed: $e');
     }
   }
 }

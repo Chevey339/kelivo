@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../../utils/mcp_structured_image.dart';
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
@@ -13,7 +14,7 @@ class GoogleFunctionCall {
     this.apiId,
     required this.name,
     required this.args,
-    this.result = '',
+    this.result,
     this.thoughtSigKey,
     this.thoughtSigVal,
     required this.part,
@@ -23,7 +24,7 @@ class GoogleFunctionCall {
   final String? apiId;
   final String name;
   final Map<String, dynamic> args;
-  String result;
+  ClientToolResult? result;
   final String? thoughtSigKey;
   final dynamic thoughtSigVal;
   final Map<String, dynamic> part;
@@ -78,11 +79,9 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   bool receivedImage;
   TokenUsage? _round;
+  final Map<String, dynamic> _roundUsageFields = {};
 
-  TokenUsage? get usage {
-    if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).merge(_round!);
-  }
+  TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
   String? finishReason;
   bool _hasSeenPart = false;
@@ -257,14 +256,18 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final um = obj['usageMetadata'];
     if (um is Map<String, dynamic>) {
-      _round = (_round ?? const TokenUsage()).merge(
-        TokenUsage(
-          promptTokens: (um['promptTokenCount'] ?? 0) as int,
-          completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
-          totalTokens: (um['totalTokenCount'] ?? 0) as int,
-        ),
-      );
-      chunks.add(Usage(usage!));
+      if (!um.containsKey('totalTokenCount') &&
+          (um.containsKey('promptTokenCount') ||
+              um.containsKey('candidatesTokenCount') ||
+              um.containsKey('thoughtsTokenCount'))) {
+        _roundUsageFields.remove('totalTokenCount');
+      }
+      _roundUsageFields.addAll(um);
+      final parsed = googleUsageFromMetadata(_roundUsageFields);
+      if (parsed.hasReportedTokens) {
+        _round = parsed;
+        chunks.add(Usage(usage!));
+      }
     }
 
     final candidates = obj['candidates'];
@@ -578,4 +581,25 @@ bool _looksLikeImageStart(String data) {
     if (data.startsWith(prefix)) return true;
   }
   return false;
+}
+
+int? _readGoogleUsageInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+TokenUsage googleUsageFromMetadata(Map usageMetadata) {
+  final reasoning = _readGoogleUsageInt(usageMetadata['thoughtsTokenCount']);
+  final candidates = _readGoogleUsageInt(usageMetadata['candidatesTokenCount']);
+  return TokenUsage(
+    promptTokens: _readGoogleUsageInt(usageMetadata['promptTokenCount']),
+    completionTokens: candidates == null && reasoning == null
+        ? null
+        : (candidates ?? 0) + (reasoning ?? 0),
+    cachedTokens: _readGoogleUsageInt(usageMetadata['cachedContentTokenCount']),
+    reasoningTokens: reasoning,
+    totalTokens: _readGoogleUsageInt(usageMetadata['totalTokenCount']),
+  );
 }

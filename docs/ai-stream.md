@@ -1,7 +1,7 @@
 # Kelivo AI 流
 
 协议无关的流式事件、decoder 契约、轨迹回放，以及如何加一个新 provider。
-请求体构造和 vendor heuristics 不在这里——那是各 provider 请求文件和 `providers/openai/openai_vendor_compat.dart` 的资产。
+请求体构造和 vendor heuristics 不在这里——那是各 provider 请求文件和 `providers/openai/openai_request_shaping.dart` 的资产。
 
 ## 事件语义与生命周期
 
@@ -15,6 +15,22 @@
 | 托管工具 | `ServerToolStart` | `ServerToolInputDelta` | `ServerToolEnd` | 搜索 / 代码执行；`server: true` 只留给这条通道 |
 | 图片 | `ImageStart` | `ImageDelta` / `ImageSnapshot` | `ImageEnd` | Snapshot 替换，不追加 |
 | 收尾 | — | `Usage` / `Annotations` | `Finish` | `Finish` 恰好一次，由 provider 发，decoder 不发 |
+
+`runClientToolFollowUps` 在执行每批客户端工具之前发出 `AssistantRoundEnd`。它记录刚结束的模型响应边界及该轮 `reasoning_details`，handler 将其保存为不可见的 `AssistantRoundEndPart`。边界不表示工具已经执行；执行状态仍由对应 `ToolCallPart.content` 是否存在决定。
+
+Chat Completions 历史从有序 parts 重建，每个边界之前的正文、思考和工具调用属于同一响应，调用后紧跟该批结果。连续无正文的工具响应也各自保留；未完成批次不伪造结果，不影响此前已完成批次。普通最终回答只携带最后一轮思考。Claude、Gemini 由各自适配器处理原生回放。
+
+Responses 在每轮返回后发出 `responses_turn` provider artifact，保存原生 output items、响应边界和供应商 call_id 与工具卡片 ID 的对应关系。流式以 `response.output_item.done` 的完整数据为准，保存明文 reasoning 或 `encrypted_content`；终止事件中的精简 output 不覆盖已完成 item。下一次请求按原顺序回放 items，在每轮调用后插入对应的工具结果，正文只发送一次。artifact 限定提供商、Base URL 和上游模型，随消息重载和会话分叉保留；未完成的工具批次及关联原生 reasoning 不回放。改写正文的回复使用当前文本，发送阶段的正则处理只改正文，不重写 reasoning。OpenAI 官方端点请求 `reasoning.encrypted_content`；不向其他兼容端点新增该参数。
+
+支持推理回放的模型和目录回放字段默认使用 `all`，包括没有实际调用工具的历史回答；`toolTurns` 保留为用户可选项，显式配置仍优先。不支持该回放字段的模型继续使用 `none`。这控制客户端回传范围，不会自动修改供应商的 `thinking.keep` 或 `clear_thinking` 等服务端参数。
+
+Claude 经 OpenAI 兼容接口回放时仍使用携带签名的 `reasoning_details`，不会因选择 `all` 而把旧的无签名思考文本当成原生 thinking 回传。
+
+Claude/Messages 每个响应都保存 `claude_turn`，普通轮次也保留完整 thinking、signature 和 redacted_thinking。没有工具卡片时，artifact 随原提供商和模型的普通助手消息进入历史；编辑正文后不恢复旧块。发送时按回放策略过滤历史 thinking，正文和工具结果保留；当前工具循环仍完整回传所需的原生块。存储不受回放选项影响，切换选项不会丢掉已经保存的块。
+
+修改历史、系统提示或工具定义后，若 Claude 返回明确的 conversation-prefix 签名错误，客户端按实际请求中的错误位置，去掉该块及其后的 thinking/redacted_thinking，仅重试一次。`claude_thinking_recovery` 保存失效块的指纹，并累计写入后续回复，重载和分叉后也不重新带回；原始 artifact 不修改，新生成的思考继续正常回放。普通请求不新增 beta 参数，其他签名错误照常报告。带工具的历史回复编辑后以当前正文替换原正文，工具调用和结果保持原位。
+
+上下文消息数限制为软上限，裁剪点回退到保留轮次的用户消息，避免把工具链从中间拆开。已有记录只能按其实际保存的 parts 和 artifact 回放，不能补回过去没有记录的响应边界或 thinking 签名。
 
 `StreamChunkHandler` 每条响应流一个实例，按 id 折成 `List<MessagePart>`。非流式走同一条合并：`generateMessage` → `sendMessageStream(stream: false)` → `handler.handle` → `TextGenerationResult`。`handleResult` 原样收下 parts，不改写图片 URI。
 

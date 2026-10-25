@@ -121,6 +121,8 @@ class StreamController {
   /// repeat restores (e.g. paging re-walks the whole window) skip them until
   /// their state is cleared.
   final Set<String> _restoredUiMessageIds = <String>{};
+  final Map<String, ({bool? reasoning, List<bool> segments})>
+  _offWindowExpansion = {};
 
   int _reasoningPayloadDecodeCount = 0;
 
@@ -252,6 +254,7 @@ class StreamController {
 
   /// Clear all state for a message (reasoning, segments, tools).
   void clearMessageState(String messageId) {
+    _offWindowExpansion.remove(messageId);
     _reasoning.remove(messageId);
     _reasoningSegments.remove(messageId);
     _contentSplits.remove(messageId);
@@ -265,6 +268,7 @@ class StreamController {
   /// Clear cached UI state while preserving any runs still owned by ChatActions.
   void clearAllState({Set<String> keepMessageIds = const {}}) {
     bool discard(String id) => !keepMessageIds.contains(id);
+    _offWindowExpansion.removeWhere((id, _) => discard(id));
     _reasoning.removeWhere((id, _) => discard(id));
     _reasoningSegments.removeWhere((id, _) => discard(id));
     _contentSplits.removeWhere((id, _) => discard(id));
@@ -274,6 +278,34 @@ class StreamController {
     _restoredUiMessageIds.removeWhere(discard);
     _cancelAllTimers(keepMessageIds: keepMessageIds);
     streamingContentNotifier.clear(keepMessageIds: keepMessageIds);
+  }
+
+  /// Release decoded history payloads while remembering the user's small
+  /// expand/collapse choices. Background generation remains owned by its run.
+  void pruneOffWindowState(Set<String> visibleMessageIds) {
+    final retained = {...visibleMessageIds, ..._activeStreamingIds};
+    final ids = {
+      ..._reasoning.keys,
+      ..._reasoningSegments.keys,
+      ..._contentSplits.keys,
+      ..._toolParts.keys,
+      ..._reasoningDetails.keys,
+      ..._decodedReasoningPayloads.keys,
+      ..._restoredUiMessageIds,
+    };
+    for (final id in ids) {
+      if (retained.contains(id)) continue;
+      final reasoning = _reasoning[id]?.expanded;
+      final segments = [
+        for (final segment
+            in _reasoningSegments[id] ?? const <ReasoningSegmentData>[])
+          segment.expanded,
+      ];
+      clearMessageState(id);
+      if (reasoning != null || segments.isNotEmpty) {
+        _offWindowExpansion[id] = (reasoning: reasoning, segments: segments);
+      }
+    }
   }
 
   /// Re-apply in-bubble retry UI after [clearAllState] / conversation switch.
@@ -1530,6 +1562,21 @@ class StreamController {
     if (details != null) {
       _reasoningDetails[messageId] = details;
     }
+    final expanded = _offWindowExpansion.remove(messageId);
+    if (expanded != null) {
+      if (expanded.reasoning != null && _reasoning[messageId] != null) {
+        _reasoning[messageId]!.expanded = expanded.reasoning!;
+      }
+      final segments =
+          _reasoningSegments[messageId] ?? const <ReasoningSegmentData>[];
+      for (
+        var i = 0;
+        i < segments.length && i < expanded.segments.length;
+        i++
+      ) {
+        segments[i].expanded = expanded.segments[i];
+      }
+    }
   }
 
   _DecodedReasoningPayload _decodedReasoningPayloadFor(
@@ -1564,6 +1611,8 @@ class GenerationContext {
   GenerationContext({
     required this.assistantMessage,
     required this.apiMessages,
+    this.contextUsageConfiguration,
+    this.contextUsageRevision,
     required this.userImagePaths,
     required this.allowImagesApiRouting,
     required this.providerKey,
@@ -1588,6 +1637,8 @@ class GenerationContext {
 
   final ChatMessage assistantMessage;
   final List<Map<String, dynamic>> apiMessages;
+  final Object? contextUsageConfiguration;
+  final int? contextUsageRevision;
   final List<String> userImagePaths;
   final bool allowImagesApiRouting;
   final String providerKey;
@@ -1611,18 +1662,34 @@ class GenerationContext {
 
 /// State object for streaming message generation.
 class StreamingState {
-  StreamingState(this.ctx)
+  StreamingState(this.ctx, {this.responsesTurnPrefix, this.claudeTurnPrefix})
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
+      totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+      firstTokenMs = ctx.assistantMessage.firstTokenMs,
+      _previousUsage = ctx.assistantMessage.tokenUsage,
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
+
+  /// Immutable native history already owned by this message before resuming.
+  final String? responsesTurnPrefix;
+  final String? claudeTurnPrefix;
   final StreamTextBuffer _content;
   String get fullContentRaw => _content.value;
   set fullContentRaw(String text) => _content.value = text;
   bool get hasContent => !_content.isEmpty;
   void appendContent(String delta) => _content.add(delta);
-  int totalTokens = 0;
+  int totalTokens;
   TokenUsage? usage;
+  final TokenUsage _previousUsage;
+  TokenUsage? get totalUsage {
+    final current = partsHandler.totalUsage ?? usage;
+    // Answering a tool question can resume the same persisted message.
+    return _previousUsage.hasReportedTokens
+        ? _previousUsage + (current ?? const TokenUsage())
+        : current;
+  }
+
   final StreamTextBuffer _bufferedReasoning = StreamTextBuffer();
   String get bufferedReasoning => _bufferedReasoning.value;
   set bufferedReasoning(String text) => _bufferedReasoning.value = text;
@@ -1631,7 +1698,48 @@ class StreamingState {
   bool finishHandled = false;
   bool terminalPersisted = false;
   bool titleQueued = false;
-  DateTime? streamStartedAt;
+  DateTime? requestStartedAt;
+  DateTime? requestFinishedAt;
+  int? firstTokenMs;
+
+  /// Whole-generation elapsed time, including waiting and reasoning. A tool
+  /// answer can resume the same message, so keep time spent in earlier runs.
+  int? get durationMs {
+    final previous = ctx.assistantMessage.durationMs;
+    final elapsed = _requestElapsedMs(requestFinishedAt ?? DateTime.now());
+    return elapsed == null ? previous : (previous ?? 0) + elapsed;
+  }
+
+  int? _requestElapsedMs(DateTime end) {
+    final start = requestStartedAt;
+    if (start == null) return null;
+    final elapsed = end.difference(start).inMilliseconds;
+    // Device clock rollback must not persist a negative duration.
+    return elapsed < 0 ? null : elapsed;
+  }
+
+  void recordFirstOutput(StreamChunk chunk) {
+    if (firstTokenMs != null ||
+        requestFinishedAt != null ||
+        ctx.assistantMessage.durationMs != null) {
+      return;
+    }
+    final hasOutput = switch (chunk) {
+      TextDelta(:final text) || ReasoningDelta(:final text) => text.isNotEmpty,
+      ToolCallStart(:final toolName) ||
+      ServerToolStart(:final toolName) => toolName.isNotEmpty,
+      ToolCallDelta(:final toolNameDelta, :final inputDelta) =>
+        toolNameDelta.isNotEmpty || inputDelta.isNotEmpty,
+      ServerToolInputDelta(:final inputDelta) => inputDelta.isNotEmpty,
+      ImageDelta(:final data) || ImageSnapshot(:final data) => data.isNotEmpty,
+      GeneratedFile(:final uri) => uri.isNotEmpty,
+      _ => false,
+    };
+    if (hasOutput) firstTokenMs = _requestElapsedMs(DateTime.now());
+  }
+
+  /// Freeze before UI draining, persistence or cancellation cleanup.
+  void finishRequestTiming() => requestFinishedAt ??= DateTime.now();
   int? generationStateRevision;
   bool generationStreamingStarted = false;
   final Map<String, String> pendingToolNames = <String, String>{};

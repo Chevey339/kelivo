@@ -10,6 +10,7 @@ void main() {
         'lib/core/database/business_migration_engine.dart',
         'lib/core/providers/hotkey_provider.dart',
         'lib/core/providers/settings_provider.dart',
+        'lib/core/services/model_catalog/model_catalog_service.dart',
         'lib/desktop/window_size_manager.dart',
         'lib/features/migration/hive_to_sqlite_migration_service.dart',
         'lib/main.dart',

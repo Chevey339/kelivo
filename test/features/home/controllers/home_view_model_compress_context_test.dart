@@ -315,31 +315,30 @@ void main() {
         keptText: 'b' * 250,
       );
 
-      // 1000 ascii chars → 250 tokens；保留 250 字符 → 62.5 → 63
-      expect(est.totalTokens, 250);
-      expect(est.keptTokens, 63);
-      // 总结区 187 tokens，10%-30% → 19..56 → 合计 82..119
-      expect(est.minResultTokens, 82);
-      expect(est.maxResultTokens, 119);
+      // tokenx: 1000 lowercase letters → ceil(1000/7) = 143
+      expect(est.totalTokens, 143);
+      expect(est.keptTokens, 36);
+      expect(est.minResultTokens, 47);
+      expect(est.maxResultTokens, 68);
     });
 
-    test('CJK 按 1.6 字符/token 估算', () {
+    test('CJK 走 tokenx 汉字权重', () {
       final est = estimateCompressionTokens(
         totalText: '中' * 400,
         keptText: '中' * 100,
       );
 
-      expect(est.totalTokens, 250);
-      expect(est.keptTokens, 63);
+      expect(est.totalTokens, 348);
+      expect(est.keptTokens, 87);
     });
 
-    test('混合文本按 CJK 与非 CJK 分段估算', () {
+    test('混合文本走 tokenx（整段命中 CJK 则按汉字计价）', () {
       final est = estimateCompressionTokens(
         totalText: '中' * 200 + 'a' * 400,
         keptText: '',
       );
 
-      expect(est.totalTokens, 225);
+      expect(est.totalTokens, 522);
     });
 
     test('空文本返回全零', () {
@@ -545,19 +544,6 @@ void main() {
         budget128k,
         lessThanOrEqualTo(CompressContextOptions.safeRequestChars),
       );
-    });
-  });
-
-  group('readModelContextWindowTokens', () {
-    test('reads common override keys and ignores junk', () {
-      expect(readModelContextWindowTokens({'contextWindow': 128000}), 128000);
-      expect(
-        readModelContextWindowTokens({'max_context_tokens': '64000'}),
-        64000,
-      );
-      expect(readModelContextWindowTokens({'contextLength': 0}), isNull);
-      expect(readModelContextWindowTokens(const {}), isNull);
-      expect(readModelContextWindowTokens(null), isNull);
     });
   });
 

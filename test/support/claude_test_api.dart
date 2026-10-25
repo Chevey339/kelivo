@@ -16,6 +16,7 @@ import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'collect_generation.dart';
+import 'legacy_reasoning.dart';
 
 /// The official endpoint, the one host Anthropic's server tools are sent to.
 const officialBaseUrl = 'http://api.anthropic.com';
@@ -274,6 +275,7 @@ Future<ClaudeExchange> captureClaudeExchange({
     },
   ],
   List<String>? sseRounds,
+  List<int>? statusCodes,
 }) async {
   final bodies = <Map<String, dynamic>>[];
   final paths = <String>[];
@@ -289,8 +291,11 @@ Future<ClaudeExchange> captureClaudeExchange({
       (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
           .cast<String, dynamic>(),
     );
-    request.response.statusCode = HttpStatus.ok;
-    if (sseRounds != null) {
+    final status = statusCodes == null
+        ? HttpStatus.ok
+        : statusCodes[round.clamp(0, statusCodes.length - 1)];
+    request.response.statusCode = status;
+    if (sseRounds != null && status == HttpStatus.ok) {
       request.response.headers.contentType = ContentType(
         'text',
         'event-stream',
@@ -313,7 +318,6 @@ Future<ClaudeExchange> captureClaudeExchange({
   final serverUrl = 'http://${server.address.address}:${server.port}';
   final cfg = config ?? claudeConfig();
   final keepBaseUrl =
-      cfg.vertexAI == true ||
       (Uri.tryParse(cfg.baseUrl)?.host ?? '') == 'api.anthropic.com';
 
   final chunks = <StreamChunk>[];
@@ -323,7 +327,7 @@ Future<ClaudeExchange> captureClaudeExchange({
         config: effective,
         modelId: modelId,
         prompt: 'hello',
-        thinkingBudget: thinkingBudget,
+        reasoning: legacyBudget(thinkingBudget),
       );
       // The text of every round, in order, is what the call must hand back.
       expect(
@@ -344,7 +348,7 @@ Future<ClaudeExchange> captureClaudeExchange({
         messages: messages,
         tools: tools,
         onToolCall: onToolCall,
-        thinkingBudget: thinkingBudget,
+        reasoning: legacyBudget(thinkingBudget),
         temperature: temperature,
         topP: topP,
         stream: stream,

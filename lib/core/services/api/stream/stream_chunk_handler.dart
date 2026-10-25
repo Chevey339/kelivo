@@ -38,6 +38,15 @@ class StreamChunkHandler {
   final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
 
   TokenUsage? usage;
+  TokenUsage? _completedUsage;
+  TokenUsage? _resultTotalUsage;
+
+  /// All API requests in this turn. [usage] remains the latest request only.
+  TokenUsage? get totalUsage =>
+      _resultTotalUsage ??
+      (_completedUsage == null
+          ? usage
+          : _completedUsage! + (usage ?? const TokenUsage()));
   dynamic reasoningDetails;
   bool finished = false;
   String? finishReason;
@@ -75,6 +84,7 @@ class StreamChunkHandler {
           if (!_isBlankPart(part)) part,
       ],
       usage: usage,
+      totalUsage: totalUsage,
       finishReason: finishReason,
       reasoningDetails: reasoningDetails,
     );
@@ -107,6 +117,7 @@ class StreamChunkHandler {
     if (result.usage != null) {
       usage = (usage ?? const TokenUsage()).merge(result.usage!);
     }
+    _resultTotalUsage = result.totalUsage;
     if (result.reasoningDetails != null) {
       reasoningDetails = result.reasoningDetails;
     }
@@ -244,6 +255,14 @@ class StreamChunkHandler {
         }
         _imageIndex.remove(id);
         _imageMime.remove(id);
+      case AssistantRoundEnd(:final reasoningDetails):
+        for (final index in _textBuffers.keys.toList()) {
+          _endText(index);
+        }
+        _textIndex.clear();
+        _reasoningIndex.clear();
+        _parts.add(AssistantRoundEndPart(reasoningDetails: reasoningDetails));
+        this.reasoningDetails = null;
       case ProviderArtifact():
         // Provider state, not message content; the chat stores it separately.
         break;
@@ -277,7 +296,14 @@ class StreamChunkHandler {
           content: _mergeSearchItems(existing?.content, items),
           server: true,
         );
-      case Usage(:final usage):
+      case Usage(:final usage, :final startsRequest):
+        if (startsRequest) {
+          if (this.usage != null) {
+            _completedUsage =
+                (_completedUsage ?? const TokenUsage()) + this.usage!;
+          }
+          this.usage = null;
+        }
         this.usage = (this.usage ?? const TokenUsage()).merge(usage);
       case final RetryPending pending:
         onRetry?.call(pending);

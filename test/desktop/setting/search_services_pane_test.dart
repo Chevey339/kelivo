@@ -1,4 +1,7 @@
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
+import '../../support/business_test_harness.dart';
 import 'package:Kelivo/desktop/setting/search_services_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +9,142 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('desktop adds DeepSeek from its provider picker', (tester) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, 'DeepSeek');
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.enterText(find.byType(TextField), 'deepseek-key');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(created, isA<DeepSeekOptions>());
+    expect((created! as DeepSeekOptions).apiKey, 'deepseek-key');
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets('desktop edits DeepSeek without losing extra keys', (
+    tester,
+  ) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          DeepSeekOptions(
+            id: 'deepseek',
+            apiKey: 'old-key',
+            extraApiKeys: const ['extra-key'],
+          ),
+        );
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('old-key'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.enterText(find.byType(TextField), 'new-key');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final saved = updated! as DeepSeekOptions;
+    expect(saved.id, 'deepseek');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['extra-key']);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets('desktop changes page reader through a dropdown', (tester) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setSearchServices([
+      const BingLocalOptions(id: 'bing'),
+      TavilyOptions(id: 'tavily', apiKey: 'key'),
+    ]);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: DesktopSearchServicesPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final dropdown = find.byKey(const ValueKey('desktop-web-fetch-mode'));
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.tap(find.text('Tavily').last);
+    await tester.pumpAndSettle();
+    expect(settings.webFetchMode, 'tavily');
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets('desktop adds keyless Exa MCP with its default endpoint', (
+    tester,
+  ) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, 'Exa MCP');
+    expect(find.text('API Key (optional)'), findsOneWidget);
+    expect(find.text(ExaMcpOptions.defaultUrl), findsOneWidget);
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    final saved = created! as ExaMcpOptions;
+    expect(saved.apiKey, isEmpty);
+    expect(saved.resolvedUrl, ExaMcpOptions.defaultUrl);
+  });
+
+  testWidgets('desktop edits Exa MCP without losing extra keys', (
+    tester,
+  ) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          ExaMcpOptions(
+            id: 'mcp',
+            apiKey: 'key',
+            extraApiKeys: const ['extra'],
+          ),
+        );
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    final urlField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == ExaMcpOptions.defaultUrl,
+    );
+    await tester.enterText(urlField, ' https://example.com/mcp ');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final saved = updated! as ExaMcpOptions;
+    expect(saved.id, 'mcp');
+    expect(saved.apiKey, 'key');
+    expect(saved.extraApiKeys, ['extra']);
+    expect(saved.url, 'https://example.com/mcp');
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 
   testWidgets('desktop add dialog rejects invalid Brave maximum tokens', (
     tester,
@@ -129,71 +268,67 @@ void main() {
     expect(saved.apiKey, 'new-key');
     expect(saved.extraApiKeys, ['backup-key']);
   });
-  testWidgets(
-    'desktop add dialog saves Kimi with the selected mode',
-    (tester) async {
-      SearchServiceOptions? created;
-      await _pumpDialogHost(
-        tester,
-        onOpen: (context) async {
-          created = await showDesktopAddSearchServiceDialog(context);
-        },
-      );
+  testWidgets('desktop add dialog saves Kimi with the selected mode', (
+    tester,
+  ) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
 
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      await _selectServiceType(tester, 'Kimi');
-      await tester.enterText(find.byType(TextField), 'kimi-key');
-      await tester.tap(find.text('Pro'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Basic').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, 'Kimi');
+    await tester.enterText(find.byType(TextField), 'kimi-key');
+    await tester.tap(find.text('Pro'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
 
-      final saved = created! as KimiOptions;
-      expect(saved.apiKey, 'kimi-key');
-      expect(saved.mode, 'basic');
-    },
-    variant: TargetPlatformVariant({TargetPlatform.macOS}),
-  );
+    final saved = created! as KimiOptions;
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'basic');
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 
-  testWidgets(
-    'desktop edit dialog preserves Kimi keys and changes mode',
-    (tester) async {
-      SearchServiceOptions? updated;
-      await _pumpDialogHost(
-        tester,
-        onOpen: (context) async {
-          updated = await showDesktopEditSearchServiceDialog(
-            context,
-            KimiOptions(
-              id: 'kimi',
-              apiKey: 'kimi-key',
-              mode: 'basic',
-              extraApiKeys: const ['extra-key'],
-            ),
-          );
-        },
-      );
+  testWidgets('desktop edit dialog preserves Kimi keys and changes mode', (
+    tester,
+  ) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          KimiOptions(
+            id: 'kimi',
+            apiKey: 'kimi-key',
+            mode: 'basic',
+            extraApiKeys: const ['extra-key'],
+          ),
+        );
+      },
+    );
 
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Basic'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pro').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pro').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
 
-      final saved = updated! as KimiOptions;
-      expect(saved.id, 'kimi');
-      expect(saved.apiKey, 'kimi-key');
-      expect(saved.mode, 'pro');
-      expect(saved.extraApiKeys, ['extra-key']);
-    },
-    variant: TargetPlatformVariant({TargetPlatform.macOS}),
-  );
+    final saved = updated! as KimiOptions;
+    expect(saved.id, 'kimi');
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'pro');
+    expect(saved.extraApiKeys, ['extra-key']);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 
   testWidgets('desktop edit dialog saves You.com content mode', (tester) async {
     SearchServiceOptions? updated;

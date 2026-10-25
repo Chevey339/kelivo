@@ -1,3 +1,5 @@
+import '../features/provider/widgets/provider_icon_picker.dart';
+import 'macos_window_drag_area.dart';
 import '../features/provider/widgets/oauth_connection_info.dart';
 import '../features/provider/pages/oauth_provider_detail_page.dart';
 import 'package:flutter/material.dart';
@@ -17,8 +19,9 @@ import '../core/providers/settings_provider.dart';
 import '../core/services/chat/chat_service.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/logging/flutter_logger.dart';
+import '../core/services/model_catalog/model_catalog_service.dart';
+import '../core/services/model_spec/model_spec_resolver.dart';
 import '../core/services/linux_window_service.dart';
-import '../core/services/model_override_resolver.dart';
 import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
@@ -35,8 +38,10 @@ import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
-import 'model_edit_dialog.dart'
-    show showDesktopCreateModelDialog, showDesktopModelEditDialog;
+import 'import_provider_dialog.dart' show showDesktopImportProviderDialog;
+import 'model_catalog_popover.dart' show showDesktopModelCatalogPopover;
+import 'model_spec_edit_dialog.dart'
+    show showDesktopCreateModelSpecDialog, showDesktopModelSpecEditDialog;
 // Use the unified model selector (desktop dialog on desktop platforms)
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
@@ -89,7 +94,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
 import '../features/settings/pages/message_style_settings_page.dart';
-import '../features/settings/widgets/memory_ui.dart';
+import '../shared/widgets/tip_icon.dart';
 
 part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';
@@ -202,6 +207,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
         case DesktopSettingsNavigationTarget.backup:
           setState(() => _selected = _SettingsMenuItem.backup);
           break;
+        case DesktopSettingsNavigationTarget.mcp:
+          setState(() => _selected = _SettingsMenuItem.mcp);
+          break;
       }
     });
   }
@@ -242,7 +250,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          topBar,
+          MacosWindowDragArea(child: topBar),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -22,9 +22,10 @@ import 'package:uuid/uuid.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/chat_gradient_background.dart';
 import '../../home/widgets/assistant_avatar.dart';
-import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../../core/models/assistant.dart';
+import '../widgets/assistant_reasoning_picker.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';
@@ -41,6 +42,7 @@ import '../../../core/services/memory/memory_gatekeeper.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../settings/pages/memory_settings_page.dart';
 import '../../settings/widgets/memory_ui.dart';
+import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/setting/memory_dialogs.dart';
@@ -1429,7 +1431,7 @@ Widget _iosNavRow(
             },
           ),
         ),
-        if (tip != null) MemoryTipIcon(message: tip),
+        if (tip != null) TipIcon(message: tip),
         GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
@@ -1526,7 +1528,7 @@ Widget _iosSwitchRow(
             },
           ),
         ),
-        if (tip != null) MemoryTipIcon(message: tip),
+        if (tip != null) TipIcon(message: tip),
         IosSwitch(value: value, onChanged: onChanged, semanticLabel: label),
       ],
     ),

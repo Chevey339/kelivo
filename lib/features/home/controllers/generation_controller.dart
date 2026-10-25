@@ -2,9 +2,12 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/providers/model_provider.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/models/reasoning_request.dart';
+import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
@@ -75,45 +78,17 @@ class GenerationController {
   bool isReasoningModel(String providerKey, String modelId) {
     final settings = contextProvider.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
-    if (ov != null && ov.containsKey('abilities')) {
-      final abilities =
-          (ov['abilities'] as List?)
-              ?.map((e) => e.toString().toLowerCase())
-              .where((e) => e.isNotEmpty)
-              .toList() ??
-          const [];
-      return abilities.contains('reasoning');
-    }
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: modelId, displayName: modelId),
-    );
-    return inferred.abilities.contains(ModelAbility.reasoning);
+    return ModelSpecResolver.instance.spec(cfg, modelId).supportsReasoning;
   }
 
   bool isToolModel(String providerKey, String modelId) {
     final settings = contextProvider.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
-    if (ov != null && ov.containsKey('abilities')) {
-      final abilities =
-          (ov['abilities'] as List?)
-              ?.map((e) => e.toString().toLowerCase())
-              .where((e) => e.isNotEmpty)
-              .toList() ??
-          const [];
-      return abilities.contains('tool');
-    }
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: modelId, displayName: modelId),
-    );
-    return inferred.abilities.contains(ModelAbility.tool);
+    return ModelSpecResolver.instance.spec(cfg, modelId).supportsTool;
   }
 
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true; // treat null as default/auto -> enabled
-    if (budget == -1) return true; // auto
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return r.level != ReasoningLevel.off;
   }
 
   // ============================================================================

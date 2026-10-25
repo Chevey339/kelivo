@@ -6,9 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 
 Future<SettingsProvider> _createSettings(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues({});
@@ -39,6 +41,7 @@ Widget _buildHarness({
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
       ChangeNotifierProvider<AssistantProvider>(
         create: (_) =>
             AssistantProvider(preferences: createBusinessTestPreferences()),
@@ -93,6 +96,63 @@ Future<void> _pumpSelectedToolbar(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('mobile conversation cache key switch saves and restores', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final settings = await _createSettings(tester);
+    addTearDown(settings.dispose);
+    Widget page() => _buildHarness(
+      settings: settings,
+      locale: const Locale('en'),
+      child: const ProviderDetailPage(
+        keyName: 'TestProvider',
+        displayName: 'Test Provider',
+      ),
+    );
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    final cacheSwitch = find.byWidgetPredicate(
+      (widget) =>
+          widget is IosSwitch &&
+          widget.semanticLabel == 'Send Conversation Cache Key',
+    );
+    expect(cacheSwitch, findsOneWidget);
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isFalse);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('TestProvider').promptCacheKeyEnabled,
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isTrue);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('TestProvider').promptCacheKeyEnabled,
+      isFalse,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await settings.setProviderConfig(
+      'TestProvider',
+      settings
+          .getProviderConfig('TestProvider')
+          .copyWith(providerType: ProviderKind.google),
+    );
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    expect(cacheSwitch, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'model selection toolbar keeps detect label before delete label on narrow phones',

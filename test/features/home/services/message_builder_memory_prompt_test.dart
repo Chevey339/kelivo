@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_data.dart';
@@ -24,6 +25,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class _FakeBuildContext implements BuildContext {
   @override
@@ -117,6 +119,7 @@ void main() {
     MemoryType type = MemoryType.identity,
     MemoryScope scope = MemoryScope.global,
     String? assistantId,
+    MemoryStatus status = MemoryStatus.active,
   }) {
     final created = DateTime.utc(2026, 8, 1).microsecondsSinceEpoch;
     return businessRepository.upsertEntity(
@@ -129,7 +132,7 @@ void main() {
           'scope': MemoryEntry.scopeToString(scope),
           'assistantId': assistantId,
           'type': MemoryEntry.typeToString(type),
-          'status': 'active',
+          'status': MemoryEntry.statusToString(status),
           'content': content,
           'source': 'manual',
           'relatedIds': <String>[],
@@ -203,6 +206,185 @@ void main() {
     name: 'Test',
     enableMemory: true,
     messageTemplate: '{{ message }}',
+  );
+
+  for (final initiallyFull in [false, true]) {
+    test(
+      'full injection toggle refreshes sends and regeneration ($initiallyFull)',
+      () async {
+        await seedAssistant(assistant.id);
+        await seedAssistant('other');
+        await settings.setMemoryInjectionMaxItems(1);
+        if (initiallyFull) {
+          await settings.setMemoryFullInjectionTypes({MemoryType.voice});
+        }
+        await putEntry(
+          id: 'voice-1',
+          type: MemoryType.voice,
+          content: 'Global voice',
+        );
+        await putEntry(
+          id: 'voice-2',
+          type: MemoryType.voice,
+          content: 'Assistant voice',
+          scope: MemoryScope.assistant,
+          assistantId: assistant.id,
+        );
+        await putEntry(
+          id: 'voice-3',
+          type: MemoryType.voice,
+          content: 'Other assistant voice',
+          scope: MemoryScope.assistant,
+          assistantId: 'other',
+        );
+        await putEntry(
+          id: 'voice-4',
+          type: MemoryType.voice,
+          content: 'Archived voice',
+          status: MemoryStatus.archived,
+        );
+        await putEntry(id: 'identity-1', content: 'First identity');
+        await putEntry(id: 'identity-2', content: 'Second identity');
+        final conversation = await seedConversation('injection-toggle');
+        final first = await seedUserMessage(
+          id: 'first',
+          conversationId: conversation.id,
+        );
+        final service = buildService();
+
+        Future<List<Map<String, dynamic>>> assemble(
+          List<ChatMessage> messages,
+        ) async {
+          final api = service.buildApiMessages(
+            messages: messages,
+            versionSelections: const {},
+            currentConversation: conversation,
+          );
+          await service.processUserMessagesForApi(
+            api,
+            settings,
+            assistant,
+            conversation: conversation,
+            sourceMessages: messages,
+          );
+          return api;
+        }
+
+        void expectSnapshot(
+          List<Map<String, dynamic>> api, {
+          required bool full,
+        }) {
+          final text = api.map((m) => m['content']).join('\n');
+          expect(MemoryPrompts.introFullZh.allMatches(text), hasLength(1));
+          expect(text, contains('Global voice'));
+          expect(
+            text,
+            full
+                ? contains('(assistant) Assistant voice')
+                : isNot(contains('Assistant voice')),
+          );
+          expect(text, contains('First identity'));
+          expect(text, isNot(contains('Second identity')));
+          expect(text, isNot(contains('Other assistant voice')));
+          expect(text, isNot(contains('Archived voice')));
+        }
+
+        expectSnapshot(await assemble([first]), full: initiallyFull);
+        final frozen = (await chatRepository.getMessagePrompt(
+          first.id,
+        ))!.payload;
+        await settings.setMemoryFullInjectionTypes(
+          initiallyFull ? {} : {MemoryType.voice},
+        );
+
+        // Regeneration has only the frozen user message to carry the new snapshot.
+        expectSnapshot(await assemble([first]), full: !initiallyFull);
+        expect(
+          (await chatRepository.getMessagePrompt(first.id))!.payload,
+          frozen,
+        );
+
+        final second = await seedUserMessage(
+          id: 'second',
+          conversationId: conversation.id,
+          content: 'next question',
+          messageOrder: 1,
+        );
+        expectSnapshot(await assemble([first, second]), full: !initiallyFull);
+        expectSnapshot(await assemble([first, second]), full: !initiallyFull);
+        expect(
+          (await chatRepository.getMessagePrompt(first.id))!.payload,
+          frozen,
+        );
+      },
+    );
+  }
+
+  test(
+    'context preview includes live memory without freezing or running OCR',
+    () async {
+      await seedAssistant(assistant.id);
+      await putEntry(
+        id: 'mem_preview',
+        content: 'User prefers concise answers.',
+      );
+      final conversation = await seedConversation('preview');
+      final message = await seedUserMessage(
+        id: 'preview-user',
+        conversationId: conversation.id,
+        content: 'question',
+        parts: const [
+          TextPart('question'),
+          ImagePart(uri: '/missing.png'),
+        ],
+      );
+      await settings.setOcrModel('Test', 'vision');
+      await settings.setOcrEnabled(true);
+      final service = buildService(
+        messages: [message],
+        ocrHandler: (paths, {revisionId, session, requestId}) async {
+          fail('Preview must not run OCR');
+        },
+        ocrPrefetch: ({required revisionIds, required imagePaths}) async {
+          fail('Preview must not prefetch OCR');
+        },
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [message],
+        versionSelections: {},
+        currentConversation: conversation,
+      );
+      await service.processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: [message],
+        previewOnly: true,
+      );
+      final segments = segmentsFromTaggedMessage(apiMessages.single);
+      expect(
+        segments
+            .where((s) => s.source == ContextSource.memorySnapshot)
+            .map((s) => s.text)
+            .join(),
+        contains('User prefers concise answers.'),
+      );
+      expect(
+        segments
+            .where((s) => s.source == ContextSource.chatHistory)
+            .map((s) => s.text)
+            .join(),
+        'question',
+      );
+      expect(await chatRepository.getMessagePrompt(message.id), isNull);
+      expect(
+        (await chatRepository.getConversation(
+          conversation.id,
+        ))!.injectedMemoryHash,
+        isNull,
+      );
+    },
   );
 
   group('§18.1 item 6 — §7.6 decision table', () {
@@ -1322,6 +1504,139 @@ void main() {
     });
   });
 
+  for (final previewOnly in [false, true]) {
+    for (final followUp in [false, true]) {
+      test('native PDF mode retains current memory after two frozen PDFs '
+          '(preview=$previewOnly, followUp=$followUp)', () async {
+        await seedAssistant(assistant.id);
+        await putEntry(id: 'mem_pdf', content: 'Memory before the update.');
+        final conversation = await seedConversation('pdf-memory');
+        final directory = await Directory.systemTemp.createTemp('pdf_memory_');
+        addTearDown(() => directory.delete(recursive: true));
+        final document = PdfDocument();
+        document.pages.add().graphics.drawString(
+          'Extracted PDF contents',
+          PdfStandardFont(PdfFontFamily.helvetica, 12),
+        );
+        final bytes = await document.save();
+        document.dispose();
+
+        Future<ChatMessage> pdfMessage(String id) async {
+          final file = File('${directory.path}/$id.pdf');
+          await file.writeAsBytes(bytes);
+          return seedUserMessage(
+            id: id,
+            conversationId: conversation.id,
+            content: id,
+            parts: [
+              TextPart(id),
+              FilePart(
+                uri: file.path,
+                name: '$id.pdf',
+                mime: 'application/pdf',
+              ),
+            ],
+          );
+        }
+
+        Future<List<Map<String, dynamic>>> assemble(
+          List<ChatMessage> messages, {
+          bool nativePdfInput = false,
+          bool preview = false,
+        }) async {
+          final service = buildService(messages: messages);
+          final apiMessages = service.buildApiMessages(
+            messages: messages,
+            versionSelections: const {},
+            currentConversation: conversation,
+          );
+          await service.processUserMessagesForApi(
+            apiMessages,
+            settings,
+            assistant,
+            conversation: conversation,
+            sourceMessages: messages,
+            nativePdfInput: nativePdfInput,
+            previewOnly: preview,
+          );
+          return apiMessages;
+        }
+
+        final first = await pdfMessage('pdf-first');
+        await assemble([first]);
+        final frozenFirst = (await chatRepository.getMessagePrompt(first.id))!;
+        expect(frozenFirst.payload, contains('Memory before the update.'));
+        expect(frozenFirst.payload, contains('Extracted PDF contents'));
+
+        await putEntry(id: 'mem_pdf', content: 'Memory after the update.');
+        final second = await pdfMessage('pdf-second');
+        await assemble([first, second]);
+        final frozenSecond = (await chatRepository.getMessagePrompt(
+          second.id,
+        ))!;
+        expect(frozenSecond.payload, contains('Memory after the update.'));
+        expect(frozenFirst.carriesMemorySnapshot, isTrue);
+        expect(frozenSecond.carriesMemorySnapshot, isTrue);
+        final storedHash = await chatRepository
+            .getConversationInjectedMemoryHash(conversation.id);
+
+        var apiMessages = await assemble(
+          [first, second],
+          nativePdfInput: true,
+          preview: previewOnly,
+        );
+        if (followUp) {
+          final next = await seedUserMessage(
+            id: 'pdf-follow-up',
+            conversationId: conversation.id,
+            content: 'ordinary follow-up',
+          );
+          apiMessages = await assemble(
+            [first, second, next],
+            nativePdfInput: true,
+            preview: previewOnly,
+          );
+        }
+        final sent = apiMessages.map((m) => m['content']).join('\n');
+        expect(sent, contains('Memory after the update.'));
+        expect(sent, isNot(contains('Memory before the update.')));
+        expect(sent, isNot(contains('Extracted PDF contents')));
+        expect(MemoryPrompts.introFullZh.allMatches(sent), hasLength(1));
+        expect(
+          (await chatRepository.getMessagePrompt(first.id))!.payload,
+          frozenFirst.payload,
+        );
+        expect(
+          (await chatRepository.getMessagePrompt(second.id))!.payload,
+          frozenSecond.payload,
+        );
+        expect(
+          await chatRepository.getConversationInjectedMemoryHash(
+            conversation.id,
+          ),
+          storedHash,
+        );
+        if (previewOnly && followUp) {
+          expect(
+            await chatRepository.getMessagePrompt('pdf-follow-up'),
+            isNull,
+          );
+        }
+        final extractedAgain = (await assemble([
+          first,
+          second,
+        ])).map((m) => m['content']).join('\n');
+        expect(extractedAgain, contains('Extracted PDF contents'));
+        expect(extractedAgain, contains('Memory after the update.'));
+        expect(extractedAgain, isNot(contains('Memory before the update.')));
+        expect(
+          MemoryPrompts.introFullZh.allMatches(extractedAgain),
+          hasLength(1),
+        );
+      });
+    }
+  }
+
   group('regeneration and forged snapshots', () {
     // Snapshot + hash for whatever [assistantId] can currently see.
     Future<({String prefix, String hash})> currentSnapshot(
@@ -1350,6 +1665,77 @@ void main() {
         hash: MemoryBlockBuilder.hashBlocks(profileBlock, memoryBlock),
       );
     }
+
+    test(
+      'native PDF mode keeps and refreshes an ordinary frozen snapshot',
+      () async {
+        await seedAssistant(assistant.id);
+        await putEntry(id: 'mem_pdf', content: 'Memory before the update.');
+        final conversation = await seedConversation('mixed-pdf-memory');
+        final ordinary = await seedUserMessage(
+          id: 'ordinary',
+          conversationId: conversation.id,
+        );
+        final firstSnapshot = await currentSnapshot(assistant.id);
+        final frozenOrdinary = '${firstSnapshot.prefix}hi';
+        await chatRepository.freezeMessagePrompt(
+          revisionId: ordinary.id,
+          conversationId: conversation.id,
+          payload: frozenOrdinary,
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(firstSnapshot.hash),
+        );
+
+        await putEntry(id: 'mem_pdf', content: 'Memory after the update.');
+        final pdf = await seedUserMessage(
+          id: 'pdf',
+          conversationId: conversation.id,
+          content: 'PDF question',
+          parts: const [
+            TextPart('PDF question'),
+            FilePart(
+              uri: '/report.pdf',
+              name: 'report.pdf',
+              mime: 'application/pdf',
+            ),
+          ],
+        );
+        final latestSnapshot = await currentSnapshot(assistant.id);
+        await chatRepository.freezeMessagePrompt(
+          revisionId: pdf.id,
+          conversationId: conversation.id,
+          payload: '${latestSnapshot.prefix}Extracted PDF contents',
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(latestSnapshot.hash),
+        );
+        final service = buildService(messages: [ordinary, pdf]);
+        final apiMessages = service.buildApiMessages(
+          messages: [ordinary, pdf],
+          versionSelections: const {},
+          currentConversation: conversation,
+        );
+        await service.processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant,
+          conversation: conversation,
+          sourceMessages: [ordinary, pdf],
+          nativePdfInput: true,
+        );
+        expect(apiMessages[0]['content'], '${latestSnapshot.prefix}hi');
+        expect(apiMessages[1]['content'], 'PDF question');
+        expect(
+          (await chatRepository.getMessagePrompt(ordinary.id))!.payload,
+          frozenOrdinary,
+        );
+        expect(
+          await chatRepository.getConversationInjectedMemoryHash(
+            conversation.id,
+          ),
+          latestSnapshot.hash,
+        );
+      },
+    );
 
     test(
       'regenerating after a scope change drops the stale snapshot',

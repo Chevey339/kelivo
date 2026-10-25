@@ -47,6 +47,28 @@ void main() {
 
   group('repair', () {
     test(
+      'repair cannot erase the only receipt and create an empty database',
+      () async {
+        final receipt = File(
+          p.join(directory.path, 'database_installation_receipt_broken.json'),
+        );
+        await receipt.writeAsString('{broken receipt');
+        await expectLater(
+          StartupRecoveryService.repair(appDataDirectory: directory),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'code',
+              'database_missing_with_prior_data',
+            ),
+          ),
+        );
+        expect(await receipt.readAsString(), '{broken receipt');
+        expect(await databaseFile(directory).exists(), isFalse);
+      },
+    );
+
+    test(
       'rebuilds a corrupt receipt from the live database identity',
       () async {
         await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
@@ -347,9 +369,8 @@ void main() {
       },
     );
 
-    test('leaves no displaced copy behind', () async {
-      // The confirmation dialog promises the data is permanently gone, so
-      // unlike an unattended rebuild this must not stash a copy.
+    test('preserves the original database as a displaced copy', () async {
+      // A fresh start retains the previous database for later recovery.
       await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
 
       await StartupRecoveryService.reset(appDataDirectory: directory);
@@ -363,7 +384,7 @@ void main() {
               '${DatabaseInstallationGate.displacedDatabasePrefix}',
             ),
           );
-      expect(displaced, isEmpty);
+      expect(displaced, isNotEmpty);
     });
   });
 }

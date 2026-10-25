@@ -44,6 +44,7 @@ class BrandAssets {
         MapEntry(RegExp(r'tinyfish'), 'tinyfish-color.svg'),
         MapEntry(RegExp(r'fish.?audio|fishaudio'), 'fish-audio.svg'),
         MapEntry(RegExp(r'openrouter'), 'openrouter.svg'),
+        MapEntry(RegExp(r'vercel'), 'vercel.svg'),
         MapEntry(RegExp(r'metaso|秘塔'), 'metaso-color.svg'),
         MapEntry(RegExp(r'meta'), 'meta-color.svg'),
         MapEntry(RegExp(r'tencent'), 'hunyuan-color.svg'),
@@ -124,6 +125,11 @@ class BrandAssets {
       id: 'openrouter',
       label: 'OpenRouter',
       asset: 'assets/icons/openrouter.svg',
+    ),
+    BrandIconOption(
+      id: 'vercel',
+      label: 'Vercel AI Gateway',
+      asset: 'assets/icons/vercel.svg',
     ),
     BrandIconOption(
       id: 'zhipu',
@@ -381,6 +387,7 @@ class BrandAssets {
     'grok.svg',
     'xai.svg',
     'openrouter.svg',
+    'vercel.svg',
     'ollama.svg',
     'github.svg',
     'linkup.svg',

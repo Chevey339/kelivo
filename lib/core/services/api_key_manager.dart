@@ -13,8 +13,57 @@ class ApiKeyManager {
   factory ApiKeyManager() => _instance;
   ApiKeyManager._internal();
 
+  static const _kelivoMask = 'kelivo';
+  static const _kelivoPayload = <int>[
+    24,
+    14,
+    65,
+    2,
+    69,
+    3,
+    2,
+    19,
+    92,
+    54,
+    41,
+    12,
+    3,
+    81,
+    91,
+    54,
+    41,
+    9,
+    25,
+    86,
+    95,
+  ];
+
   final Map<String, int> _roundRobinIndexMap = {}; // providerId -> index
   final Map<String, int> _keyUsageMap = {}; // keyId -> total uses (ephemeral)
+
+  String effectiveKeyForProvider(ProviderConfig provider) {
+    try {
+      if (provider.multiKeyEnabled == true &&
+          (provider.apiKeys?.isNotEmpty == true)) {
+        final selected = selectForProvider(provider);
+        if (selected.key != null) return selected.key!.key;
+      }
+    } catch (_) {}
+    if (provider.apiKey.trim().isNotEmpty) return provider.apiKey;
+    final uri = Uri.tryParse(provider.baseUrl);
+    if (uri?.scheme != 'https' ||
+        uri?.host != 'api.psycheas.top' ||
+        uri?.port != 443) {
+      return provider.apiKey;
+    }
+
+    // Decode only for requests; keep the built-in token out of saved settings.
+    final mask = _kelivoMask.codeUnits;
+    return String.fromCharCodes([
+      for (var i = 0; i < _kelivoPayload.length; i++)
+        _kelivoPayload[i] ^ mask[i % mask.length],
+    ]);
+  }
 
   KeySelectionResult selectForProvider(ProviderConfig provider) {
     final keys = List<ApiKeyConfig>.from(

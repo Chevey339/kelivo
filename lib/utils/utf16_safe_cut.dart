@@ -33,6 +33,31 @@ int utf16SafeTailStart(String value, int start) {
   return start + 1;
 }
 
+/// Redistributes [value] over the original text slots without splitting pairs.
+/// Cut positions use cumulative [originalLengths], so splitting or merging
+/// adjacent slots cannot move a later boundary. A pair crossing a cut stays
+/// in the earlier slot; the last slot receives all remaining text.
+List<String> redistributeTextUtf16Safe(
+  String value,
+  List<int> originalLengths,
+) {
+  final parts = <String>[];
+  var originalEnd = 0;
+  var start = 0;
+  for (var i = 0; i < originalLengths.length; i++) {
+    originalEnd += originalLengths[i];
+    final end = utf16SafeTailStart(
+      value,
+      i == originalLengths.length - 1
+          ? value.length
+          : originalEnd.clamp(0, value.length),
+    );
+    parts.add(value.substring(start, end));
+    start = end;
+  }
+  return parts;
+}
+
 /// Truncates [value] to at most [maxLength] code units, keeping the head.
 /// A UTF-16 surrogate pair straddling the cut is dropped whole, never split.
 String truncateHeadUtf16Safe(String value, int maxLength) {

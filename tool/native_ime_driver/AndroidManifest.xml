@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.kelivo.ime.driver">
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36" />
+    <application android:label="Kelivo IME test driver" android:debuggable="true"
+        android:testOnly="true" />
+    <instrumentation android:name="dev.kelivo.ime.driver.KeyboardDriver"
+        android:targetPackage="dev.kelivo.ime.driver" android:functionalTest="true" />
+</manifest>

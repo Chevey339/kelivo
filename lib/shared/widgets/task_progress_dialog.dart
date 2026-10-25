@@ -28,6 +28,9 @@ class TaskProgressDialogCard extends StatelessWidget {
     this.acknowledgeLabel = 'OK',
     this.onBackground,
     this.backgroundLabel,
+    this.errorMessage,
+    this.onCopyError,
+    this.copyErrorLabel = 'Copy error',
     this.outcome = TaskProgressOutcome.running,
   });
 
@@ -46,6 +49,9 @@ class TaskProgressDialogCard extends StatelessWidget {
   /// the caller can carry on without the result.
   final VoidCallback? onBackground;
   final String? backgroundLabel;
+  final String? errorMessage;
+  final VoidCallback? onCopyError;
+  final String copyErrorLabel;
   final TaskProgressOutcome outcome;
 
   @override
@@ -56,6 +62,7 @@ class TaskProgressDialogCard extends StatelessWidget {
         cancellable &&
         onCancel != null;
     final showAck = outcome == TaskProgressOutcome.failure;
+    final showError = showAck && errorMessage != null;
     final showBackground =
         outcome == TaskProgressOutcome.running &&
         onBackground != null &&
@@ -115,55 +122,98 @@ class TaskProgressDialogCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            AnimatedProgressBar(fraction: resolvedFraction, height: 6),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: AnimatedTextSwap(
-                    text: phaseLabel,
-                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: SingleChildScrollView(
+                  primary: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!showAck) ...[
+                        AnimatedProgressBar(
+                          fraction: resolvedFraction,
+                          height: 6,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AnimatedTextSwap(
+                              text: phaseLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: showAck ? cs.error : cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          if (!showAck && resolvedFraction == null)
+                            const CupertinoActivityIndicator(radius: 8)
+                          else if (!showAck && resolvedFraction != null)
+                            ThrottledProgressLabel(
+                              text:
+                                  '${((resolvedFraction.clamp(0.0, 1.0)) * 100).round()}%',
+                              forceImmediate: resolvedFraction >= 1,
+                              builder: (context, displayText) {
+                                return ReelText(
+                                  displayText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: AppFontWeights.emphasis,
+                                    color: cs.primary,
+                                  ),
+                                  options: const ReelTextOptions(
+                                    direction: ReelTextDirection.up,
+                                    duration: Duration(milliseconds: 320),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                      AnimatedSize(
+                        duration: kAnimFast,
+                        curve: Curves.easeOutCubic,
+                        child: (subtitle == null || subtitle!.isEmpty)
+                            ? const SizedBox.shrink()
+                            : Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  subtitle!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.onSurface.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      if (showError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: cs.errorContainer.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: cs.error.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: SelectableText(
+                              errorMessage!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (resolvedFraction == null)
-                  const CupertinoActivityIndicator(radius: 8)
-                else
-                  ThrottledProgressLabel(
-                    text:
-                        '${((resolvedFraction.clamp(0.0, 1.0)) * 100).round()}%',
-                    forceImmediate: resolvedFraction >= 1,
-                    builder: (context, displayText) {
-                      return ReelText(
-                        displayText,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: AppFontWeights.emphasis,
-                          color: cs.primary,
-                        ),
-                        options: const ReelTextOptions(
-                          direction: ReelTextDirection.up,
-                          duration: Duration(milliseconds: 320),
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-            AnimatedSize(
-              duration: kAnimFast,
-              curve: Curves.easeOutCubic,
-              child: (subtitle == null || subtitle!.isEmpty)
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
+              ),
             ),
             AnimatedSize(
               duration: kAnim,
@@ -178,6 +228,14 @@ class TaskProgressDialogCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (showError && onCopyError != null) ...[
+                              IosTileButton(
+                                icon: Lucide.Copy,
+                                label: copyErrorLabel,
+                                onTap: onCopyError!,
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                             if (showBackground)
                               IosTileButton(
                                 icon: Lucide.ChevronDown,

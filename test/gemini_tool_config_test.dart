@@ -3,6 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/services/api/gemini_tool_config.dart';
 
 void main() {
+  group('supportsMixedBuiltInAndFunctionTools', () {
+    test('is the residual Gemini 3 generation check', () {
+      expect(supportsMixedBuiltInAndFunctionTools('gemini-3.6-flash'), isTrue);
+      expect(
+        supportsMixedBuiltInAndFunctionTools('models/gemini-3-pro-preview'),
+        isTrue,
+      );
+      expect(supportsMixedBuiltInAndFunctionTools('gemini-2.5-flash'), isFalse);
+      expect(supportsMixedBuiltInAndFunctionTools('gemma-4-31B-it'), isFalse);
+    });
+  });
+
   group('shouldAttachGeminiFunctionCallingConfig', () {
     test('returns false for google_search built-in tool', () {
       final tools = <Map<String, dynamic>>[

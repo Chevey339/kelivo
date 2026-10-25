@@ -17,14 +17,17 @@ import '../../utils/app_directories.dart';
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
+  static const String _orphanedAssistantKey =
+      'orphaned_conversations_assistant_id_v1';
 
   final BusinessPreferences preferences;
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
+  String? _orphanedAssistantId;
   final ChatService? chatService;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
-  String? get currentAssistantId => _currentAssistantId;
+  String? get currentAssistantId => currentAssistant?.id;
   Assistant? get currentAssistant {
     final idx = _assistants.indexWhere((a) => a.id == _currentAssistantId);
     if (idx != -1) return _assistants[idx];
@@ -96,28 +99,40 @@ class AssistantProvider extends ChangeNotifier {
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     } else {
-      _currentAssistantId = null;
+      _currentAssistantId = _assistants.firstOrNull?.id;
+    }
+    await _ensureOrphanedAssistant();
+    if (_currentAssistantId != null && savedValue != _currentAssistantId) {
+      await preferences.setString(_currentAssistantKey, _currentAssistantId!);
     }
     notifyListeners();
   }
 
-  List<Assistant> _decodeAssistants(String raw) {
-    try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return [
-        for (final e in decoded)
-          if (e is Map) Assistant.fromJson(e.cast<String, dynamic>()),
-      ];
-    } catch (_) {
-      return const <Assistant>[];
+  Future<void> _ensureOrphanedAssistant() async {
+    final savedValue = preferences.get(_orphanedAssistantKey);
+    final savedId = savedValue is String ? savedValue : null;
+    _orphanedAssistantId =
+        (savedId == null ? null : getById(savedId))?.id ??
+        _assistants.firstOrNull?.id;
+    if (_orphanedAssistantId != null && savedValue != _orphanedAssistantId) {
+      await preferences.setString(_orphanedAssistantKey, _orphanedAssistantId!);
     }
+  }
+
+  List<Assistant> _decodeAssistants(String raw) {
+    // A decode failure is not an empty installation: ensureDefaults would
+    // replace all saved assistant IDs if we swallowed it and returned [].
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    return [
+      for (final e in decoded)
+        Assistant.fromJson((e as Map).cast<String, dynamic>()),
+    ];
   }
 
   Assistant _defaultAssistant(AppLocalizations l10n) => Assistant(
     id: const Uuid().v4(),
     name: l10n.assistantProviderDefaultAssistantName,
     systemPrompt: '',
-    thinkingBudget: null,
     temperature: null,
     topP: null,
     limitContextMessages: false,
@@ -273,10 +288,12 @@ class AssistantProvider extends ChangeNotifier {
       _assistantsKey,
       Assistant.encodeList(_assistants),
     );
+    await _ensureOrphanedAssistant();
   }
 
   Future<void> setCurrentAssistant(String id) async {
     await loaded;
+    if (getById(id) == null) return;
     if (_currentAssistantId == id) return;
     _currentAssistantId = id;
     notifyListeners();
@@ -287,6 +304,18 @@ class AssistantProvider extends ChangeNotifier {
     final idx = _assistants.indexWhere((a) => a.id == id);
     if (idx == -1) return null;
     return _assistants[idx];
+  }
+
+  /// Resolves conversation ownership consistently for navigation and requests.
+  /// Unbound conversations follow the selected assistant. A missing owner uses
+  /// the saved recovery assistant without rewriting the stored owner. Its identity
+  /// stays stable across selection changes, reordering, and restarts; only
+  /// deleting that assistant assigns another existing assistant.
+  Assistant? resolveConversationAssistant(String? assistantId) {
+    if (assistantId == null) return currentAssistant;
+    return getById(assistantId) ??
+        getById(_orphanedAssistantId ?? '') ??
+        _assistants.firstOrNull;
   }
 
   // Lightweight accessor so callers don't depend on Assistant.presetMessages symbol
@@ -382,6 +411,18 @@ class AssistantProvider extends ChangeNotifier {
     await _persist();
     notifyListeners();
     return copy.id;
+  }
+
+  Future<void> clearModelSelectionsForProvider(String providerKey) async {
+    await loaded;
+    for (final assistant in assistants) {
+      if (assistant.chatModelProvider == providerKey) {
+        await updateAssistant(assistant.copyWith(clearChatModel: true));
+      }
+    }
+    await chatService?.clearConversationModelOverrides(
+      providerKey: providerKey,
+    );
   }
 
   Future<void> updateAssistant(Assistant updated) async {

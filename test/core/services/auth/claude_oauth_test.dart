@@ -168,11 +168,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late SettingsProvider settings;
   setUp(() async {
+    resetClaudeCodeVersion();
     final harness = await createBusinessTestHarness();
     settings = SettingsProvider(harness.preferences);
     await settings.loaded;
   });
-  tearDown(() => settings.dispose());
+  tearDown(() {
+    resetClaudeCodeVersion();
+    settings.dispose();
+  });
 
   test(
     'Claude manual login uses OMP PKCE, scopes and JSON code exchange',
@@ -716,7 +720,7 @@ void main() {
             );
             expect(
               request.headers['user-agent'],
-              'claude-cli/2.1.257 (external, cli)',
+              'claude-cli/2.1.280 (external, cli)',
             );
             calls++;
             if (calls == 1) {
@@ -789,14 +793,14 @@ void main() {
     },
   );
 
-  // Generated independently with Bun.hash.xxHash64 (OMP 6f2c14b3), including
-  // a UTF-16 surrogate at fingerprint index 4 and a Unicode request body.
+  // Generated independently with Python hashlib/xxhash, with system before
+  // messages, a UTF-16 surrogate at fingerprint index 4 and a Unicode body.
   for (final vector in [
-    ('Hello', '468', '87936'),
-    ('编码测试🙂cache校验字符串with emoji', 'edf', '4270f'),
+    ('Hello', '790', 'b8f6c'),
+    ('编码测试🙂cache校验字符串with emoji', '05c', 'a1994'),
   ]) {
     test(
-      'Claude billing fingerprint and cch match the Bun oracle for ${vector.$1}',
+      'Claude billing fingerprint and cch match independent vectors for ${vector.$1}',
       () {
         final encoded = encodeClaudeOAuthRequest(
           {
@@ -813,7 +817,7 @@ void main() {
         );
         expect(
           (jsonDecode(encoded)['system'] as List).first['text'],
-          'x-anthropic-billing-header: cc_version=2.1.257.${vector.$2}; cc_entrypoint=cli; cch=${vector.$3};',
+          'x-anthropic-billing-header: cc_version=2.1.280.${vector.$2}; cc_entrypoint=cli; cch=${vector.$3};',
         );
       },
     );
@@ -856,10 +860,10 @@ void main() {
           'hi',
           'https://example.com/image.png',
         ]);
-        // Independent SHA-256 vector from OMP: first text "hi" -> 9c3.
+        // Independent SHA-256 vector from OMP: first text "hi" -> d7b.
         expect(
           (body['system'] as List).first['text'],
-          contains('cc_version=2.1.257.9c3;'),
+          contains('cc_version=2.1.280.d7b;'),
         );
       },
     );
@@ -942,7 +946,7 @@ void main() {
             expect(request.headers, isNot(contains('x-api-key')));
             expect(
               request.headers['user-agent'],
-              'claude-cli/2.1.257 (external, cli)',
+              'claude-cli/2.1.280 (external, cli)',
             );
             expect(
               request.headers['anthropic-beta'],
@@ -1074,6 +1078,278 @@ void main() {
       expect(body['tool_choice']['name'], '__lookup');
     },
   );
+
+  String versionError(
+    String version, {
+    String code = 'claude_code_version_too_old',
+  }) => jsonEncode({
+    'type': 'error',
+    'error': {
+      'type': 'invalid_request_error',
+      'message':
+          'Claude Code is too old; version $version or newer is required.',
+      'details': {'error_code': code},
+    },
+  });
+
+  test(
+    'Claude version adoption requires a structured rejection and an increase',
+    () {
+      for (final body in [
+        '{}',
+        'not JSON',
+        versionError('2.1.280'),
+        versionError('2.1.99'),
+        versionError('2.0.999'),
+        versionError('2.1.281-beta'),
+        versionError('2.1.281', code: 'unrelated_error'),
+      ]) {
+        expect(adoptRequiredClaudeCodeVersion(body), isFalse, reason: body);
+        expect(claudeCodeVersion, '2.1.280');
+      }
+      expect(adoptRequiredClaudeCodeVersion(versionError('2.1.1000')), isTrue);
+      expect(claudeCodeVersion, '2.1.1000');
+      expect(adoptRequiredClaudeCodeVersion(versionError('2.2.0')), isTrue);
+      expect(claudeCodeVersion, '2.2.0');
+    },
+  );
+
+  for (final stream in [true, false]) {
+    test(
+      'Opus 5.5 version retry rebuilds the request stream=$stream',
+      () async {
+        final config = claudeConfig();
+        await settings.setProviderConfig(config.id, config);
+        final service = ProviderOAuthService()..bind(settings);
+        final requests = <http.Request>[];
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            requests.add(request);
+            if (requests.length == 1) {
+              return http.Response(versionError('2.1.281'), 400);
+            }
+            return messageResponse(
+              [
+                {'type': 'text', 'text': 'Done'},
+              ],
+              stream: stream,
+              tool: false,
+            );
+          }),
+          config,
+        );
+        final chunks = await sendClaudeStream(
+          client,
+          config,
+          'claude-opus-5-5',
+          [
+            {'role': 'user', 'content': 'Hello'},
+          ],
+          tools: [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object'},
+              },
+            },
+          ],
+          stream: stream,
+        ).toList();
+        expect(
+          chunks.whereType<TextDelta>().map((chunk) => chunk.text).join(),
+          'Done',
+        );
+        expect(requests, hasLength(2));
+        final first = jsonDecode(requests.first.body) as Map;
+        final last = jsonDecode(requests.last.body) as Map;
+        expect(first['model'], 'claude-opus-5-5');
+        expect(
+          requests.first.headers['user-agent'],
+          'claude-cli/2.1.280 (external, cli)',
+        );
+        expect(
+          requests.last.headers['user-agent'],
+          'claude-cli/2.1.281 (external, cli)',
+        );
+        expect(
+          (first['system'] as List).first['text'],
+          contains('cc_version=2.1.280.'),
+        );
+        expect(
+          (last['system'] as List).first['text'],
+          contains('cc_version=2.1.281.'),
+        );
+        expect(
+          (first['system'] as List).first,
+          isNot((last['system'] as List).first),
+        );
+        expect(
+          (last['system'] as List).length,
+          (first['system'] as List).length,
+        );
+        expect((last['tools'] as List).single['name'], '_lookup');
+        expect(last['metadata'], first['metadata']);
+        expect(last['messages'], first['messages']);
+        expect(last['tools'], first['tools']);
+        expect(
+          requests.last.headers['x-claude-code-session-id'],
+          requests.first.headers['x-claude-code-session-id'],
+        );
+        // A separate client in the same process starts at the adopted version.
+        final next = service.authenticatedClient(
+          MockClient((request) async {
+            expect(
+              request.headers['user-agent'],
+              'claude-cli/2.1.281 (external, cli)',
+            );
+            return response({});
+          }),
+          config,
+        );
+        await next.post(
+          Uri.parse('${config.baseUrl}/messages'),
+          body: jsonEncode({'messages': []}),
+        );
+      },
+    );
+  }
+
+  test(
+    'concurrent Claude rejections both retry without downgrading the adopted version',
+    () async {
+      final config = claudeConfig();
+      await settings.setProviderConfig(config.id, config);
+      final service = ProviderOAuthService()..bind(settings);
+      final started = Completer<void>();
+      final pending = Completer<http.Response>();
+      var sends = 0;
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          sends++;
+          if (sends == 1) {
+            started.complete();
+            return pending.future;
+          }
+          expect(
+            request.headers['user-agent'],
+            'claude-cli/2.1.282 (external, cli)',
+          );
+          return response({});
+        }),
+        config,
+      );
+      final result = client.post(
+        Uri.parse('${config.baseUrl}/messages'),
+        body: jsonEncode({'messages': []}),
+      );
+      await started.future;
+      // Another request receives a newer requirement while this one is in flight.
+      expect(adoptRequiredClaudeCodeVersion(versionError('2.1.282')), isTrue);
+      pending.complete(http.Response(versionError('2.1.281'), 400));
+      expect((await result).statusCode, 200);
+      expect(sends, 2);
+      expect(claudeCodeVersion, '2.1.282');
+    },
+  );
+
+  for (final versionFirst in [true, false]) {
+    test(
+      'Claude version retry and token refresh compose versionFirst=$versionFirst',
+      () async {
+        final config = claudeConfig();
+        await settings.setProviderConfig(config.id, config);
+        var refreshes = 0;
+        final service = ProviderOAuthService(
+          clientFactory: (_) => MockClient((_) async {
+            refreshes++;
+            return response(tokenResponse(access: 'sk-ant-oat-new'));
+          }),
+        )..bind(settings);
+        final requests = <http.Request>[];
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            requests.add(request);
+            if (requests.length == 3) return response({});
+            if ((requests.length == 1) == versionFirst) {
+              return http.Response(versionError('2.1.281'), 400);
+            }
+            return response({}, 401);
+          }),
+          config,
+        );
+        final result = await client.post(
+          Uri.parse('${config.baseUrl}/messages'),
+          body: jsonEncode({'messages': []}),
+        );
+        expect(result.statusCode, 200);
+        expect(requests, hasLength(3));
+        expect(refreshes, 1);
+        expect(requests.last.headers['authorization'], 'Bearer sk-ant-oat-new');
+        expect(
+          requests.last.headers['user-agent'],
+          'claude-cli/2.1.281 (external, cli)',
+        );
+      },
+    );
+  }
+
+  for (final scenario in [
+    'repeated',
+    'increasing',
+    'unrelated',
+    'malformed',
+    'files',
+    'rate-limit',
+  ]) {
+    test(
+      'Claude version retry is bounded and preserves $scenario errors',
+      () async {
+        final config = claudeConfig();
+        await settings.setProviderConfig(config.id, config);
+        final service = ProviderOAuthService()..bind(settings);
+        var sends = 0;
+        late String error;
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            sends++;
+            error = scenario == 'malformed'
+                ? 'not JSON'
+                : versionError(
+                    scenario == 'increasing' && sends > 1
+                        ? '2.1.282'
+                        : '2.1.281',
+                    code: scenario == 'unrelated'
+                        ? 'other_error'
+                        : 'claude_code_version_too_old',
+                  );
+            return http.Response(
+              error,
+              scenario == 'rate-limit' ? 429 : 400,
+              headers: {'request-id': 'preserved'},
+              reasonPhrase: 'Rejected',
+            );
+          }),
+          config,
+        );
+        final result = await client.post(
+          Uri.parse(
+            '${config.baseUrl}/${scenario == 'files' ? 'files' : 'messages'}',
+          ),
+          body: jsonEncode({'messages': []}),
+        );
+        expect(sends, ['repeated', 'increasing'].contains(scenario) ? 2 : 1);
+        expect(result.body, error);
+        expect(result.headers['request-id'], 'preserved');
+        expect(result.reasonPhrase, 'Rejected');
+        expect(result.statusCode, scenario == 'rate-limit' ? 429 : 400);
+        expect(
+          claudeCodeVersion,
+          ['repeated', 'increasing'].contains(scenario) ? '2.1.281' : '2.1.280',
+        );
+      },
+    );
+  }
 
   for (final ttl in ['1h', '5m', 'off']) {
     test('cache TTL $ttl shapes transport markers and preserves user text', () {

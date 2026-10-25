@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
@@ -6,6 +7,7 @@ import 'package:Kelivo/features/settings/pages/settings_page.dart';
 import 'package:Kelivo/features/settings/search/settings_search_index.dart';
 import 'package:Kelivo/features/settings/search/settings_search_navigation.dart';
 import 'package:Kelivo/features/settings/widgets/settings_search_entry.dart';
+import 'package:Kelivo/features/settings/widgets/settings_search_field.dart';
 import 'package:Kelivo/features/settings/widgets/settings_search_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
@@ -89,6 +91,76 @@ void main() {
     expect(find.byType(SettingsSearchEntry).hitTestable(), findsNothing);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('search origin survives an ancestor replaced before layout', (
+    tester,
+  ) async {
+    final search = Completer<void>();
+    try {
+      final listKey = GlobalKey();
+      SettingsSearchOrigin? origin;
+      Rect? openingRect;
+      Rect? buildingRect;
+      await pump(
+        tester,
+        StatefulBuilder(
+          builder: (context, setState) {
+            final list = SettingsSearchList(
+              key: listKey,
+              onSearch: (readOrigin) {
+                openingRect = readOrigin();
+                setState(() => origin = readOrigin);
+                return search.future;
+              },
+              children: const [SizedBox(height: 1000)],
+            );
+            return Scaffold(
+              body: Stack(
+                children: [
+                  // Route transitions can reparent the existing entry under a
+                  // new animation node before the search overlay is built.
+                  if (origin == null)
+                    list
+                  else
+                    FractionalTranslation(
+                      translation: const Offset(0, 0.1),
+                      child: list,
+                    ),
+                  if (origin != null)
+                    Builder(
+                      builder: (context) {
+                        buildingRect = origin!();
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        platform: TargetPlatform.android,
+      );
+      final controller = tester
+          .widget<CustomScrollView>(find.byType(CustomScrollView))
+          .controller!;
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      final entry = find.byType(SettingsSearchEntry);
+      final initial = tester.getRect(entry);
+      await tester.tap(entry);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(openingRect, initial);
+      expect(buildingRect, initial);
+      // Once layout finishes, subsequent reads follow the new entry position.
+      final moved = tester.getRect(entry);
+      expect(moved.top, greaterThan(initial.top));
+      expect(origin!(), moved);
+    } finally {
+      search.complete();
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets(
@@ -370,6 +442,91 @@ void main() {
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  for (final query in ['a', '']) {
+    testWidgets('arrow down returns to the first entry for "$query"', (
+      tester,
+    ) async {
+      final index = SettingsSearchIndex(
+        AppLocalizationsEn(),
+        platform: TargetPlatform.macOS,
+      );
+      SettingsSearchItem? selected;
+      await pump(
+        tester,
+        Scaffold(
+          body: SettingsSearchView(
+            index: index,
+            onSelected: (item) => selected = item,
+            onClose: _noop,
+          ),
+        ),
+        platform: TargetPlatform.macOS,
+        size: const Size(390, 360),
+      );
+      await tester.enterText(find.byType(TextField), query);
+      await tester.pumpAndSettle();
+      final first = query.isEmpty
+          ? index.suggestions.first
+          : index.search(query).first;
+      final list = tester.widget<ListView>(find.byType(ListView));
+      list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      if (query.isNotEmpty) {
+        expect(find.byKey(ValueKey(first.id)), findsNothing);
+      }
+      await tester.tap(find.byType(TextField));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selected?.id, first.id);
+      expect(tester.takeException(), isNull);
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
+  testWidgets('arrow down with no results keeps the query focused', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: SettingsSearchView(
+          index: SettingsSearchIndex(
+            AppLocalizationsEn(),
+            platform: TargetPlatform.macOS,
+          ),
+          onSelected: (_) => fail('No result should activate'),
+          onClose: () => fail('Arrow Down must not select Cancel'),
+        ),
+      ),
+      platform: TargetPlatform.macOS,
+    );
+    await tester.enterText(
+      find.byType(TextField),
+      'no-such-setting-0123456789',
+    );
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('no-such-setting-0123456789'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'font size');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('color picker uses the locale changed through a search result', (
     tester,
   ) async {

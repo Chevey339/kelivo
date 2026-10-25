@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import '../models/mcp_presentation.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'business_settings_router.dart';
@@ -121,7 +122,18 @@ final class BusinessSettingsMerger {
         if (key == _pinnedModelsKey) throw FormatException(key);
         continue;
       }
-      if (key == _pinnedModelsKey) {
+      if (key == 'mcp_presentation_v1') {
+        preferences[key] = _mergeMcpPresentation(
+          preferences[key] as String?,
+          imported as String,
+          existingServerIds: existing.entities[BusinessEntityKind.mcpServer]!
+              .map((row) => row.id)
+              .toSet(),
+          mergedServerIds: entities[BusinessEntityKind.mcpServer]!
+              .map((row) => row.id)
+              .toSet(),
+        );
+      } else if (key == _pinnedModelsKey) {
         preferences[key] = _mergeStringLists(
           existing.preferences.containsKey(key)
               ? preferences[key]
@@ -129,11 +141,12 @@ final class BusinessSettingsMerger {
           imported,
           key,
         );
-      } else if (key == _asrServicesKey) {
+      } else if (key == _asrServicesKey || key == 'environment_variables_v1') {
         preferences[key] = _mergeJsonObjectListsByIdPreferExisting(
           preferences[key] as String?,
           imported as String,
           key,
+          identityKey: key == 'environment_variables_v1' ? 'name' : 'id',
         );
       } else if (_relationshipMapKeys.contains(key)) {
         preferences[key] = _mergeJsonMapsPreferExisting(
@@ -146,6 +159,47 @@ final class BusinessSettingsMerger {
     }
 
     return BusinessSnapshot(entities: entities, preferences: preferences);
+  }
+
+  static String _mergeMcpPresentation(
+    String? localJson,
+    String importedJson, {
+    required Set<String> existingServerIds,
+    required Set<String> mergedServerIds,
+  }) {
+    McpPresentation decode(String raw) => McpPresentation.fromJson(
+      (jsonDecode(raw) as Map).cast<String, dynamic>(),
+    );
+    final local = localJson == null ? McpPresentation() : decode(localJson);
+    final imported = decode(importedJson);
+    final localGroupIds = local.groups.map((group) => group.id).toSet();
+    return jsonEncode(
+      McpPresentation(
+        groups: [
+          ...local.groups,
+          ...imported.groups.where(
+            (group) => !localGroupIds.contains(group.id),
+          ),
+        ],
+        servers: {
+          for (final entry in imported.servers.entries)
+            if (mergedServerIds.contains(entry.key)) entry.key: entry.value,
+          // A removed server's historical metadata must not override a newly
+          // imported server reusing that ID. Explicit local resets still win.
+          for (final entry in local.servers.entries)
+            if (existingServerIds.contains(entry.key) &&
+                mergedServerIds.contains(entry.key))
+              entry.key: entry.value,
+        },
+        collapsed: {
+          ...local.collapsed,
+          for (final id in imported.collapsed)
+            if (!localGroupIds.contains(id) &&
+                (id != '__ungrouped__' || localJson == null))
+              id,
+        },
+      ).toJson(),
+    );
   }
 
   static List<BusinessEntityValue> _mergeAssistants(
@@ -290,8 +344,9 @@ final class BusinessSettingsMerger {
   static String _mergeJsonObjectListsByIdPreferExisting(
     String? existingRaw,
     String incomingRaw,
-    String key,
-  ) {
+    String key, {
+    String identityKey = 'id',
+  }) {
     List<Map<String, dynamic>> decode(String raw) {
       final decoded = jsonDecode(raw);
       if (decoded is! List || decoded.any((entry) => entry is! Map)) {
@@ -308,12 +363,13 @@ final class BusinessSettingsMerger {
     final incoming = decode(incomingRaw);
     final seenIds = <String>{
       for (final service in existing)
-        if (service['id'] case final String id) id,
+        if (service[identityKey] case final String id) id,
     };
     return jsonEncode([
       ...existing,
       for (final service in incoming)
-        if (service['id'] is! String || seenIds.add(service['id'] as String))
+        if (service[identityKey] is! String ||
+            seenIds.add(service[identityKey] as String))
           service,
     ]);
   }

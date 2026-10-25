@@ -1,7 +1,9 @@
+import '../widgets/provider_icon_picker.dart';
 import '../widgets/prompt_cache_ttl_control.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/avatar_cache.dart';
@@ -15,19 +17,18 @@ import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../model/widgets/model_detail_sheet.dart';
+import '../../model/pages/model_spec_edit_page.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../widgets/provider_group_picker_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/flutter_logger.dart';
-import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import 'multi_key_manager_page.dart';
 import 'provider_balance_page.dart';
 import 'provider_custom_request_page.dart';
@@ -68,6 +69,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final _saJsonCtrl = TextEditingController();
   bool _enabled = true;
   bool _useResp = false; // openai
+  bool _promptCacheKeyEnabled = false; // openai
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
@@ -103,6 +105,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _baseCtrl.text = _cfg.baseUrl;
     _pathCtrl.text = _cfg.chatPath ?? '/chat/completions';
     _useResp = _cfg.useResponseApi ?? false;
+    _promptCacheKeyEnabled = _cfg.promptCacheKeyEnabled;
     _vertexAI = _cfg.vertexAI ?? false;
     _locationCtrl.text = _cfg.location ?? '';
     _projectCtrl.text = _cfg.projectId ?? '';
@@ -139,6 +142,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'Gemini',
         'SiliconFlow',
         'OpenRouter',
+        'Vercel',
         'DeepSeek',
         'Tensdaq',
         'AIhubmix',
@@ -153,7 +157,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       return !fixed.contains(key);
     }
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         leading: Tooltip(
           message: l10n.settingsPageBackButton,
@@ -304,7 +308,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       message: l10n.providerDetailPageProviderDeletedSnackbar,
                       type: NotificationType.success,
                     );
-                    Navigator.of(context).maybePop();
+                    // A deleted provider must close even during model selection.
+                    Navigator.of(context).pop();
                   }
                 },
               ),
@@ -342,114 +347,42 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         ),
       ),
     );
+    return SelectionBackScope(
+      selecting: _isSelectionMode,
+      onCancel: _exitSelectionMode,
+      child: page,
+    );
   }
 
   Future<void> _editProviderAvatar(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.overlaySurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        final maxH = MediaQuery.of(ctx).size.height * 0.8;
-        Widget row(String text, VoidCallback onTap) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: SizedBox(
-              height: 48,
-              child: IosCardPress(
-                borderRadius: BorderRadius.circular(14),
-                baseColor: cs.surface,
-                duration: const Duration(milliseconds: 260),
-                onTap: () async {
-                  try {
-                    Haptics.light();
-                  } catch (_) {}
-                  Navigator.of(ctx).pop();
-                  await Future<void>.delayed(const Duration(milliseconds: 10));
-                  onTap();
-                },
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: AppFontWeights.medium,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    final source = await showProviderAvatarSourceMenu(context, desktop: false);
+    if (source == null || !context.mounted) return;
+    final settings = context.read<SettingsProvider>();
+    switch (source) {
+      case AvatarSource.builtin:
+        await _pickProviderIcon();
+      case AvatarSource.lobehub:
+        await _inputLobehubIcon();
+      case AvatarSource.image:
+        try {
+          final image = await ImagePicker().pickImage(
+            source: ImageSource.gallery,
+            requestFullMetadata: false,
           );
-        }
-
-        return SafeArea(
-          top: false,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxH),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: cs.onSurface.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    row(l10n.providerAvatarChooseBuiltInIcon, () async {
-                      await _pickProviderIcon();
-                    }),
-                    row(l10n.providerAvatarInputLobehubIcon, () async {
-                      await _inputLobehubIcon();
-                    }),
-                    row(l10n.sideDrawerChooseImage, () async {
-                      try {
-                        final settings = context.read<SettingsProvider>();
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? img = await picker.pickImage(
-                          source: ImageSource.gallery,
-                          requestFullMetadata: false,
-                        );
-                        if (img != null && img.path.isNotEmpty) {
-                          await settings.setProviderAvatarFilePath(
-                            widget.keyName,
-                            img.path,
-                          );
-                        }
-                      } catch (_) {}
-                    }),
-                    row(l10n.sideDrawerEnterLink, () async {
-                      await _inputProviderAvatarUrl();
-                    }),
-                    row(l10n.sideDrawerReset, () async {
-                      await context
-                          .read<SettingsProvider>()
-                          .resetProviderAvatar(widget.keyName);
-                    }),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+          if (image != null && image.path.isNotEmpty) {
+            await settings.setProviderAvatarFilePath(
+              widget.keyName,
+              image.path,
+            );
+          }
+        } catch (_) {}
+      case AvatarSource.url:
+        await _inputProviderAvatarUrl();
+      case AvatarSource.reset:
+        await settings.resetProviderAvatar(widget.keyName);
+      case AvatarSource.emoji:
+        break; // Only MCP opts into emoji sources.
+    }
   }
 
   Future<void> _inputProviderAvatarUrl() async {
@@ -629,184 +562,19 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   Future<void> _pickProviderIcon() async {
-    final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final icons = BrandAssets.selectableIcons;
-
-    // 若当前头像为 LobeHub 自定义图标，预热缓存，使弹窗与详情页头像无需等待下载。
     final current = settings.getProviderConfig(widget.keyName);
     if (current.avatarType == 'lobehub' &&
         (current.avatarValue ?? '').isNotEmpty) {
       _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
     }
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        String query = '';
-        return StatefulBuilder(
-          builder: (ctx, setLocal) {
-            final q = query.trim().toLowerCase();
-            final filtered = q.isEmpty
-                ? icons
-                : icons
-                      .where(
-                        (o) =>
-                            o.label.toLowerCase().contains(q) ||
-                            o.id.toLowerCase().contains(q),
-                      )
-                      .toList();
-            return AlertDialog(
-              backgroundColor: context.overlaySurface,
-              title: Text(l10n.providerAvatarIconDialogTitle),
-              content: SizedBox(
-                width: MediaQuery.of(ctx).size.width * 0.8,
-                height: MediaQuery.of(ctx).size.height * 0.5,
-                child: Column(
-                  children: [
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: l10n.providerAvatarIconSearchHint,
-                        prefixIcon: const Icon(Lucide.Search, size: 18),
-                        isDense: true,
-                        filled: true,
-                        fillColor: context.appColors.surfaceFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Colors.transparent,
-                          ),
-                        ),
-                        enabledBorder: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          borderSide: BorderSide(color: Colors.transparent),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: cs.primary.withValues(alpha: 0.4),
-                          ),
-                        ),
-                      ),
-                      onChanged: (v) => setLocal(() => query = v),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? Center(
-                              child: Text(
-                                l10n.providerAvatarIconNoResults,
-                                style: TextStyle(
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            )
-                          : GridView.builder(
-                              itemCount: filtered.length,
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 4,
-                                    mainAxisSpacing: 8,
-                                    crossAxisSpacing: 8,
-                                    childAspectRatio: 1,
-                                  ),
-                              itemBuilder: (ctx, i) {
-                                final opt = filtered[i];
-                                final cfg = settings.getProviderConfig(
-                                  widget.keyName,
-                                );
-                                final selected =
-                                    cfg.avatarType == 'icon' &&
-                                    cfg.avatarValue == opt.asset;
-                                final isSvg = opt.asset.endsWith('.svg');
-                                final needsMono =
-                                    isDark &&
-                                    BrandAssets.assetNeedsDarkInvert(opt.asset);
-                                return Semantics(
-                                  label: opt.label,
-                                  child: Tooltip(
-                                    message: opt.label,
-                                    child: IosCardPress(
-                                      borderRadius: BorderRadius.circular(12),
-                                      baseColor: cs.surface,
-                                      onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        Future.microtask(() async {
-                                          await settings.setProviderAvatarIcon(
-                                            widget.keyName,
-                                            opt.asset,
-                                          );
-                                          if (mounted) setState(() {});
-                                        });
-                                      },
-                                      padding: const EdgeInsets.all(8),
-                                      child: Center(
-                                        child: AspectRatio(
-                                          aspectRatio: 1,
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: cs.primary.withValues(
-                                                alpha: isDark ? 0.18 : 0.10,
-                                              ),
-                                              shape: BoxShape.circle,
-                                              border: selected
-                                                  ? Border.all(
-                                                      color: cs.primary,
-                                                      width: 2,
-                                                    )
-                                                  : null,
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: FractionallySizedBox(
-                                              widthFactor: 0.65,
-                                              heightFactor: 0.65,
-                                              child: isSvg
-                                                  ? SvgPicture.asset(
-                                                      opt.asset,
-                                                      fit: BoxFit.contain,
-                                                      colorFilter: needsMono
-                                                          ? ColorFilter.mode(
-                                                              cs.onSurface,
-                                                              BlendMode.srcIn,
-                                                            )
-                                                          : null,
-                                                    )
-                                                  : Image.asset(
-                                                      opt.asset,
-                                                      fit: BoxFit.contain,
-                                                      color: needsMono
-                                                          ? cs.onSurface
-                                                          : null,
-                                                      colorBlendMode: needsMono
-                                                          ? BlendMode.srcIn
-                                                          : null,
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(l10n.sideDrawerCancel),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final asset = await showProviderIconPicker(
+      context,
+      selectedAsset: current.avatarType == 'icon' ? current.avatarValue : null,
     );
+    if (asset != null && mounted) {
+      await settings.setProviderAvatarIcon(widget.keyName, asset);
+    }
   }
 
   Widget _buildConfigTab(
@@ -823,47 +591,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
-        if (widget.keyName.toLowerCase() == 'kelivoin') ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-            ),
-            child: Text.rich(
-              TextSpan(
-                text: 'Powered by ',
-                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                children: [
-                  TextSpan(
-                    text: 'Pollinations AI',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () async {
-                        final uri = Uri.parse('https://pollinations.ai');
-                        try {
-                          final ok = await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                          if (!ok) {
-                            await launchUrl(uri);
-                          }
-                        } catch (_) {
-                          await launchUrl(uri);
-                        }
-                      },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         if (widget.keyName.toLowerCase() == 'tensdaq') ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -930,11 +657,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                ),
-                const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
                     text: '官网：',
@@ -1178,6 +900,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   value: _useResp,
                   onChanged: (v) {
                     setState(() => _useResp = v);
+                    _save();
+                  },
+                ),
+              ),
+            if (_kind == ProviderKind.openai && !_cfg.isOAuth)
+              _iosRowWithHelp(
+                context,
+                label: l10n.providerDetailPagePromptCacheKeyTitle,
+                helpText: l10n.providerDetailPagePromptCacheKeyHelp,
+                trailing: IosSwitch(
+                  value: _promptCacheKeyEnabled,
+                  semanticLabel: l10n.providerDetailPagePromptCacheKeyTitle,
+                  onChanged: (value) {
+                    setState(() => _promptCacheKeyEnabled = value);
                     _save();
                   },
                 ),
@@ -2241,6 +1977,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       useResponseApi: _kind == ProviderKind.openai
           ? _useResp
           : old.useResponseApi,
+      promptCacheKeyEnabled: _kind == ProviderKind.openai
+          ? _promptCacheKeyEnabled
+          : old.promptCacheKeyEnabled,
       vertexAI: _kind == ProviderKind.google ? _vertexAI : old.vertexAI,
       location: _kind == ProviderKind.google
           ? _locationCtrl.text.trim()
@@ -2478,7 +2217,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   padding: compact ? iconButtonPadding : textButtonPadding,
                   colorScheme: cs,
                   onTap: () async {
-                    await showCreateModelSheet(
+                    await showCreateModelSpecPage(
                       context,
                       providerKey: widget.keyName,
                     );
@@ -3346,11 +3085,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
-    final bool isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
-    final bool hasUserKey =
-        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
-        cfg.apiKey.trim().isNotEmpty;
-    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -3371,32 +3105,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             final l10n = AppLocalizations.of(ctx)!;
             Future<void> loadModels() async {
               try {
-                if (restrictToFree) {
-                  final list = <ModelInfo>[
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'THUDM/GLM-4-9B-0414',
-                        displayName: 'THUDM/GLM-4-9B-0414',
-                      ),
-                    ),
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'Qwen/Qwen3-8B',
-                        displayName: 'Qwen/Qwen3-8B',
-                      ),
-                    ),
-                  ];
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                } else {
-                  final list = await ProviderManager.listModels(cfg);
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                }
+                final list = await ProviderManager.listModels(cfg);
+                setLocal(() {
+                  items = list;
+                  loading = false;
+                });
               } catch (e) {
                 setLocal(() {
                   items = const [];
@@ -3419,16 +3132,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 .models
                 .toSet();
             final query = controller.text.trim().toLowerCase();
-            final filtered = <ModelInfo>[
+            final filtered = <ModelSpec>[
               for (final m in items)
-                if (m is ModelInfo &&
+                if (m is ModelSpec &&
                     (query.isEmpty ||
                         m.id.toLowerCase().contains(query) ||
                         m.displayName.toLowerCase().contains(query)))
                   m,
             ];
 
-            String groupFor(ModelInfo m) {
+            String groupFor(ModelSpec m) {
               return ModelGrouping.groupFor(
                 m,
                 embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
@@ -3436,7 +3149,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               );
             }
 
-            final Map<String, List<ModelInfo>> grouped = {};
+            final Map<String, List<ModelSpec>> grouped = {};
             for (final m in filtered) {
               final g = groupFor(m);
               (grouped[g] ??= []).add(m);
@@ -3579,9 +3292,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                         final q = controller.text
                                             .trim()
                                             .toLowerCase();
-                                        final filteredNow = <ModelInfo>[
+                                        final filteredNow = <ModelSpec>[
                                           for (final m in items)
-                                            if (m is ModelInfo &&
+                                            if (m is ModelSpec &&
                                                 (q.isEmpty ||
                                                     m.id.toLowerCase().contains(
                                                       q,
@@ -4046,14 +3759,8 @@ class _ModelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final resolved = _resolveBaseAndOverride(context);
-    final effective = resolved.ov == null
-        ? resolved.base
-        : _applyModelOverride(
-            resolved.base,
-            resolved.ov!,
-            applyDisplayName: true,
-          );
+    final resolved = _resolveModel(context);
+    final effective = resolved.spec;
     String displayName = effective.displayName.trim();
     if (displayName.isEmpty) displayName = modelId;
     final Widget? detectionIndicator = isDetecting
@@ -4113,7 +3820,7 @@ class _ModelCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                _BrandAvatar(name: resolved.baseId, size: 28),
+                _BrandAvatar(name: resolved.upstreamId, size: 28),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -4144,10 +3851,10 @@ class _ModelCard extends StatelessWidget {
                     semanticLabel: l10n.providerDetailPageEditTooltip,
                     haptics: false,
                     onTap: () async {
-                      await showModelDetailSheet(
+                      await showModelSpecEditPage(
                         context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
                     },
                   ),
@@ -4160,42 +3867,23 @@ class _ModelCard extends StatelessWidget {
     );
   }
 
-  ModelInfo _infer(String id) {
-    // build a minimal ModelInfo and let registry infer
-    return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-  }
-
-  _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
-    final configs = context.watch<SettingsProvider>().providerConfigs;
-    final cfg = configs[providerKey];
-    if (cfg == null) {
-      final base = _infer(modelId);
-      return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
-    }
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov = rawOv is Map
-        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-        : null;
-    String baseId = modelId;
-    if (ov != null) {
-      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (raw != null && raw.isNotEmpty) baseId = raw;
-    }
-    final base = _infer(baseId);
-    return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
+  _ResolvedListedModel _resolveModel(BuildContext context) {
+    final cfg = context.watch<SettingsProvider>().getProviderConfig(
+      providerKey,
+    );
+    final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+    return _ResolvedListedModel(
+      spec: resolved.spec,
+      upstreamId: resolved.spec.upstreamId,
+    );
   }
 }
 
-class _ResolvedModelOverride {
-  const _ResolvedModelOverride({
-    required this.base,
-    required this.ov,
-    required this.baseId,
-  });
+class _ResolvedListedModel {
+  const _ResolvedListedModel({required this.spec, required this.upstreamId});
 
-  final ModelInfo base;
-  final Map<String, dynamic>? ov;
-  final String baseId;
+  final ModelSpec spec;
+  final String upstreamId;
 }
 
 class _ConnectionTestDialog extends StatefulWidget {
@@ -4514,30 +4202,6 @@ Future<String?> showModelPickerForTest(
     initialModelId: initialModelId,
   );
   return sel?.modelId;
-}
-
-ModelInfo _applyModelOverride(
-  ModelInfo base,
-  Map<String, dynamic> ov, {
-  bool applyDisplayName = false,
-}) {
-  try {
-    return ModelOverrideResolver.applyModelOverride(
-      base,
-      ov,
-      applyDisplayName: applyDisplayName,
-    );
-  } catch (e, st) {
-    FlutterLogger.log(
-      '[ModelOverride] applyModelOverride failed: $e\n$st',
-      tag: 'ModelOverride',
-    );
-    assert(() {
-      debugPrint('[ModelOverride] applyModelOverride failed: $e');
-      return true;
-    }());
-    return base;
-  }
 }
 
 // Using flutter_slidable for reliable swipe actions with confirm + undo.

@@ -74,7 +74,7 @@ void main() {
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
-        modelId: 'gemini-custom-thinking',
+        modelId: 'gemini-2.5-flash',
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
@@ -131,7 +131,7 @@ void main() {
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
-          modelId: 'gemini-custom-thinking',
+          modelId: 'gemini-2.5-flash',
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],

@@ -110,6 +110,15 @@ class _ControlledChatService extends ChatService {
   }
 
   @override
+  Future<List<ChatMessage>> loadMessageVersionHeaders(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) async => [
+    for (final message in await loadMessagesForGroups(conversationId, groupIds))
+      message.copyWith(content: ''),
+  ];
+
+  @override
   Future<List<ChatMessage>> loadMessagesForGroups(
     String conversationId,
     Iterable<String> groupIds,

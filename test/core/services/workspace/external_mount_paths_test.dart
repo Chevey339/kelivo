@@ -1,6 +1,7 @@
+import '../../../support/workspace_test_access.dart';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/core/services/workspace/host_file_tools.dart';
+import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
@@ -38,7 +39,9 @@ void main() {
       expect(paths.modelRoot, '/workspace');
       expect(paths.resolve('note.txt', cwd: guest).hostPath, resolved.hostPath);
       expect(paths.mounts, hasLength(6));
-      final result = await HostFileTools(paths).listDir('/mounts', depth: 2);
+      final result = await authorizedHostFileTools(
+        paths,
+      ).listDir('/mounts', depth: 2);
       expect(
         result.entries.map((e) => e.path),
         containsAll([guest, '$guest/note.txt', '/mounts/Output']),
@@ -57,23 +60,23 @@ void main() {
   test(
     'read-only denies edits, new files and symlink aliases; reads and writable mounts work',
     () async {
-      final tools = HostFileTools(paths);
+      final tools = authorizedHostFileTools(paths);
       expect(
         (await tools.readFile('$guest/note.txt')).text,
         contains('original'),
       );
       await expectLater(
         tools.writeFile('$guest/new.txt', 'bad'),
-        throwsA(isA<HostFileException>()),
+        throwsA(isA<ToolPermissionException>()),
       );
       await expectLater(
         tools.editFile('$guest/note.txt', 'original', 'bad'),
-        throwsA(isA<HostFileException>()),
+        throwsA(isA<ToolPermissionException>()),
       );
       Link('${root.path}/ws/alias').createSync('${root.path}/external');
       await expectLater(
         tools.writeFile('/workspace/alias/note.txt', 'bad'),
-        throwsA(isA<HostFileException>()),
+        throwsA(isA<ToolPermissionException>()),
       );
       expect(
         File('${root.path}/external/note.txt').readAsStringSync(),
@@ -87,7 +90,7 @@ void main() {
   test(
     'existing tools refresh permission changes and fail closed after unmount',
     () async {
-      final tools = HostFileTools(paths);
+      final tools = authorizedHostFileTools(paths);
       mounts = [Mount(host: '${root.path}/external', guest: guest)];
       await tools.writeFile('$guest/note.txt', 'allowed');
       mounts = [
@@ -95,7 +98,7 @@ void main() {
       ];
       await expectLater(
         tools.writeFile('$guest/note.txt', 'bad'),
-        throwsA(isA<HostFileException>()),
+        throwsA(isA<ToolPermissionException>()),
       );
       mounts = [];
       expect((await tools.listDir('/mounts')).entries, isEmpty);

@@ -265,7 +265,7 @@ class McpClient {
       for (var attempt = 1; attempt <= attempts; attempt++) {
         final client = createClient(config);
         try {
-          final transport = await _createTransport(transportConfig);
+          final transport = await createTransport(transportConfig);
           await client.connect(transport);
           return client;
         } catch (error) {
@@ -280,7 +280,7 @@ class McpClient {
   }
 
   /// Create a transport from the given configuration
-  static Future<ClientTransport> _createTransport(TransportConfig config) {
+  static Future<ClientTransport> createTransport(TransportConfig config) {
     return switch (config) {
       StdioTransportConfig(
         command: final command,

@@ -40,6 +40,34 @@ void main() {
     });
   });
 
+  group('redistributeTextUtf16Safe', () {
+    test('keeps cumulative boundaries independent of text block grouping', () {
+      for (final value in ['😀BC', 'A😀BC', '😀😄Z', 'ABCD', 'A', '']) {
+        final split = redistributeTextUtf16Safe(value, [1, 1, 1]);
+        final merged = redistributeTextUtf16Safe(value, [2, 1]);
+        expect([split.take(2).join(), split.last], merged);
+        expect(split.join(), value);
+        for (final text in split) {
+          expectValidUtf16(text);
+        }
+      }
+      expect(redistributeTextUtf16Safe('😀BC', [1, 1, 1]), ['😀', '', 'BC']);
+    });
+
+    test('retains empty slots and gives the last slot all remaining text', () {
+      expect(redistributeTextUtf16Safe('😀B', [0, 1, 0, 1]), [
+        '',
+        '😀',
+        '',
+        'B',
+      ]);
+      expect(redistributeTextUtf16Safe('😀', [1, 1, 1]), ['😀', '', '']);
+      expect(redistributeTextUtf16Safe('😀B', [1]), ['😀B']);
+      expect(redistributeTextUtf16Safe('', [1, 1]), ['', '']);
+      expect(redistributeTextUtf16Safe('😀B', []), isEmpty);
+    });
+  });
+
   group('truncateHeadUtf16Safe', () {
     test('keeps short values untouched', () {
       const value = 'hello';

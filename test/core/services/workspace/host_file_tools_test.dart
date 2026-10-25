@@ -1,3 +1,4 @@
+import '../../../support/workspace_test_access.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -19,7 +20,7 @@ void main() {
     final session = Directory(p.join(tmp.path, 'session'))..createSync();
     final skills = Directory(p.join(tmp.path, 'skills'))..createSync();
     cwd = workspace.path;
-    tools = HostFileTools(
+    tools = authorizedHostFileTools(
       WorkspacePaths.native(
         workspaceHostRoot: workspace.path,
         sessionHostDir: session.path,

@@ -137,7 +137,11 @@ void main() {
         expect(receivedBody['assistantOnly'], 3);
         expect(receivedBody['providerOnly'], isTrue);
         expect(receivedBody['modelOnly'], 42);
-        expect(receivedBody['nested'], {'model': true});
+        expect(receivedBody['nested'], {
+          'assistant': true,
+          'provider': true,
+          'model': true,
+        });
       },
     );
   }

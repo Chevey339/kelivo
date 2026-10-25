@@ -1,7 +1,13 @@
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/database/chat_database_repository.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../core/models/token_usage.dart';
+import '../../../core/utils/model_cost.dart';
 import '../models/stats_models.dart';
+
+typedef ModelPricingLookup =
+    ModelPricing? Function(String? providerKey, String modelId);
 
 class StatsAggregationService {
   static StatsSnapshot buildDatabaseSnapshot({
@@ -13,6 +19,7 @@ class StatsAggregationService {
     required String unknownTopicLabel,
     Map<String, String> assistantNames = const {},
     Map<String, String> providerNames = const {},
+    ModelPricingLookup? resolvePricing,
   }) {
     final assistantCounts = <String, int>{};
     for (final row in aggregate.assistants) {
@@ -30,6 +37,26 @@ class StatsAggregationService {
       )
         day: <String, StatsTokenBucket>{},
     };
+    final modelRank = [
+      for (final row in aggregate.models)
+        StatsRankItem(
+          id: row.id,
+          label: row.label,
+          value: row.count,
+          providerId: row.providerId,
+          cost: estimateModelCost(
+            TokenUsage(
+              promptTokens: row.inputTokens,
+              completionTokens: row.outputTokens,
+              cachedTokens: row.cachedTokens,
+              cacheWriteTokens: row.cacheWriteTokens,
+            ),
+            resolvePricing?.call(row.providerId, row.id),
+          ),
+        ),
+    ];
+    final costs = _summarizeCosts(modelRank);
+
     for (final row in aggregate.trend) {
       final providerLabel = row.providerId == '_unknown'
           ? unknownProviderLabel
@@ -51,6 +78,8 @@ class StatsAggregationService {
         outputTokens: aggregate.totals.outputTokens,
         cachedTokens: aggregate.totals.cachedTokens,
         launchCount: launchCount,
+        costByCurrency: costs.costByCurrency,
+        modelsWithoutPricing: costs.modelsWithoutPricing,
       ),
       heatmap: _buildHeatmap(now, heatmapCounts),
       trend: [
@@ -60,15 +89,7 @@ class StatsAggregationService {
             providerTokens: Map.unmodifiable(entry.value),
           ),
       ],
-      modelRank: [
-        for (final row in aggregate.models)
-          StatsRankItem(
-            id: row.id,
-            label: row.label,
-            value: row.count,
-            providerId: row.providerId,
-          ),
-      ],
+      modelRank: modelRank,
       assistantRank: _assistantRank(
         assistantCounts,
         assistantNames,
@@ -96,11 +117,12 @@ class StatsAggregationService {
     Map<String, String> assistantNames = const {},
     Set<String>? existingAssistantIds,
     Map<String, String> providerNames = const {},
+    ModelPricingLookup? resolvePricing,
   }) {
     final rangeMessages = <ChatMessage>[];
     final heatmapCounts = <DateTime, int>{};
-    final modelCounts = <String, int>{};
-    final modelProviders = <String, String>{};
+    final modelCounts = <(String?, String), int>{};
+    final modelTokens = <(String?, String), TokenUsage>{};
     final assistantCounts = <String, int>{};
     final topicCounts = <String, int>{};
     final topicLabels = <String, String>{};
@@ -138,11 +160,18 @@ class StatsAggregationService {
 
         final modelId = message.modelId?.trim();
         if (modelId != null && modelId.isNotEmpty) {
-          modelCounts[modelId] = (modelCounts[modelId] ?? 0) + 1;
           final providerId = message.providerId?.trim();
-          if (providerId != null && providerId.isNotEmpty) {
-            modelProviders.putIfAbsent(modelId, () => providerId);
-          }
+          final key = (providerId == '' ? null : providerId, modelId);
+          modelCounts[key] = (modelCounts[key] ?? 0) + 1;
+          final previous = modelTokens[key] ?? const TokenUsage();
+          modelTokens[key] = TokenUsage(
+            promptTokens: previous.promptTokens + (message.promptTokens ?? 0),
+            completionTokens:
+                previous.completionTokens + (message.completionTokens ?? 0),
+            cachedTokens: previous.cachedTokens + (message.cachedTokens ?? 0),
+            cacheWriteTokens:
+                previous.cacheWriteTokens + (message.cacheWriteTokens ?? 0),
+          );
         }
 
         topicCounts[conversation.id] = (topicCounts[conversation.id] ?? 0) + 1;
@@ -166,6 +195,21 @@ class StatsAggregationService {
       unknownProviderLabel: unknownProviderLabel,
     );
 
+    final modelRank = [
+      for (final entry in modelCounts.entries)
+        StatsRankItem(
+          id: entry.key.$2,
+          label: entry.key.$2,
+          value: entry.value,
+          providerId: entry.key.$1,
+          cost: estimateModelCost(
+            modelTokens[entry.key]!,
+            resolvePricing?.call(entry.key.$1, entry.key.$2),
+          ),
+        ),
+    ]..sort((a, b) => b.value.compareTo(a.value));
+    final costs = _summarizeCosts(modelRank);
+
     return StatsSnapshot(
       range: range,
       summary: StatsSummary(
@@ -175,14 +219,12 @@ class StatsAggregationService {
         outputTokens: outputTokens,
         cachedTokens: cachedTokens,
         launchCount: launchCount,
+        costByCurrency: costs.costByCurrency,
+        modelsWithoutPricing: costs.modelsWithoutPricing,
       ),
       heatmap: _buildHeatmap(now, heatmapCounts),
       trend: trend,
-      modelRank: _rank(
-        modelCounts,
-        (id) => id,
-        providerFor: (id) => modelProviders[id],
-      ),
+      modelRank: modelRank,
       assistantRank: _assistantRank(
         assistantCounts,
         assistantNames,
@@ -248,11 +290,11 @@ class StatsAggregationService {
         }
         final inputTokens = message.promptTokens ?? 0;
         final outputTokens = message.completionTokens ?? 0;
-        final legacyTotalTokens = message.totalTokens ?? 0;
+        final totalTokens = message.totalTokens ?? 0;
         final cachedTokens = message.cachedTokens ?? 0;
-        final uncategorizedTokens =
-            inputTokens == 0 && outputTokens == 0 && legacyTotalTokens > 0
-            ? legacyTotalTokens
+        final knownTokens = inputTokens + outputTokens;
+        final uncategorizedTokens = totalTokens > knownTokens
+            ? totalTokens - knownTokens
             : 0;
         final providerId = message.providerId?.trim();
         if ((providerId == null || providerId.isEmpty) &&
@@ -288,9 +330,8 @@ class StatsAggregationService {
 
   static List<StatsRankItem> _rank(
     Map<String, int> counts,
-    String Function(String id) labelFor, {
-    String? Function(String id)? providerFor,
-  }) {
+    String Function(String id) labelFor,
+  ) {
     final entries = counts.entries.toList();
     entries.sort((a, b) {
       final byValue = b.value.compareTo(a.value);
@@ -303,9 +344,27 @@ class StatsAggregationService {
           id: entry.key,
           label: labelFor(entry.key),
           value: entry.value,
-          providerId: providerFor?.call(entry.key),
         ),
     ];
+  }
+
+  static ({Map<String, double> costByCurrency, int modelsWithoutPricing})
+  _summarizeCosts(List<StatsRankItem> modelRank) {
+    final byCurrency = <String, double>{};
+    var missing = 0;
+    for (final item in modelRank) {
+      final cost = item.cost;
+      if (cost == null) {
+        missing++;
+        continue;
+      }
+      byCurrency[cost.currency] =
+          (byCurrency[cost.currency] ?? 0) + cost.amount;
+    }
+    return (
+      costByCurrency: Map.unmodifiable(byCurrency),
+      modelsWithoutPricing: missing,
+    );
   }
 
   static List<StatsRankItem> _assistantRank(

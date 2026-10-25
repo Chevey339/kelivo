@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
+import '../../../models/reasoning_request.dart';
 import '../../../providers/settings_provider.dart';
 import '../chat_api_helpers.dart';
 import '../generation/tool_loop_runner.dart';
@@ -14,8 +15,9 @@ Stream<StreamChunk> sendOpenAIChatCompletionsStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
+  String? conversationId,
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -34,8 +36,9 @@ Stream<StreamChunk> sendOpenAIChatCompletionsStream(
     cfg,
     modelId,
     messages,
+    conversationId: conversationId,
     userImagePaths: userImagePaths,
-    thinkingBudget: thinkingBudget,
+    reasoning: reasoning,
     temperature: temperature,
     topP: topP,
     maxTokens: maxTokens,

@@ -90,7 +90,7 @@ class BackgroundOverlay(
 
     fun refresh() {
         main.removeCallbacks(expire)
-        if (runtime.foreground || !runtime.enabled("overlayEnabled") ||
+        if (runtime.foreground || runtime.phoneControlActive || !runtime.enabled("overlayEnabled") ||
             !Settings.canDrawOverlays(context) || runtime.isPromoted()) {
             hide()
             return

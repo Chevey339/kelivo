@@ -1,9 +1,17 @@
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/token_usage.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:Kelivo/core/services/api/providers/claude_official.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
@@ -11,9 +19,26 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/composer_draft_store.dart';
+import 'package:drift/native.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import '../../../support/claude_test_api.dart'
+    show claudeConfig, captureClaudeExchange, sseRound;
+
+class _ReplayContext implements BuildContext {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -68,6 +93,839 @@ void main() {
     return service;
   }
 
+  for (final temporary in [false, true]) {
+    for (final stream in [true, false]) {
+      test(
+        'Unicode edits keep received tool boundaries: temporary=$temporary, stream=$stream',
+        () async {
+          final previousHttpOverrides = HttpOverrides.current;
+          HttpOverrides.global = null;
+          addTearDown(() => HttpOverrides.global = previousHttpOverrides);
+          final config = claudeConfig();
+          const model = 'claude-sonnet-4-6';
+          const replies = [
+            {
+              'content': [
+                {'type': 'text', 'text': 'A'},
+                {'type': 'text', 'text': 'B'},
+                {
+                  'type': 'tool_use',
+                  'id': 'a',
+                  'name': 'lookup',
+                  'input': <String, dynamic>{},
+                },
+              ],
+              'stop_reason': 'tool_use',
+            },
+            {
+              'content': [
+                {'type': 'text', 'text': 'C'},
+              ],
+              'stop_reason': 'end_turn',
+            },
+          ];
+          final exchange = await captureClaudeExchange(
+            config: config,
+            modelId: model,
+            stream: stream,
+            tools: const [
+              {
+                'type': 'function',
+                'function': {
+                  'name': 'lookup',
+                  'parameters': {
+                    'type': 'object',
+                    'properties': <String, dynamic>{},
+                  },
+                },
+              },
+            ],
+            onToolCall: (name, args, {toolCallId}) async => 'found',
+            replies: replies,
+            sseRounds: stream
+                ? [
+                    for (final (round, reply) in replies.indexed)
+                      sseRound('round-$round', [
+                        for (final (index, block)
+                            in (reply['content'] as List<Map<String, dynamic>>)
+                                .indexed) ...[
+                          {
+                            'type': 'content_block_start',
+                            'index': index,
+                            'content_block': block['type'] == 'text'
+                                ? {'type': 'text', 'text': ''}
+                                : block,
+                          },
+                          {
+                            'type': 'content_block_delta',
+                            'index': index,
+                            'delta': block['type'] == 'text'
+                                ? {'type': 'text_delta', 'text': block['text']}
+                                : {
+                                    'type': 'input_json_delta',
+                                    'partial_json': '{}',
+                                  },
+                          },
+                          {'type': 'content_block_stop', 'index': index},
+                        ],
+                        {
+                          'type': 'message_delta',
+                          'delta': {'stop_reason': reply['stop_reason']},
+                        },
+                        {'type': 'message_stop'},
+                      ]),
+                  ]
+                : null,
+          );
+          final received = StreamChunkHandler.collect(exchange.chunks);
+          expect(received.parts.whereType<TextPart>().map((p) => p.text), [
+            'A',
+            'B',
+            'C',
+          ]);
+          final native = exchange.chunks
+              .whereType<ProviderArtifact>()
+              .where((artifact) => artifact.kind == claudeTurnArtifactKind)
+              .last
+              .payload;
+          // Streaming coalesces the two native blocks while rendered parts
+          // retain their separate block IDs. Exercise both representations.
+          expect(
+            decodeClaudeTurn(native)!.first
+                .where((block) => block['type'] == 'text')
+                .map((block) => block['text']),
+            stream ? ['AB'] : ['A', 'B'],
+          );
+          var service = createService();
+          await service.init();
+          final conversation = temporary
+              ? await service.createDraftConversation(
+                  title: 'Block boundaries',
+                  temporary: true,
+                )
+              : await service.createConversation(title: 'Block boundaries');
+          var message = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            providerId: config.id,
+            modelId: model,
+            parts: received.parts,
+          );
+          await service.setToolEvents(message.id, [
+            for (final part in received.parts.whereType<ToolCallPart>())
+              (jsonDecode(part.payloadJson) as Map).cast<String, dynamic>(),
+          ]);
+          await service.setProviderArtifact(
+            message.id,
+            claudeTurnArtifactKind,
+            native,
+          );
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          final requests = <Map<String, dynamic>>[];
+          server.listen((request) async {
+            requests.add(jsonDecode(await utf8.decoder.bind(request).join()));
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(
+                request.uri.path.endsWith('/messages')
+                    ? {
+                        'content': [
+                          {'type': 'text', 'text': 'OK'},
+                        ],
+                        'stop_reason': 'end_turn',
+                      }
+                    : {
+                        'choices': [
+                          {
+                            'message': {'role': 'assistant', 'content': 'OK'},
+                            'finish_reason': 'stop',
+                          },
+                        ],
+                      },
+              ),
+            );
+            await request.response.close();
+          });
+          for (final edit in [
+            (content: '😀BC', texts: ['😀', 'BC'], shortenFirst: false),
+            (content: 'A😀BC', texts: ['A😀', 'BC'], shortenFirst: true),
+          ]) {
+            if (edit.shortenFirst) {
+              message = (await service.appendMessageVersion(
+                messageId: message.id,
+                content: '😀',
+              ))!;
+            }
+            final previousArtifact = service.getProviderArtifact(
+              message.id,
+              claudeTurnArtifactKind,
+            );
+            final edited = (await service.appendMessageVersion(
+              messageId: message.id,
+              content: edit.content,
+            ))!;
+            expect(
+              service.getProviderArtifact(message.id, claudeTurnArtifactKind),
+              previousArtifact,
+            );
+            if (!temporary) {
+              await service.close();
+              services.remove(service);
+              service = createService();
+              await service.init();
+            }
+            message = (await service.loadSelectedContextMessages(
+              conversation.id,
+              truncateIndex: -1,
+              limit: 10,
+            )).single;
+            expect(message.id, edited.id);
+            expect(message.content, edit.content);
+            final builder = MessageBuilderService(
+              chatService: service,
+              contextProvider: _ReplayContext(),
+              providerArtifactLookup: (message, kind) =>
+                  service.getProviderArtifactForMessage(message, kind),
+            );
+            for (final claude in [true, false]) {
+              final history = builder.buildApiMessages(
+                messages: [
+                  ChatMessage(
+                    role: 'user',
+                    content: 'Look up',
+                    conversationId: conversation.id,
+                  ),
+                  message,
+                  ChatMessage(
+                    role: 'user',
+                    content: 'Continue',
+                    conversationId: conversation.id,
+                  ),
+                ],
+                versionSelections: {},
+                currentConversation: null,
+                includeToolMessages: true,
+                preserveToolTurns: !claude,
+                claudeSource: claude
+                    ? (providerId: config.id, modelId: model)
+                    : null,
+              );
+              await ChatApiService.sendMessageStream(
+                config: config.copyWith(
+                  id: claude ? config.id : 'DeepSeek',
+                  providerType: claude
+                      ? ProviderKind.claude
+                      : ProviderKind.openai,
+                  baseUrl: 'http://${server.address.address}:${server.port}/v1',
+                ),
+                modelId: claude ? model : 'deepseek-v4-pro',
+                messages: history,
+                stream: false,
+              ).toList();
+              final sent = (requests.last['messages'] as List).cast<Map>();
+              expect(sent.map((m) => m['role']), [
+                'user',
+                'assistant',
+                claude ? 'user' : 'tool',
+                'assistant',
+                'user',
+              ]);
+              expect(
+                sent
+                    .where((m) => m['role'] == 'assistant')
+                    .map(
+                      (m) => m['content'] is String
+                          ? m['content'] as String
+                          : joinedTextOfBlocks(
+                              (m['content'] as List).cast<Map>(),
+                            ),
+                    ),
+                edit.texts,
+              );
+              if (claude) {
+                expect(
+                  sent
+                      .expand(
+                        (m) => m['content'] is List
+                            ? m['content'] as List
+                            : const [],
+                      )
+                      .where(
+                        (block) =>
+                            block is Map &&
+                            block['type'] == 'text' &&
+                            block['text'] == '',
+                      ),
+                  isEmpty,
+                );
+                expect(
+                  (sent[1]['content'] as List)
+                      .where((block) => block['type'] == 'tool_use')
+                      .single['id'],
+                  'a',
+                );
+                expect(sent[2]['content'], [
+                  {
+                    'type': 'tool_result',
+                    'tool_use_id': 'a',
+                    'content': 'found',
+                  },
+                ]);
+              } else {
+                expect((sent[1]['tool_calls'] as List).single['id'], 'a');
+                expect(sent[2]['tool_call_id'], 'a');
+                expect(sent[2]['content'], 'found');
+              }
+            }
+          }
+          expect(requests, hasLength(4));
+        },
+      );
+    }
+
+    for (final complete in [true, false]) {
+      test(
+        'Unicode body edit survives replay: temporary=$temporary, complete=$complete',
+        () async {
+          final previousHttpOverrides = HttpOverrides.current;
+          HttpOverrides.global = null;
+          addTearDown(() => HttpOverrides.global = previousHttpOverrides);
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          final requests = <Map<String, dynamic>>[];
+          server.listen((request) async {
+            requests.add(jsonDecode(await utf8.decoder.bind(request).join()));
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(
+                request.uri.path.endsWith('/messages')
+                    ? {
+                        'content': [
+                          {'type': 'text', 'text': 'OK'},
+                        ],
+                        'stop_reason': 'end_turn',
+                      }
+                    : {
+                        'choices': [
+                          {
+                            'message': {'role': 'assistant', 'content': 'OK'},
+                            'finish_reason': 'stop',
+                          },
+                        ],
+                      },
+              ),
+            );
+            await request.response.close();
+          });
+          var service = createService();
+          await service.init();
+          final conversation = temporary
+              ? await service.createDraftConversation(
+                  title: 'Unicode',
+                  temporary: true,
+                )
+              : await service.createConversation(title: 'Unicode');
+          const call = {
+            'type': 'tool_use',
+            'id': 'a',
+            'name': 'lookup',
+            'input': <String, dynamic>{},
+          };
+          const event = {
+            'id': 'a',
+            'name': 'lookup',
+            'arguments': <String, dynamic>{},
+            'content': 'found',
+          };
+          final original = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            providerId: 'Claude',
+            modelId: 'claude-sonnet-4-6',
+            parts: [
+              const TextPart('A'),
+              ToolCallPart(jsonEncode(event)),
+              const TextPart('B'),
+            ],
+          );
+          await service.setToolEvents(original.id, [event]);
+          final native = encodeClaudeTurn([
+            [
+              {'type': 'text', 'text': 'A'},
+              call,
+            ],
+            if (complete)
+              [
+                {'type': 'text', 'text': 'B'},
+              ],
+          ]);
+          await service.setProviderArtifact(
+            original.id,
+            claudeTurnArtifactKind,
+            native,
+          );
+          final edited = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: '😀B',
+          ))!;
+          expect(
+            service.getProviderArtifact(original.id, claudeTurnArtifactKind),
+            native,
+          );
+          if (!temporary) {
+            await service.close();
+            services.remove(service);
+            service = createService();
+            await service.init();
+          }
+          final selected = (await service.loadSelectedContextMessages(
+            conversation.id,
+            truncateIndex: -1,
+            limit: 10,
+          )).single;
+          expect(selected.id, edited.id);
+          expect(selected.content, '😀B');
+          expect(
+            selected.parts.whereType<TextPart>().map((part) => part.text),
+            ['😀', 'B'],
+          );
+          final builder = MessageBuilderService(
+            chatService: service,
+            contextProvider: _ReplayContext(),
+            providerArtifactLookup: (message, kind) =>
+                service.getProviderArtifactForMessage(message, kind),
+          );
+          for (final claude in [true, false]) {
+            final config = ProviderConfig(
+              id: claude ? 'Claude' : 'DeepSeek',
+              enabled: true,
+              name: claude ? 'Claude' : 'DeepSeek',
+              apiKey: 'test',
+              baseUrl: 'http://${server.address.address}:${server.port}/v1',
+              providerType: claude ? ProviderKind.claude : ProviderKind.openai,
+            );
+            final history = builder.buildApiMessages(
+              messages: [
+                ChatMessage(
+                  role: 'user',
+                  content: 'Look up',
+                  conversationId: conversation.id,
+                ),
+                selected,
+                ChatMessage(
+                  role: 'user',
+                  content: 'Continue',
+                  conversationId: conversation.id,
+                ),
+              ],
+              versionSelections: {},
+              currentConversation: null,
+              includeToolMessages: true,
+              preserveToolTurns: !claude,
+              claudeSource: claude
+                  ? (providerId: config.id, modelId: 'claude-sonnet-4-6')
+                  : null,
+            );
+            await ChatApiService.sendMessageStream(
+              config: config,
+              modelId: claude ? 'claude-sonnet-4-6' : 'deepseek-v4-pro',
+              messages: history,
+              stream: false,
+            ).toList();
+            final sent = (requests.last['messages'] as List).cast<Map>();
+            expect(sent.map((message) => message['role']), [
+              'user',
+              'assistant',
+              claude ? 'user' : 'tool',
+              'assistant',
+              'user',
+            ]);
+            if (claude) {
+              expect(sent[1]['content'], [
+                {'type': 'text', 'text': '😀'},
+                call,
+              ]);
+              expect(sent[2]['content'], [
+                {'type': 'tool_result', 'tool_use_id': 'a', 'content': 'found'},
+              ]);
+              expect(sent[3]['content'], [
+                {'type': 'text', 'text': 'B'},
+              ]);
+            } else {
+              expect(sent[1]['content'], '😀');
+              expect((sent[1]['tool_calls'] as List).single['id'], 'a');
+              expect(sent[2]['tool_call_id'], 'a');
+              expect(sent[2]['content'], 'found');
+              expect(sent[3]['content'], 'B');
+            }
+          }
+          expect(requests, hasLength(2));
+        },
+      );
+
+      test(
+        'Claude body edit retains sequential tool rounds: temporary=$temporary, complete=$complete',
+        () async {
+          var service = createService();
+          await service.init();
+          final conversation = temporary
+              ? await service.createDraftConversation(
+                  title: 'Edit',
+                  temporary: true,
+                )
+              : await service.createConversation(title: 'Edit');
+          final config = claudeConfig();
+          const model = 'claude-sonnet-4-6';
+          Map<String, dynamic> arguments(String id) => {
+            'after': id == 'b' ? 'result-a' : null,
+          };
+          ToolCallPart part(String id) => ToolCallPart(
+            jsonEncode({
+              'id': id,
+              'name': 'lookup',
+              'arguments': arguments(id),
+              'content': 'result-$id',
+            }),
+          );
+          Map<String, dynamic> call(String id) => {
+            'type': 'tool_use',
+            'id': id,
+            'name': 'lookup',
+            'input': arguments(id),
+          };
+          final original = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            providerId: config.id,
+            modelId: model,
+            parts: [
+              const TextPart('First.'),
+              part('a'),
+              const TextPart('Second.'),
+              part('b'),
+              const TextPart('Done.'),
+            ],
+          );
+          final native = encodeClaudeTurn([
+            [
+              {'type': 'thinking', 'thinking': 'Plan A', 'signature': 'sig-a'},
+              {'type': 'text', 'text': 'First.'},
+              call('a'),
+            ],
+            [
+              {'type': 'thinking', 'thinking': 'Plan B', 'signature': 'sig-b'},
+              {'type': 'text', 'text': 'Second.'},
+              call('b'),
+            ],
+            if (complete)
+              [
+                {'type': 'text', 'text': 'Done.'},
+              ],
+          ]);
+          await service.setToolEvents(original.id, [
+            for (final id in ['a', 'b'])
+              {
+                'id': id,
+                'name': 'lookup',
+                'arguments': arguments(id),
+                'content': 'result-$id',
+              },
+          ]);
+          await service.setProviderArtifact(
+            original.id,
+            claudeTurnArtifactKind,
+            native,
+          );
+          var edited = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: 'FIRST.Second.Done.',
+          ))!;
+          if (!temporary) {
+            await service.close();
+            services.remove(service);
+            service = createService();
+            await service.init();
+            edited = (await service.loadMessages(
+              conversation.id,
+            )).singleWhere((m) => m.id == edited.id);
+          }
+          final builder = MessageBuilderService(
+            chatService: service,
+            contextProvider: _ReplayContext(),
+            providerArtifactLookup: (message, kind) =>
+                service.getProviderArtifactForMessage(message, kind),
+          );
+          final history = builder.buildApiMessages(
+            messages: [
+              ChatMessage(
+                role: 'user',
+                content: 'Do A then B',
+                conversationId: conversation.id,
+              ),
+              edited,
+              ChatMessage(
+                role: 'user',
+                content: 'Continue',
+                conversationId: conversation.id,
+              ),
+            ],
+            versionSelections: {},
+            currentConversation: null,
+            includeToolMessages: true,
+            claudeSource: (providerId: config.id, modelId: model),
+          );
+          late Map<String, dynamic> body;
+          final client = MockClient((request) async {
+            body = jsonDecode(request.body);
+            return http.Response(
+              jsonEncode({
+                'content': [
+                  {'type': 'text', 'text': 'OK'},
+                ],
+                'stop_reason': 'end_turn',
+              }),
+              200,
+            );
+          });
+          addTearDown(client.close);
+          await sendClaudeStream(
+            client,
+            config,
+            model,
+            history,
+            stream: false,
+          ).toList();
+          final sent = (body['messages'] as List).cast<Map>();
+          expect(sent.map((m) => m['role']), [
+            'user',
+            'assistant',
+            'user',
+            'assistant',
+            'user',
+            'assistant',
+            'user',
+          ]);
+          expect(sent[1]['content'], [
+            {'type': 'thinking', 'thinking': 'Plan A', 'signature': 'sig-a'},
+            {'type': 'text', 'text': 'FIRST.'},
+            call('a'),
+          ]);
+          expect(sent[2]['content'], [
+            {'type': 'tool_result', 'tool_use_id': 'a', 'content': 'result-a'},
+          ]);
+          expect(sent[3]['content'], [
+            {'type': 'thinking', 'thinking': 'Plan B', 'signature': 'sig-b'},
+            {'type': 'text', 'text': 'Second.'},
+            call('b'),
+          ]);
+          expect(sent[4]['content'], [
+            {'type': 'tool_result', 'tool_use_id': 'b', 'content': 'result-b'},
+          ]);
+          expect(sent[5]['content'], [
+            {'type': 'text', 'text': 'Done.'},
+          ]);
+          expect(
+            service.getProviderArtifact(original.id, claudeTurnArtifactKind),
+            native,
+          );
+        },
+      );
+    }
+
+    for (final edit in ['unchanged', 'text', 'remove-parts']) {
+      test(
+        'message version inherits replay state: temporary=$temporary, edit=$edit',
+        () async {
+          var service = createService();
+          await service.init();
+          final conversation = temporary
+              ? await service.createDraftConversation(
+                  title: 'Versions',
+                  temporary: true,
+                )
+              : await service.createConversation(title: 'Versions');
+          final original = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            parts: const [
+              ReasoningPart('Plan'),
+              ToolCallPart(
+                '{"id":"call1","name":"lookup","arguments":{},"content":"found"}',
+              ),
+              AssistantRoundEndPart(),
+              TextPart('Answer'),
+            ],
+          );
+          await service.setToolEvents(original.id, [
+            {
+              'id': 'call1',
+              'name': 'lookup',
+              'arguments': {},
+              'content': 'found',
+            },
+          ]);
+          const recovery = '["removed-thinking-fingerprint"]';
+          final native = encodeClaudeTurn([
+            [
+              {'type': 'thinking', 'thinking': 'Plan', 'signature': 'valid'},
+              {'type': 'text', 'text': 'Answer'},
+            ],
+          ]);
+          await service.setProviderArtifact(
+            original.id,
+            claudeThinkingRecoveryArtifactKind,
+            recovery,
+          );
+          await service.setProviderArtifact(
+            original.id,
+            claudeTurnArtifactKind,
+            native,
+          );
+          final version = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: edit == 'text' ? 'Edited' : 'Answer',
+            parts: edit == 'remove-parts' ? const [TextPart('Answer')] : null,
+          ))!;
+          void expectState() {
+            expect(
+              service.getProviderArtifact(
+                version.id,
+                claudeThinkingRecoveryArtifactKind,
+              ),
+              recovery,
+            );
+            expect(
+              service.getProviderArtifact(version.id, claudeTurnArtifactKind),
+              edit == 'remove-parts'
+                  ? isNull
+                  : edit == 'unchanged'
+                  ? native
+                  : encodeClaudeTurn([
+                      [
+                        {
+                          'type': 'thinking',
+                          'thinking': 'Plan',
+                          'signature': 'valid',
+                        },
+                        {'type': 'text', 'text': 'Edited'},
+                      ],
+                    ]),
+            );
+            expect(
+              service.getToolEvents(version.id),
+              edit == 'remove-parts' ? isEmpty : hasLength(1),
+            );
+            expect(
+              service.getProviderArtifact(original.id, claudeTurnArtifactKind),
+              native,
+            );
+            expect(
+              service.getVersionSelections(conversation.id)[original.id],
+              version.version,
+            );
+          }
+
+          expectState();
+          if (!temporary) {
+            await service.close();
+            services.remove(service);
+            service = createService();
+            await service.init();
+            await service.loadMessages(conversation.id);
+            expectState();
+          }
+        },
+      );
+    }
+  }
+
+  test(
+    'native response artifacts reload into cache and follow conversation forks',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Responses');
+      final assistant = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'Answer',
+      );
+      const payload =
+          '{"providerId":"p","modelId":"m","baseUrl":"https://example.com","rounds":[]}';
+      await service.setProviderArtifact(
+        assistant.id,
+        responsesTurnArtifactKind,
+        payload,
+      );
+      final claudePayload = encodeClaudeTurn([
+        [
+          {'type': 'thinking', 'thinking': '', 'signature': 'opaque-state'},
+          {'type': 'text', 'text': 'Answer'},
+        ],
+      ]);
+      await service.setProviderArtifact(
+        assistant.id,
+        claudeTurnArtifactKind,
+        claudePayload,
+      );
+      const recoveryPayload = '["removed-thinking-fingerprint"]';
+      await service.setProviderArtifact(
+        assistant.id,
+        claudeThinkingRecoveryArtifactKind,
+        recoveryPayload,
+      );
+      await service.close();
+      services.remove(service);
+
+      final restarted = createService();
+      await restarted.init();
+      final messages = await restarted.loadMessages(conversation.id);
+      expect(
+        restarted.getProviderArtifact(assistant.id, responsesTurnArtifactKind),
+        payload,
+      );
+      final fork = await restarted.forkConversationAtRevision(
+        sourceConversationId: conversation.id,
+        sourceRevisionId: assistant.id,
+        title: 'Fork',
+      );
+      expect(
+        restarted.getProviderArtifact(
+          restarted.getMessages(fork.id).single.id,
+          responsesTurnArtifactKind,
+        ),
+        payload,
+      );
+      final copied = await restarted.forkConversationFromMessages(
+        title: 'Copy',
+        assistantId: null,
+        sourceMessages: messages,
+      );
+      expect(
+        restarted.getProviderArtifact(
+          restarted.getMessages(copied.id).single.id,
+          responsesTurnArtifactKind,
+        ),
+        payload,
+      );
+      for (final id in [
+        assistant.id,
+        restarted.getMessages(fork.id).single.id,
+        restarted.getMessages(copied.id).single.id,
+      ]) {
+        expect(
+          restarted.getProviderArtifact(id, claudeTurnArtifactKind),
+          claudePayload,
+        );
+        expect(
+          restarted.getProviderArtifact(id, claudeThinkingRecoveryArtifactKind),
+          recoveryPayload,
+        );
+      }
+    },
+  );
+
   test('cold init clears every stale streaming flag', () async {
     final first = createService();
     await first.init();
@@ -91,7 +949,7 @@ void main() {
   });
 
   test('windowed timeline cache stays appendable for the next send', () async {
-    final service = createService();
+    var service = createService();
     await service.init();
     final conversation = await service.createConversation(title: 'Chat');
     final ids = <String>[];
@@ -103,6 +961,11 @@ void main() {
       );
       ids.add(message.id);
     }
+
+    await service.close();
+    services.remove(service);
+    service = createService();
+    await service.init();
 
     // Cache only a tail window so the append lands in a partial cache.
     await service.loadTimelinePage(conversation.id, limit: 1);
@@ -1230,6 +2093,211 @@ void main() {
   });
 
   group('ChatService fork conversations', () {
+    for (final preserveVersions in [false, true]) {
+      for (final selectedVersion in [0, 1]) {
+        test(
+          'latest reply suggestions survive fork and restart '
+          '(preserveVersions: $preserveVersions, version: $selectedVersion)',
+          () async {
+            final service = createService();
+            final source = await service.createConversation(title: 'Source');
+            await service.addMessage(
+              conversationId: source.id,
+              role: 'user',
+              content: 'question',
+            );
+            final original = await service.addMessage(
+              conversationId: source.id,
+              role: 'assistant',
+              content: 'original answer',
+            );
+            final edited = (await service.appendMessageVersion(
+              messageId: original.id,
+              content: 'edited answer',
+            ))!;
+            await service.setSelectedVersion(
+              source.id,
+              original.groupId ?? original.id,
+              selectedVersion,
+            );
+            const suggestions = ['Explain more', 'Give an example'];
+            await service.updateConversationSuggestions(source.id, suggestions);
+            final selected = selectedVersion == 0 ? original : edited;
+
+            final fork = await service.forkConversationAtRevision(
+              sourceConversationId: source.id,
+              sourceRevisionId: selected.id,
+              title: 'Fork',
+              preserveVersions: preserveVersions,
+            );
+
+            expect(fork.chatSuggestions, suggestions);
+            expect(
+              (await service.loadActiveTimelineMessages(fork.id)).last.content,
+              selected.content,
+            );
+            expect(
+              service.getConversation(source.id)!.chatSuggestions,
+              suggestions,
+            );
+
+            await service.close();
+            services.remove(service);
+            final reopened = createService();
+            await reopened.init();
+            expect(
+              reopened.getConversation(fork.id)!.chatSuggestions,
+              suggestions,
+            );
+            await reopened.clearConversationSuggestions(fork.id);
+            expect(reopened.getConversation(fork.id)!.chatSuggestions, isEmpty);
+            expect(
+              reopened.getConversation(source.id)!.chatSuggestions,
+              suggestions,
+            );
+          },
+        );
+      }
+
+      test(
+        'suggestions are not copied to earlier messages or unselected versions '
+        '(preserveVersions: $preserveVersions)',
+        () async {
+          final service = createService();
+          final source = await service.createConversation(title: 'Source');
+          final earlier = await service.addMessage(
+            conversationId: source.id,
+            role: 'assistant',
+            content: 'earlier answer',
+          );
+          final question = await service.addMessage(
+            conversationId: source.id,
+            role: 'user',
+            content: 'next question',
+          );
+          final original = await service.addMessage(
+            conversationId: source.id,
+            role: 'assistant',
+            content: 'original answer',
+          );
+          final selected = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: 'selected answer',
+          ))!;
+          // A later revision of an earlier group is not the conversation tail.
+          final revisedEarlier = (await service.appendMessageVersion(
+            messageId: earlier.id,
+            content: 'revised earlier answer',
+          ))!;
+          const suggestions = ['Follow up on the selected answer'];
+          await service.updateConversationSuggestions(source.id, suggestions);
+
+          for (final target in [earlier, revisedEarlier, question, original]) {
+            final fork = await service.forkConversationAtRevision(
+              sourceConversationId: source.id,
+              sourceRevisionId: target.id,
+              title: 'Fork',
+              preserveVersions: preserveVersions,
+            );
+            expect(fork.chatSuggestions, isEmpty, reason: target.content);
+          }
+          final latestFork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: selected.id,
+            title: 'Fork',
+            preserveVersions: preserveVersions,
+          );
+          expect(latestFork.chatSuggestions, suggestions);
+
+          await service.addMessage(
+            conversationId: source.id,
+            role: 'user',
+            content: 'already continued',
+          );
+          final earlierFork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: selected.id,
+            title: 'Fork',
+            preserveVersions: preserveVersions,
+          );
+          expect(earlierFork.chatSuggestions, isEmpty);
+        },
+      );
+
+      test('suggestions are not copied from a streaming reply '
+          '(preserveVersions: $preserveVersions)', () async {
+        final service = createService();
+        final source = await service.createConversation(title: 'Source');
+        final reply = await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'partial answer',
+          isStreaming: true,
+        );
+        await service.updateConversationSuggestions(source.id, ['stale']);
+
+        final fork = await service.forkConversationAtRevision(
+          sourceConversationId: source.id,
+          sourceRevisionId: reply.id,
+          title: 'Fork',
+          preserveVersions: preserveVersions,
+        );
+        expect(fork.chatSuggestions, isEmpty);
+      });
+    }
+
+    for (final mode in ['plain', 'fromMessages', 'withVersions']) {
+      test('fork preserves total and finish usage ($mode)', () async {
+        final service = createService();
+        final source = await service.createConversation(title: 'Source');
+        const finish = TokenUsage(
+          promptTokens: 200,
+          completionTokens: 30,
+          cachedTokens: 60,
+        );
+        final message = ChatMessage(
+          role: 'assistant',
+          content: 'answer',
+          conversationId: source.id,
+          totalTokens: 350,
+          promptTokens: 300,
+          completionTokens: 50,
+          cachedTokens: 70,
+          cacheWriteTokens: 30,
+          reasoningTokens: 5,
+          finishUsage: finish,
+        );
+        await service.addMessageDirectly(source.id, message);
+
+        final fork = mode == 'fromMessages'
+            ? await service.forkConversationFromMessages(
+                title: source.title,
+                assistantId: source.assistantId,
+                sourceMessages: [message],
+              )
+            : await service.forkConversationAtRevision(
+                sourceConversationId: source.id,
+                sourceRevisionId: message.id,
+                title: 'Fork',
+                preserveVersions: mode == 'withVersions',
+              );
+
+        void expectUsage(ChatMessage copied) {
+          expect(copied.id, isNot(message.id));
+          expect(copied.conversationId, fork.id);
+          expect(copied.finishUsage?.toJson(), finish.toJson());
+          expect(copied.tokenUsage.toJson(), message.tokenUsage.toJson());
+        }
+
+        expectUsage((await service.loadMessages(fork.id)).single);
+        await service.close();
+        services.remove(service);
+        final reopened = createService();
+        await reopened.init();
+        expectUsage((await reopened.loadMessages(fork.id)).single);
+      });
+    }
+
     test(
       'fork copies selected path as plain single-version messages',
       () async {
@@ -1520,4 +2588,261 @@ void main() {
     );
     expect(page!.slots.single.message.id, original.id);
   });
+  for (final editing in [false, true]) {
+    test(
+      'cancelling a later edit keeps the pending attachment submission (editing: $editing)',
+      () async {
+        final database = AppDatabase(NativeDatabase.memory());
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var holdCopy = false;
+        final drafts = ComposerDraftStore(
+          database,
+          directory: () async {
+            if (holdCopy && !entered.isCompleted) {
+              entered.complete();
+              await release.future;
+            }
+            return Directory('${tempDir.path}/scoped-drafts');
+          },
+        );
+        try {
+          await drafts.load('a');
+          final source = await File(
+            '${tempDir.path}/pending.txt',
+          ).writeAsString('pending attachment');
+          final input = ComposerDraftInput(
+            text: 'submitted',
+            documents: [
+              DocumentAttachment(
+                path: source.path,
+                fileName: 'pending.txt',
+                mime: 'text/plain',
+              ),
+            ],
+          );
+          if (editing) {
+            drafts.beginEdit('a', 'old', input);
+          } else {
+            drafts.setInput('a', input);
+          }
+          final submission = await drafts.beginSubmission('a', input);
+          holdCopy = true;
+          final preparing = drafts.prepareSubmissionInput(
+            input.toInput(submission: submission),
+          );
+          // Attach an error handler before exercising the interleaving.
+          Object? preparationError;
+          final completed = preparing.catchError((Object error) {
+            preparationError = error;
+            return const ChatInputData(text: '');
+          });
+          await entered.future;
+          drafts.beginEdit(
+            'a',
+            'another',
+            const ComposerDraftInput(text: 'another edit'),
+          );
+          drafts.endEdit('a');
+          release.complete();
+          final prepared = await completed;
+          expect(preparationError, isNull);
+          expect(prepared.draftSubmission!.id, submission.id);
+          expect(
+            await File(prepared.documents.single.path).readAsString(),
+            'pending attachment',
+          );
+          expect(drafts.peek('a')!.submissionId, submission.id);
+          await drafts.flush();
+        } finally {
+          if (!release.isCompleted) release.complete();
+          drafts.dispose();
+          await database.close();
+        }
+      },
+    );
+  }
+
+  test(
+    'composer submission consumes only its snapshot in the message transaction',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        assistantId: 'assistant',
+        reuseNewEntry: true,
+      );
+      final drafts = first.composerDrafts!;
+      await drafts.load(conversation.id);
+      final ref = await drafts.beginSubmission(
+        conversation.id,
+        const ComposerDraftInput(text: 'first'),
+      );
+      drafts.setInput(
+        conversation.id,
+        const ComposerDraftInput(text: 'second'),
+      );
+      final sent = await first.beginSendGeneration(
+        conversationId: conversation.id,
+        userParts: [TextPart('first')],
+        modelId: 'model',
+        providerId: 'provider',
+        draftSubmission: ref,
+      );
+      expect(sent.userMessage!.id, ref.id);
+      // Deliberately skip finishSubmission: simulate the lost UI completion.
+      await drafts.flush();
+      await first.close();
+      services.remove(first);
+      final restarted = createService();
+      await restarted.init();
+      final saved = await restarted.composerDrafts!.load(conversation.id);
+      expect(saved.pending, isNull);
+      expect(saved.compose.text, 'second');
+      expect(restarted.composerDrafts!.newEntry('assistant'), isNull);
+      expect(
+        (await restarted.loadMessages(
+          conversation.id,
+        )).where((message) => message.role == 'user'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'draft attachment is private until the same message transaction publishes it',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createDraftConversation();
+      final drafts = service.composerDrafts!;
+      await drafts.load(conversation.id);
+      final file = await File(
+        '${tempDir.path}/picked.txt',
+      ).writeAsString('private content');
+      final input = ComposerDraftInput(
+        text: 'send file',
+        documents: [
+          DocumentAttachment(
+            path: file.path,
+            fileName: 'picked.txt',
+            mime: 'text/plain',
+          ),
+        ],
+      );
+      final ref = await drafts.beginSubmission(conversation.id, input);
+      final prepared = await drafts.prepareSubmissionInput(
+        input.toInput(submission: ref),
+      );
+      final uri = SandboxPathResolver.canonicalize(
+        prepared.documents.single.path,
+      );
+      expect(await drafts.publishedFiles(), isNot(contains(uri)));
+      await service.beginSendGeneration(
+        conversationId: conversation.id,
+        userParts: [
+          TextPart('send file'),
+          FilePart(uri: uri, name: 'picked.txt', mime: 'text/plain'),
+        ],
+        modelId: 'model',
+        providerId: 'provider',
+        draftSubmission: ref,
+      );
+      expect(await drafts.publishedFiles(), contains(uri));
+      await drafts.finishSubmission(ref);
+      expect(
+        await File(prepared.documents.single.path).readAsString(),
+        'private content',
+      );
+    },
+  );
+
+  test(
+    'deleting an owner prevents a prepared submission from recreating it',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createDraftConversation();
+      final drafts = service.composerDrafts!;
+      await drafts.load(conversation.id);
+      final ref = await drafts.beginSubmission(
+        conversation.id,
+        const ComposerDraftInput(text: 'late'),
+      );
+      await service.deleteConversation(conversation.id);
+      await expectLater(
+        service.beginSendGeneration(
+          conversationId: conversation.id,
+          userParts: [TextPart('late')],
+          modelId: 'model',
+          providerId: 'provider',
+          draftSubmission: ref,
+        ),
+        throwsStateError,
+      );
+      expect(service.getConversation(conversation.id), isNull);
+      expect(drafts.hasDraft(conversation.id), isFalse);
+    },
+  );
+  test('only the composer entry reuses its draft identity', () async {
+    final chat = createService();
+    await chat.init();
+    final first = await chat.createDraftConversation(
+      assistantId: 'a',
+      reuseNewEntry: true,
+    );
+    final again = await chat.createDraftConversation(
+      assistantId: 'a',
+      reuseNewEntry: true,
+    );
+    expect(again.id, first.id);
+    final independent = await chat.createDraftConversation(assistantId: 'a');
+    expect(independent.id, isNot(first.id));
+    expect(chat.composerDrafts!.newEntry('a')?.id, first.id);
+    final otherAssistant = await chat.createDraftConversation(
+      assistantId: 'b',
+      reuseNewEntry: true,
+    );
+    expect(otherAssistant.id, isNot(first.id));
+  });
+  test(
+    'restart removes an interrupted public copy but keeps its recoverable source',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        reuseNewEntry: true,
+      );
+      final store = first.composerDrafts!;
+      await store.load(conversation.id);
+      final file = await File(
+        '${tempDir.path}/original.txt',
+      ).writeAsString('private source');
+      final input = ComposerDraftInput(
+        text: 'not committed',
+        documents: [
+          DocumentAttachment(
+            path: file.path,
+            fileName: 'original.txt',
+            mime: 'text/plain',
+          ),
+        ],
+      );
+      final ref = await store.beginSubmission(conversation.id, input);
+      final prepared = await store.prepareSubmissionInput(
+        input.toInput(submission: ref),
+      );
+      await first.close();
+      services.remove(first);
+      final second = createService();
+      await second.init();
+      final recovered = await second.composerDrafts!.load(conversation.id);
+      expect(recovered.pending?.text, 'not committed');
+      expect(
+        await File(recovered.pending!.documents.single.path).readAsString(),
+        'private source',
+      );
+      expect(await File(prepared.documents.single.path).exists(), isFalse);
+    },
+  );
 }

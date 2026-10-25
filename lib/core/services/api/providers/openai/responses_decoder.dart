@@ -5,6 +5,7 @@ import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'openai_request_shaping.dart';
 
 class ResponsesFunctionCall {
   ResponsesFunctionCall({
@@ -65,15 +66,16 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final StreamChunkIds _ids;
   TokenUsage? _round;
 
-  TokenUsage? get usage {
-    if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).merge(_round!);
-  }
+  TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
   bool completed = false;
   int approxCompletionChars = 0;
 
-  List<Map<String, dynamic>> outputItems = const <Map<String, dynamic>>[];
+  final _outputItems = <int, Map<String, dynamic>>{};
+  List<Map<String, dynamic>> get outputItems => [
+    for (final index in _outputItems.keys.toList()..sort())
+      _outputItems[index]!,
+  ];
   final List<Map<String, dynamic>> citations = <Map<String, dynamic>>[];
   final Map<int, ResponsesFunctionCall> toolCallsByIndex =
       <int, ResponsesFunctionCall>{};
@@ -89,9 +91,12 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _imageIdsByIndex = <int, String>{};
   final Set<String> _openImageIds = <String>{};
   final Set<String> _endedImageIds = <String>{};
-  final Map<int, Map<String, dynamic>> _outputItemsByIndex =
-      <int, Map<String, dynamic>>{};
   final Map<String, int> _outputItemIndexesById = <String, int>{};
+  // Reasoning items seen in `output_item.added` only. They are the artifact a
+  // follow-up round needs to replay, but the item is not complete yet, so it is
+  // held back until the terminal envelope turns out to omit it.
+  final Map<int, Map<String, dynamic>> _pendingReasoningItems =
+      <int, Map<String, dynamic>>{};
   final Map<String, String> _reasoningTextByKey = <String, String>{};
   // Everything already streamed for a reasoning item (across namespaces and
   // summary parts) plus the namespace that carried it, so a terminal item can
@@ -108,6 +113,26 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   bool get emittedImageEvents =>
       _openImageIds.isNotEmpty || _endedImageIds.isNotEmpty;
   bool get emittedCitationEvents => _emittedCitationEvents;
+
+  /// Reuses the native search parser for a complete JSON response.
+  List<StreamChunk> decodeSearchResults(Map response) {
+    final output = response['output'];
+    if (output is! List) return const [];
+    final chunks = <StreamChunk>[];
+    for (final item in output.whereType<Map>()) {
+      if (item['type'] == 'web_search_call') {
+        chunks.addAll(
+          _endServerTool(
+            item.cast<String, dynamic>(),
+            fallbackStatus: ServerToolStatus.completed,
+          ),
+        );
+      }
+    }
+    _collectCitations(output);
+    _emitCollectedCitations(chunks);
+    return chunks;
+  }
 
   bool get hasFunctionCalls =>
       toolCallsByIndex.isNotEmpty || toolCallsByKey.isNotEmpty;
@@ -245,8 +270,14 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
       if (item is Map) {
-        _rememberOutputItem(idx, item);
+        // `output_item.added` carries no usable artifact yet; only remember the
+        // index so a later terminal item can be mapped back to its series.
+        _rememberOutputIndex(idx, item);
         if (item['type'] == 'reasoning') {
+          _pendingReasoningItems.putIfAbsent(
+            idx,
+            () => Map<String, dynamic>.from(item),
+          );
           chunks.addAll(_emitReasoningItem(item));
           return;
         }
@@ -318,6 +349,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
       if (item is Map) {
+        // `output_item.done` owns the completed state for the item; the
+        // terminal envelope only fills the gaps (see [_onTerminal]).
         _rememberOutputItem(idx, item);
         if (item['type'] == 'reasoning') {
           chunks.addAll(_emitReasoningItem(item));
@@ -447,24 +480,27 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         if (usage != null) chunks.add(Usage(usage!));
       }
       final output = response['output'];
-      outputItems = const <Map<String, dynamic>>[];
       if (output is List) {
-        final terminalItems = <Map<String, dynamic>>[];
         for (var index = 0; index < output.length; index++) {
-          final rawItem = output[index];
-          if (rawItem is! Map) continue;
-          final item = Map<String, dynamic>.from(rawItem);
-          _rememberOutputItem(index, item);
-          terminalItems.add(item);
+          final item = output[index];
+          if (item is! Map) continue;
+          // output_item.done owns the completed reasoning state. Some terminal
+          // envelopes omit it or contain only a reduced snapshot, so keep
+          // whatever was already recorded for this index.
+          _rememberOutputItem(index, item, overwrite: false);
         }
-        final hasTerminalItems = terminalItems.isNotEmpty;
-        outputItems = hasTerminalItems ? terminalItems : _capturedOutputItems();
+        final hasTerminalItems = output.whereType<Map>().isNotEmpty;
+        // Some providers answer with `output_item.added` plus a terminal
+        // envelope that omits the item. Keep the reasoning artifact so the next
+        // round can still replay it (encrypted content included).
+        for (final entry in _pendingReasoningItems.entries) {
+          _outputItems.putIfAbsent(entry.key, () => entry.value);
+        }
         try {
           _collectCitations(output);
           _collectCompletedImages(output);
         } catch (_) {}
         _emitCollectedImages(chunks);
-        _emitCollectedCitations(chunks);
         for (final item in outputItems) {
           if (item['type'] == 'reasoning') {
             chunks.addAll(_emitReasoningItem(item));
@@ -482,6 +518,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
             );
           }
         }
+        _emitCollectedCitations(chunks);
       }
     }
     final status = failed
@@ -491,16 +528,24 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     completed = true;
   }
 
-  void _rememberOutputItem(int index, Map item) {
+  /// Records one output item by `output_index`.
+  ///
+  /// [overwrite] is true for `output_item.done` (the authoritative snapshot)
+  /// and false for terminal envelopes, which may repeat a reduced copy of an
+  /// item that was already completed.
+  void _rememberOutputItem(int index, Map item, {bool overwrite = true}) {
     final copied = Map<String, dynamic>.from(item);
-    _outputItemsByIndex[index] = copied;
-    final itemId = (copied['id'] ?? '').toString();
-    if (itemId.isNotEmpty) _outputItemIndexesById[itemId] = index;
+    if (overwrite) {
+      _outputItems[index] = copied;
+    } else {
+      _outputItems.putIfAbsent(index, () => copied);
+    }
+    _rememberOutputIndex(index, copied);
   }
 
-  List<Map<String, dynamic>> _capturedOutputItems() {
-    final indexes = _outputItemsByIndex.keys.toList()..sort();
-    return [for (final index in indexes) _outputItemsByIndex[index]!];
+  void _rememberOutputIndex(int index, Map item) {
+    final itemId = (item['id'] ?? '').toString();
+    if (itemId.isNotEmpty) _outputItemIndexesById[itemId] = index;
   }
 
   List<StreamChunk> _emitReasoningItem(Map item) {
@@ -631,7 +676,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       if (content is! List) continue;
       for (final block in content) {
         if (block is! Map) continue;
-        final anns = block['annotations'] as List? ?? const <dynamic>[];
+        final anns = block['annotations'];
+        if (anns is! List) continue;
         for (final an in anns) {
           if (an is! Map) continue;
           if ((an['type'] ?? '') != 'url_citation') continue;
@@ -932,21 +978,7 @@ bool _isImageGenerationType(dynamic type) {
 }
 
 TokenUsage? _mergeUsage(TokenUsage? current, dynamic rawUsage) {
-  if (rawUsage is! Map) return current;
-  final details =
-      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
-  final cachedTokens = details is Map ? _readInt(details['cached_tokens']) : 0;
-  return (current ?? const TokenUsage()).merge(
-    TokenUsage(
-      promptTokens: _readInt(
-        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
-      ),
-      completionTokens: _readInt(
-        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
-      ),
-      cachedTokens: cachedTokens,
-    ),
-  );
+  return mergeOpenAICompatibleUsage(current, rawUsage);
 }
 
 int _readInt(dynamic value) {

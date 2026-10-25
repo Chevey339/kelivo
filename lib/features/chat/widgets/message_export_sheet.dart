@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:image/image.dart' as image_lib;
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
@@ -15,20 +13,23 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'image_preview_sheet.dart';
+import 'export_image_capture.dart';
+import '../utils/export_image_processor.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/model_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
-import '../../../shared/widgets/markdown_with_highlight.dart';
+import '../../../shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
 import '../../../shared/widgets/diagram_exporter.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -58,35 +59,17 @@ String? _modelDisplayNameFromSettings(
   if (msg.role != 'assistant') return null;
   final modelId = msg.modelId;
   if (modelId == null || modelId.isEmpty) return null;
-  String? name;
-  String baseId = modelId;
   final providerId = msg.providerId;
   if (providerId != null && providerId.isNotEmpty) {
     try {
       final cfg = settings.getProviderConfig(providerId);
-      final ov = cfg.modelOverrides[modelId] as Map?;
-      if (ov != null) {
-        final overrideName = (ov['name'] as String?)?.trim();
-        if (overrideName != null && overrideName.isNotEmpty) {
-          name = overrideName;
-        }
-        final apiId = (ov['apiModelId'] ?? ov['api_model_id'])
-            ?.toString()
-            .trim();
-        if (apiId != null && apiId.isNotEmpty) {
-          baseId = apiId;
-        }
-      }
+      final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+      return resolved.override.displayName ?? resolved.spec.upstreamId;
     } catch (_) {
-      // ignore lookup issues; fall back to inference below.
+      // ignore lookup issues; fall back to the logical model id.
     }
   }
-
-  final inferred = ModelRegistry.infer(
-    ModelInfo(id: baseId, displayName: baseId),
-  );
-  final fallback = inferred.displayName.trim();
-  return name ?? (fallback.isNotEmpty ? fallback : baseId);
+  return modelId;
 }
 
 String _getRoleNameFromDependencies({
@@ -441,7 +424,7 @@ List<ToolUIPart> _exportToolPartsForMessage(
 ) {
   try {
     final chatService = context.read<ChatService>();
-    final events = chatService.getToolEvents(message.id);
+    final events = chatService.getToolEventsForMessage(message);
     if (events.isEmpty) return const <ToolUIPart>[];
     return events
         .map(
@@ -929,19 +912,24 @@ Future<void> exportChatMessagesImage(
   bool expandThinkingContent = false,
 }) async {
   try {
-    File? file;
-    await _runWithExportingOverlay(context, () async {
+    _ExportedImageResult? file;
+    await _runWithExportingOverlay(context, (progress) async {
       file = await _renderAndSaveChatImage(
         context,
         conversation,
         messages,
+        progress: progress,
         showThinkingAndToolCards: showThinkingAndToolCards,
         expandThinkingContent: expandThinkingContent,
       );
     });
     if (file == null) throw 'render error';
     if (!context.mounted) return;
-    await showImagePreviewSheet(context, file: file!);
+    await showImagePreviewSheet(
+      context,
+      file: file!.file,
+      preparedPreview: file!.preview,
+    );
   } catch (e) {
     if (!context.mounted) return;
     final l10n = AppLocalizations.of(context)!;
@@ -953,9 +941,10 @@ Future<void> exportChatMessagesImage(
   }
 }
 
-Future<File?> _renderAndSaveMessageImage(
+Future<_ExportedImageResult?> _renderAndSaveMessageImage(
   BuildContext context,
   ChatMessage message, {
+  required ValueNotifier<ExportImageProgress> progress,
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
 }) async {
@@ -970,7 +959,17 @@ Future<File?> _renderAndSaveMessageImage(
   // Pre-render Mermaid and SVG diagrams to images for export
   try {
     final codes = extractDiagramCodes(message.content);
-    await preRenderDiagramCodesForExport(context, codes);
+    await preRenderDiagramCodesForExport(
+      context,
+      codes,
+      onProgress: (completed, total) {
+        progress.value = ExportImageProgress(
+          ExportImageStage.diagrams,
+          completed: completed,
+          total: total,
+        );
+      },
+    );
   } catch (_) {}
 
   final bool isDesktop =
@@ -994,15 +993,17 @@ Future<File?> _renderAndSaveMessageImage(
     context,
     buildContent,
     theme: theme,
+    progress: progress,
     width: exportConfig.width,
     pixelRatio: exportConfig.pixelRatio,
   );
 }
 
-Future<File?> _renderAndSaveChatImage(
+Future<_ExportedImageResult?> _renderAndSaveChatImage(
   BuildContext context,
   Conversation conversation,
   List<ChatMessage> messages, {
+  required ValueNotifier<ExportImageProgress> progress,
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
 }) async {
@@ -1016,7 +1017,17 @@ Future<File?> _renderAndSaveChatImage(
         .map((m) => extractDiagramCodes(m.content))
         .expand((e) => e)
         .toList();
-    await preRenderDiagramCodesForExport(context, codes);
+    await preRenderDiagramCodesForExport(
+      context,
+      codes,
+      onProgress: (completed, total) {
+        progress.value = ExportImageProgress(
+          ExportImageStage.diagrams,
+          completed: completed,
+          total: total,
+        );
+      },
+    );
   } catch (_) {}
 
   final bool isDesktop =
@@ -1043,6 +1054,7 @@ Future<File?> _renderAndSaveChatImage(
     context,
     buildContent,
     theme: theme,
+    progress: progress,
     width: exportConfig.width,
     pixelRatio: exportConfig.pixelRatio,
   );
@@ -1051,9 +1063,6 @@ Future<File?> _renderAndSaveChatImage(
 const double _desktopExportLogicalWidth = 720.0;
 const double _mobileExportLogicalWidth = 480.0;
 const double _exportImagePixelRatio = 3.0;
-const int _exportImageBlankTrimPreservePaddingPhysical = 48;
-const int _exportImageBlankAlphaTolerance = 8;
-const int _exportImageBlankColorTolerance = 3;
 
 ({double width, double pixelRatio}) _exportImageRenderConfig({
   required bool isDesktop,
@@ -1071,93 +1080,35 @@ const int _exportImageBlankColorTolerance = 3;
   return _exportImageRenderConfig(isDesktop: isDesktop);
 }
 
-// New direct rendering approach without pagination
-Future<File?> _renderWidgetDirectly(
+class _ExportedImageResult {
+  const _ExportedImageResult(this.file, this.preview);
+  final File file;
+  final ExportImagePreview? preview;
+}
+
+Future<_ExportedImageResult> _renderWidgetDirectly(
   BuildContext context,
   Widget Function() buildContent, {
   required ThemeData theme,
-  double width = 480, // 宽度*3
-  double pixelRatio = 3.0,
+  required ValueNotifier<ExportImageProgress> progress,
+  double width = 480,
+  double pixelRatio = 3,
 }) async {
-  final overlay = Overlay.of(context);
-
-  final boundaryKey = GlobalKey();
-  final completer = Completer<void>();
-
-  late OverlayEntry entry;
-  entry = OverlayEntry(
-    builder: (ctx) {
-      // Schedule the completion after multiple frames to ensure rendering
-      int frameCount = 0;
-      void scheduleCompletion() {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          frameCount++;
-          if (frameCount < 3) {
-            // Wait for 3 frames to ensure complete rendering
-            scheduleCompletion();
-          } else if (!completer.isCompleted) {
-            completer.complete();
-          }
-        });
-      }
-
-      scheduleCompletion();
-
-      return Positioned(
-        left: -10000, // Position far offscreen
-        top: -10000,
-        child: _ExportCaptureRoot(
-          theme: theme,
-          boundaryKey: boundaryKey,
-          width: width,
-          child: buildContent(),
-        ),
-      );
-    },
+  final result = await captureExportWidget(
+    context,
+    buildContent(),
+    theme: theme,
+    width: width,
+    pixelRatio: pixelRatio,
+    onProgress: (value) => progress.value = value,
   );
-
-  overlay.insert(entry);
-  var entryRemoved = false;
-
-  try {
-    // Wait for the widget to be ready
-    await completer.future;
-    // Additional delay to ensure everything is painted
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-
-    final boundary =
-        boundaryKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-    if (boundary == null) return null;
-
-    final contentSize = boundary.size;
-    var data = await _captureBoundaryPngBytes(boundary, pixelRatio: pixelRatio);
-    if (data == null && !contentSize.isEmpty) {
-      entry.remove();
-      entryRemoved = true;
-      await WidgetsBinding.instance.endOfFrame;
-      data = await _captureWidgetViewportSlicesPngBytes(
-        overlay,
-        buildContent,
-        theme: theme,
-        width: width,
-        pixelRatio: pixelRatio,
-        contentSize: contentSize,
-      );
-    }
-    if (data == null) return null;
-
-    // Save to file
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/chat-export-${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(data);
-
-    return file;
-  } finally {
-    if (!entryRemoved) entry.remove();
-  }
+  progress.value = const ExportImageProgress(ExportImageStage.saving);
+  final dir = await getTemporaryDirectory();
+  final file = File(
+    '${dir.path}/chat-export-${DateTime.now().microsecondsSinceEpoch}.png',
+  );
+  await file.writeAsBytes(result.pngBytes);
+  return _ExportedImageResult(file, result.preview);
 }
 
 @visibleForTesting
@@ -1274,240 +1225,55 @@ class _ExportCaptureViewportRoot extends StatelessWidget {
   }
 }
 
-// Keep whole-image captures below the common 16384px GPU texture edge while
-// avoiding the slice compositor for exports that can still fit at >=2x.
-const double _maxExportFullCapturePhysicalDimension = 15360.0;
-const double _maxExportCaptureSlicePhysicalHeight = 4096.0;
-const double _minExportFullCapturePixelRatio = 2.0;
-
 @visibleForTesting
 Future<Uint8List?> captureExportBoundaryPngBytesForTesting(
   RenderRepaintBoundary boundary, {
   required double pixelRatio,
-}) {
-  return _captureBoundaryPngBytes(boundary, pixelRatio: pixelRatio);
+}) async {
+  final ratio = exportFullCaptureRatio(boundary.size, pixelRatio);
+  if (ratio == null) return null;
+  final png = await captureExportBoundary(boundary, ratio);
+  if (png == null) return null;
+  return (await compute(
+    processExportImage,
+    ExportImageProcessingRequest(singlePngBytes: png),
+  )).pngBytes;
 }
 
 @visibleForTesting
 bool shouldUseFullExportCaptureForTesting({
   required Size logicalSize,
   required double pixelRatio,
-}) {
-  return _shouldUseFullExportCapture(logicalSize, pixelRatio: pixelRatio);
-}
+}) => exportFullCaptureRatio(logicalSize, pixelRatio) != null;
 
 @visibleForTesting
 double? exportFullCapturePixelRatioForTesting({
   required Size logicalSize,
   required double requestedPixelRatio,
-}) {
-  return _exportFullCapturePixelRatio(
-    logicalSize,
-    requestedPixelRatio: requestedPixelRatio,
-  );
-}
+}) => exportFullCaptureRatio(logicalSize, requestedPixelRatio);
 
 @visibleForTesting
-double exportCaptureSliceLogicalHeightForTesting({required double pixelRatio}) {
-  return _exportCaptureSliceLogicalHeight(pixelRatio: pixelRatio);
-}
+double exportCaptureSliceLogicalHeightForTesting({
+  required double pixelRatio,
+}) => exportSliceLogicalHeight(pixelRatio);
 
 @visibleForTesting
 Uint8List stitchExportPngSlicesForTesting({
   required int outputWidth,
   required int outputHeight,
   required List<({Uint8List bytes, int y})> slices,
-}) {
-  return _stitchExportPngSlices(
-    outputWidth: outputWidth,
-    outputHeight: outputHeight,
-    slices: slices,
-  );
-}
+}) => image_lib.encodePng(stitchExportImage(outputWidth, outputHeight, slices));
 
-Future<Uint8List?> _captureBoundaryPngBytes(
-  RenderRepaintBoundary boundary, {
-  required double pixelRatio,
-}) async {
-  if (boundary.size.isEmpty) return null;
-  final fullCapturePixelRatio = _exportFullCapturePixelRatio(
-    boundary.size,
-    requestedPixelRatio: pixelRatio,
-  );
-  if (fullCapturePixelRatio != null) {
-    final fullCapture = await _captureFullBoundaryPngBytes(
-      boundary,
-      pixelRatio: fullCapturePixelRatio,
-    );
-    if (fullCapture != null) {
-      return _processCapturedExportPng(
-        _CapturedExportPngProcessingRequest.single(
-          singlePngBytes: fullCapture,
-          preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
-        ),
-      );
-    }
-  }
-  return null;
-}
-
-Future<Uint8List?> _captureWidgetViewportSlicesPngBytes(
-  OverlayState overlay,
-  Widget Function() buildContent, {
-  required ThemeData theme,
-  required double width,
-  required double pixelRatio,
-  required Size contentSize,
-}) async {
-  final sliceLogicalHeight = _exportCaptureSliceLogicalHeight(
-    pixelRatio: pixelRatio,
-  );
-  final outputWidth = (contentSize.width * pixelRatio).ceil();
-  final outputHeight = (contentSize.height * pixelRatio).ceil();
-  final slices = <({Uint8List bytes, int y})>[];
-
-  double top = 0;
-  while (top < contentSize.height) {
-    final height = (contentSize.height - top).clamp(0.0, sliceLogicalHeight);
-    final boundaryKey = GlobalKey();
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) {
-        return Positioned(
-          left: -10000,
-          top: -10000,
-          child: _ExportCaptureViewportRoot(
-            theme: theme,
-            boundaryKey: boundaryKey,
-            width: width,
-            viewportHeight: height,
-            contentHeight: contentSize.height,
-            offsetY: top,
-            child: buildContent(),
-          ),
-        );
-      },
-    );
-
-    overlay.insert(entry);
-    try {
-      await _waitForExportCaptureFrames(
-        frameCount: 2,
-        settleDelay: const Duration(milliseconds: 80),
-      );
-      final boundary =
-          boundaryKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final slice = await _captureFullBoundaryPngBytes(
-        boundary,
-        pixelRatio: pixelRatio,
-      );
-      if (slice == null) return null;
-      slices.add((bytes: slice, y: (top * pixelRatio).round()));
-    } finally {
-      entry.remove();
-    }
-
-    top += height;
-    await WidgetsBinding.instance.endOfFrame;
-  }
-
-  return _processCapturedExportPng(
-    _CapturedExportPngProcessingRequest.slices(
-      outputWidth: outputWidth,
-      outputHeight: outputHeight,
-      slices: slices
-          .map(
-            (slice) => _ExportPngSlicePayload(bytes: slice.bytes, y: slice.y),
-          )
-          .toList(growable: false),
-      preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
-    ),
-  );
-}
-
-Future<void> _waitForExportCaptureFrames({
-  required int frameCount,
-  Duration settleDelay = Duration.zero,
-}) async {
-  for (var i = 0; i < frameCount; i += 1) {
-    await WidgetsBinding.instance.endOfFrame;
-  }
-  if (settleDelay > Duration.zero) {
-    await Future<void>.delayed(settleDelay);
-  }
-}
-
-bool _shouldUseFullExportCapture(
-  Size logicalSize, {
-  required double pixelRatio,
-}) {
-  return _exportFullCapturePixelRatio(
-        logicalSize,
-        requestedPixelRatio: pixelRatio,
-      ) !=
-      null;
-}
-
-double? _exportFullCapturePixelRatio(
-  Size logicalSize, {
-  required double requestedPixelRatio,
-}) {
-  if (logicalSize.isEmpty || requestedPixelRatio <= 0) return null;
-  final maxLogicalDimension = math.max(logicalSize.width, logicalSize.height);
-  if (maxLogicalDimension <= 0) return null;
-  final requestedPhysicalDimension = maxLogicalDimension * requestedPixelRatio;
-  if (requestedPhysicalDimension <= _maxExportFullCapturePhysicalDimension) {
-    return requestedPixelRatio;
-  }
-  final cappedPixelRatio =
-      _maxExportFullCapturePhysicalDimension / maxLogicalDimension;
-  if (cappedPixelRatio < _minExportFullCapturePixelRatio) return null;
-  return math.min(requestedPixelRatio, cappedPixelRatio);
-}
-
-double _exportCaptureSliceLogicalHeight({required double pixelRatio}) {
-  final height = (_maxExportCaptureSlicePhysicalHeight / pixelRatio).floor();
-  return math.max(height, 1).toDouble();
-}
-
-Future<Uint8List?> _captureFullBoundaryPngBytes(
-  RenderRepaintBoundary boundary, {
-  required double pixelRatio,
-}) async {
-  ui.Image? image;
-  try {
-    image = await boundary.toImage(pixelRatio: pixelRatio);
-    final expectedWidth = (boundary.size.width * pixelRatio).ceil();
-    final expectedHeight = (boundary.size.height * pixelRatio).ceil();
-    if (image.width < expectedWidth || image.height < expectedHeight) {
-      debugPrint(
-        'Full export image capture was clipped '
-        '(${image.width}x${image.height}, expected '
-        '${expectedWidth}x$expectedHeight); falling back to slices.',
-      );
-      return null;
-    }
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
-  } catch (e) {
-    debugPrint('Full export image capture failed, falling back to slices: $e');
-    return null;
-  } finally {
-    image?.dispose();
-  }
-}
-
-Future<Uint8List> _processCapturedExportPng(
-  _CapturedExportPngProcessingRequest request,
-) {
-  return compute(
-    _processCapturedExportPngSync,
-    request,
-    debugLabel: 'export-image-png-processing',
-  );
-}
+@visibleForTesting
+Uint8List trimExportPngBlankPaddingForTesting(
+  Uint8List bytes, {
+  required int preservePadding,
+}) => processExportImage(
+  ExportImageProcessingRequest(
+    singlePngBytes: bytes,
+    preservePadding: preservePadding,
+  ),
+).pngBytes;
 
 @visibleForTesting
 Future<Uint8List> processCapturedExportPngForTesting({
@@ -1516,272 +1282,16 @@ Future<Uint8List> processCapturedExportPngForTesting({
   int? outputHeight,
   List<({Uint8List bytes, int y})>? slices,
   required int preservePadding,
-}) {
-  final request = singlePngBytes != null
-      ? _CapturedExportPngProcessingRequest.single(
-          singlePngBytes: singlePngBytes,
-          preservePadding: preservePadding,
-        )
-      : _CapturedExportPngProcessingRequest.slices(
-          outputWidth: outputWidth ?? 0,
-          outputHeight: outputHeight ?? 0,
-          slices: (slices ?? const <({Uint8List bytes, int y})>[])
-              .map(
-                (slice) =>
-                    _ExportPngSlicePayload(bytes: slice.bytes, y: slice.y),
-              )
-              .toList(growable: false),
-          preservePadding: preservePadding,
-        );
-  return _processCapturedExportPng(request);
-}
-
-Uint8List _processCapturedExportPngSync(
-  _CapturedExportPngProcessingRequest request,
-) {
-  final singlePngBytes = request.singlePngBytes;
-  if (singlePngBytes != null) {
-    return _trimExportPngBlankPadding(
-      singlePngBytes,
-      preservePadding: request.preservePadding,
-    );
-  }
-
-  final stitched = _stitchExportPngSlicesImage(
-    outputWidth: request.outputWidth,
-    outputHeight: request.outputHeight,
-    slices: request.slices
-        .map((slice) => (bytes: slice.bytes, y: slice.y))
-        .toList(growable: false),
-  );
-  return _encodeTrimmedExportImage(
-    stitched,
-    preservePadding: request.preservePadding,
-  );
-}
-
-class _CapturedExportPngProcessingRequest {
-  const _CapturedExportPngProcessingRequest.single({
-    required this.singlePngBytes,
-    required this.preservePadding,
-  }) : outputWidth = 0,
-       outputHeight = 0,
-       slices = const <_ExportPngSlicePayload>[];
-
-  const _CapturedExportPngProcessingRequest.slices({
-    required this.outputWidth,
-    required this.outputHeight,
-    required this.slices,
-    required this.preservePadding,
-  }) : singlePngBytes = null;
-
-  final Uint8List? singlePngBytes;
-  final int outputWidth;
-  final int outputHeight;
-  final List<_ExportPngSlicePayload> slices;
-  final int preservePadding;
-}
-
-class _ExportPngSlicePayload {
-  const _ExportPngSlicePayload({required this.bytes, required this.y});
-
-  final Uint8List bytes;
-  final int y;
-}
-
-Uint8List _stitchExportPngSlices({
-  required int outputWidth,
-  required int outputHeight,
-  required List<({Uint8List bytes, int y})> slices,
-}) {
-  return image_lib.encodePng(
-    _stitchExportPngSlicesImage(
-      outputWidth: outputWidth,
-      outputHeight: outputHeight,
-      slices: slices,
-    ),
-  );
-}
-
-image_lib.Image _stitchExportPngSlicesImage({
-  required int outputWidth,
-  required int outputHeight,
-  required List<({Uint8List bytes, int y})> slices,
-}) {
-  final stitched = image_lib.Image(
-    width: outputWidth,
-    height: outputHeight,
-    numChannels: 4,
-  )..clear(image_lib.ColorRgba8(0, 0, 0, 0));
-
-  for (final slice in slices) {
-    final decoded = image_lib.decodePng(slice.bytes);
-    if (decoded == null) continue;
-    final dstY = math.max(slice.y, 0);
-    final srcY = math.max(-slice.y, 0);
-    final copyHeight = math.min(decoded.height - srcY, outputHeight - dstY);
-    final copyWidth = math.min(decoded.width, outputWidth);
-    if (copyWidth <= 0 || copyHeight <= 0) continue;
-
-    for (var y = 0; y < copyHeight; y += 1) {
-      for (var x = 0; x < copyWidth; x += 1) {
-        stitched.setPixel(x, dstY + y, decoded.getPixel(x, srcY + y));
-      }
-    }
-  }
-
-  return stitched;
-}
-
-@visibleForTesting
-Uint8List trimExportPngBlankPaddingForTesting(
-  Uint8List bytes, {
-  required int preservePadding,
-}) {
-  return _trimExportPngBlankPadding(bytes, preservePadding: preservePadding);
-}
-
-Uint8List _trimExportPngBlankPadding(
-  Uint8List bytes, {
-  required int preservePadding,
-}) {
-  final decoded = image_lib.decodePng(bytes);
-  if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
-    return bytes;
-  }
-  return _encodeTrimmedExportImage(decoded, preservePadding: preservePadding);
-}
-
-Uint8List _encodeTrimmedExportImage(
-  image_lib.Image decoded, {
-  required int preservePadding,
-}) {
-  final trimmed = _trimExportImageBlankPadding(
-    decoded,
+}) async => (await compute(
+  processExportImage,
+  ExportImageProcessingRequest(
+    singlePngBytes: singlePngBytes,
+    outputWidth: outputWidth ?? 0,
+    outputHeight: outputHeight ?? 0,
+    slices: slices ?? const [],
     preservePadding: preservePadding,
-  );
-  return image_lib.encodePng(trimmed);
-}
-
-image_lib.Image _trimExportImageBlankPadding(
-  image_lib.Image decoded, {
-  required int preservePadding,
-}) {
-  final background = _exportImageBlankReferencePixel(decoded);
-  final width = decoded.width;
-  final height = decoded.height;
-
-  int? top;
-  for (var y = 0; y < height; y += 1) {
-    if (_exportImageRowHasContent(decoded, y, background)) {
-      top = y;
-      break;
-    }
-  }
-  if (top == null) return decoded;
-
-  var bottom = height - 1;
-  for (var y = height - 1; y >= top; y -= 1) {
-    if (_exportImageRowHasContent(decoded, y, background)) {
-      bottom = y;
-      break;
-    }
-  }
-
-  var left = 0;
-  for (var x = 0; x < width; x += 1) {
-    if (_exportImageColumnHasContent(decoded, x, top, bottom, background)) {
-      left = x;
-      break;
-    }
-  }
-
-  var right = width - 1;
-  for (var x = width - 1; x >= left; x -= 1) {
-    if (_exportImageColumnHasContent(decoded, x, top, bottom, background)) {
-      right = x;
-      break;
-    }
-  }
-
-  final padding = math.max(preservePadding, 0);
-  final cropLeft = math.max(left - padding, 0);
-  final cropTop = math.max(top - padding, 0);
-  final cropRight = math.min(right + padding, width - 1);
-  final cropBottom = math.min(bottom + padding, height - 1);
-
-  if (cropLeft == 0 &&
-      cropTop == 0 &&
-      cropRight == width - 1 &&
-      cropBottom == height - 1) {
-    return decoded;
-  }
-
-  return image_lib.copyCrop(
-    decoded,
-    x: cropLeft,
-    y: cropTop,
-    width: cropRight - cropLeft + 1,
-    height: cropBottom - cropTop + 1,
-  );
-}
-
-image_lib.Pixel _exportImageBlankReferencePixel(image_lib.Image image) {
-  final corners = [
-    image.getPixel(0, 0),
-    image.getPixel(image.width - 1, 0),
-    image.getPixel(0, image.height - 1),
-    image.getPixel(image.width - 1, image.height - 1),
-  ];
-  for (final pixel in corners) {
-    if (pixel.a <= _exportImageBlankAlphaTolerance) return pixel;
-  }
-  return corners.first;
-}
-
-bool _exportImageRowHasContent(
-  image_lib.Image image,
-  int y,
-  image_lib.Pixel background,
-) {
-  for (var x = 0; x < image.width; x += 1) {
-    if (!_exportImageIsBlankPixel(image.getPixel(x, y), background)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool _exportImageColumnHasContent(
-  image_lib.Image image,
-  int x,
-  int top,
-  int bottom,
-  image_lib.Pixel background,
-) {
-  for (var y = top; y <= bottom; y += 1) {
-    if (!_exportImageIsBlankPixel(image.getPixel(x, y), background)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool _exportImageIsBlankPixel(
-  image_lib.Pixel pixel,
-  image_lib.Pixel background,
-) {
-  if (pixel.a <= _exportImageBlankAlphaTolerance) return true;
-  if (background.a <= _exportImageBlankAlphaTolerance) return false;
-  return _exportImageChannelNear(pixel.r, background.r) &&
-      _exportImageChannelNear(pixel.g, background.g) &&
-      _exportImageChannelNear(pixel.b, background.b) &&
-      _exportImageChannelNear(pixel.a, background.a);
-}
-
-bool _exportImageChannelNear(num a, num b) {
-  return (a - b).abs() <= _exportImageBlankColorTolerance;
-}
+  ),
+)).pngBytes;
 
 Future<void> showMessageExportSheet(
   BuildContext context,
@@ -1960,18 +1470,23 @@ class _ExportDialogState extends State<_ExportDialog> {
       final pctx = widget.parentContext;
       await Navigator.of(context).maybePop();
       if (!pctx.mounted) return;
-      File? file;
-      await _runWithExportingOverlay(pctx, () async {
+      _ExportedImageResult? file;
+      await _runWithExportingOverlay(pctx, (progress) async {
         file = await _renderAndSaveMessageImage(
           pctx,
           widget.message,
+          progress: progress,
           showThinkingAndToolCards: _showThinkingAndToolCards,
           expandThinkingContent: _expandThinkingContent,
         );
       });
       if (file == null) throw 'render error';
       if (!pctx.mounted) return;
-      await showImagePreviewSheet(pctx, file: file!);
+      await showImagePreviewSheet(
+        pctx,
+        file: file!.file,
+        preparedPreview: file!.preview,
+      );
       return;
     } catch (e) {
       final pctx = widget.parentContext;
@@ -2189,19 +1704,24 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
       final pctx = widget.parentContext;
       await Navigator.of(context).maybePop();
       if (!pctx.mounted) return;
-      File? file;
-      await _runWithExportingOverlay(pctx, () async {
+      _ExportedImageResult? file;
+      await _runWithExportingOverlay(pctx, (progress) async {
         file = await _renderAndSaveChatImage(
           pctx,
           widget.conversation,
           widget.messages,
+          progress: progress,
           showThinkingAndToolCards: _showThinkingAndToolCards,
           expandThinkingContent: _expandThinkingContent,
         );
       });
       if (file == null) throw 'render error';
       if (!pctx.mounted) return;
-      await showImagePreviewSheet(pctx, file: file!);
+      await showImagePreviewSheet(
+        pctx,
+        file: file!.file,
+        preparedPreview: file!.preview,
+      );
       return;
     } catch (e) {
       final pctx = widget.parentContext;
@@ -2435,12 +1955,13 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
     setState(() => _exporting = true);
     try {
       final pctx = widget.parentContext;
-      File? file;
-      await _runWithExportingOverlay(pctx, () async {
+      _ExportedImageResult? file;
+      await _runWithExportingOverlay(pctx, (progress) async {
         file = await _renderAndSaveChatImage(
           pctx,
           widget.conversation,
           widget.messages,
+          progress: progress,
           showThinkingAndToolCards: _showThinkingAndToolCards,
           expandThinkingContent: _expandThinkingContent,
         );
@@ -2449,7 +1970,11 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
       // After generation, close current sheet then open preview
       if (mounted) await Navigator.of(context).maybePop();
       if (!pctx.mounted) return;
-      await showImagePreviewSheet(pctx, file: file!);
+      await showImagePreviewSheet(
+        pctx,
+        file: file!.file,
+        preparedPreview: file!.preview,
+      );
       return; // do not fall through to setState after pop
     } catch (e) {
       final pctx = widget.parentContext;
@@ -2692,11 +2217,12 @@ class _ExportSheetState extends State<_ExportSheet> {
     setState(() => _exporting = true);
     try {
       final pctx = widget.parentContext;
-      File? file;
-      await _runWithExportingOverlay(pctx, () async {
+      _ExportedImageResult? file;
+      await _runWithExportingOverlay(pctx, (progress) async {
         file = await _renderAndSaveMessageImage(
           pctx,
           widget.message,
+          progress: progress,
           showThinkingAndToolCards: _showThinkingAndToolCards,
           expandThinkingContent: _expandThinkingContent,
         );
@@ -2704,7 +2230,11 @@ class _ExportSheetState extends State<_ExportSheet> {
       if (file == null) throw 'render error';
       if (mounted) await Navigator.of(context).maybePop();
       if (!pctx.mounted) return;
-      await showImagePreviewSheet(pctx, file: file!);
+      await showImagePreviewSheet(
+        pctx,
+        file: file!.file,
+        preparedPreview: file!.preview,
+      );
       return;
     } catch (e) {
       final pctx = widget.parentContext;
@@ -3151,7 +2681,9 @@ class _ExportedBubble extends StatelessWidget {
     final Widget contentWidget = (mdText.toString().trim().isNotEmpty)
         ? DefaultTextStyle.merge(
             style: TextStyle(fontSize: contentFontSize, height: 1.5),
-            child: MarkdownWithCodeHighlight(text: mdText.toString()),
+            child: AppSelectionArea(
+              child: MarkdownWithCodeHighlight(text: mdText.toString()),
+            ),
           )
         : Text('—', style: TextStyle(color: bubbleFg.withValues(alpha: 0.5)));
 
@@ -3241,52 +2773,95 @@ class _ExportDisclaimer extends StatelessWidget {
   }
 }
 
+@visibleForTesting
+Widget buildImageExportProgressForTesting(ExportImageProgress progress) =>
+    _ExportProgressContent(progress: progress);
+
+class _ExportProgressContent extends StatelessWidget {
+  const _ExportProgressContent({required this.progress});
+  final ExportImageProgress progress;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final label = switch (progress.stage) {
+      ExportImageStage.preparing => l10n.imageExportPreparing,
+      ExportImageStage.diagrams => l10n.imageExportDiagrams(
+        progress.completed,
+        progress.total,
+      ),
+      ExportImageStage.capturing => l10n.imageExportCapturing(
+        progress.completed,
+        progress.total,
+      ),
+      ExportImageStage.processing => l10n.imageExportProcessing,
+      ExportImageStage.saving => l10n.imageExportSaving,
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: SizedBox(
+        width: 240,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CupertinoActivityIndicator(radius: 16),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: .8),
+              ),
+            ),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(value: progress.fraction),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> _runWithExportingOverlay(
   BuildContext context,
-  Future<void> Function() task,
+  Future<void> Function(ValueNotifier<ExportImageProgress> progress) task,
 ) async {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
   final navigator = Navigator.of(context, rootNavigator: true);
-  // Show overlay first
-  showDialog<void>(
+  final progress = ValueNotifier(
+    const ExportImageProgress(ExportImageStage.preparing),
+  );
+  final route = DialogRoute<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => Center(
-      child: Material(
-        color: context.appColors.surfaceCard,
-        elevation: 6,
-        shadowColor: cs.shadow.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CupertinoActivityIndicator(radius: 16),
-              const SizedBox(height: 12),
-              Text(
-                l10n.messageExportSheetExporting,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: cs.onSurface.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
+    builder: (context) => PopScope(
+      canPop: false,
+      child: Center(
+        child: Material(
+          color: context.appColors.surfaceCard,
+          elevation: 6,
+          shadowColor: Theme.of(
+            context,
+          ).colorScheme.shadow.withValues(alpha: .2),
+          borderRadius: BorderRadius.circular(14),
+          child: ValueListenableBuilder<ExportImageProgress>(
+            valueListenable: progress,
+            builder: (context, value, _) =>
+                _ExportProgressContent(progress: value),
           ),
         ),
       ),
     ),
   );
+  unawaited(navigator.push(route));
   try {
     await WidgetsBinding.instance.endOfFrame;
-    await task();
+    await task(progress);
   } finally {
-    await Future<void>.delayed(Duration.zero);
-    if (navigator.mounted) {
-      await navigator.maybePop();
-      await Future<void>.delayed(Duration.zero);
-    }
+    // Remove only this operation's dialog, even when another route was opened.
+    if (route.isActive) navigator.removeRoute(route);
+    progress.dispose();
   }
 }
 

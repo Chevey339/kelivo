@@ -44,24 +44,40 @@ data: {"type":"message_stop"}
 
 void main() {
   group('Claude hosted tools request', () {
-    test(
-      'Claude built-in search support list includes latest Claude 5 models',
-      () {
-        for (final modelId in const [
-          'claude-opus-4-8',
-          'claude-fable-5',
-          'claude-fable-5-1',
-          'claude-mythos-5',
-          'claude-opus-5',
-          'claude-sonnet-5',
-        ]) {
-          expect(
-            BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(modelId),
-            isTrue,
-          );
-        }
-      },
-    );
+    test('Claude chat models get built-in search on any Claude provider', () {
+      final official = claudeConfig(baseUrl: officialBaseUrl);
+      final relay = claudeConfig();
+      for (final modelId in const [
+        'claude-opus-4-8',
+        'claude-fable-5',
+        'claude-sonnet-4-20250514',
+        'claude-3-haiku-20240307',
+      ]) {
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: official,
+            modelId: modelId,
+          ),
+          isTrue,
+          reason: modelId,
+        );
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: relay,
+            modelId: modelId,
+          ),
+          isTrue,
+          reason: modelId,
+        );
+      }
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: official,
+          modelId: 'dall-e-3',
+        ),
+        isFalse,
+      );
+    });
 
     test('Claude dynamic web search support matrix is official-only', () {
       final official = claudeConfig(
@@ -116,6 +132,13 @@ void main() {
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: vertex,
           modelId: 'claude-opus-4-7',
+        ),
+        isFalse,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-haiku-4-5',
         ),
         isFalse,
       );
@@ -178,26 +201,29 @@ void main() {
       },
     );
 
-    test('Opus 5 gets code execution but not the web fetch it lacks', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-5',
-        config: claudeConfig(
-          baseUrl: officialBaseUrl,
-          modelOverrides: const <String, dynamic>{
-            'claude-opus-5': <String, dynamic>{
-              'builtInTools': <String>[
-                BuiltInToolNames.webFetch,
-                BuiltInToolNames.codeExecution,
-              ],
+    test(
+      'Opus 5 sends the same official server tools as other chat models',
+      () async {
+        final body = await captureClaudeRequestBody(
+          modelId: 'claude-opus-5',
+          config: claudeConfig(
+            baseUrl: officialBaseUrl,
+            modelOverrides: const <String, dynamic>{
+              'claude-opus-5': <String, dynamic>{
+                'builtInTools': <String>[
+                  BuiltInToolNames.webFetch,
+                  BuiltInToolNames.codeExecution,
+                ],
+              },
             },
-          },
-        ),
-      );
+          ),
+        );
 
-      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
-      expect(tools.any((tool) => tool['name'] == 'web_fetch'), isFalse);
-      expect(tools.any((tool) => tool['name'] == 'code_execution'), isTrue);
-    });
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        expect(tools.any((tool) => tool['name'] == 'web_fetch'), isTrue);
+        expect(tools.any((tool) => tool['name'] == 'code_execution'), isTrue);
+      },
+    );
 
     test(
       'a utility call gets search only, never fetch or a container',

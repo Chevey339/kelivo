@@ -7,10 +7,18 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/skills_binding.dart';
+import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/providers/openai/responses_history.dart';
+import '../../../core/services/api/reasoning/reasoning_dialects.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
@@ -18,6 +26,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -26,6 +35,8 @@ import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
+import 'context_assembly.dart';
+import 'context_usage_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 import '../utils/model_display_helper.dart';
@@ -37,7 +48,6 @@ typedef OnConversationLoadingChanged =
 typedef OnScrollToBottom = void Function();
 typedef OnShowError = void Function(String message);
 typedef OnShowWarning = void Function(String message);
-typedef OnHapticFeedback = void Function();
 
 const String conversationIdHeaderName = 'X-Conversation-Id';
 const String _conversationIdHeaderNameLower = 'x-conversation-id';
@@ -60,12 +70,34 @@ Map<String, String>? buildConversationRequestHeaders({
 }
 
 /// Result of preparing a message generation
+class UnprocessedRequestContext {
+  UnprocessedRequestContext({
+    required this.apiMessages,
+    required this.toolDefs,
+    required this.hasBuiltInSearch,
+    required this.workspaceContext,
+    required this.mcpRouteSnapshot,
+    required this.workspaceAttachments,
+    required this.cfg,
+  });
+
+  final List<Map<String, dynamic>> apiMessages;
+  final List<Map<String, dynamic>> toolDefs;
+  final bool hasBuiltInSearch;
+  final WorkspaceToolContext? workspaceContext;
+  final McpToolRouteSnapshot? mcpRouteSnapshot;
+  final List<AttachmentInfo> workspaceAttachments;
+  final ProviderConfig cfg;
+}
+
 class PreparedGeneration {
   final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> toolDefs;
   final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
   final List<String> lastUserImagePaths;
+  final Object? contextUsageConfiguration;
+  final int? contextUsageRevision;
 
   PreparedGeneration({
     required this.apiMessages,
@@ -73,6 +105,8 @@ class PreparedGeneration {
     this.onToolCall,
     required this.hasBuiltInSearch,
     required this.lastUserImagePaths,
+    this.contextUsageConfiguration,
+    this.contextUsageRevision,
   });
 }
 
@@ -106,7 +140,6 @@ class MessageGenerationService {
   OnScrollToBottom? onScrollToBottom;
   OnShowError? onShowError;
   OnShowWarning? onShowWarning;
-  OnHapticFeedback? onHapticFeedback;
 
   /// Called when file processing starts for the assistant message [messageId].
   void Function(String messageId)? onFileProcessingStarted;
@@ -116,16 +149,13 @@ class MessageGenerationService {
   void Function(String? messageId)? onFileProcessingFinished;
 
   /// Check if reasoning is enabled for given budget
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true;
-    if (budget == -1) return true;
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return r.level != ReasoningLevel.off;
   }
 
-  /// Prepare API messages with all injections applied.
-  /// [requiredAttachmentMessageId] identifies a new submission; retries and
-  /// historical context can legitimately reference attachments since removed.
-  Future<PreparedGeneration> prepareApiMessagesWithInjections({
+  /// Packs system prompt, injections, history, and tool definitions without
+  /// OCR, document extraction, or inline-image encoding.
+  Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
@@ -134,12 +164,14 @@ class MessageGenerationService {
     required String? assistantId,
     required String providerKey,
     required String modelId,
-    ToolApprovalService? approvalService,
-    AskUserInteractionService? askUserService,
-    String? processingMessageId,
     String? requiredAttachmentMessageId,
+    bool syncWorkspaceAttachments = true,
+    bool persistWorldBookActivation = true,
+    void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
-    final cfg = settings.getProviderConfig(providerKey);
+    final cfg = settings
+        .getProviderConfig(providerKey)
+        .forModelProtocol(modelId);
     final kind = ProviderConfig.classify(
       providerKey,
       explicitType: cfg.providerType,
@@ -156,15 +188,20 @@ class MessageGenerationService {
       externalMounts = contextProvider.read<ExternalMountsProvider?>();
     } catch (_) {}
 
-    // Build API messages
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
       versionSelections: versionSelections,
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
+      preserveToolTurns: kind == ProviderKind.openai,
+      claudeSource: kind == ProviderKind.claude
+          ? (providerId: providerKey, modelId: modelId)
+          : null,
+      responsesScope: kind == ProviderKind.openai && cfg.useResponseApi == true
+          ? responsesReplayScope(cfg, modelId)
+          : null,
     );
 
-    // Apply assistant replace-only regexes at send-time (visual stays unchanged).
     if (assistant != null && assistant.regexRules.isNotEmpty) {
       for (int i = 0; i < apiMessages.length; i++) {
         final role = (apiMessages[i]['role'] ?? '').toString();
@@ -185,9 +222,6 @@ class MessageGenerationService {
         : chatService.getConversation(currentConversation.id) ??
               currentConversation;
 
-    // Inject prompts first so WorldBook can scan the full untrimmed history
-    // (same keyword trigger range as before OCR-after-trim). Document/OCR work
-    // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(
       apiMessages,
       assistant,
@@ -223,6 +257,8 @@ class MessageGenerationService {
       assistantId,
       conversation: promptConversation,
       conversationScoped: assistant?.allowConversationPromptInjection ?? false,
+      persistActivation: persistWorldBookActivation,
+      onActivationPersisted: onWorldBookActivationPersisted,
       sourceMessages: messageBuilderService.collapseVersions(
         messages,
         versionSelections,
@@ -245,7 +281,9 @@ class MessageGenerationService {
         assistant: assistant,
         conversation: currentConversation,
       );
-      if (workspaceContext != null && !workspaceContext.skillsOnly) {
+      if (syncWorkspaceAttachments &&
+          workspaceContext != null &&
+          !workspaceContext.skillsOnly) {
         workspaceAttachments = await syncAttachments(
           workspaceContext,
           messages,
@@ -263,8 +301,6 @@ class MessageGenerationService {
       }
     } catch (e) {
       if (workspaceContext != null && !workspaceContext.skillsOnly) {
-        // Let the existing generation error UI offer retry. Continuing here
-        // would silently send without the attachments the user selected.
         rethrow;
       }
       debugPrint('Workspace prompt/attachments failed: $e');
@@ -276,18 +312,8 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
     );
 
-    // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
-    // document extraction must run only on this retained set so images that will
-    // not be sent are never processed (#769).
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
-    // Only this step does the actual attachment work (document extraction and
-    // OCR), so the indicator must not cover the injection/trim passes above —
-    // and it only claims to be parsing files when the retained messages really
-    // carry files to parse. A text-only send that is merely slow (frozen prompt
-    // reads, memory injection, templating) must never show the bar.
-    // Tools are assembled first: whether a data file is read into the prompt
-    // or left for the sandbox depends on which tools go with it.
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,
     );
@@ -301,18 +327,159 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
       conversationId: currentConversation?.id,
     );
+    return UnprocessedRequestContext(
+      apiMessages: apiMessages,
+      toolDefs: toolDefs,
+      hasBuiltInSearch: hasBuiltInSearch,
+      workspaceContext: workspaceContext,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceAttachments: workspaceAttachments,
+      cfg: cfg,
+    );
+  }
+
+  Future<ContextAssemblyPreview> previewContextAssembly({
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+  }) async {
+    final settings = contextProvider.read<SettingsProvider>();
+    Assistant? assistant;
+    try {
+      final assistants = contextProvider.read<AssistantProvider>();
+      assistant = assistantId == null ? null : assistants.getById(assistantId);
+    } catch (_) {}
+    final conversation = chatService.getConversation(conversationId);
+    final messages = await chatService.loadMessages(conversationId);
+    final packed = await assembleUnprocessedRequestContext(
+      messages: messages,
+      versionSelections: chatService.getVersionSelections(conversationId),
+      currentConversation: conversation,
+      settings: settings,
+      assistant: assistant,
+      assistantId: assistantId,
+      providerKey: providerKey,
+      modelId: modelId,
+      syncWorkspaceAttachments: false,
+      persistWorldBookActivation: false,
+    );
+    // Reuse the send path to include the live memory snapshot and frozen user
+    // prompts. Previewing must never freeze a draft, run OCR, or write extras.
+    await messageBuilderService.processUserMessagesForApi(
+      packed.apiMessages,
+      settings,
+      assistant,
+      conversation: conversation,
+      sourceMessages: messages,
+      previewOnly: true,
+      nativePdfInput: ModelSpecResolver.instance
+          .spec(packed.cfg, modelId)
+          .supportsPdfInput,
+    );
+    return ContextAssemblyPreview.fromApiMessages(
+      apiMessages: packed.apiMessages,
+      mcpToolNames: {
+        for (final tool in packed.toolDefs)
+          if (tool['function'] case {'name': final String name})
+            if (packed.mcpRouteSnapshot?.containsExposedName(name) ?? false)
+              name,
+      },
+      tools: packed.toolDefs,
+      images: imageRefsFromApiMessages(
+        packed.apiMessages,
+        sourceMessages: messages,
+      ),
+    );
+  }
+
+  /// Prepare API messages with all injections applied.
+  /// [requiredAttachmentMessageId] identifies a new submission; retries and
+  /// historical context can legitimately reference attachments since removed.
+  Future<PreparedGeneration> prepareApiMessagesWithInjections({
+    required List<ChatMessage> messages,
+    required Map<String, int> versionSelections,
+    required Conversation? currentConversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    required String? assistantId,
+    required String providerKey,
+    required String modelId,
+    ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
+    String? processingMessageId,
+    String? requiredAttachmentMessageId,
+  }) async {
+    var requestRevision = currentConversation == null
+        ? null
+        : chatService.contextRevision(currentConversation.id);
+    final instructions = contextProvider.read<InstructionInjectionProvider?>();
+    final worldBooks = contextProvider.read<WorldBookProvider?>();
+    await instructions?.initialize();
+    await worldBooks?.initialize();
+    final configuration = contextUsageConfiguration(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      providerKey: providerKey,
+      modelId: modelId,
+      assistant: assistant,
+      assistantId: assistantId,
+      instructions: instructions,
+      worldBooks: worldBooks,
+      conversation: currentConversation == null
+          ? null
+          : chatService.getConversation(currentConversation.id) ??
+                currentConversation,
+    );
+    final requestConfiguration = (
+      settings: configuration.settings,
+      memorySnapshotHash: await readContextMemorySnapshotHash(
+        repository: chatService.chatRepositoryOrNull,
+        settings: settings,
+        assistant: assistant,
+      ),
+    );
+    final packed = await assembleUnprocessedRequestContext(
+      messages: messages,
+      versionSelections: versionSelections,
+      currentConversation: currentConversation,
+      settings: settings,
+      assistant: assistant,
+      assistantId: assistantId,
+      providerKey: providerKey,
+      modelId: modelId,
+      requiredAttachmentMessageId: requiredAttachmentMessageId,
+      onWorldBookActivationPersisted: (before, after) {
+        // Accept only this preparation's own write. A history edit before or
+        // during persistence invalidates provenance and must not be rebased.
+        requestRevision = requestRevision == before && after == before + 1
+            ? after
+            : null;
+      },
+    );
+    final cfg = packed.cfg;
+    final apiMessages = packed.apiMessages;
+    final toolDefs = packed.toolDefs;
+    final hasBuiltInSearch = packed.hasBuiltInSearch;
+    final workspaceContext = packed.workspaceContext;
+    final mcpRouteSnapshot = packed.mcpRouteSnapshot;
+    final workspaceAttachments = packed.workspaceAttachments;
+    final nativePdfInput = ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .supportsPdfInput;
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
       clientTools: toolDefs,
     );
+    final resolvedWorkspace = workspaceContext;
     final hasWorkspaceFileTools =
-        workspaceContext != null &&
-        !workspaceContext.skillsOnly &&
+        resolvedWorkspace != null &&
+        !resolvedWorkspace.skillsOnly &&
         toolDefs.any((tool) {
           final name = (tool['function'] as Map?)?['name'];
           return (name == 'read_file' || name == 'shell') &&
-              workspaceContext!.workspace.isToolEnabled(name as String);
+              resolvedWorkspace.workspace.isToolEnabled(name as String);
         });
     final localAttachments = <String, AttachmentInfo>{
       if (hasWorkspaceFileTools)
@@ -326,6 +493,7 @@ class MessageGenerationService {
               conversation: currentConversation,
               sourceMessages: messages,
               sandboxDataFiles: sandboxDataFiles,
+              nativePdfInput: nativePdfInput,
               workspaceAttachments: localAttachments,
             )
         ? processingMessageId
@@ -343,6 +511,7 @@ class MessageGenerationService {
             conversation: currentConversation,
             sourceMessages: messages,
             sandboxDataFiles: sandboxDataFiles,
+            nativePdfInput: nativePdfInput,
             workspaceAttachments: localAttachments,
           );
     } on AttachmentRequiresWorkspace catch (e) {
@@ -390,6 +559,8 @@ class MessageGenerationService {
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
+      contextUsageConfiguration: requestConfiguration,
+      contextUsageRevision: requestRevision,
     );
   }
 
@@ -446,6 +617,7 @@ class MessageGenerationService {
       userParts: userParts,
       modelId: modelId,
       providerId: providerKey,
+      draftSubmission: input.draftSubmission,
     );
     return (
       userMessage: result.userMessage!,
@@ -618,14 +790,13 @@ class MessageGenerationService {
     bool scheduledNotify = true,
     bool scheduledPreview = true,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = settings.ocrActive;
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
+      contextUsageConfiguration: prepared.contextUsageConfiguration,
+      contextUsageRevision: prepared.contextUsageRevision,
       userImagePaths: userImagePaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
@@ -808,71 +979,28 @@ class MessageGenerationService {
     return deletedIds;
   }
 
-  bool _shouldIncludeAudioForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    // Former Omni audio allowlist removed; OpenAI-compatible providers do not
-    // receive special audio attachment support via this gate.
-    return false;
-  }
-
-  bool supportsAudioAttachmentsForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    return _shouldIncludeAudioForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
-  }
-
   String _effectiveAttachmentMime(DocumentAttachment attachment) {
     return resolveDocumentAttachmentMime(attachment);
   }
 
-  bool inputContainsAudioAttachments(ChatInputData input) {
-    for (final attachment in input.documents) {
-      if (isAudioMime(_effectiveAttachmentMime(attachment))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  bool apiMessagesContainAudioAttachments(List<Map<String, dynamic>> messages) {
-    for (final message in messages) {
-      for (final ref in parseInternalMediaRefs(
-        message[MessageBuilderService.internalMediaPathsKey],
-      )) {
-        final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
-            ? ref.mime!.trim()
-            : inferMediaMimeFromSource(ref.uri);
-        if (isAudioMime(mime)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  List<String> _filterMediaPathsForProvider(
+  /// Image / audio / video the [spec] can read. Documents are never included.
+  @visibleForTesting
+  static List<String> filterMediaPathsForProvider(
     List<String> paths, {
-    required bool includeAudio,
+    required ModelSpec spec,
   }) {
-    return paths
-        .where((path) {
-          final mime = inferMediaMimeFromSource(
-            path,
-            fallbackMime: 'image/png',
-          );
-          if (isAudioMime(mime)) return includeAudio;
-          return isImageMime(mime) || isVideoMime(mime);
-        })
-        .toList(growable: false);
+    return [
+      for (final path in paths)
+        if (_specAcceptsGatedMediaPath(path, spec)) path,
+    ];
+  }
+
+  static bool _specAcceptsGatedMediaPath(String path, ModelSpec spec) {
+    final mime = inferMediaMimeFromSource(path, fallbackMime: 'image/png');
+    if (isAudioMime(mime)) return spec.supportsAudioInput;
+    if (isVideoMime(mime)) return spec.supportsVideoInput;
+    if (isImageMime(mime)) return spec.supportsImageInput;
+    return false;
   }
 
   /// Build user image paths considering OCR mode.
@@ -883,33 +1011,27 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
-
-    final includeAudio = _shouldIncludeAudioForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
+    final bool ocrActive = settings.ocrActive;
+    final spec = ModelSpecResolver.instance.spec(
+      settings.getProviderConfig(providerKey),
+      modelId,
     );
 
     if (input != null) {
       final currentMediaPaths = <String>[];
       for (final d in input.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
-        if (isVideoMime(effectiveMime) ||
-            (includeAudio && isAudioMime(effectiveMime))) {
+        if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           currentMediaPaths.add(d.path);
         }
       }
-      return _filterMediaPathsForProvider(<String>[
+      return filterMediaPathsForProvider(<String>[
         if (!ocrActive) ...input.imagePaths,
         ...currentMediaPaths,
-      ], includeAudio: includeAudio);
+      ], spec: spec);
     }
 
-    return _filterMediaPathsForProvider(
+    return filterMediaPathsForProvider(
       lastUserImagePaths
           .where((path) {
             if (!ocrActive) return true;
@@ -918,7 +1040,7 @@ class MessageGenerationService {
             );
           })
           .toList(growable: false),
-      includeAudio: includeAudio,
+      spec: spec,
     );
   }
 
@@ -940,6 +1062,7 @@ class MessageGenerationService {
       return WorkspaceToolContext.skillsOnly(
         skillsHostDir: skillsService.skillsDirectory.path,
         conversationId: conversation?.id,
+        assistantId: conversation?.assistantId,
       );
     } catch (_) {
       return null;

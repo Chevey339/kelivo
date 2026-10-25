@@ -172,13 +172,13 @@ class KelivoFetchRequestPayload {
 }
 
 class KelivoFetcher {
-  static const _defaultUA =
+  static const userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   static Future<http.Response> _fetch(KelivoFetchRequestPayload payload) async {
     try {
       final merged = <String, String>{
-        'User-Agent': _defaultUA,
+        'User-Agent': userAgent,
         ...payload.headers,
       };
       if (payload.method == 'POST') {
@@ -242,9 +242,28 @@ class KelivoFetcher {
     }
   }
 
+  /// Title and compact Markdown of a fetched page, for readers that need the
+  /// page itself rather than a bounded MCP tool result.
+  static ({String title, String content}) readablePage(http.Response resp) {
+    final contentType = (resp.headers['content-type'] ?? '').toLowerCase();
+    final body = _decodeBody(resp, contentType: contentType);
+    if (_isHtml(body, contentType: contentType)) {
+      final document = html_parser.parse(body);
+      final title = document.querySelector('title')?.text ?? '';
+      return (
+        title: title.replaceAll(RegExp(r'\s+'), ' ').trim(),
+        content: _documentToMarkdown(document, body),
+      );
+    }
+    return (
+      title: '',
+      content: _contentForModel(body, contentType: contentType),
+    );
+  }
+
   static String _contentForModel(String body, {required String contentType}) {
     if (_isHtml(body, contentType: contentType)) {
-      return _htmlToMarkdown(body);
+      return _documentToMarkdown(html_parser.parse(body), body);
     }
     if (contentType.contains('application/json') ||
         contentType.contains('+json')) {
@@ -270,8 +289,7 @@ class KelivoFetcher {
     ).hasMatch(prefix);
   }
 
-  static String _htmlToMarkdown(String html) {
-    final dom.Document document = html_parser.parse(html);
+  static String _documentToMarkdown(dom.Document document, String html) {
     document
         .querySelectorAll(
           'script,style,noscript,template,svg,iframe,nav,aside,footer,form',

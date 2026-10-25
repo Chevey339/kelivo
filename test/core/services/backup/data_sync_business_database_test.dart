@@ -141,7 +141,16 @@ void main() {
               chatService: ChatService(),
               businessRepository: repository,
             ).prepareBackupFile(
-              const WebDavConfig(includeChats: false, includeFiles: false),
+              const WebDavConfig(
+                scope: BackupScope(
+                  excluded: {
+                    BackupCategory.chats,
+                    BackupCategory.files,
+                    BackupCategory.skills,
+                    BackupCategory.workspaces,
+                  },
+                ),
+              ),
             );
 
         final settings = await _readBackupSettings(backup);
@@ -236,7 +245,9 @@ void main() {
                 chatService: ChatService(),
                 businessRepository: sourceRepository,
               ).prepareBackupFile(
-                const WebDavConfig(includeChats: false, includeFiles: true),
+                const WebDavConfig(
+                  scope: BackupScope(excluded: {BackupCategory.chats}),
+                ),
               );
         } finally {
           await sourceDatabase.close();
@@ -277,7 +288,9 @@ void main() {
             businessPreferences: businessPreferences,
           ).restoreFromLocalFile(
             backup,
-            const WebDavConfig(includeChats: false, includeFiles: true),
+            const WebDavConfig(
+              scope: BackupScope(excluded: {BackupCategory.chats}),
+            ),
           );
 
           await expectLater(
@@ -366,7 +379,16 @@ void main() {
                   chatService: ChatService(),
                   businessRepository: sourceRepository,
                 ).prepareBackupFile(
-                  const WebDavConfig(includeChats: false, includeFiles: false),
+                  const WebDavConfig(
+                    scope: BackupScope(
+                      excluded: {
+                        BackupCategory.chats,
+                        BackupCategory.files,
+                        BackupCategory.skills,
+                        BackupCategory.workspaces,
+                      },
+                    ),
+                  ),
                 );
           } finally {
             await sourceDatabase.close();
@@ -382,7 +404,16 @@ void main() {
               businessRepository: targetRepository,
             ).restoreFromLocalFile(
               backup,
-              const WebDavConfig(includeChats: false, includeFiles: false),
+              const WebDavConfig(
+                scope: BackupScope(
+                  excluded: {
+                    BackupCategory.chats,
+                    BackupCategory.files,
+                    BackupCategory.skills,
+                    BackupCategory.workspaces,
+                  },
+                ),
+              ),
               mode: mode,
             );
 
@@ -429,7 +460,9 @@ void main() {
                 chatService: ChatService(),
                 businessRepository: sourceRepository,
               ).prepareBackupFile(
-                const WebDavConfig(includeChats: false, includeFiles: true),
+                const WebDavConfig(
+                  scope: BackupScope(excluded: {BackupCategory.chats}),
+                ),
               );
         } finally {
           await sourceDatabase.close();
@@ -461,7 +494,9 @@ void main() {
             businessRepository: targetRepository,
           ).restoreFromLocalFile(
             backup,
-            const WebDavConfig(includeChats: false, includeFiles: true),
+            const WebDavConfig(
+              scope: BackupScope(excluded: {BackupCategory.chats}),
+            ),
             mode: RestoreMode.merge,
           );
 

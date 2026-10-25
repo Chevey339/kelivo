@@ -29,6 +29,7 @@ Future<String?> ensureConversationId(
   try {
     final draft = await chat.createDraftConversation(
       assistantId: resolvedAssistantId,
+      reuseNewEntry: true,
     );
     return draft.id;
   } catch (_) {

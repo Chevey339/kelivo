@@ -12,7 +12,7 @@ class ReasoningBudgetCustomDialog {
     final controller = TextEditingController(text: initialValue.toString());
 
     int? parseValue() => int.tryParse(controller.text.trim());
-    bool isValid(int? v) => v != null && (v == -1 || v >= 0);
+    bool isValid(int? v) => v != null && v > 0;
 
     try {
       return await showDialog<int>(
@@ -31,20 +31,16 @@ class ReasoningBudgetCustomDialog {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                title: Text(l10n.reasoningBudgetSheetCustomLabel),
+                title: Text(l10n.reasoningLevelCustomBudget),
                 content: SizedBox(
                   width: 360,
                   child: TextField(
                     controller: controller,
                     autofocus: true,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      signed: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^-?\d*$')),
-                    ],
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
-                      helperText: l10n.reasoningBudgetSheetCustomHint,
+                      helperText: l10n.reasoningLevelCustomBudgetHint,
                     ),
                     onChanged: (_) => setLocal(() {}),
                     onSubmitted: (_) => submit(),

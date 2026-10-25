@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/memory_entry.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/memory/legacy_memory_migration.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
@@ -186,7 +187,7 @@ void main() {
                 required ProviderConfig config,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest reasoning = ReasoningRequest.auto,
               }) async {
                 generatorCalls++;
                 return '[{"id":1,"type":"identity","content":"Converted"}]';
@@ -250,7 +251,7 @@ void main() {
                 required ProviderConfig config,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest reasoning = ReasoningRequest.auto,
               }) async {
                 generatorCalls++;
                 return '[{"id":1,"type":"identity","content":"Already saved"}]';
@@ -305,7 +306,7 @@ void main() {
                 required ProviderConfig config,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest reasoning = ReasoningRequest.auto,
               }) async {
                 prompts.add(prompt);
                 if (prompt.contains('First memory')) {
@@ -378,7 +379,7 @@ void main() {
               required ProviderConfig config,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest reasoning = ReasoningRequest.auto,
             }) async {
               attempts++;
               if (attempts == 1) {
@@ -421,7 +422,7 @@ void main() {
               required ProviderConfig config,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest reasoning = ReasoningRequest.auto,
             }) async {
               calls++;
               throw const FormatException('legacy_memory_response_incomplete');
@@ -471,7 +472,7 @@ void main() {
               required ProviderConfig config,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest reasoning = ReasoningRequest.auto,
             }) async {
               calls++;
               if (prompt.contains('Bad type') && prompt.contains('Keep me')) {
@@ -526,7 +527,7 @@ void main() {
               required ProviderConfig config,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest reasoning = ReasoningRequest.auto,
             }) async {
               calls++;
               throw Exception('HTTP 401: invalid api key');
@@ -593,7 +594,7 @@ void main() {
                 required ProviderConfig config,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest reasoning = ReasoningRequest.auto,
               }) async {
                 calls++;
                 throw Exception('ClientException: connection refused');
@@ -647,7 +648,7 @@ void main() {
               required ProviderConfig config,
               required String modelId,
               required String prompt,
-              int? thinkingBudget,
+              ReasoningRequest reasoning = ReasoningRequest.auto,
             }) async {
               calls++;
               throw const FormatException('legacy_memory_response_incomplete');
@@ -688,7 +689,7 @@ void main() {
                 required ProviderConfig config,
                 required String modelId,
                 required String prompt,
-                int? thinkingBudget,
+                ReasoningRequest reasoning = ReasoningRequest.auto,
               }) async {
                 expect(prompt, contains('Do not output content'));
                 return '[{"id":1,"type":"workflow"}]';

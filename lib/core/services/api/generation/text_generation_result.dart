@@ -10,12 +10,18 @@ final class TextGenerationResult {
   const TextGenerationResult({
     required this.parts,
     this.usage,
+    this.totalUsage,
     this.finishReason,
     this.reasoningDetails,
   });
 
   final List<MessagePart> parts;
+
+  /// Latest request, used for context accounting and the default token footer.
   final TokenUsage? usage;
+
+  /// All requests that contributed to this generation, including tool rounds.
+  final TokenUsage? totalUsage;
   final String? finishReason;
   final dynamic reasoningDetails;
 

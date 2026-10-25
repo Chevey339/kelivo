@@ -20,6 +20,9 @@ class ProviderCustomRequestEditor extends StatelessWidget {
     required this.onHeadersChanged,
     required this.onBodyChanged,
     this.showHeader = true,
+    this.showSectionTitles = true,
+    this.showHeadersSection = true,
+    this.showBodySection = true,
   });
 
   final List<Map<String, String>> headers;
@@ -27,6 +30,9 @@ class ProviderCustomRequestEditor extends StatelessWidget {
   final ProviderRequestRowsChanged onHeadersChanged;
   final ProviderRequestRowsChanged onBodyChanged;
   final bool showHeader;
+  final bool showSectionTitles;
+  final bool showHeadersSection;
+  final bool showBodySection;
 
   void _addHeader() {
     unawaited(
@@ -95,48 +101,54 @@ class ProviderCustomRequestEditor extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
-        _RequestSection(
-          title: l10n.modelDetailSheetCustomHeadersTitle,
-          addLabel: l10n.modelDetailSheetAddHeader,
-          addKey: const ValueKey('provider-custom-header-add'),
-          onAdd: _addHeader,
-          children: [
-            for (var i = 0; i < headers.length; i++)
-              _RequestRow(
-                key: ValueKey('provider-custom-header-row-$i'),
-                index: i,
-                fieldPrefix: 'header',
-                name: headers[i]['name'] ?? '',
-                value: headers[i]['value'] ?? '',
-                nameHint: l10n.modelDetailSheetHeaderKeyHint,
-                valueHint: l10n.modelDetailSheetHeaderValueHint,
-                onChanged: (name, value) => _updateHeader(i, name, value),
-                onDelete: () => _removeHeader(i),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _RequestSection(
-          title: l10n.modelDetailSheetCustomBodyTitle,
-          addLabel: l10n.modelDetailSheetAddBody,
-          addKey: const ValueKey('provider-custom-body-add'),
-          onAdd: _addBody,
-          children: [
-            for (var i = 0; i < body.length; i++)
-              _RequestRow(
-                key: ValueKey('provider-custom-body-row-$i'),
-                index: i,
-                fieldPrefix: 'body',
-                name: body[i]['key'] ?? '',
-                value: body[i]['value'] ?? '',
-                nameHint: l10n.modelDetailSheetBodyKeyHint,
-                valueHint: l10n.modelDetailSheetBodyJsonHint,
-                multilineValue: true,
-                onChanged: (key, value) => _updateBody(i, key, value),
-                onDelete: () => _removeBody(i),
-              ),
-          ],
-        ),
+        if (showHeadersSection)
+          _RequestSection(
+            title: showSectionTitles
+                ? l10n.modelDetailSheetCustomHeadersTitle
+                : null,
+            addLabel: l10n.modelDetailSheetAddHeader,
+            addKey: const ValueKey('provider-custom-header-add'),
+            onAdd: _addHeader,
+            children: [
+              for (var i = 0; i < headers.length; i++)
+                _RequestRow(
+                  key: ValueKey('provider-custom-header-row-$i'),
+                  index: i,
+                  fieldPrefix: 'header',
+                  name: headers[i]['name'] ?? '',
+                  value: headers[i]['value'] ?? '',
+                  nameHint: l10n.modelDetailSheetHeaderKeyHint,
+                  valueHint: l10n.modelDetailSheetHeaderValueHint,
+                  onChanged: (name, value) => _updateHeader(i, name, value),
+                  onDelete: () => _removeHeader(i),
+                ),
+            ],
+          ),
+        if (showHeadersSection && showBodySection) const SizedBox(height: 12),
+        if (showBodySection)
+          _RequestSection(
+            title: showSectionTitles
+                ? l10n.modelDetailSheetCustomBodyTitle
+                : null,
+            addLabel: l10n.modelDetailSheetAddBody,
+            addKey: const ValueKey('provider-custom-body-add'),
+            onAdd: _addBody,
+            children: [
+              for (var i = 0; i < body.length; i++)
+                _RequestRow(
+                  key: ValueKey('provider-custom-body-row-$i'),
+                  index: i,
+                  fieldPrefix: 'body',
+                  name: body[i]['key'] ?? '',
+                  value: body[i]['value'] ?? '',
+                  nameHint: l10n.modelDetailSheetBodyKeyHint,
+                  valueHint: l10n.modelDetailSheetBodyJsonHint,
+                  multilineValue: true,
+                  onChanged: (key, value) => _updateBody(i, key, value),
+                  onDelete: () => _removeBody(i),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -151,7 +163,7 @@ class _RequestSection extends StatelessWidget {
     required this.children,
   });
 
-  final String title;
+  final String? title;
   final String addLabel;
   final Key addKey;
   final VoidCallback onAdd;
@@ -162,18 +174,20 @@ class _RequestSection extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 440;
-        final titleWidget = Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: AppFontWeights.emphasis,
-              color: cs.onSurface.withValues(alpha: 0.8),
-            ),
-          ),
-        );
+        final isWide = constraints.maxWidth >= 440 && title != null;
+        final titleWidget = title == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Text(
+                  title!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.emphasis,
+                    color: cs.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              );
         final addButton = IosTileButton(
           key: addKey,
           label: addLabel,
@@ -189,7 +203,7 @@ class _RequestSection extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(child: titleWidget),
+                  Expanded(child: titleWidget!),
                   const SizedBox(width: 12),
                   addButton,
                 ],
@@ -205,8 +219,10 @@ class _RequestSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            titleWidget,
-            const SizedBox(height: 8),
+            if (titleWidget != null) ...[
+              titleWidget,
+              const SizedBox(height: 8),
+            ],
             ...children,
             addButton,
           ],

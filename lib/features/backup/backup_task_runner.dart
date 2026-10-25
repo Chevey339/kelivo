@@ -20,6 +20,7 @@ Future<bool> runBackupTask(
     title: title,
     task: task,
     backgroundLabel: backgroundLabel,
+    errorMessage: errorMessage,
   );
   if (!context.mounted) return false;
   if (result.backgrounded) {

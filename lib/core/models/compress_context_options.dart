@@ -1,3 +1,4 @@
+import '../utils/token_estimator.dart';
 import 'chat_message.dart';
 import '../../utils/utf16_safe_cut.dart';
 
@@ -102,31 +103,6 @@ int compressRequestCharBudget({
   final chars = (window * (1.0 - reserveFraction) * charsPerToken).floor();
   if (chars < 1) return 1;
   return chars < safeRequestChars ? chars : safeRequestChars;
-}
-
-/// Read a context-window token count from a model-override map.
-///
-/// Kelivo has no first-class [ModelInfo] context field; some imports /
-/// overrides may still store one of these keys.
-int? readModelContextWindowTokens(Map<String, dynamic>? override) {
-  if (override == null || override.isEmpty) return null;
-  const keys = <String>[
-    'contextWindow',
-    'context_window',
-    'maxContextTokens',
-    'max_context_tokens',
-    'contextLength',
-    'context_length',
-  ];
-  for (final key in keys) {
-    final raw = override[key];
-    if (raw is num && raw > 0) return raw.toInt();
-    if (raw is String) {
-      final parsed = int.tryParse(raw.trim());
-      if (parsed != null && parsed > 0) return parsed;
-    }
-  }
-  return null;
 }
 
 String buildCompressContextContent(
@@ -388,25 +364,6 @@ class CompressionTokenEstimate {
   final int maxResultTokens;
 }
 
-bool _isCjkRune(int rune) {
-  return (rune >= 0x2E80 && rune <= 0x9FFF) ||
-      (rune >= 0xF900 && rune <= 0xFAFF) ||
-      (rune >= 0xFF00 && rune <= 0xFFEF);
-}
-
-int _estimateCharsToTokens(String text) {
-  var cjk = 0;
-  var other = 0;
-  for (final rune in text.runes) {
-    if (_isCjkRune(rune)) {
-      cjk++;
-    } else {
-      other++;
-    }
-  }
-  return (cjk / 1.6 + other / 4).round();
-}
-
 /// Conservative detector for provider context-window / prompt-too-long errors.
 ///
 /// Providers surface overflow as an HTTP / provider exception whose
@@ -531,7 +488,7 @@ CompressionTokenEstimate estimateCompressionTokens({
   required String totalText,
   required String keptText,
 }) {
-  final totalTokens = _estimateCharsToTokens(totalText);
+  final totalTokens = estimateTokens(totalText);
   final totalChars = totalText.length;
   if (totalChars == 0) {
     return const CompressionTokenEstimate(

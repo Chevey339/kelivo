@@ -44,6 +44,7 @@ void main() {
       final candidate = ValidatedRestoreCandidate(
         includeChats: false,
         includeFiles: false,
+        assetRoots: const {},
         manifestSha256: _candidateHash,
         entries: const {},
         databaseInfo: null,
@@ -210,6 +211,76 @@ void main() {
       },
     );
 
+    test(
+      'partial cutover and rollback leave unselected roots untouched',
+      () async {
+        final workspace = Directory(
+          p.join(appData.path, 'workspaces', 'local'),
+        );
+        final empty = Directory(p.join(workspace.path, 'empty'));
+        await empty.create(recursive: true);
+        final script = File(p.join(workspace.path, 'run.sh'));
+        await script.writeAsString('#!/bin/sh\necho original\n');
+        if (!Platform.isWindows) {
+          final chmod = await Process.run('chmod', ['755', script.path]);
+          expect(chmod.exitCode, 0);
+          await Link(p.join(workspace.path, 'script-link')).create('run.sh');
+        }
+        final mode = (await script.stat()).mode;
+        final fixture = await _prepareCutoverFixture(
+          appData: appData,
+          runDirectory: runDirectory,
+          candidateDirectory: candidateDirectory,
+          assetRoots: const {'upload'},
+        );
+        expect(fixture.previous.plan.assets!.rootStates.keys, ['upload']);
+        // Writes after staging must survive both install and rollback.
+        await script.writeAsString('#!/bin/sh\necho latest\n');
+        Future<void> verifyWorkspace() async {
+          expect(await empty.exists(), isTrue);
+          expect(await script.readAsString(), '#!/bin/sh\necho latest\n');
+          expect((await script.stat()).mode, mode);
+          if (!Platform.isWindows) {
+            expect(
+              await Link(p.join(workspace.path, 'script-link')).target(),
+              'run.sh',
+            );
+          }
+        }
+
+        await fixture.mover.installCandidate(
+          receipt: fixture.oldRenamed,
+          candidate: fixture.candidate,
+        );
+        final installed = fixture.oldRenamed.advance(
+          RestoreReceiptState.newInstalled,
+        );
+        await fixture.mover.validateInstalled(
+          receipt: installed,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
+        );
+        await verifyWorkspace();
+        await fixture.mover.validateRollbackStart(
+          receipt: installed,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
+        );
+        final rollback = installed.advance(RestoreReceiptState.rollingBack);
+        await fixture.mover.rollbackToPrevious(
+          receipt: rollback,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
+        );
+        await fixture.mover.validateRolledBack(
+          receipt: rollback,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
+        );
+        await verifyWorkspace();
+      },
+    );
+
     test('resumes an interrupted database and asset rollback', () async {
       final fixture = await _prepareCutoverFixture(
         appData: appData,
@@ -300,6 +371,7 @@ Future<_CutoverFixture> _prepareCutoverFixture({
   required Directory appData,
   required Directory runDirectory,
   required Directory candidateDirectory,
+  Iterable<String> assetRoots = RestorePreviousAssetsPlan.rootNames,
 }) async {
   final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
   await _createDatabase(liveDatabase, conversationId: 'old');
@@ -318,7 +390,7 @@ Future<_CutoverFixture> _prepareCutoverFixture({
     candidateDatabase,
   );
   final databaseDescriptor = await _manifestDescriptor(candidateDatabase);
-  for (final root in RestorePreviousAssetsPlan.rootNames) {
+  for (final root in assetRoots) {
     await Directory(p.join(candidateDirectory.path, root)).create();
   }
   final newUpload = File(p.join(candidateDirectory.path, 'upload', 'new'));
@@ -328,12 +400,13 @@ Future<_CutoverFixture> _prepareCutoverFixture({
   await manifest.writeAsString(
     jsonEncode({
       'format': 'kelivo-backup',
-      'formatVersion': 2,
+      'formatVersion': 3,
       'payloadKind': 'sqlite',
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': 'test',
       'includeChats': true,
       'includeFiles': true,
+      'assetRoots': assetRoots.toList(),
       'database': {
         'entry': 'database/kelivo.db',
         'schemaVersion': databaseInfo.schemaVersion,
@@ -357,6 +430,7 @@ Future<_CutoverFixture> _prepareCutoverFixture({
   final bundle = await RestorePreviousBuilder.build(
     appDataDirectory: appData,
     preparedReceipt: prepared,
+    assetRoots: assetRoots,
   );
   final previousStore = RestorePreviousStore(runDirectory: runDirectory);
   final pending = await previousStore.persistPending(

@@ -796,10 +796,12 @@ class AppDatabase extends _$AppDatabase {
       'kelivo_sqlite_on_opening_isolate';
   static const _maxExecutionIsolateProbeSamples = 1000;
 
-  factory AppDatabase.open({File? file}) {
+  factory AppDatabase.open({File? file, bool requireExisting = false}) {
     final databaseFile = file;
     if (databaseFile != null) {
-      return AppDatabase(_openExecutor(databaseFile));
+      return AppDatabase(
+        _openExecutor(databaseFile, requireExisting: requireExisting),
+      );
     }
     return AppDatabase(
       LazyDatabase(() async {
@@ -807,16 +809,30 @@ class AppDatabase extends _$AppDatabase {
         if (!await dir.exists()) {
           await dir.create(recursive: true);
         }
-        return _openExecutor(File('${dir.path}/$databaseFileName'));
+        return _openExecutor(
+          File('${dir.path}/$databaseFileName'),
+          requireExisting: requireExisting,
+        );
       }),
     );
   }
 
-  static QueryExecutor _openExecutor(File file) {
+  static QueryExecutor _openExecutor(
+    File file, {
+    bool requireExisting = false,
+  }) {
+    if (requireExisting &&
+        FileSystemEntity.typeSync(file.path, followLinks: false) !=
+            FileSystemEntityType.file) {
+      throw StateError('database_missing_with_prior_data');
+    }
     final openingIsolatePort = Isolate.current.controlPort;
     return NativeDatabase.createInBackground(
       file,
       setup: (database) {
+        if (requireExisting && database.userVersion == 0) {
+          throw StateError('database_missing_with_prior_data');
+        }
         if (!AppDatabase.acceptsLiveSchema(database.userVersion)) {
           throw StateError('database_schema_version');
         }

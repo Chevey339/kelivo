@@ -140,8 +140,8 @@ class _TranslatePageState extends State<TranslatePage> {
         messages: [
           {'role': 'user', 'content': p},
         ],
-        thinkingBudget: settings.translateGenerationThinkingBudgetFor(
-          context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
+        reasoning: settings.translateGenerationReasoningFor(
+          context.read<AssistantProvider>().currentAssistant,
         ),
         requestId: _requestId,
         parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,

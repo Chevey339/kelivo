@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -466,20 +468,11 @@ class FileBrowserOps {
     final destResolved = resolveInsideRoot(rootPath, dest.path);
     // Destination may be outside the workspace (temp / user-chosen save).
     final destPath = destResolved ?? dest.path;
-    final archive = Archive();
-    await for (final entity in Directory(
-      resolved,
-    ).list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
-      final filePath = resolveInsideRoot(rootPath, entity.path);
-      if (filePath == null) continue;
-      final rel = p.relative(filePath, from: resolved).replaceAll('\\', '/');
-      archive.addFile(ArchiveFile.bytes(rel, await entity.readAsBytes()));
+    if (isWithinRoot(resolved, destPath)) {
+      throw StateError('ZIP destination must be outside the source directory');
     }
-    final out = File(destPath);
-    await out.parent.create(recursive: true);
-    await out.writeAsBytes(ZipEncoder().encodeBytes(archive), flush: true);
-    return out;
+    await Isolate.run(() => _writeDirectoryZip(rootPath, resolved, destPath));
+    return File(destPath);
   }
 
   static String _relChild(String rootPath, String parentPath, String name) {
@@ -496,6 +489,114 @@ class FileBrowserOps {
       await File(source).rename(dest);
     }
   }
+}
+
+Future<void> _writeDirectoryZip(
+  String rootPath,
+  String sourcePath,
+  String destPath,
+) async {
+  final dest = File(destPath);
+  dest.parent.createSync(recursive: true);
+  final scratch = dest.parent.createTempSync('kelivo_zip_');
+  OutputFileStream? output;
+  try {
+    output = OutputFileStream(destPath);
+    try {
+      final encoder = ZipEncoder()..startEncode(output);
+      final buffer = Uint8List(1024 * 1024);
+      await for (final entity in Directory(
+        sourcePath,
+      ).list(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        final filePath = FileBrowserOps.resolveInsideRoot(
+          rootPath,
+          entity.path,
+        );
+        if (filePath == null) continue;
+        final name = p
+            .relative(filePath, from: sourcePath)
+            .replaceAll('\\', '/');
+        final compressedPath = p.join(scratch.path, 'entry.deflate');
+        final (size, crc) = _deflateFile(entity, compressedPath, buffer);
+        final input = InputFileStream(compressedPath);
+        try {
+          final entry =
+              ArchiveFile.file(name, size, _DeflatedFileContent(input))
+                ..compression = CompressionType.deflate
+                ..crc32 = crc;
+          final stat = entity.statSync();
+          entry.mode = stat.mode;
+          entry.lastModTime = stat.modified.millisecondsSinceEpoch ~/ 1000;
+          encoder.add(entry);
+        } finally {
+          input.closeSync();
+        }
+      }
+      encoder.endEncode();
+    } finally {
+      output.closeSync();
+    }
+  } catch (_) {
+    if (output != null && dest.existsSync()) dest.deleteSync();
+    rethrow;
+  } finally {
+    scratch.deleteSync(recursive: true);
+  }
+}
+
+// ZipEncoder's normal deflate path buffers all compressed bytes in memory.
+// Compress one file at a time to disk, then let the library stream that data
+// into the ZIP and handle its headers/ZIP64. Only entry metadata accumulates.
+(int, int) _deflateFile(File file, String outputPath, Uint8List buffer) {
+  final output = OutputFileStream(outputPath);
+  try {
+    final input = file.openSync();
+    try {
+      final sink = ZLibCodec(
+        level: DeflateLevel.bestSpeed,
+        raw: true,
+      ).encoder.startChunkedConversion(_ZipCompressionSink(output));
+      var size = 0;
+      var crc = 0;
+      try {
+        while (true) {
+          final read = input.readIntoSync(buffer);
+          if (read == 0) break;
+          final chunk = Uint8List.sublistView(buffer, 0, read);
+          size += read;
+          crc = getCrc32(chunk, crc);
+          sink.add(chunk);
+        }
+      } finally {
+        sink.close();
+      }
+      return (size, crc);
+    } finally {
+      input.closeSync();
+    }
+  } finally {
+    output.closeSync();
+  }
+}
+
+class _ZipCompressionSink implements Sink<List<int>> {
+  _ZipCompressionSink(this.output);
+
+  final OutputFileStream output;
+
+  @override
+  void add(List<int> data) => output.writeBytes(data);
+
+  @override
+  void close() => output.flush();
+}
+
+class _DeflatedFileContent extends FileContentStream {
+  _DeflatedFileContent(super.stream);
+
+  @override
+  bool get isCompressed => true;
 }
 
 class WorkspaceModelPaths {

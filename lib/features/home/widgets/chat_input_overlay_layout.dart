@@ -13,6 +13,8 @@ class ChatInputOverlayLayout extends StatelessWidget {
 
   static const double _topOverlayTailHeight = 16;
   static const double _bottomOverlayFadeHeight = 180;
+  // Leaves room for badges riding 12px above the composer's top edge.
+  static const double _bottomOverlayTopGap = 12;
 
   final double topInset;
   final Widget content;
@@ -89,13 +91,11 @@ class ChatInputOverlayLayout extends StatelessWidget {
             ],
           ),
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: UnconstrainedBox(
-            constrainedAxis: Axis.horizontal,
-            alignment: Alignment.bottomCenter,
-            child: bottomOverlay,
-          ),
+        // The overlay may grow up to the top bar (an expanded composer does)
+        // but never behind it.
+        Positioned.fill(
+          top: topInset + _bottomOverlayTopGap,
+          child: Align(alignment: Alignment.bottomCenter, child: bottomOverlay),
         ),
       ],
     );

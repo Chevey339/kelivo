@@ -4,14 +4,19 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../custom_request_merger.dart';
 import '../../../models/token_usage.dart';
-import '../../../providers/model_provider.dart';
+import '../../../models/model_spec.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../native_input_attachments.dart';
+import '../tool_result_content.dart';
+import '../../model_spec/model_spec_resolver.dart';
+import '../reasoning/reasoning_dialects.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
 import '../stream/sse_framing.dart';
@@ -29,7 +34,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -48,7 +53,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
     modelId,
     messages,
     userImagePaths: userImagePaths,
-    thinkingBudget: thinkingBudget,
+    reasoning: reasoning,
     temperature: temperature,
     topP: topP,
     maxTokens: maxTokens,
@@ -120,8 +125,8 @@ Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
     final jsonStr = (cfg.serviceAccountJson ?? '').trim();
     if (jsonStr.isEmpty) {
       // Fallback: some users may paste a temporary OAuth token into apiKey
-      if (cfg.apiKey.isNotEmpty) return cfg.apiKey;
-      return null;
+      final key = effectiveApiKey(cfg);
+      return key.isEmpty ? null : key;
     }
     try {
       return await GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
@@ -133,44 +138,13 @@ Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
   return null;
 }
 
-int _getMaxOutputTokensForClaudeModel(String modelId) {
-  // Limits based on Google Vertex AI documentation
-  switch (modelId) {
-    case 'claude-fable-5-1':
-    case 'claude-fable-5':
-    case 'claude-opus-5':
-    case 'claude-opus-4-8':
-    case 'claude-opus-4-7':
-    case 'claude-opus-4-6':
-    case 'claude-sonnet-5':
-    case 'claude-sonnet-4-6':
-      return 128000;
-    case 'claude-opus-4-5@20251101':
-    case 'claude-sonnet-4-5@20250929':
-    case 'claude-haiku-4-5@20251001':
-    case 'claude-sonnet-4@20250514':
-      return 64000;
-    case 'claude-opus-4-1@20250805':
-    case 'claude-opus-4@20250514':
-      return 32000;
-    case 'claude-3-haiku@20240307':
-      return 8000;
-    case 'claude-3-5-sonnet@20240620':
-    case 'claude-3-5-sonnet-v2@20241022':
-      return 8192;
-    default:
-      // Fallback for older models
-      return 4096;
-  }
-}
-
 Stream<StreamChunk> sendGoogleVertexClaudeStream({
   required http.Client client,
   required ProviderConfig config,
   required String modelId,
   required List<Map<String, dynamic>> messages,
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -186,36 +160,9 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final loc = (config.location ?? 'us-central1').trim();
   final proj = (config.projectId ?? '').trim();
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
-  // Vertex AI Anthropic URL
-  final host = (loc.toLowerCase() == 'global')
-      ? 'aiplatform.googleapis.com'
-      : '$loc-aiplatform.googleapis.com';
   final url = Uri.parse(
-    'https://$host/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
+    '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
   );
-
-  final isReasoning = effectiveModelInfo(
-    config,
-    modelId,
-  ).abilities.contains(ModelAbility.reasoning);
-
-  // Determine effective max_tokens based on model capabilities
-  int effectiveMaxTokens =
-      maxTokens ?? _getMaxOutputTokensForClaudeModel(upstreamId);
-
-  // Ensure thinking_budget < max_tokens (API requirement)
-  int? effectiveThinkingBudget = thinkingBudget;
-  if (isReasoning &&
-      effectiveThinkingBudget != null &&
-      effectiveThinkingBudget > 0) {
-    if (effectiveThinkingBudget >= effectiveMaxTokens) {
-      // Reserve at least 1k tokens for response content
-      effectiveThinkingBudget = effectiveMaxTokens - 1024;
-      if (effectiveThinkingBudget < 1024) {
-        effectiveThinkingBudget = 1024; // floor
-      }
-    }
-  }
 
   final requestHeaders = <String, String>{'Content-Type': 'application/json'};
   final token = await maybeVertexAccessToken(config);
@@ -247,18 +194,66 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         ..remove(multimodalInternalRevisionIdKey)
         ..remove(multimodalInternalClaudeContainerKey)
         ..remove(multimodalInternalClaudeTurnKey)
+        ..remove(multimodalInternalClaudeThinkingRecoveryKey)
         ..remove(multimodalInternalGeminiThoughtSignatureKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }
 
   // Transform messages + images (Force Base64 for Vertex)
+  final canImageInput = ModelSpecResolver.instance
+      .spec(config, modelId)
+      .input
+      .contains(Modality.image);
   final initialMessages = <Map<String, dynamic>>[];
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
-    final isLast = i == nonSystemMessages.length - 1;
+    final isLast =
+        i == nonSystemMessages.lastIndexWhere((m) => m['role'] == 'user');
     final roleName = (m['role'] ?? 'user').toString();
     final raw = (m['content'] ?? '').toString();
+    if (roleName == 'tool') {
+      initialMessages.add({
+        'role': 'user',
+        'content': [
+          {
+            'type': 'tool_result',
+            'tool_use_id': m['tool_call_id'],
+            'content': (await ToolResultContent.read(
+              (m['name'] ?? '').toString(),
+              raw,
+              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              canImageInput: canImageInput,
+            )).claudeContent,
+          },
+        ],
+      });
+      continue;
+    }
+    if (roleName == 'assistant' && m['tool_calls'] is List) {
+      final content = <Map<String, dynamic>>[
+        if (raw.trim().isNotEmpty) {'type': 'text', 'text': raw},
+      ];
+      for (final call in (m['tool_calls'] as List).whereType<Map>()) {
+        final fn = call['function'];
+        if (fn is! Map) continue;
+        Map<String, dynamic> args;
+        try {
+          args = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
+              .cast<String, dynamic>();
+        } catch (_) {
+          args = {};
+        }
+        content.add({
+          'type': 'tool_use',
+          'id': call['id'],
+          'name': fn['name'],
+          'input': args,
+        });
+      }
+      initialMessages.add({'role': 'assistant', 'content': content});
+      continue;
+    }
     // Semantic media detection only - custom attachment markers are not
     // recognized. Attachments arrive via structured media-path keys /
     // userImagePaths, plus Markdown ![](...).
@@ -273,10 +268,18 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && roleName == 'user' && (userImagePaths?.isNotEmpty == true);
+    final nativeParts = await NativeInputAttachments(
+      config: config,
+      spec: ModelSpecResolver.instance.spec(config, modelId),
+      protocol: NativeInputProtocol.claude,
+    ).build(m, userPaths: isLast ? userImagePaths : null);
 
     if ((roleName == 'user' || roleName == 'assistant') &&
-        (hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
-      final parts = <Map<String, dynamic>>[];
+        (hasMarkdownImages ||
+            hasInternalMedia ||
+            hasAttachedImages ||
+            nativeParts.isNotEmpty)) {
+      final parts = <Map<String, dynamic>>[...nativeParts];
       final seenSources = <String>{};
       String normalizeSrc(String src) {
         if (src.startsWith('http') || src.startsWith('data:')) return src;
@@ -475,49 +478,49 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
+      totalUsage = null;
       pendingCalls = [];
       lastStreamResults = [];
       lastText = '';
       lastAssistantBlocks = [];
       pauseTurn = false;
-      final omitSamplingParams = claudeShouldOmitSamplingParams(
-        upstreamId,
-        effectiveThinkingBudget,
-      );
-      final compatibleTopP = claudeCompatibleTopP(
-        upstreamId,
-        effectiveThinkingBudget,
-        topP,
-      );
-      final thinking = isReasoning
-          ? claudeThinkingConfig(upstreamId, effectiveThinkingBudget)
-          : null;
-      final outputConfig = isReasoning
-          ? claudeOutputConfig(upstreamId, effectiveThinkingBudget)
-          : null;
+      final spec = ModelSpecResolver.instance.spec(config, modelId);
       final body = <String, dynamic>{
         'anthropic_version': 'vertex-2023-10-16',
+        'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
+        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         'messages': convo,
         'stream': stream,
-        'max_tokens': effectiveMaxTokens,
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-        if (!omitSamplingParams &&
-            !isClaudeReasoningEnabled(effectiveThinkingBudget) &&
-            temperature != null)
-          'temperature': temperature,
-        if (compatibleTopP != null) 'top_p': compatibleTopP,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (thinking != null) 'thinking': thinking,
-        if (outputConfig != null) 'output_config': outputConfig,
       };
-      body.addAll(customBody(config, modelId, assistantBody: extraBody));
+      applyReasoning(
+        body,
+        spec,
+        reasoning,
+        transport: ReasoningTransport.anthropicMessages,
+      );
+      final resolution = resolveReasoning(spec, reasoning);
+      applySamplingPolicy(
+        body,
+        spec,
+        resolution,
+        transport: ReasoningTransport.anthropicMessages,
+      );
+      // Custom body keys win over the reasoning dialect.
+      CustomRequestMerger.applyBody(
+        body,
+        customBody(config, modelId, assistantBody: extraBody),
+      );
+      applyAnthropicMessagesProtocolConstraints(body);
 
-      final request = http.Request('POST', url);
-      request.headers.addAll(headers);
-      request.body = jsonEncode(body);
+      final httpRequest = http.Request('POST', url);
+      httpRequest.headers.addAll(headers);
+      httpRequest.body = jsonEncode(body);
 
-      final response = await client.send(request);
+      final response = await client.send(httpRequest);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
         throw HttpException('HTTP ${response.statusCode}: $errorBody');
@@ -531,9 +534,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              claudeUsageFromMap(u),
-            );
+            final next = claudeUsageFromMap(u);
+            if (next.hasReportedTokens) totalUsage = next.asSnapshot();
           }
         } catch (_) {}
         final content = (obj['content'] as List?) ?? const <dynamic>[];
@@ -624,7 +626,10 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
               if (resultChunk is ToolCallResult) {
                 decoder.recordToolResult(
                   tool.id,
-                  (resultChunk.output ?? '').toString(),
+                  ClientToolResult(
+                    (resultChunk.output ?? '').toString(),
+                    metadata: resultChunk.metadata,
+                  ),
                 );
               }
               yield resultChunk;
@@ -659,20 +664,25 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
           ),
       ];
       for (final tool in decoder.clientTools.values) {
-        var res = toolResultsContent[tool.id] ?? '';
-        if (res.isEmpty && onToolCall != null) {
+        var res = toolResultsContent[tool.id];
+        if (res == null && onToolCall != null) {
           res = ClientToolResult.fromHandler(
             await onToolCall(
               tool.name,
               tool.decodedArguments,
               toolCallId: tool.id,
             ),
-          ).content;
+          );
         }
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          'content': claudeToolResultContent(res),
+          'content': (await ToolResultContent.read(
+            tool.name,
+            res?.content ?? '',
+            metadata: res?.metadata,
+            canImageInput: canImageInput,
+          )).claudeContent,
         });
       }
     },
@@ -681,7 +691,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (pauseTurn) {
         convo = [
           ...convo,
@@ -696,7 +706,12 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': claudeToolResultContent(item.content),
+                  'content': (await ToolResultContent.read(
+                    item.call.name,
+                    item.content,
+                    metadata: item.metadata,
+                    canImageInput: canImageInput,
+                  )).claudeContent,
                 },
             ];
       convo = [
@@ -713,4 +728,29 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     ),
     usageOf: () => totalUsage,
   );
+}
+
+/// Official Vertex hosts follow [location] (global, the `us` / `eu`
+/// multi-regions, or a single region); a custom [ProviderConfig.baseUrl]
+/// (tests, gateways) is used as the origin instead.
+String vertexOrigin(ProviderConfig config, String loc) {
+  final raw = config.baseUrl.trim();
+  final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
+  // Switching a Gemini provider to Vertex keeps its Gemini API base URL.
+  final official =
+      host.isEmpty ||
+      host == 'generativelanguage.googleapis.com' ||
+      host == 'aiplatform.googleapis.com' ||
+      host.endsWith('-aiplatform.googleapis.com') ||
+      RegExp(r'^aiplatform\.[a-z]+\.rep\.googleapis\.com$').hasMatch(host);
+  if (official) {
+    final l = loc.toLowerCase();
+    final regional = switch (l) {
+      'global' => 'aiplatform.googleapis.com',
+      'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
+      _ => '$l-aiplatform.googleapis.com',
+    };
+    return 'https://$regional';
+  }
+  return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
 }

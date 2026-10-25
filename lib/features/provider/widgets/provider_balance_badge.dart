@@ -61,7 +61,11 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       config.id,
       explicitType: config.providerType,
     );
-    if (kind != ProviderKind.openai || config.balanceEnabled != true) return;
+    if (!config.enabled ||
+        kind != ProviderKind.openai ||
+        config.balanceEnabled != true) {
+      return;
+    }
 
     final key = [
       config.id,
@@ -130,7 +134,9 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       config.id,
       explicitType: config.providerType,
     );
-    if (kind != ProviderKind.openai || config.balanceEnabled != true) {
+    if (!config.enabled ||
+        kind != ProviderKind.openai ||
+        config.balanceEnabled != true) {
       return const SizedBox.shrink();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {

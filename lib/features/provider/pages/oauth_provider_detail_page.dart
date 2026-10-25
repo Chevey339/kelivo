@@ -15,7 +15,8 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
-import '../../model/widgets/model_detail_sheet.dart';
+import '../../../desktop/model_spec_edit_dialog.dart';
+import '../../model/pages/model_spec_edit_page.dart';
 import '../widgets/oauth_account_card.dart';
 import '../widgets/oauth_login_panel.dart';
 import '../widgets/provider_avatar.dart';
@@ -467,11 +468,17 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
                                       null
                                   ? null
                                   : model,
-                              onTap: () => showModelDetailSheet(
-                                context,
-                                providerKey: config.id,
-                                modelId: model,
-                              ),
+                              onTap: () => ResponsiveHelper.isDesktop(context)
+                                  ? showDesktopModelSpecEditDialog(
+                                      context,
+                                      providerKey: config.id,
+                                      modelKey: model,
+                                    )
+                                  : showModelSpecEditPage(
+                                      context,
+                                      providerKey: config.id,
+                                      modelKey: model,
+                                    ),
                             ),
                         ],
                       ),

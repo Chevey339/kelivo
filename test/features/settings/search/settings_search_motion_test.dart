@@ -792,7 +792,22 @@ void main() {
         await tester.pumpAndSettle();
         tester.view.physicalSize = const Size(600, 700);
         await tester.pumpAndSettle();
+        final view = find.byType(SettingsSearchView);
+        final target = tester.getRect(surface(view));
+        final origin = tester.getRect(
+          surface(find.byType(SettingsSearchEntry)),
+        );
         await tester.tap(find.text('取消'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 150));
+        expect(
+          tester.getRect(surface(view)),
+          Rect.lerp(
+            origin,
+            target,
+            tester.widget<SettingsSearchView>(view).transition.value,
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.byType(SettingsSearchView), findsNothing);
         expect(

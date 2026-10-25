@@ -286,114 +286,112 @@ void main() {
     _log('PTY_EXIT $code');
   }, timeout: _suiteTimeout);
 
-  testWidgets(
-    '12 WorkspaceToolsService sandboxed file + shell + escape',
-    (tester) async {
-      await tester.pump();
-      final runtimeProvider = WorkspaceRuntimeProvider()..register(h.runtime);
-      final tools = WorkspaceToolsService(runtimeProvider: runtimeProvider);
-      final now = DateTime.now().toUtc();
-      final ctx = WorkspaceToolContext(
-        workspace: Workspace(
-          id: 'verify-android',
-          name: 'verify-android',
-          kind: WorkspaceKind.managed,
-          createdAt: now,
-          updatedAt: now,
-        ),
-        binding: const WorkspaceBinding(workspaceId: 'verify-android'),
-        paths: h.paths,
-        sessionDir: h.sessionDir,
-        outputsDir: Directory(p.join(h.sessionDir.path, 'outputs')),
-        conversationId: 'verify-android-conv',
-        runtimeStatus: await h.runtime.status(),
-        runtimeRegistered: true,
-      );
+  testWidgets('12 WorkspaceToolsService sandboxed file + shell + escape', (
+    tester,
+  ) async {
+    await tester.pump();
+    final runtimeProvider = WorkspaceRuntimeProvider()..register(h.runtime);
+    final tools = WorkspaceToolsService(runtimeProvider: runtimeProvider);
+    final now = DateTime.now().toUtc();
+    final ctx = WorkspaceToolContext(
+      workspace: Workspace(
+        id: 'verify-android',
+        name: 'verify-android',
+        kind: WorkspaceKind.managed,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      binding: const WorkspaceBinding(workspaceId: 'verify-android'),
+      paths: h.paths,
+      sessionDir: h.sessionDir,
+      outputsDir: Directory(p.join(h.sessionDir.path, 'outputs')),
+      conversationId: 'verify-android-conv',
+      runtimeStatus: await h.runtime.status(),
+      runtimeRegistered: true,
+    );
 
-      Map<String, dynamic> jsonOf(Object? raw) {
-        final decoded = jsonDecode(ClientToolResult.fromHandler(raw).content);
-        return Map<String, dynamic>.from(decoded as Map);
-      }
+    Map<String, dynamic> jsonOf(Object? raw) {
+      final decoded = jsonDecode(ClientToolResult.fromHandler(raw).content);
+      return Map<String, dynamic>.from(decoded as Map);
+    }
 
-      final written = await tools.handle(ctx, 'write_file', {
-        'path': '/workspace/note.txt',
-        'content': 'hello world',
-      }, toolCallId: 'write-1');
-      final writtenBody = jsonOf(written);
-      _log('WRITE $writtenBody');
-      expect(writtenBody['ok'], isTrue);
-      expect(writtenBody['path'], '/workspace/note.txt');
+    final written = await tools.handle(ctx, 'write_file', {
+      'path': '/workspace/note.txt',
+      'content': 'hello world',
+    }, toolCallId: 'write-1');
+    final writtenBody = jsonOf(written);
+    _log('WRITE $writtenBody');
+    expect(writtenBody['ok'], isTrue);
+    expect(writtenBody['path'], '/workspace/note.txt');
 
-      final read = await tools.handle(ctx, 'read_file', {
-        'path': '/workspace/note.txt',
-      }, toolCallId: 'read-1');
-      final readText = ClientToolResult.fromHandler(read).content;
-      _log('READ $readText');
-      expect(readText, contains('hello world'));
+    final read = await tools.handle(ctx, 'read_file', {
+      'path': '/workspace/note.txt',
+    }, toolCallId: 'read-1');
+    final readText = ClientToolResult.fromHandler(read).content;
+    _log('READ $readText');
+    expect(readText, contains('hello world'));
 
-      final edited = await tools.handle(ctx, 'edit_file', {
-        'path': '/workspace/note.txt',
-        'old_string': 'hello',
-        'new_string': 'howdy',
-      }, toolCallId: 'edit-1');
-      final editedBody = jsonOf(edited);
-      final editedMeta = WorkspaceToolMetadata.fromJson(
-        ClientToolResult.fromHandler(edited).metadata!,
-      );
-      _log(
-        'EDIT body=$editedBody added=${editedMeta.added} '
-        'removed=${editedMeta.removed} strategy=${editedMeta.strategy} '
-        'diff=${editedMeta.diff}',
-      );
-      expect(editedBody['ok'], isTrue);
-      expect(editedBody['replacements'], 1);
-      expect(editedMeta.diff, isNotNull);
+    final edited = await tools.handle(ctx, 'edit_file', {
+      'path': '/workspace/note.txt',
+      'old_string': 'hello',
+      'new_string': 'howdy',
+    }, toolCallId: 'edit-1');
+    final editedBody = jsonOf(edited);
+    final editedMeta = WorkspaceToolMetadata.fromJson(
+      ClientToolResult.fromHandler(edited).metadata!,
+    );
+    _log(
+      'EDIT body=$editedBody added=${editedMeta.added} '
+      'removed=${editedMeta.removed} strategy=${editedMeta.strategy} '
+      'diff=${editedMeta.diff}',
+    );
+    expect(editedBody['ok'], isTrue);
+    expect(editedBody['replacements'], 1);
+    expect(editedMeta.diff, isNotNull);
 
-      final listing = ClientToolResult.fromHandler(
-        await tools.handle(ctx, 'list_dir', {
-          'path': '/workspace',
-        }, toolCallId: 'list-1'),
-      ).content;
-      _log('LIST_DIR $listing');
-      expect(listing, contains('note.txt'));
+    final listing = ClientToolResult.fromHandler(
+      await tools.handle(ctx, 'list_dir', {
+        'path': '/workspace',
+      }, toolCallId: 'list-1'),
+    ).content;
+    _log('LIST_DIR $listing');
+    expect(listing, contains('note.txt'));
 
-      final glob = ClientToolResult.fromHandler(
-        await tools.handle(ctx, 'glob', {
-          'pattern': '**/*.txt',
-          'path': '/workspace',
-        }, toolCallId: 'glob-1'),
-      ).content;
-      _log('GLOB $glob');
-      expect(glob, contains('note.txt'));
+    final glob = ClientToolResult.fromHandler(
+      await tools.handle(ctx, 'glob', {
+        'pattern': '**/*.txt',
+        'path': '/workspace',
+      }, toolCallId: 'glob-1'),
+    ).content;
+    _log('GLOB $glob');
+    expect(glob, contains('note.txt'));
 
-      final grep = ClientToolResult.fromHandler(
-        await tools.handle(ctx, 'grep', {
-          'pattern': 'howdy',
-          'path': '/workspace',
-        }, toolCallId: 'grep-1'),
-      ).content;
-      _log('GREP $grep');
-      expect(grep, contains('howdy'));
+    final grep = ClientToolResult.fromHandler(
+      await tools.handle(ctx, 'grep', {
+        'pattern': 'howdy',
+        'path': '/workspace',
+      }, toolCallId: 'grep-1'),
+    ).content;
+    _log('GREP $grep');
+    expect(grep, contains('howdy'));
 
-      final shell = await tools.handle(ctx, 'shell', {
-        'command': 'pwd && cat /workspace/note.txt',
-      }, toolCallId: 'shell-1');
-      final shellBody = jsonOf(shell);
-      _log('SHELL $shellBody');
-      expect(shellBody['exit_code'], 0);
-      expect(shellBody['stdout'], contains('/workspace'));
-      expect(shellBody['stdout'], contains('howdy world'));
+    final shell = await tools.handle(ctx, 'shell', {
+      'command': 'pwd && cat /workspace/note.txt',
+    }, toolCallId: 'shell-1');
+    final shellBody = jsonOf(shell);
+    _log('SHELL $shellBody');
+    expect(shellBody['exit_code'], 0);
+    expect(shellBody['stdout'], contains('/workspace'));
+    expect(shellBody['stdout'], contains('howdy world'));
 
-      final escape = await tools.handle(ctx, 'write_file', {
-        'path': '../escape',
-        'content': 'nope',
-      }, toolCallId: 'escape-1');
-      final escapeBody = jsonOf(escape);
-      _log('ESCAPE $escapeBody');
-      expect(escapeBody['error'], 'path_error');
-    },
-    timeout: _suiteTimeout,
-  );
+    final escape = await tools.handle(ctx, 'write_file', {
+      'path': '../escape',
+      'content': 'nope',
+    }, toolCallId: 'escape-1');
+    final escapeBody = jsonOf(escape);
+    _log('ESCAPE $escapeBody');
+    expect(escapeBody['error'], 'path_error');
+  }, timeout: _suiteTimeout);
 
   group('mirror guest files', () {
     testWidgets('13 MirrorService detect/apply/restore pip', (tester) async {

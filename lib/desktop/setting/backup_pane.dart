@@ -27,6 +27,9 @@ import '../../features/backup/backup_task_runner.dart';
 import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../features/backup/widgets/backup_scope_tile.dart';
+import '../../features/backup/widgets/backup_encryption_tile.dart';
+import '../../features/backup/widgets/storage_migration_notice_button.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -41,6 +44,7 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
+  String? _backupPassword;
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -55,8 +59,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   late TextEditingController _s3Prefix;
   late TextEditingController _webDavUserAgent;
   late TextEditingController _s3UserAgent;
-  bool _includeChats = true;
-  bool _includeFiles = true;
+  BackupScope _scope = const BackupScope();
   bool _s3PathStyle = true;
   bool _remoteBackupDialogActive = false;
 
@@ -70,8 +73,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _password = TextEditingController(text: cfg.password);
     _path = TextEditingController(text: cfg.path);
     _webDavUserAgent = TextEditingController(text: cfg.userAgent);
-    _includeChats = cfg.includeChats;
-    _includeFiles = cfg.includeFiles;
+    _scope = cfg.scope;
 
     final s3 = settings.s3Config;
     _s3Endpoint = TextEditingController(text: s3.endpoint);
@@ -110,8 +112,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       password: _password.text,
       path: _path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim(),
       userAgent: _webDavUserAgent.text.trim(),
-      includeChats: _includeChats,
-      includeFiles: _includeFiles,
+      scope: _scope,
     );
   }
 
@@ -129,8 +130,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? password,
     String? path,
     String? userAgent,
-    bool? includeChats,
-    bool? includeFiles,
+    BackupScope? scope,
   }) async {
     final settings = context.read<SettingsProvider>();
     final backupProvider = context.read<BackupProvider>();
@@ -142,8 +142,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           path ??
           (_path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim()),
       userAgent: userAgent ?? _webDavUserAgent.text.trim(),
-      includeChats: includeChats ?? _includeChats,
-      includeFiles: includeFiles ?? _includeFiles,
+      scope: scope ?? _scope,
     );
     await settings.setWebDavConfig(cfg);
     backupProvider.updateConfig(cfg);
@@ -164,8 +163,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           : _s3Prefix.text.trim(),
       pathStyle: _s3PathStyle,
       userAgent: _s3UserAgent.text.trim(),
-      includeChats: _includeChats,
-      includeFiles: _includeFiles,
+      scope: _scope,
     );
   }
 
@@ -187,8 +185,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? prefix,
     bool? pathStyle,
     String? userAgent,
-    bool? includeChats,
-    bool? includeFiles,
+    BackupScope? scope,
   }) async {
     final settings = context.read<SettingsProvider>();
     final s3BackupProvider = context.read<S3BackupProvider>();
@@ -208,8 +205,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               : _s3Prefix.text.trim()),
       pathStyle: pathStyle ?? _s3PathStyle,
       userAgent: userAgent ?? _s3UserAgent.text.trim(),
-      includeChats: includeChats ?? _includeChats,
-      includeFiles: includeFiles ?? _includeFiles,
+      scope: scope ?? _scope,
     );
     await settings.setS3Config(cfg);
     s3BackupProvider.updateConfig(cfg);
@@ -289,6 +285,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                         ),
                       ),
+                      StorageMigrationNoticeButton(
+                        dataDirectory: context
+                            .read<LocalSnapshotProvider>()
+                            .appDataDirectory,
+                      ),
                       if (showHeaderBusy) const SizedBox(width: 8),
                       if (showHeaderBusy)
                         SizedBox(
@@ -329,34 +330,23 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
-                    _ItemRow(
-                      label: l10n.backupPageChatsLabel,
-                      vpad: 2,
-                      trailing: IosSwitch(
-                        value: _includeChats,
-                        onChanged: busy
-                            ? null
-                            : (v) async {
-                                setState(() => _includeChats = v);
-                                await _applyPartial(includeChats: v);
-                                await _applyS3Partial(includeChats: v);
-                              },
-                      ),
+                    BackupScopeTile(
+                      desktop: true,
+                      scope: _scope,
+                      onChanged: busy
+                          ? null
+                          : (scope) async {
+                              setState(() => _scope = scope);
+                              await _applyPartial(scope: scope);
+                              if (!mounted) return;
+                              await _applyS3Partial(scope: scope);
+                            },
                     ),
-                    _rowDivider(context),
-                    _ItemRow(
-                      label: l10n.backupPageFilesLabel,
-                      vpad: 2,
-                      trailing: IosSwitch(
-                        value: _includeFiles,
-                        onChanged: busy
-                            ? null
-                            : (v) async {
-                                setState(() => _includeFiles = v);
-                                await _applyPartial(includeFiles: v);
-                                await _applyS3Partial(includeFiles: v);
-                              },
-                      ),
+                    BackupEncryptionTile(
+                      password: _backupPassword,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => _backupPassword = value),
                     ),
                   ],
                 ),
@@ -364,13 +354,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              _buildLocalBackupSliver(context, l10n, cs),
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               SliverToBoxAdapter(child: _BackupReminderDesktopSection()),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
               const SliverToBoxAdapter(child: _LocalSnapshotDesktopSection()),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-              _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -537,6 +526,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -571,6 +563,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
+                                          password: _backupPassword,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
                                         );
@@ -828,6 +821,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -863,6 +859,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       task: (handle) async {
                                         final ok = await s3BackupProvider
                                             .backup(
+                                              password: _backupPassword,
                                               onProgress: handle.report,
                                               cancelToken: handle.cancelToken,
                                             );
@@ -948,6 +945,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                       task: (handle) async {
                         file = await backupProvider.exportToFile(
+                          password: _backupPassword,
                           onProgress: handle.report,
                           cancelToken: handle.cancelToken,
                         );
@@ -959,7 +957,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       dialogTitle: l10n.backupPageExportToFile,
                       fileName: exported.uri.pathSegments.last,
                       type: FileType.custom,
-                      allowedExtensions: ['zip'],
+                      allowedExtensions: [
+                        exported.path.endsWith('.kbackup') ? 'kbackup' : 'zip',
+                      ],
                     );
                     if (savePath != null) {
                       try {
@@ -1021,6 +1021,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       mode: mode,
                       onProgress: handle.report,
                       cancelToken: handle.cancelToken,
+                      onPassword: backupPasswordPrompt(context),
+                      onForwardCompatibility: forwardCompatibilityPrompt(
+                        context,
+                      ),
                       allowUnverifiedForwardCompatible:
                           decision == ForwardCompatDecision.proceedUnverified,
                     );
@@ -1068,6 +1072,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       imported = await CherryImporter.importFromCherryStudio(
                         file: f,
                         mode: mode,
+                        scope: _scope,
                         businessRepository: context.read<BusinessRepository>(),
                         chatService: chat,
                         onProgress: handle.report,
@@ -1122,6 +1127,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       imported = await ChatboxImporter.importFromChatbox(
                         file: f,
                         mode: mode,
+                        scope: _scope,
                         businessRepository: context.read<BusinessRepository>(),
                         chatService: chat,
                         onProgress: handle.report,

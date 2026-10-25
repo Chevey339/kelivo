@@ -6,6 +6,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.browser.customtabs.CustomTabsService
@@ -19,13 +22,18 @@ internal object OAuthHandler {
     private const val CHANNEL_NAME = "app.oauth"
     private const val CALLBACK_SCHEME = "psyche.kelivo"
     private const val CALLBACK_HOST = "mcp-oauth-callback"
+    private const val BROWSER_BIND_TIMEOUT_MS = 1000L
 
+    private var authorizationUri: Uri? = null
+    private var browserPackage: String? = null
+    private var browserConnection: BrowserConnection? = null
+    private var authorizationActivity = WeakReference<OAuthAuthorizationActivity>(null)
+    private var launched = false
+    private var completionOnly = false
     private var pendingResult: MethodChannel.Result? = null
     private var expectedRedirectUri: Uri? = null
     private var expectedState: String? = null
     private var sessionId: String? = null
-    private var browserConnection: CustomTabsServiceConnection? = null
-    private var browserContext: Context? = null
     private var host = WeakReference<Activity>(null)
 
     fun configure(activity: Activity, messenger: BinaryMessenger) {
@@ -46,7 +54,8 @@ internal object OAuthHandler {
     fun detachActivity(activity: Activity) {
         if (host.get() === activity) {
             host.clear()
-            failPending("authorization_cancelled", "The authorization window was closed.")
+            // The application owns the Flutter engine and pending authorization.
+            // Recreating its UI is not a user cancellation.
         }
     }
 
@@ -54,7 +63,7 @@ internal object OAuthHandler {
         val expected = expectedRedirectUri ?: return false
         val state = expectedState ?: return false
         val result = pendingResult ?: return false
-        if (!sameRedirectTarget(uri, expected) || !sameState(uri, state)) return false
+        if (!sameRedirectTarget(uri, expected) || !sameState(uri, state) || !validCallbackResult(uri)) return false
 
         clearPending()
         result.success(uri.toString())
@@ -70,7 +79,7 @@ internal object OAuthHandler {
         return CustomTabsClient.getPackageName(context, candidates)
     }
 
-    private fun authenticate(
+    internal fun authenticate(
         activity: Activity,
         call: MethodCall,
         result: MethodChannel.Result,
@@ -103,62 +112,162 @@ internal object OAuthHandler {
             return
         }
 
+        completionOnly = arguments?.get("completionOnly") == true
         pendingResult = result
         expectedRedirectUri = redirectUri
         expectedState = state
         sessionId = requestId
-        val browserPackage = findBrowserPackage(activity)
+        this.authorizationUri = authorizationUri
+        browserPackage = findBrowserPackage(activity)
         if (browserPackage == null) {
             failPending("authorization_failed", "No browser supporting Custom Tabs is available.")
             return
         }
-        val context = activity.applicationContext
-        val connection = object : CustomTabsServiceConnection() {
-            override fun onCustomTabsServiceConnected(name: ComponentName, client: CustomTabsClient) {
-                if (sessionId != requestId) return
-                val browserSession = client.newSession(null)
-                if (browserSession == null) {
-                    failPending("authorization_failed", "Could not start the browser session.")
-                    return
-                }
-                try {
-                    val customTab = CustomTabsIntent.Builder(browserSession)
-                        .setShowTitle(true)
-                        .build()
-                    // Let the visible browser bind back to us so Android does
-                    // not freeze the loopback server while the user logs in.
-                    customTab.intent.putExtra(
-                        "android.support.customtabs.extra.KEEP_ALIVE",
-                        Intent(activity, OAuthBrowserService::class.java),
-                    )
-                    customTab.launchUrl(activity, authorizationUri)
-                } catch (error: ActivityNotFoundException) {
-                    failPending("authorization_failed", "Could not open the authorization page.")
-                }
-            }
+        try {
+            activity.startActivity(Intent(activity, OAuthAuthorizationActivity::class.java)
+                .putExtra(OAuthAuthorizationActivity.SESSION_ID, requestId))
+        } catch (_: ActivityNotFoundException) {
+            failPending("authorization_failed", "Could not open the authorization window.")
+        }
+    }
 
-            override fun onServiceDisconnected(name: ComponentName) {
-                if (sessionId == requestId) {
-                    failPending("authorization_failed", "The browser session was closed.")
+    internal fun attachAuthorizationActivity(activity: OAuthAuthorizationActivity, requestId: String): Boolean {
+        if (sessionId != requestId || pendingResult == null) return false
+        authorizationActivity = WeakReference(activity)
+        if (!launched) {
+            if (browserConnection == null) {
+                val connection = BrowserConnection(activity.applicationContext, requestId)
+                browserConnection = connection
+                connection.connect(browserPackage ?: return false)
+            } else {
+                launchBrowser()
+            }
+        }
+        return true
+    }
+
+    /** Owns one optional service binding across authorization-window recreation. */
+    private class BrowserConnection(
+        private val context: Context,
+        private val requestId: String,
+    ) : CustomTabsServiceConnection() {
+        private val handler = Handler(Looper.getMainLooper())
+        private val timeout = Runnable { finishConnecting(null) }
+        private var bound = false
+        var connecting = true
+            private set
+        var client: CustomTabsClient? = null
+            private set
+
+        fun connect(packageName: String) {
+            handler.postDelayed(timeout, BROWSER_BIND_TIMEOUT_MS)
+            // Even a rejected bind can register a connection that needs unbinding.
+            bound = true
+            try {
+                if (!CustomTabsClient.bindCustomTabsService(context, packageName, this)) {
+                    finishConnecting(null)
+                }
+            } catch (_: SecurityException) {
+                finishConnecting(null)
+            }
+        }
+
+        override fun onCustomTabsServiceConnected(name: ComponentName, client: CustomTabsClient) {
+            finishConnecting(client)
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) = unavailable()
+        override fun onNullBinding(name: ComponentName) = unavailable()
+        override fun onBindingDied(name: ComponentName) = unavailable()
+
+        private fun isCurrent() = browserConnection === this && sessionId == requestId
+
+        private fun finishConnecting(client: CustomTabsClient?) {
+            if (!isCurrent() || !connecting) return
+            connecting = false
+            this.client = client
+            handler.removeCallbacks(timeout)
+            if (client == null) close()
+            // Resolve against the current owner, not the Activity that started binding.
+            launchBrowser()
+        }
+
+        private fun unavailable() {
+            if (!isCurrent()) return
+            if (connecting) finishConnecting(null)
+            else close() // Losing an optional binding must not cancel an open browser.
+        }
+
+        fun close() {
+            handler.removeCallbacks(timeout)
+            connecting = false
+            client = null
+            if (bound) {
+                bound = false
+                try {
+                    context.unbindService(this)
+                } catch (_: IllegalArgumentException) {
+                    // Binding was rejected before Android registered the connection.
                 }
             }
         }
-        browserContext = context
-        browserConnection = connection
-        if (!CustomTabsClient.bindCustomTabsService(context, browserPackage, connection)) {
-            failPending("authorization_failed", "Could not connect to the browser.")
+    }
+
+    private fun launchBrowser() {
+        val connection = browserConnection ?: return
+        if (launched || connection.connecting) return
+        val activity = authorizationActivity.get() ?: return
+        if (activity.isFinishing || activity.isDestroyed) return
+        val uri = authorizationUri ?: return
+        val packageName = browserPackage ?: return
+        // A registered session lets the browser bind back to keep our loopback
+        // listener running. Browsers that reject binding can still open the page.
+        val keepAlive = Intent(activity, OAuthBrowserService::class.java)
+        try {
+            if (CustomTabsClient.isAuthTabSupported(activity, packageName)) {
+                val session = try { connection.client?.newAuthTabSession(null, null) }
+                    catch (_: SecurityException) { null }
+                if (session == null) connection.close()
+                val tab = AuthTabIntent.Builder().apply {
+                    if (session != null) setSession(session)
+                }.build()
+                tab.intent.setPackage(packageName)
+                if (session != null) tab.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAlive)
+                launched = true
+                activity.launchAuthTab(tab, uri, CALLBACK_SCHEME)
+            } else {
+                val session = try { connection.client?.newSession(null) }
+                    catch (_: SecurityException) { null }
+                if (session == null) connection.close()
+                val tab = CustomTabsIntent.Builder(session).setShowTitle(true).build()
+                tab.intent.setPackage(packageName)
+                tab.intent.data = uri
+                if (session != null) tab.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAlive)
+                launched = true
+                activity.launchCustomTab(tab.intent)
+            }
+        } catch (_: ActivityNotFoundException) {
+            failPending("authorization_failed", "Could not open the authorization page.")
         }
     }
 
     private fun cancel(call: MethodCall, result: MethodChannel.Result) {
         val requestId = call.argument<String>("sessionId")
-        if (requestId != null && requestId == sessionId) {
-            failPending(
-                "authorization_cancelled",
-                "Authorization was cancelled.",
-            )
-        }
+        if (requestId != null) cancelAuthorization(requestId)
         result.success(null)
+    }
+
+    internal fun cancelAuthorization(requestId: String) {
+        if (sessionId == requestId) {
+            failPending("authorization_cancelled", "Authorization was cancelled.")
+        }
+    }
+
+    internal fun completeAuthTab(requestId: String, uri: Uri?) {
+        if (sessionId != requestId) return
+        if (uri == null || !handleCallback(uri)) {
+            failPending("authorization_failed", "The browser returned an invalid authorization callback.")
+        }
     }
 
     private fun failPending(code: String, message: String) {
@@ -172,17 +281,16 @@ internal object OAuthHandler {
         expectedRedirectUri = null
         expectedState = null
         sessionId = null
+        authorizationUri = null
+        browserPackage = null
         val connection = browserConnection
-        val context = browserContext
         browserConnection = null
-        browserContext = null
-        if (connection != null && context != null) {
-            try {
-                context.unbindService(connection)
-            } catch (_: IllegalArgumentException) {
-                // Binding can fail before the connection is registered.
-            }
-        }
+        connection?.close()
+        launched = false
+        completionOnly = false
+        val owner = authorizationActivity.get()
+        authorizationActivity.clear()
+        owner?.finish()
     }
 
     private fun validRedirectUri(uri: Uri?): Boolean =
@@ -200,6 +308,15 @@ internal object OAuthHandler {
             actual.port == expected.port &&
             actual.path == expected.path &&
             actual.fragment == null
+
+    private fun validCallbackResult(uri: Uri): Boolean {
+        if (uri.getQueryParameters("iss").size > 1) return false
+        val codes = uri.getQueryParameters("code")
+        val errors = uri.getQueryParameters("error")
+        if (completionOnly) return codes.isEmpty() && errors.isEmpty()
+        return (codes.size == 1 && codes.first().isNotEmpty() && errors.isEmpty()) ||
+            (errors.size == 1 && errors.first().isNotEmpty() && codes.isEmpty())
+    }
 
     private fun sameState(actual: Uri, expected: String): Boolean =
         actual.getQueryParameters("state").let { states ->

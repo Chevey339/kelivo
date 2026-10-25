@@ -18,6 +18,24 @@ ProviderConfig _config() => ProviderConfig(
 
 void main() {
   group('ProviderConfig custom request', () {
+    test('conversation cache key setting defaults off and round trips', () {
+      final config = _config();
+      expect(config.promptCacheKeyEnabled, isFalse);
+      final withoutSetting = config.toJson()..remove('promptCacheKeyEnabled');
+      expect(
+        ProviderConfig.fromJson(withoutSetting).promptCacheKeyEnabled,
+        isFalse,
+      );
+      final enabled = config.copyWith(promptCacheKeyEnabled: true);
+      final restored = ProviderConfig.fromJson(enabled.toJson());
+      expect(restored.promptCacheKeyEnabled, isTrue);
+      expect(restored.copyWith(name: 'Renamed').promptCacheKeyEnabled, isTrue);
+      expect(
+        restored.copyWith(promptCacheKeyEnabled: false).promptCacheKeyEnabled,
+        isFalse,
+      );
+    });
+
     test('round trips headers and body', () {
       final restored = ProviderConfig.fromJson(_config().toJson());
 

@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -21,6 +22,218 @@ import '../../../support/business_test_harness.dart';
 import '../../../support/fake_workspace_runtime.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final creating in [false, true]) {
+      testWidgets(
+        'icon and group are saved with ${creating ? 'new' : 'existing'} server desktop=$desktop',
+        (tester) async {
+          final provider = await _openEditor(
+            tester,
+            [],
+            desktop: desktop,
+            creating: creating,
+            remoteConfig: _remoteOAuthConfig,
+            size: desktop ? const Size(1280, 900) : const Size(390, 844),
+          );
+          final group = await provider.createGroup('Development');
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('mcp-edit-icon')));
+          await tester.pumpAndSettle();
+          expect(find.byType(SimpleDialog), findsNothing);
+          await tester.tap(find.text('Choose Emoji'));
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField).last, '🌿');
+          await tester.pump();
+          await tester.tap(find.text('Save').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+          await tester.pumpAndSettle();
+          expect(provider.presentationFor('guest').icon, isNull);
+          expect(provider.presentationFor('guest').groupId, isNull);
+          if (creating) {
+            await tester.enterText(
+              find.byWidgetPredicate(
+                (w) => w is TextField && w.decoration?.hintText == 'My MCP',
+              ),
+              'Draft server',
+            );
+            final url = find.byWidgetPredicate(
+              (w) =>
+                  w is TextField &&
+                  w.decoration?.hintText == 'http://localhost:3000',
+            );
+            await tester.ensureVisible(url);
+            await tester.pumpAndSettle();
+            await tester.enterText(url, 'https://mcp.example.com/mcp');
+            await tester.ensureVisible(find.byType(IosSwitch).first);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byType(IosSwitch).first);
+          }
+          await tester.tap(find.text('Save').hitTestable());
+          for (var i = 0; i < 6; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 20)),
+            );
+            await tester.pump();
+          }
+          await tester.pumpAndSettle();
+          final server = creating
+              ? provider.servers.singleWhere((s) => s.name == 'Draft server')
+              : provider.getById('guest')!;
+          expect(provider.presentationFor(server.id).icon!.value, '🌿');
+          expect(provider.presentationFor(server.id).groupId, group);
+          expect(find.byKey(const ValueKey('mcp-edit-group')), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+        variant: TargetPlatformVariant.only(
+          desktop ? TargetPlatform.macOS : TargetPlatform.android,
+        ),
+      );
+    }
+    testWidgets(
+      'cancelling presentation changes leaves the saved server untouched desktop=$desktop',
+      (tester) async {
+        final provider = await _openEditor(
+          tester,
+          [],
+          desktop: desktop,
+          remoteConfig: _remoteOAuthConfig,
+          size: desktop ? const Size(1280, 900) : const Size(390, 844),
+        );
+        final group = await provider.createGroup('Draft group');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mcp-edit-icon')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Choose Emoji'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).last, '🌿');
+        await tester.pump();
+        await tester.tap(find.text('Save').last);
+        await tester.pumpAndSettle();
+        final formContext = tester.element(
+          find.byKey(const ValueKey('mcp-edit-group')),
+        );
+        Navigator.of(formContext).pop();
+        await tester.pumpAndSettle();
+        expect(provider.presentationFor('guest').icon, isNull);
+        expect(provider.presentationFor('guest').groupId, isNull);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'OAuth settings preserve login on rename and clear it on client change (${desktop ? 'desktop' : 'mobile'})',
+      (tester) async {
+        final provider = await _openEditor(
+          tester,
+          [],
+          desktop: desktop,
+          size: desktop ? const Size(960, 720) : const Size(320, 740),
+          remoteConfig: _remoteOAuthConfig,
+        );
+        await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauth!.accessToken, 'existing-token');
+        expect(
+          provider.getById('guest')!.oauthClient!.redirectUri,
+          'http://127.0.0.1:45678/callback',
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        final client = find.byKey(const ValueKey('mcp-oauth-client-id'));
+        await tester.ensureVisible(client);
+        await tester.enterText(client, 'new-client');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauth, isNull);
+        expect(provider.getById('guest')!.oauthClient!.clientId, 'new-client');
+        expect(
+          provider.getById('guest')!.oauthClient!.authorizationServer,
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Automatic'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Automatic'));
+        await tester.pumpAndSettle();
+        final fillExample = find.byKey(
+          const ValueKey('mcp-oauth-fill-redirect-example'),
+        );
+        await tester.ensureVisible(fillExample);
+        await tester.tap(fillExample);
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauthClient, isNull);
+        expect(
+          provider.getById('guest')!.oauthRedirectUri,
+          'http://localhost:0/callback',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
+  testWidgets('OAuth form validates CIMD and local redirects before saving', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      remoteConfig: _remoteOAuthConfig,
+    );
+    await tester.ensureVisible(find.text('CIMD'));
+    await tester.tap(find.text('CIMD'));
+    await tester.pumpAndSettle();
+    final client = find.byKey(const ValueKey('mcp-oauth-client-id'));
+    await tester.ensureVisible(client);
+    await tester.enterText(client, 'http://client.example.com/metadata.json');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.oauthClient!.clientId, 'existing-client');
+    await tester.enterText(client, 'https://client.example.com/metadata.json');
+    final redirect = find.byKey(const ValueKey('mcp-oauth-redirect'));
+    await tester.ensureVisible(redirect);
+    await tester.enterText(redirect, 'http://0.0.0.0:8000/callback');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.oauthRedirectUri, isNull);
+    await tester.enterText(redirect, 'http://127.0.0.1:8000/callback');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(
+      provider.getById('guest')!.oauthClient!.clientId,
+      'https://client.example.com/metadata.json',
+    );
+    expect(
+      provider.getById('guest')!.oauthRedirectUri,
+      'http://127.0.0.1:8000/callback',
+    );
+    expect(provider.getById('guest')!.oauth, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'select, save, reopen and unbind a workspace (${brightness.name})',
@@ -74,52 +287,48 @@ void main() {
     );
   }
 
-  testWidgets(
-    'a deleted binding remains visible and can be cleared',
-    (tester) async {
-      final provider = await _openEditor(
-        tester,
-        [],
-        withWorkspaces: true,
-        workspaceId: 'scripts',
-      );
-      await provider.workspaces!.delete('scripts', deleteFiles: false);
-      await tester.pumpAndSettle();
-      expect(find.text('Workspace not found'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.workspaceId, isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('a deleted binding remains visible and can be cleared', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      withWorkspaces: true,
+      workspaceId: 'scripts',
+    );
+    await provider.workspaces!.delete('scripts', deleteFiles: false);
+    await tester.pumpAndSettle();
+    expect(find.text('Workspace not found'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.workspaceId, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets(
-    'desktop can clear a mobile binding without selecting a new one',
-    (tester) async {
-      final provider = await _openEditor(
-        tester,
-        [],
-        workspaceId: 'scripts',
-        desktop: true,
-      );
-      expect(
-        find.text(
-          'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.workspaceId, isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('desktop can clear a mobile binding without selecting a new one', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      workspaceId: 'scripts',
+      desktop: true,
+    );
+    expect(
+      find.text(
+        'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.workspaceId, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets(
     'iOS stdio fields send literal input configuration to the keyboard',
@@ -162,33 +371,31 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
-  testWidgets(
-    'renaming imported stdio preserves every argument exactly',
-    (tester) async {
-      const arguments = [
-        '-c',
-        'printf "hello"\nprintf "world"\n',
-        '',
-        '  spaced  ',
-        '\r\n',
-        '',
-      ];
-      final provider = await _openEditor(tester, arguments);
-      await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.name, 'Renamed');
-      expect(provider.getById('guest')!.args, arguments);
-      expect(
-        jsonDecode(
-          provider.exportServersAsUiJson(),
-        )['mcpServers']['guest']['args'],
-        arguments,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('renaming imported stdio preserves every argument exactly', (
+    tester,
+  ) async {
+    const arguments = [
+      '-c',
+      'printf "hello"\nprintf "world"\n',
+      '',
+      '  spaced  ',
+      '\r\n',
+      '',
+    ];
+    final provider = await _openEditor(tester, arguments);
+    await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.name, 'Renamed');
+    expect(provider.getById('guest')!.args, arguments);
+    expect(
+      jsonDecode(
+        provider.exportServersAsUiJson(),
+      )['mcpServers']['guest']['args'],
+      arguments,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets(
     'space separated arguments preserve quotes, empty strings and scripts',
@@ -213,41 +420,33 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
-  testWidgets(
-    'unclosed argument quotes prevent saving',
-    (tester) async {
-      final provider = await _openEditor(tester, ['--yes']);
-      await tester.enterText(_fieldWithText('--yes'), '"unterminated');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.args, ['--yes']);
-      expect(
-        find.text(
-          'Check for an unclosed quote or trailing escape in arguments.',
-        ),
-        findsOneWidget,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('unclosed argument quotes prevent saving', (tester) async {
+    final provider = await _openEditor(tester, ['--yes']);
+    await tester.enterText(_fieldWithText('--yes'), '"unterminated');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.args, ['--yes']);
+    expect(
+      find.text('Check for an unclosed quote or trailing escape in arguments.'),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
-  testWidgets(
-    'imports an environment variable into the server override',
-    (tester) async {
-      final provider = await _openEditor(tester, []);
-      await tester.ensureVisible(find.text('Import from Environment'));
-      await tester.tap(find.text('Import from Environment'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('API_TOKEN'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.env, {'API_TOKEN': 'test-token'});
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('imports an environment variable into the server override', (
+    tester,
+  ) async {
+    final provider = await _openEditor(tester, []);
+    await tester.ensureVisible(find.text('Import from Environment'));
+    await tester.tap(find.text('Import from Environment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('API_TOKEN'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.env, {'API_TOKEN': 'test-token'});
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }
 
 Finder _fieldWithText(String text) => find.byWidgetPredicate(
@@ -262,8 +461,10 @@ Future<McpProvider> _openEditor(
   String? workspaceId,
   bool withWorkspaces = false,
   bool desktop = false,
+  bool creating = false,
   Brightness brightness = Brightness.light,
   Size size = const Size(600, 1600),
+  Map<String, Object?>? remoteConfig,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -308,9 +509,12 @@ Future<McpProvider> _openEditor(
       'mcpServers': {
         'guest': {
           'name': 'Imported server',
-          'command': 'sh',
-          'args': arguments,
-          'env': environment,
+          if (remoteConfig == null) ...{
+            'command': 'sh',
+            'args': arguments,
+            'env': environment,
+          } else
+            ...remoteConfig,
           if (workingDirectory != null) 'workingDirectory': workingDirectory,
           if (workspaceId != null) 'workspaceId': workspaceId,
           'isActive': false,
@@ -335,8 +539,14 @@ Future<McpProvider> _openEditor(
           body: Builder(
             builder: (context) => TextButton(
               onPressed: () => desktop
-                  ? showDesktopMcpEditDialog(context, serverId: 'guest')
-                  : showMcpServerEditSheet(context, serverId: 'guest'),
+                  ? showDesktopMcpEditDialog(
+                      context,
+                      serverId: creating ? null : 'guest',
+                    )
+                  : showMcpServerEditSheet(
+                      context,
+                      serverId: creating ? null : 'guest',
+                    ),
               child: const Text('Open'),
             ),
           ),
@@ -348,6 +558,27 @@ Future<McpProvider> _openEditor(
   await tester.pumpAndSettle();
   return provider;
 }
+
+const _remoteOAuthConfig = <String, Object?>{
+  'type': 'http',
+  'baseUrl': 'https://mcp.example.com/mcp',
+  'oauthClient': {
+    'clientId': 'existing-client',
+    'authorizationServer': 'https://auth.example.com',
+    'registrationSource': 'preRegistered',
+    'redirectUri': 'http://127.0.0.1:45678/callback',
+  },
+  'oauth': {
+    'clientId': 'existing-client',
+    'authorizationServer': 'https://auth.example.com',
+    'authorizationEndpoint': 'https://auth.example.com/authorize',
+    'tokenEndpoint': 'https://auth.example.com/token',
+    'resource': 'https://mcp.example.com/mcp',
+    'accessToken': 'existing-token',
+    'registrationSource': 'preRegistered',
+    'redirectUri': 'http://127.0.0.1:45678/callback',
+  },
+};
 
 class _StdioRuntime extends FakeWorkspaceRuntime
     implements WorkspaceStdioRuntime {

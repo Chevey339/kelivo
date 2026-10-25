@@ -151,6 +151,7 @@ class PhoneControlService : AccessibilityService() {
             complete(error("SERVICE_UNAVAILABLE", "Phone control has disconnected."))
             return
         }
+        (application as? KelivoApplication)?.backgroundRuntime?.phoneControlStarted()
         val epoch = generation.get()
         var finished = false // accessed only on the main thread
         lateinit var reply: (JSONObject) -> Unit
@@ -222,15 +223,12 @@ class PhoneControlService : AccessibilityService() {
                     complete(actionResult(performGlobalAction(globalAction)))
                 }
                 "tap", "long_press", "set_text", "scroll", "swipe" -> {
-                    if (!validateSnapshot(args)) {
+                    val coordinates = action == "swipe" || (action in listOf("tap", "long_press") && !args.has("node_id"))
+                    if (!validateSnapshot(args, coordinates)) {
                         complete(error("STALE_SCREEN", "The screen changed or this snapshot expired. Call read_screen again before acting."))
                         return
                     }
-                    if (action == "swipe" || (action in listOf("tap", "long_press") && !args.has("node_id"))) {
-                        gesture(action, args, complete)
-                    } else {
-                        complete(nodeAction(action, args))
-                    }
+                    if (coordinates) gesture(action, args, complete) else complete(nodeAction(action, args))
                 }
                 else -> complete(error("INVALID_ARGUMENT", "Unknown phone control action: $action"))
             }
@@ -340,17 +338,22 @@ class PhoneControlService : AccessibilityService() {
         snapshotEventTime = started
         snapshotChange = change
         snapshotSize = size
-        snapshotNodes = output.toString()
+        snapshotNodes = identity(output)
         scheduleSnapshotExpiry(30000)
         return JSONObject().put("snapshot_id", id).put("package_name", snapshotPackage)
             .put("width", size.x).put("height", size.y).put("nodes", output)
             .put("truncated", truncated)
     }
 
+    // Node actions target the node object, not its coordinates. Bounds are left
+    // out so layout drift on animated screens does not invalidate a snapshot.
+    private fun identity(output: JSONArray) = (0 until output.length()).joinToString("\n") {
+        JSONObject(output.getJSONObject(it).toString()).apply { remove("bounds") }.toString()
+    }
+
     private fun fingerprint(node: AccessibilityNodeInfo): String {
-        val bounds = Rect().also(node::getBoundsInScreen)
         return listOf(node.windowId, node.packageName, node.className, node.viewIdResourceName,
-            bounds, if (node.isPassword) null else node.text,
+            if (node.isPassword) null else node.text,
             if (node.isPassword) null else node.contentDescription,
             if (node.isPassword || Build.VERSION.SDK_INT < 26) null else node.hintText,
             if (node.isPassword || Build.VERSION.SDK_INT < 30) null else node.stateDescription,
@@ -359,7 +362,10 @@ class PhoneControlService : AccessibilityService() {
             node.isLongClickable, node.isScrollable, node.actionList.map { it.id }.sorted()).joinToString("\u0000")
     }
 
-    private fun validateSnapshot(args: JSONObject): Boolean {
+    /** Coordinate gestures only require the same window: the caller picks the
+     * point, and feeds or video never stop changing. Node actions also require
+     * the tree to be unchanged apart from layout. */
+    private fun validateSnapshot(args: JSONObject, coordinates: Boolean): Boolean {
         if (snapshotId == null || args.optString("snapshot_id") != snapshotId ||
             SystemClock.elapsedRealtime() - snapshotTime > 30000 || screenSize() != snapshotSize) return false
         ensureActive()
@@ -368,6 +374,7 @@ class PhoneControlService : AccessibilityService() {
             root.windowId == snapshotWindow && root.packageName?.toString() == snapshotPackage
         } finally { root.recycle() }
         if (!sameWindow) return false
+        if (coordinates) return true
         if (latestChange.time >= snapshotEventTime && latestChange !== snapshotChange) {
             // Android/Flutter can emit subtree/window events without changing
             // the visible UI (e.g. a keyboard animation finishing). Revalidate
@@ -389,8 +396,7 @@ class PhoneControlService : AccessibilityService() {
             expireSnapshot?.let(handler::removeCallbacks)
             scheduleSnapshotExpiry((30000 - (SystemClock.elapsedRealtime() - snapshotTime)).coerceAtLeast(0))
         }
-        ensureActive()
-        return latestChange.time < snapshotEventTime || latestChange === snapshotChange
+        return true
     }
 
     private fun nodeAction(action: String, args: JSONObject): JSONObject {
@@ -439,9 +445,6 @@ class PhoneControlService : AccessibilityService() {
             })
         }
         ensureActive()
-        if (latestChange.time >= snapshotEventTime && latestChange !== snapshotChange) {
-            return error("STALE_SCREEN", "The screen changed during validation. Call read_screen again.")
-        }
         val result = node.performAction(actionId, arguments)
         clearSnapshot()
         return actionResult(result)
@@ -473,8 +476,6 @@ class PhoneControlService : AccessibilityService() {
         require(action != "long_press" || duration >= 500) { "long_press requires at least 500 ms." }
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, duration)).build()
-        val checkedChange = snapshotChange
-        val checkedEventTime = snapshotEventTime
         clearSnapshot()
         lateinit var finish: (JSONObject) -> Unit
         val timeout = Runnable {
@@ -495,10 +496,6 @@ class PhoneControlService : AccessibilityService() {
         handler.postDelayed(timeout, duration + 3000)
         try {
             ensureActive()
-            if (latestChange.time >= checkedEventTime && latestChange !== checkedChange) {
-                finish(error("STALE_SCREEN", "The screen changed during validation. Call read_screen again."))
-                return
-            }
             val accepted = dispatchGesture(gesture, object : GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {
                     if (!executor.isShutdown) executor.execute { finish(actionResult(true)) }

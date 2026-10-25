@@ -7,7 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/app_directories.dart';
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/image_compressor.dart';
 import '../../../utils/platform_utils.dart';
@@ -63,6 +62,14 @@ class FileUploadService {
     '3gpp',
     'wav',
     'mp3',
+    'm4a',
+    'aac',
+    'flac',
+    'ogg',
+    'oga',
+    'opus',
+    'aiff',
+    'aif',
     'pcm',
     'pcm16',
     'txt',
@@ -105,8 +112,11 @@ class FileUploadService {
     return saved.whereType<String>().toList(growable: false);
   }
 
-  Future<List<String?>> _copyPickedFilesKeepingSlots(List<XFile> files) async {
-    final dir = await AppDirectories.getUploadDirectory();
+  Future<List<String?>> _copyPickedFilesKeepingSlots(
+    List<XFile> files, {
+    ChatInputBarController? target,
+  }) async {
+    final dir = await (target ?? mediaController.capture()).uploadDirectory();
     final out = <String?>[];
     final context = getContext();
     if (!context.mounted) return out;
@@ -125,17 +135,22 @@ class FileUploadService {
     return out;
   }
 
-  void _enqueuePickedImages(Iterable<XFile> files) {
+  void _enqueuePickedImages(
+    Iterable<XFile> files,
+    ChatInputBarController target,
+  ) {
     final paths = [
       for (final file in files)
         if (file.path.isNotEmpty) file.path,
     ];
     if (paths.isEmpty) return;
-    mediaController.enqueueImages(paths, getImageCompressConfig());
+    target.enqueueImages(paths, getImageCompressConfig());
   }
 
   /// 从相册选取图片
   Future<void> onPickPhotos() async {
+    if (mediaController.restoringDraft) return;
+    final target = mediaController.capture();
     try {
       // On desktop, fall back to FilePicker as image_picker is not supported.
       if (PlatformUtils.isDesktopTarget) {
@@ -164,7 +179,7 @@ class FileUploadService {
         if (toCopy.isEmpty) return;
         final croppedFiles = await _maybeCropImages(toCopy);
         if (croppedFiles.isEmpty) return;
-        _enqueuePickedImages(croppedFiles);
+        _enqueuePickedImages(croppedFiles, target);
         return;
       }
 
@@ -173,7 +188,7 @@ class FileUploadService {
       if (files.isEmpty) return;
       final croppedFiles = await _maybeCropImages(files);
       if (croppedFiles.isEmpty) return;
-      _enqueuePickedImages(croppedFiles);
+      _enqueuePickedImages(croppedFiles, target);
     } catch (_) {}
   }
 
@@ -181,6 +196,8 @@ class FileUploadService {
   ///
   /// [context] 用于显示权限提示和错误消息
   Future<void> onPickCamera(BuildContext context) async {
+    if (mediaController.restoringDraft) return;
+    final target = mediaController.capture();
     try {
       // Proactive permission check on mobile
       if (PlatformUtils.isMobile) {
@@ -213,7 +230,7 @@ class FileUploadService {
       final croppedFiles = await _maybeCropImages([file]);
       if (croppedFiles.isEmpty) return;
       if (!context.mounted) return;
-      _enqueuePickedImages(croppedFiles);
+      _enqueuePickedImages(croppedFiles, target);
     } catch (e) {
       try {
         if (!context.mounted) return;
@@ -301,6 +318,8 @@ class FileUploadService {
 
   /// 选取文件（图片、视频、文档等）
   Future<void> onPickFiles() async {
+    if (mediaController.restoringDraft) return;
+    final target = mediaController.capture();
     try {
       final anyFile = hasWorkspace?.call() ?? false;
       final res = await FilePicker.platform.pickFiles(
@@ -325,9 +344,12 @@ class FileUploadService {
         }
       }
       if (images.isEmpty && documents.isEmpty) return;
-      _enqueuePickedImages(images);
+      _enqueuePickedImages(images, target);
 
-      final saved = await _copyPickedFilesKeepingSlots(documents);
+      final saved = await _copyPickedFilesKeepingSlots(
+        documents,
+        target: target,
+      );
       for (final savedPath in saved) {
         if (savedPath == null) continue;
         final savedName = p.basename(savedPath);
@@ -337,13 +359,15 @@ class FileUploadService {
         );
       }
       if (docs.isNotEmpty) {
-        mediaController.addFiles(docs);
+        target.addFiles(docs);
       }
     } catch (_) {}
   }
 
   /// 处理桌面端拖放的文件 (macOS/Windows/Linux)
   Future<void> onFilesDroppedDesktop(List<XFile> files) async {
+    if (mediaController.restoringDraft) return;
+    final target = mediaController.capture();
     if (files.isEmpty) return;
     try {
       final docs = <DocumentAttachment>[];
@@ -359,9 +383,12 @@ class FileUploadService {
           documents.add(f);
         }
       }
-      _enqueuePickedImages(images);
+      _enqueuePickedImages(images, target);
 
-      final saved = await _copyPickedFilesKeepingSlots(documents);
+      final saved = await _copyPickedFilesKeepingSlots(
+        documents,
+        target: target,
+      );
       for (final savedPath in saved) {
         if (savedPath == null) continue;
         final savedName = p.basename(savedPath);
@@ -370,7 +397,7 @@ class FileUploadService {
           DocumentAttachment(path: savedPath, fileName: savedName, mime: mime),
         );
       }
-      if (docs.isNotEmpty) mediaController.addFiles(docs);
+      if (docs.isNotEmpty) target.addFiles(docs);
     } catch (_) {}
   }
 }

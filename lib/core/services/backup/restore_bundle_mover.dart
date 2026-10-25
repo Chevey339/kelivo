@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../../utils/app_directories.dart';
 import '../../database/chat_database_repository.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
@@ -72,7 +73,9 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       await _moveAssetRoots(
         sourceContainer: candidateDirectory,
-        targetContainer: appDataDirectory,
+        targetContainer: await AppDirectories.contentDirectoryFor(
+          appDataDirectory,
+        ),
         expected: expected,
       );
     }
@@ -125,11 +128,13 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       final source = await RestorePreviousBuilder.inspectAssets(
         candidateDirectory,
+        rootNames: candidate.assetRoots,
       );
       final target = await RestorePreviousBuilder.inspectAssets(
-        appDataDirectory,
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
+        rootNames: candidate.assetRoots,
       );
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         if (_exactAssetRootPresence(source, expected, root) ||
             !_exactAssetRootPresence(target, expected, root)) {
           throw StateError('restore_mover_assets_not_installed:$root');
@@ -166,11 +171,13 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       final candidateActual = await RestorePreviousBuilder.inspectAssets(
         candidateDirectory,
+        rootNames: candidate.assetRoots,
       );
       final liveActual = await RestorePreviousBuilder.inspectAssets(
-        appDataDirectory,
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
+        rootNames: candidate.assetRoots,
       );
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         _requireAssetSplit(
           candidateActual: candidateActual,
           liveActual: liveActual,
@@ -211,7 +218,7 @@ final class RestoreBundleMover {
         throw StateError('restore_mover_rollback_assets');
       }
       final newAssets = _candidateAssetsPlan(candidate);
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         await _rollbackAssetRoot(
           root: root,
           newAssets: newAssets,
@@ -377,12 +384,15 @@ final class RestoreBundleMover {
   }) async {
     final candidateActual = await RestorePreviousBuilder.inspectAssets(
       candidateDirectory,
+      rootNames: newAssets.rootStates.keys,
     );
     final liveActual = await RestorePreviousBuilder.inspectAssets(
-      appDataDirectory,
+      await AppDirectories.contentDirectoryFor(appDataDirectory),
+      rootNames: newAssets.rootStates.keys,
     );
     final previousActual = await RestorePreviousBuilder.inspectAssets(
       previousStore.previousDirectory,
+      rootNames: oldAssets.rootStates.keys,
     );
     final oldState = oldAssets.rootStates[root]!;
     final previousPresent = _exactAssetRootPresence(
@@ -403,7 +413,12 @@ final class RestoreBundleMover {
       );
       if (liveHasNew) {
         await durability.renameAndSync(
-          source: Directory(p.join(appDataDirectory.path, root)),
+          source: Directory(
+            p.join(
+              (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+              root,
+            ),
+          ),
           targetPath: p.join(candidateDirectory.path, root),
         );
       }
@@ -419,13 +434,21 @@ final class RestoreBundleMover {
       );
       if (liveHasNew) {
         await durability.renameAndSync(
-          source: Directory(p.join(appDataDirectory.path, root)),
+          source: Directory(
+            p.join(
+              (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+              root,
+            ),
+          ),
           targetPath: p.join(candidateDirectory.path, root),
         );
       }
       await durability.renameAndSync(
         source: Directory(p.join(previousStore.previousDirectory.path, root)),
-        targetPath: p.join(appDataDirectory.path, root),
+        targetPath: p.join(
+          (await AppDirectories.contentDirectoryFor(appDataDirectory)).path,
+          root,
+        ),
       );
       return;
     }
@@ -527,7 +550,9 @@ final class RestoreBundleMover {
 
   Future<void> _movePreviousAssets(RestorePreviousAssetsPlan expected) async {
     await _moveAssetRoots(
-      sourceContainer: appDataDirectory,
+      sourceContainer: await AppDirectories.contentDirectoryFor(
+        appDataDirectory,
+      ),
       targetContainer: previousStore.pendingDirectory,
       expected: expected,
       syncSourceBeforeMove: true,
@@ -540,10 +565,16 @@ final class RestoreBundleMover {
     required RestorePreviousAssetsPlan expected,
     bool syncSourceBeforeMove = false,
   }) async {
-    final source = await RestorePreviousBuilder.inspectAssets(sourceContainer);
-    final target = await RestorePreviousBuilder.inspectAssets(targetContainer);
+    final source = await RestorePreviousBuilder.inspectAssets(
+      sourceContainer,
+      rootNames: expected.rootStates.keys,
+    );
+    final target = await RestorePreviousBuilder.inspectAssets(
+      targetContainer,
+      rootNames: expected.rootStates.keys,
+    );
     final rootsToMove = <String>{};
-    for (final root in RestorePreviousAssetsPlan.rootNames) {
+    for (final root in expected.rootStates.keys) {
       final expectedState = expected.rootStates[root]!;
       if (expectedState == RestorePreviousAssetRootState.missing) {
         if (source.rootStates[root] != RestorePreviousAssetRootState.missing ||
@@ -666,7 +697,7 @@ final class RestoreBundleMover {
     }
     return RestorePreviousAssetsPlan(
       rootStates: {
-        for (final root in RestorePreviousAssetsPlan.rootNames)
+        for (final root in candidate.assetRoots)
           root: RestorePreviousAssetRootState.directory,
       },
       entries: {
@@ -674,9 +705,11 @@ final class RestoreBundleMover {
           if (RestorePreviousAssetsPlan.rootNames.any(
             (root) => entry.key.startsWith('$root/'),
           ))
-            entry.key: RestoreFileDescriptor(
-              bytes: entry.value.bytes,
-              sha256: entry.value.sha256,
+            entry.key: RestoreAssetDescriptor.file(
+              RestoreFileDescriptor(
+                bytes: entry.value.bytes,
+                sha256: entry.value.sha256,
+              ),
             ),
       },
     );
@@ -698,7 +731,7 @@ final class RestoreBundleMover {
     };
     if (actualEntries.length != expectedEntries.length) return false;
     for (final entry in actualEntries.entries) {
-      if (!_sameDescriptor(entry.value, expectedEntries[entry.key])) {
+      if (!entry.value.matches(expectedEntries[entry.key])) {
         return false;
       }
     }

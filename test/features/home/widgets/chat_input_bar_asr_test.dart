@@ -1,10 +1,13 @@
 import '../../../support/business_test_harness.dart';
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -22,6 +25,10 @@ void main() {
     required SettingsProvider settings,
     required AsrProvider asr,
     required TextEditingController controller,
+    ChatInputBarController? mediaController,
+    String? modelId,
+    Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend,
+    String? conversationId,
   }) {
     return MultiProvider(
       providers: [
@@ -37,9 +44,13 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ChatInputBar(
+            conversationId: conversationId,
             controller: controller,
+            mediaController: mediaController,
             asrProvider: asr,
-            onSend: (_) async => ChatInputSubmissionResult.rejected,
+            chatModelProviderKey: modelId == null ? null : 'Gemini',
+            chatModelId: modelId,
+            onSend: onSend ?? (_) async => ChatInputSubmissionResult.rejected,
           ),
         ),
       ),
@@ -244,6 +255,347 @@ void main() {
       findsNothing,
     );
   });
+
+  _audioRecordingTests(harness);
+}
+
+void _audioRecordingTests(
+  Widget Function({
+    required SettingsProvider settings,
+    required AsrProvider asr,
+    required TextEditingController controller,
+    ChatInputBarController? mediaController,
+    String? modelId,
+    Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend,
+    String? conversationId,
+  })
+  harness,
+) {
+  late Directory tempDir;
+  late PathProviderPlatform previousPathProvider;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('kelivo_voice_audio_');
+    previousPathProvider = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+  });
+
+  tearDown(() async {
+    PathProviderPlatform.instance = previousPathProvider;
+    if (await tempDir.exists()) await tempDir.delete(recursive: true);
+  });
+
+  Future<List<DocumentAttachment>> waitForDocuments(
+    WidgetTester tester,
+    ChatInputBarController media,
+  ) async {
+    // File writes need real async time; allow for a loaded test machine.
+    for (var attempt = 0; attempt < 100; attempt++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+      final docs = media.snapshotInput('').documents;
+      if (docs.isNotEmpty) return docs;
+    }
+    return const [];
+  }
+
+  testWidgets('audio models get a recording microphone without ASR', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final capture = _FakeAudioCapture();
+    final asr = AsrProvider(audioCaptureFactory: () => capture);
+    final controller = TextEditingController(text: 'draft');
+    final media = ChatInputBarController();
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        mediaController: media,
+      ),
+    );
+    expect(find.byTooltip('Voice input'), findsNothing);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        mediaController: media,
+        modelId: 'gemini-2.5-flash',
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+    capture.add(Uint8List(16000));
+    await tester.pump();
+
+    expect(find.byTooltip('Send recording'), findsOneWidget);
+    await tester.tap(find.byTooltip('Stop and attach as audio'));
+    final docs = await waitForDocuments(tester, media);
+
+    expect(docs, hasLength(1));
+    expect(docs.single.mime, 'audio/wav');
+    expect(docs.single.fileName, startsWith('voice_'));
+    expect(File(docs.single.path).lengthSync(), 44 + 16000);
+    expect(controller.text, 'draft');
+  });
+
+  testWidgets('ASR recordings can end as audio and keep the draft text', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final option = SherpaOnnxAsrOptions(
+      id: 'local-test',
+      modelId: 'local-model',
+    );
+    await settings.setAsrServices(<AsrServiceOptions>[option]);
+    final capture = _FakeAudioCapture();
+    var transcriptionCalls = 0;
+    final asr = AsrProvider(
+      audioCaptureFactory: () => capture,
+      localModelInstalledChecker: (_) async => true,
+      localTranscriber: (_, _) async {
+        transcriptionCalls++;
+        return 'unused';
+      },
+    );
+    await asr.refreshAvailability(option);
+    final controller = TextEditingController(text: 'draft');
+    final media = ChatInputBarController();
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        mediaController: media,
+        modelId: 'gemini-2.5-flash',
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+    capture.add(Uint8List(16000));
+    await tester.pump();
+
+    expect(find.byTooltip('Stop and transcribe to input'), findsOneWidget);
+    await tester.tap(find.byTooltip('Stop and attach as audio'));
+    final docs = await waitForDocuments(tester, media);
+
+    expect(docs.single.mime, 'audio/wav');
+    expect(transcriptionCalls, 0);
+    expect(controller.text, 'draft');
+  });
+
+  testWidgets('a recording cancelled while finishing is never sent', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final capture = _FakeAudioCapture();
+    final asr = AsrProvider(audioCaptureFactory: () => capture);
+    final controller = TextEditingController(text: 'draft');
+    final media = ChatInputBarController();
+    var sends = 0;
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        mediaController: media,
+        modelId: 'gemini-2.5-flash',
+        onSend: (_) async {
+          sends++;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+    capture.add(Uint8List(16000));
+    await tester.pump();
+
+    capture.stopGate = Completer<void>();
+    await tester.tap(find.byTooltip('Send recording'));
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    controller.text = 'typed after cancel';
+    capture.stopGate!.complete();
+    await waitForDocuments(tester, media);
+
+    expect(sends, 0);
+    expect(media.snapshotInput('').documents, isEmpty);
+    expect(controller.text, 'typed after cancel');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    // Let the resume re-enable and tooltip timers run out.
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  for (final asAudio in [false, true]) {
+    testWidgets('switching conversation while finishing keeps the new draft '
+        '(${asAudio ? 'audio' : 'text'})', (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      final option = SherpaOnnxAsrOptions(
+        id: 'local-test',
+        modelId: 'local-model',
+      );
+      await settings.setAsrServices(<AsrServiceOptions>[option]);
+      final capture = _FakeAudioCapture();
+      final transcription = Completer<String>();
+      final asr = AsrProvider(
+        audioCaptureFactory: () => capture,
+        localModelInstalledChecker: (_) async => true,
+        localTranscriber: (_, _) => transcription.future,
+      );
+      await asr.refreshAvailability(option);
+      final controller = TextEditingController(text: 'draft A');
+      final media = ChatInputBarController();
+      var sends = 0;
+      addTearDown(asr.dispose);
+      addTearDown(controller.dispose);
+      Widget build(String conversationId) => harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        mediaController: media,
+        modelId: 'gemini-2.5-flash',
+        conversationId: conversationId,
+        onSend: (_) async {
+          sends++;
+          return ChatInputSubmissionResult.sent;
+        },
+      );
+
+      await tester.pumpWidget(build('A'));
+      await tester.tap(find.byTooltip('Voice input'));
+      await tester.pump();
+      capture.add(Uint8List(16000));
+      await tester.pump();
+
+      if (asAudio) capture.stopGate = Completer<void>();
+      await tester.tap(
+        find.byTooltip(
+          asAudio ? 'Stop and attach as audio' : 'Transcribe and send',
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(build('B'));
+      controller.text = 'draft B';
+      if (asAudio) {
+        capture.stopGate!.complete();
+      } else {
+        transcription.complete('words from A');
+      }
+      await waitForDocuments(tester, media);
+
+      expect(sends, 0);
+      expect(controller.text, 'draft B');
+      expect(media.snapshotInput('').documents, isEmpty);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+      // The abandoned finish still runs out its 2 s capture-done timeout.
+      await tester.pump(const Duration(seconds: 3));
+    });
+  }
+
+  testWidgets('a failed start throwing late keeps the retried recording', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final denied = _FakeAudioCapture(permission: false)
+      ..disposeGate = Completer<void>();
+    final granted = _FakeAudioCapture();
+    final captures = [denied, granted];
+    final asr = AsrProvider(audioCaptureFactory: () => captures.removeAt(0));
+    final controller = TextEditingController(text: 'draft');
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        modelId: 'gemini-2.5-flash',
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+    // The failure is published (and cleared) at once; its cleanup and the
+    // start's throw are still pending.
+    expect(asr.isActive, isFalse);
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+    expect(asr.isListening, isTrue);
+
+    denied.disposeGate!.complete();
+    await tester.pump();
+    await tester.pump();
+
+    expect(asr.isListening, isTrue);
+    expect(find.byTooltip('Send recording'), findsOneWidget);
+    expect(controller.text, 'draft');
+    await tester.tap(find.byTooltip('Discard recording'));
+    // Let the failure notice run out.
+    await tester.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('system ASR offers no audio option', (tester) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAsrServices(<AsrServiceOptions>[
+      SystemAsrOptions(id: 'system-test'),
+    ]);
+    final asr = AsrProvider(
+      systemService: SystemAsrService(backend: _FakeSystemBackend()),
+    );
+    final controller = TextEditingController();
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        modelId: 'gemini-2.5-flash',
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+
+    expect(find.byTooltip('Stop and transcribe to input'), findsOneWidget);
+    expect(find.byTooltip('Stop and attach as audio'), findsNothing);
+    await tester.tap(find.byTooltip('Discard recording'));
+    await tester.pumpAndSettle();
+  });
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
 }
 
 final class _FakeSystemBackend implements SystemAsrBackend {
@@ -302,11 +654,16 @@ final class _FakeSystemBackend implements SystemAsrBackend {
 final class _FakeAudioCapture implements AsrAudioCapture {
   final StreamController<Uint8List> _controller =
       StreamController<Uint8List>.broadcast();
+  _FakeAudioCapture({this.permission = true});
+
+  final bool permission;
+  Completer<void>? stopGate;
+  Completer<void>? disposeGate;
 
   void add(Uint8List chunk) => _controller.add(chunk);
 
   @override
-  Future<bool> hasPermission() async => true;
+  Future<bool> hasPermission() async => permission;
 
   @override
   Future<Stream<Uint8List>> start({required int sampleRate}) async =>
@@ -314,6 +671,7 @@ final class _FakeAudioCapture implements AsrAudioCapture {
 
   @override
   Future<void> stop() async {
+    await stopGate?.future;
     if (!_controller.isClosed) await _controller.close();
   }
 
@@ -324,6 +682,7 @@ final class _FakeAudioCapture implements AsrAudioCapture {
 
   @override
   Future<void> dispose() async {
+    await disposeGate?.future;
     if (!_controller.isClosed) await _controller.close();
   }
 }

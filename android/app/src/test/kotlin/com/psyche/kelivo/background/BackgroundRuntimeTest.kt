@@ -180,6 +180,23 @@ class BackgroundRuntimeTest {
         assertEquals(false, runtime.status()["overlayVisible"])
     }
 
+    @Test fun phoneControlHidesOverlayUntilTasksEnd() {
+        val (runtime, m) = setup()
+        ShadowSettings.setCanDrawOverlays(true)
+        val settings = mapOf<String, Any>("overlayEnabled" to true)
+        runtime.setForeground(false)
+        sync(m, 1, listOf("a"), settings)
+        assertEquals(true, runtime.status()["overlayVisible"])
+        runtime.phoneControlStarted()
+        assertEquals(false, runtime.status()["overlayVisible"])
+        runtime.setForeground(true)
+        runtime.setForeground(false)
+        assertEquals(false, runtime.status()["overlayVisible"])
+        sync(m, 2, emptyList(), settings)
+        sync(m, 3, listOf("b"), settings)
+        assertEquals(true, runtime.status()["overlayVisible"])
+    }
+
     @Test fun overlayUsesSavedDimensionsAndIndependentContentVisibility() {
         val (runtime, m) = setup()
         ShadowSettings.setCanDrawOverlays(true)

@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _deepSeekConfig(
   String baseUrl, {
@@ -89,7 +90,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': '9.11 and 9.8, which is greater?'},
         ],
-        thinkingBudget: 2000,
+        reasoning: legacyBudget(2000),
         stream: false,
       ).toList();
 
@@ -187,12 +188,14 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
         stream: false,
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
       expect(requestBody['reasoning'], {'effort': 'none'});
+      expect(requestBody.containsKey('thinking'), isFalse);
+      expect(requestBody.containsKey('reasoning_effort'), isFalse);
     });
 
     test('Responses max reasoning sends official max effort', () async {
@@ -234,12 +237,14 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 128000,
+        reasoning: legacyBudget(128000),
         stream: false,
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
-      expect((requestBody['reasoning'] as Map)['effort'], 'max');
+      expect(requestBody['reasoning'], {'effort': 'max'});
+      expect(requestBody.containsKey('thinking'), isFalse);
+      expect(requestBody.containsKey('reasoning_effort'), isFalse);
     });
 
     test('maps official thinking efforts and keeps thinking enabled', () async {
@@ -285,7 +290,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: budget,
+          reasoning: legacyBudget(budget),
         ).toList();
         expect(chunks.isGenerationDone, isTrue);
         return requestBody;
@@ -299,7 +304,7 @@ void main() {
       expect(low['thinking'], {'type': 'enabled'});
       expect(low['reasoning_effort'], 'low');
       expect(medium['thinking'], {'type': 'enabled'});
-      expect(medium['reasoning_effort'], 'high');
+      expect(medium['reasoning_effort'], 'low');
       expect(xhigh['thinking'], {'type': 'enabled'});
       expect(xhigh['reasoning_effort'], 'high');
       expect(max['thinking'], {'type': 'enabled'});
@@ -348,7 +353,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
@@ -420,6 +425,7 @@ void main() {
             modelOverrides: const {
               'deepseek-v4-flash': {
                 'abilities': ['tool'],
+                'reasoning': {'replay': 'toolTurns'},
               },
             },
           ),
@@ -455,7 +461,7 @@ void main() {
       },
     );
 
-    test('ordinary history strips reasoning_content', () async {
+    test('tools enabled preserves reasoning from a non-tool turn', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
@@ -487,7 +493,16 @@ void main() {
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
       await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl),
-        modelId: 'deepseek-reasoner',
+        modelId: 'deepseek-v4.1-flash',
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'weather',
+              'parameters': {'type': 'object', 'properties': {}},
+            },
+          },
+        ],
         messages: const [
           {'role': 'user', 'content': 'first question'},
           {
@@ -500,7 +515,8 @@ void main() {
       ).toList();
 
       final history = (requestBody['messages'] as List).cast<Map>();
-      expect(history[1].containsKey('reasoning_content'), isFalse);
+      expect(requestBody['tools'], isNotEmpty);
+      expect(history[1]['reasoning_content'], 'private first-turn reasoning');
     });
 
     test(
@@ -616,7 +632,7 @@ void main() {
       },
     );
 
-    test('Responses search requires a DeepSeek provider for V4 models', () {
+    test('Responses search is available on any OpenAI-compatible host', () {
       const modelId = 'deepseek-v4-pro';
       final cfg = ProviderConfig(
         id: 'CustomOpenAI',
@@ -638,15 +654,15 @@ void main() {
           cfg: cfg,
           modelId: modelId,
         ),
-        isFalse,
+        isTrue,
       );
       expect(
         BuiltInToolsHelper.buildResponsesTools(
           cfg: cfg,
           modelId: modelId,
           upstreamModelId: modelId,
-        ).tools,
-        isEmpty,
+        ).tools.any((tool) => tool['type'] == 'web_search'),
+        isTrue,
       );
     });
 

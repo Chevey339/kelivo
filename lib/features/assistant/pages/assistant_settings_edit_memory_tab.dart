@@ -1004,7 +1004,7 @@ Widget _memoryDesktopSelectRow<T>({
                   ],
                 ),
         ),
-        if (tip != null) MemoryTipIcon(message: tip),
+        if (tip != null) TipIcon(message: tip),
         const SizedBox(width: 8),
         DesktopSelectDropdown<T>(
           value: value,

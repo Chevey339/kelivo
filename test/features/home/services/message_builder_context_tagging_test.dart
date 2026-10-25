@@ -73,7 +73,7 @@ void main() {
   });
 
   test(
-    'logger disabled leaves _kelivo_ctx_segments off buildApiMessages and injects',
+    'source attribution works with logging disabled and is stripped before sending',
     () {
       final service = _service();
       final apiMessages = service.buildApiMessages(
@@ -92,6 +92,12 @@ void main() {
         false,
       );
 
+      expect(_hasSegmentsKey(apiMessages), isTrue);
+      expect(
+        segmentsFromTaggedMessage(apiMessages.first).single.source,
+        ContextSource.searchPrompt,
+      );
+      service.stripInternalRevisionIds(apiMessages);
       expect(_hasSegmentsKey(apiMessages), isFalse);
     },
   );

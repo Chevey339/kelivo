@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
@@ -130,7 +131,7 @@ _createAssistantProvider(
           required modelId,
           required prompt,
           String? conversationId,
-          int? thinkingBudget,
+          ReasoningRequest reasoning = ReasoningRequest.auto,
         }) async => '<user_memory>false</user_memory>',
   );
   return (
@@ -214,7 +215,7 @@ void main() {
   setUpAll(() async {
     if (Platform.environment['KELIVO_TIME_SCREENSHOTS'] == null) return;
     final bytes = await File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytes();
     await (FontLoader(
       'PromptTimePreview',

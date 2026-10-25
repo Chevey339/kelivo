@@ -6,6 +6,7 @@ import 'package:Kelivo/desktop/desktop_settings_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -84,6 +85,54 @@ Future<void> _pumpProviderSettings(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('desktop conversation cache key switch saves and restores', (
+    tester,
+  ) async {
+    final settings = await _buildSettings(tester);
+    addTearDown(settings.dispose);
+    await _pumpProviderSettings(tester, settings);
+    final settingsButton = find.byKey(
+      const ValueKey('desktop-provider-settings-ProviderA'),
+    );
+    await tester.tap(settingsButton);
+    await tester.pumpAndSettle();
+    final cacheSwitch = find.byWidgetPredicate(
+      (widget) =>
+          widget is IosSwitch &&
+          widget.semanticLabel == 'Send Conversation Cache Key',
+    );
+    expect(cacheSwitch, findsOneWidget);
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isFalse);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('ProviderA').promptCacheKeyEnabled,
+      isTrue,
+    );
+    Navigator.of(tester.element(cacheSwitch)).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(settingsButton);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isTrue);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('ProviderA').promptCacheKeyEnabled,
+      isFalse,
+    );
+    await settings.setProviderConfig(
+      'ProviderA',
+      settings
+          .getProviderConfig('ProviderA')
+          .copyWith(providerType: ProviderKind.claude),
+    );
+    await tester.pumpAndSettle();
+    expect(cacheSwitch, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'desktop model selection state is cleared when provider changes',
@@ -182,6 +231,8 @@ void main() {
     final portField = find.byKey(
       const ValueKey('desktop-provider-proxy-port-field'),
     );
+    await tester.ensureVisible(portField);
+    await tester.pumpAndSettle();
     await tester.tap(portField);
     await tester.pump();
     await tester.enterText(portField, '1');
@@ -284,4 +335,56 @@ void main() {
       {'key': 'desktop', 'value': 'true'},
     ]);
   });
+
+  testWidgets(
+    'desktop provider model rows pin action icons to a shared right edge',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await settings.setProviderConfig(
+        'ProviderA',
+        _providerConfig('ProviderA').copyWith(
+          models: const ['wide-ctx', 'narrow-ctx'],
+          modelOverrides: const {
+            'wide-ctx': {
+              'name': 'Wide Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 1000000,
+            },
+            'narrow-ctx': {
+              'name': 'Narrow Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 262144,
+            },
+          },
+        ),
+      );
+      await _pumpProviderSettings(tester, settings);
+
+      expect(find.text('1M'), findsOneWidget);
+      expect(find.text('262.1k'), findsOneWidget);
+
+      final wideSettings = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-settings-wide-ctx')),
+      );
+      final narrowSettings = tester.getRect(
+        find.byKey(
+          const ValueKey('desktop-provider-model-settings-narrow-ctx'),
+        ),
+      );
+      final wideRemove = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-remove-wide-ctx')),
+      );
+      final narrowRemove = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-remove-narrow-ctx')),
+      );
+
+      expect(wideSettings.right, closeTo(narrowSettings.right, 0.5));
+      expect(wideRemove.right, closeTo(narrowRemove.right, 0.5));
+    },
+  );
 }

@@ -2,9 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'streaming_zip_entry.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+import '../../database/business_data.dart';
+import '../../database/chat_database_repository.dart'
+    show ParsedChatImportBatch;
 import '../../database/business_repository.dart';
+import '../../database/backup_content_filter.dart';
 import '../../database/business_settings_router.dart';
 import '../../models/api_keys.dart';
 import '../../models/backup.dart';
@@ -48,6 +54,7 @@ class CherryImporter {
   static Future<CherryImportResult> importFromCherryStudio({
     required File file,
     required RestoreMode mode,
+    BackupScope scope = const BackupScope(),
     required BusinessRepository businessRepository,
     required ChatService chatService,
     BackupProgressSink? onProgress,
@@ -59,7 +66,9 @@ class CherryImporter {
     final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toList();
     final existingMsgIds = <String>[];
-    if (mode == RestoreMode.merge) {
+    final mergeChats =
+        mode == RestoreMode.merge && scope.includes(BackupCategory.chats);
+    if (mergeChats) {
       for (final c in existingConvs) {
         existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
@@ -71,7 +80,7 @@ class CherryImporter {
             body: _parseCherryBackupInIsolate,
             payload: _CherryParseIsolateArgs(
               path: file.path,
-              merge: mode == RestoreMode.merge,
+              merge: mergeChats,
               existingConvIds: existingConvIds,
               existingMsgIds: existingMsgIds,
               debugSpeculativeJsonProbeBytes: debugSpeculativeJsonProbeBytes,
@@ -98,40 +107,73 @@ class CherryImporter {
         cancellable: false,
       ),
     );
-    await _importBusinessData(
-      businessRepository: businessRepository,
-      mode: mode,
-      providers: importedProviders,
-      assistants: importedAssistants,
-    );
-
-    // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
-    if (mode == RestoreMode.overwrite) {
-      await chatService.clearAllData();
+    final includeChats = scope.includes(BackupCategory.chats);
+    final includeFiles = scope.includes(BackupCategory.files);
+    Directory? uploadDirectory;
+    if (includeFiles) {
+      final uploads = await AppDirectories.getUploadDirectory();
+      await uploads.create(recursive: true);
+      // Overwrite imports must not reuse or replace an old attachment with the
+      // same Cherry id. Keep old files available until their owners retire them.
+      uploadDirectory = mode == RestoreMode.overwrite && includeChats
+          ? await uploads.createTemp('cherry-import-')
+          : uploads;
     }
-
-    // Materialize stays after the first DB write so overwrite cannot delete
-    // the files we just unpacked. Cancel is already disabled at this point.
-    final pathsByFileId = await _materializeFiles(
-      parsed.filesById,
-      parsed.usedFileIds,
-      backupArchive: file,
-      onProgress: onProgress,
-      cancelToken: cancelToken,
-    );
-
-    final convCountAndMsgCount = await _commitTypedCherryTopics(
+    final pathsByFileId = includeFiles
+        ? await _materializeFiles(
+            parsed.filesById,
+            parsed.usedFileIds,
+            uploadDirectory: uploadDirectory!,
+            backupArchive: file,
+            onProgress: onProgress,
+            cancelToken: cancelToken,
+          )
+        : <String, String>{};
+    final prepared = await _prepareTypedCherryTopics(
       topics: parsed.topics,
       filePaths: pathsByFileId,
-      chatService: chatService,
+      includeChats: includeChats,
+      includeFiles: includeFiles,
+      uploadDirectory: uploadDirectory,
     );
+    BusinessSnapshot transformBusiness(BusinessSnapshot current) =>
+        _transformBusinessData(
+          current: current,
+          mode: mode,
+          scope: scope,
+          providers: importedProviders,
+          assistants: importedAssistants,
+        );
+    if (includeChats) {
+      // All fallible attachment preparation is complete. Publish chats and
+      // settings together, and acknowledge an empty result only at commit.
+      // The service can fail during post-commit cache refresh, so do not delete
+      // the prepared files on error: they may already belong to the new DB.
+      await chatService.commitParsedImport(
+        businessRepository: businessRepository,
+        overwrite: mode == RestoreMode.overwrite,
+        deleteUploads: false,
+        conversationBatches: prepared.conversationBatches,
+        messagesToAppend: prepared.messagesToAppend,
+        transformBusiness: transformBusiness,
+      );
+    } else {
+      await businessRepository.transformSnapshot(
+        transformBusiness,
+        writeReceipt: true,
+      );
+    }
 
     return CherryImportResult(
-      providers: importedProviders.length,
-      assistants: importedAssistants.length,
-      conversations: convCountAndMsgCount.$1,
-      messages: convCountAndMsgCount.$2,
-      files: pathsByFileId.length + convCountAndMsgCount.$3,
+      providers: scope.includes(BackupCategory.providers)
+          ? importedProviders.length
+          : 0,
+      assistants: scope.includes(BackupCategory.assistants)
+          ? importedAssistants.length
+          : 0,
+      conversations: prepared.conversations,
+      messages: prepared.messages,
+      files: pathsByFileId.length + prepared.files,
     );
   }
 
@@ -751,7 +793,7 @@ class CherryImporter {
         'contextMessageSize': ctxCount ?? 64,
         'limitContextMessages': true,
         'streamOutput': streamOutput ?? true,
-        'thinkingBudget': null,
+        'reasoning': null,
         'maxTokens': maxTokens,
         'systemPrompt': prompt,
         'messageTemplate': '{{ message }}',
@@ -768,78 +810,85 @@ class CherryImporter {
     return out;
   }
 
-  static Future<void> _importBusinessData({
-    required BusinessRepository businessRepository,
+  static BusinessSnapshot _transformBusinessData({
+    required BusinessSnapshot current,
     required RestoreMode mode,
+    required BackupScope scope,
     required Map<String, Map<String, dynamic>> providers,
     required List<Map<String, dynamic>> assistants,
   }) {
-    return businessRepository.transformSnapshot((current) {
-      final settings = BusinessSettingsRouter.exportSnapshot(current);
-      if (mode == RestoreMode.overwrite) {
-        settings[_providersKey] = jsonEncode(providers);
-        settings[_providersOrderKey] = providers.keys.toList();
-        settings[_assistantsKey] = jsonEncode(assistants);
-        return BusinessSettingsRouter.normalizeAndRoute(settings);
-      }
-
-      final currentProviders = _jsonObjectMap(
-        settings[_providersKey],
-        _providersKey,
+    final settings = BusinessSettingsRouter.exportSnapshot(current);
+    if (mode == RestoreMode.overwrite) {
+      settings[_providersKey] = jsonEncode(providers);
+      settings[_providersOrderKey] = providers.keys.toList();
+      settings[_assistantsKey] = jsonEncode(assistants);
+      return BackupContentFilter.preserveUnselected(
+        BusinessSettingsRouter.normalizeAndRoute(settings),
+        current,
+        scope,
       );
-      for (final entry in providers.entries) {
-        final local = currentProviders[entry.key];
-        if (local is! Map) {
-          currentProviders[entry.key] = entry.value;
+    }
+
+    final currentProviders = _jsonObjectMap(
+      settings[_providersKey],
+      _providersKey,
+    );
+    for (final entry in providers.entries) {
+      final local = currentProviders[entry.key];
+      if (local is! Map) {
+        currentProviders[entry.key] = entry.value;
+        continue;
+      }
+      final next = local.map((key, value) => MapEntry(key.toString(), value));
+      for (final importedField in entry.value.entries) {
+        final value = importedField.value;
+        if (value == null || (value is String && value.trim().isEmpty)) {
           continue;
         }
-        final next = local.map((key, value) => MapEntry(key.toString(), value));
-        for (final importedField in entry.value.entries) {
-          final value = importedField.value;
-          if (value == null || (value is String && value.trim().isEmpty)) {
-            continue;
-          }
-          next[importedField.key] = value;
-        }
-        currentProviders[entry.key] = next;
+        next[importedField.key] = value;
       }
-      settings[_providersKey] = jsonEncode(currentProviders);
+      currentProviders[entry.key] = next;
+    }
+    settings[_providersKey] = jsonEncode(currentProviders);
 
-      final order = List<String>.from(
-        (settings[_providersOrderKey] as List).cast<String>(),
-      );
-      for (final providerId in providers.keys) {
-        if (!order.contains(providerId)) order.add(providerId);
-      }
-      settings[_providersOrderKey] = order;
+    final order = List<String>.from(
+      (settings[_providersOrderKey] as List).cast<String>(),
+    );
+    for (final providerId in providers.keys) {
+      if (!order.contains(providerId)) order.add(providerId);
+    }
+    settings[_providersOrderKey] = order;
 
-      final currentAssistants = _jsonObjectList(
-        settings[_assistantsKey],
-        _assistantsKey,
-      );
-      final assistantsById = <String, Map<String, dynamic>>{
-        for (final assistant in currentAssistants)
-          if (assistant['id'] != null) assistant['id'].toString(): assistant,
-      };
-      for (final assistant in assistants) {
-        final id = assistant['id'] as String;
-        final local = assistantsById[id];
-        if (local == null) {
-          assistantsById[id] = assistant;
-          continue;
-        }
-        final prompt = (assistant['systemPrompt'] as String?)?.trim() ?? '';
-        if (prompt.isNotEmpty) local['systemPrompt'] = prompt;
-        if (assistant['chatModelProvider'] != null) {
-          local['chatModelProvider'] = assistant['chatModelProvider'];
-        }
-        if (assistant['chatModelId'] != null) {
-          local['chatModelId'] = assistant['chatModelId'];
-        }
+    final currentAssistants = _jsonObjectList(
+      settings[_assistantsKey],
+      _assistantsKey,
+    );
+    final assistantsById = <String, Map<String, dynamic>>{
+      for (final assistant in currentAssistants)
+        if (assistant['id'] != null) assistant['id'].toString(): assistant,
+    };
+    for (final assistant in assistants) {
+      final id = assistant['id'] as String;
+      final local = assistantsById[id];
+      if (local == null) {
+        assistantsById[id] = assistant;
+        continue;
       }
-      settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
-      return BusinessSettingsRouter.normalizeAndRoute(settings);
-    }, writeReceipt: true);
+      final prompt = (assistant['systemPrompt'] as String?)?.trim() ?? '';
+      if (prompt.isNotEmpty) local['systemPrompt'] = prompt;
+      if (assistant['chatModelProvider'] != null) {
+        local['chatModelProvider'] = assistant['chatModelProvider'];
+      }
+      if (assistant['chatModelId'] != null) {
+        local['chatModelId'] = assistant['chatModelId'];
+      }
+    }
+    settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
+    return BackupContentFilter.preserveUnselected(
+      BusinessSettingsRouter.normalizeAndRoute(settings),
+      current,
+      scope,
+    );
   }
 
   static Map<String, dynamic> _jsonObjectMap(Object? raw, String key) {
@@ -883,13 +932,11 @@ class CherryImporter {
   static Future<Map<String, String>> _materializeFiles(
     Map<String, Map<String, dynamic>> filesById,
     Set<String> usedIds, {
+    required Directory uploadDirectory,
     File? backupArchive,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
-    final uploadDir = await AppDirectories.getUploadDirectory();
-    if (!await uploadDir.exists()) await uploadDir.create(recursive: true);
-
     final filesPayload = <String, Map<String, dynamic>>{
       for (final id in usedIds)
         if (filesById[id] != null)
@@ -900,7 +947,7 @@ class CherryImporter {
       body: _materializeFilesInIsolate,
       payload: _CherryMaterializeArgs(
         backupPath: backupArchive?.path,
-        uploadDirPath: uploadDir.path,
+        uploadDirPath: uploadDirectory.path,
         filesById: filesPayload,
         usedIds: used,
       ),
@@ -1068,18 +1115,29 @@ class CherryImporter {
             String b64 = base64Str;
             final idx = b64.indexOf('base64,');
             if (idx != -1) b64 = b64.substring(idx + 7);
-            File(outPath).writeAsBytesSync(base64.decode(b64));
+            final bytes = base64.decode(b64);
+            _publishAttachment(outPath, (temporary) {
+              File(temporary).writeAsBytesSync(bytes, flush: true);
+              return true;
+            });
             result[id] = outPath;
             continue;
           }
+        } on FileSystemException {
+          rethrow;
         } catch (_) {}
 
         try {
           if (contentStr.isNotEmpty) {
-            File(outPath).writeAsStringSync(contentStr);
+            _publishAttachment(outPath, (temporary) {
+              File(temporary).writeAsStringSync(contentStr, flush: true);
+              return true;
+            });
             result[id] = outPath;
             continue;
           }
+        } on FileSystemException {
+          rethrow;
         } catch (_) {}
 
         try {
@@ -1120,6 +1178,8 @@ class CherryImporter {
             }
             if (done) continue;
           }
+        } on FileSystemException {
+          rethrow;
         } catch (_) {}
 
         try {
@@ -1154,6 +1214,8 @@ class CherryImporter {
             if (done) break;
           }
           if (done) continue;
+        } on FileSystemException {
+          rethrow;
         } catch (_) {}
 
         try {
@@ -1194,6 +1256,8 @@ class CherryImporter {
               continue;
             }
           }
+        } on FileSystemException {
+          rethrow;
         } catch (_) {}
       }
       return result;
@@ -1212,16 +1276,48 @@ class CherryImporter {
     return name.replaceAll('\\', '/');
   }
 
-  static bool _writeArchiveEntryToFile(ArchiveFile entry, String outPath) {
+  /// A failed or interrupted write must never leave a reusable final filename.
+  /// Only the new temporary file is ours to remove; existing attachments stay.
+  static bool _publishAttachment(
+    String outPath,
+    bool Function(String temporaryPath) write,
+  ) {
+    final temporary = File(
+      p.join(p.dirname(outPath), '.cherry-pending-${const Uuid().v4()}'),
+    );
+    try {
+      if (!write(temporary.path)) return false;
+      if (!File(outPath).existsSync()) temporary.renameSync(outPath);
+      return true;
+    } finally {
+      if (temporary.existsSync()) {
+        try {
+          temporary.deleteSync();
+        } catch (_) {
+          // An unfinished temporary is never considered a completed attachment.
+        }
+      }
+    }
+  }
+
+  static bool _writeArchiveEntryToFile(ArchiveFile entry, String outPath) =>
+      _publishAttachment(
+        outPath,
+        (temporary) => _writeArchiveEntry(entry, temporary),
+      );
+
+  static bool _writeArchiveEntry(ArchiveFile entry, String outPath) {
     final output = _ExactSizeOutputFileStream(
       outPath,
       expectedBytes: entry.size,
     );
     var written = false;
     try {
-      entry.writeContent(output);
+      writeZipEntryStreaming(entry, output);
       output.verifyComplete();
       written = true;
+    } on FileSystemException {
+      rethrow;
     } catch (_) {
       // Partial writes are cleaned up below, once the stream is closed.
     } finally {
@@ -1265,11 +1361,16 @@ class CherryImporter {
   static bool _copyDiskFileToUpload(String srcPath, String outPath) {
     try {
       final src = File(srcPath);
-      src.copySync(outPath);
-      try {
-        File(outPath).setLastModifiedSync(src.lastModifiedSync());
-      } catch (_) {}
-      return true;
+      if (!src.existsSync()) return false;
+      return _publishAttachment(outPath, (temporary) {
+        src.copySync(temporary);
+        try {
+          File(temporary).setLastModifiedSync(src.lastModifiedSync());
+        } catch (_) {}
+        return true;
+      });
+    } on FileSystemException {
+      rethrow;
     } catch (_) {
       return false;
     }
@@ -1500,12 +1601,33 @@ class CherryImporter {
     return topics;
   }
 
-  static Future<(int, int, int)> _commitTypedCherryTopics({
+  static Future<
+    ({
+      List<ParsedChatImportBatch> conversationBatches,
+      Map<String, List<ChatMessage>> messagesToAppend,
+      int conversations,
+      int messages,
+      int files,
+    })
+  >
+  _prepareTypedCherryTopics({
     required List<_CherryTypedTopic> topics,
     required Map<String, String> filePaths,
-    required ChatService chatService,
+    required Directory? uploadDirectory,
+    required bool includeChats,
+    required bool includeFiles,
   }) async {
-    if (!chatService.initialized) await chatService.init();
+    final batches = <ParsedChatImportBatch>[];
+    final append = <String, List<ChatMessage>>{};
+    if (!includeChats && !includeFiles) {
+      return (
+        conversationBatches: batches,
+        messagesToAppend: append,
+        conversations: 0,
+        messages: 0,
+        files: 0,
+      );
+    }
     var convCount = 0;
     var msgCount = 0;
     var extraSaved = 0;
@@ -1515,7 +1637,12 @@ class CherryImporter {
         final parts = <MessagePart>[...typed.message.parts];
         for (final ref in typed.pendingWrites) {
           debugPendingWriteAccessCount++;
-          final part = await _resolveCherryAttachment(ref, filePaths);
+          final part = await _resolveCherryAttachment(
+            ref,
+            filePaths,
+            includeFiles: includeFiles,
+            uploadDirectory: uploadDirectory,
+          );
           if (ref.dataUrl != null) {
             final unavailable = part is ImagePart
                 ? part.unavailable
@@ -1527,30 +1654,39 @@ class CherryImporter {
         resolved.add(typed.message.copyWith(parts: parts));
       }
 
+      if (!includeChats) continue;
       if (topic.mergeIntoExisting) {
-        for (final message in resolved) {
-          await chatService.addMessageDirectly(topic.conversation.id, message);
-          msgCount += 1;
-        }
+        append.putIfAbsent(topic.conversation.id, () => []).addAll(resolved);
+        msgCount += resolved.length;
       } else {
-        await chatService.restoreConversation(topic.conversation, resolved);
+        batches.add((conversation: topic.conversation, messages: resolved));
         convCount += 1;
         msgCount += resolved.length;
       }
     }
-    return (convCount, msgCount, extraSaved);
+    return (
+      conversationBatches: batches,
+      messagesToAppend: append,
+      conversations: convCount,
+      messages: msgCount,
+      files: extraSaved,
+    );
   }
 
   static Future<MessagePart> _resolveCherryAttachment(
     _PendingAttachmentRef ref,
-    Map<String, String> filePaths,
-  ) async {
+    Map<String, String> filePaths, {
+    required bool includeFiles,
+    required Directory? uploadDirectory,
+  }) async {
     final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
     final fileMime =
         ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream');
 
     if (ref.dataUrl != null) {
-      final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
+      final savedPath = includeFiles
+          ? await _saveDataUrlToUpload(ref.dataUrl!, uploadDirectory!)
+          : null;
       if (savedPath != null) {
         return _attachmentPart(
           isImage: ref.isImage,
@@ -1667,10 +1803,11 @@ class CherryImporter {
     return text.replaceAll(re, '');
   }
 
-  static Future<String?> _saveDataUrlToUpload(String dataUrl) async {
+  static Future<String?> _saveDataUrlToUpload(
+    String dataUrl,
+    Directory upload,
+  ) async {
     try {
-      final upload = await AppDirectories.getUploadDirectory();
-      if (!await upload.exists()) await upload.create(recursive: true);
       // Extract mime and data
       String mime = 'image/png';
       String payload = dataUrl;
@@ -1699,11 +1836,12 @@ class CherryImporter {
         default:
           ext = 'png';
       }
-      final fname =
-          'cherry_img_${DateTime.now().millisecondsSinceEpoch}_${bytes.length}.$ext';
+      final fname = 'cherry_img_${const Uuid().v4()}.$ext';
       final out = File(p.join(upload.path, fname));
       await out.writeAsBytes(bytes);
       return out.path;
+    } on FileSystemException {
+      rethrow;
     } catch (_) {
       return null;
     }

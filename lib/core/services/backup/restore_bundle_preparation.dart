@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../../models/backup_scope.dart';
+
 import 'backup_cancel_token.dart';
 import 'backup_task_progress.dart';
 import 'restore_bundle_staging.dart';
@@ -45,7 +47,9 @@ final class RestoreBundlePreparation {
     required bool bundleIncludesFiles,
     required bool restoreChats,
     required bool restoreFiles,
+    BackupScope scope = const BackupScope(),
     bool useExistingLocalAttachments = false,
+    Directory? filesDirectory,
     DateTime? createdAtUtc,
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
@@ -74,11 +78,13 @@ final class RestoreBundlePreparation {
         extractedDirectory: extractedDirectory,
         includeChats: selectedChats,
         includeFiles: selectedFiles,
+        scope: scope,
         sourceIncludesChats: bundleIncludesChats,
         sourceIncludesFiles: bundleIncludesFiles,
         sourceManifestSha256: sourceManifestSha256,
         validatedSettings: validatedSettings,
         useExistingLocalAttachments: useExistingLocalAttachments,
+        filesDirectory: filesDirectory,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );

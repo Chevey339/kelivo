@@ -110,6 +110,11 @@ String encodeTraceSnapshot(Map<String, dynamic> snapshot) {
 
 Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
   return switch (chunk) {
+    AssistantRoundEnd(:final reasoningDetails) => <String, dynamic>{
+      'type': 'assistant_round_end',
+      if (reasoningDetails != null)
+        'reasoning_details': _stableJson(reasoningDetails),
+    },
     TextStart(:final id) => <String, dynamic>{'type': 'text_start', 'id': id},
     TextDelta(:final id, :final text) => <String, dynamic>{
       'type': 'text_delta',
@@ -220,8 +225,9 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
             },
       ],
     },
-    Usage(:final usage) => <String, dynamic>{
+    Usage(:final usage, :final startsRequest) => <String, dynamic>{
       'type': 'usage',
+      if (startsRequest) 'startsRequest': true,
       'promptTokens': usage.promptTokens,
       'completionTokens': usage.completionTokens,
       'cachedTokens': usage.cachedTokens,

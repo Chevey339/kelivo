@@ -1,7 +1,9 @@
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../shared/widgets/long_message_editor.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class MessageEditPage extends StatefulWidget {
@@ -14,11 +16,25 @@ class MessageEditPage extends StatefulWidget {
 
 class _MessageEditPageState extends State<MessageEditPage> {
   late final TextEditingController _controller;
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (_saving) return;
+    _saving = true;
+    try {
+      await _controller.retireMessageInput();
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      Navigator.of(context).pop<String>(_controller.text.trim());
+    } catch (_) {
+      _saving = false;
+      rethrow;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.message.content);
+    _controller = MessageEditingController(text: widget.message.content);
   }
 
   @override
@@ -36,10 +52,7 @@ class _MessageEditPageState extends State<MessageEditPage> {
         title: Text(l10n.messageEditPageTitle),
         actions: [
           TextButton(
-            onPressed: () {
-              final text = _controller.text.trim();
-              Navigator.of(context).pop<String>(text);
-            },
+            onPressed: _save,
             child: Text(
               l10n.messageEditPageSave,
               style: TextStyle(
@@ -53,12 +66,9 @@ class _MessageEditPageState extends State<MessageEditPage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: TextField(
+          child: LongMessageEditor(
             controller: _controller,
             autofocus: true,
-            keyboardType: TextInputType.multiline,
-            minLines: 8,
-            maxLines: null,
             decoration: InputDecoration(
               hintText: l10n.messageEditPageHint,
               filled: true,

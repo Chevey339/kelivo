@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../../utils/app_directories.dart';
 import 'restore_durability.dart';
 import 'restore_previous_plan.dart';
 import 'restore_receipt.dart';
@@ -35,6 +36,7 @@ final class RestorePreviousBuilder {
   static Future<RestorePreviousBundle> build({
     required Directory appDataDirectory,
     required RestoreReceipt preparedReceipt,
+    Iterable<String> assetRoots = assetRootNames,
   }) async {
     if (preparedReceipt.state != RestoreReceiptState.prepared ||
         preparedReceipt.sequence != 1) {
@@ -51,7 +53,10 @@ final class RestorePreviousBuilder {
     final database = await inspectDatabase(appDataDirectory);
     final assets =
         preparedReceipt.selectedComponents.contains(RestoreComponent.assets)
-        ? await inspectAssets(appDataDirectory)
+        ? await inspectAssets(
+            await AppDirectories.contentDirectoryFor(appDataDirectory),
+            rootNames: assetRoots,
+          )
         : null;
     final totalBytes =
         (database.descriptor?.bytes ?? 0) +
@@ -90,7 +95,10 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_database_changed');
     }
     if (expected.assets != null) {
-      final actual = await inspectAssets(appDataDirectory);
+      final actual = await inspectAssets(
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
+        rootNames: expected.assets!.rootStates.keys,
+      );
       if (!_sameAssets(actual, expected.assets!)) {
         throw StateError('restore_previous_assets_changed');
       }
@@ -140,7 +148,10 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_stored_database_topology');
     }
     if (expected.assets != null) {
-      final actual = await inspectAssets(directory);
+      final actual = await inspectAssets(
+        directory,
+        rootNames: expected.assets!.rootStates.keys,
+      );
       if (!_sameAssets(actual, expected.assets!)) {
         throw StateError('restore_previous_stored_assets');
       }
@@ -173,15 +184,23 @@ final class RestorePreviousBuilder {
     return RestorePreviousDatabasePlan.file(descriptor);
   }
 
-  static Future<RestorePreviousAssetsPlan> inspectAssets(Directory root) async {
+  static Future<RestorePreviousAssetsPlan> inspectAssets(
+    Directory root, {
+    Iterable<String> rootNames = assetRootNames,
+  }) async {
+    if (rootNames.isEmpty ||
+        rootNames.any((name) => !assetRootNames.contains(name))) {
+      throw ArgumentError.value(rootNames, 'rootNames');
+    }
     final rootStates = <String, RestorePreviousAssetRootState>{};
-    final entries = <String, RestoreFileDescriptor>{};
+    final entries = <String, RestoreAssetDescriptor>{};
     final foldedNames = <String>{};
     final pendingFiles = <({File file, String name, FileStat stat})>[];
     var totalPathBytes = 0;
     var totalBytes = 0;
+    var entryCount = 0;
 
-    for (final rootName in assetRootNames) {
+    for (final rootName in rootNames) {
       final assetRoot = Directory(p.join(root.path, rootName));
       final rootType = await FileSystemEntity.type(
         assetRoot.path,
@@ -192,7 +211,7 @@ final class RestorePreviousBuilder {
         continue;
       }
       if (rootType != FileSystemEntityType.directory) {
-        throw StateError('restore_previous_asset_root:$rootName');
+        throw StateError('restore_previous_asset_root:$rootName:$rootType');
       }
       rootStates[rootName] = RestorePreviousAssetRootState.directory;
 
@@ -217,11 +236,34 @@ final class RestorePreviousBuilder {
         if (type == FileSystemEntityType.directory) {
           continue;
         }
-        if (type != FileSystemEntityType.file) {
-          throw StateError('restore_previous_asset_entry_type');
-        }
-        if (pendingFiles.length >= _maximumAssetEntries) {
+        if (++entryCount > _maximumAssetEntries) {
           throw StateError('restore_previous_asset_budget');
+        }
+        if (type == FileSystemEntityType.link) {
+          final target = await Link(entity.path).target();
+          final targetBytes = utf8.encode(target).length;
+          totalPathBytes += targetBytes;
+          totalBytes += targetBytes;
+          if (targetBytes > _maximumSinglePathBytes ||
+              totalPathBytes > _maximumAssetPathBytes ||
+              totalBytes > _maximumTotalBytes) {
+            throw StateError('restore_previous_asset_budget');
+          }
+          entries[relativeName] = RestoreAssetDescriptor.link(target);
+          continue;
+        }
+        if (type == FileSystemEntityType.pipe) {
+          entries[relativeName] = const RestoreAssetDescriptor.pipe();
+          continue;
+        }
+        if (type == FileSystemEntityType.unixDomainSock) {
+          entries[relativeName] = const RestoreAssetDescriptor.socket();
+          continue;
+        }
+        if (type != FileSystemEntityType.file) {
+          throw StateError(
+            'restore_previous_asset_entry_type:$relativeName:$type',
+          );
         }
         final stat = await File(entity.path).stat();
         totalBytes += stat.size;
@@ -243,16 +285,17 @@ final class RestorePreviousBuilder {
       if (descriptor.bytes != pending.stat.size) {
         throw StateError('restore_previous_file_changed');
       }
-      entries[pending.name] = descriptor;
+      entries[pending.name] = RestoreAssetDescriptor.file(descriptor);
     }
     return RestorePreviousAssetsPlan(rootStates: rootStates, entries: entries);
   }
 
   /// Makes the selected live asset roots durable before the first rename.
   ///
-  /// Files are synchronized first, followed by their directories from the
-  /// deepest level to [root]. The final root barrier also orders all earlier
-  /// file and directory flushes on Apple platforms.
+  /// Regular files are synchronized first, followed by their directories from
+  /// the deepest level to [root]. Links and IPC entries are persisted through
+  /// their parent directories, never by opening them. The final root barrier
+  /// also orders all earlier file and directory flushes on Apple platforms.
   static Future<void> syncAssetRoots({
     required Directory root,
     required RestorePreviousAssetsPlan expected,
@@ -285,6 +328,7 @@ final class RestorePreviousBuilder {
             .toList()
           ..sort((left, right) => left.key.compareTo(right.key));
     for (final entry in selectedEntries) {
+      if (entry.value.type != RestoreAssetEntryType.file) continue;
       await durability.syncFile(
         File(p.joinAll([root.path, ...entry.key.split('/')])),
       );
@@ -314,7 +358,7 @@ final class RestorePreviousBuilder {
     }
     await durability.syncDirectory(root, fullBarrier: true);
 
-    final after = await inspectAssets(root);
+    final after = await inspectAssets(root, rootNames: rootNames);
     for (final rootName in rootNames) {
       if (!_sameAssetRoot(after, expected, rootName)) {
         throw StateError('restore_previous_asset_sync_changed:$rootName');
@@ -338,7 +382,7 @@ final class RestorePreviousBuilder {
         left.entries.length != right.entries.length) {
       return false;
     }
-    return assetRootNames.every(
+    return left.rootStates.keys.every(
       (rootName) => _sameAssetRoot(left, right, rootName),
     );
   }
@@ -360,7 +404,7 @@ final class RestorePreviousBuilder {
     final values = leftEntries.toList(growable: false);
     if (values.length != rightEntries.length) return false;
     return values.every(
-      (entry) => _sameDescriptor(entry.value, rightEntries[entry.key]),
+      (entry) => entry.value.matches(rightEntries[entry.key]),
     );
   }
 

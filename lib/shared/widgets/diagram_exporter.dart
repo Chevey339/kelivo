@@ -1,47 +1,25 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'mermaid_bridge.dart';
 import 'mermaid_image_cache.dart';
-import 'markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../../utils/svg_preview_html.dart';
 
 typedef DiagramCode = ({String code, bool isSvg});
 
 List<DiagramCode> extractDiagramCodes(String markdown) {
   final diagrams = <DiagramCode>[];
-  final lexer = MarkdownLineLexer();
-  final body = StringBuffer();
-  var language = '';
-
-  void addDiagram() {
-    final code = body.toString().trim();
-    if (code.isEmpty) return;
+  final infoWords = RegExp(r'\s+');
+  for (final node in MarkdownStructure(markdown).codeBlocks) {
+    final code = node.code.trim();
+    if (code.isEmpty) continue;
+    final language = node.info.trim().split(infoWords).first.toLowerCase();
     final isSvg = isSvgCodeBlock(language, code);
     if (language == 'mermaid' || isSvg) {
       diagrams.add((code: code, isSvg: isSvg));
     }
   }
-
-  for (final line in const LineSplitter().convert(markdown)) {
-    final wasFenced = lexer.fenced;
-    lexer.consumeFence(line);
-    if (!wasFenced && lexer.fenced) {
-      final opening = line.trimLeft();
-      var end = 0;
-      while (end < opening.length && opening[end] == opening[0]) {
-        end++;
-      }
-      language = opening.substring(end).trim().toLowerCase();
-      body.clear();
-    } else if (wasFenced && !lexer.fenced) {
-      addDiagram();
-    } else if (wasFenced) {
-      body.writeln(line);
-    }
-  }
-  if (lexer.fenced) addDiagram();
   return diagrams;
 }
 
@@ -96,8 +74,9 @@ Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
 
 Future<void> preRenderDiagramCodesForExport(
   BuildContext context,
-  List<DiagramCode> codes,
-) async {
+  List<DiagramCode> codes, {
+  void Function(int completed, int total)? onProgress,
+}) async {
   if (codes.isEmpty) return;
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -118,6 +97,8 @@ Future<void> preRenderDiagramCodesForExport(
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
 
+  var completed = 0;
+  onProgress?.call(completed, distinct.length);
   // Sequentially render codes with a single offscreen overlay to avoid heavy composites
   for (final diagram in distinct) {
     if (!context.mounted) return;
@@ -132,7 +113,10 @@ Future<void> preRenderDiagramCodesForExport(
             viewKey: key,
             isSvg: diagram.isSvg,
           );
-    if (handle == null) continue;
+    if (handle == null) {
+      onProgress?.call(++completed, distinct.length);
+      continue;
+    }
     final ready = Completer<void>();
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -171,6 +155,7 @@ Future<void> preRenderDiagramCodesForExport(
       }
     } finally {
       entry.remove();
+      onProgress?.call(++completed, distinct.length);
     }
   }
 }

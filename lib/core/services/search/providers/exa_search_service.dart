@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class ExaSearchService extends SearchService<ExaOptions> {
+class ExaSearchService extends SearchService<ExaOptions>
+    implements WebFetchCapable<ExaOptions> {
+  ExaSearchService({super.client});
+
   @override
   String get name => 'Exa';
 
@@ -59,6 +63,51 @@ class ExaSearchService extends SearchService<ExaOptions> {
       return SearchResult(items: results);
     } catch (e) {
       throw Exception('Exa search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required ExaOptions serviceOptions,
+  }) async {
+    try {
+      final endpoint = siblingFetchEndpoint(
+        serviceOptions.resolvedUrl,
+        searchPath: '/search',
+        fetchPath: '/contents',
+      );
+      final data = await postFetchJson(
+        Uri.parse(endpoint),
+        headers: {
+          'Authorization':
+              'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
+        },
+        body: {
+          'urls': [url],
+          'text': {'maxCharacters': webFetchMaxContentLength},
+        },
+        commonOptions: commonOptions,
+      );
+      final statuses = (data['statuses'] as List?) ?? const [];
+      final status = statuses.isEmpty ? null : statuses.first as Map;
+      if (status != null && status['status'] == 'error') {
+        final error = status['error'];
+        throw Exception(
+          error is Map ? (error['tag'] ?? error) : 'crawl failed',
+        );
+      }
+      final results = (data['results'] as List?) ?? const [];
+      if (results.isEmpty) throw Exception('no content returned');
+      final page = (results.first as Map).cast<String, dynamic>();
+      return WebFetchPage(
+        url: (page['url'] ?? url).toString(),
+        title: (page['title'] ?? '').toString(),
+        content: (page['text'] ?? '').toString(),
+      );
+    } catch (e) {
+      throw Exception('Exa fetch failed: $e');
     }
   }
 }

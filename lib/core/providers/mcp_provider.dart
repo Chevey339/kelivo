@@ -12,6 +12,7 @@ import '../services/mcp/workspace_stdio_command.dart';
 import '../services/workspace/workspace_runtime.dart';
 import '../models/environment_state.dart';
 import '../models/workspace.dart';
+import '../models/mcp_presentation.dart';
 import 'environment_provider.dart';
 import 'workspace_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -39,21 +40,24 @@ class _Cooldown {
 class _DetachedConnection {
   const _DetachedConnection({
     this.activeConnect,
+    this.activeAuthorization,
     this.client,
     this.initializingTransport,
   });
 
   final Future<bool>? activeConnect;
+  final Future<bool>? activeAuthorization;
   final mcp.Client? client;
-  final WorkspaceStdioTransport? initializingTransport;
+  final mcp.ClientTransport? initializingTransport;
 }
 
 class _ServerConnection {
   Workspace? workspace;
-  WorkspaceStdioTransport? initializingTransport;
+  mcp.ClientTransport? initializingTransport;
   mcp.Client? client;
   Future<bool>? connectFuture;
   Future<bool>? authorizationFuture;
+  McpOAuthSession? authorizationSession;
   int generation = 0;
   McpStatus status = McpStatus.idle;
   String? error;
@@ -174,6 +178,7 @@ class McpServerConfig {
   final Map<String, String> headers; // custom HTTP headers
   final McpOAuthState? oauth;
   final McpOAuthClientRegistration? oauthClient;
+  final String? oauthRedirectUri;
   // For STDIO (host desktop or mobile workspace environment)
   final String? command;
   final List<String> args;
@@ -191,6 +196,7 @@ class McpServerConfig {
     this.headers = const {},
     this.oauth,
     this.oauthClient,
+    this.oauthRedirectUri,
     this.command,
     this.args = const [],
     this.env = const {},
@@ -208,6 +214,8 @@ class McpServerConfig {
     Map<String, String>? headers,
     McpOAuthState? oauth,
     McpOAuthClientRegistration? oauthClient,
+    String? oauthRedirectUri,
+    bool clearOAuthRedirectUri = false,
     String? command,
     List<String>? args,
     Map<String, String>? env,
@@ -227,6 +235,9 @@ class McpServerConfig {
     headers: headers ?? this.headers,
     oauth: clearOAuth ? null : (oauth ?? this.oauth),
     oauthClient: clearOAuthClient ? null : (oauthClient ?? this.oauthClient),
+    oauthRedirectUri: clearOAuthRedirectUri
+        ? null
+        : (oauthRedirectUri ?? this.oauthRedirectUri),
     command: command ?? this.command,
     args: args ?? this.args,
     env: env ?? this.env,
@@ -256,6 +267,7 @@ class McpServerConfig {
         transport != McpTransportType.inmemory &&
         oauthClient != null)
       'oauthClient': oauthClient!.toJson(),
+    if (oauthRedirectUri != null) 'oauthRedirectUri': oauthRedirectUri,
     if (transport == McpTransportType.stdio) 'command': command,
     if (transport == McpTransportType.stdio) 'args': args,
     if (transport == McpTransportType.stdio) 'env': env,
@@ -331,6 +343,7 @@ class McpServerConfig {
             const {},
         oauth: _oauthMatchesServer(oauth, url) ? oauth : null,
         oauthClient: oauthClient,
+        oauthRedirectUri: json['oauthRedirectUri'] as String?,
       );
     }
   }
@@ -353,6 +366,10 @@ class McpProvider extends ChangeNotifier {
   static const Duration _backgroundSessionRecoveryWindow = Duration(
     seconds: 30,
   );
+
+  static const String presentationKey = 'mcp_presentation_v1';
+  McpPresentation _presentation = McpPresentation();
+  final Map<String, List<Map<String, dynamic>>> _declaredIcons = {};
 
   final BusinessPreferences preferences;
   late final Future<void> loaded;
@@ -447,6 +464,8 @@ class McpProvider extends ChangeNotifier {
   );
   McpStatus statusFor(String id) => _connections[id]?.status ?? McpStatus.idle;
   String? errorFor(String id) => _connections[id]?.error;
+  McpOAuthStage? oauthStageFor(String id) =>
+      _connections[id]?.authorizationSession?.stage;
   bool get hasAnyEnabled => _servers.any((s) => s.enabled);
   bool isConnected(String id) {
     final state = _connections[id];
@@ -468,6 +487,18 @@ class McpProvider extends ChangeNotifier {
     final timeoutMs = preferences.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
       _requestTimeout = Duration(milliseconds: timeoutMs);
+    }
+    final presentation = preferences.getString(presentationKey);
+    if (presentation != null) {
+      try {
+        _presentation = McpPresentation.fromJson(
+          (jsonDecode(presentation) as Map).cast<String, dynamic>(),
+        );
+      } catch (_) {
+        // A damaged appearance preference must not prevent MCP configuration
+        // from loading. Keep the original value untouched for recovery.
+        debugPrint('Invalid MCP presentation metadata');
+      }
     }
     final raw = preferences.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -568,6 +599,8 @@ class McpProvider extends ChangeNotifier {
             if (s.transport != McpTransportType.stdio &&
                 s.transport != McpTransportType.inmemory)
               'baseUrl': s.url,
+            if (s.oauthRedirectUri != null)
+              'oauthRedirectUri': s.oauthRedirectUri,
             if (s.transport != McpTransportType.stdio &&
                 s.transport != McpTransportType.inmemory &&
                 s.headers.isNotEmpty)
@@ -743,6 +776,7 @@ class McpProvider extends ChangeNotifier {
               headers: headers,
               oauth: oauth,
               oauthClient: oauthClient,
+              oauthRedirectUri: cfg['oauthRedirectUri'] as String?,
             ),
           );
         });
@@ -846,7 +880,10 @@ class McpProvider extends ChangeNotifier {
                 latestById[server.id]?.oauth,
                 server.url,
               ))
-            server.copyWith(oauth: latestById[server.id]!.oauth)
+            server.copyWith(
+              oauth: latestById[server.id]!.oauth,
+              clearOAuth: !_sameOAuthSettings(server, latestById[server.id]!),
+            )
           else
             server,
       ];
@@ -854,6 +891,7 @@ class McpProvider extends ChangeNotifier {
       detached = [for (final server in _servers) _detachConnection(server.id)];
       _servers = committed;
       _connections.clear();
+      _declaredIcons.clear();
       for (final server in _servers) {
         _connections[server.id] = _ServerConnection();
       }
@@ -905,6 +943,7 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> headers = const {},
     McpOAuthState? oauth,
     McpOAuthClientRegistration? oauthClient,
+    String? oauthRedirectUri,
     String? command,
     List<String> args = const <String>[],
     Map<String, String> env = const <String, String>{},
@@ -921,6 +960,7 @@ class McpProvider extends ChangeNotifier {
       headers: headers,
       oauth: oauth,
       oauthClient: oauthClient,
+      oauthRedirectUri: oauthRedirectUri,
       command: command?.trim(),
       args: args,
       env: env,
@@ -945,12 +985,19 @@ class McpProvider extends ChangeNotifier {
   Future<void> updateServer(McpServerConfig updated) =>
       _updateServer(updated, preserveLatestTools: false);
 
-  Future<void> updateServerMetadata(McpServerConfig updated) =>
-      _updateServer(updated, preserveLatestTools: true);
+  Future<void> updateServerMetadata(
+    McpServerConfig updated, {
+    bool replaceOAuthSettings = false,
+  }) => _updateServer(
+    updated,
+    preserveLatestTools: true,
+    replaceOAuthSettings: replaceOAuthSettings,
+  );
 
   Future<void> _updateServer(
     McpServerConfig updated, {
     required bool preserveLatestTools,
+    bool replaceOAuthSettings = false,
   }) async {
     _DetachedConnection? detached;
     var reconnect = false;
@@ -961,14 +1008,28 @@ class McpProvider extends ChangeNotifier {
       final resourceChanged =
           !_isRemoteTransport(updated.transport) ||
           updated.url.trim() != previous.url.trim();
+      if (resourceChanged) _declaredIcons.remove(updated.id);
+      final oauthSettingsChanged =
+          replaceOAuthSettings && !_sameOAuthSettings(updated, previous);
       final effectiveUpdated = resourceChanged
-          ? updated.copyWith(clearOAuth: true, clearOAuthClient: true)
+          ? updated.copyWith(
+              clearOAuth: true,
+              clearOAuthClient:
+                  !replaceOAuthSettings ||
+                  updated.oauthClient?.registrationSource ==
+                      McpOAuthClientRegistrationSource.dcr,
+            )
           : updated.copyWith(
               oauth: previous.oauth,
-              oauthClient: _mergeOAuthClient(
-                updated.oauthClient,
-                previous.oauthClient,
-              ),
+              clearOAuth: oauthSettingsChanged,
+              clearOAuthClient:
+                  replaceOAuthSettings && updated.oauthClient == null,
+              oauthClient: replaceOAuthSettings
+                  ? updated.oauthClient
+                  : _mergeOAuthClient(
+                      updated.oauthClient,
+                      previous.oauthClient,
+                    ),
             );
       final next = List<McpServerConfig>.of(_servers)
         ..[idx] = preserveLatestTools
@@ -1005,12 +1066,202 @@ class McpProvider extends ChangeNotifier {
       detached = _detachConnection(id);
       _servers = next;
       _connections.remove(id);
+      _declaredIcons.remove(id);
       _notify();
     });
     final committedConnection = detached;
     if (committedConnection != null) {
       await _finishDisconnect(committedConnection, terminateSession: true);
     }
+  }
+
+  List<McpGroup> get groups => _presentation.groups;
+  McpServerPresentation presentationFor(String id) =>
+      _presentation.servers[id] ?? const McpServerPresentation();
+  bool groupCollapsed(String id) => _presentation.collapsed.contains(id);
+  List<Map<String, dynamic>> declaredIconsFor(String id) =>
+      List.unmodifiable(_declaredIcons[id] ?? const []);
+
+  Future<void> _updatePresentation(
+    McpPresentation Function(McpPresentation current) update,
+  ) => _serializeServerMutation(() async {
+    final next = update(_presentation);
+    await preferences.setString(presentationKey, jsonEncode(next.toJson()));
+    _presentation = next;
+    _notify();
+  });
+
+  Future<String> createGroup(String name) async {
+    final id = const Uuid().v4();
+    await _updatePresentation((current) {
+      final trimmed = name.trim();
+      if (trimmed.isEmpty ||
+          current.groups.any(
+            (g) => g.name.toLowerCase() == trimmed.toLowerCase(),
+          )) {
+        throw ArgumentError('Group name must be nonempty and unique');
+      }
+      return current.copyWith(
+        groups: [
+          ...current.groups,
+          McpGroup(id: id, name: trimmed),
+        ],
+      );
+    });
+    return id;
+  }
+
+  Future<void> renameGroup(String id, String name) =>
+      _updatePresentation((current) {
+        final trimmed = name.trim();
+        if (trimmed.isEmpty ||
+            current.groups.any(
+              (g) =>
+                  g.id != id && g.name.toLowerCase() == trimmed.toLowerCase(),
+            )) {
+          throw ArgumentError('Group name must be nonempty and unique');
+        }
+        return current.copyWith(
+          groups: [
+            for (final group in current.groups)
+              group.id == id ? McpGroup(id: id, name: trimmed) : group,
+          ],
+        );
+      });
+
+  Future<void> deleteGroup(String id) => _updatePresentation(
+    (current) => current.copyWith(
+      groups: current.groups.where((group) => group.id != id).toList(),
+      servers: current.servers.map(
+        (key, value) => MapEntry(
+          key,
+          value.groupId == id ? McpServerPresentation(icon: value.icon) : value,
+        ),
+      ),
+      collapsed: {...current.collapsed}..remove(id),
+    ),
+  );
+
+  Future<void> reorderGroup(String id, int newIndex) =>
+      _updatePresentation((current) {
+        final groups = [...current.groups];
+        final oldIndex = groups.indexWhere((group) => group.id == id);
+        if (oldIndex < 0) return current;
+        final group = groups.removeAt(oldIndex);
+        groups.insert(newIndex.clamp(0, groups.length), group);
+        return current.copyWith(groups: groups);
+      });
+
+  Future<void> setGroupCollapsed(String id, bool collapsed) =>
+      _updatePresentation((current) {
+        final next = {...current.collapsed};
+        if (collapsed) {
+          next.add(id);
+        } else {
+          next.remove(id);
+        }
+        return current.copyWith(collapsed: next);
+      });
+
+  Future<void> moveServersToGroup(Set<String> ids, String? groupId) =>
+      _updatePresentation((current) {
+        if (groupId != null &&
+            !current.groups.any((group) => group.id == groupId)) {
+          throw ArgumentError.value(groupId);
+        }
+        final entries = {...current.servers};
+        for (final id in ids) {
+          if (getById(id) == null) continue;
+          entries[id] = McpServerPresentation(
+            groupId: groupId,
+            icon: entries[id]?.icon,
+          );
+        }
+        return current.copyWith(servers: entries);
+      });
+
+  Future<void> setServerIcon(String id, McpServerIcon? icon) =>
+      _updatePresentation((current) {
+        if (getById(id) == null) return current;
+        return current.copyWith(
+          servers: {
+            ...current.servers,
+            id: McpServerPresentation(
+              groupId: current.servers[id]?.groupId,
+              icon: icon,
+            ),
+          },
+        );
+      });
+
+  Future<void> setServersEnabled(Set<String> ids, bool enabled) async {
+    for (final id in ids) {
+      final server = getById(id);
+      if (server != null && server.enabled != enabled) {
+        await updateServerMetadata(server.copyWith(enabled: enabled));
+      }
+    }
+  }
+
+  Future<void> removeServers(Set<String> ids) async {
+    for (final id in ids) {
+      await removeServer(id);
+    }
+    await _updatePresentation(
+      (current) => current.copyWith(
+        servers: {...current.servers}..removeWhere((id, _) => ids.contains(id)),
+      ),
+    );
+  }
+
+  Future<void> restoreServer(
+    McpServerConfig server,
+    McpServerPresentation presentation,
+  ) async {
+    var restored = false;
+    await _serializeServerMutation(() async {
+      if (getById(server.id) != null) return;
+      final next = [..._servers, server];
+      await _persistServers(next);
+      _servers = next;
+      restored = true;
+      _connections[server.id] = _ServerConnection();
+      _notify();
+    });
+    if (!restored) return;
+    await _updatePresentation(
+      (current) => current.copyWith(
+        servers: {
+          ...current.servers,
+          server.id: McpServerPresentation(
+            icon: presentation.icon,
+            groupId:
+                current.groups.any((group) => group.id == presentation.groupId)
+                ? presentation.groupId
+                : null,
+          ),
+        },
+      ),
+    );
+    if (server.enabled) unawaited(connect(server.id));
+  }
+
+  Future<void> moveServerBefore(
+    String id,
+    String? groupId,
+    String? beforeId,
+  ) async {
+    if (presentationFor(id).groupId != groupId) {
+      await moveServersToGroup({id}, groupId);
+    }
+    final current = _servers;
+    final oldIndex = current.indexWhere((server) => server.id == id);
+    if (oldIndex < 0) return;
+    final remaining = current.where((server) => server.id != id).toList();
+    final newIndex = beforeId == null
+        ? remaining.length
+        : remaining.indexWhere((server) => server.id == beforeId);
+    if (newIndex >= 0) await reorderServers(oldIndex, newIndex);
   }
 
   Future<void> reorderServers(int oldIndex, int newIndex) async {
@@ -1120,14 +1371,24 @@ class McpProvider extends ChangeNotifier {
 
     final detached = _detachConnection(id);
     final generation = state.generation;
+    final session = McpOAuthSession(
+      onStageChanged: (_) {
+        if (_authorizationIsCurrent(server, state, generation)) _notify();
+      },
+    );
+    state.authorizationSession = session;
     state.status = McpStatus.authorizing;
     state.error = null;
     _notify();
     late final Future<bool> future;
-    future = _performAuthorization(server, state, generation, detached)
+    future = _performAuthorization(server, state, generation, detached, session)
         .whenComplete(() {
           if (identical(state.authorizationFuture, future)) {
             state.authorizationFuture = null;
+          }
+          if (identical(state.authorizationSession, session)) {
+            state.authorizationSession = null;
+            _notify();
           }
         });
     state.authorizationFuture = future;
@@ -1139,6 +1400,7 @@ class McpProvider extends ChangeNotifier {
     _ServerConnection state,
     int generation,
     _DetachedConnection detached,
+    McpOAuthSession session,
   ) async {
     await _finishDisconnect(detached, terminateSession: true);
     if (!_authorizationIsCurrent(server, state, generation)) return false;
@@ -1150,6 +1412,17 @@ class McpProvider extends ChangeNotifier {
         wwwAuthenticate: state.oauthChallenges,
         additionalScopes: state.additionalOAuthScopes.toList(),
         clientRegistration: _authorizationRegistration(server, state),
+        loopbackRedirect: server.oauthRedirectUri == null
+            ? null
+            : Uri.parse(server.oauthRedirectUri!),
+        session: session,
+        onClientRegistered: (registration) => _persistOAuthRegistration(
+          server,
+          state,
+          generation,
+          session,
+          registration,
+        ),
       );
       if (!_authorizationIsCurrent(server, state, generation)) return false;
       final persisted = await _persistOAuthState(
@@ -1160,7 +1433,10 @@ class McpProvider extends ChangeNotifier {
       );
       if (!persisted) return false;
       state.reRegisterDynamicClient = false;
-      final connected = await _connect(server.id, retryUnauthorized: false);
+      session.moveTo(McpOAuthStage.reconnect);
+      final connected = await session.wait(
+        _connect(server.id, retryUnauthorized: false),
+      );
       if (connected ||
           !_isDesktopPlatform() ||
           state.status != McpStatus.error ||
@@ -1174,20 +1450,66 @@ class McpProvider extends ChangeNotifier {
           !_authorizationIsCurrent(server, state, generation)) {
         return false;
       }
-      return _connect(server.id, retryUnauthorized: false);
+      return await session.wait(_connect(server.id, retryUnauthorized: false));
+    } on McpOAuthCancelled {
+      if (_authorizationIsCurrent(server, state, generation)) {
+        state.status = McpStatus.needsAuthorization;
+        state.error = null;
+        _notify();
+      }
+      return false;
     } catch (error) {
       if (!_authorizationIsCurrent(server, state, generation)) return false;
-      state.status =
-          error is McpOAuthException &&
-              !error.requiresAuthorization &&
-              !error.isTransient
-          ? McpStatus.error
-          : McpStatus.needsAuthorization;
+      // Keep Sign in available after an authorization failure. The user can
+      // correct client settings or retry without a separate MCP reconnect.
+      state.status = McpStatus.needsAuthorization;
+      if (error is McpOAuthException && error.oauthError == 'invalid_client') {
+        state.reRegisterDynamicClient = true;
+      }
       state.error = error.toString();
       _notify();
       return false;
     }
   }
+
+  Future<void> cancelAuthorization(String id) async {
+    final state = _connections[id];
+    if (state?.authorizationSession == null) return;
+    final detached = _detachConnection(id);
+    state!.status = McpStatus.needsAuthorization;
+    _notify();
+    await _finishDisconnect(detached, terminateSession: true);
+  }
+
+  Future<void> _persistOAuthRegistration(
+    McpServerConfig server,
+    _ServerConnection state,
+    int generation,
+    McpOAuthSession session,
+    McpOAuthClientRegistration registration,
+  ) => _serializeServerMutation(() async {
+    session.check();
+    if (!_authorizationIsCurrent(server, state, generation)) {
+      throw const McpOAuthCancelled();
+    }
+    final index = _servers.indexWhere((entry) => entry.id == server.id);
+    final current = _servers[index];
+    final credentialChanged =
+        current.oauth != null &&
+        (current.oauth!.authorizationServer !=
+                registration.authorizationServer ||
+            current.oauth!.clientId != registration.clientId);
+    final next = List<McpServerConfig>.of(_servers)
+      ..[index] = current.copyWith(
+        oauthClient: registration,
+        clearOAuth: credentialChanged,
+      );
+    await _persistServers(next);
+    _servers = next;
+    if (_authorizationIsCurrent(server, state, generation)) {
+      state.reRegisterDynamicClient = false;
+    }
+  });
 
   bool _authorizationIsCurrent(
     McpServerConfig server,
@@ -1421,6 +1743,7 @@ class McpProvider extends ChangeNotifier {
     bool retryUnauthorized = true,
   }) async {
     mcp.Client? client;
+    mcp.ClientTransport? initializingTransport;
     WorkspaceStdioTransport? workspaceTransport;
     final startedAt = DateTime.now();
     try {
@@ -1457,7 +1780,9 @@ class McpProvider extends ChangeNotifier {
         if (!supportsStdio || runtime is! WorkspaceStdioRuntime) {
           throw StateError('Workspace environment is not ready');
         }
-        final config = await environment!.loadExecutionConfig();
+        final config = await environment!.loadExecutionConfig(
+          overrides: server.env,
+        );
         final mounts = await _stdioWorkspaceMounts(server, state);
         final cwd =
             server.workingDirectory ??
@@ -1467,7 +1792,7 @@ class McpProvider extends ChangeNotifier {
           command: server.command ?? '',
           cwd: cwd,
           mounts: mounts,
-          environment: {...config.variables, ...server.env},
+          environment: config.variables,
           timeout: _requestTimeout,
           isCancelled: () =>
               _disposed || state.generation != generation || !supportsStdio,
@@ -1478,7 +1803,7 @@ class McpProvider extends ChangeNotifier {
           arguments: server.args,
           cwd: cwd,
           mounts: mounts,
-          environment: {...config.variables, ...server.env},
+          environment: config.variables,
           startupTimeout: _requestTimeout,
           isCancelled: () => _disposed || state.generation != generation,
         );
@@ -1491,6 +1816,7 @@ class McpProvider extends ChangeNotifier {
         // Keep the process cancellable while initialize installs dependencies
         // or waits for the server; state.client is assigned only on success.
         state.initializingTransport = transport;
+        initializingTransport = transport;
         client = mcp.McpClient.createClient(clientConfig);
         // Package launchers can install dependencies before initialize is
         // answered. Keep this separate from the user's tool-call timeout.
@@ -1505,16 +1831,26 @@ class McpProvider extends ChangeNotifier {
         }
       } else {
         final transportConfig = await _transportConfig(server);
-        final result = await mcp.McpClient.createAndConnect(
-          config: clientConfig,
-          transportConfig: transportConfig,
-        );
-        client = result.fold((value) => value, (error) => throw error);
+        final authorizationSession = state.authorizationSession;
+        authorizationSession?.check();
+        final opening = mcp.McpClient.createTransport(transportConfig).then((
+          transport,
+        ) {
+          if (_disposed || state.generation != generation) transport.close();
+          return transport;
+        });
+        final transport =
+            await (authorizationSession?.wait(opening) ?? opening);
+        if (_disposed || state.generation != generation) return false;
+        // An OAuth attempt can be cancelled during initialize. Ordinary manual
+        // reconnects still finish the old initialize and terminate its session.
+        if (authorizationSession != null) {
+          state.initializingTransport = initializingTransport = transport;
+        }
+        client = mcp.McpClient.createClient(clientConfig);
+        await client.connect(transport);
       }
       final connectedClient = client;
-      if (connectedClient == null) {
-        throw StateError('MCP client was not created');
-      }
 
       if (_disposed ||
           state.generation != generation ||
@@ -1525,6 +1861,14 @@ class McpProvider extends ChangeNotifier {
       }
 
       state.client = connectedClient;
+      final icons = connectedClient.serverInfo?['icons'];
+      _declaredIcons[id] = icons is List
+          ? [
+              for (final icon in icons.take(16))
+                if (icon is Map && icon['src'] is String)
+                  Map<String, dynamic>.from(icon),
+            ]
+          : const [];
       state.status = McpStatus.connected;
       state.error = null;
       _finishScopeUpgrade(state, 'connect');
@@ -1548,7 +1892,7 @@ class McpProvider extends ChangeNotifier {
           if (await _refreshOAuthAfterUnauthorized(server, state)) {
             final latest = getById(id);
             if (latest == null || state.generation != generation) return false;
-            return _performConnect(
+            return await _performConnect(
               id,
               latest,
               state,
@@ -1582,8 +1926,8 @@ class McpProvider extends ChangeNotifier {
       _notify();
       return false;
     } finally {
-      if (workspaceTransport != null &&
-          identical(state.initializingTransport, workspaceTransport)) {
+      if (initializingTransport != null &&
+          identical(state.initializingTransport, initializingTransport)) {
         state.initializingTransport = null;
       }
     }
@@ -1847,6 +2191,10 @@ class McpProvider extends ChangeNotifier {
     );
   }
 
+  static bool _sameOAuthSettings(McpServerConfig left, McpServerConfig right) =>
+      left.oauthRedirectUri == right.oauthRedirectUri &&
+      mapEquals(left.oauthClient?.toJson(), right.oauthClient?.toJson());
+
   bool _isRemoteTransport(McpTransportType transport) =>
       transport == McpTransportType.http || transport == McpTransportType.sse;
 
@@ -1977,6 +2325,12 @@ class McpProvider extends ChangeNotifier {
     final state = _connections.putIfAbsent(id, _ServerConnection.new);
     state.generation++;
     final active = state.connectFuture;
+    final activeAuthorization = state.authorizationFuture;
+    final authorizationSession = state.authorizationSession;
+    state.authorizationSession = null;
+    if (authorizationSession != null) {
+      unawaited(authorizationSession.cancel().catchError((_) {}));
+    }
     final client = state.client;
     final initializingTransport = state.initializingTransport;
     state.initializingTransport = null;
@@ -1993,6 +2347,7 @@ class McpProvider extends ChangeNotifier {
 
     return _DetachedConnection(
       activeConnect: active,
+      activeAuthorization: activeAuthorization,
       client: client,
       initializingTransport: initializingTransport,
     );
@@ -2002,7 +2357,13 @@ class McpProvider extends ChangeNotifier {
     _DetachedConnection detached, {
     required bool terminateSession,
   }) async {
-    await detached.initializingTransport?.onClose;
+    try {
+      await detached.initializingTransport?.onClose;
+    } catch (_) {
+      // The connecting attempt already owns the transport error. Cleanup must
+      // still finish when that transport failed before cancellation.
+    }
+    await detached.activeAuthorization;
     final active = detached.activeConnect;
     if (active != null) {
       try {
@@ -2880,6 +3241,8 @@ class McpProvider extends ChangeNotifier {
       state.initializingTransport = null;
       state.client?.dispose();
       state.client = null;
+      final session = state.authorizationSession;
+      if (session != null) unawaited(session.cancel().catchError((_) {}));
     }
     _connections.clear();
     if (_ownsOAuthService) _oauthService.dispose();

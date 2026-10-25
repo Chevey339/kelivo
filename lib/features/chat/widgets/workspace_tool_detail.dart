@@ -133,7 +133,9 @@ String _detailCopyText(
   final stderr = isShell
       ? workspaceShellOutput(meta: meta, run: run, stderr: true)
       : '';
-  final error = workspaceErrorMessage(part, meta) ?? '';
+  final error =
+      workspaceErrorMessage(part, meta, l10n: AppLocalizations.of(context)) ??
+      '';
   final diff = meta?.diff ?? '';
   final text = [
     if (command.isNotEmpty) command,
@@ -303,6 +305,7 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
   String _primarySectionLabel(AppLocalizations l10n) {
     return switch (widget.part.toolName) {
       'read_file' ||
+      'view_image' ||
       'write_file' ||
       'edit_file' ||
       'list_dir' => l10n.workspaceToolSectionPath,
@@ -384,7 +387,11 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
         .where((file) => file.role != WorkspaceFileRole.log)
         .toList();
     final diff = _meta?.diff ?? '';
-    final error = workspaceErrorMessage(widget.part, _meta);
+    final error = workspaceErrorMessage(
+      widget.part,
+      _meta,
+      l10n: AppLocalizations.of(context),
+    );
     final path = workspacePathOf(widget.part, meta: _meta);
     final isShell = widget.part.toolName == 'shell';
     final showOutput =

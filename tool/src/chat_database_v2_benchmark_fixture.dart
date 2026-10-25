@@ -328,15 +328,7 @@ CREATE INDEX idx_conversations_assistant ON conversation_rows(assistant_id);
             ts,
           ]);
         }
-        partInsert.execute([
-          conversationId,
-          id,
-          ordinal,
-          'text',
-          text,
-          ts,
-          ts,
-        ]);
+        partInsert.execute([conversationId, id, ordinal, 'text', text, ts, ts]);
       }
     } finally {
       conversationInsert.close();
@@ -605,10 +597,7 @@ CREATE INDEX idx_conversations_assistant ON conversation_rows(assistant_id);
       insertPart('text', content);
     }
     for (final uri in imageUris) {
-      insertPart(
-        'image',
-        jsonEncode({'uri': uri, 'mime': 'image/png'}),
-      );
+      insertPart('image', jsonEncode({'uri': uri, 'mime': 'image/png'}));
     }
     for (var index = 0; index < fileUris.length; index++) {
       final mime = index < fileMimes.length

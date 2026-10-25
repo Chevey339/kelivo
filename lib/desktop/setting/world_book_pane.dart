@@ -10,9 +10,12 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/models/world_book.dart';
 import '../../core/providers/world_book_provider.dart';
+import '../../features/world_book/utils/world_book_import.dart';
+import '../../features/world_book/widgets/world_book_entry_actions.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/ios_checkbox.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
@@ -71,44 +74,6 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
     }
   }
 
-  WorldBook? _parseWorldBookImport(dynamic decoded) {
-    try {
-      if (decoded is Map) {
-        final map = decoded.cast<String, dynamic>();
-        final data = map['data'];
-        if (data is Map) {
-          return WorldBook.fromJson(data.cast<String, dynamic>());
-        }
-        if (map.containsKey('entries')) {
-          return WorldBook.fromJson(map);
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  WorldBook _normalizeImportedBook(
-    WorldBook book, {
-    required Set<String> existingBookIds,
-  }) {
-    var bookId = book.id.trim();
-    if (bookId.isEmpty || existingBookIds.contains(bookId)) {
-      bookId = const Uuid().v4();
-    }
-
-    final seenEntryIds = <String>{};
-    final nextEntries = <WorldBookEntry>[];
-    for (final entry in book.entries) {
-      var entryId = entry.id.trim();
-      if (entryId.isEmpty || !seenEntryIds.add(entryId)) {
-        entryId = const Uuid().v4();
-      }
-      nextEntries.add(entry.copyWith(id: entryId));
-    }
-
-    return book.copyWith(id: bookId, entries: nextEntries);
-  }
-
   Map<String, dynamic> _toRikkaHubExportJson(WorldBook book) {
     final data = book.toJson();
     return <String, dynamic>{'version': 1, 'type': 'lorebook', 'data': data};
@@ -157,7 +122,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       return;
     }
 
-    final imported = _parseWorldBookImport(decoded);
+    final imported = parseWorldBookImport(decoded, fileName: file.name);
     if (imported == null) {
       showAppSnackBar(
         context,
@@ -167,11 +132,22 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       return;
     }
 
-    final normalized = _normalizeImportedBook(
-      imported,
+    final normalized = normalizeImportedWorldBook(
+      imported.book,
       existingBookIds: provider.books.map((e) => e.id).toSet(),
     );
     await provider.addBook(normalized);
+    if (!mounted) return;
+    if (imported.unsupportedEntryCount > 0) {
+      showAppSnackBar(
+        context,
+        message: l10n.worldBookImportUnsupportedEntries(
+          imported.unsupportedEntryCount,
+        ),
+        type: NotificationType.warning,
+        duration: const Duration(seconds: 10),
+      );
+    }
   }
 
   Future<void> _exportBook(WorldBook book) async {
@@ -361,17 +337,26 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                         final entry = await _showEntryEditDialog();
                         if (!mounted) return;
                         if (entry == null) return;
-                        final next = book.copyWith(
-                          entries: [...book.entries, entry],
+                        await wbProvider.updateBook(
+                          book.id,
+                          (current) => current.copyWith(
+                            entries: [...current.entries, entry],
+                          ),
                         );
-                        await wbProvider.updateBook(next);
                       },
                       onExport: () async => _exportBook(book),
                       onConfig: () async {
                         final edited = await _showBookEditDialog(book: book);
                         if (!mounted) return;
                         if (edited == null) return;
-                        await wbProvider.updateBook(edited);
+                        await wbProvider.updateBook(
+                          book.id,
+                          (current) => current.copyWith(
+                            name: edited.name,
+                            description: edited.description,
+                            enabled: edited.enabled,
+                          ),
+                        );
                       },
                       onDelete: () async {
                         final confirm = await _confirmDeleteBook(book);
@@ -383,19 +368,23 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                         final edited = await _showEntryEditDialog(entry: entry);
                         if (!mounted) return;
                         if (edited == null) return;
-                        final nextEntries = book.entries
-                            .map((e) => e.id == entry.id ? edited : e)
-                            .toList(growable: false);
                         await wbProvider.updateBook(
-                          book.copyWith(entries: nextEntries),
+                          book.id,
+                          (current) => current.copyWith(
+                            entries: current.entries
+                                .map((e) => e.id == entry.id ? edited : e)
+                                .toList(growable: false),
+                          ),
                         );
                       },
                       onDeleteEntry: (entry) async {
-                        final nextEntries = book.entries
-                            .where((e) => e.id != entry.id)
-                            .toList(growable: false);
                         await wbProvider.updateBook(
-                          book.copyWith(entries: nextEntries),
+                          book.id,
+                          (current) => current.copyWith(
+                            entries: current.entries
+                                .where((e) => e.id != entry.id)
+                                .toList(growable: false),
+                          ),
                         );
                       },
                     );
@@ -456,6 +445,32 @@ class _WorldBookCard extends StatefulWidget {
 
 class _WorldBookCardState extends State<_WorldBookCard> {
   bool _hover = false;
+  bool _selecting = false;
+  bool _busy = false;
+  final _selectedIds = <String>{};
+
+  void _toggleEntry(String id) => setState(() {
+    if (!_selectedIds.add(id)) _selectedIds.remove(id);
+  });
+
+  Future<void> _transfer({required bool copy, required Set<String> ids}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final success = await showWorldBookEntryTransfer(
+      context,
+      sourceBookId: widget.book.id,
+      entryIds: ids,
+      copy: copy,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (success) {
+        _selecting = false;
+        _selectedIds.clear();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -471,6 +486,10 @@ class _WorldBookCardState extends State<_WorldBookCard> {
         ? l10n.worldBookUnnamed
         : widget.book.name.trim();
     final subtitle = widget.book.description.trim();
+    final selectedIds = widget.book.entries
+        .where((entry) => _selectedIds.contains(entry.id))
+        .map((entry) => entry.id)
+        .toSet();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -563,6 +582,18 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (widget.book.entries.isNotEmpty && !_selecting) ...[
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.ListChecks,
+                    tooltip: l10n.worldBookSelectEntries,
+                    onTap: () {
+                      if (_busy) return;
+                      setState(() => _selecting = true);
+                      if (widget.collapsed) widget.onToggleCollapsed();
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 _SmallIconBtn(
                   icon: lucide.Lucide.Plus,
                   onTap: widget.onAddEntry,
@@ -598,11 +629,46 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                       width: double.infinity,
                       child: Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: _EntriesPanel(
-                          bookId: widget.book.id,
-                          entries: widget.book.entries,
-                          onEdit: widget.onEditEntry,
-                          onDelete: widget.onDeleteEntry,
+                        child: Column(
+                          children: [
+                            if (_selecting)
+                              WorldBookEntrySelectionBar(
+                                busy: _busy,
+                                selectedCount: selectedIds.length,
+                                totalCount: widget.book.entries.length,
+                                onCancel: () => setState(() {
+                                  _selecting = false;
+                                  _selectedIds.clear();
+                                }),
+                                onSelectAll: () => setState(() {
+                                  _selectedIds.clear();
+                                  if (selectedIds.length !=
+                                      widget.book.entries.length) {
+                                    _selectedIds.addAll(
+                                      widget.book.entries.map(
+                                        (entry) => entry.id,
+                                      ),
+                                    );
+                                  }
+                                }),
+                                onCopy: () =>
+                                    _transfer(copy: true, ids: selectedIds),
+                                onMove: () =>
+                                    _transfer(copy: false, ids: selectedIds),
+                              ),
+                            _EntriesPanel(
+                              bookId: widget.book.id,
+                              entries: widget.book.entries,
+                              onEdit: widget.onEditEntry,
+                              onDelete: widget.onDeleteEntry,
+                              selecting: _selecting,
+                              selectedIds: selectedIds,
+                              busy: _busy,
+                              onToggle: _toggleEntry,
+                              onTransfer: (entry, copy) =>
+                                  _transfer(copy: copy, ids: {entry.id}),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -620,12 +686,22 @@ class _EntriesPanel extends StatelessWidget {
     required this.entries,
     required this.onEdit,
     required this.onDelete,
+    required this.selecting,
+    required this.selectedIds,
+    required this.busy,
+    required this.onToggle,
+    required this.onTransfer,
   });
 
   final String bookId;
   final List<WorldBookEntry> entries;
   final ValueChanged<WorldBookEntry> onEdit;
   final ValueChanged<WorldBookEntry> onDelete;
+  final bool selecting;
+  final Set<String> selectedIds;
+  final bool busy;
+  final ValueChanged<String> onToggle;
+  final void Function(WorldBookEntry entry, bool copy) onTransfer;
 
   @override
   Widget build(BuildContext context) {
@@ -700,6 +776,12 @@ class _EntriesPanel extends StatelessWidget {
           entry: entries[index],
           onEdit: onEdit,
           onDelete: onDelete,
+          selecting: selecting,
+          selected: selectedIds.contains(entries[index].id),
+          busy: busy,
+          onToggle: () => onToggle(entries[index].id),
+          onCopy: () => onTransfer(entries[index], true),
+          onMove: () => onTransfer(entries[index], false),
         ),
       ),
     );
@@ -714,6 +796,12 @@ class _EntryRow extends StatefulWidget {
     required this.entry,
     required this.onEdit,
     required this.onDelete,
+    required this.selecting,
+    required this.selected,
+    required this.busy,
+    required this.onToggle,
+    required this.onCopy,
+    required this.onMove,
   });
 
   final String bookId;
@@ -721,6 +809,12 @@ class _EntryRow extends StatefulWidget {
   final WorldBookEntry entry;
   final ValueChanged<WorldBookEntry> onEdit;
   final ValueChanged<WorldBookEntry> onDelete;
+  final bool selecting;
+  final bool selected;
+  final bool busy;
+  final VoidCallback onToggle;
+  final VoidCallback onCopy;
+  final VoidCallback onMove;
 
   @override
   State<_EntryRow> createState() => _EntryRowState();
@@ -746,7 +840,11 @@ class _EntryRowState extends State<_EntryRow> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => widget.onEdit(widget.entry),
+        onTap: widget.busy
+            ? null
+            : widget.selecting
+            ? widget.onToggle
+            : () => widget.onEdit(widget.entry),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
@@ -755,27 +853,38 @@ class _EntryRowState extends State<_EntryRow> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               children: [
-                ReorderableDragStartListener(
-                  index: widget.index,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: Tooltip(
-                      message: l10n.worldBookDragToReorder,
-                      child: SizedBox(
-                        width: 28,
-                        height: 44,
-                        child: Icon(
-                          lucide.Lucide.GripVertical,
-                          size: 18,
-                          color: worldBookPositionColor(
-                            context,
-                            widget.entry.position,
+                if (widget.selecting)
+                  IosCheckbox(
+                    value: widget.selected,
+                    semanticLabel: widget.entry.name.trim().isEmpty
+                        ? l10n.worldBookUnnamedEntry
+                        : widget.entry.name,
+                    hitTestSize: 44,
+                    onChanged: widget.busy ? null : (_) => widget.onToggle(),
+                  )
+                else
+                  ReorderableDragStartListener(
+                    index: widget.index,
+                    enabled: !widget.busy,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Tooltip(
+                        message: l10n.worldBookDragToReorder,
+                        child: SizedBox(
+                          width: 28,
+                          height: 44,
+                          child: Icon(
+                            lucide.Lucide.GripVertical,
+                            size: 18,
+                            color: worldBookPositionColor(
+                              context,
+                              widget.entry.position,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Row(
@@ -797,30 +906,44 @@ class _EntryRowState extends State<_EntryRow> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                IosSwitch(
-                  value: widget.entry.enabled,
-                  onChanged: (enabled) {
-                    final provider = context.read<WorldBookProvider>();
-                    provider.setEntryEnabled(
-                      widget.bookId,
-                      widget.entry.id,
-                      enabled,
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Settings2,
-                  onTap: () => widget.onEdit(widget.entry),
-                  tooltip: l10n.worldBookEditEntry,
-                ),
-                const SizedBox(width: 6),
-                _SmallIconBtn(
-                  icon: lucide.Lucide.Trash2,
-                  onTap: () => widget.onDelete(widget.entry),
-                  tooltip: l10n.worldBookDeleteEntry,
-                ),
+                if (!widget.selecting && !widget.busy) ...[
+                  const SizedBox(width: 8),
+                  IosSwitch(
+                    value: widget.entry.enabled,
+                    onChanged: (enabled) {
+                      final provider = context.read<WorldBookProvider>();
+                      provider.setEntryEnabled(
+                        widget.bookId,
+                        widget.entry.id,
+                        enabled,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.Copy,
+                    onTap: widget.onCopy,
+                    tooltip: l10n.worldBookCopyEntries,
+                  ),
+                  const SizedBox(width: 6),
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.FolderInput,
+                    onTap: widget.onMove,
+                    tooltip: l10n.worldBookMoveEntries,
+                  ),
+                  const SizedBox(width: 6),
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.Settings2,
+                    onTap: () => widget.onEdit(widget.entry),
+                    tooltip: l10n.worldBookEditEntry,
+                  ),
+                  const SizedBox(width: 6),
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.Trash2,
+                    onTap: () => widget.onDelete(widget.entry),
+                    tooltip: l10n.worldBookDeleteEntry,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1207,6 +1330,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     required String label,
     required TextEditingController controller,
     double width = 104,
+    bool signed = false,
   }) {
     return _labeledField(
       cs: cs,
@@ -1215,8 +1339,18 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
         width: width,
         child: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          keyboardType: TextInputType.numberWithOptions(signed: signed),
+          inputFormatters: [
+            if (signed)
+              TextInputFormatter.withFunction(
+                (oldValue, newValue) =>
+                    RegExp(r'^-?\d*$').hasMatch(newValue.text)
+                    ? newValue
+                    : oldValue,
+              )
+            else
+              FilteringTextInputFormatter.digitsOnly,
+          ],
           textAlign: TextAlign.center,
           decoration: _deskInputDecoration(context),
         ),
@@ -1500,6 +1634,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                                     cs: cs,
                                     label: l10n.worldBookEntryPriorityLabel,
                                     controller: _priorityController,
+                                    signed: true,
                                   ),
                                 ),
                               ],
@@ -1577,7 +1712,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                       priority: priority,
                       position: _position,
                       content: _contentController.text,
-                      injectDepth: injectDepth.clamp(1, 200).toInt(),
+                      injectDepth: injectDepth.clamp(0, 200).toInt(),
                       role: _role,
                       keywords: List<String>.from(_keywords),
                       useRegex: _useRegex,

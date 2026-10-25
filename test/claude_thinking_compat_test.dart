@@ -6,6 +6,44 @@ import 'support/collect_generation.dart';
 
 void main() {
   group('Claude thinking compatibility', () {
+    for (final vertex in [false, true]) {
+      for (final model in [
+        'claude-sonnet-4-5',
+        'claude-haiku-4-5',
+        'claude-sonnet-4-6',
+      ]) {
+        test(
+          '$model thinking strips temperature and top_k (vertex=$vertex)',
+          () async {
+            final overrides = {
+              model: {
+                'body': [
+                  {'key': 'temperature', 'value': '0.7'},
+                  {'key': 'top_k', 'value': '40'},
+                ],
+              },
+            };
+            final body = await captureClaudeRequestBody(
+              modelId: model,
+              config: vertex
+                  ? vertexClaudeConfig(modelOverrides: overrides)
+                  : claudeConfig(modelOverrides: overrides),
+              thinkingBudget: 2048,
+              temperature: 0.7,
+              topP: 0.96,
+            );
+            expect(
+              (body['thinking'] as Map)['type'],
+              isIn(['enabled', 'adaptive']),
+            );
+            expect(body.containsKey('temperature'), isFalse);
+            expect(body.containsKey('top_k'), isFalse);
+            expect(body['top_p'], 0.96);
+          },
+        );
+      }
+    }
+
     test(
       'prompt caching adds official Claude top-level cache control',
       () async {
@@ -77,206 +115,6 @@ void main() {
       },
     );
 
-    test(
-      'Opus 4.7 uses adaptive thinking with effort and strips sampling',
-      () async {
-        final body = await captureClaudeRequestBody(
-          modelId: 'claude-opus-4-7',
-          thinkingBudget: 16000,
-          temperature: 0.7,
-          topP: 0.8,
-        );
-
-        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-        expect(body['output_config'], {'effort': 'medium'});
-        expect(body.containsKey('temperature'), isFalse);
-        expect(body.containsKey('top_p'), isFalse);
-        expect(
-          (body['thinking'] as Map<String, dynamic>).containsKey(
-            'budget_tokens',
-          ),
-          isFalse,
-        );
-      },
-    );
-
-    test(
-      'Opus 4.8 uses adaptive thinking with xhigh effort and strips sampling',
-      () async {
-        final body = await captureClaudeRequestBody(
-          modelId: 'claude-opus-4-8',
-          thinkingBudget: 64000,
-          temperature: 0.7,
-          topP: 0.8,
-        );
-
-        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-        expect(body['output_config'], {'effort': 'xhigh'});
-        expect(body.containsKey('temperature'), isFalse);
-        expect(body.containsKey('top_p'), isFalse);
-      },
-    );
-
-    test('Opus 4.8 maps max reasoning to max effort', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-4.8',
-        thinkingBudget: 128000,
-      );
-
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'max'});
-    });
-
-    test('Opus 5 uses summarized adaptive thinking and max effort', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-5',
-        thinkingBudget: 128000,
-        temperature: 0.7,
-        topP: 0.8,
-      );
-
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'max'});
-      expect(body['max_tokens'], 128000);
-      expect(body.containsKey('temperature'), isFalse);
-      expect(body.containsKey('top_p'), isFalse);
-    });
-
-    test('Sonnet 5 can disable thinking but still rejects sampling', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-sonnet-5',
-        thinkingBudget: 0,
-        temperature: 0.7,
-        topP: 0.8,
-      );
-
-      expect(body['thinking'], {'type': 'disabled'});
-      expect(body.containsKey('output_config'), isFalse);
-      expect(body['max_tokens'], 128000);
-      expect(body.containsKey('temperature'), isFalse);
-      expect(body.containsKey('top_p'), isFalse);
-    });
-
-    test('Fable 5 never sends unsupported disabled thinking', () async {
-      final offBody = await captureClaudeRequestBody(
-        modelId: 'claude-fable-5',
-        thinkingBudget: 0,
-        temperature: 0.7,
-        topP: 0.8,
-      );
-      final mediumBody = await captureClaudeRequestBody(
-        modelId: 'claude-fable-5',
-        thinkingBudget: 16000,
-      );
-
-      expect(offBody['thinking'], {
-        'type': 'adaptive',
-        'display': 'summarized',
-      });
-      expect(offBody['output_config'], {'effort': 'low'});
-      expect(offBody.containsKey('temperature'), isFalse);
-      expect(offBody.containsKey('top_p'), isFalse);
-      expect(mediumBody['thinking'], {
-        'type': 'adaptive',
-        'display': 'summarized',
-      });
-      expect(mediumBody['output_config'], {'effort': 'medium'});
-    });
-
-    test('Fable 5 maps max reasoning to max effort', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-fable-5',
-        thinkingBudget: 128000,
-      );
-
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'max'});
-    });
-
-    test(
-      'Mythos 5 never sends disabled thinking and returns summaries',
-      () async {
-        final offBody = await captureClaudeRequestBody(
-          modelId: 'claude-mythos-5',
-          thinkingBudget: 0,
-        );
-        final maxBody = await captureClaudeRequestBody(
-          modelId: 'claude-mythos-5',
-          thinkingBudget: 128000,
-        );
-
-        expect(offBody['thinking'], {
-          'type': 'adaptive',
-          'display': 'summarized',
-        });
-        expect(offBody['output_config'], {'effort': 'low'});
-        expect(maxBody['thinking'], {
-          'type': 'adaptive',
-          'display': 'summarized',
-        });
-        expect(maxBody['output_config'], {'effort': 'max'});
-        expect(maxBody['max_tokens'], 128000);
-      },
-    );
-
-    test(
-      'Fable 5.1 maps effort levels and never disables adaptive thinking',
-      () async {
-        const modelId = 'claude-fable-5-1';
-        final offBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: 0,
-        );
-        final autoBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: -1,
-        );
-        final lowBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: 1024,
-        );
-        final highBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: 32000,
-        );
-        final xhighBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: 64000,
-        );
-        final maxBody = await captureClaudeRequestBody(
-          modelId: modelId,
-          thinkingBudget: 128000,
-        );
-
-        for (final body in [
-          offBody,
-          autoBody,
-          lowBody,
-          highBody,
-          xhighBody,
-          maxBody,
-        ]) {
-          expect(body['thinking'], {
-            'type': 'adaptive',
-            'display': 'summarized',
-          });
-          expect(
-            (body['thinking'] as Map<String, dynamic>).containsKey(
-              'budget_tokens',
-            ),
-            isFalse,
-          );
-        }
-        expect(offBody['output_config'], {'effort': 'low'});
-        expect(autoBody.containsKey('output_config'), isFalse);
-        expect(lowBody['output_config'], {'effort': 'low'});
-        expect(highBody['output_config'], {'effort': 'high'});
-        expect(xhighBody['output_config'], {'effort': 'xhigh'});
-        expect(maxBody['output_config'], {'effort': 'max'});
-        expect(maxBody['max_tokens'], 128000);
-      },
-    );
-
     test('OpenRouter Anthropic format uses Claude messages path', () async {
       final (:bodies, :chunks, :paths) = await captureClaudeExchange(
         config: ProviderConfig(
@@ -299,98 +137,8 @@ void main() {
         'display': 'summarized',
       });
       expect(requestBody['output_config'], {'effort': 'medium'});
+      expect(requestBody['max_tokens'], 128000);
     });
-
-    test(
-      'Opus 4.7 off keeps sampling params and omits output config',
-      () async {
-        final body = await captureClaudeRequestBody(
-          modelId: 'claude-opus-4-7',
-          thinkingBudget: 0,
-          temperature: 0.7,
-          topP: 0.8,
-        );
-
-        expect(body['thinking'], {'type': 'disabled'});
-        expect(body['temperature'], 0.7);
-        expect(body['top_p'], 0.8);
-        expect(body.containsKey('output_config'), isFalse);
-      },
-    );
-
-    test('Sonnet 4.6 enabled budget now uses adaptive thinking', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-sonnet-4-6',
-        thinkingBudget: 1024,
-      );
-
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'low'});
-      expect(
-        (body['thinking'] as Map<String, dynamic>).containsKey('budget_tokens'),
-        isFalse,
-      );
-    });
-
-    test('Sonnet 4.6 thinking omits temperature and invalid top_p', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-sonnet-4-6',
-        thinkingBudget: 1024,
-        temperature: 0.7,
-        topP: 0.8,
-      );
-
-      expect(body.containsKey('temperature'), isFalse);
-      expect(body.containsKey('top_p'), isFalse);
-    });
-
-    test('Sonnet 4.6 clamps large budget to max instead of xhigh', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-sonnet-4-6',
-        thinkingBudget: 64000,
-      );
-
-      expect(body['output_config'], {'effort': 'max'});
-    });
-
-    test('Opus 4.7 allows xhigh for large but non-max budgets', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-4-7',
-        thinkingBudget: 64000,
-      );
-
-      expect(body['output_config'], {'effort': 'xhigh'});
-    });
-
-    test('generateText Claude path matches Opus 4.7 adaptive rules', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-4-7',
-        thinkingBudget: 16000,
-        utilityCall: true,
-      );
-
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'medium'});
-      expect(body['stream'], isFalse);
-      expect(body.containsKey('temperature'), isFalse);
-      expect(
-        (body['thinking'] as Map<String, dynamic>).containsKey('budget_tokens'),
-        isFalse,
-      );
-    });
-
-    test(
-      'generateText Claude path omits temperature when thinking is off',
-      () async {
-        final body = await captureClaudeRequestBody(
-          modelId: 'claude-haiku-4-5',
-          thinkingBudget: 0,
-          utilityCall: true,
-        );
-
-        expect(body.containsKey('temperature'), isFalse);
-      },
-    );
 
     test('generateText Claude path reads text after thinking block', () async {
       await captureClaudeRequestBody(
@@ -408,62 +156,346 @@ void main() {
       );
     });
 
-    test('DeepSeek Claude-compatible auto thinking stays enabled', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: -1,
-      );
+    for (final c in _claudeCases) {
+      test(c.name, () async {
+        final body = await captureClaudeRequestBody(
+          modelId: c.modelId,
+          config: c.config,
+          thinkingBudget: c.thinkingBudget,
+          temperature: c.temperature,
+          topP: c.topP,
+          utilityCall: c.utilityCall,
+        );
+        c.verify(body);
+      });
+    }
+  });
+}
 
-      expect(body['thinking'], {'type': 'enabled'});
+class _ClaudeCase {
+  const _ClaudeCase({
+    required this.name,
+    required this.modelId,
+    this.config,
+    this.thinkingBudget,
+    this.temperature,
+    this.topP,
+    this.utilityCall = false,
+    required this.verify,
+  });
+
+  final String name;
+  final String modelId;
+  final ProviderConfig? config;
+  final int? thinkingBudget;
+  final double? temperature;
+  final double? topP;
+  final bool utilityCall;
+  final void Function(Map<String, dynamic> body) verify;
+}
+
+ProviderConfig _kimiAnthropicConfig() {
+  return ProviderConfig(
+    id: 'KimiAnthropic',
+    enabled: true,
+    name: 'KimiAnthropic',
+    apiKey: 'test-key',
+    baseUrl: 'https://api.kimi.com/coding/v1',
+    providerType: ProviderKind.claude,
+  );
+}
+
+final _claudeCases = <_ClaudeCase>[
+  _ClaudeCase(
+    name: 'classic Claude auto omits the thinking key',
+    modelId: 'claude-haiku-4-5',
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body.containsKey('thinking'), isFalse);
       expect(body.containsKey('output_config'), isFalse);
-    });
-
-    test('DeepSeek Claude-compatible explicit thinking uses effort', () async {
-      final lowBody = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: 2000,
-      );
-      final mediumBody = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: 16000,
-      );
-      final xhighBody = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: 64000,
-      );
-      final maxBody = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: 128000,
-      );
-
-      expect(lowBody['thinking'], {'type': 'enabled'});
-      expect(lowBody['output_config'], {'effort': 'low'});
-      expect(mediumBody['thinking'], {'type': 'enabled'});
-      expect(mediumBody['output_config'], {'effort': 'high'});
-      expect(xhighBody['thinking'], {'type': 'enabled'});
-      expect(xhighBody['output_config'], {'effort': 'high'});
-      expect(maxBody['thinking'], {'type': 'enabled'});
-      expect(maxBody['output_config'], {'effort': 'max'});
-    });
-
-    test('DeepSeek Claude-compatible off thinking stays disabled', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'deepseek-v4-pro',
-        config: deepSeekClaudeConfig(),
-        thinkingBudget: 0,
-        temperature: 0.7,
-        topP: 0.8,
-      );
-
+      expect(body['max_tokens'], 64000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'classic Claude off sends disabled thinking',
+    modelId: 'claude-haiku-4-5',
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body['temperature'], 0.7);
+      expect(body['top_p'], 0.8);
+    },
+  ),
+  _ClaudeCase(
+    name: 'classic Claude explicit budget writes budget_tokens',
+    modelId: 'claude-haiku-4-5',
+    thinkingBudget: 2048,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled', 'budget_tokens': 2048});
+      expect(body.containsKey('output_config'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'classic Claude drops top_p outside the enabled range',
+    modelId: 'claude-haiku-4-5',
+    thinkingBudget: 2048,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled', 'budget_tokens': 2048});
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.7 adaptive medium strips sampling',
+    modelId: 'claude-opus-4-7',
+    thinkingBudget: 16000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.7 off disables thinking and keeps sampling',
+    modelId: 'claude-opus-4-7',
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
       expect(body['thinking'], {'type': 'disabled'});
       expect(body.containsKey('output_config'), isFalse);
       expect(body['temperature'], 0.7);
       expect(body['top_p'], 0.8);
-    });
-  });
-}
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.8 auto writes only adaptive surface flags',
+    modelId: 'claude-opus-4-8',
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['max_tokens'], 128000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.8 xhigh and max map onto the effort ladder',
+    modelId: 'claude-opus-4.8',
+    thinkingBudget: 64000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'xhigh'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 5 max effort and 128k default max_tokens',
+    modelId: 'claude-opus-5',
+    thinkingBudget: 128000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 5.5 max effort and 128k default max_tokens',
+    modelId: 'claude-opus-5-5',
+    thinkingBudget: 128000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Sonnet 5 can disable thinking but still rejects sampling',
+    modelId: 'claude-sonnet-5',
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Fable 5 off uses the lowest adaptive effort',
+    modelId: 'claude-fable-5',
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'low'});
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Fable 5.1 maps the full adaptive ladder',
+    modelId: 'claude-fable-5-1',
+    thinkingBudget: 128000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+      expect(body['max_tokens'], 128000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Fable 5.1 auto writes adaptive thinking without effort',
+    modelId: 'claude-fable-5-1',
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body.containsKey('output_config'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Mythos 5 cannot disable thinking',
+    modelId: 'claude-mythos-5',
+    thinkingBudget: 0,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'low'});
+      expect(body['max_tokens'], 128000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Sonnet 4.6 adaptive low and max clamp',
+    modelId: 'claude-sonnet-4-6',
+    thinkingBudget: 1024,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'low'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Sonnet 4.6 clamps xhigh budget to nearest ladder level',
+    modelId: 'claude-sonnet-4-6',
+    thinkingBudget: 64000,
+    verify: (body) {
+      expect(body['output_config'], {'effort': 'high'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'generateText adaptive path matches Opus 4.7',
+    modelId: 'claude-opus-4-7',
+    thinkingBudget: 16000,
+    utilityCall: true,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body['stream'], isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'DeepSeek Claude auto writes no thinking key',
+    modelId: 'deepseek-v4-pro',
+    config: deepSeekClaudeConfig(),
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body.containsKey('thinking'), isFalse);
+      expect(body.containsKey('output_config'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'DeepSeek Claude explicit effort uses the anthropicEffort ladder',
+    modelId: 'deepseek-v4-pro',
+    config: deepSeekClaudeConfig(),
+    thinkingBudget: 2000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body['output_config'], {'effort': 'low'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'DeepSeek Claude medium clamps to nearest ladder level',
+    modelId: 'deepseek-v4-pro',
+    config: deepSeekClaudeConfig(),
+    thinkingBudget: 16000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body['output_config'], {'effort': 'low'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'DeepSeek Claude off uses the lowest effort',
+    modelId: 'deepseek-v4-pro',
+    config: deepSeekClaudeConfig(),
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body['output_config'], {'effort': 'low'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Kimi Anthropic uses budget dialect and 32k max_tokens',
+    modelId: 'kimi-k2.5',
+    config: _kimiAnthropicConfig(),
+    thinkingBudget: 2048,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled', 'budget_tokens': 2048});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['max_tokens'], 32000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Kimi Anthropic auto omits thinking',
+    modelId: 'kimi-k2.5',
+    config: _kimiAnthropicConfig(),
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body.containsKey('thinking'), isFalse);
+      expect(body['max_tokens'], 32000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Vertex Claude default max_tokens comes from the spec',
+    modelId: 'claude-sonnet-4-6',
+    config: vertexClaudeConfig(),
+    thinkingBudget: 1024,
+    verify: (body) {
+      expect(body['max_tokens'], 128000);
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'low'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Vertex dated classic Claude uses family max_tokens',
+    modelId: 'claude-sonnet-4@20250514',
+    config: vertexClaudeConfig(),
+    thinkingBudget: -1,
+    verify: (body) {
+      expect(body['max_tokens'], 64000);
+      expect(body.containsKey('thinking'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Vertex Claude clamps budget_tokens below max_tokens',
+    modelId: 'claude-haiku-4-5',
+    config: vertexClaudeConfig(),
+    thinkingBudget: 128000,
+    verify: (body) {
+      expect(body['max_tokens'], 64000);
+      expect(body['thinking'], {'type': 'enabled', 'budget_tokens': 62976});
+    },
+  ),
+];

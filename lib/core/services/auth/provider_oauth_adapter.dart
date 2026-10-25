@@ -15,7 +15,9 @@ import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
 
-const codexClientVersion = '0.153.0';
+// OMP 37bb80e3: the backend hides GPT-6.1 Sol from older client versions,
+// independently of the model's advertised minimal_client_version.
+const codexClientVersion = '0.159.0';
 
 class OAuthLoginPrompt {
   const OAuthLoginPrompt({
@@ -737,6 +739,64 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
       // Userinfo is optional; a successfully exchanged token remains usable.
     }
     return value;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> models(
+    OAuthWire wire,
+    ProviderOAuthCredentials credentials,
+  ) async {
+    final catalogs = await Future.wait([
+      get(wire, 'https://cli-chat-proxy.grok.com/v1/models-v2', credentials),
+      get(wire, '${provider.baseUrl}/models', credentials),
+    ]);
+    final models = <String, Map<String, dynamic>>{};
+    for (final catalog in catalogs) {
+      final rows = catalog['data'];
+      if (rows is! List) {
+        throw const ProviderOAuthException(
+          ProviderOAuthFailure.invalidResponse,
+        );
+      }
+      for (final row in rows.whereType<Map>()) {
+        final meta = oauthMap(row['_meta']);
+        // Grok Build's catalog id can differ from the inference model id.
+        final id =
+            oauthString(row['model']) ??
+            oauthString(row['modelId']) ??
+            oauthString(row['id']) ??
+            oauthString(meta['model']) ??
+            oauthString(meta['modelId']);
+        if (id == null || (row['hidden'] ?? meta['hidden']) == true) continue;
+        final efforts =
+            row['reasoningEfforts'] ??
+            row['reasoning_efforts'] ??
+            meta['reasoningEfforts'];
+        final contextWindow =
+            row['contextWindow'] ??
+            row['context_window'] ??
+            meta['contextWindow'] ??
+            meta['totalContextTokens'];
+        final levels = <String>[
+          if (efforts is List)
+            for (final effort in efforts)
+              if (oauthString(effort is Map ? effort['value'] : effort)
+                  case final value?)
+                value,
+        ];
+        // Prefer Grok Build metadata for models present in both catalogs.
+        models.putIfAbsent(
+          id,
+          () => {
+            ...row.cast<String, dynamic>(),
+            'id': id,
+            if (contextWindow != null) 'context_window': contextWindow,
+            if (levels.isNotEmpty) 'supported_reasoning_levels': levels,
+          },
+        );
+      }
+    }
+    return models.values.toList();
   }
 
   @override
