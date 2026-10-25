@@ -166,16 +166,18 @@ void main() {
     }
   }
 
-  Future<Uint8List> previewFixture(WidgetTester tester) async =>
-      (await tester.runAsync(() async {
-        final image = await createTestImage(width: 8, height: 8, cache: false);
-        try {
-          final data = await image.toByteData(format: ui.ImageByteFormat.png);
-          return data!.buffer.asUint8List();
-        } finally {
-          image.dispose();
-        }
-      }))!;
+  Future<Uint8List> previewFixture(
+    WidgetTester tester, {
+    int width = 8,
+  }) async => (await tester.runAsync(() async {
+    final image = await createTestImage(width: width, height: 8, cache: false);
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data!.buffer.asUint8List();
+    } finally {
+      image.dispose();
+    }
+  }))!;
 
   Future<void> openMobileMenuItem(WidgetTester tester, String label) async {
     await tester.tap(find.byTooltip('More').last);
@@ -345,6 +347,27 @@ void main() {
     },
   );
 
+  browserTestWidgets('identical captured pixels reuse the cached preview', (
+    tester,
+  ) async {
+    await service.initialize();
+    final tab = await service.createTab(url: 'https://preview.example');
+    await mount(tester);
+    final engine = engines[tab.id]!;
+    engine.previewBytes = await previewFixture(tester);
+    await service.refreshActivePreview();
+    final first = service.previewForTab(tab.id);
+    // cache: false creates a new byte buffer, not different image content.
+    final identicalPixels = await previewFixture(tester);
+    expect(identicalPixels, isNot(same(first)));
+    expect(listEquals(first, identicalPixels), isTrue);
+    engine.previewBytes = identicalPixels;
+    final captures = engine.screenshotCalls;
+    await service.refreshActivePreview(fresh: true);
+    expect(engine.screenshotCalls, captures + 1);
+    expect(service.previewForTab(tab.id), same(first));
+  });
+
   browserTestWidgets(
     'tabs capture the current page before starting the card flight',
     (tester) async {
@@ -356,7 +379,8 @@ void main() {
       await service.refreshActivePreview();
       final old = service.previewForTab(tab.id);
       engine.onChanged(_scroll(200));
-      final current = await previewFixture(tester);
+      final current = await previewFixture(tester, width: 9);
+      expect(listEquals(old, current), isFalse);
       engine.previewBytes = current;
       await tester.runAsync(
         () => precacheImage(
@@ -1070,7 +1094,8 @@ void main() {
           expect(find.byType(BrowserTransitionSnapshot), findsNothing);
           expect(cache.statusForKey(provider).pending, isTrue);
           if (replaceWhilePending) {
-            engine.previewBytes = await previewFixture(tester);
+            engine.previewBytes = await previewFixture(tester, width: 9);
+            expect(listEquals(capturedBytes, engine.previewBytes), isFalse);
             await service.refreshActivePreview();
             await tester.pump();
             expect(service.previewForTab(tab.id), same(engine.previewBytes));
