@@ -24636,6 +24636,12 @@ abstract class AppLocalizations {
   /// **'Extract text'**
   String get browserActionExtract;
 
+  /// No description provided for @browserActionScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture screenshot'**
+  String get browserActionScreenshot;
+
   /// No description provided for @browserActionSnapshot.
   ///
   /// In en, this message translates to:

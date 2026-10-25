@@ -8,15 +8,21 @@ import '../api/tool_call_cancellation.dart';
 import '../mcp/mcp_image_snapshot.dart';
 import 'browser_automation_script.dart';
 import 'browser_service.dart';
+import 'browser_engine.dart';
+import 'browser_failure.dart';
 import 'browser_workspace_resources.dart';
 
 /// One tool for the user-visible browser. Each conversation owns its own tabs;
 /// page output is data and never becomes an instruction or an image path.
 class BrowserToolsService {
-  BrowserToolsService({BrowserService? browser})
-    : browser = browser ?? BrowserService.instance;
+  BrowserToolsService({
+    BrowserService? browser,
+    BrowserWorkspaceResources? workspaces,
+  }) : browser = browser ?? BrowserService.instance,
+       workspaces = workspaces ?? BrowserWorkspaceResources.instance;
 
   final BrowserService browser;
+  final BrowserWorkspaceResources workspaces;
   static final _savedPreviews = Expando<String>();
   static const toolName = 'browser';
   static const actions = [
@@ -24,6 +30,7 @@ class BrowserToolsService {
     'render',
     'extract',
     'snapshot',
+    'screenshot',
     'click',
     'type',
     'select_option',
@@ -56,7 +63,7 @@ class BrowserToolsService {
           'Snapshots include up to 4000 characters of page text by default. '
           'Use next_offset with offset for truncated snapshot elements or extracted text. '
           'type verifies the field retained the value, and never submits a form. '
-          'Use select_option for native select controls. '
+          'Use select_option for native select controls. Ref/selector targets are automatically scrolled into view and checked for obstruction before click/type/select_option. '
           'Workspace HTML is available at kelivo://workspace/path/index.html, '
           'with relative assets scoped to this conversation’s bound workspace. '
           'For asynchronous transitions use wait_for and/or wait_for_url; '
@@ -77,7 +84,13 @@ class BrowserToolsService {
           'timed out and control is paused; ask the user to check the page '
           'and allow continuation. This is not human takeover. '
           'Never retry a mutation with outcome_unknown without observing first. '
-          'Screenshots cost image tokens; request them only for visual work.',
+          'Navigation waits default to domcontentloaded, not all images/fonts. '
+          'Use wait_until=commit for the first document, load for all resources, or none to return after issuing navigation. '
+          'Then wait_for/wait_for_url can observe a specific condition. '
+          'Errors include error_code, recoverable, outcome_unknown and next_action. '
+          'Screenshots cost image tokens; use action=screenshot with save_to=relative/path.png '
+          'to save only in the bound workspace (return_image defaults to false with save_to). '
+          'Existing files are never overwritten. Set return_image=true only when the model needs to see the image.',
       'parameters': {
         'type': 'object',
         'additionalProperties': false,
@@ -110,6 +123,23 @@ class BrowserToolsService {
             'minimum': 1,
             'maximum': 30000,
             'default': 16000,
+          },
+          'save_to': {
+            'type': 'string',
+            'description':
+                'Save a viewport PNG to a new workspace-relative path or kelivo://workspace/path.png. Implies screenshot capture; never overwrites.',
+          },
+          'return_image': {
+            'type': 'boolean',
+            'description':
+                'Send screenshot pixels to the model. Defaults to false with save_to, true otherwise. False requires save_to.',
+          },
+          'wait_until': {
+            'type': 'string',
+            'enum': ['none', 'commit', 'domcontentloaded', 'load'],
+            'default': 'domcontentloaded',
+            'description':
+                'Navigation stage for open/new_tab/render/back/forward/reload, or wait. none skips the navigation wait; condition waits still apply.',
           },
           'include_screenshot': {'type': 'boolean', 'default': false},
           'capture_screenshot_after': {'type': 'boolean', 'default': false},
@@ -192,6 +222,8 @@ class BrowserToolsService {
             'minimum': 100,
             'maximum': 30000,
             'default': 15000,
+            'description':
+                'Milliseconds for each navigation-stage or condition wait (100–30000). Does not change the separate 30-second native command deadline; a page-load timeout does not pause AI control.',
           },
           'script': {
             'type': 'string',
@@ -244,6 +276,22 @@ class BrowserToolsService {
       }
     }
 
+    if (args.containsKey('save_to')) {
+      requireString('save_to');
+      BrowserWorkspaceResources.screenshotUrl(args['save_to'] as String);
+    }
+    final capture =
+        action == 'screenshot' ||
+        args.containsKey('save_to') ||
+        args['capture_screenshot_after'] == true ||
+        (action == 'snapshot' && args['include_screenshot'] == true);
+    if ((args.containsKey('return_image') && !capture) ||
+        (args['return_image'] == false && !args.containsKey('save_to')) ||
+        (capture && (action == 'list_tabs' || action == 'close_tab'))) {
+      throw const FormatException(
+        'Screenshot output requires a page; return_image=false requires save_to.',
+      );
+    }
     if (action == 'open') requireString('url');
     if (args.containsKey('url')) {
       final uri = Uri.tryParse(args['url'] as String);
@@ -354,7 +402,7 @@ class BrowserToolsService {
         jsonEncode({
           'ok': false,
           'action': action,
-          'error': error.toString(),
+          ...BrowserFailure.from(error).toJson(),
           if (tab != null)
             'page': {
               'tab_id': tab.id,
@@ -416,18 +464,28 @@ class BrowserToolsService {
       tabId = browser.requireAgentTab(sessionId, args['tab_id'] as String?).id;
     }
     onTab(tabId);
+    final outputScope = args['save_to'] == null
+        ? null
+        : await workspaces.scope(sessionId);
     final previousTabs = browser
         .tabsForSession(sessionId)
         .map((t) => t.id)
         .toSet();
     final timeout = Duration(milliseconds: (args['timeout'] as int?) ?? 15000);
+    final stage = BrowserLoadStage.values.byName(
+      args['wait_until'] as String? ?? 'domcontentloaded',
+    );
     Map<String, dynamic> data = {};
     switch (action) {
       case 'new_tab':
       case 'open':
         if (args['url'] is String) {
           await browser.navigate(args['url'] as String, tabId: tabId);
-          await browser.waitForLoad(tabId: tabId, timeout: timeout);
+          await browser.waitForLoad(
+            tabId: tabId,
+            timeout: timeout,
+            stage: stage,
+          );
         }
       case 'render':
         await browser.loadHtml(
@@ -435,16 +493,16 @@ class BrowserToolsService {
           tabId: tabId,
           title: args['title'] as String?,
         );
-        await browser.waitForLoad(tabId: tabId, timeout: timeout);
+        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
       case 'back':
         await browser.back(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout);
+        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
       case 'forward':
         await browser.forward(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout);
+        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
       case 'reload':
         await browser.reload(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout);
+        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
       case 'switch_tab':
         await browser.selectTab(tabId);
       case 'close_tab':
@@ -458,8 +516,25 @@ class BrowserToolsService {
             awaitPromise: true,
           ),
         );
+      case 'screenshot':
+        break;
       case 'wait':
-        await _wait(tabId, args, timeout);
+        if (args.containsKey('wait_until')) {
+          await browser.waitForLoad(
+            tabId: tabId,
+            timeout: timeout,
+            stage: stage,
+          );
+        }
+        if (!args.containsKey('wait_until') ||
+            args.containsKey('wait_for') ||
+            args.containsKey('wait_for_url')) {
+          await _wait(tabId, args, timeout);
+        } else if (args['wait_ms'] is int) {
+          await Future<void>.delayed(
+            Duration(milliseconds: args['wait_ms'] as int),
+          );
+        }
         data = {'ready': true};
       default:
         data = await _dom(tabId, action, {
@@ -480,27 +555,54 @@ class BrowserToolsService {
     await browser.settleActionEvents(tabId);
     final tab = browser.requireAgentTab(sessionId, tabId);
     final images = <String>[];
-    if (args['capture_screenshot_after'] == true ||
+    final returnImage = args['return_image'] as bool? ?? outputScope == null;
+    if (action == 'screenshot' ||
+        outputScope != null ||
+        args['capture_screenshot_after'] == true ||
         (action == 'snapshot' && args['include_screenshot'] == true)) {
-      final bytes = await browser.captureScreenshot(tabId: tabId);
-      if (bytes == null || bytes.isEmpty) {
-        data['screenshot_error'] =
-            'Screenshot unavailable; open the browser page and retry.';
-      } else {
+      try {
+        final bytes = await browser.captureScreenshot(tabId: tabId);
+        if (bytes == null || bytes.isEmpty) {
+          throw const BrowserFailure(
+            'browser_screenshot_unavailable',
+            'The renderer did not produce a screenshot.',
+            'Wait for a document to render and capture again.',
+          );
+        }
         ToolCallCancellation.current?.throwIfCancelled();
-        final viewport = _decode(
-          await browser.evaluateJavascript(
-            'JSON.stringify({width:innerWidth,height:innerHeight,device_pixel_ratio:devicePixelRatio})',
-            tabId: tabId,
-          ),
-        );
-        final saved = await McpImageSnapshot.saveBytes(
-          bytes,
-          deduplicate: !temporary,
-        );
-        if (saved == null) {
-          data['screenshot_error'] = 'Could not save screenshot.';
-        } else {
+        if (outputScope != null) {
+          final path = await outputScope.saveScreenshot(
+            args['save_to'] as String,
+            bytes,
+            checkAccess: () {
+              ToolCallCancellation.current?.throwIfCancelled();
+              browser.checkAgentAction(tabId);
+            },
+          );
+          data['screenshot_file'] = {
+            'path': path,
+            'bytes': bytes.length,
+            'mime_type': 'image/png',
+          };
+        }
+        if (returnImage) {
+          final viewport = _decode(
+            await browser.evaluateJavascript(
+              'JSON.stringify({width:innerWidth,height:innerHeight,device_pixel_ratio:devicePixelRatio})',
+              tabId: tabId,
+            ),
+          );
+          final saved = await McpImageSnapshot.saveBytes(
+            bytes,
+            deduplicate: !temporary,
+          );
+          if (saved == null) {
+            throw const BrowserFailure(
+              'browser_screenshot_unavailable',
+              'The screenshot could not be stored.',
+              'Check available disk space and capture again.',
+            );
+          }
           data['screenshot_coordinates'] = {
             'viewport': viewport,
             'image': {'width': saved.width, 'height': saved.height},
@@ -509,12 +611,22 @@ class BrowserToolsService {
           };
           images.add(saved.uri);
         }
+      } catch (error) {
+        if (action == 'screenshot') rethrow;
+        // The preceding mutation may have succeeded. A capture failure must
+        // not invite the model to repeat that mutation.
+        data['screenshot_error'] = BrowserFailure.from(error).toJson();
+      } finally {
+        outputScope?.close();
       }
     }
     // Explicit screenshots remain owned even when cards are hidden. Temporary
     // chats do not create extra persistent UI previews or share saved assets.
     String? preview = images.firstOrNull;
-    if (capturePreview && !temporary && preview == null) {
+    if (capturePreview &&
+        !temporary &&
+        preview == null &&
+        (outputScope == null || returnImage)) {
       // Even a read/wait may follow asynchronous DOM changes at the same URL.
       // Only this capture can represent the page at this step's completion.
       final bytes = await browser.captureToolPreview(tabId);

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:Kelivo/core/services/browser/browser_engine.dart';
+import 'package:Kelivo/core/services/browser/browser_failure.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
@@ -55,7 +56,10 @@ class FakeBrowserEngine extends BrowserEngine {
   @override
   Future<void> stop() async {}
   @override
-  Future<void> waitForLoad(Duration timeout) async {
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  }) async {
     await loading?.future.timeout(timeout);
   }
 
@@ -1122,7 +1126,14 @@ void main() {
           expect(failure, isNull);
           expect(next, isNull);
           clock.elapse(Duration(seconds: timeout > 30 ? 30 : timeout));
-          expect(failure, isA<TimeoutException>());
+          expect(
+            failure,
+            isA<BrowserFailure>().having(
+              (e) => e.code,
+              'code',
+              'browser_load_timeout',
+            ),
+          );
           expect(next, 'complete');
           expect(service.controlEpoch, epoch);
           expect(service.agentPaused, isFalse);

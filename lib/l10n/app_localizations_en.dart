@@ -13835,6 +13835,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserActionExtract => 'Extract text';
 
   @override
+  String get browserActionScreenshot => 'Capture screenshot';
+
+  @override
   String get browserActionSnapshot => 'Read page structure';
 
   @override

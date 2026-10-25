@@ -4949,6 +4949,7 @@
   "browserActionNewTab": "新建标签页",
   "browserActionRender": "渲染页面",
   "browserActionExtract": "提取正文",
+  "browserActionScreenshot": "截取页面",
   "browserActionSnapshot": "读取页面结构",
   "browserActionClick": "点击",
   "browserActionType": "输入文字",

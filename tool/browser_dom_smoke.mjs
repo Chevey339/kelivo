@@ -119,5 +119,36 @@ try {
   const editor = (await snapshot()).elements[0].ref;
   assert.equal((await run('type',{ref:editor,text:'New draft'})).verified,true);
   assert.equal((await run('press',{ref:editor,key:'Enter'})).ok,true); checks++;
+  await page.setContent('<button id="far" style="margin-top:2000px" onclick="this.dataset.clicked=1">Far</button>');
+  assert.equal((await run('click',{selector:'#far'})).ok,true);
+  assert.equal(await page.locator('#far').getAttribute('data-clicked'),'1');
+  assert.ok(await page.evaluate(()=>scrollY)>0); checks++;
+  // A previously visible ref remains usable after scrolling out of view.
+  const farRef = (await snapshot()).elements[0].ref;
+  await page.evaluate(()=>scrollTo(0,0));
+  assert.equal((await run('click',{ref:farRef})).ok,true); checks++;
+  await page.setContent('<div id="box" style="height:100px;overflow:auto"><input id="deep" style="margin-top:600px"></div>');
+  assert.equal((await run('type',{selector:'#deep',text:'scrolled'})).verified,true);
+  assert.equal(await page.locator('#deep').inputValue(),'scrolled');
+  assert.ok(await page.locator('#box').evaluate(el=>el.scrollTop)>0); checks++;
+  await page.setContent('<iframe style="margin-top:2000px" srcdoc="<select id=choice style=margin-top:500px><option value=a>A</option><option value=b>B</option></select>"></iframe>');
+  await page.locator('iframe').contentFrame().locator('select').waitFor({state:'attached'});
+  assert.equal((await run('select_option',{selector:'#choice',option_value:'b'})).verified,true); checks++;
+  await page.setContent('<button id="blocked" onclick="window.badClick=true">Blocked</button><div style="position:fixed;inset:0;background:gray;z-index:99"></div>');
+  assert.match((await run('click',{selector:'#blocked'})).error,/element_covered/);
+  assert.equal(await page.evaluate(()=>window.badClick),undefined); checks++;
+  await page.setContent('<button id="replaceScroll" style="margin-top:2000px">Replace</button>');
+  await page.evaluate(()=>addEventListener('scroll',()=>{
+    document.querySelector('#replaceScroll').outerHTML='<button id="replaceScroll" style="margin-top:2000px" onclick="window.badScrollClick=true">Replace</button>';
+  },{once:true}));
+  assert.match((await run('click',{selector:'#replaceScroll'})).error,/stale_ref/);
+  assert.equal(await page.evaluate(()=>window.badScrollClick),undefined); checks++;
+  await page.setContent('<button style="width:200px;height:60px" onclick="window.coordsClicked=true">Here</button><div style="height:2000px"></div>');
+  await page.evaluate(()=>scrollTo(0,0));
+  assert.equal((await run('click',{x:20,y:20})).ok,true);
+  assert.equal(await page.evaluate(()=>scrollY),0);
+  assert.equal(await page.evaluate(()=>window.coordsClicked),true);
+  assert.equal((await run('click',{selector:'button'})).ok,true);
+  assert.equal(await page.evaluate(()=>scrollY),0); checks++;
   console.log(`PASS: ${checks} browser automation checks in ${await browser.version()}`);
 } finally { await browser.close(); }

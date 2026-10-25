@@ -11,6 +11,7 @@ import '../../../features/browser/models/browser_models.dart';
 import '../../../features/browser/models/browser_agent_activity.dart';
 import '../api/tool_call_cancellation.dart';
 import 'browser_engine.dart';
+import 'browser_failure.dart';
 import 'browser_workspace_resources.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_engine.dart';
@@ -697,6 +698,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     tabId,
     (engine) => engine.evaluate(source, awaitPromise: awaitPromise),
   );
+  void checkAgentAction(String tabId) => _checkAction(tabId);
+
   Future<Uint8List?> captureScreenshot({required String tabId}) =>
       _call(tabId, (engine) => engine.screenshot());
 
@@ -1035,15 +1038,20 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> waitForLoad({
     required String tabId,
     Duration timeout = const Duration(seconds: 30),
+    BrowserLoadStage stage = BrowserLoadStage.load,
   }) async {
     // Waiting observes a navigation already accepted by the engine. A slow
     // load can still be inspected or retried; it is not a human takeover or
     // an unfinished native command whose outcome is unknown.
-    await _call(
-      tabId,
-      (engine) => engine.waitForLoad(timeout),
-      pauseOnTimeout: false,
-    );
+    try {
+      await _call(
+        tabId,
+        (engine) => engine.waitForLoad(timeout, stage: stage),
+        pauseOnTimeout: false,
+      );
+    } on TimeoutException {
+      throw BrowserFailure.loadTimeout(stage.name);
+    }
   }
 
   Future<BrowserEngine> _engine(String id, {VoidCallback? onCreated}) {
@@ -1292,7 +1300,11 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       progress: state.progress,
       canGoBack: state.canGoBack,
       canGoForward: state.canGoForward,
-      error: state.error ?? (state.isLoading == true ? null : old.error),
+      error:
+          state.error ??
+          (state.isLoading == true || state.completedNavigation
+              ? null
+              : old.error),
     );
     _tabs[index] = tab;
     if (state.rendererTerminated) {

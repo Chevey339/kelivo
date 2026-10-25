@@ -311,6 +311,25 @@ namespace flutter_inappwebview_plugin
     channel->InvokeMethod("onLoadStop", std::move(arguments));
   }
 
+  void WebViewChannelDelegate::onPageCommitVisible(const std::optional<std::string>& url) const
+  {
+    if (!channel) return;
+    auto arguments = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+      {"url", make_fl_value(url)},
+    });
+    channel->InvokeMethod("onPageCommitVisible", std::move(arguments));
+  }
+
+  void WebViewChannelDelegate::onRenderProcessGone(bool didCrash) const
+  {
+    if (!channel) return;
+    auto arguments = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+      {"didCrash", make_fl_value(didCrash)},
+      {"rendererPriorityAtExit", make_fl_value(0)},
+    });
+    channel->InvokeMethod("onRenderProcessGone", std::move(arguments));
+  }
+
   void WebViewChannelDelegate::shouldOverrideUrlLoading(std::shared_ptr<NavigationAction> navigationAction, std::unique_ptr<ShouldOverrideUrlLoadingCallback> callback) const
   {
     if (!channel) {

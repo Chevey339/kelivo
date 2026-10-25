@@ -13187,6 +13187,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserActionExtract => '提取正文';
 
   @override
+  String get browserActionScreenshot => '截取页面';
+
+  @override
   String get browserActionSnapshot => '读取页面结构';
 
   @override
@@ -26512,6 +26515,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserActionExtract => '提取正文';
+
+  @override
+  String get browserActionScreenshot => '截取页面';
 
   @override
   String get browserActionSnapshot => '读取页面结构';
@@ -39918,6 +39924,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserActionExtract => '擷取正文';
+
+  @override
+  String get browserActionScreenshot => '擷取畫面';
 
   @override
   String get browserActionSnapshot => '讀取頁面結構';

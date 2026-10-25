@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import '../workspace/file_link_resolver.dart';
+import '../workspace/workspace_paths.dart';
+import 'browser_screenshot_file.dart';
 
 /// App wiring resolves the tab owner's binding, never the foreground chat.
 class BrowserWorkspaceResources {
@@ -39,6 +41,28 @@ class BrowserWorkspaceResources {
       return null;
     }
     return segments.where((s) => s.isNotEmpty).toList();
+  }
+
+  /// Output paths use the same workspace boundary as local page resources.
+  static Uri screenshotUrl(String value) {
+    final raw = value.trim();
+    final url = raw.startsWith('kelivo://')
+        ? raw
+        : 'kelivo://workspace/${KelivoLink.encodePath(raw)}';
+    if (raw.isEmpty ||
+        raw.startsWith('/') ||
+        raw.contains(r'\') ||
+        !isWorkspaceUrl(url)) {
+      throw const FormatException('Use a relative workspace PNG path.');
+    }
+    final uri = Uri.parse(url);
+    if (uri.hasQuery ||
+        uri.hasFragment ||
+        uri.pathSegments.isEmpty ||
+        !uri.pathSegments.last.toLowerCase().endsWith('.png')) {
+      throw const FormatException('The screenshot path must end in .png.');
+    }
+    return uri;
   }
 
   Future<BrowserWorkspaceScope> scope(String? sessionId) async {
@@ -106,6 +130,60 @@ class BrowserWorkspaceScope {
       throw StateError('browser_workspace_access_denied');
     }
     return File(resolved);
+  }
+
+  /// A single bounded PNG write. Resolve parents before creating anything,
+  /// recheck the binding after async work, and never truncate an existing file.
+  Future<String> saveScreenshot(
+    String path,
+    Uint8List bytes, {
+    required void Function() checkAccess,
+  }) async {
+    final uri = BrowserWorkspaceResources.screenshotUrl(path);
+    if (bytes.isEmpty || bytes.length > maxResourceBytes) {
+      throw StateError('browser_workspace_screenshot_too_large');
+    }
+    final targetPath = p.joinAll([root, ...uri.pathSegments]);
+    Future<String> checkedPath() async {
+      checkAccess();
+      final current = await resources.rootForSession?.call(sessionId);
+      if (_closed ||
+          current == null ||
+          await current.resolveSymbolicLinks() != root) {
+        throw StateError('browser_workspace_binding_changed');
+      }
+      final resolved = await WorkspacePaths.resolveHostPath(targetPath);
+      if (!p.isWithin(root, resolved)) {
+        throw StateError('browser_workspace_access_denied');
+      }
+      checkAccess();
+      return resolved;
+    }
+
+    final resolved = await checkedPath();
+    final target = File(resolved);
+    if (await FileSystemEntity.type(resolved, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('browser_workspace_file_exists');
+    }
+    await target.parent.create(recursive: true);
+    if (await checkedPath() != resolved) {
+      throw StateError('browser_workspace_binding_changed');
+    }
+    // Write only to an unpredictable staging name, then publish with an
+    // atomic no-replace operation. Never reopen the caller's leaf to truncate.
+    final staging = await target.parent.createTemp('.kelivo-screenshot-');
+    try {
+      final temp = File(p.join(staging.path, 'page.png'));
+      await temp.writeAsBytes(bytes, flush: true);
+      if (await checkedPath() != resolved) {
+        throw StateError('browser_workspace_binding_changed');
+      }
+      await publishBrowserScreenshot(temp.path, resolved);
+      return uri.toString();
+    } finally {
+      await staging.delete(recursive: true);
+    }
   }
 
   /// Serialize local reads to bound transient image buffers. There is no

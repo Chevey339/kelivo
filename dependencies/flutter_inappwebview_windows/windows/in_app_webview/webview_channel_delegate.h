@@ -71,6 +71,8 @@ namespace flutter_inappwebview_plugin
 
     void onLoadStart(const std::optional<std::string>& url) const;
     void onLoadStop(const std::optional<std::string>& url) const;
+    void onPageCommitVisible(const std::optional<std::string>& url) const;
+    void onRenderProcessGone(bool didCrash) const;
     void onProgressChanged(const int64_t& progress) const;
     void shouldOverrideUrlLoading(std::shared_ptr<NavigationAction> navigationAction, std::unique_ptr<ShouldOverrideUrlLoadingCallback> callback) const;
     void onReceivedError(std::shared_ptr<WebResourceRequest> request, std::shared_ptr<WebResourceError> error) const;

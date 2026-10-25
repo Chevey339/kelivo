@@ -13,6 +13,7 @@ import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
     show AndroidPathHandler;
 import '../../../features/browser/models/browser_models.dart';
 import 'browser_engine.dart';
+import 'browser_failure.dart';
 import 'browser_download_cookies.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
@@ -127,6 +128,12 @@ class NativeBrowserEngine implements BrowserEngine {
   bool _replacingRenderedDocument = false;
   bool _renderedDocumentLoaded = false;
   Completer<void>? _navigation;
+  Completer<void>? _commit;
+  Future<void>? _domReady;
+  Future<void> _redirectUpdate = Future<void>.value();
+  bool _hasServerRedirect = false;
+  BrowserFailure? _loadFailure;
+  String? _navigationUrl;
   int _navigationGeneration = 0;
   int _historyRevision = 0;
   int _latestHistoryRevision = 0;
@@ -182,6 +189,15 @@ class NativeBrowserEngine implements BrowserEngine {
     }
     _navigation = Completer<void>();
     _navigation!.future.ignore();
+    if (_commit != null && !_commit!.isCompleted) {
+      _commit!.completeError(StateError('browser_navigation_superseded'));
+    }
+    _commit = Completer<void>();
+    _commit!.future.ignore();
+    _domReady = null;
+    _redirectUpdate = Future<void>.value();
+    _hasServerRedirect = false;
+    _loadFailure = null;
   }
 
   static Future<BrowserEngine> create({
@@ -250,6 +266,7 @@ class NativeBrowserEngine implements BrowserEngine {
 
   Future<void> _initialize() async {
     _beginNavigation();
+    _navigationUrl = tab.url;
     if (Platform.isAndroid) {
       _defaultUserAgent = await InAppWebViewController.getDefaultUserAgent();
     }
@@ -278,6 +295,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onLoadStart: _onLoadStart,
       onLoadStop: _onLoadStop,
       onPageCommitVisible: _onPageCommit,
+      onDidReceiveServerRedirectForProvisionalNavigation: _onRedirect,
       onUpdateVisitedHistory: _onHistory,
       onTitleChanged: _onTitle,
       onProgressChanged: _onProgress,
@@ -307,7 +325,7 @@ class NativeBrowserEngine implements BrowserEngine {
           progress: 1,
         ),
       );
-      if (!(_navigation?.isCompleted ?? true)) _navigation!.complete();
+      _completeNavigation();
     }
   }
 
@@ -395,7 +413,12 @@ class NativeBrowserEngine implements BrowserEngine {
       // Leave a pending real navigation intact, including a same-URL POST.
       return;
     }
-    if (_navigation == null || _navigation!.isCompleted) _beginNavigation();
+    if (_navigation == null ||
+        _navigation!.isCompleted ||
+        _commit?.isCompleted == true) {
+      _beginNavigation();
+    }
+    _navigationUrl = _pageUrl(url) ?? _navigationUrl;
     if (Platform.isIOS) {
       _nativeScrollObserver.reset();
     } else {
@@ -419,6 +442,12 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   String? _pageUrl(WebUri? url) {
+    if (url != null &&
+        (url.scheme == 'chrome-error' ||
+            url.scheme == 'chromewebdata' ||
+            url.toString().startsWith('about:neterror'))) {
+      return _navigationUrl;
+    }
     final value = url == null
         ? null
         : (_workspace?.publicUrl(url.toString()) ?? url.toString());
@@ -492,10 +521,11 @@ class NativeBrowserEngine implements BrowserEngine {
         canGoForward: history == null
             ? null
             : history.index + 1 < history.length,
-        completedNavigation: true,
+        completedNavigation: _loadFailure == null,
+        error: _loadFailure?.message,
       ),
     );
-    if (!(navigation?.isCompleted ?? true)) navigation!.complete();
+    if (identical(navigation, _navigation)) _completeNavigation();
     _historyDocument = null;
     if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
     unawaited(_installScrollObserver());
@@ -580,16 +610,58 @@ class NativeBrowserEngine implements BrowserEngine {
   ) async {
     // URL callbacks arrive in native order. Publish the URL before querying
     // availability so a slower query cannot replay an older SPA location.
+    // A newly created WebView can report its previous about:blank document
+    // after load-start. URL notifications alone must not change the ownership
+    // of an unfinished navigation; commit/redirect events establish that.
+    if (_navigation?.isCompleted == true || _navigationUrl == null) {
+      _navigationUrl = _pageUrl(url) ?? _navigationUrl;
+    }
     _emit(BrowserPageState(url: _pageUrl(url)));
     await _refreshHistory(controller);
     if (_navigation?.isCompleted == true) unawaited(_loadFavicon());
   }
 
-  void _onPageCommit(InAppWebViewController controller, WebUri? url) {
-    // WKWebView's URL notification may precede the back/forward-list update.
-    // Commit is the first reliable refresh for a page whose resources are
-    // still loading; waiting for load-stop leaves Forward disabled meanwhile.
-    unawaited(_refreshHistory(controller));
+  void _onRedirect(InAppWebViewController controller) {
+    _hasServerRedirect = true;
+    final generation = _navigationGeneration;
+    // WebKit redirects have no second provisional start. Keep the final
+    // request address for failures that happen before commit.
+    _redirectUpdate = (() async {
+      final url = await controller.getUrl();
+      if (!_disposed && generation == _navigationGeneration && url != null) {
+        _navigationUrl = _pageUrl(url);
+      }
+    })().catchError((Object _) {});
+  }
+
+  Future<void> _onPageCommit(
+    InAppWebViewController controller,
+    WebUri? url,
+  ) async {
+    final generation = _navigationGeneration;
+    if (url == null) return;
+    try {
+      if (!_isCurrentNavigation(url)) {
+        if (!_hasServerRedirect) return;
+        final current = await controller.getUrl();
+        if (current == null ||
+            current.replace(fragment: '') != url.replace(fragment: '')) {
+          return;
+        }
+      }
+      if (_disposed ||
+          generation != _navigationGeneration ||
+          _loadFailure != null) {
+        return;
+      }
+      // The current native document, rather than an earlier history event,
+      // owns this commit. Windows additionally filters by NavigationId.
+      _navigationUrl = _pageUrl(url);
+      if (!(_commit?.isCompleted ?? true)) _commit!.complete();
+      unawaited(_refreshHistory(controller));
+    } catch (_) {
+      // Disposal or a replacing navigation invalidates this notification.
+    }
   }
 
   Future<({int index, int length})?> _readHistory(
@@ -712,7 +784,7 @@ class NativeBrowserEngine implements BrowserEngine {
     // An actual popstate/hashchange in the original document confirms a
     // same-document traversal. URL KVO/commit alone may precede a full load.
     _historyDocument = null;
-    if (!(_navigation?.isCompleted ?? true)) _navigation!.complete();
+    _completeNavigation();
     _emit(
       const BrowserPageState(
         isLoading: false,
@@ -730,25 +802,67 @@ class NativeBrowserEngine implements BrowserEngine {
     _emit(BrowserPageState(progress: progress / 100));
   }
 
-  void _onError(
+  Future<void> _onError(
     InAppWebViewController controller,
     WebResourceRequest request,
     WebResourceError error,
-  ) {
+  ) async {
+    final generation = _navigationGeneration;
+    await _redirectUpdate;
+    if (_disposed || generation != _navigationGeneration) return;
     // WebKit reports a superseded/back/stop navigation as URLError.cancelled
     // (-999). The plugin also maps WebView2's cancellation to this type. It
     // belongs to the cancelled request, not the current page or load waiter;
     // an explicit stop() already settles its own loading state below.
-    if (error.type == WebResourceErrorType.CANCELLED) return;
-    if (request.isForMainFrame == true) {
-      _historyDocument = null;
-      _emit(BrowserPageState(isLoading: false, error: error.description));
-      if (!(_navigation?.isCompleted ?? true)) {
-        _navigation!.completeError(StateError(error.description));
-      }
-      if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
-      unawaited(_installScrollObserver());
+    if (error.type == WebResourceErrorType.CANCELLED ||
+        !_isCurrentNavigation(request.url) ||
+        request.isForMainFrame != true) {
+      return;
     }
+    final type = error.type.toString().toLowerCase();
+    final code = type.contains('timeout') || type.contains('timed_out')
+        ? 'browser_connection_timeout'
+        : type.contains('aborted')
+        ? 'browser_connection_aborted'
+        : type.contains('host_lookup') || type.contains('host_name')
+        ? 'browser_name_not_resolved'
+        : type.contains('ssl') || type.contains('certificate')
+        ? 'browser_certificate_error'
+        : 'browser_navigation_failed';
+    _failNavigation(
+      BrowserFailure(
+        code,
+        'The page could not be loaded ($code).',
+        'Check the connection or address, then open another page in this tab. Do not repeat form submissions automatically.',
+      ),
+    );
+    if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
+    unawaited(_installScrollObserver());
+  }
+
+  bool _isCurrentNavigation(WebUri? url) {
+    if (_disposed || url == null || _navigationUrl == null) return false;
+    final actual = _isRenderedUrl(url)
+        ? _renderedDocumentUrl!
+        : publicUrl(url.toString());
+    return Uri.parse(actual).replace(fragment: '') ==
+        Uri.parse(_navigationUrl!).replace(fragment: '');
+  }
+
+  void _failNavigation(BrowserFailure failure) {
+    _loadFailure = failure;
+    _historyDocument = null;
+    _emit(BrowserPageState(isLoading: false, error: failure.message));
+    if (!(_commit?.isCompleted ?? true)) _commit!.completeError(failure);
+    if (!(_navigation?.isCompleted ?? true)) {
+      _navigation!.completeError(failure);
+    }
+  }
+
+  void _completeNavigation() {
+    if (_loadFailure != null) return;
+    if (!(_commit?.isCompleted ?? true)) _commit!.complete();
+    if (!(_navigation?.isCompleted ?? true)) _navigation!.complete();
   }
 
   void _onHttpError(
@@ -756,8 +870,16 @@ class NativeBrowserEngine implements BrowserEngine {
     WebResourceRequest request,
     WebResourceResponse response,
   ) {
-    if (request.isForMainFrame == true && (response.statusCode ?? 0) >= 400) {
-      _emit(BrowserPageState(error: 'HTTP ${response.statusCode}'));
+    if (request.isForMainFrame == true &&
+        _isCurrentNavigation(request.url) &&
+        (response.statusCode ?? 0) >= 400) {
+      _failNavigation(
+        BrowserFailure(
+          'browser_http_error',
+          'The server returned HTTP ${response.statusCode}.',
+          'Inspect the response page or check the address before retrying.',
+        ),
+      );
     }
   }
 
@@ -861,6 +983,10 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   void _onCrash() {
+    if (!(_commit?.isCompleted ?? true)) {
+      _commit!.completeError(BrowserFailure.renderer);
+    }
+    _loadFailure = BrowserFailure.renderer;
     _historyDocument = null;
     _historyCommandEpoch++;
     _finishHistoryTraversal();
@@ -870,7 +996,7 @@ class NativeBrowserEngine implements BrowserEngine {
       _scrollObserver.invalidate();
     }
     if (!(_navigation?.isCompleted ?? true)) {
-      _navigation!.completeError(StateError('browser_renderer_terminated'));
+      _navigation!.completeError(BrowserFailure.renderer);
     }
     _emit(
       const BrowserPageState(
@@ -918,6 +1044,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onLoadStart: _onLoadStart,
       onLoadStop: _onLoadStop,
       onPageCommitVisible: _onPageCommit,
+      onDidReceiveServerRedirectForProvisionalNavigation: _onRedirect,
       onUpdateVisitedHistory: _onHistory,
       onTitleChanged: _onTitle,
       onProgressChanged: _onProgress,
@@ -1017,12 +1144,14 @@ class NativeBrowserEngine implements BrowserEngine {
     _replacingRenderedDocument = false;
     _renderedDocumentLoaded = false;
     _beginNavigation();
+    _navigationUrl = publicUrl(url);
     await _webView.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
   }
 
   @override
   Future<void> loadHtml(String html, {String? baseUrl}) async {
     _renderedDocumentUrl = baseUrl ?? 'about:blank';
+    _navigationUrl = _renderedDocumentUrl;
     _awaitingRenderedLoadStart = true;
     _replacingRenderedDocument = false;
     _renderedDocumentLoaded = false;
@@ -1061,6 +1190,7 @@ class NativeBrowserEngine implements BrowserEngine {
       if (_disposed || commandEpoch != _historyCommandEpoch) return;
       _replacingRenderedDocument = _renderedDocumentUrl != null;
       _beginNavigation(fromHistory: true);
+      _navigationUrl = null;
       if (document != null) {
         _historyDocument = (
           generation: _navigationGeneration,
@@ -1134,8 +1264,10 @@ class NativeBrowserEngine implements BrowserEngine {
       _historyCommandEpoch++;
       _finishHistoryTraversal();
       await _controller?.stopLoading();
+      final stopped = StateError('browser_navigation_stopped');
+      if (!(_commit?.isCompleted ?? true)) _commit!.completeError(stopped);
       if (!(_navigation?.isCompleted ?? true)) {
-        _navigation!.completeError(StateError('browser_navigation_stopped'));
+        _navigation!.completeError(stopped);
       }
       _emit(const BrowserPageState(isLoading: false));
       if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
@@ -1144,8 +1276,55 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   @override
-  Future<void> waitForLoad(Duration timeout) async {
-    await _navigation?.future.timeout(timeout);
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  }) async {
+    if (stage == BrowserLoadStage.none) return;
+    final navigation = _navigation;
+    final generation = _navigationGeneration;
+    Future<void> wait() async {
+      if (stage == BrowserLoadStage.load) {
+        await navigation?.future;
+        return;
+      }
+      await _commit?.future;
+      if (generation != _navigationGeneration) {
+        throw StateError('browser_navigation_superseded');
+      }
+      if (stage == BrowserLoadStage.commit) return;
+      // One event-backed DOM wait per navigation; no permanent polling or new
+      // renderer. Commit ensures an old document cannot satisfy a reload wait.
+      await (_domReady ??= Future.any<void>([
+        (() async {
+          final result = await _webView.callAsyncJavaScript(
+            functionBody: r"""
+            if (document.readyState === 'loading') {
+              await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, {once:true}));
+            }
+            return true;
+          """,
+          );
+          if (result?.error != null || result?.value != true) {
+            throw const BrowserFailure(
+              'browser_document_changed',
+              'The document changed while waiting for its DOM.',
+              'Inspect the current page and wait again.',
+            );
+          }
+        })(),
+        if (navigation != null) navigation.future,
+      ]));
+    }
+
+    try {
+      await wait().timeout(timeout);
+    } on TimeoutException {
+      throw BrowserFailure.loadTimeout(stage.name);
+    }
+    if (generation != _navigationGeneration) {
+      throw StateError('browser_navigation_superseded');
+    }
   }
 
   @override
@@ -1336,8 +1515,10 @@ class NativeBrowserEngine implements BrowserEngine {
     } else {
       _scrollObserver.dispose();
     }
+    final disposed = StateError('browser_engine_disposed');
+    if (!(_commit?.isCompleted ?? true)) _commit!.completeError(disposed);
     if (!(_navigation?.isCompleted ?? true)) {
-      _navigation!.completeError(StateError('browser_engine_disposed'));
+      _navigation!.completeError(disposed);
     }
     if (_headless != null) await _headless!.dispose();
     if (_converted) await InAppWebViewController.disposeKeepAlive(_keepAlive);

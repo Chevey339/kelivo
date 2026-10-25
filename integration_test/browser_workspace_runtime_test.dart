@@ -123,7 +123,7 @@ void main() {
         }, capturePreview: false)).content,
       );
       expect(rejected['ok'], false);
-      expect(rejected['error'], contains('input_value_rejected'));
+      expect(rejected['error_code'], 'input_value_rejected');
       final dialog = await run('click', {'selector': '#dialog'});
       expect((dialog['events'] as List).length, 3);
       expect((await run('evaluate', {'script': 'window.answers'}))['value'], [

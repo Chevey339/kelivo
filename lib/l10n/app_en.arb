@@ -6282,6 +6282,7 @@
   "browserActionNewTab": "New tab",
   "browserActionRender": "Render page",
   "browserActionExtract": "Extract text",
+  "browserActionScreenshot": "Capture screenshot",
   "browserActionSnapshot": "Read page structure",
   "browserActionClick": "Click",
   "browserActionType": "Type",

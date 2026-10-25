@@ -3771,7 +3771,10 @@ class _Engine extends BrowserEngine {
   @override
   Future<void> stop() async {}
   @override
-  Future<void> waitForLoad(Duration timeout) async {}
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  }) async {}
   @override
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async =>
       null;
