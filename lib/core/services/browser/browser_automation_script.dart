@@ -17,19 +17,18 @@ abstract final class BrowserAutomationScript {
 const key = '__kelivoBrowserAutomation';
 let state = window[key];
 if (!state || state.document !== document) {
-  state = {document, refs:new Map(), observers:[], version:0, snapshotVersion:0};
+  state = {document, refs:new Map()};
   window[key] = state;
 }
 const fail = (message) => { throw new Error(message); };
 const clean = (value, limit=200) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit);
 const roots = [];
-const frameDocuments = [];
 const visitRoot = (root) => {
   roots.push(root);
   for (const el of root.querySelectorAll('*')) {
     if (el.shadowRoot) visitRoot(el.shadowRoot);
     if (el.tagName === 'IFRAME') {
-      try { if (el.contentDocument) { frameDocuments.push([el, el.contentDocument]); visitRoot(el.contentDocument); } } catch (_) {}
+      try { if (el.contentDocument) { visitRoot(el.contentDocument); } } catch (_) {}
     }
   }
 };
@@ -46,7 +45,7 @@ const rect = (el) => {
   while (view && view !== window) {
     const frame = view.frameElement;
     if (!frame) break;
-    const f = frame.getBoundingClientRect(); x += f.x; y += f.y;
+    const f = frame.getBoundingClientRect(); x += f.x + frame.clientLeft; y += f.y + frame.clientTop;
     view = frame.ownerDocument.defaultView;
   }
   return {x:Math.round(x), y:Math.round(y), width:Math.round(r.width), height:Math.round(r.height)};
@@ -68,8 +67,9 @@ const pointTarget = (x, y) => {
     if (el.tagName === 'IFRAME') {
       try {
         const r = el.getBoundingClientRect();
-        const child = el.contentDocument?.elementFromPoint(x-r.x, y-r.y);
-        if (child) { x -= r.x; y -= r.y; el = child; continue; }
+        const dx = r.x + el.clientLeft, dy = r.y + el.clientTop;
+        const child = el.contentDocument?.elementFromPoint(x-dx, y-dy);
+        if (child) { x -= dx; y -= dy; el = child; continue; }
       } catch (_) {}
     }
     break;
@@ -79,15 +79,20 @@ const pointTarget = (x, y) => {
 const target = (optional=false) => {
   let el;
   if (args.ref) {
-    if (state.snapshotUrl !== location.href || (state.frameDocuments || []).some(([frame, doc]) => frame.contentDocument !== doc)) {
-      fail('stale_ref: page or frame navigated; take a fresh snapshot');
-    }
-    for (const observer of state.observers) {
-      if (observer.takeRecords().length) state.version++;
-    }
-    if (state.version !== state.snapshotVersion) fail('stale_ref: page changed; take a fresh snapshot');
-    el = state.refs.get(args.ref);
-    if (!el || !el.isConnected) fail('stale_ref: ref is missing or detached; take a fresh snapshot');
+    const saved = state.refs.get(args.ref);
+    if (!saved || !saved.el.isConnected || saved.document !== saved.el.ownerDocument ||
+        state.snapshotUrl !== location.href) fail('stale_ref: element or page changed; take a fresh snapshot');
+    el = saved.el;
+    try {
+      let view = saved.document.defaultView;
+      if (!view || view.document !== saved.document) fail('stale_ref');
+      while (view !== window) {
+        const frame = view.frameElement;
+        if (!frame?.isConnected) fail('stale_ref');
+        view = frame.ownerDocument.defaultView;
+      }
+    } catch (_) { fail('stale_ref: frame navigated; take a fresh snapshot'); }
+    if (saved.identity !== identity(el)) fail('stale_ref: element identity changed; take a fresh snapshot');
   } else if (args.selector) {
     el = query(args.selector);
   } else if (Number.isFinite(args.x) && Number.isFinite(args.y)) {
@@ -101,7 +106,59 @@ const target = (optional=false) => {
   if (!el) fail('element_not_found');
   return el;
 };
-const editable = (el) => el && (el.matches('input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea') || el.isContentEditable);
+const editable = (el) => el && (el.matches('textarea') || el.isContentEditable ||
+  (el.tagName === 'INPUT' && !['checkbox','radio','file','button','submit','reset','image','hidden','range','color'].includes(el.type)));
+const semanticName = el => clean(el.getAttribute('aria-label') ||
+  (el.labels ? Array.from(el.labels).map(l => l.innerText).join(' ') : '') ||
+  (el.matches('input,textarea,select') || el.isContentEditable ? '' : el.innerText) || el.getAttribute('title') || el.getAttribute('alt'));
+const identity = el => JSON.stringify([el.tagName, el.id, el.getAttribute('name'), el.getAttribute('role'), el.type, el.href, semanticName(el)]);
+const inputValue = el => el.isContentEditable ? el.textContent : el.value;
+const inputFrame = () => new Promise(resolve => {
+  let frame, timer;
+  const done = () => { cancelAnimationFrame(frame); clearTimeout(timer); resolve(); };
+  frame = requestAnimationFrame(done);
+  timer = setTimeout(done, 50);
+});
+// Check the element's local viewport and clipping ancestors, including
+// same-origin frames. Already visible targets do not scroll or wait a frame.
+const clipped = el => {
+  const r = el.getBoundingClientRect(), view = el.ownerDocument.defaultView;
+  if (r.top < 0 || r.left < 0 || r.bottom > view.innerHeight || r.right > view.innerWidth) return true;
+  let parent = el.parentElement || el.getRootNode().host;
+  while (parent) {
+    const style = view.getComputedStyle(parent), p = parent.getBoundingClientRect();
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowY) && (r.top < p.top || r.bottom > p.bottom)) return true;
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowX) && (r.left < p.left || r.right > p.right)) return true;
+    parent = parent.parentElement || parent.getRootNode().host;
+  }
+  return view !== window && view.frameElement ? clipped(view.frameElement) : false;
+};
+const prepareTarget = async () => {
+  const el = target(), originalIdentity = identity(el);
+  const coordinate = Number.isFinite(args.x) && Number.isFinite(args.y);
+  if (!coordinate && clipped(el)) {
+    el.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+    let view = el.ownerDocument.defaultView;
+    while (view && view !== window) {
+      const frame = view.frameElement;
+      if (!frame) break;
+      frame.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+      view = frame.ownerDocument.defaultView;
+    }
+    await inputFrame();
+    roots.length = 0;
+    if (!el.isConnected || target() !== el || identity(el) !== originalIdentity) {
+      fail('stale_ref: target changed while scrolling; take a fresh snapshot');
+    }
+  }
+  if (!visible(el)) fail('element_not_visible');
+  const r = rect(el);
+  const x = coordinate ? args.x : Math.max(0,Math.min(innerWidth-1,r.x+r.width/2));
+  const y = coordinate ? args.y : Math.max(0,Math.min(innerHeight-1,r.y+r.height/2));
+  const hit = pointTarget(x,y);
+  if (!hit || (hit !== el && !el.contains(hit))) fail('element_covered: dismiss the overlay and take a fresh snapshot');
+  return {el,x,y};
+};
 const setText = (el, value) => {
   const view = el.ownerDocument.defaultView;
   if (el.isContentEditable) el.textContent = value;
@@ -113,56 +170,61 @@ const setText = (el, value) => {
   el.dispatchEvent(new view.InputEvent('input', {bubbles:true, inputType:'insertText', data:null}));
   el.dispatchEvent(new view.Event('change', {bubbles:true}));
 };
-const invalidate = () => { state.refs.clear(); state.version++; };
 const page = () => ({url:location.href, title:document.title, viewport:{width:innerWidth,height:innerHeight}, scroll:{x:scrollX,y:scrollY}});
 try {
   let result;
   switch (action) {
     case 'snapshot': {
-      for (const observer of state.observers) observer.disconnect();
-      state.observers = []; state.refs.clear();
+      state.refs.clear();
       ensureRoots();
       const elements = [], selector = 'a[href],button,input:not([type=hidden]),textarea,select,summary,[role=button],[role=link],[role=textbox],[role=checkbox],[role=combobox],[role=tab],[contenteditable=true],[tabindex]';
-      const candidates = roots.flatMap(root => Array.from(root.querySelectorAll(selector)));
-      let count = 0;
+      const candidates = args.include_elements === false ? [] : roots.flatMap(root => Array.from(root.querySelectorAll(selector)));
+      const offset = args.offset || 0, budget = args.max_chars || 16000;
+      const fullText = args.include_text === false ? '' : (document.body?.innerText || '').replace(/\s+/g,' ').trim();
+      const text = fullText.slice(0,Math.min(4000,Math.floor(budget/2)));
+      let count = 0, seen = 0, used = text.length, more = false;
       for (const el of candidates) {
         if (!visible(el)) continue;
-        if (count >= (args.max_elements || 80)) break;
-        const ref = `${args.snapshot_id}:e${count++}`;
-        state.refs.set(ref, el);
+        if (seen++ < offset) continue;
+        if (count >= (args.max_elements || 80)) { more = true; break; }
+        const ref = `${args.snapshot_id}:e${count}`;
         const tag = el.tagName.toLowerCase();
-        const name = clean(el.getAttribute('aria-label') ||
-          (el.labels ? Array.from(el.labels).map(l => l.innerText).join(' ') : '') ||
-          el.innerText || el.getAttribute('placeholder') || el.getAttribute('title') || el.getAttribute('alt'));
+        const name = semanticName(el) || clean(el.getAttribute('placeholder'));
         const entry = {ref,tag,role:el.getAttribute('role') || tag,name,rect:rect(el)};
         if (el.type) entry.type = el.type;
         if (el.disabled) entry.disabled = true;
+        if (el.readOnly) entry.readonly = true;
+        if (el.hasAttribute('placeholder')) entry.placeholder = clean(el.getAttribute('placeholder'));
         if ('checked' in el) entry.checked = el.checked;
-        if ('value' in el && el.value) entry.value = el.type === 'password' ? '[redacted]' : clean(el.value);
-        if (el.href && /^https?:/.test(el.href)) entry.href = el.href;
-        elements.push(entry);
+        if ('value' in el) entry.value = el.type === 'password' ? '[redacted]' : clean(el.value);
+        if (el.href && /^(https?|kelivo):/.test(el.href)) {
+          entry.href = el.href.slice(0,512);
+          if (el.href.length > 512) { entry.href_truncated = true; entry.href_length = el.href.length; }
+        }
+        if (el.tagName === 'SELECT') entry.options = Array.from(el.options).slice(0,30).map(o => ({value:clean(o.value),label:clean(o.label),selected:o.selected,disabled:o.disabled}));
+        const length = JSON.stringify(entry).length;
+        if (used + length > budget) {
+          if (!count) fail('snapshot_budget_too_small: increase max_chars or disable include_text');
+          more = true; break;
+        }
+        state.refs.set(ref, {el, document:el.ownerDocument, identity:identity(el)});
+        elements.push(entry); count++; used += length;
       }
-      for (const root of roots) {
-        const observer = new MutationObserver(() => { state.version++; });
-        observer.observe(root, {subtree:true,childList:true,attributes:true,characterData:true});
-        state.observers.push(observer);
-      }
-      state.snapshotVersion = state.version;
       state.snapshotUrl = location.href;
-      state.frameDocuments = frameDocuments;
       result = {...page(),snapshot_id:args.snapshot_id,elements:args.include_elements === false ? [] : elements,
-        truncated:candidates.length > elements.length,
-        limitations:'Refs cover visible DOM elements, open shadow roots and same-origin frames. Cross-origin frames and trusted native input may need human control.'};
-      if (args.include_text !== false) result.text = clean(document.body?.innerText, 4000);
+        truncated:more, offset, next_offset:more && count ? offset+count : null,
+        limitations:'Refs identify unchanged elements in the current document, open shadow roots and same-origin frames. Detached or repurposed elements require a new snapshot. Cross-origin frames and trusted native input may need human control.'};
+      if (args.include_text !== false) { result.text = text; result.text_truncated = fullText.length > text.length; }
       break;
     }
     case 'extract': {
       const root = document.querySelector('main,article,[role=main]') || document.body;
       if (!root) fail('page_not_ready');
+      let content;
       if (args.format === 'html') {
         const copy = root.cloneNode(true);
         copy.querySelectorAll('script,style,noscript,input[type=password]').forEach(el => el.remove());
-        result = {...page(),format:'html',content:copy.outerHTML.slice(0,args.max_chars)};
+        content = copy.outerHTML;
       } else if (args.format === 'markdown') {
         const copy = root.cloneNode(true);
         copy.querySelectorAll('script,style,noscript').forEach(el => el.remove());
@@ -172,30 +234,51 @@ try {
           try { const url = new URL(href,location.href); if (/^https?:$/.test(url.protocol)) el.textContent = '['+clean(el.textContent)+']('+url.href+')'; } catch (_) {}
         });
         copy.querySelectorAll('p,div,section,article,li,pre,br').forEach(el => el.appendChild(document.createTextNode('\n')));
-        result = {...page(),format:'markdown',content:copy.textContent.replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim().slice(0,args.max_chars)};
-      } else result = {...page(),format:'text',content:root.innerText.slice(0,args.max_chars)};
+        content = copy.textContent.replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+      } else content = root.innerText;
+      const offset = args.offset || 0, end = Math.min(content.length, offset + args.max_chars);
+      result = {...page(),format:args.format,content:content.slice(offset,end),offset,
+        truncated:end < content.length,total_chars:content.length,next_offset:end < content.length ? end : null};
       break;
     }
     case 'click': {
-      const el = target();
-      if (!visible(el)) fail('element_not_visible');
-      if (el.disabled) fail('element_disabled');
-      const r = rect(el), x = Math.max(0,Math.min(innerWidth-1,r.x+r.width/2)), y = Math.max(0,Math.min(innerHeight-1,r.y+r.height/2));
-      const hit = pointTarget(x,y);
-      if (hit && hit !== el && !el.contains(hit)) fail('element_covered: dismiss the overlay and take a fresh snapshot');
-      el.focus();
-      if (args.button === 'right') el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}));
-      else { el.click(); if (args.click_count === 2) { el.click(); el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,detail:2})); } }
-      invalidate(); result = {clicked:true}; break;
+      result = (async () => {
+        const {el,x,y} = await prepareTarget();
+        if (el.disabled) fail('element_disabled');
+        el.focus({preventScroll:true});
+        if (args.button === 'right') el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}));
+        else { el.click(); if (args.click_count === 2) { el.click(); el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,detail:2})); } }
+        return {clicked:true};
+      })(); break;
     }
     case 'type': {
-      const el = target();
-      if (!editable(el)) fail('element_not_editable');
-      if (el.disabled || el.readOnly) fail('element_not_editable');
-      el.focus();
-      const old = el.isContentEditable ? el.textContent : el.value;
-      setText(el, args.clear_first === false ? old + args.text : args.text);
-      invalidate(); result = {typed:true,characters:args.text.length}; break;
+      result = (async () => {
+        const {el} = await prepareTarget();
+        if (!editable(el) || el.disabled || el.readOnly) fail('element_not_editable');
+        el.focus({preventScroll:true});
+        const desired = args.clear_first === false ? inputValue(el) + args.text : args.text;
+        setText(el, desired);
+        await inputFrame();
+        if (!el.isConnected) fail('input_target_replaced: input was replaced; inspect the page before retrying');
+        if (inputValue(el) !== desired) fail('input_value_rejected: field did not retain the requested value; check its format or page validation before retrying');
+        return {typed:true,verified:true,characters:args.text.length};
+      })(); break;
+    }
+    case 'select_option': {
+      result = (async () => {
+        const {el} = await prepareTarget();
+        if (el.tagName !== 'SELECT' || el.disabled) fail('element_not_selectable');
+        const matches = Array.from(el.options).filter(o => args.option_value !== undefined ? o.value === args.option_value : o.label === args.option_label);
+        if (matches.length !== 1) fail(matches.length ? 'ambiguous_option' : 'option_not_found');
+        if (matches[0].disabled || matches[0].parentElement.disabled) fail('option_disabled');
+        for (const option of el.options) option.selected = option === matches[0];
+        const view = el.ownerDocument.defaultView;
+        el.dispatchEvent(new view.Event('input',{bubbles:true}));
+        el.dispatchEvent(new view.Event('change',{bubbles:true}));
+        await inputFrame();
+        if (!el.isConnected || el.value !== matches[0].value) fail('input_value_rejected: selection was reset by the page');
+        return {selected:true,verified:true,value:clean(el.value),label:clean(matches[0].label)};
+      })(); break;
     }
     case 'press': {
       const el = target(true) || document.activeElement || document.body;
@@ -218,7 +301,7 @@ try {
         }
       }
       el.dispatchEvent(new KeyboardEvent('keyup',init));
-      invalidate(); result = {pressed:args.key,synthetic:true}; break;
+      result = {pressed:args.key,synthetic:true}; break;
     }
     case 'scroll': {
       let el = target(true), scroller = null;
@@ -231,12 +314,13 @@ try {
       const left = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
       const top = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
       (scroller || window).scrollBy({left,top,behavior:'instant'});
-      invalidate(); result = {...page(),scrolled:true}; break;
+      result = {...page(),scrolled:true}; break;
     }
-    case 'wait': result = {ready:args.wait_for ? Boolean(query(args.wait_for)) : document.readyState !== 'loading'}; break;
+    case 'wait': result = {...page(),ready:args.wait_for ? Boolean(query(args.wait_for)) : document.readyState !== 'loading'}; break;
     default: fail('unsupported_dom_action');
   }
-  return JSON.stringify({ok:true,...result});
+  const success = data => JSON.stringify({ok:true,...data});
+  return result instanceof Promise ? result.then(success, error => JSON.stringify({ok:false,error:String(error.message || error)})) : success(result);
 } catch (error) {
   return JSON.stringify({ok:false,error:String(error.message || error)});
 }

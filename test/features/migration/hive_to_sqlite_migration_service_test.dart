@@ -1066,7 +1066,6 @@ void main() {
     expect(
       await chatService.loadSelectedContextMessages(
         conversation.id,
-        truncateIndex: migratedConversation.truncateIndex,
         limit: messageCount,
       ),
       isEmpty,

@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:Kelivo/core/services/browser/browser_favicon_loader.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
+import 'package:Kelivo/core/services/browser/browser_workspace_resources.dart';
 import 'package:Kelivo/core/services/browser/browser_native_engine.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/browser/browser_engine.dart';
+import 'package:Kelivo/core/services/browser/browser_failure.dart';
 import 'package:Kelivo/core/services/browser/browser_scroll_observer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -41,6 +43,214 @@ void main() {
       InAppWebViewPlatform.instance = previousPlatform;
     }
   });
+
+  test(
+    'workspace resources use scoped URLs and reject other tab origins',
+    () async {
+      final root = await Directory.systemTemp.createTemp('native-workspace-');
+      await File('${root.path}/index.html').writeAsString('<h1>Local</h1>');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (id) async => id == 'chat-a' ? root : null;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'chat-a',
+        url: 'kelivo://workspace/index.html',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      final uri = view.params.initialUrlRequest!.url!;
+      expect(uri.host, startsWith('ws-'));
+      expect(
+        view.params.initialSettings!.resourceCustomSchemes,
+        contains('kelivo'),
+      );
+      final response = await view.params.onLoadResourceWithCustomScheme!(
+        view.callbackController,
+        WebResourceRequest(url: uri, method: 'GET'),
+      );
+      expect(utf8.decode(response!.data), '<h1>Local</h1>');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(
+            url: WebUri('kelivo://other/index.html'),
+            method: 'GET',
+          ),
+        ),
+        isNull,
+      );
+      await view.start(uri.toString());
+      await view.stop(uri.toString());
+      expect(service.tabs.single.url, 'kelivo://workspace/index.html');
+    },
+  );
+
+  test(
+    'handoff changes workspace authority for live and previously local tabs',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-handoff-');
+      final a = await Directory('${root.path}/a').create();
+      final b = await Directory('${root.path}/b').create();
+      await File('${a.path}/index.html').writeAsString('A');
+      await File('${b.path}/index.html').writeAsString('B');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (id) async => id == 'a' ? a : b;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      await service.moveTabToSession(tab.id, 'b');
+      await service.navigate('kelivo://workspace/index.html', tabId: tab.id);
+      final view = platform.views.single;
+      final scopeB = await resources.scope('b');
+      final uriB = scopeB.internalUrl(
+        'kelivo://workspace/index.html',
+        android: false,
+      );
+      final response = await view.params.onLoadResourceWithCustomScheme!(
+        view.callbackController,
+        WebResourceRequest(url: WebUri(uriB.toString()), method: 'GET'),
+      );
+      expect(utf8.decode(response!.data), 'B');
+      await service.moveTabToSession(tab.id, 'a');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(url: WebUri(uriB.toString()), method: 'GET'),
+        ),
+        isNull,
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final next = platform.views.last;
+      final scopeA = await resources.scope('a');
+      final responseA = await next.params.onLoadResourceWithCustomScheme!(
+        next.callbackController,
+        WebResourceRequest(
+          url: WebUri(
+            scopeA
+                .internalUrl('kelivo://workspace/index.html', android: false)
+                .toString(),
+          ),
+          method: 'GET',
+        ),
+      );
+      expect(utf8.decode(responseA!.data), 'A');
+      expect(view.disposed, true);
+    },
+  );
+
+  test(
+    'missing local entry preserves current document and loading state',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-missing-');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (_) async => root;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      await view.start('https://example.com');
+      await view.stop('https://example.com');
+      final before = service.tabs.single;
+      await expectLater(
+        service.navigate('kelivo://workspace/missing.html', tabId: tab.id),
+        throwsA(isA<FileSystemException>()),
+      );
+      final after = service.tabs.single;
+      expect(after.url, before.url);
+      expect(after.isLoading, before.isLoading);
+      expect(after.hasContent, before.hasContent);
+    },
+  );
+
+  test(
+    'handoff during existing engine workspace preparation rejects stale authority',
+    () async {
+      final root = await Directory.systemTemp.createTemp('workspace-race-');
+      await File('${root.path}/index.html').writeAsString('A');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      final blocked = Completer<Directory?>();
+      final preparing = Completer<void>();
+      var calls = 0;
+      resources.rootForSession = (id) async {
+        calls++;
+        // Service scope + service file preflight complete. Block the native
+        // existing-engine scope acquisition immediately before it is installed.
+        if (calls == 3) {
+          preparing.complete();
+          return blocked.future;
+        }
+        return root;
+      };
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'a',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final navigation = service.navigate(
+        'kelivo://workspace/index.html',
+        tabId: tab.id,
+      );
+      final failed = expectLater(
+        navigation,
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'browser_tab_owner_changed',
+          ),
+        ),
+      );
+      await preparing.future;
+      await service.moveTabToSession(tab.id, 'b');
+      blocked.complete(root);
+      await failed;
+      expect(service.tabs.single.ownerSessionId, 'b');
+      expect(service.tabs.single.url, 'https://example.com');
+      final view = platform.views.single;
+      final scopeA = await resources.scope('a');
+      expect(
+        await view.params.onLoadResourceWithCustomScheme!(
+          view.callbackController,
+          WebResourceRequest(
+            url: WebUri(
+              scopeA
+                  .internalUrl('kelivo://workspace/index.html', android: false)
+                  .toString(),
+            ),
+            method: 'GET',
+          ),
+        ),
+        isNull,
+      );
+    },
+  );
 
   Future<void> evict(String tabId) async {
     for (var index = 0; index < BrowserService.maxLiveViews; index++) {
@@ -647,7 +857,7 @@ void main() {
           finished = true;
         });
         await native.start(destination);
-        native.error(oldUrl, WebResourceErrorType.CANCELLED);
+        await native.error(oldUrl, WebResourceErrorType.CANCELLED);
         await Future<void>.delayed(Duration.zero);
         expect(service.requireTab(tab.id).error, isNull);
         expect(service.requireTab(tab.id).isLoading, isTrue);
@@ -659,7 +869,7 @@ void main() {
         expect(service.requireTab(tab.id).isLoading, isFalse);
         // A late cancellation from the previous load must also leave a completed
         // destination visible rather than replacing it with the retry page.
-        native.error(oldUrl, WebResourceErrorType.CANCELLED);
+        await native.error(oldUrl, WebResourceErrorType.CANCELLED);
         expect(service.requireTab(tab.id).error, isNull);
         expect(service.requireTab(tab.id).isLoading, isFalse);
       },
@@ -677,17 +887,240 @@ void main() {
       final failed = expectLater(
         service.waitForLoad(tabId: tab.id),
         throwsA(
-          isA<StateError>().having((e) => e.message, 'message', 'offline'),
+          isA<BrowserFailure>().having(
+            (e) => e.code,
+            'code',
+            'browser_navigation_failed',
+          ),
         ),
       );
-      native.error(url, WebResourceErrorType.CANNOT_CONNECT_TO_HOST, 'offline');
+      await native.error(
+        url,
+        WebResourceErrorType.CANNOT_CONNECT_TO_HOST,
+        'offline',
+      );
       await failed;
-      expect(service.requireTab(tab.id).error, 'offline');
+      expect(service.requireTab(tab.id).error, contains('could not be loaded'));
       expect(service.requireTab(tab.id).isLoading, isFalse);
-      native.error(url, WebResourceErrorType.CANCELLED);
-      expect(service.requireTab(tab.id).error, 'offline');
+      await native.error(url, WebResourceErrorType.CANCELLED);
+      expect(service.requireTab(tab.id).error, contains('could not be loaded'));
     },
   );
+
+  test(
+    'late failure cannot poison the replacement navigation or its next open',
+    () async {
+      const old = 'https://slow.example/';
+      const next = 'https://next.example/';
+      final tab = await service.createTab(url: old);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(old);
+      await service.navigate(next, tabId: tab.id);
+      await native.start(next);
+      final waiting = service.waitForLoad(tabId: tab.id);
+      await native.error(
+        old,
+        WebResourceErrorType.CONNECTION_ABORTED,
+        'connection was stopped',
+      );
+      expect(service.requireTab(tab.id).error, isNull);
+      await native.stop(next);
+      await waiting;
+      await native.error(old, WebResourceErrorType.CONNECTION_ABORTED);
+      expect(service.requireTab(tab.id).error, isNull);
+      expect(service.requireTab(tab.id).url, next);
+      await service.reload(tabId: tab.id);
+      await native.start(next);
+      await native.stop(next);
+      await service.waitForLoad(tabId: tab.id);
+      expect(
+        platform.views,
+        hasLength(1),
+        reason: 'Network failures need no renderer recreation',
+      );
+    },
+  );
+
+  test(
+    'failed error document retains requested URL and recovers in the same tab',
+    () async {
+      const url = 'https://offline.example/';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      await native.error(url, WebResourceErrorType.CONNECTION_ABORTED);
+      await native.history('chrome-error://chromewebdata/');
+      await native.stop('chrome-error://chromewebdata/');
+      expect(service.requireTab(tab.id).url, url);
+      expect(service.requireTab(tab.id).error, isNotNull);
+      await service.navigate('https://recovered.example/', tabId: tab.id);
+      await native.start('https://recovered.example/');
+      await native.stop('https://recovered.example/');
+      await service.waitForLoad(tabId: tab.id);
+      expect(service.requireTab(tab.id).error, isNull);
+      expect(platform.views, hasLength(1));
+    },
+  );
+
+  test('old history notification cannot erase the first real commit', () async {
+    const url = 'https://first.example/';
+    final tab = await service.createTab(url: url);
+    await service.evaluateJavascript('1', tabId: tab.id);
+    final native = platform.views.single;
+    await native.start(url);
+    await native.history('about:blank');
+    await native.commit(url);
+    await native.history(url);
+    await service.waitForLoad(
+      tabId: tab.id,
+      stage: BrowserLoadStage.domcontentloaded,
+      timeout: const Duration(milliseconds: 50),
+    );
+    expect(service.requireTab(tab.id).isLoading, true);
+  });
+
+  test(
+    'redirect failure before commit uses the final request address',
+    () async {
+      final tab = await service.createTab(url: 'https://initial.example/');
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start('https://initial.example/');
+      native.document.url = WebUri('https://redirect.example/');
+      native.params.onDidReceiveServerRedirectForProvisionalNavigation!(
+        native.callbackController,
+      );
+      final failed = expectLater(
+        service.waitForLoad(tabId: tab.id),
+        throwsA(isA<BrowserFailure>()),
+      );
+      await native.error(
+        'https://redirect.example/',
+        WebResourceErrorType.CONNECTION_ABORTED,
+      );
+      await failed;
+    },
+  );
+
+  test(
+    'Apple redirect history without another start advances commit and failure ownership',
+    () async {
+      const original = 'https://original.example/';
+      const redirect = 'https://redirect.example/';
+      final tab = await service.createTab(url: original);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(original);
+      native.document.url = WebUri(redirect);
+      native.params.onDidReceiveServerRedirectForProvisionalNavigation!(
+        native.callbackController,
+      );
+      await native.history(redirect);
+      await native.commit(redirect);
+      await service.waitForLoad(
+        tabId: tab.id,
+        stage: BrowserLoadStage.commit,
+        timeout: const Duration(milliseconds: 50),
+      );
+      await service.waitForLoad(
+        tabId: tab.id,
+        stage: BrowserLoadStage.domcontentloaded,
+        timeout: const Duration(milliseconds: 50),
+      );
+      expect(service.requireTab(tab.id).isLoading, true);
+      final failed = expectLater(
+        service.waitForLoad(tabId: tab.id),
+        throwsA(isA<BrowserFailure>()),
+      );
+      await native.error(redirect, WebResourceErrorType.CONNECTION_ABORTED);
+      await failed;
+      expect(service.requireTab(tab.id).error, isNotNull);
+    },
+  );
+
+  test(
+    'commit and DOM stages finish before full load; timeout leaves wait reusable',
+    () async {
+      const url = 'https://stages.example/';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      await service.waitForLoad(tabId: tab.id, stage: BrowserLoadStage.none);
+      await expectLater(
+        service.waitForLoad(
+          tabId: tab.id,
+          timeout: const Duration(milliseconds: 5),
+          stage: BrowserLoadStage.commit,
+        ),
+        throwsA(
+          isA<BrowserFailure>().having(
+            (e) => e.code,
+            'code',
+            'browser_load_timeout',
+          ),
+        ),
+      );
+      native.document.domReady = Completer<CallAsyncJavaScriptResult?>();
+      await native.commit(url);
+      await service.waitForLoad(tabId: tab.id, stage: BrowserLoadStage.commit);
+      var domFinished = false, loadFinished = false;
+      final dom = service
+          .waitForLoad(tabId: tab.id, stage: BrowserLoadStage.domcontentloaded)
+          .then((_) => domFinished = true);
+      final load = service
+          .waitForLoad(tabId: tab.id)
+          .then((_) => loadFinished = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(domFinished, false);
+      native.document.domReady!.complete(
+        CallAsyncJavaScriptResult(value: true),
+      );
+      await dom;
+      expect(loadFinished, false);
+      expect(native.document.domWaits, 1);
+      await service.waitForLoad(
+        tabId: tab.id,
+        stage: BrowserLoadStage.domcontentloaded,
+      );
+      expect(
+        native.document.domWaits,
+        1,
+        reason: 'No polling or duplicate DOM subscriptions',
+      );
+      await native.stop(url);
+      await load;
+    },
+  );
+
+  test('stop and renderer exit settle pending commit waits', () async {
+    for (final crash in [false, true]) {
+      final tab = await service.createTab(url: 'https://pending.example/');
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.last;
+      await native.start('https://pending.example/');
+      final waiting = expectLater(
+        service.waitForLoad(tabId: tab.id, stage: BrowserLoadStage.commit),
+        throwsA(crash ? isA<BrowserFailure>() : isA<StateError>()),
+      );
+      if (crash) {
+        native.params.onWebContentProcessDidTerminate!(
+          native.callbackController,
+        );
+      } else {
+        await service.stop(tabId: tab.id);
+      }
+      await waiting;
+      if (crash) {
+        await service.navigate('https://recovered.example/', tabId: tab.id);
+        expect(platform.views.last, isNot(same(native)));
+        expect(service.requireTab(tab.id).url, 'https://recovered.example/');
+      }
+      await service.closeTab(tab.id);
+    }
+  });
 
   test('subframe resource and HTTP failures do not replace the page', () async {
     const url = 'https://page.example';
@@ -695,7 +1128,7 @@ void main() {
     await service.evaluateJavascript('1', tabId: tab.id);
     final native = platform.views.single;
     await native.start(url);
-    native.error(
+    await native.error(
       'https://frame.example',
       WebResourceErrorType.HOST_LOOKUP,
       'frame failed',
@@ -707,7 +1140,7 @@ void main() {
     await native.stop(url);
     await service.waitForLoad(tabId: tab.id);
     native.httpError(url, 503);
-    expect(service.requireTab(tab.id).error, 'HTTP 503');
+    expect(service.requireTab(tab.id).error, contains('HTTP 503'));
   });
 
   test(
@@ -729,7 +1162,7 @@ void main() {
         ),
       );
       await service.stop(tabId: tab.id);
-      native.error(url, WebResourceErrorType.CANCELLED);
+      await native.error(url, WebResourceErrorType.CANCELLED);
       await stopped;
       expect(service.requireTab(tab.id).error, isNull);
       expect(service.requireTab(tab.id).isLoading, isFalse);
@@ -1631,6 +2064,8 @@ class _Document {
   void Function()? onForward;
   WebUri? url;
   String readiness = 'complete';
+  Completer<CallAsyncJavaScriptResult?>? domReady;
+  int domWaits = 0;
   final List<String> htmlLoads = [];
   String documentId = 'document-a';
   final Map<String, JavaScriptHandlerCallback> handlers = {};
@@ -1683,16 +2118,19 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
     await Future<void>.delayed(Duration.zero);
   }
 
-  void error(
+  Future<void> error(
     String url,
     WebResourceErrorType type, [
     String description = 'cancelled',
     bool mainFrame = true,
-  ]) => params.onReceivedError!(
-    callbackController,
-    WebResourceRequest(url: WebUri(url), isForMainFrame: mainFrame),
-    WebResourceError(type: type, description: description),
-  );
+  ]) async {
+    params.onReceivedError!(
+      callbackController,
+      WebResourceRequest(url: WebUri(url), isForMainFrame: mainFrame),
+      WebResourceError(type: type, description: description),
+    );
+    await Future<void>.delayed(Duration.zero);
+  }
 
   void httpError(String url, int status, {bool mainFrame = true}) =>
       params.onReceivedHttpError!(
@@ -1720,6 +2158,11 @@ class _Controller extends PlatformInAppWebViewController {
     Map<String, dynamic> arguments = const {},
     ContentWorld? contentWorld,
   }) async {
+    if (functionBody.contains('DOMContentLoaded')) {
+      document.domWaits++;
+      return document.domReady?.future ??
+          CallAsyncJavaScriptResult(value: true);
+    }
     if (functionBody.contains(browserFaviconScript)) {
       document.faviconReads++;
       document.faviconSource = functionBody;

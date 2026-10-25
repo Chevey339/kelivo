@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -43,8 +44,9 @@ class _FakeChatService extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String conversationId,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     expect(conversationId, conversation.id);
     conversation = conversation.copyWith(extras: update(conversation.extras));
     notifyListeners();
@@ -588,11 +590,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(ToolApprovalButton), findsNothing);
     expect(find.byKey(WorkspaceStatusBadge.approvalKey), findsOneWidget);
     expect(find.bySemanticsLabel('Deny'), findsOneWidget);
-    expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-    expect(find.text('Allow all this session'), findsOneWidget);
+    expect(find.bySemanticsLabel('Allow'), findsOneWidget);
+    expect(find.text('Switch to full access'), findsOneWidget);
     expect(find.text('ls'), findsWidgets);
     expect(find.byIcon(Lucide.Terminal), findsWidgets);
   });
@@ -627,27 +628,30 @@ void main() {
         ],
       ),
     );
-    await tester.tap(find.byKey(WorkspaceToolCardBody.allowAllKey));
+    await tester.tap(find.byKey(WorkspaceToolCardBody.fullAccessKey));
     await tester.pump();
     expect(
-      WorkspaceBinding.fromExtras(chat.conversation.extras).allowAll,
+      ToolPermissionMode.fromExtras(chat.conversation.extras) ==
+          ToolPermissionMode.fullAccess,
       isTrue,
     );
     expect(approval.hasPending, isFalse);
     for (final result in pending) {
       expect((await result).approved, isTrue);
     }
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 400));
   });
 
-  testWidgets('deny dialog contains IosFormTextField', (tester) async {
+  testWidgets('long pressing deny offers an optional denial reason', (
+    tester,
+  ) async {
     final approval = ToolApprovalService();
-    unawaited(
-      approval.requestApproval(
-        toolCallId: 'pending-deny',
-        toolName: 'shell',
-        arguments: const {'command': 'ls'},
-        conversationId: 'c1',
-      ),
+    final pending = approval.requestApproval(
+      toolCallId: 'pending-deny',
+      toolName: 'shell',
+      arguments: const {'command': 'ls'},
+      conversationId: 'c1',
     );
     await tester.pumpWidget(
       _harness(
@@ -664,12 +668,91 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.bySemanticsLabel('Deny'));
+    await tester.longPress(find.bySemanticsLabel('Deny'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(IosFormTextField), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    expect(approval.isPending('pending-deny', conversationId: 'c1'), isTrue);
+    await tester.enterText(
+      find.byType(EditableText),
+      'Use the project directory',
+    );
+    await tester.tap(find.text('Deny').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final result = await pending;
+    expect(result.approved, isFalse);
+    expect(result.denyReason, 'Use the project directory');
   });
+
+  for (final tool in ['shell', 'lookup']) {
+    testWidgets(
+      'pending $tool details show the complete request before approval',
+      (tester) async {
+        tester.view.physicalSize = const Size(1000, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const command =
+            'echo first\necho second\necho third\necho review-the-last-command';
+        final arguments = tool == 'shell'
+            ? <String, dynamic>{'command': command}
+            : <String, dynamic>{
+                'first': 'a' * 60,
+                'second': 'b' * 60,
+                'third': 'review-the-hidden-parameter',
+              };
+        final approval = ToolApprovalService();
+        final pending = approval.requestApproval(
+          toolCallId: 'pending-detail',
+          toolName: tool,
+          arguments: arguments,
+          conversationId: 'c1',
+        );
+        await tester.pumpWidget(
+          _harness(
+            approval: approval,
+            toolParts: [
+              _uiPart(
+                id: 'pending-detail',
+                tool: tool,
+                arguments: arguments,
+                loading: true,
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+        await tester.tap(find.byIcon(Lucide.ChevronRight).last);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(IosFormTextField), findsNothing);
+        final detail = tool == 'shell'
+            ? find.byType(WorkspaceToolDetailBody)
+            : find.byKey(const ValueKey('tool_detail_desktop_dialog'));
+        expect(detail, findsOneWidget);
+        expect(
+          find.descendant(
+            of: detail,
+            matching: find.text(
+              tool == 'shell'
+                  ? command
+                  : const JsonEncoder.withIndent('  ').convert(arguments),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          approval.isPending('pending-detail', conversationId: 'c1'),
+          isTrue,
+        );
+        approval.deny('pending-detail', conversationId: 'c1');
+        expect((await pending).approved, isFalse);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+  }
 
   testWidgets('assistant shell tool sits in the timeline card', (tester) async {
     await tester.pumpWidget(

@@ -17,63 +17,143 @@ namespace flutter_inappwebview_plugin
 
   void UserContentController::registerEventHandlers()
   {
-    if (!webView_ || !(webView_->webView)) {
-      return;
-    }
+    if (!webView_ || !webView_->webView) return;
 
-    wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver> executionContextCreated;
-    if (succeededOrLog(webView_->webView->GetDevToolsProtocolEventReceiver(L"Runtime.executionContextCreated", &executionContextCreated))) {
-      auto hr = executionContextCreated->add_DevToolsProtocolEventReceived(
+    // Subscribe before enabling Runtime: it immediately reports existing
+    // contexts. Keep frame/unique-context identities through popup handoff.
+    auto listen = [this](const wchar_t* name, std::function<void(const nlohmann::json&)> handler) {
+      wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver> receiver;
+      auto hr = webView_->webView->GetDevToolsProtocolEventReceiver(name, &receiver);
+      if (FAILED(hr)) { pendingScripts_->error = hr; return; }
+      hr = receiver->add_DevToolsProtocolEventReceived(
         Callback<ICoreWebView2DevToolsProtocolEventReceivedEventHandler>(
-          [this](
-            ICoreWebView2* sender,
-            ICoreWebView2DevToolsProtocolEventReceivedEventArgs* args) -> HRESULT
-          {
-            wil::unique_cotaskmem_string json;
-            if (succeededOrLog(args->get_ParameterObjectAsJson(&json))) {
-              nlohmann::json context = nlohmann::json::parse(wide_to_utf8(json.get()))["context"];
-              auto id = context["id"].get<int>();
-              auto name = context["name"].get<std::string>();
-              nlohmann::json auxData = context["auxData"];
-              auto isDefault = auxData["isDefault"].get<bool>();
-              auto frameId = auxData["frameId"].get<std::string>();
-              if (string_equals(webView_->pageFrameId(), frameId)) {
-                if (isDefault) {
-                  contentWorlds_.insert_or_assign(ContentWorld::page()->name, id);
-                }
-                else {
-                  contentWorlds_.insert_or_assign(name, id);
-                  addPluginScriptsIfRequired(std::make_shared<ContentWorld>(name));
-                }
-              }
+          [alive = alive_, handler](ICoreWebView2*, ICoreWebView2DevToolsProtocolEventReceivedEventArgs* args) {
+            if (!*alive) return S_OK;
+            wil::unique_cotaskmem_string raw;
+            if (SUCCEEDED(args->get_ParameterObjectAsJson(&raw)) && raw) {
+              const auto event = nlohmann::json::parse(wide_to_utf8(raw.get()), nullptr, false);
+              if (event.is_object()) handler(event);
             }
-
             return S_OK;
-          })
-        .Get(), nullptr);
+          }).Get(), nullptr);
+      if (FAILED(hr)) pendingScripts_->error = hr;
+    };
+    listen(L"Runtime.executionContextCreated", [this](const nlohmann::json& event) {
+      if (!event.contains("context") || !event["context"].is_object()) return;
+      const auto& context = event["context"];
+      if (!context.contains("id") || !context["id"].is_number_integer() ||
+        !context.contains("uniqueId") || !context["uniqueId"].is_string() ||
+        !context.contains("auxData") || !context["auxData"].is_object()) return;
+      const auto& aux = context["auxData"];
+      if (!aux.contains("frameId") || !aux["frameId"].is_string()) return;
+      const int id = context["id"].get<int>();
+      const bool isDefault = aux.contains("isDefault") && aux["isDefault"] == true;
+      const auto name = isDefault ? ContentWorld::page()->name : context.value("name", std::string());
+      executionContexts_.insert_or_assign(id, ExecutionContext{ context["uniqueId"], aux["frameId"] });
+      if (aux["frameId"] == webView_->pageFrameId()) {
+        contentWorlds_.insert_or_assign(name, id);
+        if (!isDefault) addPluginScriptsIfRequired(std::make_shared<ContentWorld>(name));
+      }
+    });
+    listen(L"Runtime.executionContextDestroyed", [this](const nlohmann::json& event) {
+      if (!event.contains("executionContextId") || !event["executionContextId"].is_number_integer()) return;
+      const int id = event["executionContextId"].get<int>();
+      executionContexts_.erase(id);
+      for (auto it = contentWorlds_.begin(); it != contentWorlds_.end();) {
+        if (it->second == id) it = contentWorlds_.erase(it);
+        else ++it;
+      }
+    });
+    listen(L"Runtime.executionContextsCleared", [this](const nlohmann::json&) {
+      executionContexts_.clear();
+      contentWorlds_.clear();
+    });
+    listen(L"Page.frameNavigated", [this](const nlohmann::json& event) {
+      if (!event.contains("frame") || !event["frame"].is_object()) return;
+      const auto& frame = event["frame"];
+      if (!frame.contains("parentId") && frame.contains("id") && frame["id"].is_string()) {
+        webView_->setPageFrameId(frame["id"].get<std::string>());
+      }
+    });
+    listen(L"Runtime.bindingCalled", [this](const nlohmann::json& event) {
+      if (!event.contains("name") || event["name"] != JAVASCRIPT_BRIDGE_BINDING_NAME ||
+        !event.contains("payload") || !event["payload"].is_string() ||
+        !event.contains("executionContextId") || !event["executionContextId"].is_number_integer()) return;
+      const int contextId = event["executionContextId"].get<int>();
+      const auto context = executionContexts_.find(contextId);
+      // Runtime bindings exist in subframes too. Preserve WebMessageReceived's
+      // top-level-only boundary using native context metadata, not a JS claim.
+      if (context == executionContexts_.end() || webView_->pageFrameId().empty() ||
+        context->second.frameId != webView_->pageFrameId() || !webView_->channelDelegate) return;
+      const auto message = nlohmann::json::parse(event["payload"].get<std::string>(), nullptr, false);
+      if (!message.is_object() || !message.contains("name") || message["name"] != "callHandler" ||
+        !message.contains("body") || !message["body"].is_object()) return;
+      const auto& body = message["body"];
+      if (!body.contains("handlerName") || !body["handlerName"].is_string() ||
+        !body.contains("_callHandlerID") || !body["_callHandlerID"].is_number_integer() ||
+        !body.contains("args") || !body["args"].is_string()) return;
+      const auto uniqueId = context->second.uniqueId;
+      const auto callId = body["_callHandlerID"].get<int64_t>();
+      auto reply = [this, alive = alive_, contextId, uniqueId, callId](const std::string& value, bool error) {
+        if (!*alive) return;
+        const auto current = executionContexts_.find(contextId);
+        if (current == executionContexts_.end() || current->second.uniqueId != uniqueId) return;
+        auto json = nlohmann::json::parse(value, nullptr, false);
+        if (json.is_discarded()) json = nullptr;
+        const auto target = "window." + JAVASCRIPT_BRIDGE_NAME + "[" + std::to_string(callId) + "]";
+        const auto source = "if (" + target + ") { " + target +
+          (error ? ".reject(new Error(" + nlohmann::json(value).dump() + "))" : ".resolve(" + json.dump() + ")") +
+          "; delete " + target + "; }";
+        // An integer context id can be reused after navigation. CDP's unique id
+        // also protects against navigation between this check and evaluation.
+        const nlohmann::json parameters = { { "expression", source }, { "uniqueContextId", uniqueId } };
+        failedLog(webView_->webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), nullptr));
+      };
+      auto callback = std::make_unique<WebViewChannelDelegate::CallJsHandlerCallback>();
+      callback->defaultBehaviour = [reply](const std::optional<const flutter::EncodableValue*> response) {
+        const auto value = response.has_value() ? std::get_if<std::string>(*response) : nullptr;
+        reply(value ? *value : "null", false);
+      };
+      callback->error = [reply](const std::string& code, const std::string& message, const flutter::EncodableValue*) {
+        reply(code + ", " + message, true);
+      };
+      webView_->channelDelegate->onCallJsHandler(body["handlerName"].get<std::string>(), body["args"].get<std::string>(), std::move(callback));
+    });
 
-      failedLog(hr);
-    }
+    initializeMethod(L"Runtime.enable", "{}", [this](const nlohmann::json&) {
+      initializeMethod(L"Runtime.addBinding", nlohmann::json({ { "name", JAVASCRIPT_BRIDGE_BINDING_NAME } }).dump());
+    });
+    initializeMethod(L"Page.enable", "{}", [this](const nlohmann::json&) {
+      initializeMethod(L"Page.getFrameTree", "{}", [this](const nlohmann::json& tree) {
+        if (tree.contains("frameTree") && tree["frameTree"].contains("frame") &&
+          tree["frameTree"]["frame"].contains("id") && tree["frameTree"]["frame"]["id"].is_string()) {
+          webView_->setPageFrameId(tree["frameTree"]["frame"]["id"].get<std::string>());
+        }
+      });
+    });
+  }
 
-    /*
-    wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver> executionContextDestroyed;
-    if (succeededOrLog(webView_->webView->GetDevToolsProtocolEventReceiver(L"Runtime.executionContextDestroyed ", &executionContextDestroyed))) {
-      failedLog(executionContextDestroyed->add_DevToolsProtocolEventReceived(
-        Callback<ICoreWebView2DevToolsProtocolEventReceivedEventHandler>(
-          [this](
-            ICoreWebView2* sender,
-            ICoreWebView2DevToolsProtocolEventReceivedEventArgs* args) -> HRESULT
-          {
-            wil::unique_cotaskmem_string json;
-            if (succeededOrLog(args->get_ParameterObjectAsJson(&json))) {
-              debugLog("executionContextDestroyed: " + wide_to_utf8(json.get()));
-            }
-
-            return S_OK;
-          })
-        .Get(), nullptr));
-    }
-    */
+  void UserContentController::initializeMethod(const wchar_t* name, const std::string& parameters,
+    std::function<void(const nlohmann::json&)> onResult)
+  {
+    ++pendingScripts_->count;
+    auto finish = [alive = alive_, pending = pendingScripts_, onResult](HRESULT hr, LPCWSTR raw) {
+      if (*alive && SUCCEEDED(hr) && onResult) {
+        const auto result = raw ? nlohmann::json::parse(wide_to_utf8(raw), nullptr, false) : nlohmann::json();
+        if (result.is_object()) onResult(result);
+        else hr = E_FAIL;
+      }
+      if (FAILED(hr)) pending->error = hr;
+      if (--pending->count == 0) {
+        auto callbacks = std::move(pending->completions);
+        pending->completions.clear();
+        if (*alive) for (const auto& callback : callbacks) callback(pending->error);
+      }
+      return S_OK;
+    };
+    const auto hr = webView_->webView->CallDevToolsProtocolMethod(name, utf8_to_wide(parameters).c_str(),
+      Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(finish).Get());
+    if (FAILED(hr)) finish(hr, nullptr);
   }
 
   std::vector<std::shared_ptr<UserScript>> UserContentController::getUserOnlyScriptsAt(const UserScriptInjectionTime& injectionTime) const
@@ -333,12 +413,19 @@ namespace flutter_inappwebview_plugin
     }
   }
 
+  void UserContentController::whenScriptsReady(std::function<void(HRESULT)> completion) const
+  {
+    if (pendingScripts_->count == 0) completion(pendingScripts_->error);
+    else pendingScripts_->completions.push_back(std::move(completion));
+  }
+
   void UserContentController::addScriptToWebView(std::shared_ptr<UserScript> userScript, const std::function<void(std::string)> completionHandler) const
   {
     if (!webView_ || !(webView_->webView)) {
       if (completionHandler) {
         completionHandler(userScript->id);
       }
+      return;
     }
 
     std::string source = userScript->source;
@@ -347,6 +434,26 @@ namespace flutter_inappwebview_plugin
       std::ostringstream address;
       address << std::addressof(userScript);
       replace_all(source, VAR_PLACEHOLDER_MEMORY_ADDRESS_VALUE, address.str());
+    }
+
+    if (!userScript->contentWorld || ContentWorld::isPage(userScript->contentWorld)) {
+      ++pendingScripts_->count;
+      auto finish = [pending = pendingScripts_, userScript, completionHandler](HRESULT hr, LPCWSTR id)
+        {
+          if (SUCCEEDED(hr) && id) userScript->id = "native:" + wide_to_utf8(id);
+          else pending->error = FAILED(hr) ? hr : E_FAIL;
+          if (completionHandler) completionHandler(userScript->id);
+          if (--pending->count == 0) {
+            auto callbacks = std::move(pending->completions);
+            pending->completions.clear();
+            for (const auto& callback : callbacks) callback(pending->error);
+          }
+          return S_OK;
+        };
+      const auto hr = webView_->webView->AddScriptToExecuteOnDocumentCreated(utf8_to_wide(source).c_str(),
+        Callback<ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler>(finish).Get());
+      if (FAILED(hr)) finish(hr, nullptr);
+      return;
     }
 
     nlohmann::json parameters = {
@@ -382,6 +489,12 @@ namespace flutter_inappwebview_plugin
       if (completionHandler) {
         completionHandler();
       }
+      return;
+    }
+
+    if (userScript->id.rfind("native:", 0) == 0) {
+      failedLog(webView_->webView->RemoveScriptToExecuteOnDocumentCreated(utf8_to_wide(userScript->id.substr(7)).c_str()));
+      if (completionHandler) completionHandler();
       return;
     }
 
@@ -424,6 +537,8 @@ namespace flutter_inappwebview_plugin
   UserContentController::~UserContentController()
   {
     debugLog("dealloc UserContentController");
+    *alive_ = false;
+    pendingScripts_->completions.clear();
     removeAllUserOnlyScripts();
     removeAllPluginScripts();
     contentWorlds_.clear();

@@ -11,6 +11,8 @@ import '../../../features/browser/models/browser_models.dart';
 import '../../../features/browser/models/browser_agent_activity.dart';
 import '../api/tool_call_cancellation.dart';
 import 'browser_engine.dart';
+import 'browser_failure.dart';
+import 'browser_workspace_resources.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_engine.dart';
 import 'browser_store.dart';
@@ -93,7 +95,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   bool _disposed = false;
   bool _initialized = false;
   int _controlEpoch = 0;
-  Completer<void> _controlCancelled = Completer<void>();
+  Completer<String> _controlCancelled = Completer<String>();
   String? _activeTabId;
   String? _selectedSessionId;
   final Map<String, String> _lastTabBySession = {};
@@ -265,7 +267,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   static bool _isPageUrl(String value) {
-    if (value == 'about:blank') return true;
+    if (value == 'about:blank' ||
+        BrowserWorkspaceResources.isWorkspaceUrl(value)) {
+      return true;
+    }
     final uri = Uri.tryParse(value);
     return uri != null &&
         (uri.scheme == 'https' || uri.scheme == 'http') &&
@@ -290,7 +295,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     ).hasMatch(value);
     if (explicit && !hostWithPort) {
       if (!_isPageUrl(value)) {
-        throw const FormatException('Only HTTP and HTTPS pages are supported');
+        throw const FormatException('Use HTTP(S) or kelivo://workspace/ pages');
       }
       return Uri.parse(value).toString();
     }
@@ -440,6 +445,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             _engineGroups[_agentTabId] == group)) {
       throw StateError('browser_tab_busy');
     }
+    var releaseWorkspace = false;
+    for (final member in ids) {
+      final engine = _engines[member];
+      if (engine is NativeBrowserEngine) {
+        releaseWorkspace |= engine.hasWorkspaceScope;
+        engine.updateOwnerSession(sessionId);
+      }
+    }
     _lastTabBySession.removeWhere((_, tabId) => ids.contains(tabId));
     for (var index = 0; index < _tabs.length; index++) {
       if (ids.contains(_tabs[index].id)) {
@@ -448,6 +461,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           error: _tabs[index].error,
         );
       }
+    }
+    if (releaseWorkspace) {
+      for (final member in ids) {
+        _invalidatePreview(member);
+      }
+      await _disposeEngineGroup(group);
     }
     _selectTab(requireTab(id));
     _changed();
@@ -543,6 +562,20 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     final id = _target(tabId);
     _checkAction(id);
     final url = normalizeAddress(input, searchEngine: _settings.searchEngine);
+    if (BrowserWorkspaceResources.isWorkspaceUrl(url)) {
+      final owner = requireTab(id).ownerSessionId;
+      final scope = await BrowserWorkspaceResources.instance.scope(owner);
+      try {
+        await scope.file(Uri.parse(url));
+      } finally {
+        scope.close();
+      }
+      _checkAction(id);
+      if (requireTab(id).ownerSessionId != owner) {
+        throw StateError('browser_tab_owner_changed');
+      }
+    }
+    final previous = requireTab(id);
     _htmlDocuments.remove(id);
     final index = _tabs.indexWhere((tab) => tab.id == id);
     if (index >= 0) _tabs[index] = _tabs[index].copyWith(hasContent: false);
@@ -555,7 +588,25 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     requireTab(id);
     if (_navigationRevisions[id] != revision) return;
     if (!created) {
-      await engine.navigate(url).timeout(const Duration(seconds: 30));
+      try {
+        await _runEngineOperation(id, () => engine.navigate(url));
+      } catch (error) {
+        if (error is StateError &&
+            error.message == 'browser_tab_owner_changed' &&
+            identical(_engines[id], engine) &&
+            _navigationRevisions[id] == revision) {
+          _updateTab(
+            id,
+            BrowserPageState(
+              url: previous.url,
+              title: previous.title,
+              isLoading: previous.isLoading,
+              progress: previous.progress,
+            ),
+          );
+        }
+        rethrow;
+      }
     }
   }
 
@@ -615,6 +666,30 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stop({String? tabId}) =>
       _call(_target(tabId), (engine) => engine.stop());
+  final List<Map<String, dynamic>> _actionEvents = [];
+  final Map<String, Set<Future<void>>> _pendingPopups = {};
+
+  List<Map<String, dynamic>> get actionEvents =>
+      List.unmodifiable(_actionEvents);
+
+  String publicDocumentUrl(String tabId, String url) {
+    final engine = _engines[tabId];
+    return engine is NativeBrowserEngine ? engine.publicUrl(url) : url;
+  }
+
+  /// Drain only popup handoffs that actually started. Ordinary actions do not
+  /// pay a fixed navigation delay, nor wait for unrelated network activity.
+  Future<void> settleActionEvents(String tabId) async {
+    await Future<void>.delayed(Duration.zero);
+    final pending = _pendingPopups[tabId]?.toList() ?? const <Future<void>>[];
+    if (pending.isNotEmpty) {
+      await Future.wait(
+        pending,
+      ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+    }
+    _checkAction(tabId);
+  }
+
   Future<Object?> evaluateJavascript(
     String source, {
     required String tabId,
@@ -623,6 +698,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     tabId,
     (engine) => engine.evaluate(source, awaitPromise: awaitPromise),
   );
+  void checkAgentAction(String tabId) => _checkAction(tabId);
+
   Future<Uint8List?> captureScreenshot({required String tabId}) =>
       _call(tabId, (engine) => engine.screenshot());
 
@@ -630,6 +707,52 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   /// A separate cache budget bounds their count; navigation/close discards the
   /// old image without imposing a limit on saved tabs.
   Uint8List? previewForTab(String id) => _tabPreviews[id];
+
+  /// Freeze a small preview while this tool still owns the page. Historical
+  /// cards persist these pixels rather than following the tab's mutable cache.
+  /// No renderer is created/resumed here, and slow captures never fail a tool.
+  Future<Uint8List?> captureToolPreview(String id) async {
+    _checkAction(id);
+    final tab = requireTab(id);
+    final engine = _engines[id];
+    final epoch = _previewEpochs[id] ?? 0;
+    bool current() =>
+        !_disposed &&
+        _previewForeground &&
+        identical(_engines[id], engine) &&
+        (_previewEpochs[id] ?? 0) == epoch;
+    if (engine == null ||
+        !current() ||
+        tab.isLoading ||
+        tab.error != null ||
+        (tab.url == 'about:blank' && !tab.hasContent)) {
+      return null;
+    }
+    const budget = Duration(milliseconds: 500);
+    final elapsed = Stopwatch()..start();
+    try {
+      // A capture started before this action cannot stand in for its result.
+      // Wait for it to release the encoder, without allowing concurrent work.
+      if (_previewFlights[id] case final pending?) {
+        await pending.future.timeout(budget);
+      }
+      if (!current() || _nativePreviewFlights.containsKey(id)) return null;
+      final remaining = budget - elapsed.elapsed;
+      if (remaining <= Duration.zero) return null;
+      _checkAction(id);
+      _chatPreviewTimers.remove(id)?.cancel();
+      _chatPreviewTimes[id] = DateTime.now();
+      final bytes = await _startPreviewCapture(
+        tab,
+        engine,
+        allowLoading: false,
+      ).timeout(remaining);
+      _checkAction(id);
+      return current() ? bytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// A visible chat card requests snapshots of an already-existing renderer.
   /// This never creates, selects, resizes or resumes a WebView. Updates are
@@ -758,7 +881,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     return _startPreviewCapture(tab, _engines[id]!, allowLoading: fresh);
   }
 
-  Future<void> _startPreviewCapture(
+  Future<Uint8List?> _startPreviewCapture(
     BrowserTab tab,
     BrowserEngine engine, {
     required bool allowLoading,
@@ -766,7 +889,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   }) {
     final id = tab.id;
     final epoch = _previewEpochs[id] ?? 0;
-    late final Future<void> future;
+    late final Future<Uint8List?> future;
     future =
         _capturePreview(
           tab,
@@ -790,7 +913,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     return future;
   }
 
-  Future<void> _capturePreview(
+  Future<Uint8List?> _capturePreview(
     BrowserTab before,
     BrowserEngine engine,
     int epoch, {
@@ -805,7 +928,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         try {
           await pending.future.timeout(const Duration(seconds: 2));
         } on TimeoutException {
-          return;
+          return null;
         } catch (_) {
           // Its failure does not prevent a new snapshot of the current page.
         }
@@ -817,7 +940,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
                       !_previewWatchers.containsKey(before.id)
                 : !_canPreview(activeTab, allowLoading: allowLoading) ||
                       activeTabId != before.id)) {
-          return;
+          return null;
         }
       }
       final future = Future<Uint8List?>.sync(engine.thumbnail);
@@ -842,10 +965,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           current.error != null ||
           (_previewEpochs[before.id] ?? 0) != epoch ||
           !identical(_engines[before.id], engine)) {
-        return;
+        return null;
       }
-      _tabPreviews.remove(before.id);
-      _tabPreviews[before.id] = bytes;
+      final previous = _tabPreviews.remove(before.id);
+      // Identical pixels retain their identity so immutable tool previews can
+      // reuse the same saved file instead of writing duplicates after clicks.
+      _tabPreviews[before.id] = listEquals(previous, bytes) ? previous! : bytes;
       while (_tabPreviews.length > maxCachedPreviews) {
         final oldest = _tabPreviews.keys.firstWhere(
           (id) => id != _activeTabId && id != before.id,
@@ -857,9 +982,11 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         _previewCompletedEpochs[before.id] = epoch;
       }
       _notify();
+      return _tabPreviews[before.id];
     } catch (_) {
       // A hidden/terminated native view may not produce a snapshot. Keep its
       // previous valid last-view image and never fail navigation for a preview.
+      return null;
     }
   }
 
@@ -872,18 +999,35 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<T> _call<T>(
     String id,
-    Future<T> Function(BrowserEngine) action,
-  ) async {
+    Future<T> Function(BrowserEngine) action, {
+    bool pauseOnTimeout = true,
+  }) async {
     _checkAction(id);
     final engine = await _engine(id);
     _checkAction(id);
     requireTab(id);
+    return _runEngineOperation(
+      id,
+      () => action(engine),
+      pauseOnTimeout: pauseOnTimeout,
+    );
+  }
+
+  Future<T> _runEngineOperation<T>(
+    String id,
+    Future<T> Function() action, {
+    bool pauseOnTimeout = true,
+  }) async {
     final T result;
     try {
-      result = await action(engine).timeout(const Duration(seconds: 30));
+      result = await action().timeout(const Duration(seconds: 30));
     } on TimeoutException {
-      if (Zone.current[_actionKey] != null) {
+      if (pauseOnTimeout && Zone.current[_actionKey] != null) {
+        // A late result from a cancelled action must not replace a newer
+        // takeover, resume or permission change with a timeout pause.
+        _checkAction(id);
         _pauseAgentActions(BrowserAgentPauseReason.timeout);
+        throw StateError(_agentTimeoutError);
       }
       rethrow;
     }
@@ -894,8 +1038,20 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> waitForLoad({
     required String tabId,
     Duration timeout = const Duration(seconds: 30),
+    BrowserLoadStage stage = BrowserLoadStage.load,
   }) async {
-    await _call(tabId, (engine) => engine.waitForLoad(timeout));
+    // Waiting observes a navigation already accepted by the engine. A slow
+    // load can still be inspected or retried; it is not a human takeover or
+    // an unfinished native command whose outcome is unknown.
+    try {
+      await _call(
+        tabId,
+        (engine) => engine.waitForLoad(timeout, stage: stage),
+        pauseOnTimeout: false,
+      );
+    } on TimeoutException {
+      throw BrowserFailure.loadTimeout(stage.name);
+    }
   }
 
   Future<BrowserEngine> _engine(String id, {VoidCallback? onCreated}) {
@@ -975,6 +1131,16 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           },
           onDownload: (url, name) {
             if (isCurrent()) {
+              if (_isRunningAgentAction &&
+                  _agentTabId == id &&
+                  _actionEvents.length < 8) {
+                _actionEvents.add({
+                  'type': 'download',
+                  'url': url,
+                  'file_name': name,
+                  'status': 'started',
+                });
+              }
               unawaited(
                 download(
                   url,
@@ -993,6 +1159,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
                 ? _runningAgentGuard
                 : null;
             BrowserTab? child;
+            final done = Completer<void>();
+            (_pendingPopups[id] ??= {}).add(done.future);
             try {
               // Native events outlive the action that created their engine.
               // Apply only the triggering action's tab quota and selection;
@@ -1012,6 +1180,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
             } catch (_) {
               if (child != null) await closeTab(child.id);
               return false;
+            } finally {
+              done.complete();
+              _pendingPopups[id]?.remove(done.future);
+              if (_pendingPopups[id]?.isEmpty == true) {
+                _pendingPopups.remove(id);
+              }
             }
           },
           isAgentActive: () => _isRunningAgentAction && _agentTabId == id,
@@ -1044,6 +1218,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         await engine.dispose();
         throw StateError('browser_renderer_terminated');
       }
+      if (requireTab(id).ownerSessionId != tab.ownerSessionId) {
+        await engine.dispose();
+        throw StateError('browser_tab_owner_changed');
+      }
       _engines[id] = engine;
       _engineGroups[id] = tab.popupGroupId ?? id;
       final currentIndex = _tabs.indexWhere((candidate) => candidate.id == id);
@@ -1068,6 +1246,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _updateTab(String id, BrowserPageState state) {
     if (_disposed) return;
+    if (state.agentEvent != null) {
+      if (_isRunningAgentAction &&
+          _agentTabId == id &&
+          _actionEvents.length < 8) {
+        _actionEvents.add(state.agentEvent!);
+      }
+      return;
+    }
     if (state.scroll != null) {
       _scrollStates[id] = state.scroll!;
       scrollPosition.value = (tabId: id, state: state.scroll!);
@@ -1114,7 +1300,11 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       progress: state.progress,
       canGoBack: state.canGoBack,
       canGoForward: state.canGoForward,
-      error: state.error ?? (state.isLoading == true ? null : old.error),
+      error:
+          state.error ??
+          (state.isLoading == true || state.completedNavigation
+              ? null
+              : old.error),
     );
     _tabs[index] = tab;
     if (state.rendererTerminated) {
@@ -1331,7 +1521,13 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     await initialize();
     if (!_settings.agentEnabled) throw StateError('browser_agent_disabled');
     if (_clearingWebsiteData) throw StateError('browser_clearing_website_data');
-    if (_agentPaused) throw StateError('browser_human_control');
+    if (_agentPaused) {
+      throw StateError(
+        _agentPauseReason == BrowserAgentPauseReason.timeout
+            ? _agentTimeoutError
+            : 'browser_human_control',
+      );
+    }
     if (sessionId.isEmpty) {
       throw ArgumentError('Browser actions require a session');
     }
@@ -1353,16 +1549,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         _agentSessionId = sessionId;
         _agentAction = label;
         _runningAgentGuard = guard;
+        _actionEvents.clear();
         _notify();
         final running = Future<T>.sync(action);
         var cancellationRelevant = true;
         try {
           final value = await Future.any<T>([
             running,
-            controlCancelled.then<T>(
-              (_) =>
-                  throw StateError('browser_action_cancelled_outcome_unknown'),
-            ),
+            controlCancelled.then<T>((error) => throw StateError(error)),
             sessionCancelled.then<T>(
               (_) =>
                   throw StateError('browser_action_cancelled_outcome_unknown'),
@@ -1409,6 +1603,9 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     final guard = Zone.current[_actionKey] as _BrowserAction?;
     if (guard == null) return;
     guard.cancellation?.throwIfCancelled();
+    if (_agentPaused && _agentPauseReason == BrowserAgentPauseReason.timeout) {
+      throw StateError(_agentTimeoutError);
+    }
     if (!_settings.agentEnabled ||
         _agentPaused ||
         guard.epoch != _controlEpoch ||
@@ -1433,6 +1630,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
+  static const _agentTimeoutError = 'browser_action_timeout_outcome_unknown';
+
   void _pauseAgentActions(
     BrowserAgentPauseReason reason, {
     String? sessionId,
@@ -1443,13 +1642,19 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _pausedAgentSessionId =
         sessionId ?? _agentSessionId ?? activeTab?.ownerSessionId;
     _pausedAgentTabId = tabId ?? _agentTabId ?? _activeTabId;
-    _invalidateAgentActions();
+    _invalidateAgentActions(
+      error: reason == BrowserAgentPauseReason.timeout
+          ? _agentTimeoutError
+          : 'browser_action_cancelled_outcome_unknown',
+    );
   }
 
-  void _invalidateAgentActions() {
+  void _invalidateAgentActions({
+    String error = 'browser_action_cancelled_outcome_unknown',
+  }) {
     _controlEpoch++;
-    _controlCancelled.complete();
-    _controlCancelled = Completer<void>();
+    _controlCancelled.complete(error);
+    _controlCancelled = Completer<String>();
     for (final engine in _engines.values) {
       unawaited(engine.stop().catchError((Object _) {}));
     }

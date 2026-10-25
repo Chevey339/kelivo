@@ -202,7 +202,6 @@ class _BenchHarnessState extends State<_BenchHarness> {
       scrollController: scrollController,
       onStateChanged: () {},
       getAutoScrollEnabled: () => true,
-      getAutoScrollIdleSeconds: () => 3,
       isGenerating: () => generating,
     );
     final tools = _tools(

@@ -13856,10 +13856,11 @@ class $$ConversationRowsTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (messageRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           ConversationRow,
                           $ConversationRowsTable,
-                          MessageRow
+                          MessageRow,
+                          $MessageRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$ConversationRowsTableReferences
@@ -13870,17 +13871,16 @@ class $$ConversationRowsTableTableManager
                                 table,
                                 p0,
                               ).messageRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.conversationId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'conversation_id',
                           typedResults: items,
                         ),
                       if (conversationMcpServerRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           ConversationRow,
                           $ConversationRowsTable,
-                          ConversationMcpServerRow
+                          ConversationMcpServerRow,
+                          $ConversationMcpServerRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$ConversationRowsTableReferences
@@ -13891,17 +13891,16 @@ class $$ConversationRowsTableTableManager
                                 table,
                                 p0,
                               ).conversationMcpServerRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.conversationId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'conversation_id',
                           typedResults: items,
                         ),
                       if (generationRunRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           ConversationRow,
                           $ConversationRowsTable,
-                          GenerationRunRow
+                          GenerationRunRow,
+                          $GenerationRunRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$ConversationRowsTableReferences
@@ -13912,10 +13911,8 @@ class $$ConversationRowsTableTableManager
                                 table,
                                 p0,
                               ).generationRunRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.conversationId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'conversation_id',
                           typedResults: items,
                         ),
                     ];
@@ -14839,10 +14836,11 @@ class $$MessageRowsTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (genUiSurfaceStateRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           MessageRow,
                           $MessageRowsTable,
-                          GenUiSurfaceStateRow
+                          GenUiSurfaceStateRow,
+                          $GenUiSurfaceStateRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$MessageRowsTableReferences
@@ -14853,17 +14851,16 @@ class $$MessageRowsTableTableManager
                                 table,
                                 p0,
                               ).genUiSurfaceStateRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.revisionId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'revision_id',
                           typedResults: items,
                         ),
                       if (messageAssetRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           MessageRow,
                           $MessageRowsTable,
-                          MessageAssetRow
+                          MessageAssetRow,
+                          $MessageAssetRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$MessageRowsTableReferences
@@ -14874,17 +14871,16 @@ class $$MessageRowsTableTableManager
                                 table,
                                 p0,
                               ).messageAssetRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.revisionId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'revision_id',
                           typedResults: items,
                         ),
                       if (assetReferenceDirtyRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           MessageRow,
                           $MessageRowsTable,
-                          AssetReferenceDirtyRow
+                          AssetReferenceDirtyRow,
+                          $AssetReferenceDirtyRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$MessageRowsTableReferences
@@ -14895,10 +14891,8 @@ class $$MessageRowsTableTableManager
                                 table,
                                 p0,
                               ).assetReferenceDirtyRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.revisionId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'revision_id',
                           typedResults: items,
                         ),
                     ];
@@ -16764,10 +16758,11 @@ class $$AssetRowsTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (messageAssetRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           AssetRow,
                           $AssetRowsTable,
-                          MessageAssetRow
+                          MessageAssetRow,
+                          $MessageAssetRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$AssetRowsTableReferences
@@ -16778,17 +16773,16 @@ class $$AssetRowsTableTableManager
                                 table,
                                 p0,
                               ).messageAssetRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.assetId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'asset_id',
                           typedResults: items,
                         ),
                       if (assetGcRowsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           AssetRow,
                           $AssetRowsTable,
-                          AssetGcRow
+                          AssetGcRow,
+                          $AssetGcRowsTable
                         >(
                           currentTable: table,
                           referencedTable: $$AssetRowsTableReferences
@@ -16799,10 +16793,8 @@ class $$AssetRowsTableTableManager
                                 table,
                                 p0,
                               ).assetGcRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.assetId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'asset_id',
                           typedResults: items,
                         ),
                     ];

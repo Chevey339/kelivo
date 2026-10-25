@@ -9,12 +9,15 @@
 namespace flutter_inappwebview_plugin
 {
   const std::string JAVASCRIPT_BRIDGE_NAME = "flutter_inappwebview";
+  const std::string JAVASCRIPT_BRIDGE_BINDING_NAME = "_flutter_inappwebview_postMessage";
   const std::string JAVASCRIPT_BRIDGE_JS_SOURCE = "window." + JAVASCRIPT_BRIDGE_NAME + " = {}; \
   window." + JAVASCRIPT_BRIDGE_NAME + ".callHandler = function() { \
     var _callHandlerID = setTimeout(function() {}); \
-    window.chrome.webview.postMessage({ 'name': 'callHandler', 'body': {'handlerName': arguments[0], '_callHandlerID' : _callHandlerID, 'args' : JSON.stringify(Array.prototype.slice.call(arguments, 1))} }); \
+    var message = JSON.stringify({ 'name': 'callHandler', 'body': {'handlerName': arguments[0], '_callHandlerID' : _callHandlerID, 'args' : JSON.stringify(Array.prototype.slice.call(arguments, 1))} }); \
     return new Promise(function(resolve, reject) { \
       window." + JAVASCRIPT_BRIDGE_NAME + "[_callHandlerID] = { resolve: resolve, reject : reject };\
+      try { window." + JAVASCRIPT_BRIDGE_BINDING_NAME + "(message); } \
+      catch (error) { delete window." + JAVASCRIPT_BRIDGE_NAME + "[_callHandlerID]; reject(error); } \
     });\
   };";
   const std::string JAVASCRIPT_BRIDGE_JS_PLUGIN_SCRIPT_GROUP_NAME = "IN_APP_WEBVIEW_JAVASCRIPT_BRIDGE_JS_PLUGIN_SCRIPT";

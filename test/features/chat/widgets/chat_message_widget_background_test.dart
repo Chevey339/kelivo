@@ -1242,7 +1242,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsNothing);
-        expect(find.bySemanticsLabel('Approve'), findsNothing);
+        expect(find.bySemanticsLabel('Allow'), findsNothing);
         expect(approval.isPending('call-a'), isTrue);
 
         await tester.pumpWidget(
@@ -1260,9 +1260,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1358,9 +1358,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('lookup'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1446,9 +1446,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('lookup'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1513,8 +1513,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         expect((await futureA).approved, isTrue);
         expect(
@@ -1536,8 +1536,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         expect((await futureB).approved, isTrue);
       },
@@ -1585,7 +1585,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Time Info'), findsOneWidget);
-      expect(find.bySemanticsLabel('Approve'), findsNothing);
+      expect(find.bySemanticsLabel('Allow'), findsNothing);
       expect(approval.isPending('call-a'), isTrue);
     });
 
@@ -1638,11 +1638,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsNWidgets(2));
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('seattle-pending'), findsOneWidget);
         expect(find.textContaining('query: tokyo-sibling'), findsNothing);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1702,7 +1702,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('seattle-pending'), findsOneWidget);
         expect(find.textContaining('tokyo-sibling'), findsNothing);
       },
@@ -1755,7 +1755,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('unscoped-args'), findsOneWidget);
         expect(find.textContaining('query: other-args'), findsNothing);
       },

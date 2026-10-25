@@ -18,6 +18,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
 import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/world_book.dart';
@@ -50,8 +51,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     extrasWrites++;
     await repository.updateConversationExtras(id, update);
     conversations[id] = (await repository.getConversation(id))!;
@@ -64,9 +66,12 @@ class _Chat extends ChatService {
       (await repository.getConversation(id))!.messageIds.length;
 
   @override
-  Future<List<ChatMessage>> loadSelectedContextMessages(
+  Future<List<ChatMessage>> loadSelectedMessageProjections(String id) =>
+      repository.getSelectedMessageProjections(id);
+
+  @override
+  Future<List<ChatMessage>> loadRawSelectedContextMessages(
     String id, {
-    required int truncateIndex,
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
@@ -74,7 +79,6 @@ class _Chat extends ChatService {
     historyReads++;
     return repository.getSelectedContextMessages(
       id,
-      truncateIndex: truncateIndex,
       limit: limit,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,
@@ -802,6 +806,150 @@ void main() {
         // Regenerating before the trigger must not count later conversation messages.
         expect(await inject([history.first]), hasLength(1));
         expect(chat.getConversation('one')!.extras['keep'], isTrue);
+      });
+    },
+  );
+
+  testWidgets(
+    'compression preserves real-message timers while scans use effective history',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        await books.addBook(
+          const WorldBook(
+            id: 'timed',
+            entries: [
+              WorldBookEntry(
+                id: 'sticky',
+                content: 'STICKY',
+                keywords: ['dragon'],
+                scanDepth: 1,
+                sticky: 2,
+                cooldown: 2,
+                delay: 3,
+              ),
+              WorldBookEntry(
+                id: 'delayed',
+                content: 'DELAYED',
+                constantActive: true,
+                delay: 6,
+              ),
+              WorldBookEntry(
+                id: 'original-only',
+                content: 'ORIGINAL_ONLY',
+                keywords: ['old-secret'],
+                scanDepth: 200,
+              ),
+            ],
+          ),
+        );
+        await books.setActiveBookIds(['timed'], assistantId: 'assistant');
+        final history = <ChatMessage>[];
+        Future<ChatMessage> add(String role, String content) async {
+          final message = ChatMessage(
+            id: 'clock-${history.length}',
+            conversationId: 'one',
+            role: role,
+            content: content,
+          );
+          history.add(message);
+          await repository.putMessage(message);
+          chat.conversations['one'] = (await repository.getConversation(
+            'one',
+          ))!;
+          return message;
+        }
+
+        Future<String> inject(
+          List<ChatMessage> source, {
+          bool preview = false,
+        }) async {
+          final messages = builder.buildApiMessages(
+            messages: source,
+            versionSelections: {},
+            currentConversation: chat.getConversation('one'),
+          );
+          await builder.injectWorldBookPrompts(
+            messages,
+            'assistant',
+            conversation: chat.getConversation('one'),
+            sourceMessages: source,
+            persistActivation: !preview,
+          );
+          return messages.map((message) => message['content']).join('\n');
+        }
+
+        await add('user', 'old-secret');
+        await add('assistant', 'away');
+        final trigger = await add('user', 'dragon');
+        expect(await inject([trigger]), contains('STICKY'));
+        final snapshot = await repository.readContextSnapshot('one');
+        await repository.appendContextOperation(
+          'one',
+          ContextOperation(
+            id: 'summary',
+            kind: ContextOperationKind.compress,
+            anchorGroupId: trigger.id,
+            appliedAfterGroupId: trigger.id,
+            sourceGroups: history.map(ContextHistory.group).toList(),
+            dependencies: const [],
+            createdAt: DateTime(2026),
+            summary: 'Summary without keyword triggers',
+            originalSummary: 'Summary without keyword triggers',
+          ),
+          expectedFingerprint: snapshot.fingerprint,
+        );
+        final summaryOnly = await repository.getEffectiveContextMessages(
+          'one',
+          limit: 100,
+        );
+        expect(summaryOnly, hasLength(1));
+        final preview = await inject(summaryOnly, preview: true);
+        expect(preview, contains('STICKY'));
+        expect(preview, isNot(contains('DELAYED')));
+        expect(preview, isNot(contains('ORIGINAL_ONLY')));
+        expect(
+          (chat.getConversation('one')!.extras[WorldBookActivation.extrasKey]
+              as Map)['messageCount'],
+          3,
+        );
+        final pending = ChatMessage(
+          id: 'not-submitted',
+          conversationId: 'one',
+          role: 'user',
+          content: 'away',
+        );
+        expect(
+          await inject([...summaryOnly, pending], preview: true),
+          contains('STICKY'),
+        );
+        await add('assistant', 'away');
+        await add('user', 'away');
+        final retained = await repository.getEffectiveContextMessages(
+          'one',
+          limit: 1,
+        );
+        final sticky = await inject(retained);
+        expect(sticky, contains('STICKY'));
+        expect(sticky, isNot(contains('DELAYED')));
+        expect(sticky, isNot(contains('ORIGINAL_ONLY')));
+        await add('assistant', 'away');
+        await add('user', 'dragon');
+        final cooling = await inject(
+          await repository.getEffectiveContextMessages('one', limit: 1),
+        );
+        expect(cooling, isNot(contains('STICKY')));
+        expect(cooling, contains('DELAYED'));
+        expect(cooling, isNot(contains('ORIGINAL_ONLY')));
+        expect(
+          (chat.getConversation('one')!.extras[WorldBookActivation.extrasKey]
+              as Map)['messageCount'],
+          7,
+        );
+        // A historical request still excludes all later real messages.
+        final historical = await inject([history.first], preview: true);
+        expect(historical, isNot(contains('DELAYED')));
+        expect(historical, isNot(contains('STICKY')));
       });
     },
   );

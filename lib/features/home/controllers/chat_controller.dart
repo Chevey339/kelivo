@@ -750,7 +750,6 @@ class ChatController extends ChangeNotifier {
   }) {
     return _chatService.loadSelectedContextMessages(
       conversation.id,
-      truncateIndex: conversation.truncateIndex,
       limit: maxMessages,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,
@@ -1116,7 +1115,11 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Set the selected real version number for a message group.
-  Future<void> setSelectedVersion(String groupId, int version) async {
+  Future<void> setSelectedVersion(
+    String groupId,
+    int version, {
+    String? expectedContextState,
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null) return;
     final serial = ++_versionSelectionSerial;
@@ -1133,6 +1136,7 @@ class ChatController extends ChangeNotifier {
             conversation.id,
             groupId,
             version,
+            expectedContextState: expectedContextState,
           ),
         );
     _versionSelectionWrites = write;

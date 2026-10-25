@@ -91,6 +91,81 @@ void main() {
   );
 
   previewTest(
+    'tool previews sample each completed step without resuming its renderer',
+    (tester) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      final resumes = engine.resumes;
+      final first = await service.captureToolPreview(id);
+      expect(first, [1]);
+      expect(engine.captures, 1);
+      engine.bytes = Uint8List.fromList([2]);
+      expect(await service.captureToolPreview(id), [2]);
+      expect(engine.captures, 2);
+      final second = await service.captureToolPreview(id);
+      expect(second, [2]);
+      expect(first, [1]);
+      expect(engine.captures, 3);
+      expect(engine.resumes, resumes);
+      expect(engine.viewBuilds, 0);
+      final saved = await service.createTab(
+        url: 'https://never-created.example',
+      );
+      expect(await service.captureToolPreview(saved.id), isNull);
+      expect(engines.containsKey(saved.id), isFalse);
+    },
+  );
+
+  previewTest(
+    'slow historical capture never blocks tools or starts concurrent encoders',
+    (tester) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      engine.pending = Completer<Uint8List?>();
+      final preview = service.captureToolPreview(id);
+      await tester.pump(const Duration(milliseconds: 501));
+      expect(await preview, isNull);
+      expect(service.agentPaused, isFalse);
+      final again = service.captureToolPreview(id);
+      await tester.pump(const Duration(milliseconds: 501));
+      expect(await again, isNull);
+      expect(engine.captures, 1);
+      await service.navigate('https://next.example', tabId: id);
+      engine.pending!.complete(Uint8List.fromList([3]));
+      await tester.pump();
+      expect(service.previewForTab(id), isNull);
+    },
+  );
+
+  for (final failure in ['null', 'empty', 'oversized', 'error']) {
+    previewTest('failed $failure capture never freezes earlier pixels', (
+      tester,
+    ) async {
+      final id = await backgroundPage();
+      final engine = engines[id]!;
+      final first = await service.captureToolPreview(id);
+      final pending = Completer<Uint8List?>();
+      engine.pending = pending;
+      final next = service.captureToolPreview(id);
+      switch (failure) {
+        case 'null':
+          pending.complete(null);
+        case 'empty':
+          pending.complete(Uint8List(0));
+        case 'oversized':
+          pending.complete(Uint8List(2 * 1024 * 1024 + 1));
+        case 'error':
+          pending.completeError(StateError('renderer unavailable'));
+      }
+      expect(await next, isNull);
+      expect(service.previewForTab(id), same(first));
+      engine.pending = null;
+      engine.bytes = Uint8List.fromList([2]);
+      expect(await service.captureToolPreview(id), [2]);
+    });
+  }
+
+  previewTest(
     'fast actions coalesce and the final snapshot updates at most once per second',
     (tester) async {
       final id = await backgroundPage();

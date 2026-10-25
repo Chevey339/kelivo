@@ -1,3 +1,4 @@
+import '../../../core/models/context_compression_task.dart';
 import '../../../core/services/auth/provider_oauth_service.dart';
 import 'dart:async';
 import 'dart:collection';
@@ -758,36 +759,6 @@ class ChatActions {
     );
   }
 
-  Conversation _conversationForMessageContext(
-    Conversation conversation,
-    List<ChatMessage> messages, {
-    int? maxRawTruncateIndex,
-  }) {
-    final completeConversation = chatController
-        .conversationForCompleteHistoryContext(conversation);
-    return conversationForMessageContext(
-      conversation: completeConversation,
-      messages: messages,
-      maxRawTruncateIndex: maxRawTruncateIndex,
-    );
-  }
-
-  @visibleForTesting
-  static Conversation conversationForMessageContext({
-    required Conversation conversation,
-    required List<ChatMessage> messages,
-    int? maxRawTruncateIndex,
-  }) {
-    final rawTruncateIndex = conversation.truncateIndex;
-    if (maxRawTruncateIndex != null && rawTruncateIndex > maxRawTruncateIndex) {
-      return conversation.copyWith(truncateIndex: -1);
-    }
-    if (rawTruncateIndex < 0 || rawTruncateIndex <= messages.length) {
-      return conversation;
-    }
-    return conversation.copyWith(truncateIndex: -1);
-  }
-
   @visibleForTesting
   static String resolveStreamErrorContent({
     required String partialContent,
@@ -1139,7 +1110,8 @@ class ChatActions {
     bool scheduledPreview = true,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
-    if (isSendInFlight(conversation.id)) {
+    if (isSendInFlight(conversation.id) ||
+        chatService.contextCompression.blocksSending(conversation.id)) {
       return ChatActionResult.inFlight();
     }
     _sendInFlightClaims[conversation.id] = claimToken;
@@ -1157,6 +1129,11 @@ class ChatActions {
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
         _sendInFlightClaims.remove(conversation.id);
+        chatService.contextCompression.resumeIfReady(conversation.id);
+        onLoadingChanged?.call(
+          conversation.id,
+          chatController.isConversationLoading(conversation.id),
+        );
       }
     }
   }
@@ -1514,14 +1491,17 @@ class ChatActions {
     bool scheduled = false,
     bool scheduledNotify = true,
     bool scheduledPreview = true,
+    String? expectedContextState,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
-    if (isSendInFlight(conversation.id)) {
+    if (isSendInFlight(conversation.id) ||
+        chatService.contextCompression.blocksSending(conversation.id)) {
       return ChatActionResult.inFlight();
     }
     _sendInFlightClaims[conversation.id] = claimToken;
     try {
       return await _regenerateAtMessageClaimed(
+        expectedContextState: expectedContextState,
         message: message,
         conversation: conversation,
         assistantAsNewReply: assistantAsNewReply,
@@ -1537,6 +1517,11 @@ class ChatActions {
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
         _sendInFlightClaims.remove(conversation.id);
+        chatService.contextCompression.resumeIfReady(conversation.id);
+        onLoadingChanged?.call(
+          conversation.id,
+          chatController.isConversationLoading(conversation.id),
+        );
       }
     }
   }
@@ -1553,6 +1538,7 @@ class ChatActions {
     bool scheduled = false,
     bool scheduledNotify = true,
     bool scheduledPreview = true,
+    String? expectedContextState,
   }) async {
     // Avoid using BuildContext across async gaps (this class holds a BuildContext).
     final settings = contextProvider.read<SettingsProvider>();
@@ -1584,11 +1570,12 @@ class ChatActions {
     final isTemporaryConversation = chatService.isTemporaryConversation(
       conversation.id,
     );
+    final contextLimit = await _contextReadLimit(assistant, conversation);
     final completeMessages = isTemporaryConversation
         ? await chatController.messagesForCompleteHistoryContext(conversation)
         : await chatController.messagesForGenerationContext(
             conversation,
-            maxMessages: await _contextReadLimit(assistant, conversation),
+            maxMessages: contextLimit,
             throughRevisionId: message.id,
             includeFollowingAssistant: true,
           );
@@ -1649,6 +1636,7 @@ class ChatActions {
       assistantAsNewReply: assistantAsNewReply,
     )) {
       begin = await messageGenerationService.beginAssistantGeneration(
+        expectedContextState: expectedContextState,
         conversationId: conversation.id,
         modelId: modelId,
         providerKey: providerKey,
@@ -1667,6 +1655,7 @@ class ChatActions {
                 ) +
                 1;
       begin = await messageGenerationService.beginRegeneration(
+        expectedContextState: expectedContextState,
         conversationId: conversation.id,
         modelId: modelId,
         providerKey: providerKey,
@@ -1691,12 +1680,19 @@ class ChatActions {
       regenerationVersionSelections[groupId] = assistantMessage.version;
     }
 
-    final regenerationMessages = ChatActions.buildRegenerationMessages(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-      assistantPlaceholder: assistantMessage,
-    );
+    final regenerationMessages = isTemporaryConversation
+        ? await chatController.messagesForGenerationContext(
+            conversation,
+            // The new empty reply occupies one slot in this post-begin read.
+            maxMessages: contextLimit + 1,
+            throughRevisionId: assistantMessage.id,
+          )
+        : ChatActions.buildRegenerationMessages(
+            messages: completeMessages,
+            lastKeep: versioning.lastKeep,
+            targetGroupId: versioning.targetGroupId,
+            assistantPlaceholder: assistantMessage,
+          );
 
     // Keep the loaded window around the persisted generation message instead
     // of replacing a distant reading position with the conversation tail
@@ -1740,13 +1736,7 @@ class ChatActions {
             .prepareApiMessagesWithInjections(
               messages: regenerationMessages,
               versionSelections: regenerationVersionSelections,
-              currentConversation: isTemporaryConversation
-                  ? _conversationForMessageContext(
-                      conversation,
-                      regenerationMessages,
-                      maxRawTruncateIndex: versioning.lastKeep,
-                    )
-                  : conversation.copyWith(truncateIndex: -1),
+              currentConversation: conversation.copyWith(truncateIndex: -1),
               settings: settings,
               assistant: assistant,
               assistantId: assistantId,
@@ -1829,7 +1819,11 @@ class ChatActions {
     required Conversation conversation,
     bool allowImagesApiRouting = true,
   }) async {
-    if (isSendInFlight(conversation.id)) {
+    final compression = chatService.contextCompression.taskFor(conversation.id);
+    if (isSendInFlight(conversation.id) ||
+        (compression != null &&
+            compression.active &&
+            compression.phase != CompressionPhase.waiting)) {
       return ChatActionResult.inFlight();
     }
 

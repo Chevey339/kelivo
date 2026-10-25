@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -8,6 +10,7 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_content.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_layout.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_node.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -208,6 +211,80 @@ root = Metric(label="Result", value=$a, unit="u")''');
     expect(find.byType(GenUiMetric), findsNothing);
     expect(find.byType(GenUiNode), findsNothing);
   });
+
+  testWidgets(
+    'surface export includes every Markdown row and removes formula source actions',
+    (tester) async {
+      final markdown = [
+        '| Row | Value |',
+        '| --- | --- |',
+        for (var i = 1; i <= 100; i++) '| Row $i | $i |',
+      ].join('\n');
+      final c = _controller(
+        'root = Column(children=[markdown,invalid,styled])\n'
+        'markdown = Markdown(text=${jsonEncode(markdown)})\n'
+        'invalid = Formula(tex=${jsonEncode(r'\frac{')})\n'
+        'styled = Formula(tex=${jsonEncode(r'\textcolor{red}{x}')})',
+      );
+      for (final exporting in [true, false, true]) {
+        await tester.pumpWidget(
+          _app(GenUiSurface(controller: c, exporting: exporting)),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final table = tester.widget<Table>(find.byType(Table));
+        expect(
+          table.children.length,
+          exporting ? 101 : ms.PerformanceLimits.initialTableRows,
+        );
+        expect(
+          find.text('Row 100', findRichText: true),
+          exporting ? findsOneWidget : findsNothing,
+        );
+        expect(find.byType(GenUiSource), findsNWidgets(2));
+        for (final source in tester.widgetList<GenUiSource>(
+          find.byType(GenUiSource),
+        )) {
+          expect(source.exporting, exporting);
+        }
+        for (final view in tester.widgetList<ms.MarkstreamView>(
+          find.byType(ms.MarkstreamView),
+        )) {
+          expect(view.exporting, exporting);
+          expect(view.cullToViewport, !exporting);
+        }
+        expect(
+          find.byType(ms.MarkstreamActionButton),
+          exporting ? findsNothing : findsWidgets,
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'standalone content retains ordinary Markdown and source actions',
+    (tester) async {
+      final markdown = [
+        '| Row |',
+        '| --- |',
+        for (var i = 1; i <= 100; i++) '| Row $i |',
+      ].join('\n');
+      for (final child in [
+        GenUiMarkdown(text: markdown),
+        const GenUiFormula(tex: r'\frac{'),
+      ]) {
+        await tester.pumpWidget(_app(child));
+        await tester.pumpAndSettle();
+        final view = tester.widget<ms.MarkstreamView>(
+          find.byType(ms.MarkstreamView),
+        );
+        expect(view.exporting, isFalse);
+        expect(view.cullToViewport, isTrue);
+        expect(find.byType(ms.MarkstreamActionButton), findsWidgets);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
 
   testWidgets(
     'invalid and presentation-changing formulas expose their source',

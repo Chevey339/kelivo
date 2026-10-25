@@ -13,11 +13,13 @@ class BrowserAgentStatusChip extends StatelessWidget {
   const BrowserAgentStatusChip({
     super.key,
     required this.activity,
+    this.pauseReason,
     required this.onPause,
     required this.onResume,
   });
 
   final BrowserAgentActivity activity;
+  final BrowserAgentPauseReason? pauseReason;
   final VoidCallback onPause;
   final VoidCallback onResume;
 
@@ -26,7 +28,11 @@ class BrowserAgentStatusChip extends StatelessWidget {
     if (activity == BrowserAgentActivity.idle) return const SizedBox.shrink();
     final l = AppLocalizations.of(context)!;
     final paused = activity == BrowserAgentActivity.paused;
-    final label = paused ? l.browserAgentPaused : l.browserAgentWorking;
+    final label = paused
+        ? pauseReason == BrowserAgentPauseReason.timeout
+              ? l.browserAgentTimedOut
+              : l.browserAgentPaused
+        : l.browserAgentWorking;
     final action = paused ? l.browserAllowAgent : l.browserTakeOver;
     final colors = Theme.of(context).colorScheme;
     return Align(

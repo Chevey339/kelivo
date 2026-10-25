@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'package:Kelivo/shared/widgets/app_text_selection_toolbar.dart';
 
 Widget _harness(String source) => _widgetHarness(Text(source));
 
@@ -34,13 +35,13 @@ Widget _widgetHarness(
   ),
 );
 
-AdaptiveTextSelectionToolbar _menu(WidgetTester tester) {
+AppTextSelectionToolbar _menu(WidgetTester tester) {
   final area = tester.widget<SelectionArea>(find.byType(SelectionArea));
   return area.contextMenuBuilder!(
         tester.element(find.byType(SelectionArea)),
         tester.state<SelectableRegionState>(find.byType(SelectableRegion)),
       )
-      as AdaptiveTextSelectionToolbar;
+      as AppTextSelectionToolbar;
 }
 
 class _ClipboardWriter implements ClipboardWriter {
@@ -146,7 +147,7 @@ void main() {
       expect(controller.selectedPlainText.length, greaterThan(30000));
       for (final label in ['native', 'Copy Markdown', 'Copy rich text']) {
         final menu = _menu(tester);
-        menu.buttonItems!
+        menu.buttonItems
             .singleWhere(
               (item) => label == 'native'
                   ? item.type == ContextMenuButtonType.copy
@@ -258,7 +259,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await selectAll(tester);
-      _menu(tester).buttonItems!
+      _menu(tester).buttonItems
           .singleWhere((item) => item.label == 'Copy rich text')
           .onPressed!();
       await tester.pumpAndSettle();
@@ -299,7 +300,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await selectAll(tester);
-      _menu(tester).buttonItems!
+      _menu(tester).buttonItems
           .singleWhere((item) => item.label == 'Copy rich text')
           .onPressed!();
       await tester.pumpAndSettle();
@@ -347,7 +348,7 @@ void main() {
     await drag.moveTo(edge(6, end: true));
     await drag.up();
     await tester.pumpAndSettle();
-    _menu(tester).buttonItems!
+    _menu(tester).buttonItems
         .singleWhere((item) => item.label == 'Copy rich text')
         .onPressed!();
     await tester.pumpAndSettle();
@@ -370,7 +371,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await selectAll(tester);
-      _menu(tester).buttonItems!
+      _menu(tester).buttonItems
           .singleWhere((item) => item.label == 'Copy rich text')
           .onPressed!();
       await tester.pumpAndSettle();
@@ -385,7 +386,7 @@ void main() {
       expect(
         _menu(
           tester,
-        ).buttonItems!.any((item) => item.type == ContextMenuButtonType.copy),
+        ).buttonItems.any((item) => item.type == ContextMenuButtonType.copy),
         isTrue,
       );
     },
@@ -410,7 +411,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await selectAll(tester);
-    _menu(tester).buttonItems!
+    _menu(tester).buttonItems
         .singleWhere((item) => item.type == ContextMenuButtonType.copy)
         .onPressed!();
     await tester.pumpAndSettle();
@@ -418,7 +419,7 @@ void main() {
     expect(writes.last, contains('A\tB\n\tvalue'));
     expect(writes.last, isNot(contains('**Bold**')));
     await selectAll(tester);
-    _menu(tester).buttonItems!
+    _menu(tester).buttonItems
         .singleWhere((item) => item.label == 'Copy Markdown')
         .onPressed!();
     await tester.pumpAndSettle();
@@ -465,7 +466,7 @@ void main() {
       await drag.moveTo(edge(6, end: true));
       await drag.up();
       await tester.pumpAndSettle();
-      _menu(tester).buttonItems!
+      _menu(tester).buttonItems
           .singleWhere((item) => item.label == 'Copy Markdown')
           .onPressed!();
       await tester.pumpAndSettle();
@@ -507,7 +508,7 @@ void main() {
     await tester.pumpAndSettle();
     await selectAll(tester);
     expect(
-      _menu(tester).buttonItems!.any((item) => item.label == 'Copy Markdown'),
+      _menu(tester).buttonItems.any((item) => item.label == 'Copy Markdown'),
       isFalse,
     );
   });
@@ -522,7 +523,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await selectAll(tester);
-    final labels = _menu(tester).buttonItems!.map((item) => item.label);
+    final labels = _menu(tester).buttonItems.map((item) => item.label);
     expect(labels, containsAll(['Translate', 'Copy Markdown']));
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
@@ -543,10 +544,10 @@ void main() {
     await tester.pumpAndSettle();
     final menu = _menu(tester);
     expect(
-      menu.buttonItems!.any((item) => item.type == ContextMenuButtonType.copy),
+      menu.buttonItems.any((item) => item.type == ContextMenuButtonType.copy),
       isTrue,
     );
-    menu.buttonItems!
+    menu.buttonItems
         .singleWhere((item) => item.label == 'Translate')
         .onPressed!();
     await tester.pumpAndSettle();
@@ -573,7 +574,7 @@ void main() {
             .selectAll(SelectionChangedCause.keyboard);
         await tester.pumpAndSettle();
         expect(
-          _menu(tester).buttonItems!.any((item) => item.label == 'Translate'),
+          _menu(tester).buttonItems.any((item) => item.label == 'Translate'),
           isFalse,
         );
         expect(tester.takeException(), isNull);
@@ -602,7 +603,7 @@ void main() {
         .selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
     expect(
-      _menu(tester).buttonItems!.any((item) => item.label == 'Translate'),
+      _menu(tester).buttonItems.any((item) => item.label == 'Translate'),
       isFalse,
     );
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
@@ -621,15 +622,15 @@ void main() {
     );
     region.selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
-    _menu(tester).buttonItems!
-        .singleWhere((item) => item.label == 'Translate')
-        .onPressed!();
+    _menu(
+      tester,
+    ).buttonItems.singleWhere((item) => item.label == 'Translate').onPressed!();
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(
       _menu(
         tester,
-      ).buttonItems!.any((item) => item.type == ContextMenuButtonType.copy),
+      ).buttonItems.any((item) => item.type == ContextMenuButtonType.copy),
       isTrue,
     );
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));

@@ -27,6 +27,7 @@ import '../utils/export_image_processor.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/context_operation.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -826,6 +827,37 @@ Future<void> saveExportTextWithPicker(
   );
 }
 
+String exportContextNodeText(
+  ContextOperation op,
+  AppLocalizations l10n, {
+  required bool markdown,
+  required List<ContextOperation> operations,
+}) {
+  final title = op.isCompression
+      ? l10n.contextCompressMarker
+      : l10n.contextClearMarker;
+  final hidden = operations
+      .skipWhile((item) => item.id != op.id)
+      .skip(1)
+      .any(
+        (item) =>
+            !item.revoked &&
+            !item.isCompression &&
+            item.sourceGroups.contains(op.anchorGroupId),
+      );
+  final status = op.revoked
+      ? l10n.contextOperationUndone
+      : hidden
+      ? l10n.contextOperationHidden
+      : operations.any(
+          (item) => !item.revoked && item.dependencies.contains(op.id),
+        )
+      ? l10n.contextOperationSuperseded
+      : l10n.contextOperationActive;
+  return '${markdown ? '### ' : '['}$title · $status${markdown ? '' : ']'}\n'
+      '${op.isCompression ? '${op.summary}\n' : ''}';
+}
+
 Future<void> exportChatMessagesMarkdown(
   BuildContext context, {
   required Conversation conversation,
@@ -836,6 +868,7 @@ Future<void> exportChatMessagesMarkdown(
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final settings = context.read<SettingsProvider>();
+  final chat = context.read<ChatService>();
   final userProvider = context.read<UserProvider>();
   final assistant = context.read<AssistantProvider>().currentAssistant;
   final thinkingLabel = l10n.messageExportThinkingContentLabel;
@@ -857,6 +890,8 @@ Future<void> exportChatMessagesMarkdown(
         : l10n.messageExportSheetDefaultTitle;
     final includeThinking = showThinkingAndToolCards && expandThinkingContent;
 
+    final operations = await chat.loadContextOperations(conversation.id);
+    final exportedNodes = <String>{};
     final buf = StringBuffer();
     buf.writeln('# $title');
     buf.writeln('');
@@ -900,6 +935,19 @@ Future<void> exportChatMessagesMarkdown(
         },
       );
 
+      for (final op in operations) {
+        if (op.anchorGroupId == ContextHistory.group(msg) &&
+            exportedNodes.add(op.id)) {
+          buf.writeln(
+            exportContextNodeText(
+              op,
+              l10n,
+              markdown: true,
+              operations: operations,
+            ),
+          );
+        }
+      }
       buf.writeln('\n---\n');
     }
 
@@ -933,6 +981,7 @@ Future<void> exportChatMessagesTxt(
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final settings = context.read<SettingsProvider>();
+  final chat = context.read<ChatService>();
   final userProvider = context.read<UserProvider>();
   final assistant = context.read<AssistantProvider>().currentAssistant;
   final thinkingLabel = l10n.messageExportThinkingContentLabel;
@@ -954,6 +1003,8 @@ Future<void> exportChatMessagesTxt(
         : l10n.messageExportSheetDefaultTitle;
     final includeThinking = showThinkingAndToolCards && expandThinkingContent;
 
+    final operations = await chat.loadContextOperations(conversation.id);
+    final exportedNodes = <String>{};
     final buf = StringBuffer();
     buf.writeln(title);
     buf.writeln('');
@@ -984,6 +1035,19 @@ Future<void> exportChatMessagesTxt(
         },
       );
 
+      for (final op in operations) {
+        if (op.anchorGroupId == ContextHistory.group(msg) &&
+            exportedNodes.add(op.id)) {
+          buf.writeln(
+            exportContextNodeText(
+              op,
+              l10n,
+              markdown: false,
+              operations: operations,
+            ),
+          );
+        }
+      }
       buf.writeln('\n---\n');
     }
 

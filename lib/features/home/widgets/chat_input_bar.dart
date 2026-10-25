@@ -1,8 +1,12 @@
 import '../../intelligent_ui/models/ui_context_attachment.dart';
 import '../../intelligent_ui/host/ui_composer_context_chip.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/rendering.dart';
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
@@ -50,6 +54,7 @@ import 'package:re_editor/re_editor.dart' show CodeEditorTapRegion;
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/long_message_editor.dart';
+import '../../../shared/widgets/app_text_selection_toolbar.dart';
 import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../core/models/composer_draft.dart';
@@ -640,6 +645,9 @@ class ChatInputBar extends StatefulWidget {
     this.loading = false,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedStatusLabel,
+    this.queuedSubtitle,
+    this.queuedPaused = false,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.reasoningActive = false,
@@ -701,6 +709,9 @@ class ChatInputBar extends StatefulWidget {
   final bool loading;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final String? queuedStatusLabel;
+  final String? queuedSubtitle;
+  final bool queuedPaused;
   final VoidCallback? onCancelQueuedInput;
 
   /// Reports when the composer starts filling the chat area and when it has
@@ -2260,12 +2271,13 @@ class _ChatInputBarState extends State<ChatInputBar>
     TextSelectionToolbarAnchors anchors,
     List<ContextMenuButtonItem> defaultItems,
     VoidCallback hideToolbar,
+    VoidCallback onNativeDismiss,
   ) {
     // Suppress context menu during app lifecycle transitions to avoid flickering
     if (_suppressContextMenu) {
       return const SizedBox.shrink();
     }
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       final items = <ContextMenuButtonItem>[];
       try {
         final appL10n = AppLocalizations.of(context)!;
@@ -2356,9 +2368,11 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
       } catch (_) {}
-      return AdaptiveTextSelectionToolbar.buttonItems(
+      return AppTextSelectionToolbar(
         anchors: anchors,
         buttonItems: items,
+        selectionContext: context,
+        onDismiss: onNativeDismiss,
       );
     }
 
@@ -2373,9 +2387,11 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         })
         .toList(growable: false);
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    return AppTextSelectionToolbar(
       anchors: anchors,
       buttonItems: items,
+      selectionContext: context,
+      onDismiss: onNativeDismiss,
     );
   }
 
@@ -3176,11 +3192,14 @@ class _ChatInputBarState extends State<ChatInputBar>
           actions.add(
             _OverflowAction(
               width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.workspaceEntryTooltip,
-                icon: Lucide.FolderCode,
-                active: widget.workspaceActive,
-                onTap: lockTap(widget.onOpenWorkspace),
+              builder: () => ToolPermissionDot(
+                conversationId: widget.conversationId,
+                child: _CompactIconButton(
+                  tooltip: l10n.workspaceEntryTooltip,
+                  icon: Lucide.FolderCode,
+                  active: widget.workspaceActive,
+                  onTap: lockTap(widget.onOpenWorkspace),
+                ),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.FolderCode,
@@ -3215,12 +3234,17 @@ class _ChatInputBarState extends State<ChatInputBar>
           actions.add(
             _OverflowAction(
               width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarToolsTooltip,
-                icon: Lucide.ToolCase,
-                active: widget.toolsActive,
-                onTap: lockTap(widget.onOpenTools),
-                onLongPress: lockTap(widget.onLongPressTools),
+              builder: () => ToolPermissionDot(
+                conversationId: widget.showWorkspaceButton
+                    ? null
+                    : widget.conversationId,
+                child: _CompactIconButton(
+                  tooltip: l10n.chatInputBarToolsTooltip,
+                  icon: Lucide.ToolCase,
+                  active: widget.toolsActive,
+                  onTap: lockTap(widget.onOpenTools),
+                  onLongPress: lockTap(widget.onLongPressTools),
+                ),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.ToolCase,
@@ -3900,10 +3924,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                 ),
               if (widget.hasQueuedInput) ...[
                 _QueuedInputBanner(
-                  label: AppLocalizations.of(
-                    context,
-                  )!.chatInputBarQueuedPending,
+                  label:
+                      widget.queuedStatusLabel ??
+                      AppLocalizations.of(context)!.chatInputBarQueuedPending,
                   previewText: widget.queuedPreviewText,
+                  subtitle: widget.queuedSubtitle,
+                  paused: widget.queuedPaused,
                   cancelLabel: AppLocalizations.of(
                     context,
                   )!.chatInputBarQueuedCancel,
@@ -4509,12 +4535,16 @@ class _QueuedInputBanner extends StatelessWidget {
     required this.label,
     required this.cancelLabel,
     this.previewText,
+    this.subtitle,
+    this.paused = false,
     this.onCancel,
   });
 
   final String label;
   final String cancelLabel;
   final String? previewText;
+  final String? subtitle;
+  final bool paused;
   final VoidCallback? onCancel;
 
   @override
@@ -4544,9 +4574,11 @@ class _QueuedInputBanner extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              Icons.schedule_rounded,
+              paused ? LucideIcons.pause : LucideIcons.clock,
               size: 16,
-              color: theme.colorScheme.primary,
+              color: paused
+                  ? context.appColors.warning
+                  : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
@@ -4555,11 +4587,26 @@ class _QueuedInputBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: AppFontWeights.semibold,
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                  ],
                 ),
                 if (hasPreview) ...[
                   const SizedBox(height: 2),

@@ -273,8 +273,7 @@ class FilePreviewFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final desktop = dialog || useDesktopWorkspaceLayout(context);
-    final actions = _headerActions(context, desktop: desktop);
+    final actions = _headerActions(context);
     if (dialog) {
       return Column(
         children: [
@@ -307,7 +306,7 @@ class FilePreviewFrame extends StatelessWidget {
     );
   }
 
-  List<Widget> _headerActions(BuildContext context, {required bool desktop}) {
+  List<Widget> _headerActions(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     // 20 is the IosIconButton default every other page's app-bar actions use;
@@ -356,7 +355,7 @@ class FilePreviewFrame extends StatelessWidget {
         onTap: () => unawaited(openPreviewFileExternally(context, file)),
       ),
     ];
-    if (desktop) {
+    if (canRevealPreviewFileInFileManager) {
       items.add(
         action(
           label: revealInFileManagerLabel(l10n),

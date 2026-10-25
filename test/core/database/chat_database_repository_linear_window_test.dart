@@ -224,19 +224,16 @@ void main() {
         geminiSignaturesByMessageId: const {},
       );
 
-      final complete = await repository.getSelectedContextMessages(
+      final complete = await repository.getEffectiveContextMessages(
         conversation.id,
-        truncateIndex: conversation.truncateIndex,
         limit: 10,
       );
-      final bounded = await repository.getSelectedContextMessages(
+      final bounded = await repository.getEffectiveContextMessages(
         conversation.id,
-        truncateIndex: conversation.truncateIndex,
         limit: 2,
       );
-      final throughUser = await repository.getSelectedContextMessages(
+      final throughUser = await repository.getEffectiveContextMessages(
         conversation.id,
-        truncateIndex: -1,
         limit: 10,
         throughRevisionId: 'user-1',
         includeFollowingAssistant: true,
@@ -257,8 +254,8 @@ void main() {
         'user-1',
         'assistant-tail',
       ]);
+      // Regeneration after the clear boundary still honors that boundary.
       expect(throughUser.map((message) => message.id), [
-        'user-0',
         'answer-v0',
         'user-1',
         'assistant-tail',
@@ -367,9 +364,8 @@ void main() {
         geminiSignaturesByMessageId: const {},
       );
 
-      final context = await repository.getSelectedContextMessages(
+      final context = await repository.getEffectiveContextMessages(
         conversationId,
-        truncateIndex: -1,
         limit: 10,
         throughRevisionId: 'user-1',
         includeFollowingAssistant: true,

@@ -1,10 +1,12 @@
+import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -64,12 +66,8 @@ class ToolHandlerService {
         registry: contextProvider.read<ToolRunRegistry>(),
         runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
         updateConversationExtras: chat.updateConversationExtras,
-        readWorkspaceBinding: (id) {
-          final conversation = chat.getConversation(id);
-          return conversation == null
-              ? null
-              : WorkspaceBinding.fromExtras(conversation.extras);
-        },
+        readPermissionState: ConversationToolPermissions.forChat(chat).read,
+        permissionChanges: chat,
         touchLastUsed: workspaces.touchLastUsed,
         onSkillRead: onSkillRead,
         onShellCompleted: onShellCompleted,
@@ -443,35 +441,57 @@ class ToolHandlerService {
       return '${name}_${DateTime.now().microsecondsSinceEpoch}';
     }
 
+    ChatService? permissionChat;
+    try {
+      permissionChat = contextProvider.read<ChatService>();
+    } catch (_) {}
+    ToolCallPermission permissionFor(String name, String? toolCallId) =>
+        ToolCallPermission(
+          toolName: name,
+          toolCallId: approvalIdFor(name, toolCallId),
+          conversationId: conversationId,
+          assistantId: assistant?.id,
+          approvals: approvalService,
+          stateChanges: permissionChat,
+          readState: () => permissionChat != null && conversationId != null
+              ? ConversationToolPermissions.forChat(
+                  permissionChat,
+                ).read(conversationId)
+              : ToolPermissionState(assistantId: assistant?.id),
+        );
     Future<Object?> approveAndExecuteMcp(
       String name,
-      Map<String, dynamic> args, {
-      String? toolCallId,
-    }) async {
-      if (approvalService != null &&
-          toolSvc.toolNeedsApprovalForAssistant(
-            mcp,
-            assistantProvider,
-            assistantId: assistant?.id,
-            toolName: name,
-            routeSnapshot: routes,
-            reservedNames: BuiltInToolNames.all,
-          )) {
-        final result = await approvalService.requestApproval(
-          toolCallId: approvalIdFor(name, toolCallId),
+      Map<String, dynamic> args,
+      ToolCallPermission permission,
+    ) async {
+      void checkEnabled() {
+        if (!toolSvc.isToolEnabledForAssistant(
+          mcp,
+          assistantProvider,
+          assistantId: assistant?.id,
           toolName: name,
-          arguments: args,
-          conversationId: conversationId,
-        );
-        if (!result.approved) {
-          return _toolError(
-            error: 'approval_denied',
-            message: result.denyReason ?? 'User denied the tool call',
-            tool: name,
+          routeSnapshot: routes,
+        )) {
+          throw const ToolPermissionException(
+            'tool_disabled',
+            'This MCP tool is disabled',
           );
         }
       }
 
+      checkEnabled();
+      await permission.authorize(
+        needed: toolSvc.toolNeedsApprovalForAssistant(
+          mcp,
+          assistantProvider,
+          assistantId: assistant?.id,
+          toolName: name,
+          routeSnapshot: routes,
+          reservedNames: BuiltInToolNames.all,
+        ),
+        arguments: args,
+      );
+      checkEnabled();
       return toolSvc.callToolForAssistant(
         mcp,
         assistantProvider,
@@ -486,166 +506,190 @@ class ToolHandlerService {
     final workspaceTools = workspaceContext == null ? null : _workspaceTools();
 
     return (name, args, {toolCallId}) async {
-      try {
-        if (name == BrowserToolsService.toolName) {
-          final current = assistant == null
-              ? null
-              : assistantProvider.getById(assistant.id);
-          if (current == null ||
-              !current.localToolIds.contains(LocalToolNames.browser) ||
-              conversationId == null) {
-            return _toolError(
-              error: 'permission_denied',
-              message:
-                  'Browser control is disabled for this assistant or conversation.',
-              tool: name,
-            );
-          }
-          return await BrowserToolsService().handle(conversationId, args);
-        }
-        if (workspaceContext != null &&
-            workspaceTools != null &&
-            WorkspaceToolsService.toolNames.contains(name)) {
-          return await workspaceTools.handle(
-            workspaceContext,
-            name,
-            args,
-            toolCallId: toolCallId ?? '',
-            approvalService: approvalService,
-            conversationId: conversationId,
-          );
-        }
-
-        if (routes.containsExposedName(name)) {
-          return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
-        }
-
-        // Search tool
-        if (name == SearchToolService.toolName &&
-            assistant?.searchEnabled == true) {
-          final q = (args['query'] ?? '').toString();
-          return await SearchToolService.executeSearch(q, settings);
-        }
-        if (name == WebFetchToolService.toolName &&
-            assistant?.searchEnabled == true) {
-          return await WebFetchToolService.executeFetch(args, settings);
-        }
-
-        // Memory tools
-        final memoryResult = await _handleMemoryToolCall(
-          name,
-          args,
-          assistant,
-          conversationId: conversationId,
-        );
-        if (memoryResult != null) {
-          return memoryResult;
-        }
-
-        // Creating calendar events or changing reminders modifies user data,
-        // so those tools always require explicit user approval first.
-        if (LocalToolNames.requiresUserApproval.contains(name) &&
-            assistant != null &&
-            assistant.localToolIds.contains(name) &&
-            approvalService != null) {
-          final approval = await approvalService.requestApproval(
-            toolCallId: approvalIdFor(name, toolCallId),
-            toolName: name,
-            arguments: args,
-            conversationId: conversationId,
-          );
-          if (!approval.approved) {
-            return _toolError(
-              error: 'approval_denied',
-              message: approval.denyReason ?? 'User denied the tool call',
-              tool: name,
-            );
-          }
-        }
-
-        // Re-read phone-control permission on every call so disabling it also
-        // stops a tool loop that was built with an older assistant snapshot.
-        if (name == LocalToolNames.phoneControl) {
-          final current = assistant == null
-              ? null
-              : assistantProvider.getById(assistant.id);
-          if (current == null || !current.localToolIds.contains(name)) {
-            return _toolError(
-              error: 'permission_denied',
-              message: 'Phone control is disabled for this assistant.',
-              tool: name,
-            );
-          }
-        }
-
-        // Local tools
-        final localResult = await LocalToolsService.tryHandleToolCall(
-          name,
-          args,
-          assistant,
-          onSpeakText: (text) async {
-            final tts = contextProvider.read<TtsProvider>();
-            if (!tts.isAvailable) {
-              throw StateError('Text-to-speech is unavailable.');
+      final permission = permissionFor(name, toolCallId);
+      Future<Object?> execute() async {
+        try {
+          if (name == BrowserToolsService.toolName) {
+            final current = assistant == null
+                ? null
+                : assistantProvider.getById(assistant.id);
+            if (current == null ||
+                !current.localToolIds.contains(LocalToolNames.browser) ||
+                conversationId == null) {
+              return _toolError(
+                error: 'permission_denied',
+                message:
+                    'Browser control is disabled for this assistant or conversation.',
+                tool: name,
+              );
             }
-            unawaited(
-              tts.speak(text).catchError((Object error, StackTrace stack) {
-                FlutterError.reportError(
-                  FlutterErrorDetails(
-                    exception: error,
-                    stack: stack,
-                    library: 'Kelivo local tools',
-                    context: ErrorDescription('while playing text-to-speech'),
-                  ),
-                );
-              }),
-            );
-          },
-        );
-        if (localResult != null) {
-          return localResult;
-        }
-
-        if (name == LocalToolNames.askUser &&
-            assistant != null &&
-            assistant.localToolIds.contains(LocalToolNames.askUser)) {
-          if (askUserService == null) {
-            return _toolError(
-              error: 'ask_user_unavailable',
-              message: 'Ask user interaction service is unavailable.',
-              tool: name,
+            return await BrowserToolsService().handle(
+              conversationId,
+              args,
+              capturePreview: settings.showBrowserPageCards,
+              temporary: _isTemporaryConversation(conversationId),
             );
           }
-          try {
-            final result = await askUserService.requestAnswer(
-              toolCallId: (toolCallId?.trim().isNotEmpty == true)
-                  ? toolCallId!.trim()
-                  : '${name}_${DateTime.now().microsecondsSinceEpoch}',
-              arguments: args,
+          if (workspaceContext != null &&
+              workspaceTools != null &&
+              WorkspaceToolsService.toolNames.contains(name)) {
+            return await workspaceTools.handle(
+              workspaceContext,
+              name,
+              args,
+              toolCallId: toolCallId ?? '',
+              approvalService: approvalService,
               conversationId: conversationId,
             );
-            return result.toJsonString();
-          } on AskUserInvalidRequestException catch (e) {
-            return _toolError(
-              error: 'invalid_ask_user_request',
-              message: e.message,
-              tool: name,
-            );
           }
-        }
 
-        return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
-      } catch (e) {
-        // Catch unexpected exceptions and return error JSON to LLM
-        // This prevents tool failures from terminating the chat flow
-        return _toolError(
-          error: 'execution_error',
-          message: e.toString(),
-          tool: name,
-          instruction:
-              'The tool execution failed unexpectedly. You may try again with different parameters or inform the user about the issue.',
-        );
+          if (routes.containsExposedName(name)) {
+            return await approveAndExecuteMcp(name, args, permission);
+          }
+
+          // Search tool
+          if (name == SearchToolService.toolName &&
+              assistant?.searchEnabled == true) {
+            final q = (args['query'] ?? '').toString();
+            return await SearchToolService.executeSearch(q, settings);
+          }
+          if (name == WebFetchToolService.toolName &&
+              assistant?.searchEnabled == true) {
+            return await WebFetchToolService.executeFetch(args, settings);
+          }
+
+          // Memory tools
+          final memoryResult = await _handleMemoryToolCall(
+            name,
+            args,
+            assistant,
+            conversationId: conversationId,
+          );
+          if (memoryResult != null) {
+            return memoryResult;
+          }
+
+          // Full access skips only the ordinary execution prompt.
+          if (LocalToolNames.requiresUserApproval.contains(name)) {
+            final current = assistant == null
+                ? null
+                : assistantProvider.getById(assistant.id);
+            if (current == null || !current.localToolIds.contains(name)) {
+              return _toolError(
+                error: 'tool_disabled',
+                message: 'This tool is disabled',
+                tool: name,
+              );
+            }
+            await permission.authorize(needed: true, arguments: args);
+            final latest = assistantProvider.getById(current.id);
+            if (latest == null || !latest.localToolIds.contains(name)) {
+              return _toolError(
+                error: 'tool_disabled',
+                message: 'This tool is disabled',
+                tool: name,
+              );
+            }
+          }
+
+          // Re-read phone-control permission on every call so disabling it also
+          // stops a tool loop that was built with an older assistant snapshot.
+          if (name == LocalToolNames.phoneControl) {
+            final current = assistant == null
+                ? null
+                : assistantProvider.getById(assistant.id);
+            if (current == null || !current.localToolIds.contains(name)) {
+              return _toolError(
+                error: 'permission_denied',
+                message: 'Phone control is disabled for this assistant.',
+                tool: name,
+              );
+            }
+          }
+
+          // Local tools
+          final localResult = await LocalToolsService.tryHandleToolCall(
+            name,
+            args,
+            assistant,
+            onSpeakText: (text) async {
+              final tts = contextProvider.read<TtsProvider>();
+              if (!tts.isAvailable) {
+                throw StateError('Text-to-speech is unavailable.');
+              }
+              unawaited(
+                tts.speak(text).catchError((Object error, StackTrace stack) {
+                  FlutterError.reportError(
+                    FlutterErrorDetails(
+                      exception: error,
+                      stack: stack,
+                      library: 'Kelivo local tools',
+                      context: ErrorDescription('while playing text-to-speech'),
+                    ),
+                  );
+                }),
+              );
+            },
+          );
+          if (localResult != null) {
+            return localResult;
+          }
+
+          if (name == LocalToolNames.askUser &&
+              assistant != null &&
+              assistant.localToolIds.contains(LocalToolNames.askUser)) {
+            if (askUserService == null) {
+              return _toolError(
+                error: 'ask_user_unavailable',
+                message: 'Ask user interaction service is unavailable.',
+                tool: name,
+              );
+            }
+            try {
+              final result = await askUserService.requestAnswer(
+                toolCallId: (toolCallId?.trim().isNotEmpty == true)
+                    ? toolCallId!.trim()
+                    : '${name}_${DateTime.now().microsecondsSinceEpoch}',
+                arguments: args,
+                conversationId: conversationId,
+              );
+              return result.toJsonString();
+            } on AskUserInvalidRequestException catch (e) {
+              return _toolError(
+                error: 'invalid_ask_user_request',
+                message: e.message,
+                tool: name,
+              );
+            }
+          }
+
+          return await approveAndExecuteMcp(name, args, permission);
+        } on ToolPermissionException catch (e) {
+          permission.byFullAccess = false;
+          return ClientToolResult(
+            _toolError(error: e.code, message: e.message, tool: name),
+            metadata: {'toolPermissionError': e.code},
+          );
+        } catch (e) {
+          // Catch unexpected exceptions and return error JSON to LLM
+          // This prevents tool failures from terminating the chat flow
+          return _toolError(
+            error: 'execution_error',
+            message: e.toString(),
+            tool: name,
+            instruction:
+                'The tool execution failed unexpectedly. You may try again with different parameters or inform the user about the issue.',
+          );
+        }
       }
+
+      final result = await execute();
+      if (!permission.byFullAccess) return result;
+      final client = ClientToolResult.fromHandler(result);
+      return ClientToolResult(
+        client.content,
+        metadata: {...?client.metadata, 'toolPermission': 'fullAccess'},
+      );
     };
   }
 

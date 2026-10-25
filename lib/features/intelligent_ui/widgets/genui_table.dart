@@ -1,4 +1,4 @@
-import 'genui_number_text.dart';
+import '../text/ui_number_display.dart';
 import 'dart:math' as math;
 import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';

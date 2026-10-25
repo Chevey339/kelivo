@@ -8,6 +8,8 @@ import '../../../features/browser/models/browser_models.dart';
 String browserTabUserScriptMarker(String tabId) =>
     '/* kelivo-browser-tab:${base64Url.encode(utf8.encode(tabId))} */';
 
+enum BrowserLoadStage { none, commit, domcontentloaded, load }
+
 enum BrowserScrollPhase { reset, update, end, metrics }
 
 /// Main-document geometry in CSS pixels. End is emitted only by a real DOM
@@ -63,6 +65,7 @@ class BrowserPageState {
     this.scroll,
     this.favicon,
     this.faviconPageUrl,
+    this.agentEvent,
   });
   final String? url;
   final String? title;
@@ -82,6 +85,7 @@ class BrowserPageState {
   /// A bounded, rasterized icon from this exact main document's session.
   final Uint8List? favicon;
   final String? faviconPageUrl;
+  final Map<String, dynamic>? agentEvent;
 }
 
 typedef BrowserEngineFactory =
@@ -105,7 +109,10 @@ abstract class BrowserEngine {
   Future<void> forward();
   Future<void> reload();
   Future<void> stop();
-  Future<void> waitForLoad(Duration timeout);
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  });
   Future<Object?> evaluate(String source, {bool awaitPromise = false});
   Future<Uint8List?> screenshot();
 

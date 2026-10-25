@@ -95,7 +95,6 @@ class _HState extends State<_H> {
       scrollController: scrollController,
       onStateChanged: () {},
       getAutoScrollEnabled: () => true,
-      getAutoScrollIdleSeconds: () => 3,
       isGenerating: () => true,
     );
     notifier.getNotifier(_id);

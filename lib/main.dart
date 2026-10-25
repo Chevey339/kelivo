@@ -108,6 +108,8 @@ import 'core/services/mobile_background.dart';
 import 'core/services/notification_service.dart';
 import 'features/home/controllers/chat_actions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/models/workspace_binding.dart';
+import 'core/services/browser/browser_workspace_resources.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -120,6 +122,17 @@ void _wireWorkspaceServices(BuildContext ctx) {
     final chat = ctx.read<ChatService>();
     final workspaces = ctx.read<WorkspaceProvider>();
     final assistants = ctx.read<AssistantProvider>();
+    BrowserWorkspaceResources.instance.rootForSession = (sessionId) async {
+      await workspaces.loaded;
+      final conversation = chat.getConversation(sessionId);
+      if (conversation == null) return null;
+      final binding = WorkspaceBinding.fromExtras(conversation.extras);
+      final workspace = binding.workspaceId == null
+          ? null
+          : workspaces.byId(binding.workspaceId!);
+      if (workspace == null) return null;
+      return Directory(await workspaces.hostRootFor(workspace));
+    };
     chat.newConversationExtras = (assistantId) {
       if (assistantId == null) {
         return const <String, dynamic>{};

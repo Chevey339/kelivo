@@ -160,7 +160,6 @@ class _HState extends State<_H> {
       scrollController: scrollController,
       onStateChanged: () {},
       getAutoScrollEnabled: () => false,
-      getAutoScrollIdleSeconds: () => 3,
       isGenerating: () => false,
     );
   }

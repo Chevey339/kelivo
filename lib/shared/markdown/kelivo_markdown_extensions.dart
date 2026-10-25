@@ -12,8 +12,9 @@ import 'package:Kelivo/features/intelligent_ui/host/ui_markdown_builder.dart';
 import 'citation_syntax.dart';
 import 'diagram_code_blocks.dart';
 import 'highlight_adapter.dart';
-import 'link_image_handlers.dart';
+import 'markdown_image_sources.dart';
 import 'markdown_actions.dart';
+import 'link_image_handlers.dart';
 
 // Stable registration identity preserves the parser and completed prefix trees.
 final kelivoMarkdownExtensions = MarkstreamExtensions(

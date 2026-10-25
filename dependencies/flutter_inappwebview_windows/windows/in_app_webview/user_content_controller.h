@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 #include "../plugin_scripts_js/javascript_bridge_js.h"
 #include "../plugin_scripts_js/plugin_scripts_util.h"
@@ -49,10 +50,26 @@ namespace flutter_inappwebview_plugin
     void removePluginScriptsByGroupName(const std::string& groupName);
     std::vector<std::shared_ptr<PluginScript>> getPluginScriptsRequiredInAllContentWorlds() const;
 
+    void initializeMethod(const wchar_t* name, const std::string& parameters,
+      std::function<void(const nlohmann::json&)> onResult = nullptr);
+
+    void whenScriptsReady(std::function<void(HRESULT)> completion) const;
     void registerEventHandlers();
     void createContentWorld(const std::shared_ptr<ContentWorld> contentWorld, const std::function<void(int)> completionHandler);
   private:
     InAppWebView* webView_;
+    const std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+    struct ExecutionContext {
+      std::string uniqueId;
+      std::string frameId;
+    };
+    std::map<int, ExecutionContext> executionContexts_;
+    struct PendingScripts {
+      int count = 0;
+      HRESULT error = S_OK;
+      std::vector<std::function<void(HRESULT)>> completions;
+    };
+    const std::shared_ptr<PendingScripts> pendingScripts_ = std::make_shared<PendingScripts>();
 
     // used to track Content World names -> Execution Context ID
     std::map<std::string, int> contentWorlds_;

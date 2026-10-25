@@ -116,7 +116,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceRefreshTooltip => '刷新';
 
   @override
-  String get storageSpaceLoadFailed => '加载失败';
+  String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
   String get storageSpaceTotalLabel => '已用空间';
@@ -185,9 +185,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助手';
-
-  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -226,12 +223,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享内存索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '头像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '图片';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -338,18 +329,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
-
-  @override
-  String get storageSpaceSourceLabel => '来源';
-
-  @override
-  String get storageSpaceSourceAll => '全部';
-
-  @override
-  String get storageSpaceSourceUserUpload => '用户上传';
-
-  @override
-  String get storageSpaceSourceAssistant => '助手发出';
 
   @override
   String get storageSpaceSortLabel => '排序';
@@ -2282,16 +2261,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContext => '压缩上下文';
 
   @override
-  String get compressContextDesc => '总结对话并开始新聊天';
+  String get compressContextDesc => '生成可查看、可撤销的摘要';
 
   @override
   String get clearContextDesc => '标记上下文分界点';
 
   @override
   String get contextManagement => '上下文管理';
-
-  @override
-  String get compressingContext => '正在压缩上下文...';
 
   @override
   String get compressContextFailed => '压缩上下文失败';
@@ -2312,16 +2288,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextOptionsTitle => '压缩上下文';
 
   @override
-  String get compressContextOptionsDesc => '选择发送给压缩模型的当前聊天范围。';
+  String get compressContextOptionsDesc => '在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。';
 
   @override
-  String get compressContextKeepStart => '最开始';
+  String get compressContextKeepStart => '开头取样';
 
   @override
-  String get compressContextKeepRecent => '最近';
+  String get compressContextKeepRecent => '末尾取样';
 
   @override
-  String get compressContextUnlimited => '无限制';
+  String get compressContextUnlimited => '全部内容';
 
   @override
   String get compressContextMaxCharsLabel => '字符数';
@@ -2339,10 +2315,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextModelUnset => '选择模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留N条';
+  String get compressContextKeepRecentMessages => '保留 N 条';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近条数';
+  String get compressContextKeepCountLabel => '保留用户消息数';
 
   @override
   String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
@@ -5274,13 +5250,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自动回到底部延迟';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '用户停止滚动后等待多久再自动回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
@@ -8212,9 +8182,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolApprovalPending => '等待审批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒绝';
 
   @override
@@ -9561,9 +9528,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -9865,7 +9829,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -10138,12 +10102,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -10632,7 +10590,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -13818,6 +13776,671 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get genuiClearSelection => '清除选择';
+
+  @override
+  String get chatInputBarQueuedPausedReason => '压缩未完成，不会自动发送';
+
+  @override
+  String get contextChanged => '历史已发生变化，请重新打开此操作并确认范围。';
+
+  @override
+  String get contextOperationSuperseded => '已并入后续摘要';
+
+  @override
+  String get compressIncludeAttachments => '附件文字与工具结果';
+
+  @override
+  String contextEditCharacters(int count) {
+    return '$count 字';
+  }
+
+  @override
+  String get compressOverSnack => '摘要过长，应用后会超出上下文上限，未应用';
+
+  @override
+  String get contextSummaryHint => '这是后续请求实际使用的摘要，保存不会改写已有回复。附件仅使用已有文字，不会额外识图。';
+
+  @override
+  String get compressAdvanced => '高级选项';
+
+  @override
+  String get compressTaskWaiting => '等待当前回复完成';
+
+  @override
+  String get contextBudgetExceeded => '预计上下文超过当前模型上限，请缩短摘要、重新压缩或选择上下文更大的模型。';
+
+  @override
+  String get contextManualSupplement => '将手工编辑的摘要作为补充';
+
+  @override
+  String get contextDetailEdited => '已人工编辑';
+
+  @override
+  String get contextSourceLabel => '摘要来源';
+
+  @override
+  String get contextImpactSourceTitle => '修改已压缩的原文？';
+
+  @override
+  String get chatInputBarQueuedCompressionFailed => '压缩失败，不会自动发送';
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要输入约 $before tokens → 摘要约 $after tokens';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
+
+  @override
+  String contextDetailKeptCount(int count) {
+    return '最近 $count 条用户消息及其回复、工具过程';
+  }
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get compressNothingNew => '自上次压缩后没有新的可压缩内容';
+
+  @override
+  String get browserActionScreenshot => '截取页面';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
+  String contextUndoneSnack(String from, String to) {
+    return '已撤销 · $from → $to';
+  }
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '开启后，流式输出时位于底部会自动跟随。上滑后保持阅读位置，主动回到底部后才继续跟随；关闭后不随新内容自动滚动。';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get compressTaskRetry => '重试';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String contextImpactSaveConfirm(int count) {
+    return '保存并撤销 $count 个节点';
+  }
+
+  @override
+  String get contextRestore => '恢复';
+
+  @override
+  String compressUsageOriginal(String value) {
+    return '原 $value';
+  }
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get contextTaskApplying => '正在应用摘要';
+
+  @override
+  String get storageSpaceImagesHint => '删除会影响聊天图片和工具结果。正在使用的头像与背景会受到保护。';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get compressReread => '重新读取已压缩的原始消息';
+
+  @override
+  String get chatInputBarQueuedPausedHold => '待发内容保持暂停，请取消排队后编辑或发送';
+
+  @override
+  String get contextSummaryTitle => '压缩摘要';
+
+  @override
+  String get contextKeepInvalid => '请输入正整数的用户消息数量。';
+
+  @override
+  String get compressTaskAbandon => '放弃';
+
+  @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
+  String get compressCancelledSnack => '已取消压缩，当前上下文未改变';
+
+  @override
+  String get contextImpactClearTitle => '撤销较早的清除？';
+
+  @override
+  String get compressTaskWaitingApproval => '等待工具审批完成';
+
+  @override
+  String get contextTaskFailed => '压缩失败';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get compressTaskMerging => '正在合并摘要';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get compressStaleSnack => '聊天内容已变化，压缩结果未应用';
+
+  @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get contextEditEmpty => '摘要不能为空。如需丢弃全部旧历史，请使用“清空上下文”。';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get storageSpaceImageTypeLabel => '类型';
+
+  @override
+  String get contextImpactUndoTitle => '撤销较早的压缩？';
+
+  @override
+  String get contextOriginalMessages => '查看原始消息';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '删除 $count 张图片？相关聊天图片、工具截图及其会话副本将无法再查看或使用。正在使用的头像与背景会保留。';
+  }
+
+  @override
+  String get chatInputBarQueuedAfterCompress => '压缩完成后发送';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get compressTaskAdjustRetry => '调整选项后重试';
+
+  @override
+  String get contextDetailLegacy => '由旧版清除位置转换';
+
+  @override
+  String get contextDetailCurrent => '当前上下文';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get contextDetailViewOriginals => '查看被压缩的原文';
+
+  @override
+  String get contextTaskCompleted => '压缩已完成';
+
+  @override
+  String get chatInputBarQueuedPaused => '已暂停';
+
+  @override
+  String get contextCompressMarker => '上下文已压缩';
+
+  @override
+  String contextDetailParts(int count) {
+    return '自动分 $count 段';
+  }
+
+  @override
+  String get contextEditPending => '已保存，当前回复结束后生效';
+
+  @override
+  String get contextTaskRetry => '重试压缩';
+
+  @override
+  String get contextUndoCompressTooltip => '撤销此次压缩';
+
+  @override
+  String get contextDividerCompressed => '压缩上下文';
+
+  @override
+  String compressSuccessSnack(String from, String to) {
+    return '上下文已压缩 · $from → $to';
+  }
+
+  @override
+  String get contextEffectiveHistory => '当前摘要及后续消息';
+
+  @override
+  String get compressRereadAll => '本段全部原文';
+
+  @override
+  String get contextDone => '完成';
+
+  @override
+  String get contextMore => '更多';
+
+  @override
+  String compressFailedSnack(String reason) {
+    return '压缩失败：$reason';
+  }
+
+  @override
+  String get branchInheritNote => '只继承此处之前有效的上下文节点';
+
+  @override
+  String get contextTaskInterrupted => '压缩已中断，输入内容已保留';
+
+  @override
+  String get storageSpaceImageTypeAll => '全部';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 条消息；原样保留最近 $keep 条用户消息及后续回复。';
+  }
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要输入：$mode · $source';
+  }
+
+  @override
+  String get contextDetailKept => '原样保留';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get compressDiscardedSnack => '已清空上下文，进行中的压缩已废弃';
+
+  @override
+  String get browserActionSelect => '选择选项';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get contextDetailNext => '下次请求';
+
+  @override
+  String get contextTaskCancel => '取消压缩';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get chatInputBarQueuedCompressionCancelled => '压缩已取消，不会自动发送';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get contextImpactUndoOne => '撤销';
+
+  @override
+  String get contextDetailContinueNewChat => '在新聊天继续';
+
+  @override
+  String get contextTaskPaused => '发送已暂停，可取消排队恢复编辑';
+
+  @override
+  String get contextTaskReview => '请检查摘要后再应用';
+
+  @override
+  String compressApproxTokens(String value) {
+    return '约 $value tokens';
+  }
+
+  @override
+  String get storageSpaceImageInUseHint => '请先在对应设置中更换或移除头像、背景或图标，再删除。';
+
+  @override
+  String get compressRereadLastLayer => '展开最近一层压缩';
+
+  @override
+  String get contextRestoreOperation => '恢复操作';
+
+  @override
+  String get contextOriginalHistory => '重新读取本段全部原文';
+
+  @override
+  String get contextImpactEditTitle => '保存较早的摘要？';
+
+  @override
+  String get contextOpenNewChat => '打开新聊天';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get contextEditUnknownPreview => '用量暂不可用，保存前会重新检查。';
+
+  @override
+  String get contextTaskWait => '等待当前回复和工具执行结束';
+
+  @override
+  String compressTaskElapsed(int i, int n, int seconds) {
+    return '第 $i/$n 段 · 已用 $seconds 秒';
+  }
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改还会撤销 $count 个受影响的上下文操作，原始消息保留。是否继续？';
+  }
+
+  @override
+  String get contextImpactSave => '保存';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在压缩 $done/$total 段';
+  }
+
+  @override
+  String get contextSummaryNotSmaller => '摘要没有比输入更短，请检查后再应用。';
+
+  @override
+  String get storageSpaceImageTypeTool => '工具图片';
+
+  @override
+  String get contextPreviousHistory => '重新读取最近一层压缩原文';
+
+  @override
+  String get contextDetailRead => '实际读取';
+
+  @override
+  String get contextViewGenerated => '查看已生成摘要';
+
+  @override
+  String get contextImpactDeleteDescription =>
+      '删除原文时，一并撤销相关摘要及依赖后继，避免继续发送残留内容。其他消息与独立节点保持不变。';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '头像与背景';
+
+  @override
+  String get contextDetailAfterUndo => '撤销后';
+
+  @override
+  String get contextOperationUndo => '撤销此次上下文操作';
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原样保留的历史仍受当前聊天“最多发送 $count 条消息”的限制。';
+  }
+
+  @override
+  String get contextOverLimitWarning => '撤销后可能超出模型上下文上限，建议重新压缩。仍可撤销，发送前会再次检查。';
+
+  @override
+  String get storageSpaceImageTypeChat => '聊天图片';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String get compressUsageSummary => '预计摘要';
+
+  @override
+  String contextDetailRange(String from, String to, int count) {
+    return '第 $from–$to 条 · $count 条用户消息';
+  }
+
+  @override
+  String get contextOperationHidden => '已被后续清除隔开';
+
+  @override
+  String get contextUndoClearTooltip => '撤销此次清除';
+
+  @override
+  String compressKeepDescription(int count) {
+    return '保留最近 $count 条用户消息及其回复、工具过程；更早内容由摘要替代。纯附件消息也算一条。';
+  }
+
+  @override
+  String get contextOperationUndone => '已撤销';
+
+  @override
+  String contextEditPreview(String value) {
+    return '保存后约 $value tokens。输入时不影响当前生效内容。';
+  }
+
+  @override
+  String get contextDetailExcluded => '不再发送';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get contextDetailReplaced => '被替代范围';
+
+  @override
+  String get displaySettingsPageAutoScrollEnabledLabel => '开启';
+
+  @override
+  String get contextChangeTitle => '确认上下文影响';
+
+  @override
+  String get contextDetailTitle => '压缩摘要';
+
+  @override
+  String get compressModelGlobal => '全局设置 · 本次启动后固定';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get compressRereadDesc => '处理多次压缩造成的信息损失，会增加本次用量';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get compressUsageInput => '本次摘要输入';
+
+  @override
+  String get contextDetailSummaryLabel => '实际用于后续请求的摘要';
+
+  @override
+  String get contextImpactDeleteTitle => '删除已压缩的原文？';
+
+  @override
+  String get compressAdvancedOff => '重读原文 关';
+
+  @override
+  String get contextOperationActive => '当前生效';
+
+  @override
+  String get compressAdvancedOn => '重读原文 开';
+
+  @override
+  String get contextTaskMerging => '正在合并摘要';
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只读取选定的 $count 字符，摘要会替代整个选定历史范围。';
+  }
+
+  @override
+  String get contextDividerRunning => '正在压缩上下文';
+
+  @override
+  String get contextClearDetails => '此前聊天历史不再参与后续请求；系统提示、记忆和工具定义仍然生效。';
+
+  @override
+  String get compressCopyResult => '复制结果';
+
+  @override
+  String get contextDetailInUse => '当前直接使用';
+
+  @override
+  String get contextImpactDescription =>
+      '相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。';
+
+  @override
+  String get compressIncludeAttachmentsDesc =>
+      '纳入已有附件文字、工具参数与结果；过长内容会截断并标明，不会重新识图。';
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get contextImpactSourceDescription =>
+      '确认后变更原文，并撤销概括过它的摘要及依赖后继。其他消息与独立节点保留，不会自动调用模型。';
+
+  @override
+  String get contextEditTitle => '编辑摘要';
+
+  @override
+  String get compressUsageNext => '生效后下次请求';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能为空；需要排除历史时请使用清除上下文。';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String get contextDetailModel => '模型 · 时间';
+
+  @override
+  String compressIncludeManual(int count) {
+    return '纳入人工补充 · $count 份';
+  }
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次请求估算（含输出预留）：$used / $limit tokens';
+  }
+
+  @override
+  String get contextTaskDismiss => '关闭状态提示';
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤销后预计约 $used tokens（含输出预留）';
+  }
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get contextDividerFailed => '压缩失败';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get contextChangeWaiting => '等待当前回复和工具执行结束后生效。';
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已删除 $deleted 个项目；保留了 $kept 个正在使用或无法删除的项目。';
+  }
+
+  @override
+  String get contextSourceScopeHint => '仅处理最近清除边界之后的历史，可能包含平时发送窗口之外的较早消息。';
+
+  @override
+  String get contextTaskPreparing => '正在准备压缩';
+
+  @override
+  String contextImpactUsage(String from, String to) {
+    return '约 $from → $to tokens';
+  }
+
+  @override
+  String contextImpactConfirm(int count) {
+    return '撤销 $count 个节点';
+  }
+
+  @override
+  String get contextDividerEdited => '已编辑';
+
+  @override
+  String get compressAdjust => '调整';
+
+  @override
+  String get compressRegenerate => '重新压缩';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get contextDetailSuperseded => '已由后续摘要替代';
+
+  @override
+  String get contextTaskQueued => '已排队，等待压缩完成';
+
+  @override
+  String get contextNewConversation => '使用摘要创建新聊天';
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get contextLimitedInputHint => '仅读取所选字符范围；被替代历史中的其余内容不会进入摘要，原始消息仍可回看。';
+
+  @override
+  String get contextTaskCancelled => '压缩已取消';
+
+  @override
+  String get contextDetailClearTitle => '上下文已清除';
+
+  @override
+  String get contextImpactKeep => '保持不变';
+
+  @override
+  String get contextImpactUndoAlso => '一并撤销';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13932,7 +14555,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceRefreshTooltip => '刷新';
 
   @override
-  String get storageSpaceLoadFailed => '加载失败';
+  String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
   String get storageSpaceTotalLabel => '已用空间';
@@ -14001,9 +14624,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助手';
-
-  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -14042,12 +14662,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享内存索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '头像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '图片';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -14154,18 +14768,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
-
-  @override
-  String get storageSpaceSourceLabel => '来源';
-
-  @override
-  String get storageSpaceSourceAll => '全部';
-
-  @override
-  String get storageSpaceSourceUserUpload => '用户上传';
-
-  @override
-  String get storageSpaceSourceAssistant => '助手发出';
 
   @override
   String get storageSpaceSortLabel => '排序';
@@ -16098,16 +16700,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContext => '压缩上下文';
 
   @override
-  String get compressContextDesc => '总结对话并开始新聊天';
+  String get compressContextDesc => '生成可查看、可撤销的摘要';
 
   @override
   String get clearContextDesc => '标记上下文分界点';
 
   @override
   String get contextManagement => '上下文管理';
-
-  @override
-  String get compressingContext => '正在压缩上下文...';
 
   @override
   String get compressContextFailed => '压缩上下文失败';
@@ -16128,16 +16727,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextOptionsTitle => '压缩上下文';
 
   @override
-  String get compressContextOptionsDesc => '选择发送给压缩模型的当前聊天范围。';
+  String get compressContextOptionsDesc => '在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。';
 
   @override
-  String get compressContextKeepStart => '最开始';
+  String get compressContextKeepStart => '开头取样';
 
   @override
-  String get compressContextKeepRecent => '最近';
+  String get compressContextKeepRecent => '末尾取样';
 
   @override
-  String get compressContextUnlimited => '无限制';
+  String get compressContextUnlimited => '全部内容';
 
   @override
   String get compressContextMaxCharsLabel => '字符数';
@@ -16155,10 +16754,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextModelUnset => '选择模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留N条';
+  String get compressContextKeepRecentMessages => '保留 N 条';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近条数';
+  String get compressContextKeepCountLabel => '保留用户消息数';
 
   @override
   String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
@@ -19090,13 +19689,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自动回到底部延迟';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '用户停止滚动后等待多久再自动回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
@@ -21954,9 +22547,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get toolApprovalPending => '等待审批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒绝';
 
   @override
@@ -23303,9 +23893,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceToolImageTag => '图片';
 
   @override
-  String get workspaceToolAllowAll => '本会话全部允许';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -23607,7 +24194,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+  String get workspaceEnvNativeShellApproval => '请求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -23880,12 +24467,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本会话全部允许';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
 
   @override
   String get workspaceEntryEnvironment => '环境';
@@ -24374,7 +24955,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+      '命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -27560,6 +28141,671 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get genuiClearSelection => '清除选择';
+
+  @override
+  String get chatInputBarQueuedPausedReason => '压缩未完成，不会自动发送';
+
+  @override
+  String get contextChanged => '历史已发生变化，请重新打开此操作并确认范围。';
+
+  @override
+  String get contextOperationSuperseded => '已并入后续摘要';
+
+  @override
+  String get compressIncludeAttachments => '附件文字与工具结果';
+
+  @override
+  String contextEditCharacters(int count) {
+    return '$count 字';
+  }
+
+  @override
+  String get compressOverSnack => '摘要过长，应用后会超出上下文上限，未应用';
+
+  @override
+  String get contextSummaryHint => '这是后续请求实际使用的摘要，保存不会改写已有回复。附件仅使用已有文字，不会额外识图。';
+
+  @override
+  String get compressAdvanced => '高级选项';
+
+  @override
+  String get compressTaskWaiting => '等待当前回复完成';
+
+  @override
+  String get contextBudgetExceeded => '预计上下文超过当前模型上限，请缩短摘要、重新压缩或选择上下文更大的模型。';
+
+  @override
+  String get contextManualSupplement => '将手工编辑的摘要作为补充';
+
+  @override
+  String get contextDetailEdited => '已人工编辑';
+
+  @override
+  String get contextSourceLabel => '摘要来源';
+
+  @override
+  String get contextImpactSourceTitle => '修改已压缩的原文？';
+
+  @override
+  String get chatInputBarQueuedCompressionFailed => '压缩失败，不会自动发送';
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要输入约 $before tokens → 摘要约 $after tokens';
+  }
+
+  @override
+  String get worldBookTransferFailed => '保存条目失败，请重试。';
+
+  @override
+  String contextDetailKeptCount(int count) {
+    return '最近 $count 条用户消息及其回复、工具过程';
+  }
+
+  @override
+  String get toolPermissionRequestApproval => '请求批准';
+
+  @override
+  String get compressNothingNew => '自上次压缩后没有新的可压缩内容';
+
+  @override
+  String get browserActionScreenshot => '截取页面';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。';
+
+  @override
+  String contextUndoneSnack(String from, String to) {
+    return '已撤销 · $from → $to';
+  }
+
+  @override
+  String get toolApprovalByFullAccess => '已自动执行';
+
+  @override
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '开启后，流式输出时位于底部会自动跟随。上滑后保持阅读位置，主动回到底部后才继续跟随；关闭后不随新内容自动滚动。';
+
+  @override
+  String get toolApprovalRealTarget => '实际目标';
+
+  @override
+  String get compressTaskRetry => '重试';
+
+  @override
+  String get wsDeniedPathOutside => '目标不在授权区域内，已拒绝。';
+
+  @override
+  String contextImpactSaveConfirm(int count) {
+    return '保存并撤销 $count 个节点';
+  }
+
+  @override
+  String get contextRestore => '恢复';
+
+  @override
+  String compressUsageOriginal(String value) {
+    return '原 $value';
+  }
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待审批 · $kind';
+  }
+
+  @override
+  String get contextTaskApplying => '正在应用摘要';
+
+  @override
+  String get storageSpaceImagesHint => '删除会影响聊天图片和工具结果。正在使用的头像与背景会受到保护。';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生选择菜单';
+
+  @override
+  String get worldBookMoveEntries => '移动到…';
+
+  @override
+  String get compressReread => '重新读取已压缩的原始消息';
+
+  @override
+  String get chatInputBarQueuedPausedHold => '待发内容保持暂停，请取消排队后编辑或发送';
+
+  @override
+  String get contextSummaryTitle => '压缩摘要';
+
+  @override
+  String get contextKeepInvalid => '请输入正整数的用户消息数量。';
+
+  @override
+  String get compressTaskAbandon => '放弃';
+
+  @override
+  String get browserAgentTimedOut => '操作超时，AI 已暂停';
+
+  @override
+  String get compressCancelledSnack => '已取消压缩，当前上下文未改变';
+
+  @override
+  String get contextImpactClearTitle => '撤销较早的清除？';
+
+  @override
+  String get compressTaskWaitingApproval => '等待工具审批完成';
+
+  @override
+  String get contextTaskFailed => '压缩失败';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目录只读。';
+
+  @override
+  String get compressTaskMerging => '正在合并摘要';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。';
+
+  @override
+  String get compressStaleSnack => '聊天内容已变化，压缩结果未应用';
+
+  @override
+  String get worldBookCopyEntries => '复制到…';
+
+  @override
+  String get contextEditEmpty => '摘要不能为空。如需丢弃全部旧历史，请使用“清空上下文”。';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒绝并说明原因…';
+
+  @override
+  String get toolApprovalRequestedPath => '请求路径';
+
+  @override
+  String get toolApprovalScopeOnce => '仅授权本次调用';
+
+  @override
+  String get storageSpaceImageTypeLabel => '类型';
+
+  @override
+  String get contextImpactUndoTitle => '撤销较早的压缩？';
+
+  @override
+  String get contextOriginalMessages => '查看原始消息';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '删除 $count 张图片？相关聊天图片、工具截图及其会话副本将无法再查看或使用。正在使用的头像与背景会保留。';
+  }
+
+  @override
+  String get chatInputBarQueuedAfterCompress => '压缩完成后发送';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。';
+
+  @override
+  String get compressTaskAdjustRetry => '调整选项后重试';
+
+  @override
+  String get contextDetailLegacy => '由旧版清除位置转换';
+
+  @override
+  String get contextDetailCurrent => '当前上下文';
+
+  @override
+  String get toolPermissionUndo => '撤销';
+
+  @override
+  String get contextDetailViewOriginals => '查看被压缩的原文';
+
+  @override
+  String get contextTaskCompleted => '压缩已完成';
+
+  @override
+  String get chatInputBarQueuedPaused => '已暂停';
+
+  @override
+  String get contextCompressMarker => '上下文已压缩';
+
+  @override
+  String contextDetailParts(int count) {
+    return '自动分 $count 段';
+  }
+
+  @override
+  String get contextEditPending => '已保存，当前回复结束后生效';
+
+  @override
+  String get contextTaskRetry => '重试压缩';
+
+  @override
+  String get contextUndoCompressTooltip => '撤销此次压缩';
+
+  @override
+  String get contextDividerCompressed => '压缩上下文';
+
+  @override
+  String compressSuccessSnack(String from, String to) {
+    return '上下文已压缩 · $from → $to';
+  }
+
+  @override
+  String get contextEffectiveHistory => '当前摘要及后续消息';
+
+  @override
+  String get compressRereadAll => '本段全部原文';
+
+  @override
+  String get contextDone => '完成';
+
+  @override
+  String get contextMore => '更多';
+
+  @override
+  String compressFailedSnack(String reason) {
+    return '压缩失败：$reason';
+  }
+
+  @override
+  String get branchInheritNote => '只继承此处之前有效的上下文节点';
+
+  @override
+  String get contextTaskInterrupted => '压缩已中断，输入内容已保留';
+
+  @override
+  String get storageSpaceImageTypeAll => '全部';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 条消息；原样保留最近 $keep 条用户消息及后续回复。';
+  }
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要输入：$mode · $source';
+  }
+
+  @override
+  String get contextDetailKept => '原样保留';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已复制 $count 个条目';
+  }
+
+  @override
+  String get toolPermissionSaveFailed => '保存失败，权限未更改。';
+
+  @override
+  String get compressDiscardedSnack => '已清空上下文，进行中的压缩已废弃';
+
+  @override
+  String get browserActionSelect => '选择选项';
+
+  @override
+  String get toolPermissionTitle => '权限';
+
+  @override
+  String get contextDetailNext => '下次请求';
+
+  @override
+  String get contextTaskCancel => '取消压缩';
+
+  @override
+  String get toolPermissionFullAccess => '完全访问';
+
+  @override
+  String get chatInputBarQueuedCompressionCancelled => '压缩已取消，不会自动发送';
+
+  @override
+  String get toolPermissionResetSnack => '已更换工作区 · 此对话权限已恢复为请求批准';
+
+  @override
+  String get contextImpactUndoOne => '撤销';
+
+  @override
+  String get contextDetailContinueNewChat => '在新聊天继续';
+
+  @override
+  String get contextTaskPaused => '发送已暂停，可取消排队恢复编辑';
+
+  @override
+  String get contextTaskReview => '请检查摘要后再应用';
+
+  @override
+  String compressApproxTokens(String value) {
+    return '约 $value tokens';
+  }
+
+  @override
+  String get storageSpaceImageInUseHint => '请先在对应设置中更换或移除头像、背景或图标，再删除。';
+
+  @override
+  String get compressRereadLastLayer => '展开最近一层压缩';
+
+  @override
+  String get contextRestoreOperation => '恢复操作';
+
+  @override
+  String get contextOriginalHistory => '重新读取本段全部原文';
+
+  @override
+  String get contextImpactEditTitle => '保存较早的摘要？';
+
+  @override
+  String get contextOpenNewChat => '打开新聊天';
+
+  @override
+  String get wsPathChanged => '审批期间目标已变化。';
+
+  @override
+  String get contextEditUnknownPreview => '用量暂不可用，保存前会重新检查。';
+
+  @override
+  String get contextTaskWait => '等待当前回复和工具执行结束';
+
+  @override
+  String compressTaskElapsed(int i, int n, int seconds) {
+    return '第 $i/$n 段 · 已用 $seconds 秒';
+  }
+
+  @override
+  String get wsContextChanged => '对话上下文已变化，请求失效。';
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改还会撤销 $count 个受影响的上下文操作，原始消息保留。是否继续？';
+  }
+
+  @override
+  String get contextImpactSave => '保存';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在压缩 $done/$total 段';
+  }
+
+  @override
+  String get contextSummaryNotSmaller => '摘要没有比输入更短，请检查后再应用。';
+
+  @override
+  String get storageSpaceImageTypeTool => '工具图片';
+
+  @override
+  String get contextPreviousHistory => '重新读取最近一层压缩原文';
+
+  @override
+  String get contextDetailRead => '实际读取';
+
+  @override
+  String get contextViewGenerated => '查看已生成摘要';
+
+  @override
+  String get contextImpactDeleteDescription =>
+      '删除原文时，一并撤销相关摘要及依赖后继，避免继续发送残留内容。其他消息与独立节点保持不变。';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '头像与背景';
+
+  @override
+  String get contextDetailAfterUndo => '撤销后';
+
+  @override
+  String get contextOperationUndo => '撤销此次上下文操作';
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原样保留的历史仍受当前聊天“最多发送 $count 条消息”的限制。';
+  }
+
+  @override
+  String get contextOverLimitWarning => '撤销后可能超出模型上下文上限，建议重新压缩。仍可撤销，发送前会再次检查。';
+
+  @override
+  String get storageSpaceImageTypeChat => '聊天图片';
+
+  @override
+  String get worldBookSelectEntries => '多选条目';
+
+  @override
+  String get compressUsageSummary => '预计摘要';
+
+  @override
+  String contextDetailRange(String from, String to, int count) {
+    return '第 $from–$to 条 · $count 条用户消息';
+  }
+
+  @override
+  String get contextOperationHidden => '已被后续清除隔开';
+
+  @override
+  String get contextUndoClearTooltip => '撤销此次清除';
+
+  @override
+  String compressKeepDescription(int count) {
+    return '保留最近 $count 条用户消息及其回复、工具过程；更早内容由摘要替代。纯附件消息也算一条。';
+  }
+
+  @override
+  String get contextOperationUndone => '已撤销';
+
+  @override
+  String contextEditPreview(String value) {
+    return '保存后约 $value tokens。输入时不影响当前生效内容。';
+  }
+
+  @override
+  String get contextDetailExcluded => '不再发送';
+
+  @override
+  String get worldBookNoMoveTargets => '请先创建另一本世界书，再移动条目。';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get contextDetailReplaced => '被替代范围';
+
+  @override
+  String get displaySettingsPageAutoScrollEnabledLabel => '开启';
+
+  @override
+  String get contextChangeTitle => '确认上下文影响';
+
+  @override
+  String get contextDetailTitle => '压缩摘要';
+
+  @override
+  String get compressModelGlobal => '全局设置 · 本次启动后固定';
+
+  @override
+  String get wsDeniedMountReadonly => '只读挂载，不能写入。';
+
+  @override
+  String get compressRereadDesc => '处理多次压缩造成的信息损失，会增加本次用量';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切换到完全访问';
+
+  @override
+  String get compressUsageInput => '本次摘要输入';
+
+  @override
+  String get contextDetailSummaryLabel => '实际用于后续请求的摘要';
+
+  @override
+  String get contextImpactDeleteTitle => '删除已压缩的原文？';
+
+  @override
+  String get compressAdvancedOff => '重读原文 关';
+
+  @override
+  String get contextOperationActive => '当前生效';
+
+  @override
+  String get compressAdvancedOn => '重读原文 开';
+
+  @override
+  String get contextTaskMerging => '正在合并摘要';
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只读取选定的 $count 字符，摘要会替代整个选定历史范围。';
+  }
+
+  @override
+  String get contextDividerRunning => '正在压缩上下文';
+
+  @override
+  String get contextClearDetails => '此前聊天历史不再参与后续请求；系统提示、记忆和工具定义仍然生效。';
+
+  @override
+  String get compressCopyResult => '复制结果';
+
+  @override
+  String get contextDetailInUse => '当前直接使用';
+
+  @override
+  String get contextImpactDescription =>
+      '相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。';
+
+  @override
+  String get compressIncludeAttachmentsDesc =>
+      '纳入已有附件文字、工具参数与结果；过长内容会截断并标明，不会重新识图。';
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移动 $count 个条目';
+  }
+
+  @override
+  String get contextImpactSourceDescription =>
+      '确认后变更原文，并撤销概括过它的摘要及依赖后继。其他消息与独立节点保留，不会自动调用模型。';
+
+  @override
+  String get contextEditTitle => '编辑摘要';
+
+  @override
+  String get compressUsageNext => '生效后下次请求';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能为空；需要排除历史时请使用清除上下文。';
+
+  @override
+  String get toolApprovalDenied => '已拒绝';
+
+  @override
+  String get contextDetailModel => '模型 · 时间';
+
+  @override
+  String compressIncludeManual(int count) {
+    return '纳入人工补充 · $count 份';
+  }
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次请求估算（含输出预留）：$used / $limit tokens';
+  }
+
+  @override
+  String get contextTaskDismiss => '关闭状态提示';
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤销后预计约 $used tokens（含输出预留）';
+  }
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get contextDividerFailed => '压缩失败';
+
+  @override
+  String get toolPermissionUnboundHint => '未绑定工作区：不会因此开启文件或 Shell 工具。';
+
+  @override
+  String get contextChangeWaiting => '等待当前回复和工具执行结束后生效。';
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已删除 $deleted 个项目；保留了 $kept 个正在使用或无法删除的项目。';
+  }
+
+  @override
+  String get contextSourceScopeHint => '仅处理最近清除边界之后的历史，可能包含平时发送窗口之外的较早消息。';
+
+  @override
+  String get contextTaskPreparing => '正在准备压缩';
+
+  @override
+  String contextImpactUsage(String from, String to) {
+    return '约 $from → $to tokens';
+  }
+
+  @override
+  String contextImpactConfirm(int count) {
+    return '撤销 $count 个节点';
+  }
+
+  @override
+  String get contextDividerEdited => '已编辑';
+
+  @override
+  String get compressAdjust => '调整';
+
+  @override
+  String get compressRegenerate => '重新压缩';
+
+  @override
+  String get toolPermissionEnabledSnack => '已为此对话启用完全访问';
+
+  @override
+  String get contextDetailSuperseded => '已由后续摘要替代';
+
+  @override
+  String get contextTaskQueued => '已排队，等待压缩完成';
+
+  @override
+  String get contextNewConversation => '使用摘要创建新聊天';
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。';
+
+  @override
+  String get contextLimitedInputHint => '仅读取所选字符范围；被替代历史中的其余内容不会进入摘要，原始消息仍可回看。';
+
+  @override
+  String get contextTaskCancelled => '压缩已取消';
+
+  @override
+  String get contextDetailClearTitle => '上下文已清除';
+
+  @override
+  String get contextImpactKeep => '保持不变';
+
+  @override
+  String get contextImpactUndoAlso => '一并撤销';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get toolPermissionScopeThisChat => '仅此对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -27674,7 +28920,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceRefreshTooltip => '重新整理';
 
   @override
-  String get storageSpaceLoadFailed => '載入失敗';
+  String get storageSpaceLoadFailed => '無法載入檔案或檢查圖片使用情況，請重新整理後重試。';
 
   @override
   String get storageSpaceTotalLabel => '已用空間';
@@ -27743,9 +28989,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的還原快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助理';
-
-  @override
   String get storageSpaceCategoryCache => '快取';
 
   @override
@@ -27784,12 +29027,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '頭像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '圖片';
 
   @override
   String get storageSpaceSubCacheAvatars => '頭像快取';
@@ -27896,18 +29133,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 項';
   }
-
-  @override
-  String get storageSpaceSourceLabel => '來源';
-
-  @override
-  String get storageSpaceSourceAll => '全部';
-
-  @override
-  String get storageSpaceSourceUserUpload => '使用者上傳';
-
-  @override
-  String get storageSpaceSourceAssistant => '助理傳送';
 
   @override
   String get storageSpaceSortLabel => '排序';
@@ -29840,16 +31065,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContext => '壓縮上下文';
 
   @override
-  String get compressContextDesc => '總結對話並開始新聊天';
+  String get compressContextDesc => '生成可查看、可撤銷的摘要';
 
   @override
   String get clearContextDesc => '標記上下文分界點';
 
   @override
   String get contextManagement => '上下文管理';
-
-  @override
-  String get compressingContext => '正在壓縮上下文...';
 
   @override
   String get compressContextFailed => '壓縮上下文失敗';
@@ -29870,16 +31092,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextOptionsTitle => '壓縮上下文';
 
   @override
-  String get compressContextOptionsDesc => '選擇要傳送給壓縮模型的目前聊天範圍。';
+  String get compressContextOptionsDesc => '在目前聊天產生可查看、可編輯、可撤銷的摘要。原始訊息保留。';
 
   @override
-  String get compressContextKeepStart => '最開始';
+  String get compressContextKeepStart => '開頭取樣';
 
   @override
-  String get compressContextKeepRecent => '最近';
+  String get compressContextKeepRecent => '末尾取樣';
 
   @override
-  String get compressContextUnlimited => '無限制';
+  String get compressContextUnlimited => '全部內容';
 
   @override
   String get compressContextMaxCharsLabel => '字元數';
@@ -29897,10 +31119,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextModelUnset => '選擇模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留N條';
+  String get compressContextKeepRecentMessages => '保留 N 則';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近條數';
+  String get compressContextKeepCountLabel => '保留使用者訊息數';
 
   @override
   String get compressContextKeepAllMessages => '保留條數涵蓋全部訊息，無內容可壓縮';
@@ -32831,13 +34053,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSizeTitle => '聊天字體大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自動回到底部';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自動回到底部延遲';
-
-  @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '使用者停止捲動後等待多久再自動回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自動跟隨底部';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已關閉';
@@ -35771,9 +36987,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get toolApprovalPending => '等待審批';
 
   @override
-  String get toolApprovalApprove => '批准';
-
-  @override
   String get toolApprovalDeny => '拒絕';
 
   @override
@@ -37120,9 +38333,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceToolImageTag => '圖片';
 
   @override
-  String get workspaceToolAllowAll => '本工作階段全部允許';
-
-  @override
   String get workspaceToolStdout => 'stdout';
 
   @override
@@ -37424,8 +38634,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get workspaceEnvNativeShellApproval =>
-      '除非此工作階段允許全部工具，否則 shell 工具需要核准。';
+  String get workspaceEnvNativeShellApproval => '請求批准模式下，Shell 工具需要批准。';
 
   @override
   String workspaceEnvDownloadProgress(
@@ -37698,12 +38907,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySessionSkills => '技能';
-
-  @override
-  String get workspaceEntryAllowAll => '本工作階段全部允許';
-
-  @override
-  String get workspaceEntryAllowAllSubtitle => '此對話中的 Shell 命令將不再需要核准。';
 
   @override
   String get workspaceEntryEnvironment => '環境';
@@ -38192,7 +39395,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeUnsandboxed =>
-      '指令在本機直接執行（無沙盒），除非允許本工作階段全部工具，否則需要核准。';
+      '指令在本機直接執行（無沙盒），除非此對話已啟用完全存取，否則需要批准。';
 
   @override
   String get workspaceEnvRootfsTitle => '/';
@@ -41382,4 +42585,670 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get genuiClearSelection => '清除選取';
+
+  @override
+  String get chatInputBarQueuedPausedReason => '壓縮未完成，不會自動傳送';
+
+  @override
+  String get contextChanged => '歷史已發生變化，請重新開啟此操作並確認範圍。';
+
+  @override
+  String get contextOperationSuperseded => '已併入後續摘要';
+
+  @override
+  String get compressIncludeAttachments => '附件文字與工具結果';
+
+  @override
+  String contextEditCharacters(int count) {
+    return '$count 字';
+  }
+
+  @override
+  String get compressOverSnack => '摘要過長，套用後會超出上下文上限，未套用';
+
+  @override
+  String get contextSummaryHint =>
+      '這是後續請求實際使用的摘要，儲存不會改寫既有回覆。附件僅使用已有文字，不會額外辨識圖片。';
+
+  @override
+  String get compressAdvanced => '進階選項';
+
+  @override
+  String get compressTaskWaiting => '等待目前回覆完成';
+
+  @override
+  String get contextBudgetExceeded => '預計上下文超過目前模型上限，請縮短摘要、重新壓縮或選擇上下文更大的模型。';
+
+  @override
+  String get contextManualSupplement => '將手動編輯的摘要作為補充';
+
+  @override
+  String get contextDetailEdited => '已人工編輯';
+
+  @override
+  String get contextSourceLabel => '摘要來源';
+
+  @override
+  String get contextImpactSourceTitle => '修改已壓縮的原文？';
+
+  @override
+  String get chatInputBarQueuedCompressionFailed => '壓縮失敗，不會自動傳送';
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要輸入約 $before tokens → 摘要約 $after tokens';
+  }
+
+  @override
+  String get worldBookTransferFailed => '儲存條目失敗，請重試。';
+
+  @override
+  String contextDetailKeptCount(int count) {
+    return '最近 $count 則使用者訊息及其回覆、工具過程';
+  }
+
+  @override
+  String get toolPermissionRequestApproval => '請求批准';
+
+  @override
+  String get compressNothingNew => '自上次壓縮後沒有新的可壓縮內容';
+
+  @override
+  String get browserActionScreenshot => '擷取畫面';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuSubtitle =>
+      '用於輸入框和訊息選取範圍；如遇卡頓可關閉，恢復原選單。';
+
+  @override
+  String contextUndoneSnack(String from, String to) {
+    return '已撤銷 · $from → $to';
+  }
+
+  @override
+  String get toolApprovalByFullAccess => '已自動執行';
+
+  @override
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '開啟後，串流輸出時位於底部會自動跟隨。向上捲動後保持閱讀位置，主動回到底部後才繼續跟隨；關閉後不隨新內容自動捲動。';
+
+  @override
+  String get toolApprovalRealTarget => '實際目標';
+
+  @override
+  String get compressTaskRetry => '重試';
+
+  @override
+  String get wsDeniedPathOutside => '目標不在授權區域內，已拒絕。';
+
+  @override
+  String contextImpactSaveConfirm(int count) {
+    return '儲存並撤銷 $count 個節點';
+  }
+
+  @override
+  String get contextRestore => '恢復';
+
+  @override
+  String compressUsageOriginal(String value) {
+    return '原 $value';
+  }
+
+  @override
+  String toolApprovalPendingKind(String kind) {
+    return '等待審批 · $kind';
+  }
+
+  @override
+  String get contextTaskApplying => '正在套用摘要';
+
+  @override
+  String get storageSpaceImagesHint => '刪除會影響聊天圖片和工具結果。正在使用的頭像與背景會受到保護。';
+
+  @override
+  String get displaySettingsPageIosNativeSelectionMenuTitle => 'iOS 26+ 原生選取選單';
+
+  @override
+  String get worldBookMoveEntries => '移動到…';
+
+  @override
+  String get compressReread => '重新讀取已壓縮的原始訊息';
+
+  @override
+  String get chatInputBarQueuedPausedHold => '待傳內容維持暫停，請取消排隊後編輯或傳送';
+
+  @override
+  String get contextSummaryTitle => '壓縮摘要';
+
+  @override
+  String get contextKeepInvalid => '請輸入正整數的使用者訊息數量。';
+
+  @override
+  String get compressTaskAbandon => '放棄';
+
+  @override
+  String get browserAgentTimedOut => '操作逾時，AI 已暫停';
+
+  @override
+  String get compressCancelledSnack => '已取消壓縮，目前上下文未改變';
+
+  @override
+  String get contextImpactClearTitle => '撤銷較早的清除？';
+
+  @override
+  String get compressTaskWaitingApproval => '等待工具審批完成';
+
+  @override
+  String get contextTaskFailed => '壓縮失敗';
+
+  @override
+  String get wsDeniedSkillsReadonly => '技能目錄唯讀。';
+
+  @override
+  String get compressTaskMerging => '正在合併摘要';
+
+  @override
+  String get toolPermissionFullAccessDesc =>
+      '允許此對話直接存取本機檔案、執行命令及使用已啟用的聯網工具，不再逐次詢問。';
+
+  @override
+  String get compressStaleSnack => '聊天內容已變更，壓縮結果未套用';
+
+  @override
+  String get worldBookCopyEntries => '複製到…';
+
+  @override
+  String get contextEditEmpty => '摘要不能為空。如需捨棄全部舊歷史，請使用「清空上下文」。';
+
+  @override
+  String get toolApprovalDenyWithReason => '拒絕並說明原因…';
+
+  @override
+  String get toolApprovalRequestedPath => '請求路徑';
+
+  @override
+  String get toolApprovalScopeOnce => '僅授權本次呼叫';
+
+  @override
+  String get storageSpaceImageTypeLabel => '類型';
+
+  @override
+  String get contextImpactUndoTitle => '撤銷較早的壓縮？';
+
+  @override
+  String get contextOriginalMessages => '檢視原始訊息';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '刪除 $count 張圖片？相關聊天圖片、工具截圖及其對話副本將無法再檢視或使用。正在使用的頭像與背景會保留。';
+  }
+
+  @override
+  String get chatInputBarQueuedAfterCompress => '壓縮完成後傳送';
+
+  @override
+  String get toolPermissionFullAccessDescMobile =>
+      '允許此對話在沙盒和已授權資料夾內自動執行工具，不再逐次詢問。';
+
+  @override
+  String get compressTaskAdjustRetry => '調整選項後重試';
+
+  @override
+  String get contextDetailLegacy => '由舊版清除位置轉換';
+
+  @override
+  String get contextDetailCurrent => '目前上下文';
+
+  @override
+  String get toolPermissionUndo => '復原';
+
+  @override
+  String get contextDetailViewOriginals => '檢視被壓縮的原文';
+
+  @override
+  String get contextTaskCompleted => '壓縮已完成';
+
+  @override
+  String get chatInputBarQueuedPaused => '已暫停';
+
+  @override
+  String get contextCompressMarker => '上下文已壓縮';
+
+  @override
+  String contextDetailParts(int count) {
+    return '自動分 $count 段';
+  }
+
+  @override
+  String get contextEditPending => '已儲存，目前回覆結束後生效';
+
+  @override
+  String get contextTaskRetry => '重試壓縮';
+
+  @override
+  String get contextUndoCompressTooltip => '撤銷此次壓縮';
+
+  @override
+  String get contextDividerCompressed => '壓縮上下文';
+
+  @override
+  String compressSuccessSnack(String from, String to) {
+    return '上下文已壓縮 · $from → $to';
+  }
+
+  @override
+  String get contextEffectiveHistory => '目前摘要及後續訊息';
+
+  @override
+  String get compressRereadAll => '本段全部原文';
+
+  @override
+  String get contextDone => '完成';
+
+  @override
+  String get contextMore => '更多';
+
+  @override
+  String compressFailedSnack(String reason) {
+    return '壓縮失敗：$reason';
+  }
+
+  @override
+  String get branchInheritNote => '只繼承此處之前有效的上下文節點';
+
+  @override
+  String get contextTaskInterrupted => '壓縮已中斷，輸入內容已保留';
+
+  @override
+  String get storageSpaceImageTypeAll => '全部';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 則訊息；原樣保留最近 $keep 則使用者訊息及後續回覆。';
+  }
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要輸入：$mode · $source';
+  }
+
+  @override
+  String get contextDetailKept => '原樣保留';
+
+  @override
+  String worldBookEntriesCopied(int count) {
+    return '已複製 $count 個條目';
+  }
+
+  @override
+  String get toolPermissionSaveFailed => '儲存失敗，權限未變更。';
+
+  @override
+  String get compressDiscardedSnack => '已清空上下文，進行中的壓縮已捨棄';
+
+  @override
+  String get browserActionSelect => '選擇選項';
+
+  @override
+  String get toolPermissionTitle => '權限';
+
+  @override
+  String get contextDetailNext => '下次請求';
+
+  @override
+  String get contextTaskCancel => '取消壓縮';
+
+  @override
+  String get toolPermissionFullAccess => '完全存取';
+
+  @override
+  String get chatInputBarQueuedCompressionCancelled => '壓縮已取消，不會自動傳送';
+
+  @override
+  String get toolPermissionResetSnack => '已更換工作區 · 此對話權限已恢復為請求批准';
+
+  @override
+  String get contextImpactUndoOne => '撤銷';
+
+  @override
+  String get contextDetailContinueNewChat => '在新聊天繼續';
+
+  @override
+  String get contextTaskPaused => '傳送已暫停，可取消排隊恢復編輯';
+
+  @override
+  String get contextTaskReview => '請檢查摘要後再套用';
+
+  @override
+  String compressApproxTokens(String value) {
+    return '約 $value tokens';
+  }
+
+  @override
+  String get storageSpaceImageInUseHint => '請先在對應設定中更換或移除頭像、背景或圖示，再刪除。';
+
+  @override
+  String get compressRereadLastLayer => '展開最近一層壓縮';
+
+  @override
+  String get contextRestoreOperation => '恢復操作';
+
+  @override
+  String get contextOriginalHistory => '重新讀取本段全部原文';
+
+  @override
+  String get contextImpactEditTitle => '儲存較早的摘要？';
+
+  @override
+  String get contextOpenNewChat => '開啟新聊天';
+
+  @override
+  String get wsPathChanged => '審批期間目標已變化。';
+
+  @override
+  String get contextEditUnknownPreview => '用量暫不可用，儲存前會重新檢查。';
+
+  @override
+  String get contextTaskWait => '等待目前回覆和工具執行結束';
+
+  @override
+  String compressTaskElapsed(int i, int n, int seconds) {
+    return '第 $i/$n 段 · 已用 $seconds 秒';
+  }
+
+  @override
+  String get wsContextChanged => '對話上下文已變化，請求失效。';
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改還會撤銷 $count 個受影響的上下文操作，原始訊息保留。是否繼續？';
+  }
+
+  @override
+  String get contextImpactSave => '儲存';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在壓縮 $done/$total 段';
+  }
+
+  @override
+  String get contextSummaryNotSmaller => '摘要沒有比輸入更短，請檢查後再套用。';
+
+  @override
+  String get storageSpaceImageTypeTool => '工具圖片';
+
+  @override
+  String get contextPreviousHistory => '重新讀取最近一層壓縮原文';
+
+  @override
+  String get contextDetailRead => '實際讀取';
+
+  @override
+  String get contextViewGenerated => '檢視已產生摘要';
+
+  @override
+  String get contextImpactDeleteDescription =>
+      '刪除原文時，一併撤銷相關摘要及相依後繼，避免繼續傳送殘留內容。其他訊息與獨立節點保持不變。';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '頭像與背景';
+
+  @override
+  String get contextDetailAfterUndo => '撤銷後';
+
+  @override
+  String get contextOperationUndo => '撤銷此次上下文操作';
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原樣保留的歷史仍受目前聊天「最多傳送 $count 則訊息」的限制。';
+  }
+
+  @override
+  String get contextOverLimitWarning => '撤銷後可能超出模型上下文上限，建議重新壓縮。仍可撤銷，傳送前會再次檢查。';
+
+  @override
+  String get storageSpaceImageTypeChat => '聊天圖片';
+
+  @override
+  String get worldBookSelectEntries => '多選條目';
+
+  @override
+  String get compressUsageSummary => '預計摘要';
+
+  @override
+  String contextDetailRange(String from, String to, int count) {
+    return '第 $from–$to 則 · $count 則使用者訊息';
+  }
+
+  @override
+  String get contextOperationHidden => '已被後續清除隔開';
+
+  @override
+  String get contextUndoClearTooltip => '撤銷此次清除';
+
+  @override
+  String compressKeepDescription(int count) {
+    return '保留最近 $count 則使用者訊息及其回覆、工具過程；較早內容由摘要取代。純附件訊息也算一則。';
+  }
+
+  @override
+  String get contextOperationUndone => '已撤銷';
+
+  @override
+  String contextEditPreview(String value) {
+    return '儲存後約 $value tokens。輸入時不影響目前生效內容。';
+  }
+
+  @override
+  String get contextDetailExcluded => '不再傳送';
+
+  @override
+  String get worldBookNoMoveTargets => '請先建立另一本世界書，再移動條目。';
+
+  @override
+  String worldBookSelectedEntries(int count) {
+    return '已選擇 $count 項';
+  }
+
+  @override
+  String get contextDetailReplaced => '被取代範圍';
+
+  @override
+  String get displaySettingsPageAutoScrollEnabledLabel => '開啟';
+
+  @override
+  String get contextChangeTitle => '確認上下文影響';
+
+  @override
+  String get contextDetailTitle => '壓縮摘要';
+
+  @override
+  String get compressModelGlobal => '全域設定 · 本次啟動後固定';
+
+  @override
+  String get wsDeniedMountReadonly => '唯讀掛載，無法寫入。';
+
+  @override
+  String get compressRereadDesc => '處理多次壓縮造成的資訊損失，會增加本次用量';
+
+  @override
+  String get toolApprovalSwitchToFullAccess => '切換到完全存取';
+
+  @override
+  String get compressUsageInput => '本次摘要輸入';
+
+  @override
+  String get contextDetailSummaryLabel => '實際用於後續請求的摘要';
+
+  @override
+  String get contextImpactDeleteTitle => '刪除已壓縮的原文？';
+
+  @override
+  String get compressAdvancedOff => '重讀原文 關';
+
+  @override
+  String get contextOperationActive => '目前生效';
+
+  @override
+  String get compressAdvancedOn => '重讀原文 開';
+
+  @override
+  String get contextTaskMerging => '正在合併摘要';
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只讀取選定的 $count 字元，摘要會替代整個選定歷史範圍。';
+  }
+
+  @override
+  String get contextDividerRunning => '正在壓縮上下文';
+
+  @override
+  String get contextClearDetails => '此前聊天歷史不再參與後續請求；系統提示、記憶和工具定義仍然生效。';
+
+  @override
+  String get compressCopyResult => '複製結果';
+
+  @override
+  String get contextDetailInUse => '目前直接使用';
+
+  @override
+  String get contextImpactDescription =>
+      '相關摘要將一併撤銷；原始聊天訊息保留，不會自動呼叫模型。獨立的上下文節點保持不變。';
+
+  @override
+  String get compressIncludeAttachmentsDesc =>
+      '納入已有附件文字、工具參數與結果；過長內容會截斷並標明，不會重新識圖。';
+
+  @override
+  String worldBookEntriesMoved(int count) {
+    return '已移動 $count 個條目';
+  }
+
+  @override
+  String get contextImpactSourceDescription =>
+      '確認後變更原文，並撤銷概括過它的摘要及相依後繼。其他訊息與獨立節點保留，不會自動呼叫模型。';
+
+  @override
+  String get contextEditTitle => '編輯摘要';
+
+  @override
+  String get compressUsageNext => '生效後下次請求';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能為空；需要排除歷史時請使用清除上下文。';
+
+  @override
+  String get toolApprovalDenied => '已拒絕';
+
+  @override
+  String get contextDetailModel => '模型 · 時間';
+
+  @override
+  String compressIncludeManual(int count) {
+    return '納入人工補充 · $count 份';
+  }
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次請求估算（含輸出預留）：$used / $limit tokens';
+  }
+
+  @override
+  String get contextTaskDismiss => '關閉狀態提示';
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤銷後預計約 $used tokens（含輸出預留）';
+  }
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get worldBookSelectionDone => '完成';
+
+  @override
+  String get contextDividerFailed => '壓縮失敗';
+
+  @override
+  String get toolPermissionUnboundHint => '未綁定工作區：不會因此開啟檔案或 Shell 工具。';
+
+  @override
+  String get contextChangeWaiting => '等待目前回覆與工具執行結束後生效。';
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已刪除 $deleted 個項目；保留了 $kept 個正在使用或無法刪除的項目。';
+  }
+
+  @override
+  String get contextSourceScopeHint => '僅處理最近清除邊界之後的歷史，可能包含平時傳送範圍之外的較早訊息。';
+
+  @override
+  String get contextTaskPreparing => '正在準備壓縮';
+
+  @override
+  String contextImpactUsage(String from, String to) {
+    return '約 $from → $to tokens';
+  }
+
+  @override
+  String contextImpactConfirm(int count) {
+    return '撤銷 $count 個節點';
+  }
+
+  @override
+  String get contextDividerEdited => '已編輯';
+
+  @override
+  String get compressAdjust => '調整';
+
+  @override
+  String get compressRegenerate => '重新壓縮';
+
+  @override
+  String get toolPermissionEnabledSnack => '已為此對話啟用完全存取';
+
+  @override
+  String get contextDetailSuperseded => '已由後續摘要取代';
+
+  @override
+  String get contextTaskQueued => '已排隊，等待壓縮完成';
+
+  @override
+  String get contextNewConversation => '使用摘要建立新聊天';
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String get browserErrActionTimeout => '操作逾時，結果未確認，請檢查頁面後允許繼續';
+
+  @override
+  String get toolPermissionRequestApprovalDesc =>
+      '工作區外檔案存取、桌面命令和其他需要授權的工具將在執行前詢問。';
+
+  @override
+  String get contextLimitedInputHint => '僅讀取所選字元範圍；被替代歷史中的其餘內容不會進入摘要，原始訊息仍可檢視。';
+
+  @override
+  String get contextTaskCancelled => '壓縮已取消';
+
+  @override
+  String get contextDetailClearTitle => '上下文已清除';
+
+  @override
+  String get contextImpactKeep => '保持不變';
+
+  @override
+  String get contextImpactUndoAlso => '一併撤銷';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get toolPermissionScopeThisChat => '僅此對話';
 }

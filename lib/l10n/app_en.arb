@@ -41,7 +41,7 @@
   "settingsPageCalculating": "Calculating…",
   "storageSpacePageTitle": "Storage Space",
   "storageSpaceRefreshTooltip": "Refresh",
-  "storageSpaceLoadFailed": "Failed to load storage usage",
+  "storageSpaceLoadFailed": "Could not load files or check which images are in use. Please refresh and try again.",
   "storageSpaceTotalLabel": "Used",
   "storageSpaceClearableLabel": "Clearable: {size}",
   "@storageSpaceClearableLabel": {
@@ -76,7 +76,6 @@
   "storageSpaceClearDisplacedDatabasesButton": "Delete Set-Aside Databases",
   "storageSpaceClearRestoreTracesConfirmMessage": "Clear completed restore snapshots? Your current database, settings, and files will not be affected.",
   "storageSpaceSubCompletedRestoreRuns": "Completed restore snapshots",
-  "storageSpaceCategoryAssistantData": "Assistants",
   "storageSpaceCategoryCache": "Cache",
   "storageSpaceCategoryLogs": "Logs",
   "storageSpaceCategoryOther": "Other",
@@ -90,8 +89,6 @@
   "storageSpaceSubChatDatabase": "Chat database",
   "storageSpaceSubChatWriteAheadLog": "Write-ahead log",
   "storageSpaceSubChatSharedMemory": "Shared memory index",
-  "storageSpaceSubAssistantAvatars": "Avatars",
-  "storageSpaceSubAssistantImages": "Images",
   "storageSpaceSubCacheAvatars": "Avatar cache",
   "storageSpaceSubCacheOther": "Other cache",
   "storageSpaceSubCacheSystem": "System cache",
@@ -170,10 +167,6 @@
       }
     }
   },
-  "storageSpaceSourceLabel": "Source",
-  "storageSpaceSourceAll": "All",
-  "storageSpaceSourceUserUpload": "User uploads",
-  "storageSpaceSourceAssistant": "Assistant",
   "storageSpaceSortLabel": "Sort",
   "storageSpaceSortNewest": "Newest",
   "storageSpaceSortOldest": "Oldest",
@@ -1013,27 +1006,26 @@
   "bottomToolsSheetUpload": "Upload",
   "bottomToolsSheetClearContext": "Clear Context",
   "compressContext": "Compress Context",
-  "compressContextDesc": "Summarize and start a new chat",
+  "compressContextDesc": "Create a summary you can review and undo",
   "clearContextDesc": "Mark a context boundary",
   "contextManagement": "Context Management",
-  "compressingContext": "Compressing context...",
   "compressContextFailed": "Failed to compress context",
   "compressContextNoMessages": "No messages to compress",
   "compressContextNoConversation": "No conversation to compress",
   "compressContextNoModel": "No compression model configured",
   "compressContextEmptySummary": "Compression returned an empty summary",
   "compressContextOptionsTitle": "Compress Context",
-  "compressContextOptionsDesc": "Choose which part of the current chat is sent to the compression model.",
-  "compressContextKeepStart": "Start",
-  "compressContextKeepRecent": "Recent",
-  "compressContextUnlimited": "Unlimited",
+  "compressContextOptionsDesc": "Create an editable, reversible summary in this chat. Original messages are kept.",
+  "compressContextKeepStart": "Start sample",
+  "compressContextKeepRecent": "End sample",
+  "compressContextUnlimited": "All content",
   "compressContextMaxCharsLabel": "Characters",
   "compressContextInvalidLimit": "Enter a positive character count",
   "compressContextStartButton": "Compress",
   "compressContextModelLabel": "Model",
   "compressContextModelUnset": "Select a model",
   "compressContextKeepRecentMessages": "Keep N",
-  "compressContextKeepCountLabel": "Keep recent messages",
+  "compressContextKeepCountLabel": "Recent user messages",
   "compressContextKeepAllMessages": "Keeping that many covers all messages — nothing to compress",
   "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
   "@compressContextEstimatePreview": {
@@ -2447,9 +2439,7 @@
   "desktopDisplaySettingsTopicPositionRight": "Right",
   "displaySettingsPageNewChatOnLaunchSubtitle": "Automatically create a new chat on launch",
   "displaySettingsPageChatFontSizeTitle": "Chat Font Size",
-  "displaySettingsPageAutoScrollEnableTitle": "Auto-scroll to bottom",
-  "displaySettingsPageAutoScrollIdleTitle": "Auto-Scroll Back Delay",
-  "displaySettingsPageAutoScrollIdleSubtitle": "Wait time after user scroll before jumping to bottom",
+  "displaySettingsPageAutoScrollEnableTitle": "Auto-follow bottom",
   "displaySettingsPageAutoScrollDisabledLabel": "Off",
   "displaySettingsPageChatFontSampleText": "This is a sample chat text",
   "displaySettingsPageChatBackgroundMaskTitle": "Chat Background Overlay Opacity",
@@ -3760,7 +3750,6 @@
   "worldBookInjectionRoleAssistant": "Assistant",
   "mcpToolNeedsApproval": "Require approval",
   "toolApprovalPending": "Waiting for approval",
-  "toolApprovalApprove": "Approve",
   "toolApprovalDeny": "Deny",
   "toolApprovalDenyTitle": "Deny tool call",
   "toolApprovalDenyHint": "Reason (optional)",
@@ -4512,7 +4501,6 @@
   "workspaceToolUpdated": "updated",
   "workspaceToolTruncated": "truncated",
   "workspaceToolImageTag": "image",
-  "workspaceToolAllowAll": "Allow all this session",
   "workspaceToolStdout": "stdout",
   "workspaceToolStderr": "stderr",
   "workspaceToolOpenFullOutput": "Open full output",
@@ -4723,7 +4711,7 @@
       }
     }
   },
-  "workspaceEnvNativeShellApproval": "The shell tool needs approval unless this session allows all tools.",
+  "workspaceEnvNativeShellApproval": "The shell tool needs approval in Ask for approval mode.",
   "workspaceEnvDownloadProgress": "{downloaded} / {total} MB ({percent}%)",
   "@workspaceEnvDownloadProgress": {
     "placeholders": {
@@ -4837,8 +4825,6 @@
   "workspaceEntryOpenSystemTerminal": "Open in system terminal",
   "workspaceEntryReveal": "Reveal in file manager",
   "workspaceEntrySessionSkills": "Skills",
-  "workspaceEntryAllowAll": "Allow all this session",
-  "workspaceEntryAllowAllSubtitle": "Shell commands in this conversation will run without approval.",
   "workspaceEntryEnvironment": "Environment",
   "workspaceEntryManage": "Manage workspaces",
   "workspaceEntryCreate": "Create new workspace…",
@@ -5143,7 +5129,7 @@
       }
     }
   },
-  "workspaceEnvNativeUnsandboxed": "Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.",
+  "workspaceEnvNativeUnsandboxed": "Commands run on this computer without a sandbox and need approval unless this chat has full access.",
   "workspaceEnvRootfsTitle": "/",
   "workspaceEnvBrowserUnavailable": "The sandbox file system is not available.",
   "workspaceEnvMirrorNameOfficial": "Official",
@@ -6693,5 +6679,459 @@
   "displaySettingsShowGenUiHeader": "Show interactive UI title bar",
   "displaySettingsShowGenUiHeaderSubtitle": "Hide for a cleaner message. Source and actions remain in the menu below the UI.",
   "genuiClearFilter": "Clear filter",
-  "genuiClearSelection": "Clear selection"
+  "genuiClearSelection": "Clear selection",
+  "chatInputBarQueuedPausedReason": "Compression did not finish; sending stays paused",
+  "contextChanged": "History changed. Reopen this action to review its current scope.",
+  "contextOperationSuperseded": "Included in a later summary",
+  "compressIncludeAttachments": "Attachment text & tool results",
+  "contextEditCharacters": "{count} characters",
+  "compressOverSnack": "The summary would exceed the context limit and was not applied.",
+  "contextSummaryHint": "This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.",
+  "compressAdvanced": "Advanced",
+  "compressTaskWaiting": "Waiting for the current reply",
+  "contextBudgetExceeded": "The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.",
+  "@compressApproxTokens": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "contextManualSupplement": "Include manually edited summaries as supplements",
+  "@contextUndoneSnack": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "contextDetailEdited": "Manually edited",
+  "contextSourceLabel": "Summary input",
+  "contextImpactSourceTitle": "Change compressed originals?",
+  "chatInputBarQueuedCompressionFailed": "Compression failed; sending stays paused",
+  "contextTokenInfo": "Summary input ≈ {before} tokens → summary ≈ {after} tokens",
+  "worldBookTransferFailed": "Could not save the entries. Please try again.",
+  "contextDetailKeptCount": "Latest {count} user messages, replies and tools",
+  "toolPermissionRequestApproval": "Ask for approval",
+  "compressNothingNew": "Nothing new to compress since the last summary",
+  "browserActionScreenshot": "Capture screenshot",
+  "displaySettingsPageIosNativeSelectionMenuSubtitle": "Applies to input and messages. Turn off if menus feel slow.",
+  "contextUndoneSnack": "Undone · {from} → {to}",
+  "toolApprovalByFullAccess": "Ran automatically",
+  "displaySettingsPageAutoScrollSubtitle": "While streaming, follow new content when at the bottom. Scrolling up pauses following until you return to the bottom. When off, new content does not scroll automatically.",
+  "toolApprovalRealTarget": "Actual target",
+  "@storageSpaceDeletedUploadsPartial": {
+    "placeholders": {
+      "deleted": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      }
+    }
+  },
+  "compressTaskRetry": "Retry",
+  "wsDeniedPathOutside": "Target is outside the authorized area. Denied.",
+  "contextImpactSaveConfirm": "Save and undo {count} nodes",
+  "contextRestore": "Restore",
+  "compressUsageOriginal": "was {value}",
+  "toolApprovalPendingKind": "Awaiting approval · {kind}",
+  "contextTaskApplying": "Applying summary",
+  "storageSpaceImagesHint": "Deleting images affects chat history and tool results. Avatars and backgrounds in use are protected.",
+  "displaySettingsPageIosNativeSelectionMenuTitle": "iOS 26+ native selection menu",
+  "worldBookMoveEntries": "Move to…",
+  "compressReread": "Re-read compressed originals",
+  "@contextImpactConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatInputBarQueuedPausedHold": "Input remains paused; cancel the queue to edit or send",
+  "contextSummaryTitle": "Context summary",
+  "contextKeepInvalid": "Enter a positive number of user messages.",
+  "@contextInputModeInfo": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "compressTaskAbandon": "Dismiss",
+  "browserAgentTimedOut": "Operation timed out; AI paused",
+  "compressCancelledSnack": "Compression cancelled. Current context is unchanged.",
+  "contextImpactClearTitle": "Undo earlier clear?",
+  "@contextBudgetInfo": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "compressTaskWaitingApproval": "Waiting for tool approval",
+  "contextTaskFailed": "Compression failed",
+  "wsDeniedSkillsReadonly": "Skills folder is read-only.",
+  "compressTaskMerging": "Merging summaries",
+  "toolPermissionFullAccessDesc": "Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.",
+  "compressStaleSnack": "Chat history changed; the summary was not applied.",
+  "@contextDetailKeptCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextTokenInfo": {
+    "placeholders": {
+      "before": {
+        "type": "int"
+      },
+      "after": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookCopyEntries": "Copy to…",
+  "contextEditEmpty": "Summary cannot be empty. Use Clear context to exclude all earlier history.",
+  "toolApprovalDenyWithReason": "Deny with reason…",
+  "toolApprovalRequestedPath": "Requested path",
+  "toolApprovalScopeOnce": "Applies to this call only",
+  "storageSpaceImageTypeLabel": "Type",
+  "contextImpactUndoTitle": "Undo earlier compression?",
+  "contextOriginalMessages": "View original messages",
+  "storageSpaceDeleteImagesConfirmMessage": "Delete {count} images? Related chat images, tool screenshots, and conversation copies will no longer be available. Avatars and backgrounds in use will be kept.",
+  "chatInputBarQueuedAfterCompress": "Sends after compression",
+  "toolPermissionFullAccessDescMobile": "Lets this conversation run tools automatically inside the sandbox and authorized folders, without asking each time.",
+  "@compressUsageOriginal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "compressTaskAdjustRetry": "Adjust options and retry",
+  "contextDetailLegacy": "Converted from legacy clear",
+  "contextDetailCurrent": "Current context",
+  "toolPermissionUndo": "Undo",
+  "contextDetailViewOriginals": "View originals",
+  "contextTaskCompleted": "Compression complete",
+  "chatInputBarQueuedPaused": "Paused",
+  "@contextSampledInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextCompressMarker": "Context compressed",
+  "contextDetailParts": "{count} segments",
+  "contextEditPending": "Saved; applies after the current reply",
+  "contextTaskRetry": "Retry compression",
+  "contextUndoCompressTooltip": "Undo this compression",
+  "@compressKeepDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextDividerCompressed": "Context compressed",
+  "compressSuccessSnack": "Context compressed · {from} → {to}",
+  "@compressIncludeManual": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextEffectiveHistory": "Current summary and later messages",
+  "compressRereadAll": "All originals in segment",
+  "contextDone": "Done",
+  "contextMore": "More",
+  "compressFailedSnack": "Compression failed: {reason}",
+  "@contextHistoryWindowNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "branchInheritNote": "Only inherits context nodes active before this point",
+  "contextTaskInterrupted": "Compression interrupted; input is preserved",
+  "storageSpaceImageTypeAll": "All",
+  "contextRangeInfo": "Replaces {count} messages; keeps {keep} recent user messages and their replies.",
+  "@compressFailedSnack": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "contextInputModeInfo": "Input: {mode} · {source}",
+  "contextDetailKept": "Kept",
+  "worldBookEntriesCopied": "{count, plural, =1{Copied 1 entry} other{Copied {count} entries}}",
+  "toolPermissionSaveFailed": "Couldn’t save. Permission unchanged.",
+  "compressDiscardedSnack": "Context cleared; the running compression was discarded.",
+  "browserActionSelect": "Select option",
+  "@worldBookEntriesCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "toolPermissionTitle": "Permissions",
+  "contextDetailNext": "Next request",
+  "contextTaskCancel": "Cancel compression",
+  "@contextTaskProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "toolPermissionFullAccess": "Full access",
+  "chatInputBarQueuedCompressionCancelled": "Compression cancelled; sending stays paused",
+  "toolPermissionResetSnack": "Workspace changed · permission reset to Ask for approval",
+  "@contextRangeInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "keep": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactUndoOne": "Undo",
+  "contextDetailContinueNewChat": "Continue in new chat",
+  "contextTaskPaused": "Sending paused — cancel the queue to edit",
+  "contextTaskReview": "Review the summary before applying",
+  "compressApproxTokens": "Approx. {value} tokens",
+  "@contextImpactUsage": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceImageInUseHint": "Change or remove this avatar, background, or icon in its settings before deleting it.",
+  "compressRereadLastLayer": "Expand last layer",
+  "contextRestoreOperation": "Restore operation",
+  "contextOriginalHistory": "Re-read all original messages in this segment",
+  "contextImpactEditTitle": "Save earlier summary?",
+  "contextOpenNewChat": "Open new chat",
+  "wsPathChanged": "Target changed while awaiting approval.",
+  "contextEditUnknownPreview": "Usage is unavailable; it will be checked again before saving.",
+  "contextTaskWait": "Waiting for the current reply and tools to finish",
+  "@storageSpaceDeleteImagesConfirmMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressTaskElapsed": "Part {i}/{n} · {seconds}s elapsed",
+  "wsContextChanged": "Conversation context changed. Request expired.",
+  "contextChangeImpact": "This change will also undo {count} affected context operations. Original messages are kept. Continue?",
+  "@compressTaskElapsed": {
+    "placeholders": {
+      "i": {
+        "type": "int"
+      },
+      "n": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactSave": "Save",
+  "@contextUndoBudgetInfo": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextEditPreview": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "contextTaskProgress": "Compressing {done}/{total} segments",
+  "contextSummaryNotSmaller": "The summary is not shorter than its input. Review it before applying.",
+  "storageSpaceImageTypeTool": "Tool images",
+  "contextPreviousHistory": "Re-read the last compression layer",
+  "contextDetailRead": "Read",
+  "contextViewGenerated": "View generated summary",
+  "contextImpactDeleteDescription": "Delete the originals and undo related summaries so removed content is not sent again. Other messages and independent nodes are unchanged.",
+  "storageSpaceImageTypeAvatar": "Avatars & backgrounds",
+  "contextDetailAfterUndo": "After undo",
+  "contextOperationUndo": "Undo this context operation",
+  "contextHistoryWindowNote": "Recent history is still limited by the chat’s {count}-message sending window.",
+  "contextOverLimitWarning": "Undo may exceed the context limit. You can still undo and recompress; sending checks the limit again.",
+  "storageSpaceImageTypeChat": "Chat images",
+  "worldBookSelectEntries": "Select entries",
+  "compressUsageSummary": "Est. summary",
+  "contextDetailRange": "Messages {from}–{to} · {count} user messages",
+  "contextOperationHidden": "Excluded by a later clear",
+  "contextUndoClearTooltip": "Undo this clear",
+  "@compressSuccessSnack": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "compressKeepDescription": "Keep the latest {count} user messages with their replies and tools. Earlier history is summarized; attachment-only messages also count.",
+  "contextOperationUndone": "Undone",
+  "contextEditPreview": "Approx. {value} tokens after saving. Editing does not change active context.",
+  "contextDetailExcluded": "Excluded history",
+  "worldBookNoMoveTargets": "Create another world book to move entries into it.",
+  "worldBookSelectedEntries": "{count} selected",
+  "contextDetailReplaced": "Replaced",
+  "displaySettingsPageAutoScrollEnabledLabel": "On",
+  "@contextDetailParts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextChangeTitle": "Review affected context",
+  "contextDetailTitle": "Summary",
+  "compressModelGlobal": "Global setting · fixed when started",
+  "wsDeniedMountReadonly": "Read-only mount. Can’t write.",
+  "compressRereadDesc": "Recover details lost across summaries. Uses more tokens.",
+  "toolApprovalSwitchToFullAccess": "Switch to full access",
+  "compressUsageInput": "Summary input",
+  "contextDetailSummaryLabel": "Summary used in later requests",
+  "contextImpactDeleteTitle": "Delete compressed originals?",
+  "compressAdvancedOff": "Re-read originals off",
+  "contextOperationActive": "Currently applied",
+  "compressAdvancedOn": "Re-read originals on",
+  "contextTaskMerging": "Merging summaries",
+  "contextSampledInfo": "Only the selected {count} characters were read; the summary replaces the entire selected history range.",
+  "contextDividerRunning": "Compressing context",
+  "contextClearDetails": "Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.",
+  "compressCopyResult": "Copy result",
+  "contextDetailInUse": "In use",
+  "contextImpactDescription": "Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.",
+  "compressIncludeAttachmentsDesc": "Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.",
+  "worldBookEntriesMoved": "{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}",
+  "contextImpactSourceDescription": "Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.",
+  "contextEditTitle": "Edit summary",
+  "compressUsageNext": "Next request",
+  "contextSummaryEmpty": "The summary cannot be empty. Use Clear context to exclude history.",
+  "toolApprovalDenied": "Denied",
+  "contextDetailModel": "Model · time",
+  "compressIncludeManual": "Include manual edits · {count}",
+  "contextBudgetInfo": "Estimated next request (including output reserve): {used} / {limit} tokens",
+  "contextTaskDismiss": "Dismiss status",
+  "contextUndoBudgetInfo": "After undo: approximately {used} tokens including output reserve",
+  "storageSpaceImageInUse": "In use",
+  "worldBookSelectionDone": "Done",
+  "@contextChangeImpact": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextDividerFailed": "Compression failed",
+  "toolPermissionUnboundHint": "No workspace bound: this does not turn on file or shell tools.",
+  "contextChangeWaiting": "Waiting for the current reply and tools to finish before applying this change.",
+  "@contextEditCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceDeletedUploadsPartial": "Deleted {deleted} items; kept {kept} items that are in use or could not be deleted.",
+  "contextSourceScopeHint": "Only history after the latest clear is included. This may include older messages outside the normal send window.",
+  "@toolApprovalPendingKind": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "contextTaskPreparing": "Preparing compression",
+  "@worldBookEntriesMoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactUsage": "Approx. {from} → {to} tokens",
+  "contextImpactConfirm": "Undo {count} nodes",
+  "contextDividerEdited": "edited",
+  "compressAdjust": "Adjust",
+  "compressRegenerate": "Recompress",
+  "@contextDetailRange": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextImpactSaveConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "toolPermissionEnabledSnack": "Full access enabled for this chat",
+  "contextDetailSuperseded": "Superseded by a later summary",
+  "contextTaskQueued": "Queued — waiting for compression",
+  "contextNewConversation": "Create a new chat with the summary",
+  "contextUnknownLimit": "unknown limit",
+  "browserErrActionTimeout": "Operation timed out; outcome unknown. Check the page before allowing AI to continue.",
+  "toolPermissionRequestApprovalDesc": "Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.",
+  "contextLimitedInputHint": "Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.",
+  "contextTaskCancelled": "Compression cancelled",
+  "contextDetailClearTitle": "Context cleared",
+  "contextImpactKeep": "Unchanged",
+  "@worldBookSelectedEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactUndoAlso": "Also undone",
+  "contextClearMarker": "Context cleared",
+  "toolPermissionScopeThisChat": "This chat only"
 }

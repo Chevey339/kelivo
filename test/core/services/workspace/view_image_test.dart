@@ -185,7 +185,7 @@ void main() {
       jsonDecode(
         (await view('/workspace/link.png', ctx: ctx)).content,
       )['error'],
-      'path_error',
+      'path_outside',
     );
   }, skip: Platform.isWindows);
 

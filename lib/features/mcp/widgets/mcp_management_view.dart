@@ -10,6 +10,7 @@ import '../../../desktop/setting/mcp_edit_dialog.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_text_button.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import 'mcp_form.dart';
 import 'mcp_group_picker.dart';
 import '../../../desktop/setting/mcp_json_edit_dialog.dart';
@@ -985,7 +986,7 @@ class _McpManagementViewState extends State<McpManagementView> {
         ),
       );
     }
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         centerTitle: selected != null,
         leadingWidth: selected == null ? null : 76,
@@ -1005,6 +1006,13 @@ class _McpManagementViewState extends State<McpManagementView> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: body,
       ),
+    );
+    return SelectionBackScope(
+      selecting: selected != null,
+      onCancel: () {
+        if (!_busy) setState(() => _selected = null);
+      },
+      child: page,
     );
   }
 }

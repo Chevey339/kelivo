@@ -1,4 +1,4 @@
-import 'genui_number_text.dart';
+import '../text/ui_number_display.dart';
 import '../text/ui_markdown_text.dart';
 import 'dart:async';
 
@@ -40,9 +40,15 @@ class GenUiText extends StatelessWidget {
 /// A deliberately isolated Markdown renderer. Empty extensions ensure nested
 /// kelivo-ui/kelivo-web fences remain code, and images use the library's alt text.
 class GenUiMarkdown extends StatelessWidget {
-  const GenUiMarkdown({super.key, required this.text, this.linkHandler});
+  const GenUiMarkdown({
+    super.key,
+    required this.text,
+    this.linkHandler,
+    this.exporting = false,
+  });
   final String text;
   final ms.LinkHandler? linkHandler;
+  final bool exporting;
   @override
   Widget build(BuildContext context) => ms.MarkstreamView(
     source: text,
@@ -50,6 +56,8 @@ class GenUiMarkdown extends StatelessWidget {
     options: genUiMarkdownOptions,
     mathRenderer: const _GenUiMathRenderer(),
     linkHandler: linkHandler,
+    exporting: exporting,
+    cullToViewport: !exporting,
     labels: _labels(AppLocalizations.of(context)!),
   );
 }
@@ -166,6 +174,7 @@ class _GenUiSourceState extends State<GenUiSource> {
         extensions: _extensions,
         theme: GenUiTheme.of(context).markdown,
         exporting: widget.exporting,
+        cullToViewport: !widget.exporting,
         labels: _labels(AppLocalizations.of(context)!),
         codeOptions: const ms.CodeBlockOptions(highlight: false),
       ),
@@ -174,9 +183,15 @@ class _GenUiSourceState extends State<GenUiSource> {
 }
 
 class GenUiFormula extends StatelessWidget {
-  const GenUiFormula({super.key, required this.tex, this.label});
+  const GenUiFormula({
+    super.key,
+    required this.tex,
+    this.label,
+    this.exporting = false,
+  });
   final String tex;
   final String? label;
+  final bool exporting;
   // Formula content may not override host color, font size or pixel geometry.
   static final _visualCommands = RegExp(
     r'\\(?:color|textcolor|colorbox|fcolorbox|bbox|htmlStyle|htmlClass|htmlId|style|class|cssId|includegraphics|fontsize|Huge|huge|LARGE|Large|large|small|tiny|scriptsize|sixptsize|footnotesize|normalsize|setlength|rule|kern|mkern|hskip|mskip|hspace|vspace|raisebox|genfrac|above|tmspace|newcommand|renewcommand|providecommand|def|gdef|edef|xdef|let|futurelet|csname|expandafter)\b',
@@ -198,7 +213,7 @@ class GenUiFormula extends StatelessWidget {
           AppLocalizations.of(context)!.genuiFormulaInvalid,
           style: theme.caption.copyWith(color: theme.error),
         ),
-        GenUiSource(source: tex, language: 'tex'),
+        GenUiSource(source: tex, language: 'tex', exporting: exporting),
       ],
     );
     if (_requiresSource(tex)) return _withLabel(theme, fallback());

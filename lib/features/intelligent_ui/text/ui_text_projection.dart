@@ -11,6 +11,7 @@ import '../runtime/ui_surface_controller.dart';
 import '../runtime/ui_table_data.dart';
 import 'ui_bounded_text.dart';
 import 'ui_number.dart';
+import 'ui_number_display.dart';
 import 'ui_markdown_text.dart';
 
 /// The Flutter host supplies ARB-backed wording. Projection itself has no
@@ -331,10 +332,15 @@ final class UiTextProjection {
     }
     String format(UiTableColumn column, Object? value) =>
         scalar(value, digits: column.digits);
+    // Match the visible table's row set without rounding the values copied
+    // below into text or the frozen context.
+    String display(UiTableColumn column, Object? value) => value is num
+        ? genUiDisplayNumber(value, digits: column.digits)
+        : format(column, value);
     final page = table.project(
       view: read.state.view[node.declaration.name] ?? const {},
       defaultPageSize: (node.properties['pageSize'] as num?)?.toInt() ?? 10,
-      format: format,
+      format: display,
       sortable: node.properties['sortable'] != false,
       filterable: node.properties['filterable'] != false,
     );

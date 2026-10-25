@@ -20,6 +20,8 @@ import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/compress_context_options.dart';
+import 'package:Kelivo/core/services/chat/context_compression_service.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/preset_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -129,6 +131,7 @@ class _GatedChatService extends ChatService {
     required String providerId,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? expectedContextState,
   }) async {
     regenerationEntered = true;
     await regenerationHold?.future;
@@ -148,6 +151,7 @@ class _GatedChatService extends ChatService {
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
+    String? expectedContextState,
   }) async {
     if (!holdAfterVersionSave) {
       versionSaveEntered = true;
@@ -159,6 +163,7 @@ class _GatedChatService extends ChatService {
       parts: parts,
       draftSubmission: draftSubmission,
       uiContext: uiContext,
+      expectedContextState: expectedContextState,
     );
     if (holdAfterVersionSave) {
       versionSaveEntered = true;
@@ -1581,6 +1586,456 @@ void main() {
           isTrue,
         );
       });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final stale in [false, true]) {
+    testWidgets(
+      'compression budgets the frozen queued UI payload before applying: stale=$stale',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        final omitted = AppLocalizations.of(
+          tester.element(find.byType(_ControllerHarness)),
+        )!.genuiChipOmitted;
+        await tester.runAsync(() async {
+          await assistantProvider.updateAssistant(
+            assistantProvider.currentAssistant!.copyWith(maxTokens: 32),
+          );
+          final conversation = await openConversation(controller);
+          await service.addMessage(
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'Old context to compress. ' * 200,
+          );
+          final frozen = UiContextText(title: 'Budget', body: 'value ' * 450);
+          final attachment = stale
+              ? UiContextAttachment.attached(
+                  source: UiContextSource(
+                    conversationId: conversation.id,
+                    revisionId: 'missing-source',
+                    surfaceKey: '0:0',
+                    sourceHash: 'a' * 64,
+                  ),
+                  text: frozen,
+                )
+              : UiContextAttachment.history(frozen);
+          final summary = ChatMessage(
+            id: 'context-summary:estimate',
+            role: 'user',
+            conversationId: conversation.id,
+            content: 'Budget summary',
+          );
+          final estimate = service.contextCompression.estimateCandidate!;
+          final bare = await estimate(conversation.id, [summary]);
+          final full = await estimate(conversation.id, [
+            summary,
+            ChatMessage(
+              role: 'user',
+              conversationId: conversation.id,
+              parts: UiUserContextParts.attach([const TextPart('')], frozen),
+            ),
+          ]);
+          expect(full.usedTokens, greaterThan(bare.usedTokens + 10));
+          final window = (bare.usedTokens + full.usedTokens) ~/ 2;
+          final config = settings.getProviderConfig('SiliconFlow');
+          await settings.setProviderConfig(
+            config.id,
+            config.copyWith(
+              modelOverrides: {
+                'test-model': {'contextWindow': window},
+              },
+            ),
+          );
+          final expected = await estimate(conversation.id, [
+            summary,
+            ChatMessage(
+              role: 'user',
+              conversationId: conversation.id,
+              parts: UiContextSubmission(
+                attachment,
+                omittedText: omitted,
+              ).resolve([const TextPart('')], sourceIsCurrent: false),
+            ),
+          ]);
+          final hold = Completer<String>();
+          var entered = false;
+          await service.contextCompression.start(
+            conversation.id,
+            CompressionRequest(
+              options: const CompressContextOptions(
+                mode: CompressContextLimitMode.unlimited,
+              ),
+              model: 'test-model',
+              generate: (_, _) {
+                entered = true;
+                return hold.future;
+              },
+            ),
+          );
+          await waitFor(() => entered, 'compression generation');
+          expect(
+            await controller.sendMessage(
+              ChatInputData(text: '', uiContext: attachment),
+            ),
+            ChatInputSubmissionResult.queued,
+          );
+          final queued = await estimate(conversation.id, [summary]);
+          expect(queued, expected);
+          hold.complete('Budget summary');
+          await waitFor(
+            () =>
+                service.contextCompression.taskFor(conversation.id)!.phase ==
+                (stale ? CompressionPhase.completed : CompressionPhase.review),
+            'budget decision',
+          );
+          final task = service.contextCompression.taskFor(conversation.id)!;
+          if (stale) {
+            expect(task.budget!.usedTokens, lessThan(window));
+            await waitFor(
+              () => streamRequestCount == 1,
+              'stale chip notice sent',
+            );
+            await waitFor(
+              () => !controller.chatController.isConversationLoading(
+                conversation.id,
+              ),
+              'stale chip reply finished',
+            );
+            final payload = jsonEncode(streamRequests.single);
+            expect(payload, contains(omitted));
+            expect(payload, isNot(contains(frozen.exactText)));
+          } else {
+            expect(task.error, 'context_budget_exceeded');
+            expect(task.budget!.usedTokens, greaterThan(window));
+            expect(service.contextOperationsFor(conversation.id), isEmpty);
+            expect(controller.currentQueuedInputPaused, isTrue);
+            expect(controller.currentQueuedInput!.input.uiContext, attachment);
+            expect(streamRequestCount, 0);
+          }
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('compression reuses one existing queued input per conversation', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final a = await openConversation(controller);
+      await service.addMessage(
+        conversationId: a.id,
+        role: 'user',
+        content: 'A history ' * 100,
+      );
+      final aHold = Completer<String>();
+      var aEntered = false;
+      await service.contextCompression.start(
+        a.id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          ),
+          model: 'test',
+          generate: (_, _) {
+            aEntered = true;
+            return aHold.future;
+          },
+        ),
+      );
+      await waitFor(() => aEntered, 'A compression');
+      expect(
+        await controller.sendMessage(ChatInputData(text: 'queued A')),
+        ChatInputSubmissionResult.queued,
+      );
+      expect(
+        await controller.sendMessage(ChatInputData(text: 'second A')),
+        ChatInputSubmissionResult.rejected,
+      );
+      expect(controller.currentQueuedInput!.input.text, 'queued A');
+      final b = await openConversation(controller);
+      await service.addMessage(
+        conversationId: b.id,
+        role: 'user',
+        content: 'B history ' * 100,
+      );
+      final bHold = Completer<String>();
+      var bEntered = false;
+      await service.contextCompression.start(
+        b.id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          ),
+          model: 'test',
+          generate: (_, _) {
+            bEntered = true;
+            return bHold.future;
+          },
+        ),
+      );
+      await waitFor(() => bEntered, 'B compression');
+      expect(
+        await controller.sendMessage(ChatInputData(text: 'queued B')),
+        ChatInputSubmissionResult.queued,
+      );
+      expect(streamRequestCount, 0);
+      bHold.complete('B summary');
+      await waitFor(() => streamRequestCount == 1, 'only B released');
+      expect(jsonEncode(streamRequests.single), contains('queued B'));
+      expect(jsonEncode(streamRequests.single), contains('B summary'));
+      expect(jsonEncode(streamRequests.single), isNot(contains('B history')));
+      expect(service.contextCompression.taskFor(a.id)!.active, isTrue);
+      aHold.complete('A summary');
+      await waitFor(() => streamRequestCount == 2, 'A released in background');
+      expect(controller.currentConversation!.id, b.id);
+      expect(jsonEncode(streamRequests.last), contains('queued A'));
+      expect(jsonEncode(streamRequests.last), contains('A summary'));
+      expect(
+        jsonEncode(streamRequests.last),
+        isNot(contains('context-summary:')),
+      );
+      await waitFor(
+        () =>
+            !controller.chatController.isConversationLoading(a.id) &&
+            !controller.chatController.isConversationLoading(b.id),
+        'both replies finish',
+      );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'failed compression pauses queued input until existing cancellation restores it',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final a = await openConversation(controller);
+        await service.addMessage(
+          conversationId: a.id,
+          role: 'user',
+          content: 'history ' * 100,
+        );
+        final hold = Completer<String>();
+        var entered = false;
+        await service.contextCompression.start(
+          a.id,
+          CompressionRequest(
+            options: const CompressContextOptions(
+              mode: CompressContextLimitMode.unlimited,
+            ),
+            model: 'test',
+            generate: (_, _) {
+              entered = true;
+              return hold.future;
+            },
+          ),
+        );
+        await waitFor(() => entered, 'compression started');
+        expect(
+          await controller.sendMessage(ChatInputData(text: 'keep this draft')),
+          ChatInputSubmissionResult.queued,
+        );
+        hold.completeError(StateError('test network failure'));
+        await waitFor(
+          () => controller.currentQueuedInputPaused,
+          'queue paused',
+        );
+        expect(controller.currentQueuedInput!.input.text, 'keep this draft');
+        expect(streamRequestCount, 0);
+        await controller.cancelQueuedMessage();
+        expect(controller.currentQueuedInput, isNull);
+        expect(streamRequestCount, 0);
+      });
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'queued input waits for the full reply then compression then sends once',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final conversation = await openConversation(controller);
+        streamHold = Completer<void>();
+        await controller.sendMessage(ChatInputData(text: 'old history ' * 100));
+        await waitFor(() => streamRequestCount == 1, 'first request');
+        final generated = Completer<String>();
+        var entered = false;
+        await service.contextCompression.start(
+          conversation.id,
+          CompressionRequest(
+            options: const CompressContextOptions(
+              mode: CompressContextLimitMode.unlimited,
+            ),
+            model: 'test',
+            generate: (text, _) {
+              expect(
+                controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+                isFalse,
+              );
+              expect(text, contains('Assistant: ok'));
+              entered = true;
+              return generated.future;
+            },
+          ),
+        );
+        expect(
+          service.contextCompression.taskFor(conversation.id)!.phase,
+          CompressionPhase.waiting,
+        );
+        expect(
+          await controller.sendMessage(
+            ChatInputData(text: 'after compression'),
+          ),
+          ChatInputSubmissionResult.queued,
+        );
+        expect(entered, isFalse);
+        streamHold!.complete();
+        streamHold = null;
+        await waitFor(() => entered, 'compression after persistence');
+        expect(streamRequestCount, 1);
+        generated.complete('summary');
+        await waitFor(() => streamRequestCount == 2, 'queued request');
+        expect(jsonEncode(streamRequests.last), contains('summary'));
+        expect(jsonEncode(streamRequests.last), contains('after compression'));
+        expect(jsonEncode(streamRequests.last), isNot(contains('old history')));
+        await waitFor(
+          () =>
+              !controller.chatController.isConversationLoading(conversation.id),
+          'final reply',
+        );
+        expect(controller.currentQueuedInput, isNull);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'withdrawing existing queued attachments is not undone by compression completion',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final conversation = await openConversation(controller);
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'old context ' * 100,
+        );
+        final generated = Completer<String>();
+        var entered = false;
+        await service.contextCompression.start(
+          conversation.id,
+          CompressionRequest(
+            options: const CompressContextOptions(
+              mode: CompressContextLimitMode.unlimited,
+            ),
+            model: 'test',
+            generate: (_, _) {
+              entered = true;
+              return generated.future;
+            },
+          ),
+        );
+        await waitFor(() => entered, 'compression');
+        final input = ChatInputData(
+          text: 'keep draft',
+          imagePaths: ['/not-read-image.png'],
+        );
+        expect(
+          await controller.sendMessage(input),
+          ChatInputSubmissionResult.queued,
+        );
+        final restored = controller.debugViewModel.cancelCurrentQueuedInput();
+        expect(restored!.text, input.text);
+        expect(restored.imagePaths, input.imagePaths);
+        generated.complete('summary');
+        await waitFor(
+          () =>
+              service.contextCompression.taskFor(conversation.id)!.phase ==
+              CompressionPhase.completed,
+          'completion',
+        );
+        expect(streamRequestCount, 0);
+        expect(controller.currentQueuedInput, isNull);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'compression guard does not consume a recovered tool answer before continuation',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final conversation = await openConversation(controller);
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'old context ' * 100,
+        );
+        final arguments = <String, dynamic>{
+          'questions': [
+            {'id': 'q', 'question': 'Choose'},
+          ],
+        };
+        final reply = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: [
+            ToolCallPart(
+              jsonEncode({
+                'id': 'pending',
+                'name': AskUserToolNames.askUser,
+                'arguments': arguments,
+                'content': null,
+              }),
+            ),
+            const AssistantRoundEndPart(),
+          ],
+        );
+        final generated = Completer<String>();
+        var entered = false;
+        await service.contextCompression.start(
+          conversation.id,
+          CompressionRequest(
+            options: const CompressContextOptions(
+              mode: CompressContextLimitMode.unlimited,
+            ),
+            model: 'test',
+            generate: (_, _) {
+              entered = true;
+              return generated.future;
+            },
+          ),
+        );
+        await waitFor(() => entered, 'compression');
+        final before = List<Map<String, dynamic>>.of(
+          service.getToolEvents(reply.id),
+        );
+        await controller.submitRecoveredAskUserAnswer(
+          reply,
+          ToolUIPart(
+            id: 'pending',
+            toolName: AskUserToolNames.askUser,
+            arguments: arguments,
+            loading: true,
+          ),
+          const AskUserResult.answer({
+            'q': AskUserAnswerValue.single(value: 'keep pending', custom: true),
+          }),
+        );
+        expect(service.getToolEvents(reply.id), before);
+        expect(streamRequestCount, 0);
+        await service.contextCompression.cancel(conversation.id);
+        generated.complete('late summary');
+      });
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -2798,7 +3253,7 @@ void main() {
         final question = (await service.loadMessages(
           target.id,
         )).firstWhere((m) => m.role == 'user');
-        await service.toggleTruncateAtTail(target.id);
+        await service.clearConversationContext(target.id);
         final current = service.getConversation(target.id)!;
         final choices = await repository.getSelectedMessageProjections(
           target.id,

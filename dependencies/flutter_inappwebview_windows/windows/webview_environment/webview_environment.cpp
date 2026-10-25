@@ -3,6 +3,7 @@
 
 #include "../utils/log.h"
 #include "webview_environment.h"
+#include "kelivo_scheme.h"
 
 #include "webview_environment_manager.h"
 
@@ -33,6 +34,7 @@ namespace flutter_inappwebview_plugin
     }
 
     auto options = Make<CoreWebView2EnvironmentOptions>();
+    registerKelivoScheme(options.Get());
     if (settings) {
       if (settings->additionalBrowserArguments.has_value()) {
         options->put_AdditionalBrowserArguments(utf8_to_wide(settings->additionalBrowserArguments.value()).c_str());

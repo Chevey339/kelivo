@@ -26,11 +26,11 @@ jobs:
           cache: true
 
       - name: Flutter pub get
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Flutter pub get (markstream)
         working-directory: dependencies/markstream
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Dart format (changed files only)
         shell: bash

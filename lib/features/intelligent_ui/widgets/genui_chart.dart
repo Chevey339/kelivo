@@ -1,4 +1,4 @@
-import 'genui_number_text.dart';
+import '../text/ui_number_display.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';

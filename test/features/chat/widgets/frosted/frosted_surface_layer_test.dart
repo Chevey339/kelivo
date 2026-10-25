@@ -55,6 +55,7 @@ void main() {
       surface = ChatFrostedBackdropScope(
         controller: controller,
         backgroundActive: true,
+        size: const Size(800, 600),
         child: surface,
       );
       return MaterialApp(home: Scaffold(body: surface));

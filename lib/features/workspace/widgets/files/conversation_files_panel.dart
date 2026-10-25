@@ -1,6 +1,9 @@
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:path/path.dart' as p;
+import '../../workspace_file_navigation.dart';
+import '../../../../core/services/workspace/file_link_resolver.dart';
 
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -373,6 +376,19 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
       rootLabel: _workspace!.name,
       scrollController: widget.scrollController,
       modelPathOf: (host) => WorkspaceModelPaths.workspaceFile(host, root.path),
+      onOpenFile: (file) async {
+        final navigator = Navigator.of(context);
+        final html =
+            ['.html', '.htm'].contains(p.extension(file.path).toLowerCase()) &&
+            !Platform.isLinux;
+        final targetContext = html ? navigator.context : context;
+        if (html && navigator.canPop()) navigator.pop();
+        await openWorkspaceLinkedFile(
+          targetContext,
+          'kelivo://workspace/${KelivoLink.encodePath(p.relative(file.path, from: root.path))}',
+          conversationId: widget.conversationId,
+        );
+      },
     );
   }
 }

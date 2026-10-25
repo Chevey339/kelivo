@@ -1,6 +1,10 @@
 import '../../intelligent_ui/host/ui_persistence_host.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
+import '../../../core/models/context_operation.dart';
+import '../../../core/models/context_compression_task.dart';
+import '../../chat/widgets/context_compression_status.dart';
+import '../../chat/widgets/context_operation_widgets.dart';
 import '../../browser/models/browser_tool_presentation.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -18,7 +22,6 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_regex.dart';
-import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/selection_scroll_container.dart';
@@ -110,6 +113,13 @@ class MessageListView extends StatefulWidget {
     required this.byGroup,
     required this.versionSelections,
     this.truncCollapsedIndex = -1,
+    this.contextOperations = const [],
+    this.contextTask,
+    this.contextTaskRevision,
+    this.contextTaskWaitingForApproval = false,
+    this.onOpenContextTask,
+    this.onOpenContextOperation,
+    this.onUndoContextOperation,
     required this.reasoning,
     required this.reasoningSegments,
     required this.contentSplits,
@@ -187,6 +197,14 @@ class MessageListView extends StatefulWidget {
 
   /// Pre-computed truncate index in collapsed message space (-1 = none).
   final int truncCollapsedIndex;
+  final List<ContextOperation> contextOperations;
+  final ContextCompressionTask? contextTask;
+  final String? contextTaskRevision;
+  final bool contextTaskWaitingForApproval;
+  final void Function(ContextCompressionTask task, Offset anchor)?
+  onOpenContextTask;
+  final ValueChanged<ContextOperation>? onOpenContextOperation;
+  final ValueChanged<ContextOperation>? onUndoContextOperation;
 
   final Map<String, stream_ctrl.ReasoningData> reasoning;
   final Map<String, List<stream_ctrl.ReasoningSegmentData>> reasoningSegments;
@@ -309,6 +327,20 @@ class _MessageListViewState extends State<MessageListView> {
   );
 
   bool get _hasFooter => _showsFooter(widget);
+
+  bool _taskAt(int index) {
+    final task = widget.contextTask;
+    if (task == null ||
+        !compressionShowsDivider(task) ||
+        widget.selecting ||
+        index < 0 ||
+        index >= _effectiveRenderModels.length) {
+      return false;
+    }
+    return task.anchorGroupId == null
+        ? !widget.hasMoreAfter && index == _effectiveRenderModels.length - 1
+        : task.anchorGroupId == _effectiveRenderModels[index].slotId;
+  }
 
   static bool _showsFooter(MessageListView view) =>
       view.footer != null &&
@@ -630,7 +662,19 @@ class _MessageListViewState extends State<MessageListView> {
         _hasFooter && index == _effectiveRenderModels.length - 1
         ? _footerExtent
         : 0;
-    return _estimateMessageExtent(index, crossAxisExtent) + footerExtent;
+    final nodes = index >= _effectiveRenderModels.length
+        ? 0
+        : widget.contextOperations
+              .where(
+                (op) =>
+                    !op.revoked &&
+                    op.anchorGroupId == _effectiveRenderModels[index].slotId,
+              )
+              .length;
+    return _estimateMessageExtent(index, crossAxisExtent) +
+        footerExtent +
+        (nodes + (_taskAt(index) ? 1 : 0)) *
+            (28 + widget.dividerPadding.vertical);
   }
 
   double _estimateMessageExtent(int? index, double crossAxisExtent) {
@@ -1261,7 +1305,8 @@ class _MessageListViewState extends State<MessageListView> {
     final newModels = _effectiveRenderModels;
     if ((_hasFooter || _showsFooter(oldWidget)) &&
         (oldModels.length != newModels.length ||
-            _hasFooter != _showsFooter(oldWidget))) {
+            _hasFooter != _showsFooter(oldWidget) ||
+            !identical(widget.footer, oldWidget.footer))) {
       for (final index in {
         math.max(0, oldModels.length - 1),
         math.max(0, newModels.length - 1),
@@ -1272,6 +1317,15 @@ class _MessageListViewState extends State<MessageListView> {
       }
     }
     final metricInputsChanged =
+        oldWidget.contextTaskRevision != widget.contextTaskRevision ||
+        !listEquals(
+          oldWidget.contextOperations
+              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .toList(),
+          widget.contextOperations
+              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .toList(),
+        ) ||
         oldWidget.chatFontScale != widget.chatFontScale ||
         oldWidget.selecting != widget.selecting ||
         oldWidget.showModelIcon != widget.showModelIcon ||
@@ -1664,41 +1718,6 @@ class _MessageListViewState extends State<MessageListView> {
     super.dispose();
   }
 
-  /// Build the context divider widget shown at truncate position.
-  Widget _buildContextDivider(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final label = l10n.homePageClearContext;
-    return Row(
-      children: [
-        Expanded(
-          child: Divider(
-            color: cs.outlineVariant.withValues(alpha: 0.6),
-            height: 1,
-            thickness: 1,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Divider(
-            color: cs.outlineVariant.withValues(alpha: 0.6),
-            height: 1,
-            thickness: 1,
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Items render at the system scale times the chat scale (see the MediaQuery
@@ -1781,10 +1800,7 @@ class _MessageListViewState extends State<MessageListView> {
                 keyboardDismissBehavior: _keyboardDismissBehavior,
                 itemBuilder: (context, index) {
                   if (_effectiveRenderModels.isEmpty && _hasFooter) {
-                    return SizedBox(
-                      height: _footerExtent,
-                      child: widget.footer,
-                    );
+                    return widget.footer!;
                   }
                   if (index < 0 || index >= _effectiveRenderModels.length) {
                     return const SizedBox.shrink();
@@ -2201,13 +2217,58 @@ class _MessageListViewState extends State<MessageListView> {
             ),
           ],
         ),
-        if (model.showContextDivider)
+        for (final operation in widget.contextOperations)
+          if (!operation.revoked &&
+              operation.anchorGroupId == (message.groupId ?? message.id))
+            Padding(
+              padding: widget.dividerPadding,
+              child: ContextOperationDivider(
+                key: ValueKey('context-node-${operation.id}'),
+                operation: operation,
+                hiddenByClear: widget.contextOperations
+                    .skipWhile((op) => op.id != operation.id)
+                    .skip(1)
+                    .any(
+                      (op) =>
+                          !op.revoked &&
+                          !op.isCompression &&
+                          op.sourceGroups.contains(operation.anchorGroupId),
+                    ),
+                superseded: widget.contextOperations.any(
+                  (other) =>
+                      !other.revoked &&
+                      other.dependencies.contains(operation.id),
+                ),
+                onOpen: () => widget.onOpenContextOperation?.call(operation),
+                onUndo: widget.onUndoContextOperation == null
+                    ? null
+                    : () => widget.onUndoContextOperation!(operation),
+              ),
+            ),
+        if (_taskAt(index))
           Padding(
             padding: widget.dividerPadding,
-            child: _buildContextDivider(context),
+            child: Builder(
+              builder: (anchorContext) => ContextOperationDivider.task(
+                key: ValueKey('context-task-${widget.contextTask!.id}'),
+                task: widget.contextTask!,
+                waitingForApproval: widget.contextTaskWaitingForApproval,
+                onOpen: () {
+                  final box = anchorContext.findRenderObject() as RenderBox?;
+                  if (box != null) {
+                    widget.onOpenContextTask?.call(
+                      widget.contextTask!,
+                      box.localToGlobal(
+                        Offset(box.size.width / 2, box.size.height),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
           ),
         if (_hasFooter && index == _effectiveRenderModels.length - 1)
-          SizedBox(height: _footerExtent, child: widget.footer),
+          widget.footer!,
       ],
     );
     final isSpotlight =

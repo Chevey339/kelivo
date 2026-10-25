@@ -1,5 +1,5 @@
 import '../runtime/ui_numeric_step.dart';
-import '../text/ui_number.dart';
+import 'ui_number.dart';
 
 /// Human-readable output only. Raw values, editing drafts, sort order and
 /// frozen context keep their original precision. Only near-identical short

@@ -26,7 +26,7 @@ namespace flutter_inappwebview_plugin
 
     if (string_equals(methodName, "dispose")) {
       if (webView->plugin && webView->plugin->headlessInAppWebViewManager) {
-        std::map<std::string, std::unique_ptr<HeadlessInAppWebView>>& webViews = webView->plugin->headlessInAppWebViewManager->webViews;
+        auto& webViews = webView->plugin->headlessInAppWebViewManager->webViews;
         auto& id = webView->id;
         if (map_contains(webViews, id)) {
           if (webView->channelDelegate) {

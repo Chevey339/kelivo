@@ -30,7 +30,7 @@ abstract mixin class AndroidPathHandler
   final String _id = IdGenerator.generate();
 
   @override
-  late final PlatformPathHandlerEvents? eventHandler;
+  PlatformPathHandlerEvents? eventHandler;
 
   @override
   late final String path;
@@ -70,6 +70,7 @@ abstract mixin class AndroidPathHandler
 
   @override
   void dispose() {
+    if (disposed) return;
     disposeChannel();
     eventHandler = null;
   }

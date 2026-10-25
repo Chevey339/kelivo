@@ -15,6 +15,7 @@ Future<void> openBrowserPage(
   String? conversationId,
   String? assistantId,
   String? tabId,
+  String? url,
   bool fullPage = false,
 }) async {
   final id = await ensureConversationId(
@@ -30,6 +31,18 @@ Future<void> openBrowserPage(
   if (tabId != null && browser.tabs.any((tab) => tab.id == tabId)) {
     selectedTabId = tabId;
     await browser.selectTab(tabId);
+    if (!context.mounted) return;
+  }
+  if (url != null) {
+    await browser.initialize();
+    final tab = await browser.createTab(ownerSessionId: id);
+    selectedTabId = tab.id;
+    try {
+      await browser.navigate(url, tabId: tab.id);
+    } catch (_) {
+      await browser.closeTab(tab.id);
+      rethrow;
+    }
     if (!context.mounted) return;
   }
   final panel = BrowserPanelController.instance;

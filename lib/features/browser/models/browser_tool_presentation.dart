@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../utils/mcp_structured_image.dart';
 
 /// Read-only presentation of an existing tool result; never runs browser work.
 class BrowserToolAction {
@@ -14,12 +15,20 @@ class BrowserToolAction {
     Map<String, dynamic>? metadata,
     this.loading = false,
   }) : result = _result(content),
-       browserMetadata = _map(metadata?['browser']);
+       browserMetadata = _map(metadata?['browser']),
+       _images = mcpResultImageUris(readMcpResultMetadata(metadata));
 
   final String id;
   final Map<String, dynamic> arguments;
   final bool loading;
   final Map<String, dynamic> result, browserMetadata;
+  final List<String> _images;
+
+  /// This action's immutable image only, never another action's current tab.
+  String? get previewImage {
+    final preview = _string(browserMetadata['previewImage']);
+    return preview.isNotEmpty ? preview : _images.firstOrNull;
+  }
 
   static Map<String, dynamic> _map(Object? value) => value is Map
       ? {
@@ -47,7 +56,7 @@ class BrowserToolAction {
   bool get failed =>
       !loading &&
       (result['ok'] == false || browserMetadata['status'] == 'error');
-  String get error => _string(result['error']);
+  String get error => _string(result['error_code'] ?? result['error']);
   String? get tabId {
     final id = _string(
       browserMetadata['tabId'] ??
@@ -138,8 +147,10 @@ String browserActionLabel(AppLocalizations l, String action) =>
       'render' => l.browserActionRender,
       'extract' => l.browserActionExtract,
       'snapshot' => l.browserActionSnapshot,
+      'screenshot' => l.browserActionScreenshot,
       'click' => l.browserActionClick,
       'type' => l.browserActionType,
+      'select_option' => l.browserActionSelect,
       'press' => l.browserActionPress,
       'scroll' => l.browserActionScroll,
       'wait' => l.browserActionWait,
@@ -159,8 +170,10 @@ IconData browserActionIcon(String action) => switch (action) {
   'render' => LucideIcons.code,
   'extract' => LucideIcons.fileText,
   'snapshot' => LucideIcons.scanEye,
+  'screenshot' => LucideIcons.camera,
   'click' => LucideIcons.mousePointerClick,
   'type' => LucideIcons.keyboard,
+  'select_option' => LucideIcons.list,
   'press' => LucideIcons.cornerDownLeft,
   'scroll' => LucideIcons.arrowUpDown,
   'wait' => LucideIcons.hourglass,
@@ -184,6 +197,9 @@ String browserErrorSummary(AppLocalizations l, String error) {
     return l.browserErrNotVisible;
   }
   if (error.contains('element_not_found')) return l.browserErrNotFound;
+  if (error.contains('browser_action_timeout_outcome_unknown')) {
+    return l.browserErrActionTimeout;
+  }
   if (error.toLowerCase().contains('timeout')) return l.browserErrTimeout;
   if (error.contains('browser_human_control')) return l.browserErrHumanControl;
   if (error.contains('browser_tab_closed') ||

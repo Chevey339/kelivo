@@ -427,6 +427,80 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
+  testWidgets(
+    'wide mobile creation imports a copy into a managed workspace',
+    (tester) async {
+      const haptics = MethodChannel('haptic_feedback');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, (_) async => true);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, null),
+      );
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1366, 1024);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final source = Directory(p.join(tempDir.path, 'source'))..createSync();
+      final original = File(p.join(source.path, 'note.txt'))
+        ..writeAsStringSync('original');
+      (FilePicker.platform as _FolderPicker).folder = source.path;
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(WorkspacesPane)),
+      )!;
+      await tester.tap(find.byKey(WorkspacesPane.createKey));
+      await _settleSheet(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text(l10n.workspaceMgmtImportFromFolder), findsOneWidget);
+      expect(find.text(l10n.workspaceMgmtKindLinkedTitle), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Imported');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 400);
+      addTearDown(tester.view.resetViewInsets);
+      await _settleSheet(tester);
+      expect(
+        tester
+            .getBottomRight(
+              find.byKey(const ValueKey<String>('workspaces-create-confirm')),
+            )
+            .dy,
+        lessThanOrEqualTo(624),
+      );
+      await tester.tap(find.text(l10n.workspaceMgmtImportFromFolder));
+      await tester.pump();
+      await _tapFormConfirm(
+        tester,
+        const ValueKey<String>('workspaces-create-confirm'),
+      );
+      await _awaitIo(tester, () => workspaces.workspaces.isNotEmpty);
+      final created = workspaces.workspaces.single;
+      expect(created.kind, WorkspaceKind.managed);
+      expect(created.hostPath, isNull);
+      final destination = await tester.runAsync(
+        () => workspaces.hostRootFor(created),
+      );
+      final copied = File(p.join(destination!, 'note.txt'));
+      await _awaitIo(tester, copied.existsSync);
+      expect(copied.readAsStringSync(), 'original');
+      expect(copied.path, isNot(original.path));
+      copied.writeAsStringSync('edited copy');
+      expect(original.readAsStringSync(), 'original');
+      await _awaitIo(
+        tester,
+        () => find.byType(DesktopWorkspaceFiles).evaluate().isNotEmpty,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+
   testWidgets('creates renames and deletes a workspace', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(400, 900);

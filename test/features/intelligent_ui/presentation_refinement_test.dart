@@ -5,7 +5,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_chart_data.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
-import 'package:Kelivo/features/intelligent_ui/widgets/genui_number_text.dart';
+import 'package:Kelivo/features/intelligent_ui/text/ui_number_display.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_expansion.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_web_card.dart';

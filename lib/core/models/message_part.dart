@@ -106,6 +106,16 @@ final class ToolCallPart extends MessagePart {
 
   final String payloadJson;
 
+  /// Client-owned browser thumbnails are UI assets, not model image parts.
+  String? get browserPreviewImage {
+    if (!payloadJson.contains('"previewImage"')) return null;
+    try {
+      return browserPreviewImageFromToolEvent(jsonDecode(payloadJson));
+    } on FormatException {
+      return null;
+    }
+  }
+
   @override
   String get kind => 'tool_call';
 
@@ -120,6 +130,16 @@ final class ToolCallPart extends MessagePart {
   @override
   int get hashCode => payloadJson.hashCode;
 }
+
+String? browserPreviewImageFromToolEvent(Object? event) => switch (event) {
+  {
+    'name': 'browser',
+    'metadata': {'browser': {'previewImage': final String uri}},
+  }
+      when uri.trim().isNotEmpty =>
+    uri,
+  _ => null,
+};
 
 /// End of one model response before its client tools execute. This is durable
 /// transcript structure, not visible text or a tool execution result.

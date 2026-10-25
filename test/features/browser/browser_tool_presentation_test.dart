@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/browser/models/browser_tool_presentation.dart';
 import 'package:Kelivo/l10n/app_localizations_zh.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 void main() {
   final l = AppLocalizationsZh();
@@ -22,6 +23,33 @@ void main() {
       expect(estimateBrowserGroupBodyHeight(lite: true), 48);
     },
   );
+  test(
+    'preview belongs to result metadata, with explicit screenshots as fallback',
+    () {
+      BrowserToolAction saved(Map<String, dynamic> metadata) =>
+          BrowserToolAction(
+            id: 'step',
+            arguments: const {'action': 'snapshot'},
+            metadata: metadata,
+            content:
+                '{"ok":true,"page":{"previewImage":"file:///untrusted.png"}}',
+          );
+      expect(saved({}).previewImage, isNull);
+      expect(
+        saved({
+          kMcpResultMetadataKey: mcpResultMetadata(['own-screenshot']),
+        }).previewImage,
+        'own-screenshot',
+      );
+      expect(
+        saved({
+          'browser': {'previewImage': 'own-preview'},
+          kMcpResultMetadataKey: mcpResultMetadata(['own-screenshot']),
+        }).previewImage,
+        'own-preview',
+      );
+    },
+  );
   test('every browser operation has a localized label', () {
     const labels = {
       'open': '打开网页',
@@ -29,6 +57,7 @@ void main() {
       'render': '渲染页面',
       'extract': '提取正文',
       'snapshot': '读取页面结构',
+      'screenshot': '截取页面',
       'click': '点击',
       'type': '输入文字',
       'press': '按键',
@@ -46,6 +75,23 @@ void main() {
     for (final entry in labels.entries) {
       expect(browserActionLabel(l, entry.key), entry.value);
     }
+  });
+  test('structured failure codes keep localized error presentation', () {
+    final failed = action(
+      'click',
+      raw: jsonEncode({
+        'ok': false,
+        'error_code': 'stale_ref',
+        'error': 'The target changed.',
+      }),
+    );
+    expect(failed.failed, true);
+    expect(browserErrorSummary(l, failed.error), l.browserErrStaleRef);
+    final old = action(
+      'open',
+      raw: '{"ok":false,"error":"browser_tab_closed"}',
+    );
+    expect(browserErrorSummary(l, old.error), l.browserErrTabClosed);
   });
   test('image suffix and malformed result never break presentation', () {
     expect(
@@ -127,6 +173,7 @@ void main() {
         'element_not_found': '未找到元素',
         'TimeoutException': '页面加载超时',
         'timeout': '页面加载超时',
+        'browser_action_timeout_outcome_unknown': '操作超时，结果未确认，请检查页面后允许继续',
         'browser_human_control': '你正在接管浏览器',
         'browser_tab_not_found': '标签页已关闭',
         'browser_tab_closed': '标签页已关闭',

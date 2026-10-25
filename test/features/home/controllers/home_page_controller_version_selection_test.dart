@@ -253,6 +253,7 @@ class _SelectionFakeChatService extends ChatService {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? expectedContextState,
   }) async {
     lastDeletedIds = Set<String>.of(messageIds);
     return lastDeletedIds!;

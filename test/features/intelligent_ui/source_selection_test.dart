@@ -10,6 +10,7 @@ import 'package:Kelivo/features/intelligent_ui/widgets/genui_diagnostic_source.d
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'package:Kelivo/shared/widgets/app_text_selection_toolbar.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 Widget _app(Widget child) => MaterialApp(
@@ -87,8 +88,8 @@ void main() {
         await tester.pumpAndSettle();
         final menu =
             area.contextMenuBuilder!(areaContext, region)
-                as AdaptiveTextSelectionToolbar;
-        menu.buttonItems!
+                as AppTextSelectionToolbar;
+        menu.buttonItems
             .singleWhere((item) => item.type == ContextMenuButtonType.copy)
             .onPressed!();
         await tester.pumpAndSettle();
@@ -157,8 +158,8 @@ void main() {
               tester.element(find.byType(SelectionArea)),
               region,
             )
-            as AdaptiveTextSelectionToolbar;
-    menu.buttonItems!
+            as AppTextSelectionToolbar;
+    menu.buttonItems
         .singleWhere((item) => item.type == ContextMenuButtonType.copy)
         .onPressed!();
     await tester.pumpAndSettle();

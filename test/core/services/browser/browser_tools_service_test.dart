@@ -14,6 +14,8 @@ import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
 import 'package:Kelivo/core/services/browser/browser_tools_service.dart';
+import 'package:Kelivo/core/services/browser/browser_workspace_resources.dart';
+import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/features/browser/models/browser_agent_activity.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -34,6 +36,14 @@ void main() {
         {'action': 'click', 'x': 2},
         {'action': 'click', 'ref': 'e1', 'selector': 'button'},
         {'action': 'type', 'selector': 'input'},
+        {'action': 'select_option', 'selector': 'select'},
+        {
+          'action': 'select_option',
+          'selector': 'select',
+          'option_value': 'a',
+          'option_label': 'One',
+        },
+        {'action': 'extract', 'offset': -1},
         {'action': 'close_tab'},
         {'action': 'snapshot', 'max_elements': 201},
         {'action': 'wait', 'timeout': 99999},
@@ -90,6 +100,7 @@ void main() {
   late BrowserToolsService tools;
   late PathProviderPlatform originalPaths;
   late Map<String, _Engine> engines;
+  TimeoutException? loadError;
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('browser_tools_test_');
@@ -97,6 +108,7 @@ void main() {
     PathProviderPlatform.instance = FakePathProviderPlatform(directory.path);
     SandboxPathResolver.debugSetDirs(docsDir: directory.path);
     engines = {};
+    loadError = null;
     browser = BrowserService(
       store: BrowserStore(directory: Directory('${directory.path}/browser')),
       supported: true,
@@ -109,11 +121,19 @@ void main() {
             required onNewWindow,
             required isAgentActive,
           }) async {
-            return engines[tab.id] = _Engine(onChanged);
+            return engines[tab.id] = _Engine(
+              onChanged,
+              loadError: loadError,
+              onNewWindow: onNewWindow,
+            );
           },
     );
     await browser.initialize();
-    tools = BrowserToolsService(browser: browser);
+    tools = BrowserToolsService(
+      browser: browser,
+      workspaces: BrowserWorkspaceResources()
+        ..rootForSession = (id) async => id == 'chat-a' ? directory : null,
+    );
   });
 
   tearDown(() async {
@@ -157,6 +177,461 @@ void main() {
     expect(browser.tabs, isEmpty);
     expect(engines, isEmpty);
   });
+
+  test(
+    'step previews persist independently and never enter model image input',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final engine = engines.values.single;
+      engine.onChanged(const BrowserPageState(isLoading: false));
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)..setPixelRgba(0, 0, 255, 0, 0, 255),
+      );
+      final first = await tools.handle('chat-a', {
+        'action': 'scroll',
+        'direction': 'down',
+      });
+      final firstUri =
+          (first.metadata!['browser'] as Map)['previewImage'] as String;
+      final firstFile = (await McpImageSnapshot.localFile(firstUri))!;
+      final firstBytes = await firstFile.readAsBytes();
+      expect(engine.thumbnailCalls, 1);
+      expect(
+        (await ToolResultContent.read(
+          'browser',
+          first.content,
+          metadata: first.metadata,
+        )).imageUrls,
+        isEmpty,
+      );
+      expect(first.content, isNot(contains(firstUri)));
+
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)..setPixelRgba(0, 0, 0, 0, 255, 255),
+      );
+      final second = await tools.handle('chat-a', {
+        'action': 'scroll',
+        'direction': 'down',
+      });
+      final secondUri =
+          (second.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(secondUri, isNot(firstUri));
+      expect(await firstFile.readAsBytes(), firstBytes);
+      expect(
+        await (await McpImageSnapshot.localFile(secondUri))!.readAsBytes(),
+        isNot(firstBytes),
+      );
+      expect(engine.thumbnailCalls, 2);
+
+      final read = await tools.handle('chat-a', {'action': 'extract'});
+      expect((read.metadata!['browser'] as Map)['previewImage'], secondUri);
+      expect(
+        engine.thumbnailCalls,
+        3,
+        reason: 'Each step samples current pixels, even at the same URL',
+      );
+      expect(
+        await firstFile.parent.list().length,
+        2,
+        reason: 'Reused preview pixels do not create duplicate files',
+      );
+      engine.previewBytes = Uint8List.fromList(engine.previewBytes!);
+      final unchanged = await tools.handle('chat-a', {
+        'action': 'click',
+        'selector': '#same-page',
+      });
+      expect(
+        (unchanged.metadata!['browser'] as Map)['previewImage'],
+        secondUri,
+      );
+      expect(await firstFile.parent.list().length, 2);
+      final persisted = jsonDecode(jsonEncode(first.metadata)) as Map;
+      expect(
+        await McpImageSnapshot.localFile(
+          persisted['browser']['previewImage'] as String,
+        ),
+        isNotNull,
+      );
+      await (await McpImageSnapshot.localFile(secondUri))!.delete();
+      final restored = await tools.handle('chat-a', {'action': 'snapshot'});
+      final restoredUri =
+          (restored.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(restoredUri, secondUri);
+      expect(await McpImageSnapshot.localFile(restoredUri), isNotNull);
+    },
+  );
+
+  test(
+    'hidden cards skip preview capture and explicit screenshots are reused',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final engine = engines.values.single;
+      engine.onChanged(const BrowserPageState(isLoading: false));
+      final hidden = await tools.handle('chat-a', {
+        'action': 'scroll',
+      }, capturePreview: false);
+      expect(hidden.metadata!['browser'], isNot(contains('previewImage')));
+      expect(engine.thumbnailCalls, 0);
+      final explicit = await tools.handle('chat-a', {
+        'action': 'snapshot',
+        'include_screenshot': true,
+      }, capturePreview: false);
+      final images = mcpResultImageUris(
+        readMcpResultMetadata(explicit.metadata),
+      );
+      expect(images, hasLength(1));
+      expect(
+        (explicit.metadata!['browser'] as Map)['previewImage'],
+        images.single,
+      );
+      expect(engine.thumbnailCalls, 0);
+      expect(
+        await (await McpImageSnapshot.localFile(
+          images.single,
+        ))!.parent.list().length,
+        1,
+      );
+    },
+  );
+
+  test(
+    'temporary chats skip extra previews and own explicit screenshot files',
+    () async {
+      await enable();
+      final opened = await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, temporary: true);
+      expect(opened.metadata!['browser'], isNot(contains('previewImage')));
+      final engine = engines.values.single;
+      expect(engine.thumbnailCalls, 0);
+      final uris = <String>{};
+      for (final temporary in [false, true, true]) {
+        final result = await tools.handle('chat-a', {
+          'action': 'snapshot',
+          'include_screenshot': true,
+        }, temporary: temporary);
+        final uri =
+            (result.metadata!['browser'] as Map)['previewImage'] as String;
+        expect(
+          uris.add(uri),
+          isTrue,
+          reason: 'Temporary screenshots must not share persistent assets',
+        );
+      }
+      expect(engine.thumbnailCalls, 0);
+    },
+  );
+
+  test('wait and reads capture asynchronous changes at the same URL', () async {
+    await enable();
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'https://example.com',
+    }, capturePreview: false);
+    final engine = engines.values.single;
+    engine.waitReady = true;
+    engine.onChanged(const BrowserPageState(isLoading: false));
+    final uris = <String>{};
+    for (final action in ['click', 'wait', 'snapshot', 'extract']) {
+      engine.previewBytes = img.encodePng(
+        img.Image(width: 2, height: 2)
+          ..setPixelRgba(0, 0, uris.length * 60, 0, 0, 255),
+      );
+      final result = await tools.handle('chat-a', {
+        'action': action,
+        if (action == 'click') 'selector': '#load-results',
+        if (action == 'wait') 'wait_for': '#results',
+      });
+      final uri =
+          (result.metadata!['browser'] as Map)['previewImage'] as String;
+      expect(uris.add(uri), isTrue, reason: '$action must sample current DOM');
+    }
+    expect(engine.thumbnailCalls, 4);
+  });
+
+  for (final action in [
+    'open',
+    'new_tab',
+    'render',
+    'back',
+    'forward',
+    'reload',
+  ]) {
+    test(
+      '$action load timeout leaves AI free to inspect and continue',
+      () async {
+        await enable();
+        await tools.handle('chat-a', {
+          'action': 'open',
+          'url': 'https://example.com',
+        });
+        loadError = TimeoutException(
+          'Future not completed',
+          const Duration(seconds: 15),
+        );
+        for (final engine in engines.values) {
+          engine.loadError = loadError;
+        }
+        final epoch = browser.controlEpoch;
+        final result = payload(
+          await tools.handle('chat-a', {
+            'action': action,
+            if (action == 'open' || action == 'new_tab')
+              'url': 'https://slow.example.com',
+            if (action == 'render') 'html': '<h1>Page</h1>',
+          }),
+        );
+        expect(result['ok'], isFalse);
+        expect(result['error_code'], 'browser_load_timeout');
+        expect(
+          result['page']['tab_id'],
+          browser.selectedTabForSession('chat-a')!.id,
+        );
+        expect(result['page']['url'], isNotNull);
+        expect(result['page']['navigation_state'], isNotNull);
+        expect(result['error'], isNot(contains('browser_human_control')));
+        expect(browser.agentPaused, isFalse);
+        expect(browser.agentPauseReason, isNull);
+        expect(browser.controlEpoch, epoch);
+        expect(engines.values.every((engine) => engine.stopCalls == 0), isTrue);
+        expect(
+          payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+          isTrue,
+        );
+        expect(
+          payload(await tools.handle('chat-b', {'action': 'list_tabs'}))['ok'],
+          isTrue,
+        );
+
+        loadError = null;
+        for (final engine in engines.values) {
+          engine.loadError = null;
+        }
+        expect(
+          payload(
+            await tools.handle('chat-a', {
+              'action': 'open',
+              'url': 'https://example.com/next',
+            }),
+          )['ok'],
+          isTrue,
+        );
+      },
+    );
+  }
+
+  test(
+    'select, continuation and URL waits preserve the tool contract',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      final selected = payload(
+        await tools.handle('chat-a', {
+          'action': 'select_option',
+          'selector': 'select',
+          'option_value': 'b',
+        }),
+      );
+      expect(selected['ok'], true);
+      expect(engine.lastAwaitPromise, true);
+      expect(engine.scripts.last, contains('"option_value":"b"'));
+      final continued = payload(
+        await tools.handle('chat-a', {'action': 'extract', 'offset': 1000}),
+      );
+      expect(continued['ok'], true);
+      engine.waitReady = true;
+      engine.documentUrl = 'https://example.com/next';
+      final ready = payload(
+        await tools.handle('chat-a', {
+          'action': 'wait',
+          'wait_for_url': '/next',
+          'timeout': 100,
+        }),
+      );
+      expect(ready['ok'], true);
+      final timedOut = payload(
+        await tools.handle('chat-a', {
+          'action': 'wait',
+          'wait_for_url': '/missing',
+          'timeout': 100,
+        }),
+      );
+      expect(timedOut['ok'], false);
+      expect(browser.agentPaused, false);
+    },
+  );
+
+  test(
+    'rejected input reports current page and never claims success',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      engines.values.single.domError = 'input_value_rejected';
+      final result = await tools.handle('chat-a', {
+        'action': 'type',
+        'selector': 'input',
+        'text': 'x',
+      });
+      expect(payload(result)['ok'], false);
+      expect(payload(result)['page']['tab_id'], browser.tabs.single.id);
+      expect(result.metadata!['browser']['tabId'], browser.tabs.single.id);
+      expect(browser.agentPaused, false);
+    },
+  );
+
+  test(
+    'action results report popup ownership and bounded dialog events',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final parent = engines.values.single;
+      final parentId = browser.tabs.single.id;
+      parent.onEvaluation = () async {
+        parent.onEvaluation = null;
+        parent.onChanged(
+          const BrowserPageState(
+            agentEvent: {
+              'type': 'dialog',
+              'dialog': 'confirm',
+              'response': 'dismissed',
+            },
+          ),
+        );
+        unawaited(parent.onNewWindow!('https://example.com/child', 101));
+      };
+      final result = payload(
+        await tools.handle('chat-a', {
+          'action': 'click',
+          'selector': 'a',
+        }, capturePreview: false),
+      );
+      expect(result['ok'], true);
+      expect(result['page']['tab_id'], parentId);
+      expect(result['page']['events'], [
+        {'type': 'dialog', 'dialog': 'confirm', 'response': 'dismissed'},
+      ]);
+      expect(result['page']['opened_tabs'], hasLength(1));
+      expect(
+        result['page']['opened_tabs'][0]['url'],
+        'https://example.com/child',
+      );
+      expect(browser.tabs.last.ownerSessionId, 'chat-a');
+      final next = payload(
+        await tools.handle('chat-a', {
+          'action': 'snapshot',
+          'tab_id': parentId,
+        }, capturePreview: false),
+      );
+      expect(next['page'].containsKey('events'), false);
+      expect(next['page'].containsKey('opened_tabs'), false);
+    },
+  );
+
+  test('selector wait timeout does not pause later browser actions', () async {
+    await enable();
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'https://example.com',
+    });
+    final result = payload(
+      await tools.handle('chat-a', {
+        'action': 'wait',
+        'wait_for': '#not-yet-present',
+        'timeout': 100,
+      }),
+    );
+    expect(result['error_code'], 'browser_wait_timeout');
+    expect(browser.agentPaused, isFalse);
+    expect(
+      payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+      isTrue,
+    );
+  });
+
+  test(
+    'unfinished native operation pauses with a timeout reason, not takeover',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      engine.evaluationError = TimeoutException(
+        'Native operation did not finish',
+      );
+      final result = payload(
+        await tools.handle('chat-a', {
+          'action': 'click',
+          'selector': '#submit',
+        }),
+      );
+      expect(
+        result['error_code'],
+        contains('browser_action_timeout_outcome_unknown'),
+      );
+      expect(browser.agentPauseReason, BrowserAgentPauseReason.timeout);
+      expect(browser.agentPaused, isTrue);
+      expect(browser.pausedAgentSessionId, 'chat-a');
+      expect(engine.stopCalls, 1);
+      final blocked = payload(
+        await tools.handle('chat-a', {'action': 'snapshot'}),
+      );
+      expect(
+        blocked['error_code'],
+        contains('browser_action_timeout_outcome_unknown'),
+      );
+      expect(blocked['error'], isNot(contains('browser_human_control')));
+
+      engine.evaluationError = null;
+      browser.allowAgentControl(sessionId: 'chat-a');
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+        isTrue,
+      );
+      expect(browser.agentPaused, isFalse);
+    },
+  );
+
+  test(
+    'human takeover stays paused until the user allows continuation',
+    () async {
+      await enable();
+      browser.takeOver(sessionId: 'chat-a');
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final result = payload(
+          await tools.handle('chat-a', {'action': 'list_tabs'}),
+        );
+        expect(result['error_code'], contains('browser_human_control'));
+        expect(browser.agentPauseReason, BrowserAgentPauseReason.user);
+        expect(browser.agentPaused, isTrue);
+      }
+      browser.allowAgentControl(sessionId: 'chat-a');
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'list_tabs'}))['ok'],
+        isTrue,
+      );
+    },
+  );
 
   test(
     'pause display belongs to its session and disabled permission clears it',
@@ -351,8 +826,8 @@ void main() {
         await tools.handle('agent-chat', {'action': 'new_tab'}),
       );
       expect(denied['ok'], isFalse);
-      expect(denied['error'], contains('browser_session_tab_limit'));
-      expect(denied['error'], contains('list_tabs'));
+      expect(denied['error_code'], contains('browser_session_tab_limit'));
+      expect(denied['next_action'], contains('list_tabs'));
       final reused = payload(
         await tools.handle('agent-chat', {
           'action': 'open',
@@ -429,6 +904,141 @@ void main() {
       );
     },
   );
+
+  test(
+    'navigation stage is explicit, defaults to DOM, and none tolerates slow load',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      expect(engine.loadStages.last, BrowserLoadStage.domcontentloaded);
+      for (final stage in BrowserLoadStage.values) {
+        final result = payload(
+          await tools.handle('chat-a', {
+            'action': 'reload',
+            'wait_until': stage.name,
+          }, capturePreview: false),
+        );
+        expect(result['ok'], true);
+        expect(engine.loadStages.last, stage);
+      }
+      engine.loadError = TimeoutException('raw failure');
+      expect(
+        payload(
+          await tools.handle('chat-a', {
+            'action': 'open',
+            'url': 'https://slow.example',
+            'wait_until': 'none',
+          }, capturePreview: false),
+        )['ok'],
+        true,
+      );
+    },
+  );
+
+  test(
+    'workspace-only screenshot saves PNG without model images or extra previews',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      }, capturePreview: false);
+      final engine = engines.values.single;
+      final before = engine.thumbnailCalls;
+      final result = await tools.handle('chat-a', {
+        'action': 'screenshot',
+        'save_to': 'shots/页面.png',
+      });
+      final data = payload(result);
+      expect(data['ok'], true);
+      expect(
+        data['page']['screenshot_file']['path'],
+        'kelivo://workspace/shots/%E9%A1%B5%E9%9D%A2.png',
+      );
+      final file = File('${directory.path}/shots/页面.png');
+      expect(img.decodePng(await file.readAsBytes()), isNotNull);
+      expect(result.content, isNot(contains('![](')));
+      expect(
+        mcpResultImageUris(readMcpResultMetadata(result.metadata)),
+        isEmpty,
+      );
+      final replay = await ToolResultContent.read(
+        'browser',
+        result.content,
+        metadata: result.metadata,
+      );
+      expect(replay.imageUrls, isEmpty);
+      expect(engine.thumbnailCalls, before);
+      expect(
+        engine.scripts.any((s) => s.contains('const action = "screenshot"')),
+        false,
+      );
+      final again = payload(
+        await tools.handle('chat-a', {
+          'action': 'screenshot',
+          'save_to': 'shots/页面.png',
+        }),
+      );
+      expect(again['ok'], false);
+      expect(again['error_code'], 'browser_workspace_file_exists');
+      final dual = await tools.handle('chat-a', {
+        'action': 'screenshot',
+        'save_to': 'dual.png',
+        'return_image': true,
+      });
+      expect(payload(dual)['ok'], true);
+      expect(
+        mcpResultImageUris(readMcpResultMetadata(dual.metadata)),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'invalid screenshot paths and combinations cannot write files',
+    () async {
+      for (final args in <Map<String, dynamic>>[
+        {'save_to': '../escape.png'},
+        {'save_to': '/absolute.png'},
+        {'save_to': 'kelivo://workspace/%2e%2e/escape.png'},
+        {'save_to': 'file:///a.png'},
+        {'save_to': 'page.html'},
+        {'return_image': false},
+      ]) {
+        final result = payload(
+          await tools.handle('chat-a', {'action': 'screenshot', ...args}),
+        );
+        expect(
+          result['error_code'],
+          'browser_invalid_arguments',
+          reason: '$args',
+        );
+      }
+      expect(browser.tabs, isEmpty);
+    },
+  );
+
+  test('structured errors do not expose raw exception details', () async {
+    await enable();
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'https://example.com',
+    }, capturePreview: false);
+    engines.values.single.domError =
+        'some raw site exception /private/path/secret';
+    final result = payload(
+      await tools.handle('chat-a', {'action': 'snapshot'}),
+    );
+    expect(result['error_code'], 'browser_action_failed');
+    expect(result['error'], isNot(contains('secret')));
+    expect(result['next_action'], isNotEmpty);
+    expect(result['outcome_unknown'], false);
+    expect(result['recoverable'], true);
+  });
 
   test(
     'screenshot is stored and replayed as a typed image for providers',
@@ -536,28 +1146,49 @@ void main() {
 }
 
 class _Engine extends BrowserEngine {
-  _Engine(this.onChanged);
+  _Engine(this.onChanged, {this.loadError, this.onNewWindow});
+  final Future<bool> Function(String?, int)? onNewWindow;
+  Future<void> Function()? onEvaluation;
   final void Function(BrowserPageState) onChanged;
   final scripts = <String>[];
   String? domError;
   Uint8List? screenshotBytes;
+  Uint8List? previewBytes;
+  int thumbnailCalls = 0;
+  TimeoutException? loadError;
+  final loadStages = <BrowserLoadStage>[];
+  TimeoutException? evaluationError;
+  bool waitReady = false;
+  bool lastAwaitPromise = false;
+  String documentUrl = 'https://example.com';
+  int stopCalls = 0;
   @override
   Widget buildView() => const SizedBox.shrink();
   @override
   Future<void> navigate(String url) async =>
       onChanged(BrowserPageState(url: url, title: 'Page', isLoading: false));
   @override
-  Future<void> waitForLoad(Duration timeout) async {}
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  }) async {
+    loadStages.add(stage);
+    if (stage != BrowserLoadStage.none && loadError != null) throw loadError!;
+  }
+
   @override
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async {
     scripts.add(source);
+    lastAwaitPromise = awaitPromise;
+    if (onEvaluation != null) await onEvaluation!();
+    if (evaluationError case final error?) throw error;
     if (source == 'document.readyState') return 'complete';
     if (source.startsWith('JSON.stringify({width:innerWidth')) {
       return '{"width":390,"height":780,"device_pixel_ratio":3}';
     }
     if (domError != null) return jsonEncode({'ok': false, 'error': domError});
     if (source.contains('const action = "wait"')) {
-      return '{"ok":true,"ready":false}';
+      return jsonEncode({'ok': true, 'ready': waitReady, 'url': documentUrl});
     }
     if (source.contains('const action = "extract"')) {
       return '{"ok":true,"content":"A real page result"}';
@@ -569,6 +1200,12 @@ class _Engine extends BrowserEngine {
   Future<Uint8List?> screenshot() async =>
       screenshotBytes ?? img.encodePng(img.Image(width: 1, height: 1));
   @override
+  Future<Uint8List?> thumbnail() async {
+    thumbnailCalls++;
+    return previewBytes ?? img.encodePng(img.Image(width: 1, height: 1));
+  }
+
+  @override
   Future<void> loadHtml(String html, {String? baseUrl}) async {}
   @override
   Future<void> back() async {}
@@ -577,7 +1214,7 @@ class _Engine extends BrowserEngine {
   @override
   Future<void> reload() async {}
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async => stopCalls++;
   @override
   Future<void> updateSettings(BrowserSettings settings) async {}
   @override

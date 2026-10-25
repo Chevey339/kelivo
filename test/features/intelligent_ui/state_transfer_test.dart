@@ -7,6 +7,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
@@ -228,6 +229,71 @@ void main() {
     return result;
   }
 
+  test(
+    'compression into a new chat preserves pending UI state and completion',
+    () async {
+      await seed(repo, [message('history', content: 'Earlier'), message('r')]);
+      await run(db, 'r');
+      final snapshot = await repo.readContextSnapshot('source');
+      await save(repo, 'r', value: 37, flush: false);
+      final copied = await repo.createCompressedConversation(
+        'source',
+        ContextOperation(
+          id: 'compression',
+          kind: ContextOperationKind.compress,
+          anchorGroupId: 'history',
+          appliedAfterGroupId: 'r',
+          sourceGroups: const ['history'],
+          dependencies: const [],
+          createdAt: _anchor,
+          summary: 'Compressed history',
+        ),
+        expectedFingerprint: snapshot.fingerprint,
+        retained: [snapshot.messages.last],
+      );
+      final messages = await repo.getSelectedContextMessages(
+        copied.id,
+        limit: 10,
+      );
+      expect(messages.map((m) => m.content), ['Compressed history', _fence]);
+      final state = (await rows(copied.id)).single;
+      expect(state.revisionId, messages.last.id);
+      expect(state.revisionId, isNot('r'));
+      expect(jsonDecode(state.stateJson)['inputs'], {'value': 37});
+      expect(messages.last.generationState, GenerationRunState.completed);
+      expect(jsonDecode((await rows('source')).single.stateJson)['inputs'], {
+        'value': 37,
+      });
+      expect(await repo.readContextOperations('source'), isEmpty);
+    },
+  );
+  test('restore availability bookkeeping retains pending UI state', () async {
+    await seed(repo, [
+      message('r').copyWith(
+        parts: [
+          const TextPart(_fence),
+          FilePart(uri: '${directory.path}/missing.txt', name: 'missing.txt'),
+        ],
+      ),
+    ]);
+    await run(db, 'r');
+    await save(repo, 'r', value: 43, flush: false);
+    expect(
+      await repo.recomputeAttachmentAvailabilityForConversations(
+        conversationIds: ['source'],
+        filesRestored: false,
+      ),
+      1,
+    );
+    await repo.genUiStates.flush();
+    final restored = (await repo.getMessage('r'))!;
+    expect(restored.content, _fence);
+    expect(restored.parts.whereType<FilePart>().single.unavailable, isTrue);
+    expect(restored.generationState, GenerationRunState.completed);
+    expect(jsonDecode((await rows('source')).single.stateJson)['inputs'], {
+      'value': 43,
+    });
+  });
   test(
     'duplicate flushes newest inputs/view and copies cache plus completion',
     () async {

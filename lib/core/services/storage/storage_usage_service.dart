@@ -18,6 +18,7 @@ import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
 import '../workspace/workspace_session_sync.dart';
+import 'storage_image_usage.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -27,7 +28,6 @@ enum StorageUsageCategoryKey {
   restoreTraces,
   displacedDatabases,
   localSnapshots,
-  assistantData,
   cache,
   logs,
   other,
@@ -87,20 +87,20 @@ class StorageUsageReport {
   });
 }
 
-enum StorageFileSource { userUpload, assistant }
-
 class StorageFileEntry {
   final String path;
   final String name;
   final int bytes;
   final DateTime modifiedAt;
-  final StorageFileSource source;
+  final StorageImageKind? imageKind;
+  final bool isInUse;
   const StorageFileEntry({
     required this.path,
     required this.name,
     required this.bytes,
     required this.modifiedAt,
-    required this.source,
+    this.imageKind,
+    this.isInUse = false,
   });
 }
 
@@ -193,7 +193,6 @@ abstract final class StorageUsageService {
         name: _MutableStats(),
     };
 
-    final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
     final otherSubs = <String, _MutableStats>{
       'fonts': _MutableStats(),
       'local_models': _MutableStats(),
@@ -327,16 +326,13 @@ abstract final class StorageUsageService {
               break;
             case 'upload':
             case 'images':
+            case 'avatars':
               final name = parts.last;
               if (_isImageExt(name)) {
                 byCat[StorageUsageCategoryKey.images]!.add(bytes);
               } else {
                 byCat[StorageUsageCategoryKey.files]!.add(bytes);
               }
-              break;
-            case 'avatars':
-              byCat[StorageUsageCategoryKey.assistantData]!.add(bytes);
-              assistantSubs['avatars']!.add(bytes);
               break;
             case 'fonts':
               byCat[StorageUsageCategoryKey.other]!.add(bytes);
@@ -416,7 +412,6 @@ abstract final class StorageUsageService {
         sessionsUsage.stats.bytes +
         sandboxUsage.stats.bytes;
 
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
     final localModelsDir = Directory(p.join(contentRoot.path, 'asr_models'));
     final cacheDir = await AppDirectories.getCacheDirectory();
@@ -537,17 +532,6 @@ abstract final class StorageUsageService {
             ),
           ],
         ),
-      StorageUsageCategory(
-        key: StorageUsageCategoryKey.assistantData,
-        stats: byCat[StorageUsageCategoryKey.assistantData]!.toStats(),
-        subcategories: [
-          StorageUsageSubcategory(
-            id: 'avatars',
-            stats: assistantSubs['avatars']!.toStats(),
-            path: avatarsDir.path,
-          ),
-        ],
-      ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.cache,
         stats: byCat[StorageUsageCategoryKey.cache]!.toStats(),
@@ -785,20 +769,16 @@ abstract final class StorageUsageService {
   }) async {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
+    final avatarsDir = await AppDirectories.getAvatarsDirectory();
+    final usage = await StorageImageUsage.load(includeMessages: images);
     final out = <StorageFileEntry>[];
-    Future<void> addFromDir(
-      Directory d, {
-      required bool includeImages,
-      required bool includeNonImages,
-      required StorageFileSource source,
-    }) async {
+    Future<void> addFromDir(Directory d) async {
       if (!await d.exists()) return;
       try {
         await for (final ent in _listFiles(d)) {
           final name = p.basename(ent.path);
           final isImg = _isImageExt(name);
-          if (isImg && !includeImages) continue;
-          if (!isImg && !includeNonImages) continue;
+          if (isImg != images) continue;
           int bytes = 0;
           DateTime modifiedAt = DateTime.fromMillisecondsSinceEpoch(0);
           try {
@@ -810,13 +790,24 @@ abstract final class StorageUsageService {
               bytes = await ent.length();
             } catch (_) {}
           }
+          String? realPath;
+          try {
+            realPath = await ent.resolveSymbolicLinks();
+          } on FileSystemException {
+            // A concurrent removal must not stop listing the remaining files.
+          }
           out.add(
             StorageFileEntry(
               path: ent.path,
               name: name,
               bytes: bytes,
               modifiedAt: modifiedAt,
-              source: source,
+              imageKind: images
+                  ? usage.kindFor(ent.path, realPath: realPath)
+                  : null,
+              isInUse:
+                  usage.isInUse(ent.path) ||
+                  (realPath != null && usage.isInUse(realPath)),
             ),
           );
         }
@@ -825,19 +816,9 @@ abstract final class StorageUsageService {
       }
     }
 
-    // Chat attachments live under upload/. Inline/generated images live under images/.
-    await addFromDir(
-      dir,
-      includeImages: images,
-      includeNonImages: !images,
-      source: StorageFileSource.userUpload,
-    );
-    await addFromDir(
-      imagesDir,
-      includeImages: images,
-      includeNonImages: !images,
-      source: StorageFileSource.assistant,
-    );
+    await addFromDir(dir);
+    await addFromDir(imagesDir);
+    await addFromDir(avatarsDir);
     out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return out;
   }
@@ -848,9 +829,11 @@ abstract final class StorageUsageService {
   }) async {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
+    final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final roots = <String>[
       p.normalize(dir.absolute.path),
       p.normalize(imagesDir.absolute.path),
+      p.normalize(avatarsDir.absolute.path),
     ];
     final realRoots = await Future.wait(
       roots.map((root) async {
@@ -861,6 +844,9 @@ abstract final class StorageUsageService {
         }
       }),
     );
+    // Re-read references after confirmation; the list shown by the UI may be
+    // stale after an assistant/user/provider changed its appearance.
+    final usage = await StorageImageUsage.load(includeMessages: false);
     final removedPaths = <String>{};
     for (final raw in paths) {
       try {
@@ -878,6 +864,10 @@ abstract final class StorageUsageService {
         }
         if (await FileSystemEntity.type(abs, followLinks: false) !=
             FileSystemEntityType.file) {
+          continue;
+        }
+        if (usage.isInUse(abs) ||
+            usage.isInUse(await File(abs).resolveSymbolicLinks())) {
           continue;
         }
         await File(abs).delete();
@@ -1157,7 +1147,6 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.restoreTraces,
   StorageUsageCategoryKey.displacedDatabases,
   StorageUsageCategoryKey.localSnapshots,
-  StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
   StorageUsageCategoryKey.other,
@@ -1184,7 +1173,6 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
     case StorageUsageCategoryKey.images:
     case StorageUsageCategoryKey.files:
     case StorageUsageCategoryKey.chatData:
-    case StorageUsageCategoryKey.assistantData:
     case StorageUsageCategoryKey.cache:
     case StorageUsageCategoryKey.logs:
     case StorageUsageCategoryKey.other:

@@ -11,6 +11,66 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 void main() {
+  test('dirty browser preview protects every stage of asset GC', () async {
+    final root = await Directory.systemTemp.createTemp('browser_preview_gc_');
+    final repository = ChatDatabaseRepository.open(
+      file: File('${root.path}/assets.sqlite'),
+    );
+    addTearDown(() async {
+      await repository.close();
+      await root.delete(recursive: true);
+    });
+    final now = DateTime.now().toUtc();
+    const uri = 'kelivo-file:///images/mcp_img_preview.png';
+    final conversation = Conversation(
+      id: 'browser',
+      title: 'Browser',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final message = ChatMessage(
+      id: 'tool-owner',
+      role: 'assistant',
+      conversationId: conversation.id,
+      content: 'Browser',
+    );
+    await repository.putMigrationBatch(
+      conversations: [conversation],
+      messages: [(message: message, messageOrder: 0)],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    await repository.registerAsset(
+      id: 'preview',
+      contentHash: 'a' * 64,
+      path: uri,
+      byteSize: 20,
+      createdAt: now,
+    );
+    await repository.scheduleUnreferencedAssetGc(notBefore: now);
+    final candidate = (await repository.claimAssetGc(now: now)).single;
+    expect(await repository.isAssetGcClaimStillValid(candidate), isTrue);
+    await repository.setToolEvents(message.id, [
+      {
+        'name': 'browser',
+        'metadata': {
+          'browser': {'previewImage': uri},
+        },
+      },
+    ]);
+    expect(await repository.hasPendingAssetReferenceSync(), isTrue);
+    expect(await repository.isAssetGcClaimStillValid(candidate), isFalse);
+    expect(
+      await repository.completeAssetGc(
+        assetId: candidate.assetId,
+        expectedGeneration: candidate.generation,
+        path: candidate.path,
+      ),
+      isFalse,
+    );
+    expect(await repository.claimAssetGc(now: now), isEmpty);
+  });
+
   test(
     'asset references cancel delayed GC and unreferenced assets are claimed',
     () async {

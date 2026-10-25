@@ -24,6 +24,7 @@
 		B610A5500000000000000001 /* BrowserGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000002 /* BrowserGlassView.swift */; };
 		B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */; };
 		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
+		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
 		A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */; };
 		A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000012 /* LocationToolHandler.swift */; };
 		A2DT00000000000000000003 /* WeatherToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000013 /* WeatherToolHandler.swift */; };
@@ -138,6 +139,7 @@
 		B610A5500000000000000002 /* BrowserGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserGlassView.swift; sourceTree = "<group>"; };
 		B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BrowserGlass/BrowserLegacyGlassRuntime.m; sourceTree = "<group>"; };
 		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
+		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalToolsHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000012 /* LocationToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationToolHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000013 /* WeatherToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherToolHandler.swift; sourceTree = "<group>"; };
@@ -326,6 +328,7 @@
 				B610A5500000000000000002 /* BrowserGlassView.swift */,
 				B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */,
 				B610A5500000000000000006 /* BrowserScrollBridge.swift */,
+				B610A5500000000000000008 /* IosSelectionMenuHandler.swift */,
 				BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */,
 				CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */,
 				A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */,
@@ -755,6 +758,7 @@
 				B610A5500000000000000001 /* BrowserGlassView.swift in Sources */,
 				B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */,
 				B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */,
+				B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */,
 				BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */,
 				CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */,
 				A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */,

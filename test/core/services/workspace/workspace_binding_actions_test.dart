@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -144,33 +146,34 @@ void main() {
         conversationId: conversation.id,
         workspaceId: 'ws1',
       );
-      await setConversationWorkspaceAllowAll(
-        chat,
-        conversationId: conversation.id,
-        workspaceId: 'ws1',
-        allowAll: true,
+      await ConversationToolPermissions.forChat(chat).setMode(
+        conversation.id,
+        ToolPermissionMode.fullAccess,
         approvals: approvals,
       );
       expect((await pending).approved, isTrue);
       final binding = WorkspaceBinding.fromExtras(
         chat.getConversation(conversation.id)!.extras,
       );
-      expect(binding.allowAll, isTrue);
+      expect(
+        ToolPermissionMode.fromExtras(
+          chat.getConversation(conversation.id)!.extras,
+        ),
+        ToolPermissionMode.fullAccess,
+      );
       expect(binding.cwd, 'src');
       expect(binding.toolsUsed, isTrue);
 
-      await setConversationWorkspaceAllowAll(
-        chat,
-        conversationId: conversation.id,
-        workspaceId: 'ws1',
-        allowAll: false,
+      await ConversationToolPermissions.forChat(chat).setMode(
+        conversation.id,
+        ToolPermissionMode.requestApproval,
         approvals: approvals,
       );
       expect(
-        WorkspaceBinding.fromExtras(
+        ToolPermissionMode.fromExtras(
           chat.getConversation(conversation.id)!.extras,
-        ).allowAll,
-        isFalse,
+        ),
+        ToolPermissionMode.requestApproval,
       );
     },
   );
@@ -192,20 +195,22 @@ void main() {
         conversationId: conversation.id,
         workspaceId: 'ws1',
       );
-      await setConversationWorkspaceAllowAll(
-        chat,
-        conversationId: conversation.id,
-        workspaceId: 'ws1',
-        allowAll: true,
+      await ConversationToolPermissions.forChat(chat).setMode(
+        conversation.id,
+        ToolPermissionMode.fullAccess,
         approvals: approvals,
       );
       final binding = WorkspaceBinding.fromExtras(
         chat.getConversation(conversation.id)!.extras,
       );
       expect(binding.workspaceId, 'ws2');
-      expect(binding.allowAll, isFalse);
-      expect(approvals.hasPending, isTrue);
-      approvals.cancelAll();
+      expect(
+        ToolPermissionMode.fromExtras(
+          chat.getConversation(conversation.id)!.extras,
+        ),
+        ToolPermissionMode.fullAccess,
+      );
+      expect(approvals.hasPending, isFalse);
       expect((await pending).approved, isFalse);
     },
   );

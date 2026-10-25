@@ -565,6 +565,62 @@ void main() {
   });
 
   group('MessageBuilderService.buildApiMessages', () {
+    test(
+      'compression background survives M and is not a persisted user prompt',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({}),
+          contextProvider: _FakeBuildContext(),
+        );
+        final messages = service.buildApiMessages(
+          messages: [
+            _message(
+              id: 'context-summary:S',
+              role: 'user',
+              content: 'Actual edited summary',
+            ),
+            _message(id: 'old', role: 'user', content: 'old raw history'),
+            _message(id: 'answer', role: 'assistant', content: 'old answer'),
+            _message(id: 'new', role: 'user', content: 'next input'),
+          ],
+          versionSelections: {},
+          currentConversation: Conversation(
+            id: 'conversation-1',
+            title: 'summary',
+          ),
+        );
+        expect(messages.first['role'], 'user');
+        expect(
+          messages.first.containsKey(
+            MessageBuilderService.internalRevisionIdKey,
+          ),
+          isFalse,
+        );
+        service.applyContextLimit(
+          messages,
+          const Assistant(
+            id: 'a',
+            name: 'a',
+            limitContextMessages: true,
+            contextMessageSize: 1,
+          ),
+        );
+        expect(messages.map((m) => m['content']), [
+          'Actual edited summary',
+          'next input',
+        ]);
+        service.stripInternalRevisionIds(messages);
+        expect(
+          messages.every(
+            (m) =>
+                !m.containsKey('_contextSummary') &&
+                !m.containsKey(MessageBuilderService.internalRevisionIdKey),
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('有工具调用时会把 reasoning_content 回填到 assistant tool 消息', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({

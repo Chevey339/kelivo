@@ -230,6 +230,22 @@ class McpToolService extends ChangeNotifier {
     return route?.tool.needsApproval ?? true;
   }
 
+  bool isToolEnabledForAssistant(
+    McpProvider mcpProvider,
+    AssistantProvider assistants, {
+    required String? assistantId,
+    required String toolName,
+    required McpToolRouteSnapshot routeSnapshot,
+  }) {
+    final assistant = assistantId != null
+        ? assistants.getById(assistantId)
+        : assistants.currentAssistant;
+    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final published = routeSnapshot._find(toolName);
+    return published != null &&
+        _currentRouteForIdentity(mcpProvider, selected, published) != null;
+  }
+
   McpToolRouteSnapshot captureRoutesForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {

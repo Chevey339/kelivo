@@ -47,6 +47,8 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
+import '../../chat/widgets/context_operation_actions.dart';
+import '../../../core/models/context_operation.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/widgets/message_edit_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
@@ -728,6 +730,9 @@ class HomePageController extends ChangeNotifier {
       _viewModel.isCurrentConversationLoading;
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
+  bool get currentQueuedInputPaused => _viewModel.currentQueuedInputPaused;
+  bool get isCurrentConversationCompressing =>
+      _viewModel.currentCompressionTask?.active ?? false;
 
   ValueNotifier<String?> get processingFilesMessageId =>
       _viewModel.processingFilesMessageId;
@@ -978,6 +983,10 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
+    if (error.contains('context_changed')) return l10n.contextChanged;
+    if (error.contains('context_budget_exceeded')) {
+      return l10n.contextBudgetExceeded;
+    }
     return '${l10n.generationInterrupted}: $error';
   }
 
@@ -987,8 +996,6 @@ class HomePageController extends ChangeNotifier {
       onStateChanged: () => notifyListeners(),
       getAutoScrollEnabled: () =>
           _context.read<SettingsProvider>().autoScrollEnabled,
-      getAutoScrollIdleSeconds: () =>
-          _context.read<SettingsProvider>().autoScrollIdleSeconds,
       getTopRevealInset: () =>
           kToolbarHeight + MediaQuery.paddingOf(_context).top,
       isGenerating: () => _chatController.isCurrentConversationLoading,
@@ -1703,8 +1710,41 @@ class HomePageController extends ChangeNotifier {
     bool? allowImagesApiRouting,
   }) async {
     if (currentConversation == null) return;
+    final projected = await _chatService.loadSelectedMessageProjections(
+      message.conversationId,
+    );
+    if (!_context.mounted) return;
+    final deletingTail = _context
+        .read<SettingsProvider>()
+        .regenerateDeleteTrailingMessages;
+    final versioning = _messageGenerationService
+        .calculateRegenerationVersioning(
+          message: message,
+          messages: projected,
+          assistantAsNewReply: assistantAsNewReply,
+        );
+    final affectedGroups = {
+      if (versioning.targetGroupId != null) versioning.targetGroupId!,
+    };
+    final removedGroups = deletingTail && versioning.lastKeep >= 0
+        ? projected
+              .skip(versioning.lastKeep + 1)
+              .map(ContextHistory.group)
+              .where((group) => group != versioning.targetGroupId)
+              .toSet()
+        : <String>{};
+    affectedGroups.addAll(removedGroups);
+    final approved = await confirmContextSourceMutation(
+      _context,
+      chat: _chatService,
+      conversationId: message.conversationId,
+      groups: affectedGroups,
+      removedGroups: removedGroups,
+    );
+    if (approved == null) return;
     _warmupSerial++;
 
+    if (!_context.mounted) return;
     final settings = _context.read<SettingsProvider>();
     if (settings.regenerateDeleteTrailingMessages &&
         currentConversation?.id == message.conversationId) {
@@ -1725,6 +1765,7 @@ class HomePageController extends ChangeNotifier {
     final success = await _viewModel.regenerateAtMessage(
       message,
       assistantAsNewReply: assistantAsNewReply,
+      expectedContextState: approved,
       allowImagesApiRouting:
           allowImagesApiRouting ?? _mediaController.allowImagesApiRouting,
     );
@@ -1740,7 +1781,8 @@ class HomePageController extends ChangeNotifier {
   ) async {
     final conversation = currentConversation;
     if (conversation == null ||
-        _viewModel.isConversationSendInFlight(conversation.id)) {
+        _viewModel.isConversationSendInFlight(conversation.id) ||
+        _chatService.contextCompression.blocksSending(conversation.id)) {
       return;
     }
 
@@ -1995,27 +2037,13 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Compress context: summarize via LLM, create new conversation.
-  /// Returns null on success, or an error string on failure.
   Future<String?> compressContext({
     required CompressContextOptions options,
-  }) async {
-    final result = await _viewModel.compressContext(options: options);
-    if (result == null) {
-      // Success - switched to new conversation.
-      // keepRecent clones original messages (including translation text).
-      // `onConversationSwitched` already rebuilt fold state for those ids;
-      // clearing here would leave arrows visible but untoggleable.
-      if (options.mode == CompressContextLimitMode.keepRecent) {
-        _restoreMessageUiState();
-      } else {
-        _translations.clear();
-      }
-      notifyListeners();
-      _scrollToBottomSoon(animate: false);
-    }
-    return result;
-  }
+    String? targetConversationId,
+  }) => _viewModel.compressContext(
+    options: options,
+    targetConversationId: targetConversationId,
+  );
 
   // ============================================================================
   // Public Methods - Message Operations
@@ -2025,6 +2053,18 @@ class HomePageController extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
+    if (!_context.mounted) return;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      deleting: true,
+      chat: _chatService,
+      conversationId: message.conversationId,
+      groups: {ContextHistory.group(message)},
+      removedGroups: (byGroup[ContextHistory.group(message)]?.length ?? 1) <= 1
+          ? {ContextHistory.group(message)}
+          : {},
+    );
+    if (approved == null) return;
     final keepAtBottom = _scrollCtrl.isNearBottom();
     final gid = (message.groupId ?? message.id);
     // Deleting the only version removes the whole slot; deleting one version
@@ -2040,7 +2080,11 @@ class HomePageController extends ChangeNotifier {
     }
     _translations.remove(message.id);
     try {
-      await _viewModel.deleteMessage(message: message, byGroup: byGroup);
+      await _viewModel.deleteMessage(
+        message: message,
+        byGroup: byGroup,
+        expectedContextState: approved,
+      );
     } finally {
       _settleAfterSlotRemoval(
         gid,
@@ -2055,6 +2099,16 @@ class HomePageController extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
+    if (!_context.mounted) return;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      deleting: true,
+      chat: _chatService,
+      conversationId: message.conversationId,
+      groups: {ContextHistory.group(message)},
+      removedGroups: {ContextHistory.group(message)},
+    );
+    if (approved == null) return;
     final keepAtBottom = _scrollCtrl.isNearBottom();
     final gid = (message.groupId ?? message.id);
     int? preserveRequest;
@@ -2071,6 +2125,7 @@ class HomePageController extends ChangeNotifier {
       await _viewModel.deleteAllMessageVersions(
         message: message,
         byGroup: byGroup,
+        expectedContextState: approved,
       );
     } finally {
       _settleAfterSlotRemoval(
@@ -2178,6 +2233,41 @@ class HomePageController extends ChangeNotifier {
     final selectedMessageIds = Set<String>.of(_selectedItems);
     if (selectedMessageIds.isEmpty) return;
 
+    final conversationId = currentConversation?.id;
+    if (conversationId == null) return;
+    final selected = await _chatService.loadSelectedMessageProjections(
+      conversationId,
+    );
+    final groups = {
+      for (final m in selected)
+        if (selectedMessageIds.contains(m.id)) ContextHistory.group(m),
+    };
+    final versions = await _chatService.loadMessagesForGroups(
+      conversationId,
+      groups,
+    );
+    final removedGroups = deleteAllVersions
+        ? groups
+        : {
+            for (final group in groups)
+              if (versions
+                  .where((m) => ContextHistory.group(m) == group)
+                  .every((m) => selectedMessageIds.contains(m.id)))
+                group,
+          };
+    if (!_context.mounted) return;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      deleting: true,
+      chat: _chatService,
+      conversationId: conversationId,
+      removedGroups: removedGroups,
+      groups: {
+        for (final m in selected)
+          if (selectedMessageIds.contains(m.id)) ContextHistory.group(m),
+      },
+    );
+    if (approved == null) return;
     final keepAtBottom = _scrollCtrl.isNearBottom();
     // Invalidate in-flight select-all before awaiting delete work.
     _selectionEpoch++;
@@ -2189,6 +2279,7 @@ class HomePageController extends ChangeNotifier {
       _translations.remove(id);
     }
     await _viewModel.deleteMessages(
+      expectedContextState: approved,
       messageIds: selectedMessageIds,
       deleteAllVersions: deleteAllVersions,
     );
@@ -2255,6 +2346,14 @@ class HomePageController extends ChangeNotifier {
         : showMessageEditSheet(ctx, message: message);
     final MessageEditResult? result = await future;
     if (result == null) return;
+    if (!_context.mounted) return;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      chat: _chatService,
+      conversationId: message.conversationId,
+      groups: {ContextHistory.group(message)},
+    );
+    if (approved == null) return;
 
     if (currentConversation != null) {
       await _chatService.clearConversationSuggestions(currentConversation!.id);
@@ -2264,6 +2363,7 @@ class HomePageController extends ChangeNotifier {
     }
 
     final newMsg = await _chatService.appendMessageVersion(
+      expectedContextState: approved,
       messageId: message.id,
       content: result.content,
       parts: message.role == 'assistant' && !keepThinkingAndToolCards
@@ -2503,6 +2603,19 @@ class HomePageController extends ChangeNotifier {
         ? currentConversation
         : _chatService.getConversation(input.draftSubmission!.conversationId);
     if (conversation == null) return null;
+    final original = (await _chatService.loadMessagesByIds([
+      editState.messageId,
+    ])).firstOrNull;
+    if (original == null) return null;
+    if (!_context.mounted) return null;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      chat: _chatService,
+      conversationId: conversation.id,
+      groups: {ContextHistory.group(original)},
+    );
+    if (approved == null) return null;
+    if (!_context.mounted) return null;
     final assistants = _context.read<AssistantProvider>();
     final assistant = assistants.resolveConversationAssistant(
       conversation.assistantId,
@@ -2521,6 +2634,7 @@ class HomePageController extends ChangeNotifier {
     }
 
     final newMsg = await _chatService.appendMessageVersion(
+      expectedContextState: approved,
       messageId: editState.messageId,
       parts: parts,
       draftSubmission: input.draftSubmission,
@@ -3084,7 +3198,21 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   Future<void> setSelectedVersion(String groupId, int version) async {
-    await _chatController.setSelectedVersion(groupId, version);
+    final conversationId = currentConversation?.id;
+    if (conversationId == null) return;
+    if (!_context.mounted) return;
+    final approved = await confirmContextSourceMutation(
+      _context,
+      chat: _chatService,
+      conversationId: conversationId,
+      groups: {groupId},
+    );
+    if (approved == null || currentConversation?.id != conversationId) return;
+    await _chatController.setSelectedVersion(
+      groupId,
+      version,
+      expectedContextState: approved,
+    );
     for (final message in _chatController.collapsedMessages) {
       if ((message.groupId ?? message.id) == groupId) {
         _restoreAssistantMessageUiState(message);
@@ -4152,6 +4280,7 @@ class HomePageController extends ChangeNotifier {
     try {
       _notificationTapSub?.cancel();
     } catch (_) {}
+    _viewModel.dispose();
     _chatController.dispose();
     _streamController.dispose();
     super.dispose();

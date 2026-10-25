@@ -171,6 +171,11 @@ class _GenUiNodeState extends State<GenUiNode>
       );
     }
     if (!node.visible) return const SizedBox.shrink();
+    final exporting =
+        context
+            .dependOnInheritedWidgetOfExactType<GenUiInteractions>()
+            ?.exporting ??
+        false;
     if (const {
           'TextField',
           'NumberField',
@@ -180,7 +185,7 @@ class _GenUiNodeState extends State<GenUiNode>
           'Select',
           'RadioGroup',
         }.contains(node.declaration.component) &&
-        GenUiInteractions.of(context).exporting) {
+        exporting) {
       return GenUiInputSnapshot(node: node);
     }
     final props = node.properties;
@@ -264,11 +269,13 @@ class _GenUiNodeState extends State<GenUiNode>
         key: key,
         text: props['text'] as String,
         linkHandler: widget.linkHandler,
+        exporting: exporting,
       ),
       'Formula' => GenUiFormula(
         key: key,
         tex: props['tex'] as String,
         label: props['label'] as String?,
+        exporting: exporting,
       ),
       'Metric' => GenUiMetric(
         key: key,

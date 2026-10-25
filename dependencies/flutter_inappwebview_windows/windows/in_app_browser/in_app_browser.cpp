@@ -85,15 +85,18 @@ namespace flutter_inappwebview_plugin
             channelDelegate->onBrowserCreated();
           }
 
-          if (params.urlRequest.has_value()) {
-            webView->loadUrl(params.urlRequest.value());
-          }
-          else if (params.assetFilePath.has_value()) {
-            webView->loadFile(params.assetFilePath.value());
-          }
-          else if (params.data.has_value()) {
-            webView->loadData(params.data.value());
-          }
+          webView->whenReady([this, params](HRESULT hr) {
+            if (FAILED(hr)) { close(); return; }
+            if (params.urlRequest.has_value()) {
+              webView->loadUrl(params.urlRequest.value());
+            }
+            else if (params.assetFilePath.has_value()) {
+              webView->loadFile(params.assetFilePath.value());
+            }
+            else if (params.data.has_value()) {
+              webView->loadData(params.data.value());
+            }
+          });
         }
         else {
           std::cerr << "Cannot create the InAppWebView instance!" << std::endl;

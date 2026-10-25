@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
+import 'package:Kelivo/features/intelligent_ui/text/ui_text_projection.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_table.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_view_tabs.dart';
@@ -14,6 +15,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
+import '../../support/genui_projection_fixture.dart';
 
 String _source({int rows = 35, bool note = false, bool chart = false}) {
   final data = jsonEncode([
@@ -232,6 +234,60 @@ void main() {
       expect(c.state.view['root']?['filter'], '1.234');
     },
   );
+  for (final chart in [false, true]) {
+    testWidgets(
+      '${chart ? 'Chart data view' : 'DataTable'} projects the displayed filter rows with exact values',
+      (tester) async {
+        const data =
+            '[{"name":"Item noisy","price":0.1+0.2},'
+            '{"name":"Item distinct","price":0.30000000001}]';
+        final c = _controller(
+          chart
+              ? 'root = Chart(kind="line",x="name",y=["price"],xLabel="Name",yLabel="Value",data=$data)'
+              : 'root = DataTable(data=$data,rowKey="name",columns=[{"key":"name","label":"Name"},{"key":"price","label":"Value"}])',
+        );
+        if (chart) c.setView('root', {'dataView': true}, token: c.token);
+        await tester.pumpWidget(_app(c));
+        await tester.pumpAndSettle();
+        expect(find.text('0.3'), findsOneWidget);
+        expect(find.text('0.30000000000000004'), findsNothing);
+        for (final (query, names) in [
+          ('000', ['Item distinct']),
+          ('00000000000000004', <String>[]),
+          ('0.3', ['Item noisy', 'Item distinct']),
+        ]) {
+          await tester.enterText(_filter, query);
+          await tester.pumpAndSettle();
+          expect(_items(tester), names);
+          final read = c.captureRead();
+          for (final body in [
+            for (final mode in UiTextMode.values)
+              testUiProjection.text(read, mode: mode),
+            testUiProjection.context(read).body,
+          ]) {
+            expect(
+              body,
+              contains(
+                names.isEmpty
+                    ? 'Rows 0–0 of 0'
+                    : 'Rows 1–${names.length} of ${names.length}',
+              ),
+            );
+            for (final name in ['Item noisy', 'Item distinct']) {
+              expect(
+                body.contains('Name: $name | Value:'),
+                names.contains(name),
+              );
+            }
+            if (names.contains('Item noisy')) {
+              expect(body, contains('Value: 0.30000000000000004'));
+            }
+          }
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets(
     'IME draft blocks late restore, survives appearance changes, then commits',
     (tester) async {

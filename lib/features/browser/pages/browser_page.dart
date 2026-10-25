@@ -1408,6 +1408,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     if (activity == BrowserAgentActivity.idle) return null;
     return BrowserAgentStatusChip(
       activity: activity,
+      pauseReason: _service.agentPauseReason,
       onPause: () => _service.takeOver(
         sessionId: _visibleConversationId,
         tabId: _service.activeTabId,
