@@ -14,6 +14,8 @@ import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,115 @@ const _streamingId = 'probe-streaming';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  for (final input in ['touch', 'wheel', 'keyboard']) {
+    testWidgets(
+      '$input scroll up stays put through idle and more stream output',
+      (tester) async {
+        tester.view.physicalSize = const Size(1170, 2100);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        Future<void> pumpFrames() async {
+          for (var frame = 0; frame < 20; frame++) {
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+        }
+
+        final key = GlobalKey<_ProbeHarnessState>();
+        await tester.pumpWidget(_ProbeHarness(key: key));
+        await pumpFrames();
+        final state = key.currentState!;
+        final content = List.filled(
+          40,
+          'Streaming content for scroll testing.',
+        ).join('\n\n');
+        state.pushStreamTick(visibleContent: content, targetContent: content);
+        await pumpFrames();
+        final position = state.scrollController.position;
+        expect(position.extentAfter, lessThan(1));
+
+        final timeline = find.byType(MessageListView);
+        switch (input) {
+          case 'touch':
+            await tester.drag(timeline, const Offset(0, 30));
+          case 'wheel':
+            await tester.sendEventToBinding(
+              PointerScrollEvent(
+                position: tester.getCenter(timeline),
+                scrollDelta: const Offset(0, -12),
+              ),
+            );
+          case 'keyboard':
+            tester
+                .widget<Focus>(
+                  find.byKey(const ValueKey('timeline-keyboard-scroll-region')),
+                )
+                .focusNode!
+                .requestFocus();
+            await tester.pump();
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        }
+        await pumpFrames();
+        expect(position.extentAfter, greaterThan(1));
+        if (input != 'keyboard') {
+          expect(position.extentAfter, lessThanOrEqualTo(56));
+        }
+        final readingOffset = position.pixels;
+        await tester.pump(const Duration(minutes: 2));
+        expect(state.scrollCtrl.autoStickToBottom, isFalse);
+
+        final updated = '$content\n\nMore streaming content.';
+        state.pushStreamTick(visibleContent: updated, targetContent: updated);
+        await pumpFrames();
+        expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+
+        state.finishStreaming(updated);
+        state.scrollCtrl.stickToBottomAfterGeneration();
+        await pumpFrames();
+        expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('wheel scroll cancels the generation-finish pin before layout', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1170, 2100);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final key = GlobalKey<_ProbeHarnessState>();
+    await tester.pumpWidget(_ProbeHarness(key: key));
+    await tester.pump(const Duration(milliseconds: 100));
+    final state = key.currentState!;
+    final content = List.filled(
+      40,
+      'Content before generation ends.',
+    ).join('\n\n');
+    state.pushStreamTick(visibleContent: content, targetContent: content);
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    final position = state.scrollController.position;
+    expect(position.extentAfter, lessThan(1));
+
+    state.finishStreaming(content);
+    state.scrollCtrl.stickToBottomAfterGeneration();
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(find.byType(MessageListView)),
+        scrollDelta: const Offset(0, -12),
+      ),
+    );
+    final readingOffset = position.pixels;
+    expect(position.extentAfter, greaterThan(1));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+    expect(state.scrollCtrl.autoStickToBottom, isFalse);
+    await tester.pump(const Duration(seconds: 1));
+    expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('生成结束时尾部高度变化被布局阶段吸收，不再跳一下再滑回底部', (tester) async {
@@ -128,7 +239,6 @@ class _ProbeHarnessState extends State<_ProbeHarness> {
       scrollController: scrollController,
       onStateChanged: () {},
       getAutoScrollEnabled: () => true,
-      getAutoScrollIdleSeconds: () => 3,
       isGenerating: () => generating,
     );
     streamingNotifier.getNotifier(_streamingId);

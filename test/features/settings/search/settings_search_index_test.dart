@@ -112,6 +112,28 @@ void main() {
   });
 
   test(
+    'auto-follow is searchable on mobile and desktop without a delay entry',
+    () {
+      for (final platform in TargetPlatform.values) {
+        final candidate = SettingsSearchIndex(en, platform: platform);
+        for (final query in ['auto follow', '自动跟随底部', '自動跟隨底部']) {
+          final result = candidate.search(query).first;
+          expect(result.id, 'displaySettingsPageAutoScrollEnableTitle');
+          expect(result.destination, SettingsSearchDestination.display);
+          expect(
+            result.targetLabel,
+            en.displaySettingsPageAutoScrollEnableTitle,
+          );
+        }
+        expect(
+          candidate.entries.map((entry) => entry.id),
+          isNot(contains('displaySettingsPageAutoScrollIdleTitle')),
+        );
+      }
+    },
+  );
+
+  test(
     'native menu rollback is searchable by its appearance and destination',
     () {
       for (final query in ['liquid glass', '液态玻璃', '原生選取選單']) {

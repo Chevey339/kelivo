@@ -10018,20 +10018,20 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageAutoScrollEnableTitle.
   ///
   /// In en, this message translates to:
-  /// **'Auto-scroll to bottom'**
+  /// **'Auto-follow bottom'**
   String get displaySettingsPageAutoScrollEnableTitle;
 
-  /// No description provided for @displaySettingsPageAutoScrollIdleTitle.
+  /// No description provided for @displaySettingsPageAutoScrollSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Auto-Scroll Back Delay'**
-  String get displaySettingsPageAutoScrollIdleTitle;
+  /// **'While streaming, follow new content when at the bottom. Scrolling up pauses following until you return to the bottom. When off, new content does not scroll automatically.'**
+  String get displaySettingsPageAutoScrollSubtitle;
 
-  /// No description provided for @displaySettingsPageAutoScrollIdleSubtitle.
+  /// No description provided for @displaySettingsPageAutoScrollEnabledLabel.
   ///
   /// In en, this message translates to:
-  /// **'Wait time after user scroll before jumping to bottom'**
-  String get displaySettingsPageAutoScrollIdleSubtitle;
+  /// **'On'**
+  String get displaySettingsPageAutoScrollEnabledLabel;
 
   /// No description provided for @displaySettingsPageAutoScrollDisabledLabel.
   ///

@@ -6,6 +6,40 @@ import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
+    testWidgets('disabled follow tolerates overlapping layout positions', (
+      tester,
+    ) async {
+      var enabled = false;
+      var itemCount = 30;
+      final scrollController = ChatAutoFollowScrollController();
+      final chat = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => enabled,
+        isGenerating: () => true,
+      );
+      Widget harness(String layout) => KeyedSubtree(
+        key: ValueKey(layout),
+        child: _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      await tester.pumpWidget(harness('mobile'));
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pumpWidget(harness('wide'));
+      expect(tester.takeException(), isNull);
+      expect(scrollController.positions, hasLength(1));
+      expect(scrollController.position.extentAfter, greaterThan(1));
+      final readingOffset = scrollController.offset;
+      enabled = true;
+      itemCount++;
+      await tester.pumpWidget(harness('wide'));
+      expect(scrollController.offset, readingOffset);
+      chat.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('conversation open reaches bottom in its first layout', (
       tester,
     ) async {
@@ -15,7 +49,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _ScrollHarness(
@@ -64,7 +97,6 @@ void main() {
         scrollController: nextController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       nextChatController.positionAtBottomOnNextLayout();
       await tester.pumpWidget(
@@ -113,7 +145,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       chatScrollController.positionAtBottomOnNextLayout();
       await tester.pumpWidget(
@@ -150,7 +181,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _ResizableScrollHarness(
@@ -200,7 +230,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _ScrollHarness(
@@ -248,7 +277,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _ScrollHarness(
@@ -287,7 +315,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
       await tester.pumpWidget(
@@ -334,7 +361,6 @@ void main() {
           scrollController: scrollController,
           onStateChanged: () {},
           getAutoScrollEnabled: () => true,
-          getAutoScrollIdleSeconds: () => 8,
           isGenerating: () => generating,
         );
         await tester.pumpWidget(
@@ -381,7 +407,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => generating,
       );
       await tester.pumpWidget(
@@ -423,7 +448,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
       await tester.pumpWidget(
@@ -471,7 +495,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _ScrollHarness(scrollController: scrollController, itemCount: 30),
@@ -479,6 +502,8 @@ void main() {
 
       chatScrollController.scrollToBottom();
       await tester.pumpAndSettle();
+      expect(chatScrollController.isUserScrolling, isFalse);
+      scrollController.jumpTo(scrollController.position.maxScrollExtent - 12);
       chatScrollController.handleUserScrollIntent();
       expect(chatScrollController.isUserScrolling, isTrue);
       expect(chatScrollController.autoStickToBottom, isFalse);
@@ -497,7 +522,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => autoScrollEnabled,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
 
@@ -524,6 +548,20 @@ void main() {
         lessThan(scrollController.position.maxScrollExtent),
       );
 
+      autoScrollEnabled = true;
+      itemCount++;
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      expect(
+        scrollController.offset,
+        oldMax,
+        reason: 'Enabling follow away from the bottom must not move the reader',
+      );
+
       chatScrollController.dispose();
       scrollController.dispose();
     });
@@ -538,7 +576,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => autoScrollEnabled,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
 
@@ -574,7 +611,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => false,
       );
       await tester.pumpWidget(
@@ -612,7 +648,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
       await tester.pumpWidget(
@@ -662,6 +697,80 @@ void main() {
       scrollController.dispose();
     });
 
+    testWidgets(
+      'small upward scroll stays detached after idle and completion',
+      (tester) async {
+        var generating = true;
+        var itemCount = 24;
+        final scrollController = ChatAutoFollowScrollController();
+        final chat = ChatScrollController(
+          scrollController: scrollController,
+          onStateChanged: () {},
+          getAutoScrollEnabled: () => true,
+          isGenerating: () => generating,
+        );
+        addTearDown(chat.dispose);
+        addTearDown(scrollController.dispose);
+        Widget harness() => _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        );
+        await tester.pumpWidget(harness());
+        scrollController.jumpTo(scrollController.position.maxScrollExtent - 12);
+        chat.handleUserScrollIntent();
+        final readingOffset = scrollController.offset;
+
+        await tester.pump(const Duration(minutes: 2));
+        expect(chat.autoStickToBottom, isFalse);
+        expect(chat.pinBottomDuringViewportResizeIfNeeded(), isFalse);
+        itemCount++;
+        chat.autoScrollToBottomIfNeeded();
+        await tester.pumpWidget(harness());
+        expect(scrollController.offset, readingOffset);
+
+        generating = false;
+        chat.stickToBottomAfterGeneration();
+        itemCount++;
+        await tester.pumpWidget(harness());
+        await tester.pump(const Duration(seconds: 1));
+        expect(scrollController.offset, readingOffset);
+      },
+    );
+
+    testWidgets('returning to bottom resumes follow without a drag direction', (
+      tester,
+    ) async {
+      var itemCount = 24;
+      final scrollController = ChatAutoFollowScrollController();
+      final chat = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        isGenerating: () => true,
+      );
+      addTearDown(chat.dispose);
+      addTearDown(scrollController.dispose);
+      Widget harness() => _ScrollHarness(
+        scrollController: scrollController,
+        itemCount: itemCount,
+      );
+      await tester.pumpWidget(harness());
+      scrollController.jumpTo(scrollController.position.maxScrollExtent - 120);
+      chat.handleUserScrollIntent();
+      expect(chat.autoStickToBottom, isFalse);
+
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      expect(chat.autoStickToBottom, isTrue);
+      expect(chat.isUserScrolling, isFalse);
+      itemCount++;
+      await tester.pumpWidget(harness());
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+      await tester.pump(const Duration(seconds: 2));
+    });
+
     testWidgets('streaming tail growth is monotonic without rebound', (
       tester,
     ) async {
@@ -671,7 +780,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
       await tester.pumpWidget(
@@ -717,7 +825,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _IndexedScrollHarness(
@@ -752,7 +859,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         isGenerating: () => true,
       );
       await tester.pumpWidget(
@@ -801,7 +907,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
         getTopRevealInset: () => 100,
       );
       await tester.pumpWidget(
@@ -896,7 +1001,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
         getTopRevealInset: () => 100,
       );
       await tester.pumpWidget(
@@ -972,7 +1076,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
 
       await tester.pumpWidget(
@@ -1014,7 +1117,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
 
       await tester.pumpWidget(
@@ -1056,7 +1158,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _IndexedScrollHarness(
@@ -1102,7 +1203,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _IndexedScrollHarness(
@@ -1146,7 +1246,6 @@ void main() {
           scrollController: scrollController,
           onStateChanged: () {},
           getAutoScrollEnabled: () => false,
-          getAutoScrollIdleSeconds: () => 8,
           getTopRevealInset: () => 100,
         );
         await tester.pumpWidget(
@@ -1191,7 +1290,6 @@ void main() {
           scrollController: scrollController,
           onStateChanged: () {},
           getAutoScrollEnabled: () => false,
-          getAutoScrollIdleSeconds: () => 8,
         );
         await tester.pumpWidget(
           _VariableExtentIndexedScrollHarness(
@@ -1240,7 +1338,6 @@ void main() {
           scrollController: scroll,
           onStateChanged: () {},
           getAutoScrollEnabled: () => false,
-          getAutoScrollIdleSeconds: () => 8,
         );
         final visible = ValueNotifier(true);
         var taps = 0;
@@ -1313,7 +1410,6 @@ void main() {
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
-        getAutoScrollIdleSeconds: () => 8,
       );
       await tester.pumpWidget(
         _IndexedScrollHarness(

@@ -5291,13 +5291,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自动回到底部延迟';
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '开启后，流式输出时位于底部会自动跟随。上滑后保持阅读位置，主动回到底部后才继续跟随；关闭后不随新内容自动滚动。';
 
   @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '用户停止滚动后等待多久再自动回到底部';
+  String get displaySettingsPageAutoScrollEnabledLabel => '开启';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
@@ -19197,13 +19198,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自动回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自动回到底部延迟';
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '开启后，流式输出时位于底部会自动跟随。上滑后保持阅读位置，主动回到底部后才继续跟随；关闭后不随新内容自动滚动。';
 
   @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '用户停止滚动后等待多久再自动回到底部';
+  String get displaySettingsPageAutoScrollEnabledLabel => '开启';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
@@ -33028,13 +33030,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSizeTitle => '聊天字體大小';
 
   @override
-  String get displaySettingsPageAutoScrollEnableTitle => '自動回到底部';
+  String get displaySettingsPageAutoScrollEnableTitle => '自動跟隨底部';
 
   @override
-  String get displaySettingsPageAutoScrollIdleTitle => '自動回到底部延遲';
+  String get displaySettingsPageAutoScrollSubtitle =>
+      '開啟後，串流輸出時位於底部會自動跟隨。向上捲動後保持閱讀位置，主動回到底部後才繼續跟隨；關閉後不隨新內容自動捲動。';
 
   @override
-  String get displaySettingsPageAutoScrollIdleSubtitle => '使用者停止捲動後等待多久再自動回到底部';
+  String get displaySettingsPageAutoScrollEnabledLabel => '開啟';
 
   @override
   String get displaySettingsPageAutoScrollDisabledLabel => '已關閉';
