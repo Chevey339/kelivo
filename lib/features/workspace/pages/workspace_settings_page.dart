@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +16,7 @@ import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/utils/platform_utils.dart';
 
 /// Mobile settings hub for workspaces and the sandbox environment.
 class WorkspaceSettingsPage extends StatefulWidget {
@@ -42,12 +42,21 @@ class _WorkspaceSettingsPageState extends State<WorkspaceSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (useDesktopWorkspaceLayout(context)) {
+    if (PlatformUtils.isDesktopTarget) {
       return const WorkspacesPage();
     }
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final showEnv = !_envIsDesktopTarget();
+    final desktopLayout = useDesktopWorkspaceLayout(context);
+    final showEnv = PlatformUtils.isMobileTarget;
+    final headings = <Widget>[
+      if (showEnv) ...[
+        IosSectionHeader(text: l10n.workspaceEnvTitle, first: true),
+        const _EnvironmentNavRow(),
+        const SizedBox(height: 12),
+      ],
+      IosSectionHeader(text: l10n.workspacesTitle, first: !showEnv),
+    ];
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -61,20 +70,22 @@ class _WorkspaceSettingsPageState extends State<WorkspaceSettingsPage> {
           onTap: () => Navigator.of(context).maybePop(),
         ),
         title: Text(l10n.settingsPageWorkspace),
-        actions: workspaceMgmtCreateActions(context),
+        actions: desktopLayout ? null : workspaceMgmtCreateActions(context),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        children: [
-          if (showEnv) ...[
-            IosSectionHeader(text: l10n.workspaceEnvTitle, first: true),
-            const _EnvironmentNavRow(),
-            const SizedBox(height: 12),
-          ],
-          IosSectionHeader(text: l10n.workspacesTitle, first: !showEnv),
-          const WorkspacesPane(showHeader: false),
-        ],
-      ),
+      body: desktopLayout
+          ? Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(children: headings),
+                ),
+                const Expanded(child: WorkspacesPane(showHeader: false)),
+              ],
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              children: [...headings, const WorkspacesPane(showHeader: false)],
+            ),
     );
   }
 }
@@ -108,12 +119,6 @@ class _EnvironmentNavRow extends StatelessWidget {
       ],
     );
   }
-}
-
-bool _envIsDesktopTarget() {
-  return defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux;
 }
 
 String _phaseLabel(AppLocalizations l10n, EnvironmentPhase phase) {

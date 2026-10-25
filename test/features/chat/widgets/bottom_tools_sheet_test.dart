@@ -202,6 +202,16 @@ void main() {
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
   }
 
+  testWidgets('more sheet retains browser entry with a window icon', (
+    tester,
+  ) async {
+    await pumpSheet(tester);
+    final row = tester.widget<ToolsSheetRow>(
+      find.byKey(const ValueKey('bottom-tools-browser')),
+    );
+    expect(row.icon, Lucide.AppWindow);
+  });
+
   testWidgets('hides camera and photos when those callbacks are null', (
     tester,
   ) async {

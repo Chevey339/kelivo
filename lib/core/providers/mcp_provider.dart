@@ -12,6 +12,7 @@ import '../services/mcp/workspace_stdio_command.dart';
 import '../services/workspace/workspace_runtime.dart';
 import '../models/environment_state.dart';
 import '../models/workspace.dart';
+import '../models/mcp_presentation.dart';
 import 'environment_provider.dart';
 import 'workspace_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -366,6 +367,10 @@ class McpProvider extends ChangeNotifier {
     seconds: 30,
   );
 
+  static const String presentationKey = 'mcp_presentation_v1';
+  McpPresentation _presentation = McpPresentation();
+  final Map<String, List<Map<String, dynamic>>> _declaredIcons = {};
+
   final BusinessPreferences preferences;
   late final Future<void> loaded;
   final McpOAuthService _oauthService;
@@ -482,6 +487,18 @@ class McpProvider extends ChangeNotifier {
     final timeoutMs = preferences.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
       _requestTimeout = Duration(milliseconds: timeoutMs);
+    }
+    final presentation = preferences.getString(presentationKey);
+    if (presentation != null) {
+      try {
+        _presentation = McpPresentation.fromJson(
+          (jsonDecode(presentation) as Map).cast<String, dynamic>(),
+        );
+      } catch (_) {
+        // A damaged appearance preference must not prevent MCP configuration
+        // from loading. Keep the original value untouched for recovery.
+        debugPrint('Invalid MCP presentation metadata');
+      }
     }
     final raw = preferences.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -874,6 +891,7 @@ class McpProvider extends ChangeNotifier {
       detached = [for (final server in _servers) _detachConnection(server.id)];
       _servers = committed;
       _connections.clear();
+      _declaredIcons.clear();
       for (final server in _servers) {
         _connections[server.id] = _ServerConnection();
       }
@@ -990,6 +1008,7 @@ class McpProvider extends ChangeNotifier {
       final resourceChanged =
           !_isRemoteTransport(updated.transport) ||
           updated.url.trim() != previous.url.trim();
+      if (resourceChanged) _declaredIcons.remove(updated.id);
       final oauthSettingsChanged =
           replaceOAuthSettings && !_sameOAuthSettings(updated, previous);
       final effectiveUpdated = resourceChanged
@@ -1047,12 +1066,202 @@ class McpProvider extends ChangeNotifier {
       detached = _detachConnection(id);
       _servers = next;
       _connections.remove(id);
+      _declaredIcons.remove(id);
       _notify();
     });
     final committedConnection = detached;
     if (committedConnection != null) {
       await _finishDisconnect(committedConnection, terminateSession: true);
     }
+  }
+
+  List<McpGroup> get groups => _presentation.groups;
+  McpServerPresentation presentationFor(String id) =>
+      _presentation.servers[id] ?? const McpServerPresentation();
+  bool groupCollapsed(String id) => _presentation.collapsed.contains(id);
+  List<Map<String, dynamic>> declaredIconsFor(String id) =>
+      List.unmodifiable(_declaredIcons[id] ?? const []);
+
+  Future<void> _updatePresentation(
+    McpPresentation Function(McpPresentation current) update,
+  ) => _serializeServerMutation(() async {
+    final next = update(_presentation);
+    await preferences.setString(presentationKey, jsonEncode(next.toJson()));
+    _presentation = next;
+    _notify();
+  });
+
+  Future<String> createGroup(String name) async {
+    final id = const Uuid().v4();
+    await _updatePresentation((current) {
+      final trimmed = name.trim();
+      if (trimmed.isEmpty ||
+          current.groups.any(
+            (g) => g.name.toLowerCase() == trimmed.toLowerCase(),
+          )) {
+        throw ArgumentError('Group name must be nonempty and unique');
+      }
+      return current.copyWith(
+        groups: [
+          ...current.groups,
+          McpGroup(id: id, name: trimmed),
+        ],
+      );
+    });
+    return id;
+  }
+
+  Future<void> renameGroup(String id, String name) =>
+      _updatePresentation((current) {
+        final trimmed = name.trim();
+        if (trimmed.isEmpty ||
+            current.groups.any(
+              (g) =>
+                  g.id != id && g.name.toLowerCase() == trimmed.toLowerCase(),
+            )) {
+          throw ArgumentError('Group name must be nonempty and unique');
+        }
+        return current.copyWith(
+          groups: [
+            for (final group in current.groups)
+              group.id == id ? McpGroup(id: id, name: trimmed) : group,
+          ],
+        );
+      });
+
+  Future<void> deleteGroup(String id) => _updatePresentation(
+    (current) => current.copyWith(
+      groups: current.groups.where((group) => group.id != id).toList(),
+      servers: current.servers.map(
+        (key, value) => MapEntry(
+          key,
+          value.groupId == id ? McpServerPresentation(icon: value.icon) : value,
+        ),
+      ),
+      collapsed: {...current.collapsed}..remove(id),
+    ),
+  );
+
+  Future<void> reorderGroup(String id, int newIndex) =>
+      _updatePresentation((current) {
+        final groups = [...current.groups];
+        final oldIndex = groups.indexWhere((group) => group.id == id);
+        if (oldIndex < 0) return current;
+        final group = groups.removeAt(oldIndex);
+        groups.insert(newIndex.clamp(0, groups.length), group);
+        return current.copyWith(groups: groups);
+      });
+
+  Future<void> setGroupCollapsed(String id, bool collapsed) =>
+      _updatePresentation((current) {
+        final next = {...current.collapsed};
+        if (collapsed) {
+          next.add(id);
+        } else {
+          next.remove(id);
+        }
+        return current.copyWith(collapsed: next);
+      });
+
+  Future<void> moveServersToGroup(Set<String> ids, String? groupId) =>
+      _updatePresentation((current) {
+        if (groupId != null &&
+            !current.groups.any((group) => group.id == groupId)) {
+          throw ArgumentError.value(groupId);
+        }
+        final entries = {...current.servers};
+        for (final id in ids) {
+          if (getById(id) == null) continue;
+          entries[id] = McpServerPresentation(
+            groupId: groupId,
+            icon: entries[id]?.icon,
+          );
+        }
+        return current.copyWith(servers: entries);
+      });
+
+  Future<void> setServerIcon(String id, McpServerIcon? icon) =>
+      _updatePresentation((current) {
+        if (getById(id) == null) return current;
+        return current.copyWith(
+          servers: {
+            ...current.servers,
+            id: McpServerPresentation(
+              groupId: current.servers[id]?.groupId,
+              icon: icon,
+            ),
+          },
+        );
+      });
+
+  Future<void> setServersEnabled(Set<String> ids, bool enabled) async {
+    for (final id in ids) {
+      final server = getById(id);
+      if (server != null && server.enabled != enabled) {
+        await updateServerMetadata(server.copyWith(enabled: enabled));
+      }
+    }
+  }
+
+  Future<void> removeServers(Set<String> ids) async {
+    for (final id in ids) {
+      await removeServer(id);
+    }
+    await _updatePresentation(
+      (current) => current.copyWith(
+        servers: {...current.servers}..removeWhere((id, _) => ids.contains(id)),
+      ),
+    );
+  }
+
+  Future<void> restoreServer(
+    McpServerConfig server,
+    McpServerPresentation presentation,
+  ) async {
+    var restored = false;
+    await _serializeServerMutation(() async {
+      if (getById(server.id) != null) return;
+      final next = [..._servers, server];
+      await _persistServers(next);
+      _servers = next;
+      restored = true;
+      _connections[server.id] = _ServerConnection();
+      _notify();
+    });
+    if (!restored) return;
+    await _updatePresentation(
+      (current) => current.copyWith(
+        servers: {
+          ...current.servers,
+          server.id: McpServerPresentation(
+            icon: presentation.icon,
+            groupId:
+                current.groups.any((group) => group.id == presentation.groupId)
+                ? presentation.groupId
+                : null,
+          ),
+        },
+      ),
+    );
+    if (server.enabled) unawaited(connect(server.id));
+  }
+
+  Future<void> moveServerBefore(
+    String id,
+    String? groupId,
+    String? beforeId,
+  ) async {
+    if (presentationFor(id).groupId != groupId) {
+      await moveServersToGroup({id}, groupId);
+    }
+    final current = _servers;
+    final oldIndex = current.indexWhere((server) => server.id == id);
+    if (oldIndex < 0) return;
+    final remaining = current.where((server) => server.id != id).toList();
+    final newIndex = beforeId == null
+        ? remaining.length
+        : remaining.indexWhere((server) => server.id == beforeId);
+    if (newIndex >= 0) await reorderServers(oldIndex, newIndex);
   }
 
   Future<void> reorderServers(int oldIndex, int newIndex) async {
@@ -1652,6 +1861,14 @@ class McpProvider extends ChangeNotifier {
       }
 
       state.client = connectedClient;
+      final icons = connectedClient.serverInfo?['icons'];
+      _declaredIcons[id] = icons is List
+          ? [
+              for (final icon in icons.take(16))
+                if (icon is Map && icon['src'] is String)
+                  Map<String, dynamic>.from(icon),
+            ]
+          : const [];
       state.status = McpStatus.connected;
       state.error = null;
       _finishScopeUpgrade(state, 'connect');

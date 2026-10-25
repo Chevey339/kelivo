@@ -1,0 +1,2410 @@
+{
+  "date": "2026-10-20",
+  "baselineRevision": "cf2af98e64c0d7713491228bf56db790693573fb",
+  "previousStyleRevision": "437e7c50",
+  "candidateParentRevision": "437e7c50",
+  "sourceSha256": {
+    "dependencies/markstream/lib/src/flutter/render/inline_code_capsule.dart": "740c60d80d03b07ae185eec87be1bd1aeb312dbe4e5f8004bad92b027ed90898",
+    "dependencies/markstream/lib/src/flutter/theme/markstream_theme.dart": "26f41fda1d63fab09b7666d907932ce70fb4dac5a9fc5e05456186df9628f0f7"
+  },
+  "host": {
+    "cpu": "Apple M4 Pro",
+    "os": "macOS 26.5.2",
+    "flutter": "3.47.6",
+    "dart": "3.13.5"
+  },
+  "protocol": {
+    "roundsPerVersion": 6,
+    "order": "base/style/optimized; style/optimized/base; optimized/base/style; repeated twice",
+    "statistic": "median of per-process statistics, not pooled p95",
+    "debugPhaseCycles": 5,
+    "debugPhaseSamplesPerProcess": 280,
+    "originalCycles": 1,
+    "originalSamplesPerProcess": 56,
+    "profileCycles": 1,
+    "profileSamplesPerProcess": 56,
+    "profileSurface": [
+      720,
+      900
+    ],
+    "profileDpr": 2,
+    "profileFramePolicy": "onlyPumps",
+    "profileFrameTimingWarmupFrames": 24
+  },
+  "debugPhase": {
+    "raw": {
+      "plain": {
+        "base": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 231,
+            "firstPumpP95Us": 398,
+            "contentPumpMedianUs": 1141,
+            "contentPumpP95Us": 2412,
+            "coldFirstFrameUs": 509371,
+            "coldPhaseUs": {
+              "build": 344880.0,
+              "layout": 345108.0,
+              "paint": 4947.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 222.0,
+              "layout": 396.0,
+              "paint": 114.0
+            },
+            "contentPhaseP95Us": {
+              "build": 537.0,
+              "layout": 934.0,
+              "paint": 223.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 246,
+            "firstPumpP95Us": 446,
+            "contentPumpMedianUs": 1157,
+            "contentPumpP95Us": 2428,
+            "coldFirstFrameUs": 509495,
+            "coldPhaseUs": {
+              "build": 336242.0,
+              "layout": 349836.0,
+              "paint": 5040.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 232.0,
+              "layout": 395.0,
+              "paint": 110.0
+            },
+            "contentPhaseP95Us": {
+              "build": 526.0,
+              "layout": 869.0,
+              "paint": 198.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 233,
+            "firstPumpP95Us": 785,
+            "contentPumpMedianUs": 1144,
+            "contentPumpP95Us": 3553,
+            "coldFirstFrameUs": 520172,
+            "coldPhaseUs": {
+              "build": 339949.0,
+              "layout": 359175.0,
+              "paint": 5264.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 222.0,
+              "layout": 385.0,
+              "paint": 112.0
+            },
+            "contentPhaseP95Us": {
+              "build": 616.0,
+              "layout": 1549.0,
+              "paint": 313.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 252,
+            "firstPumpP95Us": 480,
+            "contentPumpMedianUs": 1256,
+            "contentPumpP95Us": 2486,
+            "coldFirstFrameUs": 504521,
+            "coldPhaseUs": {
+              "build": 338069.0,
+              "layout": 343541.0,
+              "paint": 4669.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 234.0,
+              "layout": 419.0,
+              "paint": 125.0
+            },
+            "contentPhaseP95Us": {
+              "build": 547.0,
+              "layout": 1026.0,
+              "paint": 216.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 274,
+            "firstPumpP95Us": 643,
+            "contentPumpMedianUs": 1295,
+            "contentPumpP95Us": 3093,
+            "coldFirstFrameUs": 478496,
+            "coldPhaseUs": {
+              "build": 310111.0,
+              "layout": 319200.0,
+              "paint": 4884.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 251.0,
+              "layout": 457.0,
+              "paint": 132.0
+            },
+            "contentPhaseP95Us": {
+              "build": 642.0,
+              "layout": 1158.0,
+              "paint": 235.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 212,
+            "firstPumpP95Us": 372,
+            "contentPumpMedianUs": 956,
+            "contentPumpP95Us": 1923,
+            "coldFirstFrameUs": 472646,
+            "coldPhaseUs": {
+              "build": 312230.0,
+              "layout": 318371.0,
+              "paint": 4593.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 187.0,
+              "layout": 317.0,
+              "paint": 91.0
+            },
+            "contentPhaseP95Us": {
+              "build": 358.0,
+              "layout": 628.0,
+              "paint": 147.0
+            }
+          }
+        ],
+        "style": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 263,
+            "firstPumpP95Us": 463,
+            "contentPumpMedianUs": 1351,
+            "contentPumpP95Us": 2405,
+            "coldFirstFrameUs": 502053,
+            "coldPhaseUs": {
+              "build": 339786.0,
+              "layout": 340869.0,
+              "paint": 3848.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 264.0,
+              "layout": 472.0,
+              "paint": 131.0
+            },
+            "contentPhaseP95Us": {
+              "build": 542.0,
+              "layout": 889.0,
+              "paint": 227.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 253,
+            "firstPumpP95Us": 468,
+            "contentPumpMedianUs": 1171,
+            "contentPumpP95Us": 2567,
+            "coldFirstFrameUs": 505477,
+            "coldPhaseUs": {
+              "build": 341509.0,
+              "layout": 345749.0,
+              "paint": 4064.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 227.0,
+              "layout": 390.0,
+              "paint": 118.0
+            },
+            "contentPhaseP95Us": {
+              "build": 562.0,
+              "layout": 942.0,
+              "paint": 248.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 245,
+            "firstPumpP95Us": 495,
+            "contentPumpMedianUs": 1160,
+            "contentPumpP95Us": 2378,
+            "coldFirstFrameUs": 505415,
+            "coldPhaseUs": {
+              "build": 338691.0,
+              "layout": 346113.0,
+              "paint": 3744.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 225.0,
+              "layout": 398.0,
+              "paint": 114.0
+            },
+            "contentPhaseP95Us": {
+              "build": 496.0,
+              "layout": 915.0,
+              "paint": 213.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 249,
+            "firstPumpP95Us": 498,
+            "contentPumpMedianUs": 1182,
+            "contentPumpP95Us": 2409,
+            "coldFirstFrameUs": 512394,
+            "coldPhaseUs": {
+              "build": 343444.0,
+              "layout": 350499.0,
+              "paint": 3923.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 229.0,
+              "layout": 406.0,
+              "paint": 121.0
+            },
+            "contentPhaseP95Us": {
+              "build": 544.0,
+              "layout": 892.0,
+              "paint": 210.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 234,
+            "firstPumpP95Us": 555,
+            "contentPumpMedianUs": 1104,
+            "contentPumpP95Us": 2667,
+            "coldFirstFrameUs": 503567,
+            "coldPhaseUs": {
+              "build": 339059.0,
+              "layout": 342845.0,
+              "paint": 3822.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 217.0,
+              "layout": 382.0,
+              "paint": 112.0
+            },
+            "contentPhaseP95Us": {
+              "build": 555.0,
+              "layout": 945.0,
+              "paint": 232.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 212,
+            "firstPumpP95Us": 316,
+            "contentPumpMedianUs": 971,
+            "contentPumpP95Us": 1959,
+            "coldFirstFrameUs": 463071,
+            "coldPhaseUs": {
+              "build": 314684.0,
+              "layout": 316577.0,
+              "paint": 3415.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 192.0,
+              "layout": 326.0,
+              "paint": 96.0
+            },
+            "contentPhaseP95Us": {
+              "build": 408.0,
+              "layout": 650.0,
+              "paint": 158.0
+            }
+          }
+        ],
+        "optimized": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 234,
+            "firstPumpP95Us": 491,
+            "contentPumpMedianUs": 1164,
+            "contentPumpP95Us": 2366,
+            "coldFirstFrameUs": 500370,
+            "coldPhaseUs": {
+              "build": 331808.0,
+              "layout": 337802.0,
+              "paint": 3841.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 231.0,
+              "layout": 405.0,
+              "paint": 113.0
+            },
+            "contentPhaseP95Us": {
+              "build": 521.0,
+              "layout": 892.0,
+              "paint": 205.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 248,
+            "firstPumpP95Us": 455,
+            "contentPumpMedianUs": 1201,
+            "contentPumpP95Us": 2437,
+            "coldFirstFrameUs": 504103,
+            "coldPhaseUs": {
+              "build": 332910.0,
+              "layout": 342453.0,
+              "paint": 3789.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 236.0,
+              "layout": 401.0,
+              "paint": 114.0
+            },
+            "contentPhaseP95Us": {
+              "build": 511.0,
+              "layout": 875.0,
+              "paint": 214.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 250,
+            "firstPumpP95Us": 483,
+            "contentPumpMedianUs": 1217,
+            "contentPumpP95Us": 2485,
+            "coldFirstFrameUs": 499910,
+            "coldPhaseUs": {
+              "build": 328352.0,
+              "layout": 338931.0,
+              "paint": 4194.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 231.0,
+              "layout": 407.0,
+              "paint": 121.0
+            },
+            "contentPhaseP95Us": {
+              "build": 521.0,
+              "layout": 876.0,
+              "paint": 219.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 253,
+            "firstPumpP95Us": 476,
+            "contentPumpMedianUs": 1242,
+            "contentPumpP95Us": 2519,
+            "coldFirstFrameUs": 503846,
+            "coldPhaseUs": {
+              "build": 336159.0,
+              "layout": 344602.0,
+              "paint": 3512.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 246.0,
+              "layout": 442.0,
+              "paint": 123.0
+            },
+            "contentPhaseP95Us": {
+              "build": 503.0,
+              "layout": 884.0,
+              "paint": 243.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 213,
+            "firstPumpP95Us": 342,
+            "contentPumpMedianUs": 1026,
+            "contentPumpP95Us": 2057,
+            "coldFirstFrameUs": 459311,
+            "coldPhaseUs": {
+              "build": 304608.0,
+              "layout": 311644.0,
+              "paint": 3540.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 201.0,
+              "layout": 347.0,
+              "paint": 99.0
+            },
+            "contentPhaseP95Us": {
+              "build": 403.0,
+              "layout": 659.0,
+              "paint": 160.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 205,
+            "firstPumpP95Us": 374,
+            "contentPumpMedianUs": 971,
+            "contentPumpP95Us": 2141,
+            "coldFirstFrameUs": 463146,
+            "coldPhaseUs": {
+              "build": 309192.0,
+              "layout": 307680.0,
+              "paint": 3372.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 190.0,
+              "layout": 315.0,
+              "paint": 91.0
+            },
+            "contentPhaseP95Us": {
+              "build": 419.0,
+              "layout": 675.0,
+              "paint": 147.0
+            }
+          }
+        ]
+      },
+      "rich": {
+        "base": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 286,
+            "firstPumpP95Us": 556,
+            "contentPumpMedianUs": 2903,
+            "contentPumpP95Us": 5786,
+            "coldFirstFrameUs": 509985,
+            "coldPhaseUs": {
+              "build": 344063.0,
+              "layout": 347549.0,
+              "paint": 4981.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 798.0,
+              "layout": 1293.0,
+              "paint": 249.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1901.0,
+              "layout": 2569.0,
+              "paint": 503.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 274,
+            "firstPumpP95Us": 566,
+            "contentPumpMedianUs": 2816,
+            "contentPumpP95Us": 5460,
+            "coldFirstFrameUs": 511658,
+            "coldPhaseUs": {
+              "build": 345718.0,
+              "layout": 349709.0,
+              "paint": 5021.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 773.0,
+              "layout": 1263.0,
+              "paint": 235.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1652.0,
+              "layout": 2425.0,
+              "paint": 511.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 296,
+            "firstPumpP95Us": 568,
+            "contentPumpMedianUs": 2943,
+            "contentPumpP95Us": 5826,
+            "coldFirstFrameUs": 507180,
+            "coldPhaseUs": {
+              "build": 339232.0,
+              "layout": 343112.0,
+              "paint": 5241.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 818.0,
+              "layout": 1285.0,
+              "paint": 256.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1845.0,
+              "layout": 2602.0,
+              "paint": 547.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 285,
+            "firstPumpP95Us": 607,
+            "contentPumpMedianUs": 2946,
+            "contentPumpP95Us": 5708,
+            "coldFirstFrameUs": 514149,
+            "coldPhaseUs": {
+              "build": 339244.0,
+              "layout": 351483.0,
+              "paint": 4636.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 811.0,
+              "layout": 1282.0,
+              "paint": 249.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1694.0,
+              "layout": 2496.0,
+              "paint": 501.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 217,
+            "firstPumpP95Us": 439,
+            "contentPumpMedianUs": 2359,
+            "contentPumpP95Us": 4587,
+            "coldFirstFrameUs": 461047,
+            "coldPhaseUs": {
+              "build": 305435.0,
+              "layout": 312988.0,
+              "paint": 4443.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 620.0,
+              "layout": 971.0,
+              "paint": 193.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1457.0,
+              "layout": 2092.0,
+              "paint": 373.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 215,
+            "firstPumpP95Us": 402,
+            "contentPumpMedianUs": 2349,
+            "contentPumpP95Us": 4706,
+            "coldFirstFrameUs": 466200,
+            "coldPhaseUs": {
+              "build": 314105.0,
+              "layout": 315151.0,
+              "paint": 4516.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 626.0,
+              "layout": 969.0,
+              "paint": 193.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1428.0,
+              "layout": 2057.0,
+              "paint": 394.0
+            }
+          }
+        ],
+        "style": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 278,
+            "firstPumpP95Us": 606,
+            "contentPumpMedianUs": 2818,
+            "contentPumpP95Us": 5634,
+            "coldFirstFrameUs": 513232,
+            "coldPhaseUs": {
+              "build": 343660.0,
+              "layout": 351261.0,
+              "paint": 4006.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 780.0,
+              "layout": 1243.0,
+              "paint": 218.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1699.0,
+              "layout": 2646.0,
+              "paint": 463.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 282,
+            "firstPumpP95Us": 566,
+            "contentPumpMedianUs": 2919,
+            "contentPumpP95Us": 5561,
+            "coldFirstFrameUs": 506371,
+            "coldPhaseUs": {
+              "build": 338605.0,
+              "layout": 348697.0,
+              "paint": 3565.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 785.0,
+              "layout": 1286.0,
+              "paint": 225.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1663.0,
+              "layout": 2451.0,
+              "paint": 424.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 274,
+            "firstPumpP95Us": 625,
+            "contentPumpMedianUs": 2833,
+            "contentPumpP95Us": 5664,
+            "coldFirstFrameUs": 504260,
+            "coldPhaseUs": {
+              "build": 343808.0,
+              "layout": 344210.0,
+              "paint": 3811.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 788.0,
+              "layout": 1257.0,
+              "paint": 219.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1661.0,
+              "layout": 2523.0,
+              "paint": 456.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 274,
+            "firstPumpP95Us": 587,
+            "contentPumpMedianUs": 2876,
+            "contentPumpP95Us": 5814,
+            "coldFirstFrameUs": 524779,
+            "coldPhaseUs": {
+              "build": 352395.0,
+              "layout": 364859.0,
+              "paint": 3792.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 761.0,
+              "layout": 1259.0,
+              "paint": 222.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1799.0,
+              "layout": 2643.0,
+              "paint": 453.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 214,
+            "firstPumpP95Us": 513,
+            "contentPumpMedianUs": 2412,
+            "contentPumpP95Us": 5489,
+            "coldFirstFrameUs": 484748,
+            "coldPhaseUs": {
+              "build": 325790.0,
+              "layout": 331689.0,
+              "paint": 3586.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 645.0,
+              "layout": 1030.0,
+              "paint": 178.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1773.0,
+              "layout": 2536.0,
+              "paint": 417.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 210,
+            "firstPumpP95Us": 405,
+            "contentPumpMedianUs": 2315,
+            "contentPumpP95Us": 4397,
+            "coldFirstFrameUs": 459072,
+            "coldPhaseUs": {
+              "build": 312701.0,
+              "layout": 309203.0,
+              "paint": 3366.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 616.0,
+              "layout": 995.0,
+              "paint": 167.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1405.0,
+              "layout": 1995.0,
+              "paint": 320.0
+            }
+          }
+        ],
+        "optimized": [
+          {
+            "run": 1,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 297,
+            "firstPumpP95Us": 570,
+            "contentPumpMedianUs": 2991,
+            "contentPumpP95Us": 5494,
+            "coldFirstFrameUs": 536897,
+            "coldPhaseUs": {
+              "build": 346483.0,
+              "layout": 360380.0,
+              "paint": 3847.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 813.0,
+              "layout": 1330.0,
+              "paint": 236.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1715.0,
+              "layout": 2597.0,
+              "paint": 423.0
+            }
+          },
+          {
+            "run": 2,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 275,
+            "firstPumpP95Us": 566,
+            "contentPumpMedianUs": 2883,
+            "contentPumpP95Us": 5598,
+            "coldFirstFrameUs": 507471,
+            "coldPhaseUs": {
+              "build": 337965.0,
+              "layout": 346852.0,
+              "paint": 3607.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 797.0,
+              "layout": 1275.0,
+              "paint": 221.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1623.0,
+              "layout": 2506.0,
+              "paint": 445.0
+            }
+          },
+          {
+            "run": 3,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 270,
+            "firstPumpP95Us": 531,
+            "contentPumpMedianUs": 2825,
+            "contentPumpP95Us": 5282,
+            "coldFirstFrameUs": 495356,
+            "coldPhaseUs": {
+              "build": 328543.0,
+              "layout": 335252.0,
+              "paint": 3925.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 793.0,
+              "layout": 1274.0,
+              "paint": 228.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1680.0,
+              "layout": 2506.0,
+              "paint": 394.0
+            }
+          },
+          {
+            "run": 4,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 291,
+            "firstPumpP95Us": 570,
+            "contentPumpMedianUs": 2924,
+            "contentPumpP95Us": 5393,
+            "coldFirstFrameUs": 540493,
+            "coldPhaseUs": {
+              "build": 354813.0,
+              "layout": 378302.0,
+              "paint": 4099.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 822.0,
+              "layout": 1302.0,
+              "paint": 231.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1757.0,
+              "layout": 2481.0,
+              "paint": 503.0
+            }
+          },
+          {
+            "run": 5,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 242,
+            "firstPumpP95Us": 407,
+            "contentPumpMedianUs": 2570,
+            "contentPumpP95Us": 5136,
+            "coldFirstFrameUs": 466886,
+            "coldPhaseUs": {
+              "build": 310518.0,
+              "layout": 315190.0,
+              "paint": 3654.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 700.0,
+              "layout": 1119.0,
+              "paint": 189.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1506.0,
+              "layout": 2156.0,
+              "paint": 341.0
+            }
+          },
+          {
+            "run": 6,
+            "renderer": "markstream",
+            "richInlineAtoms": 20,
+            "appAdapters": true,
+            "selectionController": true,
+            "appendChars": 30000,
+            "coldChars": 100000,
+            "samples": 280,
+            "cycles": 5,
+            "firstPumpMedianUs": 208,
+            "firstPumpP95Us": 338,
+            "contentPumpMedianUs": 2336,
+            "contentPumpP95Us": 4277,
+            "coldFirstFrameUs": 451238,
+            "coldPhaseUs": {
+              "build": 296734.0,
+              "layout": 305344.0,
+              "paint": 3415.0
+            },
+            "contentPhaseMedianUs": {
+              "build": 638.0,
+              "layout": 995.0,
+              "paint": 172.0
+            },
+            "contentPhaseP95Us": {
+              "build": 1339.0,
+              "layout": 1913.0,
+              "paint": 328.0
+            }
+          }
+        ]
+      }
+    },
+    "summary": {
+      "plain": {
+        "base": {
+          "coldPhaseUs": {
+            "build": 337155.5,
+            "layout": 344324.5,
+            "paint": 4915.5
+          },
+          "contentPhaseMedianUs": {
+            "build": 227.0,
+            "layout": 395.5,
+            "paint": 113.0
+          },
+          "contentPhaseP95Us": {
+            "build": 542.0,
+            "layout": 980.0,
+            "paint": 219.5
+          }
+        },
+        "style": {
+          "coldPhaseUs": {
+            "build": 339422.5,
+            "layout": 344297.0,
+            "paint": 3835.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 226.0,
+            "layout": 394.0,
+            "paint": 116.0
+          },
+          "contentPhaseP95Us": {
+            "build": 543.0,
+            "layout": 903.5,
+            "paint": 220.0
+          }
+        },
+        "optimized": {
+          "coldPhaseUs": {
+            "build": 330080.0,
+            "layout": 338366.5,
+            "paint": 3664.5
+          },
+          "contentPhaseMedianUs": {
+            "build": 231.0,
+            "layout": 403.0,
+            "paint": 113.5
+          },
+          "contentPhaseP95Us": {
+            "build": 507.0,
+            "layout": 875.5,
+            "paint": 209.5
+          }
+        }
+      },
+      "rich": {
+        "base": {
+          "coldPhaseUs": {
+            "build": 339238.0,
+            "layout": 345330.5,
+            "paint": 4808.5
+          },
+          "contentPhaseMedianUs": {
+            "build": 785.5,
+            "layout": 1272.5,
+            "paint": 242.0
+          },
+          "contentPhaseP95Us": {
+            "build": 1673.0,
+            "layout": 2460.5,
+            "paint": 502.0
+          }
+        },
+        "style": {
+          "coldPhaseUs": {
+            "build": 341132.5,
+            "layout": 346453.5,
+            "paint": 3689.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 770.5,
+            "layout": 1250.0,
+            "paint": 218.5
+          },
+          "contentPhaseP95Us": {
+            "build": 1681.0,
+            "layout": 2529.5,
+            "paint": 438.5
+          }
+        },
+        "optimized": {
+          "coldPhaseUs": {
+            "build": 333254.0,
+            "layout": 341052.0,
+            "paint": 3750.5
+          },
+          "contentPhaseMedianUs": {
+            "build": 795.0,
+            "layout": 1274.5,
+            "paint": 224.5
+          },
+          "contentPhaseP95Us": {
+            "build": 1651.5,
+            "layout": 2493.5,
+            "paint": 408.5
+          }
+        }
+      }
+    },
+    "gateFailures": []
+  },
+  "debugOriginal": {
+    "raw": {
+      "base": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 348,
+          "firstPumpP95Us": 584,
+          "contentPumpMedianUs": 2024,
+          "contentPumpP95Us": 3569,
+          "coldFirstFrameUs": 515557
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 340,
+          "firstPumpP95Us": 656,
+          "contentPumpMedianUs": 1861,
+          "contentPumpP95Us": 2773,
+          "coldFirstFrameUs": 495989
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 342,
+          "firstPumpP95Us": 657,
+          "contentPumpMedianUs": 1866,
+          "contentPumpP95Us": 3305,
+          "coldFirstFrameUs": 545703
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 327,
+          "firstPumpP95Us": 555,
+          "contentPumpMedianUs": 1903,
+          "contentPumpP95Us": 2981,
+          "coldFirstFrameUs": 505965
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 334,
+          "firstPumpP95Us": 623,
+          "contentPumpMedianUs": 1912,
+          "contentPumpP95Us": 3068,
+          "coldFirstFrameUs": 510434
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 337,
+          "firstPumpP95Us": 717,
+          "contentPumpMedianUs": 1977,
+          "contentPumpP95Us": 2948,
+          "coldFirstFrameUs": 501318
+        }
+      ],
+      "style": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 314,
+          "firstPumpP95Us": 674,
+          "contentPumpMedianUs": 1901,
+          "contentPumpP95Us": 3075,
+          "coldFirstFrameUs": 506397
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 307,
+          "firstPumpP95Us": 917,
+          "contentPumpMedianUs": 1921,
+          "contentPumpP95Us": 3183,
+          "coldFirstFrameUs": 498206
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 315,
+          "firstPumpP95Us": 626,
+          "contentPumpMedianUs": 1836,
+          "contentPumpP95Us": 3293,
+          "coldFirstFrameUs": 502092
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 371,
+          "firstPumpP95Us": 709,
+          "contentPumpMedianUs": 2034,
+          "contentPumpP95Us": 3495,
+          "coldFirstFrameUs": 506543
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 330,
+          "firstPumpP95Us": 648,
+          "contentPumpMedianUs": 1934,
+          "contentPumpP95Us": 3282,
+          "coldFirstFrameUs": 536777
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 361,
+          "firstPumpP95Us": 620,
+          "contentPumpMedianUs": 2073,
+          "contentPumpP95Us": 3359,
+          "coldFirstFrameUs": 502223
+        }
+      ],
+      "optimized": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 329,
+          "firstPumpP95Us": 574,
+          "contentPumpMedianUs": 1872,
+          "contentPumpP95Us": 3791,
+          "coldFirstFrameUs": 495812
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 340,
+          "firstPumpP95Us": 694,
+          "contentPumpMedianUs": 1935,
+          "contentPumpP95Us": 3133,
+          "coldFirstFrameUs": 499143
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 422,
+          "firstPumpP95Us": 1087,
+          "contentPumpMedianUs": 2234,
+          "contentPumpP95Us": 3893,
+          "coldFirstFrameUs": 547739
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 337,
+          "firstPumpP95Us": 588,
+          "contentPumpMedianUs": 1903,
+          "contentPumpP95Us": 3366,
+          "coldFirstFrameUs": 518988
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 315,
+          "firstPumpP95Us": 643,
+          "contentPumpMedianUs": 1840,
+          "contentPumpP95Us": 3431,
+          "coldFirstFrameUs": 504473
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "firstPumpMedianUs": 346,
+          "firstPumpP95Us": 895,
+          "contentPumpMedianUs": 1903,
+          "contentPumpP95Us": 3643,
+          "coldFirstFrameUs": 499298
+        }
+      ]
+    },
+    "summary": {
+      "base": {
+        "firstPumpMedianUs": 338.5,
+        "firstPumpP95Us": 639.5,
+        "contentPumpMedianUs": 1907.5,
+        "contentPumpP95Us": 3024.5,
+        "coldFirstFrameUs": 508199.5
+      },
+      "style": {
+        "firstPumpMedianUs": 322.5,
+        "firstPumpP95Us": 661.0,
+        "contentPumpMedianUs": 1927.5,
+        "contentPumpP95Us": 3287.5,
+        "coldFirstFrameUs": 504310.0
+      },
+      "optimized": {
+        "firstPumpMedianUs": 338.5,
+        "firstPumpP95Us": 668.5,
+        "contentPumpMedianUs": 1903.0,
+        "contentPumpP95Us": 3537.0,
+        "coldFirstFrameUs": 501885.5
+      }
+    }
+  },
+  "macOSProfile": {
+    "raw": {
+      "base": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2438.0,
+          "frameRasterP95Us": 1692.0,
+          "frameTotalP95Us": 4261.0,
+          "frameVsyncOverheadP95Us": 224.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8507,
+          "wallFirstPumpP95Us": 8778,
+          "wallContentPumpMedianUs": 60612,
+          "wallContentPumpP95Us": 61211,
+          "coldFirstFrameUs": 114622,
+          "coldPhaseUs": {
+            "build": 32438.0,
+            "layout": 80288.0,
+            "paint": 520.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 577.0,
+            "layout": 1199.0,
+            "paint": 217.0
+          },
+          "contentPhaseP95Us": {
+            "build": 718.0,
+            "layout": 1548.0,
+            "paint": 273.0
+          }
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2366.0,
+          "frameRasterP95Us": 1726.0,
+          "frameTotalP95Us": 4183.0,
+          "frameVsyncOverheadP95Us": 217.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8479,
+          "wallFirstPumpP95Us": 8858,
+          "wallContentPumpMedianUs": 60547,
+          "wallContentPumpP95Us": 61471,
+          "coldFirstFrameUs": 111077,
+          "coldPhaseUs": {
+            "build": 32473.0,
+            "layout": 75609.0,
+            "paint": 517.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 534.0,
+            "layout": 1152.0,
+            "paint": 225.0
+          },
+          "contentPhaseP95Us": {
+            "build": 704.0,
+            "layout": 1492.0,
+            "paint": 310.0
+          }
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2433.0,
+          "frameRasterP95Us": 1664.0,
+          "frameTotalP95Us": 4170.0,
+          "frameVsyncOverheadP95Us": 204.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8470,
+          "wallFirstPumpP95Us": 8644,
+          "wallContentPumpMedianUs": 60494,
+          "wallContentPumpP95Us": 61416,
+          "coldFirstFrameUs": 107352,
+          "coldPhaseUs": {
+            "build": 32520.0,
+            "layout": 73003.0,
+            "paint": 489.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 598.0,
+            "layout": 1193.0,
+            "paint": 215.0
+          },
+          "contentPhaseP95Us": {
+            "build": 752.0,
+            "layout": 1558.0,
+            "paint": 311.0
+          }
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2409.0,
+          "frameRasterP95Us": 1641.0,
+          "frameTotalP95Us": 4209.0,
+          "frameVsyncOverheadP95Us": 213.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8489,
+          "wallFirstPumpP95Us": 8719,
+          "wallContentPumpMedianUs": 60502,
+          "wallContentPumpP95Us": 61262,
+          "coldFirstFrameUs": 107746,
+          "coldPhaseUs": {
+            "build": 31911.0,
+            "layout": 73104.0,
+            "paint": 454.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 577.0,
+            "layout": 1190.0,
+            "paint": 195.0
+          },
+          "contentPhaseP95Us": {
+            "build": 726.0,
+            "layout": 1505.0,
+            "paint": 296.0
+          }
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2386.0,
+          "frameRasterP95Us": 1599.0,
+          "frameTotalP95Us": 4129.0,
+          "frameVsyncOverheadP95Us": 287.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8479,
+          "wallFirstPumpP95Us": 8844,
+          "wallContentPumpMedianUs": 60341,
+          "wallContentPumpP95Us": 61285,
+          "coldFirstFrameUs": 110570,
+          "coldPhaseUs": {
+            "build": 34567.0,
+            "layout": 75397.0,
+            "paint": 592.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 561.0,
+            "layout": 1098.0,
+            "paint": 232.0
+          },
+          "contentPhaseP95Us": {
+            "build": 696.0,
+            "layout": 1521.0,
+            "paint": 318.0
+          }
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2178.0,
+          "frameRasterP95Us": 1576.0,
+          "frameTotalP95Us": 3997.0,
+          "frameVsyncOverheadP95Us": 288.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8431,
+          "wallFirstPumpP95Us": 8737,
+          "wallContentPumpMedianUs": 60288,
+          "wallContentPumpP95Us": 61357,
+          "coldFirstFrameUs": 108032,
+          "coldPhaseUs": {
+            "build": 30881.0,
+            "layout": 73863.0,
+            "paint": 513.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 527.0,
+            "layout": 1067.0,
+            "paint": 202.0
+          },
+          "contentPhaseP95Us": {
+            "build": 677.0,
+            "layout": 1459.0,
+            "paint": 308.0
+          }
+        }
+      ],
+      "style": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2467.0,
+          "frameRasterP95Us": 1658.0,
+          "frameTotalP95Us": 4237.0,
+          "frameVsyncOverheadP95Us": 197.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8468,
+          "wallFirstPumpP95Us": 8626,
+          "wallContentPumpMedianUs": 60650,
+          "wallContentPumpP95Us": 61244,
+          "coldFirstFrameUs": 112370,
+          "coldPhaseUs": {
+            "build": 32967.0,
+            "layout": 73937.0,
+            "paint": 662.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 602.0,
+            "layout": 1239.0,
+            "paint": 213.0
+          },
+          "contentPhaseP95Us": {
+            "build": 770.0,
+            "layout": 1528.0,
+            "paint": 332.0
+          }
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2525.0,
+          "frameRasterP95Us": 1604.0,
+          "frameTotalP95Us": 4230.0,
+          "frameVsyncOverheadP95Us": 214.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8452,
+          "wallFirstPumpP95Us": 8706,
+          "wallContentPumpMedianUs": 60690,
+          "wallContentPumpP95Us": 61486,
+          "coldFirstFrameUs": 111350,
+          "coldPhaseUs": {
+            "build": 32992.0,
+            "layout": 73728.0,
+            "paint": 533.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 615.0,
+            "layout": 1215.0,
+            "paint": 201.0
+          },
+          "contentPhaseP95Us": {
+            "build": 801.0,
+            "layout": 1632.0,
+            "paint": 299.0
+          }
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2496.0,
+          "frameRasterP95Us": 1666.0,
+          "frameTotalP95Us": 4257.0,
+          "frameVsyncOverheadP95Us": 214.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8459,
+          "wallFirstPumpP95Us": 8734,
+          "wallContentPumpMedianUs": 60658,
+          "wallContentPumpP95Us": 61469,
+          "coldFirstFrameUs": 111186,
+          "coldPhaseUs": {
+            "build": 32883.0,
+            "layout": 74405.0,
+            "paint": 522.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 640.0,
+            "layout": 1286.0,
+            "paint": 225.0
+          },
+          "contentPhaseP95Us": {
+            "build": 751.0,
+            "layout": 1563.0,
+            "paint": 298.0
+          }
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2458.0,
+          "frameRasterP95Us": 1601.0,
+          "frameTotalP95Us": 4258.0,
+          "frameVsyncOverheadP95Us": 215.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8495,
+          "wallFirstPumpP95Us": 8848,
+          "wallContentPumpMedianUs": 60508,
+          "wallContentPumpP95Us": 61230,
+          "coldFirstFrameUs": 108402,
+          "coldPhaseUs": {
+            "build": 30879.0,
+            "layout": 72943.0,
+            "paint": 482.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 594.0,
+            "layout": 1148.0,
+            "paint": 204.0
+          },
+          "contentPhaseP95Us": {
+            "build": 745.0,
+            "layout": 1526.0,
+            "paint": 321.0
+          }
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2425.0,
+          "frameRasterP95Us": 1690.0,
+          "frameTotalP95Us": 4179.0,
+          "frameVsyncOverheadP95Us": 278.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8469,
+          "wallFirstPumpP95Us": 8971,
+          "wallContentPumpMedianUs": 60474,
+          "wallContentPumpP95Us": 61373,
+          "coldFirstFrameUs": 106998,
+          "coldPhaseUs": {
+            "build": 31259.0,
+            "layout": 70977.0,
+            "paint": 465.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 587.0,
+            "layout": 1110.0,
+            "paint": 211.0
+          },
+          "contentPhaseP95Us": {
+            "build": 756.0,
+            "layout": 1532.0,
+            "paint": 291.0
+          }
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2348.0,
+          "frameRasterP95Us": 1657.0,
+          "frameTotalP95Us": 4167.0,
+          "frameVsyncOverheadP95Us": 276.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8452,
+          "wallFirstPumpP95Us": 8763,
+          "wallContentPumpMedianUs": 60332,
+          "wallContentPumpP95Us": 61355,
+          "coldFirstFrameUs": 109152,
+          "coldPhaseUs": {
+            "build": 32468.0,
+            "layout": 73016.0,
+            "paint": 501.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 513.0,
+            "layout": 1015.0,
+            "paint": 181.0
+          },
+          "contentPhaseP95Us": {
+            "build": 749.0,
+            "layout": 1494.0,
+            "paint": 273.0
+          }
+        }
+      ],
+      "optimized": [
+        {
+          "run": 1,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2375.0,
+          "frameRasterP95Us": 1654.0,
+          "frameTotalP95Us": 4164.0,
+          "frameVsyncOverheadP95Us": 199.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8495,
+          "wallFirstPumpP95Us": 8684,
+          "wallContentPumpMedianUs": 60549,
+          "wallContentPumpP95Us": 61366,
+          "coldFirstFrameUs": 123380,
+          "coldPhaseUs": {
+            "build": 34029.0,
+            "layout": 85493.0,
+            "paint": 729.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 597.0,
+            "layout": 1198.0,
+            "paint": 195.0
+          },
+          "contentPhaseP95Us": {
+            "build": 733.0,
+            "layout": 1518.0,
+            "paint": 294.0
+          }
+        },
+        {
+          "run": 2,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2436.0,
+          "frameRasterP95Us": 1582.0,
+          "frameTotalP95Us": 4233.0,
+          "frameVsyncOverheadP95Us": 216.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8495,
+          "wallFirstPumpP95Us": 8764,
+          "wallContentPumpMedianUs": 60628,
+          "wallContentPumpP95Us": 61534,
+          "coldFirstFrameUs": 109973,
+          "coldPhaseUs": {
+            "build": 29838.0,
+            "layout": 74707.0,
+            "paint": 506.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 603.0,
+            "layout": 1193.0,
+            "paint": 208.0
+          },
+          "contentPhaseP95Us": {
+            "build": 766.0,
+            "layout": 1543.0,
+            "paint": 297.0
+          }
+        },
+        {
+          "run": 3,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2449.0,
+          "frameRasterP95Us": 1755.0,
+          "frameTotalP95Us": 4195.0,
+          "frameVsyncOverheadP95Us": 225.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8518,
+          "wallFirstPumpP95Us": 8858,
+          "wallContentPumpMedianUs": 60682,
+          "wallContentPumpP95Us": 61449,
+          "coldFirstFrameUs": 107398,
+          "coldPhaseUs": {
+            "build": 31671.0,
+            "layout": 71791.0,
+            "paint": 437.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 622.0,
+            "layout": 1242.0,
+            "paint": 221.0
+          },
+          "contentPhaseP95Us": {
+            "build": 760.0,
+            "layout": 1525.0,
+            "paint": 303.0
+          }
+        },
+        {
+          "run": 4,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2297.0,
+          "frameRasterP95Us": 1700.0,
+          "frameTotalP95Us": 4021.0,
+          "frameVsyncOverheadP95Us": 203.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8491,
+          "wallFirstPumpP95Us": 8737,
+          "wallContentPumpMedianUs": 60491,
+          "wallContentPumpP95Us": 61203,
+          "coldFirstFrameUs": 108659,
+          "coldPhaseUs": {
+            "build": 31458.0,
+            "layout": 73926.0,
+            "paint": 483.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 589.0,
+            "layout": 1174.0,
+            "paint": 189.0
+          },
+          "contentPhaseP95Us": {
+            "build": 728.0,
+            "layout": 1509.0,
+            "paint": 279.0
+          }
+        },
+        {
+          "run": 5,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2302.0,
+          "frameRasterP95Us": 1597.0,
+          "frameTotalP95Us": 4086.0,
+          "frameVsyncOverheadP95Us": 292.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8459,
+          "wallFirstPumpP95Us": 8692,
+          "wallContentPumpMedianUs": 60426,
+          "wallContentPumpP95Us": 61331,
+          "coldFirstFrameUs": 112640,
+          "coldPhaseUs": {
+            "build": 32883.0,
+            "layout": 75596.0,
+            "paint": 450.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 596.0,
+            "layout": 1122.0,
+            "paint": 195.0
+          },
+          "contentPhaseP95Us": {
+            "build": 746.0,
+            "layout": 1573.0,
+            "paint": 294.0
+          }
+        },
+        {
+          "run": 6,
+          "renderer": "markstream",
+          "buildMode": "macOS profile",
+          "devicePixelRatio": 2.0,
+          "logicalSurface": [
+            720,
+            900
+          ],
+          "nativeWindowVisible": true,
+          "nativeWindowFocused": true,
+          "frameCount": 168,
+          "frameBuildP95Us": 2500.0,
+          "frameRasterP95Us": 1634.0,
+          "frameTotalP95Us": 4185.0,
+          "frameVsyncOverheadP95Us": 281.0,
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 56,
+          "wallFirstPumpMedianUs": 8494,
+          "wallFirstPumpP95Us": 8674,
+          "wallContentPumpMedianUs": 60614,
+          "wallContentPumpP95Us": 61444,
+          "coldFirstFrameUs": 109400,
+          "coldPhaseUs": {
+            "build": 32113.0,
+            "layout": 73301.0,
+            "paint": 548.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 647.0,
+            "layout": 1239.0,
+            "paint": 230.0
+          },
+          "contentPhaseP95Us": {
+            "build": 804.0,
+            "layout": 1550.0,
+            "paint": 308.0
+          }
+        }
+      ]
+    },
+    "summary": {
+      "base": {
+        "frameBuildP95Us": 2397.5,
+        "frameRasterP95Us": 1652.5,
+        "frameTotalP95Us": 4176.5,
+        "frameVsyncOverheadP95Us": 220.5,
+        "coldFirstFrameUs": 109301.0,
+        "coldPhaseUs": {
+          "build": 32455.5,
+          "layout": 74630.0,
+          "paint": 515.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 569.0,
+          "layout": 1171.0,
+          "paint": 216.0
+        },
+        "contentPhaseP95Us": {
+          "build": 711.0,
+          "layout": 1513.0,
+          "paint": 309.0
+        }
+      },
+      "style": {
+        "frameBuildP95Us": 2462.5,
+        "frameRasterP95Us": 1657.5,
+        "frameTotalP95Us": 4233.5,
+        "frameVsyncOverheadP95Us": 214.5,
+        "coldFirstFrameUs": 110169.0,
+        "coldPhaseUs": {
+          "build": 32675.5,
+          "layout": 73372.0,
+          "paint": 511.5
+        },
+        "contentPhaseMedianUs": {
+          "build": 598.0,
+          "layout": 1181.5,
+          "paint": 207.5
+        },
+        "contentPhaseP95Us": {
+          "build": 753.5,
+          "layout": 1530.0,
+          "paint": 298.5
+        }
+      },
+      "optimized": {
+        "frameBuildP95Us": 2405.5,
+        "frameRasterP95Us": 1644.0,
+        "frameTotalP95Us": 4174.5,
+        "frameVsyncOverheadP95Us": 220.5,
+        "coldFirstFrameUs": 109686.5,
+        "coldPhaseUs": {
+          "build": 31892.0,
+          "layout": 74316.5,
+          "paint": 494.5
+        },
+        "contentPhaseMedianUs": {
+          "build": 600.0,
+          "layout": 1195.5,
+          "paint": 201.5
+        },
+        "contentPhaseP95Us": {
+          "build": 753.0,
+          "layout": 1534.0,
+          "paint": 295.5
+        }
+      }
+    }
+  },
+  "visual": {
+    "captures": 384,
+    "equalCaptures": 384,
+    "changedPixels": 0
+  },
+  "reproduction": {
+    "benchmarkPath": "test/perf/markstream_render_bench.dart",
+    "benchmarkSha256": "7aced7efb509bb1943fd45d08e9b9bfe5c340d958456494bb671092532f11f75",
+    "fixturesSha256": "bd913ed508232e03e94392e49318c629dbb732c3af46f6a3e8d5318cd8fd2562",
+    "richProbeSource": "import 'dart:convert';\nimport 'dart:io';\n\nimport 'package:Kelivo/core/providers/settings_provider.dart';\nimport 'package:Kelivo/l10n/app_localizations.dart';\nimport 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';\nimport 'package:flutter/material.dart';\nimport 'package:flutter/foundation.dart'\n    show AggregatedTimings, FlutterTimeline;\nimport 'package:Kelivo/shared/widgets/app_selection_area.dart';\nimport 'package:flutter/services.dart';\nimport 'package:flutter_test/flutter_test.dart';\nimport 'package:provider/provider.dart';\n\nimport '../test/fixtures/markdown/markstream_documents.dart';\nimport '../test/support/business_test_harness.dart';\n\n// Explicit diagnostic benchmark. Unit tests validate the fixtures separately.\n// Run in five fresh processes, setting MARKSTREAM_RUN=1..5, so each cold\n// measurement starts before this isolate has rendered any Markdown.\nfinal richAppendFixture = () {\n  final prefix = markstreamAppendFixture.substring(0, markstreamAppendFixture.lastIndexOf('\\n\\nFixed padding paragraph 64:'));\n  final rich = '$prefix\\n\\nFinal streaming tail: ${List.generate(20, (i) => '`inline$i()`').join(' ')} ';\n  return rich + 'x' * (30000 - rich.length);\n}();\n\nvoid main() {\n  const profilePhases = bool.fromEnvironment('MARKSTREAM_PROFILE_PHASES');\n  const cycles = int.fromEnvironment(\n    'MARKSTREAM_BENCH_CYCLES',\n    defaultValue: 1,\n  );\n  assert(cycles > 0);\n  setUpAll(() async {\n    final bytes = File(\n      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',\n    ).readAsBytesSync();\n    await (FontLoader(\n      'markstream-bench',\n    )..addFont(Future.value(ByteData.sublistView(bytes)))).load();\n  });\n\n  final run = int.parse(Platform.environment['MARKSTREAM_RUN'] ?? '1');\n  testWidgets('fixed fixtures round $run', (tester) async {\n    tester.view.physicalSize = const Size(720, 900);\n    tester.view.devicePixelRatio = 1;\n    addTearDown(tester.view.reset);\n    final settings = SettingsProvider(createBusinessTestPreferences());\n    await settings.loaded;\n    await settings.setCodeFontSystemFamily('markstream-bench');\n    addTearDown(settings.dispose);\n    final scroll = ScrollController();\n    addTearDown(scroll.dispose);\n    final source = ValueNotifier(markstreamColdFixture);\n    addTearDown(source.dispose);\n\n    Widget host({required bool streaming, bool renderMarkdown = true}) =>\n        ChangeNotifierProvider<SettingsProvider>.value(\n          value: settings,\n          child: MaterialApp(\n            theme: ThemeData(fontFamily: 'markstream-bench'),\n            localizationsDelegates: AppLocalizations.localizationsDelegates,\n            supportedLocales: AppLocalizations.supportedLocales,\n            home: Scaffold(\n              body: AppSelectionArea(\n                child: SingleChildScrollView(\n                  controller: scroll,\n                  child: ValueListenableBuilder<String>(\n                    valueListenable: source,\n                    builder: (_, value, _) => renderMarkdown\n                        ? MarkdownWithCodeHighlight(\n                            text: value,\n                            streaming: streaming,\n                            useBlockRendering: true,\n                            baseStyle: const TextStyle(\n                              fontFamily: 'markstream-bench',\n                              fontSize: 15.5,\n                              height: 1.55,\n                            ),\n                          )\n                        : const SizedBox.shrink(),\n                  ),\n                ),\n              ),\n            ),\n          ),\n        );\n\n    // Initialize the host without invoking the Markdown parser or renderer.\n    // The measured frame is the document's first render, not app startup.\n    await tester.pumpWidget(host(streaming: false, renderMarkdown: false));\n    await tester.pumpAndSettle();\n    if (profilePhases) {\n      FlutterTimeline.debugCollectionEnabled = true;\n      addTearDown(() => FlutterTimeline.debugCollectionEnabled = false);\n    }\n    final cold = Stopwatch()..start();\n    await tester.pumpWidget(host(streaming: false));\n    cold.stop();\n    final coldPhases = profilePhases\n        ? _phaseDurations(FlutterTimeline.debugCollect())\n        : null;\n    await tester.pumpAndSettle();\n    await tester.pumpWidget(const SizedBox.shrink());\n    source.value = richAppendFixture.substring(0, 29936);\n    await tester.pumpWidget(host(streaming: true));\n    await tester.pump(const Duration(milliseconds: 100));\n    scroll.jumpTo(scroll.position.maxScrollExtent);\n    await tester.pump();\n    final firstPumps = <int>[];\n    final contentPumps = <int>[];\n    final phaseSamples = <String, List<double>>{\n      if (profilePhases)\n        for (final phase in ['build', 'layout', 'paint']) phase: [],\n    };\n    for (var cycle = 0; cycle < cycles; cycle++) {\n      if (cycle > 0) {\n        // Rewind outside the measured window; each cycle warms up eight tokens.\n        source.value = richAppendFixture.substring(0, 29936);\n        await tester.pump();\n        await tester.pump(const Duration(milliseconds: 100));\n        scroll.jumpTo(scroll.position.maxScrollExtent);\n        await tester.pump();\n      }\n      for (var token = 0; token < 64; token++) {\n        source.value = richAppendFixture.substring(0, 29937 + token);\n        final first = Stopwatch()..start();\n        await tester.pump();\n        first.stop();\n        // The current renderer schedules its 50 ms coalescing timer in\n        // didUpdateWidget. Its first pump therefore does not render the token.\n        // Record that frame separately from the frame that actually paints it.\n        if (profilePhases) FlutterTimeline.debugReset();\n        final content = Stopwatch()..start();\n        await tester.pump(const Duration(milliseconds: 50));\n        content.stop();\n        final phases = profilePhases\n            ? _phaseDurations(FlutterTimeline.debugCollect())\n            : null;\n        if (token >= 8) {\n          firstPumps.add(first.elapsedMicroseconds);\n          contentPumps.add(content.elapsedMicroseconds);\n          if (phases != null) {\n            for (final entry in phases.entries) {\n              phaseSamples[entry.key]!.add(entry.value);\n            }\n          }\n        }\n        scroll.jumpTo(scroll.position.maxScrollExtent);\n        await tester.pump();\n      }\n    }\n    firstPumps.sort();\n    contentPumps.sort();\n    for (final samples in phaseSamples.values) {\n      samples.sort();\n    }\n    final results = {\n      'run': run,\n      'renderer': 'markstream',\n      'richInlineAtoms': 20,\n      'appAdapters': true,\n      'selectionController': true,\n      'appendChars': richAppendFixture.length,\n      'coldChars': markstreamColdFixture.length,\n      'samples': firstPumps.length,\n      if (cycles != 1) 'cycles': cycles,\n      'firstPumpMedianUs': firstPumps[firstPumps.length ~/ 2],\n      'firstPumpP95Us': firstPumps[(firstPumps.length * .95).ceil() - 1],\n      'contentPumpMedianUs': contentPumps[contentPumps.length ~/ 2],\n      'contentPumpP95Us': contentPumps[(contentPumps.length * .95).ceil() - 1],\n      'coldFirstFrameUs': cold.elapsedMicroseconds,\n      if (profilePhases) ...{\n        'coldPhaseUs': coldPhases,\n        'contentPhaseMedianUs': {\n          for (final entry in phaseSamples.entries)\n            entry.key: entry.value[entry.value.length ~/ 2],\n        },\n        'contentPhaseP95Us': {\n          for (final entry in phaseSamples.entries)\n            entry.key: entry.value[(entry.value.length * .95).ceil() - 1],\n        },\n      },\n    };\n    // ignore: avoid_print\n    print('MARKSTREAM_RENDER ${jsonEncode(results)}');\n    await tester.pumpWidget(const SizedBox.shrink());\n  });\n}\n\n// Root layout/paint timings already include descendant pipeline owners. Adding\n// their child events would double-count work. BUILD can include layout-time\n// builders, so these diagnostics are not additive and exclude raster time.\nMap<String, double> _phaseDurations(AggregatedTimings timings) => {\n  'build': timings.getAggregated('BUILD').duration,\n  'layout': timings.getAggregated('LAYOUT (root)').duration,\n  'paint': timings.getAggregated('PAINT (root)').duration,\n};\n",
+    "richProbeSha256": "3fe20176c038c64526b776ece5a51e72b887fe1cd8dd966a4b20b48c3d30503c",
+    "profileProbeSourceBeforeEmbeddedFont": "import 'dart:convert';\nimport 'dart:io';\nimport 'package:window_manager/window_manager.dart';\nimport 'package:integration_test/integration_test.dart';\nimport 'package:flutter/scheduler.dart';\n\nimport 'package:Kelivo/core/providers/settings_provider.dart';\nimport 'package:Kelivo/l10n/app_localizations.dart';\nimport 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';\nimport 'package:flutter/material.dart';\nimport 'package:flutter/foundation.dart'\n    show AggregatedTimings, FlutterTimeline;\nimport 'package:Kelivo/shared/widgets/app_selection_area.dart';\nimport 'package:flutter/services.dart';\nimport 'package:flutter_test/flutter_test.dart';\nimport 'package:provider/provider.dart';\n\nimport '../../test/fixtures/markdown/markstream_documents.dart';\nimport '../../test/support/business_test_harness.dart';\n\n// Explicit diagnostic benchmark. Unit tests validate the fixtures separately.\n// Run in five fresh processes, setting MARKSTREAM_RUN=1..5, so each cold\n// measurement starts before this isolate has rendered any Markdown.\nvoid main() {\n  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();\n  binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.onlyPumps;\n  binding.deviceEventDispatcher = null;\n  const profilePhases = true;\n  const cycles = int.fromEnvironment(\n    'MARKSTREAM_BENCH_CYCLES',\n    defaultValue: 1,\n  );\n  assert(cycles > 0);\n  setUpAll(() async {\n    await windowManager.ensureInitialized();\n    await windowManager.show();\n    await windowManager.focus();\n    expect(await windowManager.isVisible(), isTrue);\n    final bytes = base64Decode(_fontBytes);\n    await (FontLoader(\n      'markstream-bench',\n    )..addFont(Future.value(ByteData.sublistView(bytes)))).load();\n  });\n\n  final run = int.parse(Platform.environment['MARKSTREAM_RUN'] ?? '1');\n  testWidgets('fixed fixtures round $run', (tester) async {\n    await binding.setSurfaceSize(const Size(720, 900));\n    addTearDown(() => binding.setSurfaceSize(null));\n    final settings = SettingsProvider(createBusinessTestPreferences());\n    await settings.loaded;\n    await settings.setCodeFontSystemFamily('markstream-bench');\n    addTearDown(settings.dispose);\n    final scroll = ScrollController();\n    addTearDown(scroll.dispose);\n    final source = ValueNotifier(markstreamColdFixture);\n    addTearDown(source.dispose);\n\n    Widget host({required bool streaming, bool renderMarkdown = true}) =>\n        ChangeNotifierProvider<SettingsProvider>.value(\n          value: settings,\n          child: MaterialApp(\n            locale: const Locale('en'),\n            theme: ThemeData(fontFamily: 'markstream-bench'),\n            localizationsDelegates: AppLocalizations.localizationsDelegates,\n            supportedLocales: AppLocalizations.supportedLocales,\n            home: Scaffold(\n              body: AppSelectionArea(\n                child: SingleChildScrollView(\n                  controller: scroll,\n                  child: ValueListenableBuilder<String>(\n                    valueListenable: source,\n                    builder: (_, value, _) => renderMarkdown\n                        ? MarkdownWithCodeHighlight(\n                            text: value,\n                            streaming: streaming,\n                            useBlockRendering: true,\n                            baseStyle: const TextStyle(\n                              fontFamily: 'markstream-bench',\n                              fontSize: 15.5,\n                              height: 1.55,\n                            ),\n                          )\n                        : const SizedBox.shrink(),\n                  ),\n                ),\n              ),\n            ),\n          ),\n        );\n\n    // Initialize the host without invoking the Markdown parser or renderer.\n    // The measured frame is the document's first render, not app startup.\n    await tester.pumpWidget(host(streaming: false, renderMarkdown: false));\n    await tester.pumpAndSettle();\n    if (profilePhases) {\n      FlutterTimeline.debugCollectionEnabled = true;\n      addTearDown(() => FlutterTimeline.debugCollectionEnabled = false);\n    }\n    final cold = Stopwatch()..start();\n    await tester.pumpWidget(host(streaming: false));\n    cold.stop();\n    final coldPhases = profilePhases\n        ? _phaseDurations(FlutterTimeline.debugCollect())\n        : null;\n    await tester.pumpAndSettle();\n    await tester.pumpWidget(const SizedBox.shrink());\n    source.value = markstreamAppendFixture.substring(0, 29936);\n    await tester.pumpWidget(host(streaming: true));\n    await tester.pump(const Duration(milliseconds: 100));\n    scroll.jumpTo(scroll.position.maxScrollExtent);\n    await tester.pump();\n    final frameTimings = <FrameTiming>[];\n    void collect(List<FrameTiming> values) => frameTimings.addAll(values);\n    SchedulerBinding.instance.addTimingsCallback(collect);\n    addTearDown(() => SchedulerBinding.instance.removeTimingsCallback(collect));\n    await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));\n    frameTimings.clear();\n    final firstPumps = <int>[];\n    final contentPumps = <int>[];\n    final phaseSamples = <String, List<double>>{\n      if (profilePhases)\n        for (final phase in ['build', 'layout', 'paint']) phase: [],\n    };\n    for (var cycle = 0; cycle < cycles; cycle++) {\n      if (cycle > 0) {\n        // Rewind outside the measured window; each cycle warms up eight tokens.\n        source.value = markstreamAppendFixture.substring(0, 29936);\n        await tester.pump();\n        await tester.pump(const Duration(milliseconds: 100));\n        scroll.jumpTo(scroll.position.maxScrollExtent);\n        await tester.pump();\n      }\n      for (var token = 0; token < 64; token++) {\n        source.value = markstreamAppendFixture.substring(0, 29937 + token);\n        final first = Stopwatch()..start();\n        await tester.pump();\n        first.stop();\n        // The current renderer schedules its 50 ms coalescing timer in\n        // didUpdateWidget. Its first pump therefore does not render the token.\n        // Record that frame separately from the frame that actually paints it.\n        if (profilePhases) FlutterTimeline.debugReset();\n        final content = Stopwatch()..start();\n        await tester.pump(const Duration(milliseconds: 50));\n        content.stop();\n        final phases = profilePhases\n            ? _phaseDurations(FlutterTimeline.debugCollect())\n            : null;\n        expect(phases!.values.every((value) => value > 0), isTrue,\n          reason: 'Every content pump must capture build, layout and paint');\n        if (token >= 8) {\n          firstPumps.add(first.elapsedMicroseconds);\n          contentPumps.add(content.elapsedMicroseconds);\n          if (phases != null) {\n            for (final entry in phases.entries) {\n              phaseSamples[entry.key]!.add(entry.value);\n            }\n          }\n        }\n        scroll.jumpTo(scroll.position.maxScrollExtent);\n        await tester.pump();\n      }\n    }\n    await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));\n    double p95(List<int> values) {\n      values.sort();\n      return values[(values.length * .95).ceil() - 1].toDouble();\n    }\n    final settledFrames = frameTimings.skip(24).toList();\n    expect(settledFrames, isNotEmpty);\n    expect(settledFrames.any((f) => f.rasterDuration.inMicroseconds > 10), isTrue,\n      reason: 'The native surface must actually rasterize test frames');\n    firstPumps.sort();\n    contentPumps.sort();\n    for (final samples in phaseSamples.values) {\n      samples.sort();\n    }\n    final results = {\n      'run': run,\n      'renderer': 'markstream',\n      'buildMode': 'macOS profile',\n      'devicePixelRatio': tester.view.devicePixelRatio,\n      'logicalSurface': [720,900],\n      'nativeWindowVisible': await windowManager.isVisible(),\n      'nativeWindowFocused': await windowManager.isFocused(),\n      'frameCount': settledFrames.length,\n      'frameBuildP95Us': p95(settledFrames.map((f) => f.buildDuration.inMicroseconds).toList()),\n      'frameRasterP95Us': p95(settledFrames.map((f) => f.rasterDuration.inMicroseconds).toList()),\n      'frameTotalP95Us': p95(settledFrames.map((f) => f.totalSpan.inMicroseconds).toList()),\n      'frameVsyncOverheadP95Us': p95(settledFrames.map((f) => f.vsyncOverhead.inMicroseconds).toList()),\n      'appAdapters': true,\n      'selectionController': true,\n      'appendChars': markstreamAppendFixture.length,\n      'coldChars': markstreamColdFixture.length,\n      'samples': firstPumps.length,\n      if (cycles != 1) 'cycles': cycles,\n      'wallFirstPumpMedianUs': firstPumps[firstPumps.length ~/ 2],\n      'wallFirstPumpP95Us': firstPumps[(firstPumps.length * .95).ceil() - 1],\n      'wallContentPumpMedianUs': contentPumps[contentPumps.length ~/ 2],\n      'wallContentPumpP95Us': contentPumps[(contentPumps.length * .95).ceil() - 1],\n      'coldFirstFrameUs': cold.elapsedMicroseconds,\n      if (profilePhases) ...{\n        'coldPhaseUs': coldPhases,\n        'contentPhaseMedianUs': {\n          for (final entry in phaseSamples.entries)\n            entry.key: entry.value[entry.value.length ~/ 2],\n        },\n        'contentPhaseP95Us': {\n          for (final entry in phaseSamples.entries)\n            entry.key: entry.value[(entry.value.length * .95).ceil() - 1],\n        },\n      },\n    };\n    // ignore: avoid_print\n    print('MARKSTREAM_RENDER ${jsonEncode(results)}');\n    binding.reportData = results;\n    await tester.pumpWidget(const SizedBox.shrink());\n  });\n}\n\n// Root layout/paint timings already include descendant pipeline owners. Adding\n// their child events would double-count work. BUILD can include layout-time\n// builders, so these diagnostics are not additive and exclude raster time.\nMap<String, double> _phaseDurations(AggregatedTimings timings) => {\n  'build': timings.getAggregated('BUILD').duration,\n  'layout': timings.getAggregated('LAYOUT (root)').duration,\n  'paint': timings.getAggregated('PAINT (root)').duration,\n};\n",
+    "profileProbeSha256": "bb220c6fa75e982ca882ced8544b0ad138d8a9132bc69a54c2406581298aad08",
+    "profileFontPath": "test/fixtures/fonts/JetBrainsMono-Regular.ttf",
+    "profileFontSha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f"
+  },
+  "validation": {
+    "flutter": "3.44.9",
+    "dart": "3.12.2",
+    "rootTestsPassed": 8127,
+    "markstreamTestsPassed": 290,
+    "goldenTestsPassed": 389,
+    "goldenCapturesEqual": 384,
+    "staticAnalysis": "no issues",
+    "fixedDebugPhaseGate": "passed",
+    "nativeEngineFrameP95Gate": "passed",
+    "nativeContentSubphaseGate": "not all within +3%",
+    "originalShortDebugPumpGate": "not all within +3%",
+    "sourceUnchangedAfterChecks": true
+  }
+}

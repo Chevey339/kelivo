@@ -455,8 +455,12 @@ class MessageBuilderService {
                 'id': id,
                 'type': 'function',
                 'function': {'name': name, 'arguments': argumentsJson},
-                if (e['metadata'] is Map)
-                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+                if (e['metadata'] is Map || e['server'] == true)
+                  'metadata': {
+                    if (e['metadata'] is Map)
+                      ...(e['metadata'] as Map).cast<String, dynamic>(),
+                    if (e['server'] == true) 'server': true,
+                  },
               });
 
               final c = e['content'];

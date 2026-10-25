@@ -118,6 +118,52 @@ void main() {
         expect(data.contentAsBytes(), bytes);
       },
     );
+
+    test(
+      'local UI snapshots resolve only client-owned files inside images',
+      () async {
+        final saved = (await McpImageSnapshot.saveBytes(
+          img.encodePng(img.Image(width: 2, height: 2)),
+        ))!;
+        final file = await McpImageSnapshot.localFile(saved.uri);
+        expect(file, isNotNull);
+        expect(await file!.exists(), isTrue);
+        final external = File('${root.path}/mcp_img_external.png');
+        await external.writeAsBytes(
+          img.encodePng(img.Image(width: 2, height: 2)),
+        );
+        expect(await McpImageSnapshot.localFile(external.path), isNull);
+        expect(
+          await McpImageSnapshot.localFile(
+            'https://example.com/mcp_img_remote.png',
+          ),
+          isNull,
+        );
+        final link = Link('${root.path}/images/mcp_img_symlink.png');
+        await link.create(external.path);
+        expect(await McpImageSnapshot.localFile(link.path), isNull);
+      },
+    );
+
+    test(
+      'deduplicated previews share immutable files across independent saves',
+      () async {
+        final bytes = img.encodePng(img.Image(width: 3, height: 2));
+        final results = await Future.wait([
+          McpImageSnapshot.saveBytes(bytes, deduplicate: true),
+          McpImageSnapshot.saveBytes(bytes, deduplicate: true),
+        ]);
+        expect(results[0]!.uri, results[1]!.uri);
+        final later = await McpImageSnapshot.saveBytes(
+          bytes,
+          deduplicate: true,
+        );
+        expect(later!.uri, results[0]!.uri);
+        expect(await Directory('${root.path}/images').list().length, 1);
+        final file = (await McpImageSnapshot.localFile(later.uri))!;
+        expect(await file.readAsBytes(), bytes);
+      },
+    );
   });
 
   test(

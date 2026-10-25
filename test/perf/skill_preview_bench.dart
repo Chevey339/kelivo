@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,7 +27,7 @@ String _document(int sections) => [
 void main() {
   setUpAll(() async {
     final bytes = File(
-      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+      'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
     ).readAsBytesSync();
     await (FontLoader(
       'skill-bench',

@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
@@ -165,11 +166,9 @@ void main() {
             settings,
             null,
             workspaceContext: WorkspaceToolContext(
+              permissionMode: ToolPermissionMode.fullAccess,
               workspace: workspace,
-              binding: WorkspaceBinding(
-                workspaceId: workspace.id,
-                allowAll: true,
-              ),
+              binding: WorkspaceBinding(workspaceId: workspace.id),
               paths: sandboxed
                   ? WorkspacePaths.sandboxed(
                       workspaceHostRoot: workspaceDir.path,

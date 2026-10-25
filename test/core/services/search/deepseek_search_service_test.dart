@@ -69,7 +69,7 @@ void main() {
                 'content': '',
                 'site_name': null,
                 'site_icon': null,
-                'date': null,
+                'date': '2026-10-17T00:00:00+00:00',
               },
               {
                 'title': '另一结果',
@@ -90,8 +90,82 @@ void main() {
       expect(result.items, hasLength(2));
       expect(result.items.first.title, '模型发布 🚀');
       expect(result.items.first.url, _pageUrl);
-      expect(result.items.first.text, '供模型阅读的较长摘要。');
+      expect(result.items.first.text, '[Published: 2026-10-17] 供模型阅读的较长摘要。');
       expect(result.items.last.text, '仅有短摘要');
+    },
+  );
+
+  test(
+    'search prefixes UTC publication dates without including scores',
+    () async {
+      final service = DeepSeekSearchService(
+        client: MockClient(
+          (_) async => _json({
+            'results': [
+              {
+                'title': 'Snippet result',
+                'url': _pageUrl,
+                'summary': '  ',
+                'snippet': '简短摘要',
+                'date': '2026-10-17T23:59:59.123Z',
+                'authority': 3,
+                'rerank_score': 2.3,
+              },
+              {
+                'title': 'Offset result',
+                'url': _pageUrl,
+                'summary': '较长摘要',
+                'date': '2026-10-17T01:00:00+08:00',
+              },
+            ],
+          }),
+        ),
+      );
+      final result = await service.search(
+        query: 'query',
+        commonOptions: _common,
+        serviceOptions: DeepSeekOptions(id: 'dates', apiKey: 'key'),
+      );
+      expect(result.items.first.text, '[Published: 2026-10-17] 简短摘要');
+      expect(result.items.last.text, '[Published: 2026-10-16] 较长摘要');
+      expect(
+        (result.toJson()['items'] as List).first['text'],
+        result.items.first.text,
+      );
+    },
+  );
+
+  test(
+    'search preserves summaries when publication dates are unavailable',
+    () async {
+      final service = DeepSeekSearchService(
+        client: MockClient(
+          (_) async => _json({
+            'results': [
+              for (final date in [
+                null,
+                '',
+                'not-a-date',
+                123,
+                '2026-10-17T12:00:00',
+              ])
+                {
+                  'title': 'Undated result',
+                  'url': _pageUrl,
+                  'summary': '原始摘要',
+                  'date': date,
+                },
+            ],
+          }),
+        ),
+      );
+      final result = await service.search(
+        query: 'query',
+        commonOptions: _common,
+        serviceOptions: DeepSeekOptions(id: 'undated', apiKey: 'key'),
+      );
+      expect(result.items, hasLength(5));
+      expect(result.items.map((item) => item.text), everyElement('原始摘要'));
     },
   );
 

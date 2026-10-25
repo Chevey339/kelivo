@@ -12,6 +12,46 @@ Future<void> expectStillPending(Future<dynamic> future) async {
 
 void main() {
   test(
+    'full access releases matching conversation tools and rejects stale workspaces',
+    () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final requests = [
+        for (final (chat, workspace, tool, id)
+            in <(String?, String?, String, String)>[
+              ('a', 'ws1', 'shell', 'first'),
+              ('a', 'ws1', 'shell', 'second'),
+              ('b', 'ws1', 'shell', 'first'),
+              ('a', 'ws2', 'shell', 'other-workspace'),
+              ('a', 'ws1', 'write_file', 'outside-write'),
+              ('a', null, 'mcp_tool', 'mcp'),
+              (null, 'ws1', 'shell', 'unscoped'),
+            ])
+          service.requestApproval(
+            toolCallId: id,
+            toolName: tool,
+            arguments: const {},
+            conversationId: chat,
+            workspaceId: workspace,
+          ),
+      ];
+
+      service.approveConversationTools(conversationId: 'a', workspaceId: 'ws1');
+      expect((await requests[0]).approved, isTrue);
+      expect((await requests[1]).approved, isTrue);
+      expect((await requests[3]).denyReason, 'context_changed');
+      expect((await requests[4]).byFullAccess, isTrue);
+      expect((await requests[5]).byFullAccess, isTrue);
+      expect(service.pendingRequests, hasLength(2));
+      await expectStillPending(requests[2]);
+      await expectStillPending(requests[6]);
+      service.cancelAll();
+      expect((await requests[2]).approved, isFalse);
+      expect((await requests[6]).approved, isFalse);
+    },
+  );
+
+  test(
     'two conversations sharing a placeholder id keep both Completers',
     () async {
       final service = ToolApprovalService();

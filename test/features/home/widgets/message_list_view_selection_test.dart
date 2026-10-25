@@ -1,4 +1,5 @@
 import '../../../support/business_test_harness.dart';
+import '../../../support/markdown_render_helpers.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -8,6 +9,7 @@ import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
+import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -22,6 +24,72 @@ const _messageText = 'alpha bravo charlie';
 const _wordSelection = TextSelection(baseOffset: 6, extentOffset: 11);
 
 void main() {
+  testWidgets(
+    'selection edge scroll expresses user intent before auto-follow can pin the page',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final scroll = ChatAutoFollowScrollController();
+      var autoFollow = true;
+      var scrollIntents = 0;
+      scroll.shouldAutoFollow = () => autoFollow;
+      await _pumpTimeline(
+        tester,
+        controller: scroll,
+        content: List.generate(
+          100,
+          (i) => 'anchor$i selectable words on this line.',
+        ).join('\n\n'),
+        onUserScrollIntent: () {
+          autoFollow = false;
+          scrollIntents++;
+        },
+      );
+      final bounds = tester.getRect(find.byType(MessageListView));
+      final paragraph = renderParagraphs(find.byType(MessageListView))
+          .firstWhere((p) {
+            final top = p.localToGlobal(Offset.zero).dy;
+            return p.text.toPlainText().startsWith('anchor') &&
+                top > bounds.top + 100 &&
+                top < bounds.bottom - 100;
+          });
+      final glyph = paragraph
+          .getBoxesForSelection(
+            const TextSelection(baseOffset: 0, extentOffset: 1),
+          )
+          .first
+          .toRect();
+      await tester.longPressAt(paragraph.localToGlobal(glyph.center));
+      await tester.pumpAndSettle();
+      final region = tester.state<SelectableRegionState>(
+        find.byType(SelectableRegion).first,
+      );
+      final regionBox = region.context.findRenderObject()! as RenderBox;
+      final start =
+          regionBox.localToGlobal(region.selectionEndpoints.first.point) +
+          const Offset(0, 8);
+      autoFollow = true;
+      scrollIntents = 0;
+      final before = scroll.offset;
+      final gesture = await tester.startGesture(start);
+      final target = Offset(start.dx, bounds.top + 4);
+      for (var i = 1; i <= 12; i++) {
+        await gesture.moveTo(Offset.lerp(start, target, i / 12)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(scrollIntents, greaterThan(0));
+      expect(scroll.offset, lessThan(before - 60));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   for (final role in ['user', 'assistant']) {
     testWidgets(
       '$role message supports keyboard copy after double-click and drag selection',
@@ -42,12 +110,10 @@ void main() {
         );
 
         await _pumpTimeline(tester, role: role);
-        final paragraph = tester.renderObject<RenderParagraph>(
-          find.byWidgetPredicate(
-            (widget) =>
-                widget is RichText && widget.text.toPlainText() == _messageText,
-          ),
-        );
+        final paragraph = renderParagraphs(find.byType(MessageListView))
+            .singleWhere(
+              (paragraph) => paragraph.text.toPlainText() == _messageText,
+            );
 
         await _selectWord(tester, paragraph, doubleClick: true);
         expect(paragraph.selections, contains(_wordSelection));
@@ -129,9 +195,11 @@ Future<void> _selectWord(
 Future<FocusNode> _pumpTimeline(
   WidgetTester tester, {
   String role = 'assistant',
+  String content = _messageText,
+  ScrollController? controller,
   VoidCallback? onUserScrollIntent,
 }) async {
-  final scrollController = ScrollController();
+  final scrollController = controller ?? ScrollController();
   final listController = ListController();
   final processingFilesMessageId = ValueNotifier<String?>(null);
   final inputFocus = FocusNode();
@@ -180,7 +248,7 @@ Future<FocusNode> _pumpTimeline(
                     ChatMessage(
                       id: 'message-1',
                       role: role,
-                      content: _messageText,
+                      content: content,
                       conversationId: 'conversation-1',
                     ),
                   ],

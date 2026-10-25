@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
+import '../../../desktop/macos_window_drag_area.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/native_file_save.dart';
@@ -14,6 +15,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
@@ -214,6 +216,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryFonts;
       case 'local_models':
         return l10n.storageSpaceCategoryLocalModels;
+      case 'retained_data':
+        return l10n.recoveryRetainedData;
+      case 'app_documents':
       case 'app':
         return l10n.storageSpaceSubOtherApp;
       case 'avatars':
@@ -839,7 +844,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          topBar,
+          MacosWindowDragArea(child: topBar),
           Expanded(child: content),
         ],
       );
@@ -2198,7 +2203,10 @@ class _UploadManagerState extends State<_UploadManager> {
   Future<void> _deleteSelected() async {
     if (_selected.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
-    final count = _selected.length;
+    // Back can clear or replace the selection while deletion awaits file I/O.
+    // Keep the targets shown in this confirmation independent of that UI state.
+    final pathsToDelete = _selected.toList(growable: false);
+    final count = pathsToDelete.length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -2222,7 +2230,7 @@ class _UploadManagerState extends State<_UploadManager> {
 
     try {
       final deleted = await StorageUsageService.deleteUploadFiles(
-        _selected,
+        pathsToDelete,
         images: widget.images,
       );
       if (!mounted) return;
@@ -2335,7 +2343,7 @@ class _UploadManagerState extends State<_UploadManager> {
       ],
     );
 
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.images) ...[
@@ -2436,6 +2444,11 @@ class _UploadManagerState extends State<_UploadManager> {
           ),
         ),
       ],
+    );
+    return SelectionBackScope(
+      selecting: _selectMode,
+      onCancel: _clearSelection,
+      child: content,
     );
   }
 }

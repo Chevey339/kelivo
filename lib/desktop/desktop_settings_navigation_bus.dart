@@ -1,6 +1,6 @@
 import 'dart:async';
 
-enum DesktopSettingsNavigationTarget { backup }
+enum DesktopSettingsNavigationTarget { backup, mcp }
 
 class DesktopSettingsNavigationBus {
   DesktopSettingsNavigationBus._();
@@ -15,5 +15,9 @@ class DesktopSettingsNavigationBus {
 
   void openBackup() {
     _controller.add(DesktopSettingsNavigationTarget.backup);
+  }
+
+  void openMcp() {
+    _controller.add(DesktopSettingsNavigationTarget.mcp);
   }
 }

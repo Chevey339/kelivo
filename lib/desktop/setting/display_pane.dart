@@ -130,6 +130,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowHideToolResultImages(),
                   _RowDivider(),
+                  _ToggleRowShowBrowserPageCards(),
+                  _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
                   _CollapseLongUserMessagesSection(),
@@ -2705,6 +2707,21 @@ class _ToggleRowHideToolResultImages extends StatelessWidget {
   }
 }
 
+class _ToggleRowShowBrowserPageCards extends StatelessWidget {
+  const _ToggleRowShowBrowserPageCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+      value: sp.showBrowserPageCards,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowBrowserPageCards(v),
+    );
+  }
+}
+
 class _ToggleRowInsertSuggestionOnly extends StatelessWidget {
   const _ToggleRowInsertSuggestionOnly();
   @override
@@ -2825,7 +2842,7 @@ class _ToggleRowRequestLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);
@@ -2882,7 +2899,7 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);

@@ -22,6 +22,9 @@ import 'conversation_files.dart';
 import 'environment_output_redactor.dart';
 import 'file_link_resolver.dart';
 import 'host_file_tools.dart';
+import 'workspace_file_access.dart';
+import '../conversation_tool_permissions.dart';
+import '../../models/tool_permission_mode.dart';
 import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
@@ -46,6 +49,8 @@ class WorkspaceToolsService {
     ToolRunRegistry? registry,
     WorkspaceRuntimeProvider? runtimeProvider,
     this.updateConversationExtras,
+    this.readPermissionState,
+    this.permissionChanges,
     this.touchLastUsed,
     this.onSkillRead,
     this.onShellCompleted,
@@ -80,6 +85,9 @@ class WorkspaceToolsService {
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
   final ConversationExtrasUpdater? updateConversationExtras;
+  final Listenable? permissionChanges;
+  final ToolPermissionState? Function(String conversationId)?
+  readPermissionState;
   final Future<void> Function(String workspaceId)? touchLastUsed;
   final Future<void> Function(String skillId)? onSkillRead;
   final Future<void> Function()? onShellCompleted;
@@ -145,6 +153,8 @@ class WorkspaceToolsService {
             skillsHostDir: skillsDir.path,
           );
 
+    await Directory(paths.tmpHostRoot).create(recursive: true);
+
     return WorkspaceToolContext(
       workspace: workspace,
       binding: binding,
@@ -152,6 +162,7 @@ class WorkspaceToolsService {
       sessionDir: sessionDir,
       outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
       conversationId: conversationId,
+      assistantId: conversation.assistantId,
       runtimeStatus: status,
       runtimeRegistered: runtime != null,
     );
@@ -471,6 +482,29 @@ class WorkspaceToolsService {
     final environment =
         await loadEnvironment?.call() ?? EnvironmentExecutionConfig();
     final redactor = EnvironmentOutputRedactor(environment);
+    final id = conversationId ?? ctx.conversationId;
+    final access = WorkspaceFileAccess(
+      paths: ctx.paths,
+      skillsOnly: ctx.skillsOnly,
+      arguments: args,
+      permission: ToolCallPermission(
+        toolName: name,
+        toolCallId: toolCallId,
+        conversationId: id,
+        workspaceId: ctx.skillsOnly ? null : ctx.workspace.id,
+        assistantId: ctx.assistantId,
+        approvals: approvalService,
+        stateChanges: permissionChanges,
+        isEnabled: () => ctx.skillsOnly || _enabled(ctx, name),
+        readState: () => readPermissionState != null && id != null
+            ? readPermissionState!(id)
+            : ToolPermissionState(
+                mode: ctx.permissionMode,
+                workspaceId: ctx.skillsOnly ? null : ctx.workspace.id,
+                assistantId: ctx.assistantId,
+              ),
+      ),
+    );
     final result = await _handle(
       ctx,
       name,
@@ -479,8 +513,18 @@ class WorkspaceToolsService {
       approvalService: approvalService,
       conversationId: conversationId,
       environment: environment.variables,
+      access: access,
     );
-    return redactor.redact(ClientToolResult.fromHandler(result));
+    final client = ClientToolResult.fromHandler(result);
+    return redactor.redact(
+      ClientToolResult(
+        client.content,
+        metadata: {
+          ...?client.metadata,
+          if (access.permission.byFullAccess) 'toolPermission': 'fullAccess',
+        },
+      ),
+    );
   }
 
   Future<Object?> _handle(
@@ -491,6 +535,7 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
     required Map<String, String> environment,
+    required WorkspaceFileAccess access,
   }) async {
     if (ctx.skillsOnly && name != 'read_file') {
       return _errorResult(
@@ -515,19 +560,21 @@ class WorkspaceToolsService {
           return await _handleShell(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
             environment: environment,
           );
         case 'read_file':
-          return await _handleReadFile(ctx, args);
+          return await _handleReadFile(ctx, args, access);
         case 'view_image':
-          return await _handleViewImage(ctx, args);
+          return await _handleViewImage(ctx, args, access);
         case 'write_file':
           return await _handleWriteFile(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
@@ -536,16 +583,17 @@ class WorkspaceToolsService {
           return await _handleEditFile(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
           );
         case 'list_dir':
-          return await _handleListDir(ctx, args);
+          return await _handleListDir(ctx, args, access);
         case 'glob':
-          return await _handleGlob(ctx, args);
+          return await _handleGlob(ctx, args, access);
         case 'grep':
-          return await _handleGrep(ctx, args);
+          return await _handleGrep(ctx, args, access);
         default:
           return _errorResult(
             tool: name,
@@ -553,6 +601,9 @@ class WorkspaceToolsService {
             message: 'Unknown workspace tool: $name',
           );
       }
+    } on ToolPermissionException catch (e) {
+      access.permission.byFullAccess = false;
+      return _deniedResult(tool: name, error: e.code, message: e.message);
     } catch (e) {
       return _errorResult(
         tool: name,
@@ -662,6 +713,7 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
     required Map<String, String> environment,
+    required WorkspaceFileAccess access,
   }) async {
     const tool = 'shell';
     final cancellation = ToolCallCancellation.current;
@@ -698,18 +750,8 @@ class WorkspaceToolsService {
     }
 
     final sandboxed = status.sandboxed;
-    final needsApproval =
-        (ctx.workspace.shellNeedsApproval || !sandboxed) &&
-        !ctx.binding.allowAll;
-    final denied = await _maybeApprove(
-      approvalService,
-      needed: needsApproval,
-      toolCallId: toolCallId,
-      toolName: tool,
-      args: args,
-      conversationId: conversationId ?? ctx.conversationId,
-    );
-    if (denied != null) return denied;
+    final needsApproval = ctx.workspace.shellNeedsApproval || !sandboxed;
+    await access.permission.authorize(needed: needsApproval, arguments: args);
 
     final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 900).clamp(
       1,
@@ -726,9 +768,12 @@ class WorkspaceToolsService {
       'TERM': 'dumb',
       'LANG': 'C.UTF-8',
       'HOME': sandboxed ? '/root' : (Platform.environment['HOME'] ?? ''),
+      for (final name in ['TMPDIR', 'TMP', 'TEMP'])
+        name: sandboxed ? '/tmp' : ctx.paths.tmpHostRoot,
       ...environment,
     };
 
+    await Directory(ctx.paths.tmpHostRoot).create(recursive: true);
     final runtimeRunId = const Uuid().v4();
     final run = registry.start(
       toolCallId,
@@ -747,6 +792,7 @@ class WorkspaceToolsService {
     var executing = false;
     try {
       cancellation?.throwIfCancelled();
+      await access.permission.authorize(needed: needsApproval, arguments: args);
       executing = true;
       unawaited(
         cancellation?.cancelled.then((_) async {
@@ -910,9 +956,22 @@ class WorkspaceToolsService {
     return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
   }
 
+  Future<String> _snapshotImage(ToolImage image) async {
+    ToolCallCancellation.current?.throwIfCancelled();
+    final imagesDir = await AppDirectories.getImagesDirectory();
+    await imagesDir.create(recursive: true);
+    final extension = image.mime == 'image/png' ? 'png' : 'jpg';
+    final snapshot = File(
+      p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
+    );
+    await snapshot.writeAsBytes(image.bytes);
+    return SandboxPathResolver.canonicalize(snapshot.path);
+  }
+
   Future<Object?> _handleViewImage(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'view_image';
     final path = args['path'];
@@ -924,21 +983,14 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      final resolved = await access.resolve(path, ctx.cwd);
       ToolCallCancellation.current?.throwIfCancelled();
       if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
         throw const PathResolutionException('Path is outside sandbox zones');
       }
       final image = await ToolImage.read(resolved.hostPath);
       ToolCallCancellation.current?.throwIfCancelled();
-      final imagesDir = await AppDirectories.getImagesDirectory();
-      await imagesDir.create(recursive: true);
-      final extension = image.mime == 'image/png' ? 'png' : 'jpg';
-      final snapshot = File(
-        p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
-      );
-      await snapshot.writeAsBytes(image.bytes);
-      final uri = SandboxPathResolver.canonicalize(snapshot.path);
+      final uri = await _snapshotImage(image);
       await _markToolsUsed(
         ctx,
         conversationId: ctx.conversationId,
@@ -970,6 +1022,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleReadFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'read_file';
     final path = _stringArg(args, 'path');
@@ -981,7 +1034,7 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      final resolved = await access.resolve(path, ctx.cwd);
       if (ctx.skillsOnly && resolved.zone != WorkspaceZone.skills) {
         return _errorResult(
           tool: tool,
@@ -989,7 +1042,7 @@ class WorkspaceToolsService {
           message: 'read_file is limited to /skills in skills-only mode',
         );
       }
-      final result = await HostFileTools(ctx.paths).readFile(
+      final result = await HostFileTools(ctx.paths, access: access).readFile(
         path,
         offset: _intArg(args, 'offset'),
         limit: _intArg(args, 'limit'),
@@ -1002,7 +1055,9 @@ class WorkspaceToolsService {
         files: [_fileFor(ctx, resolved)],
       );
       if (result.imageBytes != null) {
-        final uri = resolved.hostPath;
+        final uri = await _snapshotImage(
+          await ToolImage.fromBytes(result.imageBytes!),
+        );
         await _maybeNoteSkillRead(ctx, resolved);
         await _markToolsUsed(
           ctx,
@@ -1060,6 +1115,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleWriteFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args, {
+    required WorkspaceFileAccess access,
     required String toolCallId,
     ToolApprovalService? approvalService,
     String? conversationId,
@@ -1085,25 +1141,15 @@ class WorkspaceToolsService {
     }
     late final ResolvedPath resolved;
     try {
-      resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      resolved = await access.resolve(path, ctx.cwd, write: true);
     } on PathResolutionException catch (e) {
       return _errorResult(tool: tool, error: 'path_error', message: e.message);
     }
 
-    final denied = await _approveWrite(
-      ctx,
-      resolved,
-      tool: tool,
-      args: args,
-      toolCallId: toolCallId,
-      approvalService: approvalService,
-      conversationId: conversationId,
-    );
-    if (denied != null) return denied;
-
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
         checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
       ).writeFile(path, content, cwd: ctx.cwd);
       final link = linkFor(resolved, paths: ctx.paths);
@@ -1144,6 +1190,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleEditFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args, {
+    required WorkspaceFileAccess access,
     required String toolCallId,
     ToolApprovalService? approvalService,
     String? conversationId,
@@ -1166,26 +1213,16 @@ class WorkspaceToolsService {
     }
     late final ResolvedPath resolved;
     try {
-      resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      resolved = await access.resolve(path, ctx.cwd, write: true);
     } on PathResolutionException catch (e) {
       return _errorResult(tool: tool, error: 'path_error', message: e.message);
     }
-
-    final denied = await _approveWrite(
-      ctx,
-      resolved,
-      tool: tool,
-      args: args,
-      toolCallId: toolCallId,
-      approvalService: approvalService,
-      conversationId: conversationId,
-    );
-    if (denied != null) return denied;
 
     try {
       final result =
           await HostFileTools(
             ctx.paths,
+            access: access,
             checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
           ).editFile(
             path,
@@ -1237,12 +1274,14 @@ class WorkspaceToolsService {
   Future<Object?> _handleListDir(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'list_dir';
     final path = _stringArg(args, 'path', fallback: ctx.cwd);
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
       ).listDir(path, depth: _intArg(args, 'depth') ?? 1, cwd: ctx.cwd);
       final lines = <String>[
         for (final entry in result.entries)
@@ -1251,7 +1290,7 @@ class WorkspaceToolsService {
       if (result.truncated) lines.add('... truncated');
       ResolvedPath? resolved;
       try {
-        resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+        resolved = await access.resolve(path, ctx.cwd);
       } catch (_) {}
       final meta = WorkspaceToolMetadata(
         tool: tool,
@@ -1281,6 +1320,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleGlob(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'glob';
     final pattern = _stringArg(args, 'pattern');
@@ -1294,6 +1334,7 @@ class WorkspaceToolsService {
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
       ).glob(pattern, path: _optionalString(args, 'path'), cwd: ctx.cwd);
       final lines = List<String>.from(result.paths);
       if (result.truncated) lines.add('... truncated');
@@ -1321,6 +1362,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleGrep(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'grep';
     final pattern = _stringArg(args, 'pattern');
@@ -1332,7 +1374,7 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final result = await HostFileTools(ctx.paths).grep(
+      final result = await HostFileTools(ctx.paths, access: access).grep(
         pattern,
         path: _optionalString(args, 'path'),
         cwd: ctx.cwd,
@@ -1365,90 +1407,6 @@ class WorkspaceToolsService {
     }
   }
 
-  Future<Object?> _approveWrite(
-    WorkspaceToolContext ctx,
-    ResolvedPath resolved, {
-    required String tool,
-    required Map<String, dynamic> args,
-    required String toolCallId,
-    ToolApprovalService? approvalService,
-    String? conversationId,
-  }) async {
-    if (ctx.paths.isReadOnlyPath(resolved.hostPath)) {
-      return _deniedResult(
-        tool: tool,
-        error: 'mount_readonly',
-        message: 'This external mount is read-only',
-        path: resolved.modelPath,
-      );
-    }
-    if (resolved.zone == WorkspaceZone.skills) {
-      return _deniedResult(
-        tool: tool,
-        error: 'skills_readonly',
-        message: 'The skills zone is read-only',
-        path: resolved.modelPath,
-      );
-    }
-    if (resolved.zone == WorkspaceZone.outside) {
-      if (ctx.paths.sandboxed) {
-        return _deniedResult(
-          tool: tool,
-          error: 'path_outside',
-          message: 'Writes outside the workspace are not allowed',
-          path: resolved.modelPath,
-        );
-      }
-      return _maybeApprove(
-        approvalService,
-        needed: true,
-        toolCallId: toolCallId,
-        toolName: tool,
-        args: args,
-        conversationId: conversationId ?? ctx.conversationId,
-        path: resolved.modelPath,
-      );
-    }
-    return null;
-  }
-
-  Future<Object?> _maybeApprove(
-    ToolApprovalService? approvalService, {
-    required bool needed,
-    required String toolCallId,
-    required String toolName,
-    required Map<String, dynamic> args,
-    String? conversationId,
-    String? path,
-  }) async {
-    ToolCallCancellation.current?.throwIfCancelled();
-    if (!needed) return null;
-    if (approvalService == null) {
-      return _deniedResult(
-        tool: toolName,
-        error: 'approval_denied',
-        message: 'User denied the tool call',
-        path: path,
-      );
-    }
-    final id = toolCallId.trim().isEmpty
-        ? '${toolName}_${DateTime.now().microsecondsSinceEpoch}'
-        : toolCallId;
-    final result = await approvalService.requestApproval(
-      toolCallId: id,
-      toolName: toolName,
-      arguments: args,
-      conversationId: conversationId,
-    );
-    if (result.approved) return null;
-    return _deniedResult(
-      tool: toolName,
-      error: 'approval_denied',
-      message: result.denyReason ?? 'User denied the tool call',
-      path: path,
-    );
-  }
-
   Future<void> _markToolsUsed(
     WorkspaceToolContext ctx, {
     String? conversationId,
@@ -1467,7 +1425,6 @@ class WorkspaceToolsService {
           workspaceId: current.workspaceId,
           cwd: current.cwd,
           toolsUsed: true,
-          allowAll: current.allowAll,
         ).applyTo(extras);
       });
       await touchLastUsed?.call(ctx.workspace.id);

@@ -232,6 +232,7 @@ void main() {
   test('openPty omits rootfs paths and maps session events', () async {
     expect(runtime.supportsPty, isTrue);
     expect(runtime.supportsSystemTerminal, isFalse);
+    expect(runtime.supportsFileManager, isFalse);
 
     final session = await runtime.openPty(
       mounts: const [],

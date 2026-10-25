@@ -1,6 +1,6 @@
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +11,7 @@ import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_render_helpers.dart';
 
 const _kelivoLink = '[daily_sign.py](kelivo://workspace/shenyu/daily_sign.py)';
 
@@ -89,10 +90,10 @@ void main() {
     WidgetTester tester,
     AppLocalizations l10n,
   ) async {
-    final labels = find.text('daily_sign.py');
-    expect(labels, findsWidgets);
-    for (var i = 0; i < labels.evaluate().length; i++) {
-      await tester.tap(labels.at(i));
+    final locations = markdownGlyphCenters(tester, 'daily_sign.py');
+    expect(locations, isNotEmpty);
+    for (final location in locations) {
+      await tester.tapAt(location);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
     }

@@ -54,9 +54,9 @@ Future<T?> showAppDialog<T>(
           onTap: dismissible ? () => Navigator.of(ctx).maybePop() : null,
           child: Material(
             type: MaterialType.transparency,
-            child: Center(
-              child: Padding(
-                padding: insetPadding,
+            child: Padding(
+              padding: insetPadding + MediaQuery.viewInsetsOf(ctx),
+              child: Center(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () {},
@@ -79,7 +79,14 @@ Future<T?> showAppDialog<T>(
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
-                        child: child,
+                        child: MediaQuery.removeViewInsets(
+                          context: ctx,
+                          removeLeft: true,
+                          removeTop: true,
+                          removeRight: true,
+                          removeBottom: true,
+                          child: child,
+                        ),
                       ),
                     ),
                   ),

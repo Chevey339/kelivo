@@ -8,6 +8,7 @@ import 'package:Kelivo/core/database/composer_draft_store.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 
 import '../../support/commit_gate.dart';
@@ -82,6 +83,74 @@ void main() {
     expect(store.newEntry('assistant')?.chatModelId, 'model');
     expect((await store.load('new-id')).active.text, 'unsent');
   });
+
+  test('moving a new entry clears its permission after reopening', () async {
+    store.registerNewEntry(
+      Conversation(
+        id: 'new-permission',
+        title: 'New',
+        assistantId: 'before',
+        extras: const {
+          'workspace.id': 'workspace',
+          'workspace.allowAll': true,
+          'tools.permission_mode': 'fullAccess',
+        },
+      ),
+    );
+    store.setInput('new-permission', const ComposerDraftInput(text: 'unsent'));
+    await store.flush();
+    expect(await store.moveAssistant('new-permission', 'after'), isTrue);
+    expect(store.newEntry('before'), isNull);
+    expect(
+      ToolPermissionMode.fromExtras(store.newEntry('after')!.extras),
+      ToolPermissionMode.requestApproval,
+    );
+    await reopen();
+    final moved = store.newEntry('after')!;
+    expect(moved.extras['workspace.id'], 'workspace');
+    expect(moved.extras.containsKey('workspace.allowAll'), isFalse);
+    expect(
+      ToolPermissionMode.fromExtras(moved.extras),
+      ToolPermissionMode.requestApproval,
+    );
+    expect((await store.load(moved.id)).active.text, 'unsent');
+  });
+
+  test(
+    'a failed permission save does not publish or persist the grant',
+    () async {
+      store.registerNewEntry(
+        Conversation(id: 'permission', title: 'New', assistantId: 'assistant'),
+      );
+      await store.flush();
+      commits.onNextCommit = () async => throw StateError('disk full');
+      await expectLater(
+        store.updateNewEntryExtras(
+          'permission',
+          ToolPermissionMode.fullAccess.applyTo,
+        ),
+        throwsStateError,
+      );
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.requestApproval,
+      );
+      await reopen();
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.requestApproval,
+      );
+      await store.updateNewEntryExtras(
+        'permission',
+        ToolPermissionMode.fullAccess.applyTo,
+      );
+      await reopen();
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.fullAccess,
+      );
+    },
+  );
 
   test(
     'attachments are recoverable after the selected original disappears',

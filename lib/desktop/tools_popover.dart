@@ -1,6 +1,12 @@
 import 'dart:ui' as ui;
+import 'dart:async';
+import '../core/database/business_preferences.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../features/mcp/widgets/mcp_server_avatar.dart';
+import '../features/mcp/utils/mcp_tool_groups.dart';
+import '../features/workspace/widgets/workspace_section.dart';
 import 'package:provider/provider.dart';
 
 import '../icons/lucide_adapter.dart';
@@ -11,11 +17,14 @@ import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import '../shared/widgets/ios_tactile.dart';
 
 Future<void> showDesktopToolsPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required String assistantId,
+  required bool supportsModelTools,
+  String? conversationId,
 }) async {
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -39,6 +48,8 @@ Future<void> showDesktopToolsPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
+      supportsModelTools: supportsModelTools,
+      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -54,12 +65,16 @@ class _ToolsPopover extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
+    required this.supportsModelTools,
     required this.onClose,
+    this.conversationId,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final String assistantId;
+  final bool supportsModelTools;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -149,6 +164,8 @@ class _ToolsPopoverState extends State<_ToolsPopover>
                         ),
                         child: _ToolsContent(
                           assistantId: widget.assistantId,
+                          supportsModelTools: widget.supportsModelTools,
+                          conversationId: widget.conversationId,
                           onDone: _close,
                         ),
                       ),
@@ -204,10 +221,47 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _ToolsContent extends StatelessWidget {
-  const _ToolsContent({required this.assistantId, required this.onDone});
+class _ToolsContent extends StatefulWidget {
+  const _ToolsContent({
+    required this.assistantId,
+    required this.supportsModelTools,
+    required this.onDone,
+    this.conversationId,
+  });
+  final String? conversationId;
   final String assistantId;
+  final bool supportsModelTools;
   final VoidCallback onDone;
+
+  @override
+  State<_ToolsContent> createState() => _ToolsContentState();
+}
+
+class _ToolsContentState extends State<_ToolsContent> {
+  late final _preferences = context.read<BusinessPreferences>();
+  late bool _workspaceExpanded =
+      (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
+              ['mcp', 'workspace'])
+          .contains('workspace');
+
+  void _toggleWorkspace() {
+    setState(() => _workspaceExpanded = !_workspaceExpanded);
+    final expanded =
+        (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
+                ['mcp', 'workspace'])
+            .toSet();
+    if (_workspaceExpanded) {
+      expanded.add('workspace');
+    } else {
+      expanded.remove('workspace');
+    }
+    unawaited(
+      _preferences.setStringList(
+        'display_chat_tools_expanded_groups_v1',
+        expanded.toList(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,22 +269,25 @@ class _ToolsContent extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final mcp = context.watch<McpProvider>();
     final ap = context.watch<AssistantProvider>();
-    final a = ap.getById(assistantId)!;
+    final a = ap.getById(widget.assistantId);
+    if (a == null) return const SizedBox.shrink();
     final selected = a.mcpServerIds.toSet();
-    final servers = mcp.servers
-        .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
-        .toList();
+    final groups = [if (widget.supportsModelTools) ...mcpToolGroups(mcp)];
 
-    final localToolIds = availableLocalToolIds();
+    final localToolIds = widget.supportsModelTools
+        ? availableLocalToolIds()
+        : const <String>[];
     final enabledLocalTools = a.localToolIds.toSet();
 
-    final rows = <Widget>[];
+    final rows = <WidgetBuilder>[];
     if (localToolIds.isNotEmpty) {
-      rows.add(_SectionLabel(text: l10n.assistantEditPageLocalToolsTab));
+      rows.add(
+        (context) => _SectionLabel(text: l10n.assistantEditPageLocalToolsTab),
+      );
       for (final id in localToolIds) {
         final isEnabled = enabledLocalTools.contains(id);
         rows.add(
-          _RowItem(
+          (context) => _RowItem(
             leading: Icon(
               localToolIcon(id),
               size: 16,
@@ -252,46 +309,110 @@ class _ToolsContent extends StatelessWidget {
       }
     }
 
-    if (servers.isNotEmpty) {
-      rows.add(_SectionLabel(text: l10n.mcpAssistantSheetTitle));
+    if (groups.isNotEmpty) {
+      rows.add((context) => _SectionLabel(text: l10n.mcpAssistantSheetTitle));
       rows.add(
-        _RowItem(
+        (context) => _RowItem(
           leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
           label: l10n.mcpAssistantSheetClearAll,
-          selected: false,
           onTap: () async {
             await context.read<AssistantProvider>().updateAssistant(
               a.copyWith(mcpServerIds: const <String>[]),
             );
-            onDone();
+            widget.onDone();
           },
         ),
       );
     }
 
-    for (final s in servers) {
-      final isSelected = selected.contains(s.id);
-      rows.add(
-        _RowItem(
-          leading: Icon(
-            Lucide.Hammer,
-            size: 16,
-            color: isSelected ? cs.primary : cs.onSurface,
+    for (final group in groups) {
+      if (mcp.groups.isNotEmpty) {
+        rows.add(
+          (context) => _SectionLabel(
+            text: group.group?.name ?? l10n.providerGroupsOther,
+            subgroup: true,
           ),
-          label: s.name,
-          selected: isSelected,
-          onTap: () async {
-            final set = a.mcpServerIds.toSet();
-            if (isSelected) {
-              set.remove(s.id);
-            } else {
-              set.add(s.id);
-            }
-            await context.read<AssistantProvider>().updateAssistant(
-              a.copyWith(mcpServerIds: set.toList()),
-            );
-            // Do not close; allow multi-select
-          },
+        );
+      }
+      for (final s in group.servers) {
+        final isSelected = selected.contains(s.id);
+        rows.add(
+          (context) => _RowItem(
+            key: ValueKey('desktop-tools-mcp-${s.id}'),
+            leading: McpServerAvatar(
+              server: s,
+              size: 16,
+              radius: 7,
+              showBackground: false,
+            ),
+            detail:
+                '${s.tools.where((t) => t.enabled).length}/${s.tools.length}',
+            label: s.name,
+            selected: isSelected,
+            onTap: () async {
+              final set = a.mcpServerIds.toSet();
+              if (isSelected) {
+                set.remove(s.id);
+              } else {
+                set.add(s.id);
+              }
+              await context.read<AssistantProvider>().updateAssistant(
+                a.copyWith(mcpServerIds: set.toList()),
+              );
+              // Do not close; allow multi-select
+            },
+          ),
+        );
+      }
+    }
+
+    rows.add(
+      (context) => Semantics(
+        button: true,
+        expanded: _workspaceExpanded,
+        child: IosCardPress(
+          focusable: true,
+          haptics: false,
+          baseColor: Colors.transparent,
+          pressedBlendStrength: 0,
+          onTap: _toggleWorkspace,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: SizedBox(
+              height: 32,
+              child: Row(
+                children: [
+                  AnimatedRotation(
+                    turns: _workspaceExpanded ? .25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Lucide.ChevronRight,
+                      size: 12,
+                      color: cs.onSurface.withValues(alpha: .5),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.workspacesTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: AppFontWeights.semibold,
+                      color: cs.onSurface.withValues(alpha: .5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (_workspaceExpanded) {
+      rows.add(
+        (context) => WorkspaceSection(
+          assistantId: widget.assistantId,
+          conversationId: widget.conversationId,
+          onClose: widget.onDone,
         ),
       );
     }
@@ -300,18 +421,14 @@ class _ToolsContent extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 420),
-        child: SingleChildScrollView(
+        child: ListView.builder(
+          shrinkWrap: true,
+          addRepaintBoundaries: false,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ...rows.map(
-                (w) => Padding(
-                  padding: const EdgeInsets.only(bottom: 1),
-                  child: w,
-                ),
-              ),
-            ],
+          itemCount: rows.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 1),
+            child: rows[index](context),
           ),
         ),
       ),
@@ -320,7 +437,8 @@ class _ToolsContent extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.text});
+  const _SectionLabel({required this.text, this.subgroup = false});
+  final bool subgroup;
 
   final String text;
 
@@ -333,7 +451,9 @@ class _SectionLabel extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: AppFontWeights.semibold,
+          fontWeight: subgroup
+              ? AppFontWeights.regular
+              : AppFontWeights.semibold,
           decoration: TextDecoration.none,
           color: cs.onSurface.withValues(alpha: 0.5),
         ),
@@ -344,14 +464,17 @@ class _SectionLabel extends StatelessWidget {
 
 class _RowItem extends StatefulWidget {
   const _RowItem({
+    super.key,
     required this.leading,
+    this.detail,
     required this.label,
-    required this.selected,
+    this.selected,
     required this.onTap,
   });
   final Widget leading;
+  final String? detail;
   final String label;
-  final bool selected;
+  final bool? selected;
   final VoidCallback onTap;
 
   @override
@@ -360,62 +483,92 @@ class _RowItem extends StatefulWidget {
 
 class _RowItemState extends State<_RowItem> {
   bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final onColor = widget.selected ? cs.primary : cs.onSurface;
+    final onColor = widget.selected == true ? cs.primary : cs.onSurface;
     final baseBg = Colors.transparent;
     final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? hoverBg : baseBg,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: Center(child: widget.leading),
+    return Semantics(
+      button: true,
+      toggled: widget.selected,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: FocusableActionDetector(
+          onShowFocusHighlight: (value) => setState(() => _focused = value),
+          shortcuts: const {
+            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+          },
+          actions: {
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                widget.onTap();
+                return null;
+              },
+            ),
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: _hovered || _focused ? hoverBg : baseBg,
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: AppFontWeights.regular,
-                    decoration: TextDecoration.none,
-                  ).copyWith(color: onColor),
-                ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: Center(child: widget.leading),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.regular,
+                        decoration: TextDecoration.none,
+                      ).copyWith(color: onColor),
+                    ),
+                  ),
+                  if (widget.detail != null) ...[
+                    Text(
+                      widget.detail!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: .5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    child: widget.selected == true
+                        ? Icon(
+                            Lucide.Check,
+                            key: const ValueKey('check'),
+                            size: 16,
+                            color: cs.primary,
+                          )
+                        : const SizedBox(width: 16, key: ValueKey('space')),
+                  ),
+                ],
               ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                child: widget.selected
-                    ? Icon(
-                        Lucide.Check,
-                        key: const ValueKey('check'),
-                        size: 16,
-                        color: cs.primary,
-                      )
-                    : const SizedBox(width: 16, key: ValueKey('space')),
-              ),
-            ],
+            ),
           ),
         ),
       ),

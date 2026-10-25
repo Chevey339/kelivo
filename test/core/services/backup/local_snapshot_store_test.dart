@@ -50,7 +50,7 @@ void main() {
       final entry = await publish(at: at);
 
       expect(await entry.file.exists(), isTrue);
-      expect(p.dirname(entry.file.path), store.directory.path);
+      expect(p.dirname(entry.file.path), (await store.directory).path);
 
       final listed = await store.list();
       expect(listed, hasLength(1));
@@ -72,7 +72,7 @@ void main() {
       );
 
       expect(await source.exists(), isFalse);
-      final names = await store.directory
+      final names = await (await store.directory)
           .list()
           .map((entity) => p.basename(entity.path))
           .toList();
@@ -97,7 +97,7 @@ void main() {
         throwsA(isA<StateError>()),
       );
       expect(await store.list(), isEmpty);
-      final leftovers = await store.directory
+      final leftovers = await (await store.directory)
           .list()
           .map((entity) => p.basename(entity.path))
           .toList();
@@ -161,7 +161,7 @@ void main() {
 
       expect(removed, hasLength(3));
       expect(await store.list(), hasLength(2));
-      final remaining = await store.directory
+      final remaining = await (await store.directory)
           .list()
           .map((entity) => p.basename(entity.path))
           .toList();
@@ -175,7 +175,7 @@ void main() {
       await store.ensureDirectory();
       final orphan = File(
         p.join(
-          store.directory.path,
+          (await store.directory).path,
           '${LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1))}'
           '${LocalSnapshotPaths.metadataSuffix}',
         ),
@@ -217,7 +217,7 @@ void main() {
       await store.ensureDirectory();
       final debris = File(
         p.join(
-          store.directory.path,
+          (await store.directory).path,
           '${LocalSnapshotPaths.temporaryPrefix}'
           '${LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1))}',
         ),
@@ -233,7 +233,7 @@ void main() {
       await store.ensureDirectory();
       await File(
         p.join(
-          store.directory.path,
+          (await store.directory).path,
           '${LocalSnapshotPaths.temporaryPrefix}'
           '${LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1))}',
         ),

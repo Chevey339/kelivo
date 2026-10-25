@@ -28,6 +28,8 @@ import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../features/backup/widgets/backup_scope_tile.dart';
+import '../../features/backup/widgets/backup_encryption_tile.dart';
+import '../../features/backup/widgets/storage_migration_notice_button.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -42,6 +44,7 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
+  String? _backupPassword;
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -282,6 +285,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                         ),
                       ),
+                      StorageMigrationNoticeButton(
+                        dataDirectory: context
+                            .read<LocalSnapshotProvider>()
+                            .appDataDirectory,
+                      ),
                       if (showHeaderBusy) const SizedBox(width: 8),
                       if (showHeaderBusy)
                         SizedBox(
@@ -333,6 +341,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               if (!mounted) return;
                               await _applyS3Partial(scope: scope);
                             },
+                    ),
+                    BackupEncryptionTile(
+                      password: _backupPassword,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => _backupPassword = value),
                     ),
                   ],
                 ),
@@ -512,6 +526,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -546,6 +563,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
+                                          password: _backupPassword,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
                                         );
@@ -803,6 +821,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -838,6 +859,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       task: (handle) async {
                                         final ok = await s3BackupProvider
                                             .backup(
+                                              password: _backupPassword,
                                               onProgress: handle.report,
                                               cancelToken: handle.cancelToken,
                                             );
@@ -923,6 +945,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                       task: (handle) async {
                         file = await backupProvider.exportToFile(
+                          password: _backupPassword,
                           onProgress: handle.report,
                           cancelToken: handle.cancelToken,
                         );
@@ -934,7 +957,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       dialogTitle: l10n.backupPageExportToFile,
                       fileName: exported.uri.pathSegments.last,
                       type: FileType.custom,
-                      allowedExtensions: ['zip'],
+                      allowedExtensions: [
+                        exported.path.endsWith('.kbackup') ? 'kbackup' : 'zip',
+                      ],
                     );
                     if (savePath != null) {
                       try {
@@ -996,6 +1021,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       mode: mode,
                       onProgress: handle.report,
                       cancelToken: handle.cancelToken,
+                      onPassword: backupPasswordPrompt(context),
+                      onForwardCompatibility: forwardCompatibilityPrompt(
+                        context,
+                      ),
                       allowUnverifiedForwardCompatible:
                           decision == ForwardCompatDecision.proceedUnverified,
                     );

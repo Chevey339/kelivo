@@ -33,11 +33,13 @@ class HiveToSqliteMigrationPage extends StatefulWidget {
     required this.service,
     this.mobileBackupSaver,
     this.mobileDirectBackupSaver,
+    this.restartApp,
   });
 
   final HiveToSqliteMigrationService service;
   final MobileBackupSaver? mobileBackupSaver;
   final MobileDirectBackupSaver? mobileDirectBackupSaver;
+  final Future<void> Function()? restartApp;
 
   @override
   State<HiveToSqliteMigrationPage> createState() =>
@@ -94,7 +96,11 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Future<void> _pickBackupAndStart() async {
-    if (_busy) return;
+    if (_busy ||
+        widget.service.isComplete ||
+        widget.service.freshStartSelected) {
+      return;
+    }
     setState(() => _busy = true);
     var backupPhaseComplete = false;
     try {
@@ -119,6 +125,10 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       backupPhaseComplete = true;
       await widget.service.migrate(backupPath: backupFile?.path);
     } catch (error, stackTrace) {
+      if (widget.service.isComplete) {
+        if (mounted) setState(() => _status = widget.service.initialStatus());
+        return;
+      }
       if (!backupPhaseComplete) {
         try {
           await widget.service.recordFailedAttempt();
@@ -222,7 +232,11 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Future<void> _retry() async {
-    if (_busy) return;
+    if (_busy || widget.service.isComplete) return;
+    if (widget.service.freshStartSelected) {
+      await _startFresh();
+      return;
+    }
     if (_skipBackup) {
       setState(() => _busy = true);
       try {
@@ -252,7 +266,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Future<void> _confirmSkipMigration() async {
-    if (_busy) return;
+    if (_busy || widget.service.isComplete) return;
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -277,23 +291,49 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         );
       },
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || _busy || widget.service.isComplete) {
+      return;
+    }
+    await _startFresh();
+  }
+
+  Future<void> _startFresh() async {
+    if (_busy || widget.service.isComplete) return;
     setState(() => _busy = true);
     try {
       await widget.service.skipMigrationAndStartFresh();
       if (!mounted) return;
-      setState(() => _canOfferSkip = false);
-      await requestAppRestart(context, PlatformUtils.restartApp);
+      setState(() {
+        _canOfferSkip = false;
+        _status = widget.service.initialStatus();
+      });
+      await requestAppRestart(
+        context,
+        widget.restartApp ?? PlatformUtils.restartApp,
+      );
     } catch (error, stackTrace) {
       await _refreshSkipAvailability();
       if (mounted) {
         setState(() {
-          _status = _status.copyWith(
+          _status = widget.service.initialStatus().copyWith(
             error: '$error',
             log: [..._status.log, '$error', stackTrace.toString()],
           );
         });
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restartCompleted() async {
+    if (_busy || _status.stage != HiveToSqliteMigrationStage.complete) return;
+    setState(() => _busy = true);
+    try {
+      await requestAppRestart(
+        context,
+        widget.restartApp ?? PlatformUtils.restartApp,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -357,7 +397,9 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Widget _bodyForStatus(AppLocalizations l10n, {required Key key}) {
-    final onSkip = !_busy && _canOfferSkip ? _confirmSkipMigration : null;
+    final onSkip = !_busy && _canOfferSkip && !widget.service.freshStartSelected
+        ? _confirmSkipMigration
+        : null;
     return switch (_status.stage) {
       HiveToSqliteMigrationStage.intro => _IntroStep(
         key: key,
@@ -383,13 +425,12 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.complete => _CompleteStep(
         key: key,
         status: _status,
-        onRestart: () async {
-          await requestAppRestart(context, PlatformUtils.restartApp);
-        },
+        onRestart: _busy ? null : _restartCompleted,
       ),
       HiveToSqliteMigrationStage.failed => _FailedStep(
         key: key,
         status: _status,
+        freshStartSelected: widget.service.freshStartSelected,
         skipChatsJson: _skipChatsJson,
         skipBackup: _skipBackup,
         onSkipChatsJsonChanged: _busy
@@ -633,12 +674,13 @@ class _CompleteStep extends StatelessWidget {
   });
 
   final HiveToSqliteMigrationStatus status;
-  final Future<void> Function() onRestart;
+  final Future<void> Function()? onRestart;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final startedFresh = status.detail == 'startedFresh';
     return _StepShell(
       key: key,
       activeStep: 2,
@@ -662,16 +704,21 @@ class _CompleteStep extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _Header(
-          title: l10n.migrationCompleteTitle,
-          subtitle: l10n.migrationCompleteSubtitle,
+          title: startedFresh
+              ? l10n.migrationFreshStartTitle
+              : l10n.migrationCompleteTitle,
+          subtitle: startedFresh
+              ? l10n.migrationFreshStartSubtitle
+              : l10n.migrationCompleteSubtitle,
         ),
         const SizedBox(height: 14),
-        _StatsCard(
-          conversations: status.conversations,
-          messages: status.messages,
-          converted: status.converted,
-          malformed: status.malformed,
-        ),
+        if (!startedFresh)
+          _StatsCard(
+            conversations: status.conversations,
+            messages: status.messages,
+            converted: status.converted,
+            malformed: status.malformed,
+          ),
         const SizedBox(height: 12),
         if (status.backupPath != null)
           _BackupFileCard(path: status.backupPath!),
@@ -687,7 +734,7 @@ class _CompleteStep extends StatelessWidget {
         _PrimaryButton(
           icon: Lucide.RefreshCw,
           label: l10n.migrationRestartButton,
-          onPressed: () => unawaited(onRestart()),
+          onPressed: onRestart == null ? null : () => unawaited(onRestart!()),
         ),
       ],
     );
@@ -698,6 +745,7 @@ class _FailedStep extends StatelessWidget {
   const _FailedStep({
     super.key,
     required this.status,
+    required this.freshStartSelected,
     required this.skipChatsJson,
     required this.skipBackup,
     required this.onSkipChatsJsonChanged,
@@ -707,6 +755,7 @@ class _FailedStep extends StatelessWidget {
   });
 
   final HiveToSqliteMigrationStatus status;
+  final bool freshStartSelected;
   final bool skipChatsJson;
   final bool skipBackup;
   final ValueChanged<bool>? onSkipChatsJsonChanged;
@@ -730,8 +779,12 @@ class _FailedStep extends StatelessWidget {
                 Icon(Lucide.TriangleAlert, color: cs.error, size: 58),
                 const SizedBox(height: 16),
                 _Header(
-                  title: l10n.migrationFailedTitle,
-                  subtitle: l10n.migrationFailedSubtitle,
+                  title: freshStartSelected
+                      ? l10n.migrationFreshStartFailedTitle
+                      : l10n.migrationFailedTitle,
+                  subtitle: freshStartSelected
+                      ? l10n.migrationFreshStartFailedSubtitle
+                      : l10n.migrationFailedSubtitle,
                 ),
                 const SizedBox(height: 14),
                 _ErrorCard(error: status.error ?? l10n.migrationUnknownError),
@@ -750,12 +803,13 @@ class _FailedStep extends StatelessWidget {
                 const SizedBox(height: 12),
                 _LogCard(lines: status.log),
                 const SizedBox(height: 12),
-                MigrationBackupOptions(
-                  skipChatsJson: skipChatsJson,
-                  skipBackup: skipBackup,
-                  onSkipChatsJsonChanged: onSkipChatsJsonChanged,
-                  onSkipBackupChanged: onSkipBackupChanged,
-                ),
+                if (!freshStartSelected)
+                  MigrationBackupOptions(
+                    skipChatsJson: skipChatsJson,
+                    skipBackup: skipBackup,
+                    onSkipChatsJsonChanged: onSkipChatsJsonChanged,
+                    onSkipBackupChanged: onSkipBackupChanged,
+                  ),
               ],
             ),
           ),
@@ -763,7 +817,9 @@ class _FailedStep extends StatelessWidget {
         const SizedBox(height: 12),
         _PrimaryButton(
           icon: skipBackup ? Lucide.Database : Lucide.RotateCcw,
-          label: skipBackup
+          label: freshStartSelected
+              ? l10n.migrationSkipDialogConfirm
+              : skipBackup
               ? l10n.migrationStartWithoutBackupButton
               : l10n.migrationRetryButton,
           onPressed: onRetry,
