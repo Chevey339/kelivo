@@ -116,7 +116,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceRefreshTooltip => '刷新';
 
   @override
-  String get storageSpaceLoadFailed => '加载失败';
+  String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
   String get storageSpaceTotalLabel => '已用空间';
@@ -185,9 +185,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助手';
-
-  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -226,12 +223,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享内存索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '头像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '图片';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -340,16 +331,38 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get storageSpaceSourceLabel => '来源';
+  String get storageSpaceImageTypeLabel => '类型';
 
   @override
-  String get storageSpaceSourceAll => '全部';
+  String get storageSpaceImageTypeAll => '全部';
 
   @override
-  String get storageSpaceSourceUserUpload => '用户上传';
+  String get storageSpaceImageTypeChat => '聊天图片';
 
   @override
-  String get storageSpaceSourceAssistant => '助手发出';
+  String get storageSpaceImageTypeTool => '工具图片';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '头像与背景';
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get storageSpaceImageInUseHint => '请先在对应设置中更换或移除头像、背景或图标，再删除。';
+
+  @override
+  String get storageSpaceImagesHint => '删除会影响聊天图片和工具结果。正在使用的头像与背景会受到保护。';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '删除 $count 张图片？相关聊天图片、工具截图及其会话副本将无法再查看或使用。正在使用的头像与背景会保留。';
+  }
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已删除 $deleted 个项目；保留了 $kept 个正在使用或无法删除的项目。';
+  }
 
   @override
   String get storageSpaceSortLabel => '排序';
@@ -13520,7 +13533,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceRefreshTooltip => '刷新';
 
   @override
-  String get storageSpaceLoadFailed => '加载失败';
+  String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
   String get storageSpaceTotalLabel => '已用空间';
@@ -13589,9 +13602,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助手';
-
-  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -13630,12 +13640,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享内存索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '头像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '图片';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -13744,16 +13748,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get storageSpaceSourceLabel => '来源';
+  String get storageSpaceImageTypeLabel => '类型';
 
   @override
-  String get storageSpaceSourceAll => '全部';
+  String get storageSpaceImageTypeAll => '全部';
 
   @override
-  String get storageSpaceSourceUserUpload => '用户上传';
+  String get storageSpaceImageTypeChat => '聊天图片';
 
   @override
-  String get storageSpaceSourceAssistant => '助手发出';
+  String get storageSpaceImageTypeTool => '工具图片';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '头像与背景';
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get storageSpaceImageInUseHint => '请先在对应设置中更换或移除头像、背景或图标，再删除。';
+
+  @override
+  String get storageSpaceImagesHint => '删除会影响聊天图片和工具结果。正在使用的头像与背景会受到保护。';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '删除 $count 张图片？相关聊天图片、工具截图及其会话副本将无法再查看或使用。正在使用的头像与背景会保留。';
+  }
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已删除 $deleted 个项目；保留了 $kept 个正在使用或无法删除的项目。';
+  }
 
   @override
   String get storageSpaceSortLabel => '排序';
@@ -26850,7 +26876,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceRefreshTooltip => '重新整理';
 
   @override
-  String get storageSpaceLoadFailed => '載入失敗';
+  String get storageSpaceLoadFailed => '無法載入檔案或檢查圖片使用情況，請重新整理後重試。';
 
   @override
   String get storageSpaceTotalLabel => '已用空間';
@@ -26919,9 +26945,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSubCompletedRestoreRuns => '已完成的還原快照';
 
   @override
-  String get storageSpaceCategoryAssistantData => '助理';
-
-  @override
   String get storageSpaceCategoryCache => '快取';
 
   @override
@@ -26960,12 +26983,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => '頭像';
-
-  @override
-  String get storageSpaceSubAssistantImages => '圖片';
 
   @override
   String get storageSpaceSubCacheAvatars => '頭像快取';
@@ -27074,16 +27091,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get storageSpaceSourceLabel => '來源';
+  String get storageSpaceImageTypeLabel => '類型';
 
   @override
-  String get storageSpaceSourceAll => '全部';
+  String get storageSpaceImageTypeAll => '全部';
 
   @override
-  String get storageSpaceSourceUserUpload => '使用者上傳';
+  String get storageSpaceImageTypeChat => '聊天圖片';
 
   @override
-  String get storageSpaceSourceAssistant => '助理傳送';
+  String get storageSpaceImageTypeTool => '工具圖片';
+
+  @override
+  String get storageSpaceImageTypeAvatar => '頭像與背景';
+
+  @override
+  String get storageSpaceImageInUse => '使用中';
+
+  @override
+  String get storageSpaceImageInUseHint => '請先在對應設定中更換或移除頭像、背景或圖示，再刪除。';
+
+  @override
+  String get storageSpaceImagesHint => '刪除會影響聊天圖片和工具結果。正在使用的頭像與背景會受到保護。';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return '刪除 $count 張圖片？相關聊天圖片、工具截圖及其對話副本將無法再檢視或使用。正在使用的頭像與背景會保留。';
+  }
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return '已刪除 $deleted 個項目；保留了 $kept 個正在使用或無法刪除的項目。';
+  }
 
   @override
   String get storageSpaceSortLabel => '排序';

@@ -10,7 +10,7 @@ import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'citation_syntax.dart';
 import 'diagram_code_blocks.dart';
 import 'highlight_adapter.dart';
-import 'link_image_handlers.dart';
+import 'markdown_image_sources.dart';
 import 'markdown_actions.dart';
 
 // Stable registration identity preserves the parser and completed prefix trees.

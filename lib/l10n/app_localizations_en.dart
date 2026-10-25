@@ -125,7 +125,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceRefreshTooltip => 'Refresh';
 
   @override
-  String get storageSpaceLoadFailed => 'Failed to load storage usage';
+  String get storageSpaceLoadFailed =>
+      'Could not load files or check which images are in use. Please refresh and try again.';
 
   @override
   String get storageSpaceTotalLabel => 'Used';
@@ -199,9 +200,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Completed restore snapshots';
 
   @override
-  String get storageSpaceCategoryAssistantData => 'Assistants';
-
-  @override
   String get storageSpaceCategoryCache => 'Cache';
 
   @override
@@ -242,12 +240,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatSharedMemory => 'Shared memory index';
-
-  @override
-  String get storageSpaceSubAssistantAvatars => 'Avatars';
-
-  @override
-  String get storageSpaceSubAssistantImages => 'Images';
 
   @override
   String get storageSpaceSubCacheAvatars => 'Avatar cache';
@@ -356,16 +348,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get storageSpaceSourceLabel => 'Source';
+  String get storageSpaceImageTypeLabel => 'Type';
 
   @override
-  String get storageSpaceSourceAll => 'All';
+  String get storageSpaceImageTypeAll => 'All';
 
   @override
-  String get storageSpaceSourceUserUpload => 'User uploads';
+  String get storageSpaceImageTypeChat => 'Chat images';
 
   @override
-  String get storageSpaceSourceAssistant => 'Assistant';
+  String get storageSpaceImageTypeTool => 'Tool images';
+
+  @override
+  String get storageSpaceImageTypeAvatar => 'Avatars & backgrounds';
+
+  @override
+  String get storageSpaceImageInUse => 'In use';
+
+  @override
+  String get storageSpaceImageInUseHint =>
+      'Change or remove this avatar, background, or icon in its settings before deleting it.';
+
+  @override
+  String get storageSpaceImagesHint =>
+      'Deleting images affects chat history and tool results. Avatars and backgrounds in use are protected.';
+
+  @override
+  String storageSpaceDeleteImagesConfirmMessage(int count) {
+    return 'Delete $count images? Related chat images, tool screenshots, and conversation copies will no longer be available. Avatars and backgrounds in use will be kept.';
+  }
+
+  @override
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
+    return 'Deleted $deleted items; kept $kept items that are in use or could not be deleted.';
+  }
 
   @override
   String get storageSpaceSortLabel => 'Sort';

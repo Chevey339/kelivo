@@ -33,6 +33,7 @@ import '../../models/workspace_binding.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 import '../mcp/mcp_image_snapshot.dart';
+import '../storage/storage_image_usage.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -2328,6 +2329,8 @@ class ChatService extends ChangeNotifier {
         notBefore: effectiveNow.add(_assetGcDelay),
       );
       final candidates = await _repo.claimAssetGc(now: effectiveNow);
+      if (candidates.isEmpty) return;
+      final imageUsage = await StorageImageUsage.load(includeMessages: false);
       final appDataDir = await AppDirectories.getContentDirectory();
       final allowedRoots = [
         p.normalize(p.join(appDataDir.absolute.path, 'upload')),
@@ -2340,6 +2343,7 @@ class ChatService extends ChangeNotifier {
         ].whereType<String>();
         final regularFiles = <File>[];
         var safe = true;
+        var appearanceInUse = false;
         for (final candidatePath in paths) {
           final resolved = SandboxPathResolver.resolveForIo(candidatePath);
           if (resolved == null) {
@@ -2347,6 +2351,11 @@ class ChatService extends ChangeNotifier {
             break;
           }
           final normalized = p.normalize(File(resolved).absolute.path);
+          if (imageUsage.isInUse(normalized)) {
+            appearanceInUse = true;
+            safe = false;
+            break;
+          }
           if (!allowedRoots.any((root) => p.isWithin(root, normalized))) {
             safe = false;
             break;
@@ -2356,6 +2365,13 @@ class ChatService extends ChangeNotifier {
             followLinks: false,
           );
           if (type == FileSystemEntityType.file) {
+            if (imageUsage.isInUse(
+              await File(normalized).resolveSymbolicLinks(),
+            )) {
+              appearanceInUse = true;
+              safe = false;
+              break;
+            }
             if (await _recentlyReusedPreview(File(normalized), effectiveNow)) {
               safe = false;
               break;
@@ -2365,6 +2381,12 @@ class ChatService extends ChangeNotifier {
             safe = false;
             break;
           }
+        }
+        if (appearanceInUse) {
+          await _repo.deferAssetGc(
+            candidate,
+            notBefore: effectiveNow.add(const Duration(hours: 6)),
+          );
         }
         if (!safe) continue;
         if (!await _repo.isAssetGcClaimStillValid(candidate)) continue;

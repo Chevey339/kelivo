@@ -8,6 +8,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/citation_syntax.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
 import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
+import 'package:Kelivo/shared/markdown/markdown_image_sources.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';

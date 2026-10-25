@@ -313,7 +313,7 @@ abstract class AppLocalizations {
   /// No description provided for @storageSpaceLoadFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to load storage usage'**
+  /// **'Could not load files or check which images are in use. Please refresh and try again.'**
   String get storageSpaceLoadFailed;
 
   /// No description provided for @storageSpaceTotalLabel.
@@ -436,12 +436,6 @@ abstract class AppLocalizations {
   /// **'Completed restore snapshots'**
   String get storageSpaceSubCompletedRestoreRuns;
 
-  /// No description provided for @storageSpaceCategoryAssistantData.
-  ///
-  /// In en, this message translates to:
-  /// **'Assistants'**
-  String get storageSpaceCategoryAssistantData;
-
   /// No description provided for @storageSpaceCategoryCache.
   ///
   /// In en, this message translates to:
@@ -519,18 +513,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shared memory index'**
   String get storageSpaceSubChatSharedMemory;
-
-  /// No description provided for @storageSpaceSubAssistantAvatars.
-  ///
-  /// In en, this message translates to:
-  /// **'Avatars'**
-  String get storageSpaceSubAssistantAvatars;
-
-  /// No description provided for @storageSpaceSubAssistantImages.
-  ///
-  /// In en, this message translates to:
-  /// **'Images'**
-  String get storageSpaceSubAssistantImages;
 
   /// No description provided for @storageSpaceSubCacheAvatars.
   ///
@@ -706,29 +688,65 @@ abstract class AppLocalizations {
   /// **'{count} items'**
   String storageSpaceUploadsCount(int count);
 
-  /// No description provided for @storageSpaceSourceLabel.
+  /// No description provided for @storageSpaceImageTypeLabel.
   ///
   /// In en, this message translates to:
-  /// **'Source'**
-  String get storageSpaceSourceLabel;
+  /// **'Type'**
+  String get storageSpaceImageTypeLabel;
 
-  /// No description provided for @storageSpaceSourceAll.
+  /// No description provided for @storageSpaceImageTypeAll.
   ///
   /// In en, this message translates to:
   /// **'All'**
-  String get storageSpaceSourceAll;
+  String get storageSpaceImageTypeAll;
 
-  /// No description provided for @storageSpaceSourceUserUpload.
+  /// No description provided for @storageSpaceImageTypeChat.
   ///
   /// In en, this message translates to:
-  /// **'User uploads'**
-  String get storageSpaceSourceUserUpload;
+  /// **'Chat images'**
+  String get storageSpaceImageTypeChat;
 
-  /// No description provided for @storageSpaceSourceAssistant.
+  /// No description provided for @storageSpaceImageTypeTool.
   ///
   /// In en, this message translates to:
-  /// **'Assistant'**
-  String get storageSpaceSourceAssistant;
+  /// **'Tool images'**
+  String get storageSpaceImageTypeTool;
+
+  /// No description provided for @storageSpaceImageTypeAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatars & backgrounds'**
+  String get storageSpaceImageTypeAvatar;
+
+  /// No description provided for @storageSpaceImageInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get storageSpaceImageInUse;
+
+  /// No description provided for @storageSpaceImageInUseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Change or remove this avatar, background, or icon in its settings before deleting it.'**
+  String get storageSpaceImageInUseHint;
+
+  /// No description provided for @storageSpaceImagesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting images affects chat history and tool results. Avatars and backgrounds in use are protected.'**
+  String get storageSpaceImagesHint;
+
+  /// No description provided for @storageSpaceDeleteImagesConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} images? Related chat images, tool screenshots, and conversation copies will no longer be available. Avatars and backgrounds in use will be kept.'**
+  String storageSpaceDeleteImagesConfirmMessage(int count);
+
+  /// No description provided for @storageSpaceDeletedUploadsPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {deleted} items; kept {kept} items that are in use or could not be deleted.'**
+  String storageSpaceDeletedUploadsPartial(int deleted, int kept);
 
   /// No description provided for @storageSpaceSortLabel.
   ///

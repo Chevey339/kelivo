@@ -12,6 +12,7 @@ import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Kelivo/core/services/storage/storage_image_usage.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -530,7 +531,7 @@ void main() {
   });
 
   test(
-    'image entries distinguish user uploads from assistant images',
+    'unreferenced images do not acquire an inferred assistant sender',
     () async {
       final uploadDir = Directory(p.join(tempDir.path, 'upload'));
       final imagesDir = Directory(p.join(tempDir.path, 'images'));
@@ -540,10 +541,10 @@ void main() {
       await _writeSizedFile(imagesDir, 'assistant.png', 20);
 
       final entries = await StorageUsageService.listUploadEntries(images: true);
-      final sources = {for (final entry in entries) entry.name: entry.source};
+      final kinds = {for (final entry in entries) entry.name: entry.imageKind};
 
-      expect(sources['uploaded.png'], StorageFileSource.userUpload);
-      expect(sources['assistant.png'], StorageFileSource.assistant);
+      expect(kinds['uploaded.png'], StorageImageKind.chat);
+      expect(kinds['assistant.png'], isNull);
     },
   );
 }
