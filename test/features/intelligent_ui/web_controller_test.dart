@@ -31,6 +31,7 @@ void main() {
         'navigationPolicy',
         'httpAuth',
         'navigationDelegate',
+        'background:0',
         'alert',
         'confirm',
         'prompt',
@@ -63,6 +64,7 @@ void main() {
     'navigationPolicy',
     'httpAuth',
     'navigationDelegate',
+    'background:0',
     'alert',
     'confirm',
     'prompt',
@@ -79,6 +81,19 @@ void main() {
       controller.dispose();
     });
   }
+
+  test('submitting HTML does not expose an unfinished native page', () async {
+    platform.finishInitial = false;
+    final controller = UiWebController();
+    await controller.start(document);
+    expect(controller.phase, UiWebNativePhase.initializing);
+    platform.controllers.single.navigation!.finished!('about:blank');
+    expect(controller.phase, UiWebNativePhase.ready);
+    await controller.close();
+    platform.controllers.single.navigation!.finished!('about:blank');
+    expect(controller.phase, UiWebNativePhase.closed);
+    controller.dispose();
+  });
 
   test(
     'navigation allows only local frames after the host load has started',

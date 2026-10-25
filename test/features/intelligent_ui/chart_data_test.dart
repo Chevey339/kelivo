@@ -34,6 +34,25 @@ double _nextUp(double value) {
 }
 
 void main() {
+  test('readable Y bounds put the lowest tick on the painted border', () {
+    for (final values in [
+      [50.0, 40.0, 35.0, 30.0],
+      [-50.0, 40.0],
+      [0.0, 0.0],
+    ]) {
+      final axis = UiChartAxis(values, includeZero: true, niceTicks: true);
+      final step = axis.tickInterval!;
+      final firstTick = (axis.minimum / step).ceil() * step;
+      expect(
+        (firstTick - axis.minimum) / (axis.maximum - axis.minimum) * 260,
+        lessThan(1e-6),
+      );
+      expect(
+        axis.coordinate(values.reduce((a, b) => a < b ? a : b)),
+        greaterThan(axis.minimum),
+      );
+    }
+  });
   test(
     'tick labels suppress cancellation residue without erasing tiny data',
     () {

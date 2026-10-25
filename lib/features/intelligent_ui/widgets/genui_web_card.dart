@@ -98,7 +98,7 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ExcludeSemantics(
                     child: Container(
@@ -119,52 +119,33 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                   ),
                   SizedBox(width: theme.xs),
                   Expanded(
-                    child: ExcludeSemantics(
-                      child: Text(
-                        title,
-                        style: theme.header,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ExcludeSemantics(
+                          child: Text(
+                            title,
+                            style: theme.header,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (document.summary.isNotEmpty) ...[
+                          SizedBox(height: theme.xxs),
+                          Text(
+                            document.summary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.caption.copyWith(
+                              color: theme.secondaryInk,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (actions && widget.supported) ...[
-                    GenUiControlRegion(
-                      child: IosIconButton(
-                        icon: LucideIcons.codeXml,
-                        size: 17,
-                        minSize: 44,
-                        visualSize: 28,
-                        color: theme.secondaryInk,
-                        tooltip: l10n.genuiViewSource,
-                        onTap: () => setState(() => _source = !_source),
-                      ),
-                    ),
-                    if (!invalid)
-                      GenUiWebOpenButton(
-                        label: l10n.genuiWebOpen,
-                        focusNode: _openFocus,
-                        reason: document.canOpen ? null : reason,
-                        enabled:
-                            document.canOpen && !_busy && widget.onOpen != null,
-                        onTap: _open,
-                      ),
-                  ],
                 ],
               ),
-              if (document.summary.isNotEmpty)
-                Padding(
-                  padding: EdgeInsetsDirectional.only(
-                    start: 32 + theme.xs,
-                    top: theme.xxs,
-                  ),
-                  child: Text(
-                    document.summary,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.caption.copyWith(color: theme.secondaryInk),
-                  ),
-                ),
               if (streaming || interrupted)
                 Align(
                   alignment: AlignmentDirectional.centerStart,
@@ -190,8 +171,8 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                   ),
                 ),
               ],
-              if (actions && !widget.supported) ...[
-                SizedBox(height: theme.xs),
+              if (actions) ...[
+                SizedBox(height: theme.xxs),
                 Wrap(
                   spacing: theme.xs,
                   runSpacing: theme.xxs,
@@ -208,6 +189,15 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
                         }),
                       ),
                     ),
+                    if (widget.supported && !invalid)
+                      GenUiWebOpenButton(
+                        label: l10n.genuiWebOpen,
+                        focusNode: _openFocus,
+                        reason: document.canOpen ? null : reason,
+                        enabled:
+                            document.canOpen && !_busy && widget.onOpen != null,
+                        onTap: _open,
+                      ),
                     if (!widget.supported && !invalid) ...[
                       GenUiControlRegion(
                         child: IosTextButton(
@@ -304,9 +294,9 @@ class _GenUiWebOpenButtonState extends State<GenUiWebOpenButton> {
                   : const Duration(milliseconds: 160),
               pressedScale: MediaQuery.disableAnimationsOf(context) ? 1 : .98,
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: theme.xxs),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Container(
-                  constraints: const BoxConstraints(minHeight: 36),
+                  constraints: const BoxConstraints(minHeight: 32),
                   decoration: BoxDecoration(
                     color: disabled ? theme.fill : theme.primary,
                     borderRadius: BorderRadius.circular(theme.controlRadius),
@@ -322,11 +312,17 @@ class _GenUiWebOpenButtonState extends State<GenUiWebOpenButton> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                       minHeight: 20,
-                      minWidth: 44,
+                      minWidth: 0,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(
+                          LucideIcons.externalLink,
+                          size: 14,
+                          color: disabled ? theme.disabledInk : theme.onPrimary,
+                        ),
+                        SizedBox(width: theme.xs),
                         Flexible(
                           child: Text(
                             widget.label,

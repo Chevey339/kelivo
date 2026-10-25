@@ -96,6 +96,12 @@ final class UiWebController extends ChangeNotifier {
       await navigation.platform.setOnPageStarted((_) {
         _initialNavigation = false;
       });
+      await navigation.platform.setOnPageFinished((_) {
+        if (_loaded && !_closeRequested && error == null) {
+          phase = UiWebNativePhase.ready;
+          _notify();
+        }
+      });
       await navigation.platform.setOnWebResourceError((failure) {
         if (failure.isForMainFrame == true && !_closeRequested) {
           _fail(
@@ -107,6 +113,9 @@ final class UiWebController extends ChangeNotifier {
         request.onCancel();
       });
       await controller.setNavigationDelegate(navigation);
+      // A platform view starts painting before its HTML is ready. Let the
+      // native shell show through instead of WebKit/Android's white canvas.
+      await controller.setBackgroundColor(const Color(0x00000000));
       await controller.setOnJavaScriptAlertDialog((_) async {});
       await controller.setOnJavaScriptConfirmDialog((_) async => false);
       await controller.setOnJavaScriptTextInputDialog((_) async => '');
@@ -125,11 +134,8 @@ final class UiWebController extends ChangeNotifier {
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
       if (_closeRequested) return;
       _loaded = true;
-      await controller.loadHtmlString(document);
-      if (_closeRequested) return;
-      if (error != null) return;
-      phase = UiWebNativePhase.ready;
       _notify();
+      await controller.loadHtmlString(document);
     } catch (failure) {
       _fail(failure);
       rethrow;
@@ -145,7 +151,7 @@ final class UiWebController extends ChangeNotifier {
 
   Widget buildView() {
     final controller = _controller;
-    return controller == null || phase != UiWebNativePhase.ready
+    return controller == null || !_loaded || phase == UiWebNativePhase.closed
         ? const SizedBox.shrink()
         : WebViewWidget(controller: controller);
   }

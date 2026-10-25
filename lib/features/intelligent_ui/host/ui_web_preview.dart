@@ -95,9 +95,11 @@ final class _UiWebPreviewLease {
     if (info != null && info.isActive) {
       info.navigator?.removeRoute(info);
     }
-    await controller.close();
     final current = route;
-    if (current == null) return;
+    if (current == null) {
+      await release();
+      return;
+    }
     final navigator = current.navigator;
     if (navigator != null && current.isActive) {
       if (current.isCurrent) {
@@ -107,6 +109,9 @@ final class _UiWebPreviewLease {
       }
     }
     await current.completed;
+    // Keep the real page painted throughout the exit transition. Clearing its
+    // document while the route is visible exposes an empty native canvas.
+    await release();
   }
 }
 
@@ -309,14 +314,12 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
                           ),
                         );
                       }
-                      if (_controller.phase == UiWebNativePhase.initializing) {
-                        return Center(
-                          child: CupertinoActivityIndicator(
-                            color: theme.primary,
-                          ),
-                        );
-                      }
-                      return _controller.buildView();
+                      return _PreviewContent(
+                        ready: _controller.phase == UiWebNativePhase.ready,
+                        background: headerColor,
+                        foreground: headerInk,
+                        child: _controller.buildView(),
+                      );
                     },
                   ),
                 ),
@@ -330,7 +333,7 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
               statusBarColor: theme.previewHeader,
               statusBarBrightness: Brightness.dark,
             ),
-            child: Scaffold(backgroundColor: theme.card, body: shell),
+            child: Scaffold(backgroundColor: headerColor, body: shell),
           );
         }
         return PopScope(
@@ -353,5 +356,93 @@ class _UiWebPreviewWindowState extends State<_UiWebPreviewWindow> {
         );
       },
     ),
+  );
+}
+
+/// Mount the native view behind an opaque cover while its first document loads.
+/// Revealing the cover after didFinish also gives the platform composition a
+/// frame to display the page; HTML load submission alone is not paint readiness.
+class _PreviewContent extends StatefulWidget {
+  const _PreviewContent({
+    required this.ready,
+    required this.background,
+    required this.foreground,
+    required this.child,
+  });
+  final bool ready;
+  final Color background, foreground;
+  final Widget child;
+  @override
+  State<_PreviewContent> createState() => _PreviewContentState();
+}
+
+class _PreviewContentState extends State<_PreviewContent>
+    with SingleTickerProviderStateMixin {
+  late final _reveal =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 180),
+      )..addStatusListener((_) {
+        if (mounted) setState(() {});
+      });
+
+  @override
+  void initState() {
+    super.initState();
+    _showWhenReady();
+  }
+
+  @override
+  void didUpdateWidget(_PreviewContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.ready != oldWidget.ready) _showWhenReady();
+  }
+
+  void _showWhenReady() {
+    if (!widget.ready) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.ready) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _reveal.value = 1;
+      } else {
+        _reveal.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _reveal.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      IgnorePointer(
+        ignoring: !_reveal.isCompleted,
+        child: ExcludeFocus(
+          excluding: !_reveal.isCompleted,
+          child: ExcludeSemantics(
+            excluding: !_reveal.isCompleted,
+            child: widget.child,
+          ),
+        ),
+      ),
+      if (!_reveal.isCompleted)
+        IgnorePointer(
+          child: FadeTransition(
+            opacity: ReverseAnimation(_reveal),
+            child: ColoredBox(
+              key: const ValueKey('genui-web-loading-cover'),
+              color: widget.background,
+              child: Center(
+                child: CupertinoActivityIndicator(color: widget.foreground),
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 }

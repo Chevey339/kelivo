@@ -514,8 +514,11 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                     ),
                   ),
                 Padding(
-                  padding: EdgeInsets.all(
+                  padding: EdgeInsetsDirectional.fromSTEB(
                     ResponsiveHelper.isMobile(context) ? 14 : theme.md,
+                    surface.showHeader ? theme.sm : theme.xxs,
+                    ResponsiveHelper.isMobile(context) ? 14 : theme.md,
+                    !surface.showHeader && actions ? 0 : theme.sm,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -627,7 +630,13 @@ class _Footer extends StatelessWidget {
           ),
           SizedBox(width: theme.xs),
           Expanded(child: Text(text, style: theme.caption)),
-          if (action != null) Flexible(child: action!),
+          if (action != null)
+            Flexible(
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: action!,
+              ),
+            ),
         ],
       ),
     );

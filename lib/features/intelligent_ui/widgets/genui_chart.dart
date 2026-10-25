@@ -556,7 +556,9 @@ class _GenUiChartState extends State<GenUiChart> {
                 child: ExcludeSemantics(
                   child: IosIconButton(
                     key: ValueKey('genui-chart-legend-${widget.id}-$series'),
-                    minSize: ResponsiveHelper.isDesktop(context) ? 32 : 44,
+                    // Legends form a compact list; using a full field height
+                    // on every wrapped row leaves a blank line between labels.
+                    minSize: 32,
                     padding: EdgeInsets.symmetric(horizontal: theme.xxs),
                     color: hidden ? theme.captionInk : theme.secondaryInk,
                     tooltip: action,

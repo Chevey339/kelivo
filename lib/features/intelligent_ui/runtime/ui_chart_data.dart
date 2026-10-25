@@ -58,6 +58,11 @@ final class UiChartAxis {
         }
       }
     }
+    if (niceTicks && low == 0 && high == 0) {
+      niceLow = 0;
+      niceHigh = 1;
+      niceStep = .25;
+    }
     _origin = niceLow ?? (span.isFinite ? low : 0);
     factor = span.isFinite && span > 0
         ? span
@@ -74,7 +79,10 @@ final class UiChartAxis {
       padding = math.max(padding, gap / 2);
       groupGap = gap;
     }
-    minimum = niceLow == null ? start - padding : coordinate(niceLow) - padding;
+    // Keep the lowest tick on the border, with a subpixel inset so an exact
+    // zero/minimum hit is inside RenderBox's exclusive bottom edge. Retain
+    // headroom above the data for markers and labels.
+    minimum = niceLow == null ? start - padding : coordinate(niceLow) - 1e-9;
     maximum = niceHigh == null ? end + padding : coordinate(niceHigh) + padding;
     tickInterval = niceStep == null ? null : niceStep / factor;
     groupSpacing = groupGap == null

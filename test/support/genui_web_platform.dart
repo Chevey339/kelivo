@@ -9,7 +9,8 @@ class FakeGenUiWebPlatform extends WebViewPlatform {
   final events = <String>[];
   String? failAt;
   Completer<void>? permissionWait, cleanupWait, emptyWait;
-  bool finishEmpty = true;
+  bool finishEmpty = true, finishInitial = true;
+  VoidCallback? onTap;
 
   Future<void> step(String name) async {
     events.add(name);
@@ -32,7 +33,7 @@ class FakeGenUiWebPlatform extends WebViewPlatform {
   @override
   PlatformWebViewWidget createPlatformWebViewWidget(
     PlatformWebViewWidgetCreationParams params,
-  ) => FakeGenUiWebWidget(params);
+  ) => FakeGenUiWebWidget(params, this);
 }
 
 class FakeGenUiWebController extends PlatformWebViewController {
@@ -86,6 +87,9 @@ class FakeGenUiWebController extends PlatformWebViewController {
   Future<void> setJavaScriptMode(JavaScriptMode mode) =>
       owner.step('javascript:${mode.name}');
   @override
+  Future<void> setBackgroundColor(Color color) =>
+      owner.step('background:${color.toARGB32()}');
+  @override
   Future<void> loadHtmlString(String html, {String? baseUrl}) async {
     await owner.step('load');
     documents.add(html);
@@ -94,7 +98,7 @@ class FakeGenUiWebController extends PlatformWebViewController {
       await owner.emptyWait?.future;
       title = 'Kelivo preview closed';
       if (owner.finishEmpty) navigation?.finished?.call('about:blank');
-    } else {
+    } else if (owner.finishInitial) {
       navigation?.finished?.call('about:blank');
     }
   }
@@ -144,17 +148,27 @@ class FakeGenUiNavigation extends PlatformNavigationDelegate {
 }
 
 class FakeGenUiWebWidget extends PlatformWebViewWidget {
-  FakeGenUiWebWidget(super.params) : super.implementation();
+  FakeGenUiWebWidget(super.params, this.owner) : super.implementation();
+  final FakeGenUiWebPlatform owner;
   @override
-  Widget build(BuildContext context) => const ColoredBox(
-    color: Color(0xffeeeeee),
-    child: Center(
-      child: Text(
-        'Native preview test double',
-        style: TextStyle(color: Color(0xff222222)),
+  Widget build(BuildContext context) {
+    const view = ColoredBox(
+      color: Color(0xffeeeeee),
+      child: Center(
+        child: Text(
+          'Native preview test double',
+          style: TextStyle(color: Color(0xff222222)),
+        ),
       ),
-    ),
-  );
+    );
+    return owner.onTap == null
+        ? view
+        : Semantics(
+            label: 'Native preview action',
+            button: true,
+            child: GestureDetector(onTap: owner.onTap, child: view),
+          );
+  }
 }
 
 class FakeGenUiPermission extends PlatformWebViewPermissionRequest {

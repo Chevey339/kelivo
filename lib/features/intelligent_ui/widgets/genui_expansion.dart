@@ -14,6 +14,7 @@ import '../catalog/ui_budgets.dart';
 import 'genui_surface.dart';
 import 'genui_theme.dart';
 import 'genui_motion.dart';
+import 'genui_expansion_snapshot.dart';
 import '../runtime/ui_resolved_node.dart';
 
 typedef GenUiSurfaceBuilder =
@@ -44,11 +45,13 @@ class _GenUiExpansionState extends State<GenUiExpansion>
       )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() => _changed = const {});
+          _discardSnapshot();
         }
       });
   Map<String, UiResolvedNode> _before = const {};
   Set<String> _changed = const {};
   double? _inlineHeight;
+  GenUiExpansionSnapshot? _snapshot;
   final _updates = ValueNotifier<int>(0);
   TransitionRoute<void>? _route;
   UiRuntimeToken? _activeToken;
@@ -122,6 +125,7 @@ class _GenUiExpansionState extends State<GenUiExpansion>
     _close();
     _expandFocus.dispose();
     _returnReveal.dispose();
+    _snapshot?.dispose();
     // The route can finish removal at frame end after the inline host unmounts.
     final route = _route;
     if (route == null) {
@@ -132,7 +136,7 @@ class _GenUiExpansionState extends State<GenUiExpansion>
     super.dispose();
   }
 
-  Widget _sharedContent(GenUiSurface surface) => KeyedSubtree(
+  Widget _sharedContent(GenUiSurface surface) => GenUiExpansionAnchor(
     key: _contentKey,
     child: GenUiReturnMotion(
       animation: _returnReveal,
@@ -166,14 +170,25 @@ class _GenUiExpansionState extends State<GenUiExpansion>
         ))
           entry.key,
     };
-    if (_changed.isNotEmpty && !(_media?.disableAnimations ?? false)) {
-      _returnReveal.forward(from: .65);
+    if ((_changed.isNotEmpty || _snapshot != null) &&
+        !(_media?.disableAnimations ?? false)) {
+      _returnReveal.forward(from: 0);
     } else {
       _changed = const {};
+      _discardSnapshot();
     }
     setState(() => _expanded = false);
     // The outgoing route releases the key before this frame is finalized.
     _updates.value++;
+  }
+
+  void _discardSnapshot() {
+    final previous = _snapshot;
+    _snapshot = null;
+    // The previous RawImage may still be painted until this frame commits.
+    if (previous != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    }
   }
 
   Widget _routeContent(bool desktop) => ListenableBuilder(
@@ -210,10 +225,14 @@ class _GenUiExpansionState extends State<GenUiExpansion>
     _inlineHeight = render is RenderBox && render.hasSize
         ? render.size.height
         : null;
+    _discardSnapshot();
     _before = Map.of(controller.nodes);
     _changed = const {};
     _returnReveal.stop();
     _returnReveal.value = 1;
+    if (render is RenderGenUiExpansionAnchor) {
+      _snapshot = render.capture(MediaQuery.of(context));
+    }
     setState(() => _expanded = true);
     if (!controller.accepts(token) || controller != _surface.controller) {
       _activeToken = null;
@@ -256,16 +275,41 @@ class _GenUiExpansionState extends State<GenUiExpansion>
     markdownTheme: _surface.markdownTheme,
     child: Builder(
       builder: (context) {
+        final snapshot = _snapshot;
         final content = _expanded
             ? SizedBox(
                 height: _inlineHeight,
-                child: const Align(
-                  alignment: AlignmentDirectional.topStart,
-                  child: GenUiExpandedStub(),
-                ),
+                width: double.infinity,
+                child: snapshot == null
+                    ? const Align(
+                        alignment: AlignmentDirectional.topStart,
+                        child: GenUiExpandedStub(),
+                      )
+                    : Semantics(
+                        label: AppLocalizations.of(context)!.genuiExpandedStub,
+                        child: ExcludeSemantics(
+                          child: Stack(children: [snapshot.build()]),
+                        ),
+                      ),
               )
-            : _sharedContent(
-                widget.surfaceBuilder(_expand, _expandFocus, false),
+            : Stack(
+                children: [
+                  _sharedContent(
+                    widget.surfaceBuilder(_expand, _expandFocus, false),
+                  ),
+                  if (snapshot != null)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: FadeTransition(
+                            key: const ValueKey('genui-return-reveal'),
+                            opacity: ReverseAnimation(_returnReveal),
+                            child: Stack(children: [snapshot.build()]),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               );
         if (MediaQuery.disableAnimationsOf(context)) return content;
         return AnimatedSize(

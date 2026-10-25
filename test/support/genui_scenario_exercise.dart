@@ -9,6 +9,7 @@ import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_web_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_context_chip.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_expansion.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_slider.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_text_input.dart';
@@ -96,9 +97,13 @@ Future<List<String>> exerciseGenUiScenarios(
         ),
       );
       expect(
-        find.text('Being edited in expanded view', skipOffstage: false),
+        find.descendant(
+          of: find.byType(GenUiExpansion, skipOffstage: false),
+          matching: find.byType(RawImage, skipOffstage: false),
+        ),
         findsOneWidget,
       );
+      expect(find.byType(GenUiExpandedStub, skipOffstage: false), findsNothing);
       expect(find.byType(GenUiSurface, skipOffstage: false), findsOneWidget);
     }
   }
@@ -107,6 +112,13 @@ Future<List<String>> exerciseGenUiScenarios(
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle();
     expect(find.text('Being edited in expanded view'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(GenUiExpansion),
+        matching: find.byType(RawImage),
+      ),
+      findsNothing,
+    );
   }
 
   void done(String scene) {

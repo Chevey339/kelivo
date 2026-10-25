@@ -273,9 +273,11 @@ class IosFormTextField extends StatelessWidget {
               ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 44),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: maxLines > 1 ? 8 : 0,
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    prefix == null ? 12 : 6,
+                    maxLines > 1 ? 8 : 0,
+                    12,
+                    maxLines > 1 ? 8 : 0,
                   ),
                   child: field,
                 ),

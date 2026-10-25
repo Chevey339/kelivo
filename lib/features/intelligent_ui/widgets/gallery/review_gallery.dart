@@ -427,11 +427,19 @@ class _ReviewWeb extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final state in ['ready', 'streaming', 'invalid', 'unsupported']) ...[
+      for (final state in [
+        'ready',
+        'dark',
+        'streaming',
+        'invalid',
+        'unsupported',
+      ]) ...[
         GenUiWebCard(
           document: UiWebDocument.parse(
             state == 'invalid'
                 ? '{"version":9}\n<body>Invalid</body>'
+                : state == 'dark'
+                ? genUiWebDarkGallerySource
                 : genUiWebGallerySource,
             closed: state != 'streaming',
             generation: state == 'streaming'

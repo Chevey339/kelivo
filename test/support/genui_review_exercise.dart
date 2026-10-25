@@ -249,6 +249,11 @@ Future<List<String>> exerciseGenUiReview(
       await tester.pump(const Duration(milliseconds: 350));
       await tester.tap(find.byTooltip('关闭').first);
       await tester.pump(const Duration(milliseconds: 350));
+      await tap(find.text('打开').at(1));
+      await tester.pump(const Duration(seconds: 2));
+      await shot('web-dark-canvas-preview');
+      await tester.tap(find.byTooltip('关闭').first);
+      await tester.pump(const Duration(milliseconds: 350));
     }
     await bottom();
     await shot('${i.toString().padLeft(2, '0')}-bottom');

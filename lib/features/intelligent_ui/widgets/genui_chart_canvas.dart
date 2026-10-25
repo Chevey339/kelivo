@@ -135,6 +135,9 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
             drawVerticalLine: false,
             horizontalInterval:
                 axis.tickInterval ?? (axis.maximum - axis.minimum) / 4,
+            checkToShowHorizontalLine: (value) =>
+                (value - axis.minimum).abs() >
+                (axis.maximum - axis.minimum) * 1e-8,
             getDrawingHorizontalLine: (_) =>
                 FlLine(color: theme.hairline, strokeWidth: 1),
           );

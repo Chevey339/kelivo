@@ -175,6 +175,67 @@ void main() {
       variant: TargetPlatformVariant.only(TargetPlatform.macOS),
     );
   }
+  testWidgets('loading is covered and the page stays alive throughout exit', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    platform.finishInitial = false;
+    var nativeTaps = 0;
+    platform.onTap = () => nativeTaps++;
+    final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => GenUiWebCard(
+              document: document(),
+              supported: true,
+              onOpen: (value) => showUiWebPreview(context, value),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(WebViewWidget), findsOneWidget);
+      final cover = find.byKey(const ValueKey('genui-web-loading-cover'));
+      expect(cover, findsOneWidget);
+      await tester.tapAt(tester.getCenter(find.byType(WebViewWidget)));
+      expect(nativeTaps, 0);
+      expect(
+        find.bySemanticsLabel(RegExp('Native preview action')),
+        findsNothing,
+      );
+      final native = platform.controllers.single;
+      native.navigation!.finished!('about:blank');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(cover, findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(cover, findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('Native preview action')),
+        findsOneWidget,
+      );
+      await tester.tapAt(tester.getCenter(find.byType(WebViewWidget)));
+      expect(nativeTaps, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(find.byType(WebViewWidget), findsOneWidget);
+      expect(native.scripts, isEmpty);
+      expect(native.documents, hasLength(1));
+      await tester.pumpAndSettle();
+      expect(find.byType(WebViewWidget), findsNothing);
+      expect(native.documents.last, UiWebSandbox.emptyDocument);
+    } finally {
+      semantics.dispose();
+    }
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
   testWidgets('disposing the entire Navigator closes its native session', (
     tester,
   ) async {

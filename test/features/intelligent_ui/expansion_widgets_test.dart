@@ -174,10 +174,13 @@ void main() {
           lessThanOrEqualTo(1),
         );
       }
-      expect(
-        find.text('Being edited in expanded view', skipOffstage: false),
-        findsOneWidget,
+      expect(find.byType(GenUiExpandedStub, skipOffstage: false), findsNothing);
+      final frozen = find.descendant(
+        of: find.byType(GenUiExpansion, skipOffstage: false),
+        matching: find.byType(RawImage, skipOffstage: false),
       );
+      expect(frozen, findsOneWidget);
+      expect(tester.widget<RawImage>(frozen).image!.height, greaterThan(40));
       expect(find.text('Shares the same state as the message'), findsOneWidget);
       expect(
         tester.state<EditableTextState>(find.byType(EditableText).first),
@@ -199,8 +202,17 @@ void main() {
       await tester.pump();
       expect(controller.captureRead().inputs['name'], 'expanded');
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      var sawReturnReveal = false;
       for (var i = 0; i < 20; i++) {
         await tester.pump(const Duration(milliseconds: 20));
+        final fade = find.byKey(const ValueKey('genui-return-reveal'));
+        if (fade.evaluate().isNotEmpty) {
+          sawReturnReveal = true;
+          expect(
+            tester.widget<FadeTransition>(fade).opacity.value,
+            inInclusiveRange(0, 1),
+          );
+        }
         expect(
           find.byType(EditableText, skipOffstage: false).evaluate().length,
           lessThanOrEqualTo(2),
@@ -210,8 +222,10 @@ void main() {
           lessThanOrEqualTo(1),
         );
       }
+      expect(sawReturnReveal, isTrue);
       await tester.pumpAndSettle();
       expect(find.text('Being edited in expanded view'), findsNothing);
+      expect(find.byType(RawImage), findsNothing);
       expect(
         tester.state<EditableTextState>(find.byType(EditableText).first),
         same(originalEditor),

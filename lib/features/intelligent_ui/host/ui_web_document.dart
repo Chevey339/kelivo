@@ -106,7 +106,7 @@ abstract final class UiWebSandbox {
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${_attribute.convert(csp)}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;border:0;width:100%;height:100%}</style>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:white}iframe{display:block;border:0;width:100%;height:100%}</style>
 </head><body><iframe id="$frameId" title="${_attribute.convert(title)}" sandbox="allow-scripts" srcdoc="${_attribute.convert(generatedHtml)}"></iframe></body></html>''';
 
   /// Host-only teardown. Removing the child browsing context terminates its
