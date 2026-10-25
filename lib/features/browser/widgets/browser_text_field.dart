@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/app_text_selection_toolbar.dart';
+
 /// Keeps browser field decoration shared while selection, handles, magnifiers
 /// and editing menus follow the host platform.
 class BrowserTextField extends StatelessWidget {
@@ -37,9 +39,25 @@ class BrowserTextField extends StatelessWidget {
   final int maxLines;
   final ValueChanged<String>? onChanged, onSubmitted;
 
+  static Widget _buildDesktopContextMenu(
+    BuildContext context,
+    EditableTextState state,
+  ) {
+    return AppTextSelectionToolbar(
+      anchors: state.contextMenuAnchors,
+      buttonItems: state.contextMenuButtonItems,
+      selectionContext: state.context,
+      onDismiss: () => state.hideToolbar(false),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final platform = Theme.of(context).platform;
+    final desktop =
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.linux;
     final textStyle = Theme.of(context).textTheme.bodyMedium!.merge(style);
     final hintStyle = textStyle.merge(placeholderStyle);
     if (platform == TargetPlatform.iOS || platform == TargetPlatform.macOS) {
@@ -68,6 +86,9 @@ class BrowserTextField extends StatelessWidget {
         maxLines: maxLines,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
+        contextMenuBuilder: desktop
+            ? _buildDesktopContextMenu
+            : const CupertinoTextField().contextMenuBuilder,
       );
     }
     return Material(
@@ -94,6 +115,9 @@ class BrowserTextField extends StatelessWidget {
                 maxLines: maxLines,
                 onChanged: onChanged,
                 onSubmitted: onSubmitted,
+                contextMenuBuilder: desktop
+                    ? _buildDesktopContextMenu
+                    : const TextField().contextMenuBuilder,
                 decoration: InputDecoration(
                   hintText: placeholder,
                   hintStyle: hintStyle,
