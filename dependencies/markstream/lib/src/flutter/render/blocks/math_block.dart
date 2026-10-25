@@ -13,10 +13,12 @@ class MarkstreamMathBlock extends StatelessWidget {
   const MarkstreamMathBlock({
     super.key,
     required this.node,
+    required this.tex,
     required this.theme,
     this.renderer,
   });
-  final MathBlockNode node;
+  final BlockNode node;
+  final String tex;
   final MarkstreamTheme theme;
   final MathRenderer? renderer;
   @override
@@ -46,11 +48,11 @@ class MarkstreamMathBlock extends StatelessWidget {
                     child:
                         renderer?.build(
                           context,
-                          node.tex,
+                          tex,
                           style: theme.body,
                           displayMode: true,
                         ) ??
-                        Text(node.tex, style: theme.body),
+                        Text(tex, style: theme.body),
                   ),
                 ),
               ),

@@ -15,6 +15,7 @@ import 'highlight_adapter.dart';
 import 'markdown_image_sources.dart';
 import 'markdown_actions.dart';
 import 'link_image_handlers.dart';
+import 'math_adapter.dart';
 
 // Stable registration identity preserves the parser and completed prefix trees.
 final kelivoMarkdownExtensions = MarkstreamExtensions(
@@ -23,6 +24,7 @@ final kelivoMarkdownExtensions = MarkstreamExtensions(
   codeBlockBuilders: {
     'kelivo-ui': _nativeUi,
     'kelivo-web': _nativeUi,
+    'math': _math,
     'mermaid': _diagram,
     'svg': _diagram,
     'xml': _diagram,
@@ -57,6 +59,35 @@ Widget _nativeUi(
     exporting: ExportCaptureScope.of(context),
   ),
 );
+
+Widget _math(
+  BuildContext context,
+  CodeBlockNode node,
+  MarkstreamRenderContext rendering,
+) {
+  final settings = context.watch<SettingsProvider>();
+  if (settings.enableMathRendering &&
+      node.closed &&
+      node.code.trim().isNotEmpty &&
+      parseNormalizedMath(normalizeMathTex(node.code)) != null) {
+    return MarkstreamMathBlock(
+      node: node,
+      tex: node.code,
+      theme: rendering.theme,
+      renderer: const KelivoMathRenderer(),
+    );
+  }
+  return MarkstreamCodeBlock(
+    node: node,
+    theme: rendering.theme,
+    extensions: kelivoMarkdownExtensions,
+    options: markdownCodeOptions(settings),
+    labels: markdownLabels(context),
+    highlighter: KelivoCodeHighlighter.forTheme(rendering.theme),
+    streaming: rendering.streaming,
+    exporting: ExportCaptureScope.of(context),
+  );
+}
 
 Widget _diagram(
   BuildContext context,

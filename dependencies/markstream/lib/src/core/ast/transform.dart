@@ -140,6 +140,11 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
         closed: node.closed,
         children: children.cast<InlineNode>(),
       ),
+      HighlightNode() => HighlightNode(
+        span: node.span,
+        closed: node.closed,
+        children: children.cast<InlineNode>(),
+      ),
       MathInlineNode() => MathInlineNode(
         span: node.span,
         children: children.cast<TextNode>(),

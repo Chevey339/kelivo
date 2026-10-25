@@ -9,7 +9,7 @@ String _escape(String text) {
       result.write('&amp;');
     } else if (const {40, 41, 91, 93}.contains(code)) {
       result.write('&#$code;');
-    } else if (r'\`*_{}<>#+.!|~:$-'.contains(char)) {
+    } else if (r'\`*_{}<>#+.!|~:$-='.contains(char)) {
       result.write('\\$char');
     } else {
       result.write(char);
@@ -79,6 +79,7 @@ String toMarkdown(MarkdownNode root, {String? source}) {
       return '$marker$body$marker';
     }
     if (node is StrikethroughNode) return '~~$body~~';
+    if (node is HighlightNode) return '==$body==';
     if (node is CodeSpanNode)
       return _code(node.code, table: tableDescendants.contains(node));
     if (node is MathInlineNode)
@@ -161,7 +162,7 @@ String toMarkdown(MarkdownNode root, {String? source}) {
       return '<details${node.open ? ' open' : ''}>\n${joinChildren(node, output, '\n\n')}\n</details>';
     if (node is NamedBlockNode) {
       if (node.syntax == NamedBlockSyntax.alert)
-        return '> [!${node.name.toUpperCase()}]\n${indentLines(joinChildren(node, output, '\n\n'), '> ')}';
+        return '> [!${node.name.toUpperCase()}]${node.attributes['title'] == null ? '' : ' ${_escape(node.attributes['title']!)}'}\n${indentLines(joinChildren(node, output, '\n\n'), '> ')}';
       final label =
           node.children.isNotEmpty && node.children.first is DirectiveLabelNode
           ? '[${output[node.children.first]}]'

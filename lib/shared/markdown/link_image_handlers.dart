@@ -13,6 +13,8 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import 'package:Kelivo/utils/svg_image_provider.dart';
+import 'package:open_filex/open_filex.dart';
 
 /// Source is read lazily when opening the gallery, avoiding another parse on
 /// every streaming frame. Existing image widgets only rebuild for a new scope.
@@ -96,7 +98,13 @@ class KelivoImageBuilder implements ImageBuilder {
   }
 }
 
-ImageProvider? markdownImageProvider(String source) {
+ImageProvider? markdownImageProvider(
+  String source, {
+  Color currentColor = const Color(0xff000000),
+}) {
+  if (isSvgImageSource(source)) {
+    return SvgImageProvider(source, currentColor: currentColor);
+  }
   if (source.startsWith('http://') || source.startsWith('https://')) {
     return NetworkImage(source);
   }
@@ -168,7 +176,13 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   @override
   Widget build(BuildContext context) {
     if (_file == null) {
-      return _image(widget.url, markdownImageProvider(widget.url));
+      return _image(
+        widget.url,
+        markdownImageProvider(
+          widget.url,
+          currentColor: widget.theme.colors.ink,
+        ),
+      );
     }
     return FutureBuilder<File?>(
       future: _file,
@@ -187,7 +201,15 @@ class _MarkdownImageState extends State<_MarkdownImage> {
           );
         }
         final file = snapshot.data;
-        return file == null ? _broken() : _image(file.path, FileImage(file));
+        return file == null
+            ? _broken()
+            : _image(
+                file.path,
+                markdownImageProvider(
+                  file.path,
+                  currentColor: widget.theme.colors.ink,
+                ),
+              );
       },
     );
   }
@@ -230,7 +252,26 @@ class _MarkdownImageState extends State<_MarkdownImage> {
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stack) => _broken(),
+                errorBuilder: (context, error, stack) => isSvgImageSource(url)
+                    ? GestureDetector(
+                        onTap: () async {
+                          if (url.startsWith('http://') ||
+                              url.startsWith('https://')) {
+                            await const KelivoLinkHandler().open(
+                              context,
+                              LinkNode(
+                                span: const SourceSpan(0, 0),
+                                children: const [],
+                                destination: url,
+                              ),
+                            );
+                          } else if (!url.startsWith('data:')) {
+                            await OpenFilex.open(SandboxPathResolver.fix(url));
+                          }
+                        },
+                        child: _broken(),
+                      )
+                    : _broken(),
               ),
             );
           },
@@ -252,8 +293,18 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     if (!urls.contains(url)) urls.insert(0, url);
     Navigator.of(context).push(
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) =>
-            ImageViewerPage(images: urls, initialIndex: urls.indexOf(url)),
+        pageBuilder: (_, __, ___) => ImageViewerPage(
+          images: urls,
+          initialIndex: urls.indexOf(url),
+          imageProviders: {
+            for (final source in urls)
+              if (isSvgImageSource(source))
+                source: SvgImageProvider(
+                  source,
+                  currentColor: widget.theme.colors.ink,
+                ),
+          },
+        ),
         transitionDuration: const Duration(milliseconds: 360),
         reverseTransitionDuration: const Duration(milliseconds: 280),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(

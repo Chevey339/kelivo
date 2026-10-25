@@ -210,6 +210,8 @@ class InlineSpanBuilder {
           ]),
         ),
       );
+    if (node is HighlightNode)
+      return children(node.children, highlightedTextStyle(style, theme));
     if (node is LinkNode)
       return children(node.children, style.merge(theme.link), target: node);
     if (node is CodeSpanNode) {

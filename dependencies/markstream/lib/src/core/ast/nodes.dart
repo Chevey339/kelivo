@@ -599,6 +599,24 @@ final class StrikethroughNode extends InlineNode {
   T accept<T>(AstVisitor<T> visitor) => visitor.visitStrikethrough(this);
 }
 
+final class HighlightNode extends InlineNode {
+  HighlightNode({
+    required SourceSpan span,
+    this.closed = true,
+    required List<InlineNode> children,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  final bool closed;
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'highlight';
+  @override
+  Map<String, Object?> get fields => {if (!closed) 'closed': false};
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitHighlight(this);
+}
+
 final class MathInlineNode extends InlineNode {
   MathInlineNode({
     required SourceSpan span,

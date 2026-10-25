@@ -9,6 +9,7 @@ final class ParserOptions {
     this.inlineMath = true,
     this.dollarInlineMath = true,
     this.strikethrough = true,
+    this.highlight = true,
     this.inlineHtml = true,
     this.softBreakAsHardBreak = true,
     this.underscoreEmphasis = true,
@@ -40,6 +41,7 @@ final class ParserOptions {
       inlineMath = false,
       dollarInlineMath = false,
       strikethrough = false,
+      highlight = false,
       inlineHtml = true,
       softBreakAsHardBreak = false,
       underscoreEmphasis = true,
@@ -68,6 +70,7 @@ final class ParserOptions {
       inlineMath = false,
       dollarInlineMath = false,
       strikethrough = true,
+      highlight = false,
       inlineHtml = true,
       softBreakAsHardBreak = false,
       underscoreEmphasis = true,
@@ -98,6 +101,7 @@ final class ParserOptions {
   /// Single-dollar inline math; parenthesized and display math stay independent.
   final bool dollarInlineMath;
   final bool strikethrough;
+  final bool highlight;
   final bool inlineHtml;
   final bool softBreakAsHardBreak;
   final bool underscoreEmphasis;
@@ -126,6 +130,7 @@ final class ParserOptions {
     bool? inlineMath,
     bool? dollarInlineMath,
     bool? strikethrough,
+    bool? highlight,
     bool? inlineHtml,
     bool? softBreakAsHardBreak,
     bool? underscoreEmphasis,
@@ -153,6 +158,7 @@ final class ParserOptions {
     inlineMath: inlineMath ?? this.inlineMath,
     dollarInlineMath: dollarInlineMath ?? this.dollarInlineMath,
     strikethrough: strikethrough ?? this.strikethrough,
+    highlight: highlight ?? this.highlight,
     inlineHtml: inlineHtml ?? this.inlineHtml,
     softBreakAsHardBreak: softBreakAsHardBreak ?? this.softBreakAsHardBreak,
     underscoreEmphasis: underscoreEmphasis ?? this.underscoreEmphasis,

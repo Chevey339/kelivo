@@ -1,6 +1,42 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/tex.dart';
 import 'package:markstream/markstream.dart';
+
+// Cache only successful syntax trees. Presentation is supplied afresh by Math,
+// whose build cache compares MathOptions (color, font, scale and math style).
+final _parsedMath = <String, SyntaxTree>{};
+int _cachedMathCharacters = 0;
+const _maxMathEntries = 128;
+const _maxMathCharacters = 64 * 1024;
+
+SyntaxTree? parseNormalizedMath(String tex) {
+  final cached = _parsedMath.remove(tex);
+  if (cached != null) {
+    _parsedMath[tex] = cached;
+    return cached;
+  }
+  try {
+    final ast = SyntaxTree(
+      greenRoot: TexParser(tex, const TexParserSettings()).parse(),
+    );
+    if (tex.length <= _maxMathCharacters) {
+      while (_parsedMath.isNotEmpty &&
+          (_parsedMath.length >= _maxMathEntries ||
+              _cachedMathCharacters + tex.length > _maxMathCharacters)) {
+        final oldest = _parsedMath.keys.first;
+        _cachedMathCharacters -= oldest.length;
+        _parsedMath.remove(oldest);
+      }
+      _parsedMath[tex] = ast;
+      _cachedMathCharacters += tex.length;
+    }
+    return ast;
+  } catch (_) {
+    // Incomplete streaming formulas must remain eligible for the next update.
+    return null;
+  }
+}
 
 /// The parser retains original LaTeX; repairs belong only to its visual adapter.
 class KelivoMathRenderer implements MathRenderer {
@@ -13,9 +49,11 @@ class KelivoMathRenderer implements MathRenderer {
     required bool displayMode,
   }) {
     final normalized = normalizeMathTex(tex);
+    final ast = parseNormalizedMath(normalized);
+    if (ast == null) return Text(normalized, style: style);
     try {
-      return Math.tex(
-        normalized,
+      return Math(
+        ast: ast,
         mathStyle: displayMode ? MathStyle.display : MathStyle.text,
         textStyle: style,
         onErrorFallback: (_) => Text(normalized, style: style),

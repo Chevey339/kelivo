@@ -28,6 +28,7 @@ abstract class AstVisitor<T> {
   T visitLineBreak(LineBreakNode node) => visitNode(node);
   T visitReferenceDefinition(ReferenceDefinitionNode node) => visitNode(node);
   T visitStrikethrough(StrikethroughNode node) => visitNode(node);
+  T visitHighlight(HighlightNode node) => visitNode(node);
   T visitMathInline(MathInlineNode node) => visitNode(node);
   T visitNamedInline(NamedInlineNode node) => visitNode(node);
   T visitListItem(ListItemNode node) => visitNode(node);

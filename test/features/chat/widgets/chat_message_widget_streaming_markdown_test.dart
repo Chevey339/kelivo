@@ -47,6 +47,71 @@ String _allRichTextPlainText(WidgetTester tester) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final width in [390.0, 1000.0]) {
+    testWidgets(
+      'reasoning preview pauses follow after scrolling up and resumes at bottom $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        var reasoning = List.generate(
+          80,
+          (i) => 'Paragraph $i **bold** text.',
+        ).join('\n\n');
+        late StateSetter rebuild;
+        await tester.pumpWidget(
+          _buildHarness(
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return SizedBox(
+                  width: 360,
+                  child: ChatMessageWidget(
+                    message: ChatMessage(
+                      id: 'review-reasoning-follow',
+                      role: 'assistant',
+                      content: '',
+                      conversationId: 'conversation-1',
+                      isStreaming: true,
+                    ),
+                    reasoningText: reasoning,
+                    reasoningLoading: true,
+                    showModelIcon: false,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+        final scrollable = find.byType(Scrollable);
+        expect(scrollable, findsOneWidget);
+        final position = tester.state<ScrollableState>(scrollable).position;
+        expect(position.maxScrollExtent, greaterThan(100));
+        await tester.drag(scrollable, const Offset(0, 65));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(position.extentAfter, greaterThan(1));
+        final readingOffset = position.pixels;
+        rebuild(() => reasoning += '\n\nA new streaming reasoning paragraph.');
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 100));
+        final afterUpdate = position.pixels;
+        expect(
+          afterUpdate,
+          moreOrLessEquals(readingOffset, epsilon: 1),
+          reason:
+              'New reasoning must preserve the user reading position after scrolling upward',
+        );
+        position.jumpTo(position.maxScrollExtent);
+        rebuild(() => reasoning += '\n\nFollowing again.');
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(position.extentAfter, lessThanOrEqualTo(1));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   testWidgets(
     'streaming preserves completed citation chips until their indices change',
     (tester) async {

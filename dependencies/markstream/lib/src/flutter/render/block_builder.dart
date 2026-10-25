@@ -265,6 +265,7 @@ class MarkstreamRenderer {
     if (node is MathBlockNode)
       return MarkstreamMathBlock(
         node: node,
+        tex: node.tex,
         theme: theme,
         renderer: mathRenderer,
       );

@@ -10,6 +10,7 @@ import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, visibleForTesting, mapEquals;
 import 'dart:ui' as ui;
@@ -5390,6 +5391,7 @@ class _ChainOfThoughtReasoningStepState
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
   Timer? _elapsedTimer;
   final ScrollController _scroll = ScrollController();
+  bool _followBottom = true;
   bool _hasOverflow = false;
   bool? _localExpanded;
 
@@ -5439,10 +5441,14 @@ class _ChainOfThoughtReasoningStepState
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_updateFollowBottom);
     _syncElapsedTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOverflow();
-      if (widget.step.loading && _scroll.hasClients) {
+      if (mounted &&
+          widget.step.loading &&
+          _followBottom &&
+          _scroll.hasClients) {
         _scroll.jumpTo(_scroll.position.maxScrollExtent);
       }
     });
@@ -5452,14 +5458,25 @@ class _ChainOfThoughtReasoningStepState
   void didUpdateWidget(covariant _ChainOfThoughtReasoningStep oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncElapsedTimer();
-    if (widget.step.loading) {
+    if (widget.step.loading && widget.step.text != oldWidget.step.text) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) {
+        if (mounted &&
+            widget.step.loading &&
+            _followBottom &&
+            _scroll.hasClients) {
           _scroll.jumpTo(_scroll.position.maxScrollExtent);
         }
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOverflow());
+  }
+
+  void _updateFollowBottom() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    _followBottom =
+        position.userScrollDirection != ScrollDirection.forward &&
+        position.extentAfter <= 1;
   }
 
   @override

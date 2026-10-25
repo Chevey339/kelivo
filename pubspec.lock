@@ -2156,12 +2156,11 @@ packages:
     source: hosted
     version: "1.1.13"
   vector_graphics_compiler:
-    dependency: transitive
+    dependency: "direct dev"
     description:
-      name: vector_graphics_compiler
-      sha256: "4dca4feb77dc3ec7f6e27e49c53241eb8217f55e4f9b12599a27f8903bca5682"
-      url: "https://pub.dev"
-    source: hosted
+      path: "dependencies/vector_graphics_compiler"
+      relative: true
+    source: path
     version: "1.3.0"
   vector_math:
     dependency: transitive

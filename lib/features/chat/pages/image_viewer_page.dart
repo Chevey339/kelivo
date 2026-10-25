@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:Kelivo/utils/svg_image_provider.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -328,6 +329,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       <String, ImageProvider>{};
   final Map<String, _DisplayProviderEntry> _displayProviderCache =
       <String, _DisplayProviderEntry>{};
+  Color? _svgCurrentColor;
 
   @visibleForTesting
   int get debugLiveImageSizeListenerCount => _imageSizeListeners.length;
@@ -391,6 +393,29 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final color = Theme.of(context).colorScheme.onSurface;
+    if (_svgCurrentColor == color) return;
+    _svgCurrentColor = color;
+    // This also refreshes providers supplied by Markdown when opening a gallery.
+    for (final source in _baseProviderCache.keys.toList()) {
+      final provider = _baseProviderCache[source];
+      if (provider is! SvgImageProvider || provider.currentColor == color) {
+        continue;
+      }
+      _baseProviderCache[source] = SvgImageProvider(
+        provider.source,
+        currentColor: color,
+      );
+      _displayProviderCache.remove(source);
+      final listener = _imageSizeListeners.remove(source);
+      final stream = _imageSizeStreams.remove(source);
+      if (listener != null) stream?.removeListener(listener);
+    }
   }
 
   @override
@@ -864,6 +889,12 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   ImageProvider _createProviderFor(String src) {
+    if (isSvgImageSource(src)) {
+      return SvgImageProvider(
+        src,
+        currentColor: Theme.of(context).colorScheme.onSurface,
+      );
+    }
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return NetworkImage(src);
     }
@@ -884,6 +915,12 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final fixed = SandboxPathResolver.fix(src);
     // Use a FileImage with a unique key per path so Hero tags remain stable
     return FileImage(File(fixed));
+  }
+
+  Future<Uint8List> _svgPngBytes(String src) {
+    final provider = _baseProviderFor(src);
+    return (provider is SvgImageProvider ? provider : SvgImageProvider(src))
+        .pngBytes();
   }
 
   bool _canDragDismiss() {
@@ -939,7 +976,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       final src = widget.images[_index];
       Uint8List? bytes;
 
-      if (src.startsWith('data:')) {
+      if (isSvgImageSource(src)) {
+        bytes = await _svgPngBytes(src);
+      } else if (src.startsWith('data:')) {
         final marker = 'base64,';
         final idx = src.indexOf(marker);
         if (idx != -1) {
@@ -1057,7 +1096,18 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       final src = widget.images[_index];
       String? pathToSave;
       File? temp;
-      if (src.startsWith('data:')) {
+      if (isSvgImageSource(src)) {
+        final bytes = await _svgPngBytes(src);
+        final tmp = await getTemporaryDirectory();
+        temp = await File(
+          p.join(
+            tmp.path,
+            'kelivo_${DateTime.now().millisecondsSinceEpoch}.png',
+          ),
+        ).create(recursive: true);
+        await temp.writeAsBytes(bytes);
+        pathToSave = temp.path;
+      } else if (src.startsWith('data:')) {
         final i = src.indexOf('base64,');
         if (i != -1) {
           final bytes = base64Decode(src.substring(i + 7));
@@ -1167,7 +1217,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     String? sourcePath;
 
     try {
-      if (src.startsWith('data:')) {
+      if (isSvgImageSource(src)) {
+        bytes = await _svgPngBytes(src);
+        suggestedName = 'image.png';
+      } else if (src.startsWith('data:')) {
         final marker = 'base64,';
         final idx = src.indexOf(marker);
         if (idx != -1) {
@@ -1572,7 +1625,17 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                                       child: SizedBox(
                                         width: imageBoxSize.width,
                                         height: imageBoxSize.height,
-                                        child: image,
+                                        child: isSvgImageSource(src)
+                                            ? ColoredBox(
+                                                key: ValueKey(
+                                                  'image-viewer-svg-surface-$i',
+                                                ),
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.surface,
+                                                child: image,
+                                              )
+                                            : image,
                                       ),
                                     ),
                                   ),
@@ -1791,7 +1854,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       Uint8List? bytes;
       String ext = '.jpg';
 
-      if (src.startsWith('data:')) {
+      if (isSvgImageSource(src)) {
+        bytes = await _svgPngBytes(src);
+        ext = '.png';
+      } else if (src.startsWith('data:')) {
         final marker = 'base64,';
         final idx = src.indexOf(marker);
         if (idx != -1) {
