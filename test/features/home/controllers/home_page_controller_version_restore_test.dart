@@ -122,8 +122,9 @@ class _VersionedChatService extends ChatService {
   Future<void> setSelectedVersion(
     String conversationId,
     String groupId,
-    int version,
-  ) async {
+    int version, {
+    String? expectedContextState,
+  }) async {
     selectedVersion = version;
   }
 

@@ -277,7 +277,6 @@ void main() {
             }
             message = (await service.loadSelectedContextMessages(
               conversation.id,
-              truncateIndex: -1,
               limit: 10,
             )).single;
             expect(message.id, edited.id);
@@ -481,7 +480,6 @@ void main() {
           }
           final selected = (await service.loadSelectedContextMessages(
             conversation.id,
-            truncateIndex: -1,
             limit: 10,
           )).single;
           expect(selected.id, edited.id);

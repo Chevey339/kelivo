@@ -8,11 +8,13 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
-import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show debugPrint, visibleForTesting, listEquals;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../models/context_operation.dart';
 import '../models/token_usage.dart';
 import '../models/conversation.dart';
 import '../models/message_part.dart';
@@ -36,6 +38,8 @@ import '../services/api/providers/claude/claude_thinking_recovery.dart';
 import '../services/api/providers/claude/claude_history.dart';
 import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_previous_plan.dart';
+
+part 'chat_context_repository.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -1920,6 +1924,7 @@ class ChatDatabaseRepository {
   /// Reads only row metadata, never long message bodies or attachment content.
   /// Covers edits to old messages as well as selected versions and truncation.
   Future<String?> scheduledContextRevision(String conversationId) async {
+    final operations = await readContextOperations(conversationId);
     final conversation = await getConversation(conversationId);
     if (conversation == null) return null;
     final rows = await _db
@@ -1937,6 +1942,7 @@ class ChatDatabaseRepository {
               'versions': conversation.versionSelections,
               'truncate': conversation.truncateIndex,
               'summary': conversation.summary,
+              'contextOperations': operations.map((op) => op.toJson()).toList(),
               'extras': conversation.extras,
               'model': [
                 conversation.chatModelProvider,
@@ -2526,13 +2532,11 @@ class ChatDatabaseRepository {
 
   /// Loads the selected linear message versions needed for model context.
   ///
-  /// Version collapsing, truncate-index application, tail limiting, and part
-  /// hydration share one read transaction so a large
-  /// conversation is never materialized merely to discard its prefix. A reset
-  /// after the requested revision does not apply to that earlier turn.
+  /// Raw selection, tail limiting and part hydration share a transaction.
+  /// Model requests use getEffectiveContextMessages to apply context nodes;
+  /// this raw reader remains available for snapshots and original-history views.
   Future<List<ChatMessage>> getSelectedContextMessages(
     String conversationId, {
-    required int truncateIndex,
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
@@ -2550,7 +2554,6 @@ class ChatDatabaseRepository {
             .getSingleOrNull();
         final total = state?.read<int>('group_count') ?? 0;
         if (total == 0) return <ChatMessage>[];
-        var targetIndex = total;
         QueryRow? upper;
         if (throughRevisionId != null) {
           upper = await _db
@@ -2565,17 +2568,6 @@ class ChatDatabaseRepository {
               )
               .getSingleOrNull();
           if (upper == null) return <ChatMessage>[];
-          final suffix = await _db
-              .customSelect(
-                'SELECT COUNT(*) AS n FROM timeline_group_rows WHERE conversation_id=? AND (anchor_order,group_id)>(?,?)',
-                variables: [
-                  Variable<String>(conversationId),
-                  Variable<int>(upper.read<int>('anchor_order')),
-                  Variable<String>(upper.read<String>('group_id')),
-                ],
-              )
-              .getSingle();
-          targetIndex = total - suffix.read<int>('n') - 1;
           if (includeFollowingAssistant &&
               upper.read<String>('role') == 'user') {
             final following = await _db
@@ -2606,25 +2598,6 @@ class ChatDatabaseRepository {
         }
         final conditions = <String>[];
         final values = <Variable<Object>>[Variable<String>(conversationId)];
-        if (truncateIndex > 0 &&
-            truncateIndex <= total &&
-            truncateIndex <= targetIndex) {
-          if (truncateIndex == total) return <ChatMessage>[];
-          final lower = await _db
-              .customSelect(
-                'SELECT anchor_order,group_id FROM timeline_group_rows WHERE conversation_id=? ORDER BY anchor_order,group_id LIMIT 1 OFFSET ?',
-                variables: [
-                  Variable<String>(conversationId),
-                  Variable<int>(truncateIndex),
-                ],
-              )
-              .getSingle();
-          conditions.add('AND (g.anchor_order,g.group_id)>=(?,?)');
-          values.addAll([
-            Variable<int>(lower.read<int>('anchor_order')),
-            Variable<String>(lower.read<String>('group_id')),
-          ]);
-        }
         if (upper != null) {
           conditions.add('AND (g.anchor_order,g.group_id)<=(?,?)');
           values.addAll([
@@ -3083,13 +3056,22 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.queryMessagesByIds,
       () async {
-        final rows = await (_db.select(
-          _db.messageRows,
-        )..where((t) => t.id.isIn(ids))).get();
-        final messages = await _messagesFromRowsWithParts(rows);
-        final byId = <String, ChatMessage>{
-          for (final message in messages) message.id: message,
-        };
+        final byId = <String, ChatMessage>{};
+        // Compression can select an entire long history. Bound SQL parameters
+        // and part hydration together instead of issuing one unbounded IN list.
+        const batchSize = 900;
+        for (var offset = 0; offset < ids.length; offset += batchSize) {
+          final batch = ids.sublist(
+            offset,
+            (offset + batchSize).clamp(0, ids.length),
+          );
+          final rows = await (_db.select(
+            _db.messageRows,
+          )..where((t) => t.id.isIn(batch))).get();
+          for (final message in await _messagesFromRowsWithParts(rows)) {
+            byId[message.id] = message;
+          }
+        }
         return [
           for (final id in ids)
             if (byId[id] != null) byId[id]!,
@@ -4360,6 +4342,7 @@ class ChatDatabaseRepository {
 
   Future<Conversation?> duplicateConversation(String sourceId) {
     return _db.transaction(() async {
+      await readContextOperations(sourceId);
       final sourceRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(sourceId))).getSingleOrNull();
@@ -4417,6 +4400,12 @@ class ChatDatabaseRepository {
         messageIdMap: messageIdMap,
         groupIdMap: groupIdMap,
       );
+      await _copyContextOperations(
+        sourceId: sourceId,
+        targetId: targetId,
+        groups: groupIdMap,
+        completeHistory: true,
+      );
       return duplicate;
     });
   }
@@ -4426,6 +4415,7 @@ class ChatDatabaseRepository {
     required List<MessageRow> messages,
     required Map<String, String> messageIdMap,
     required Map<String, String> groupIdMap,
+    bool resetVersions = false,
   }) async {
     for (final message in messages) {
       final targetMessageId = messageIdMap[message.id]!;
@@ -4446,9 +4436,13 @@ class ChatDatabaseRepository {
               translation: Value(message.translation),
               reasoningSegmentsJson: Value(message.reasoningSegmentsJson),
               groupId: Value(
-                message.groupId == null ? null : groupIdMap[message.groupId],
+                resetVersions
+                    ? null
+                    : (message.groupId == null
+                          ? null
+                          : groupIdMap[message.groupId]),
               ),
-              version: Value(message.version),
+              version: Value(resetVersions ? 0 : message.version),
               promptTokens: Value(message.promptTokens),
               completionTokens: Value(message.completionTokens),
               cachedTokens: Value(message.cachedTokens),
@@ -4501,8 +4495,10 @@ class ChatDatabaseRepository {
     required String targetRevisionId,
     required String title,
     String? assistantId,
+    bool preserveVersions = true,
   }) {
     return _db.transaction(() async {
+      await readContextOperations(sourceId);
       final sourceRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(sourceId))).getSingleOrNull();
@@ -4538,13 +4534,18 @@ class ChatDatabaseRepository {
       final anchorOrder = firstOrderByGroup[targetGroupId];
       if (anchorOrder == null) return null;
 
-      final kept = sourceMessages
+      var kept = sourceMessages
           .where((row) {
             final firstOrder = firstOrderByGroup[row.groupId ?? row.id];
             return firstOrder != null && firstOrder <= anchorOrder;
           })
           .toList(growable: false);
 
+      final selected = await _contextMetadata(sourceId);
+      final selectedIds = {for (final m in selected) m.id};
+      if (!preserveVersions) {
+        kept = kept.where((row) => selectedIds.contains(row.id)).toList();
+      }
       const uuid = Uuid();
       final targetId = uuid.v4();
       final messageIdMap = {for (final message in kept) message.id: uuid.v4()};
@@ -4553,7 +4554,9 @@ class ChatDatabaseRepository {
         final groupId = message.groupId ?? message.id;
         groupIdMap.putIfAbsent(
           groupId,
-          () => messageIdMap[groupId] ?? uuid.v4(),
+          () => !preserveVersions
+              ? messageIdMap[message.id]!
+              : messageIdMap[groupId] ?? uuid.v4(),
         );
       }
 
@@ -4583,7 +4586,11 @@ class ChatDatabaseRepository {
           if (keptSourceGroupIds.contains(entry.key))
             (groupIdMap[entry.key] ?? entry.key): entry.value,
       };
-      selections[groupIdMap[targetGroupId]!] = target.version;
+      if (preserveVersions) {
+        selections[groupIdMap[targetGroupId]!] = target.version;
+      } else {
+        selections.clear();
+      }
 
       final now = DateTime.now();
       await _invalidateEmptyAcknowledgement();
@@ -4598,6 +4605,8 @@ class ChatDatabaseRepository {
                 updatedAt: now,
                 assistantId: assistantId,
                 versionSelections: selections,
+                chatModelProvider: source.chatModelProvider,
+                chatModelId: source.chatModelId,
                 chatSuggestions: suggestions,
                 messageIds: [
                   for (final message in kept) messageIdMap[message.id]!,
@@ -4611,7 +4620,16 @@ class ChatDatabaseRepository {
         messages: kept,
         messageIdMap: messageIdMap,
         groupIdMap: groupIdMap,
+        resetVersions: !preserveVersions,
       );
+      await _copyContextOperations(
+        sourceId: sourceId,
+        targetId: targetId,
+        groups: groupIdMap,
+      );
+      if (preserveVersions && !selectedIds.contains(target.id)) {
+        await _revokeContextForGroups(targetId, {groupIdMap[targetGroupId]!});
+      }
       final insertedRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(targetId))).getSingle();
@@ -4757,6 +4775,7 @@ class ChatDatabaseRepository {
     required ChatMessage assistantMessage,
     required String runId,
     required bool truncateFuture,
+    String? expectedContextState,
   }) {
     _validateGenerationBeginMessages(
       conversation: conversation,
@@ -4771,6 +4790,7 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _db.transaction(() async {
+        await _assertContextState(conversation.id, expectedContextState);
         var current = conversation;
         if (truncateFuture) {
           current = await _truncateLinearMessageGroupsAfter(
@@ -4806,6 +4826,7 @@ class ChatDatabaseRepository {
     required String anchorGroupId,
     required String runId,
     required bool truncateFuture,
+    String? expectedContextState,
   }) {
     _validateGenerationBeginMessages(
       conversation: conversation,
@@ -4814,6 +4835,7 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _db.transaction(() async {
+        await _assertContextState(conversation.id, expectedContextState);
         var current = conversation;
         if (truncateFuture) {
           current = await _truncateLinearMessageGroupsAfter(
@@ -4921,15 +4943,22 @@ class ChatDatabaseRepository {
       final existingRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(conversation.id))).getSingleOrNull();
+      if (existingRow != null && existingRow.truncateIndex >= 0) {
+        await readContextOperations(conversation.id);
+      }
       final current = existingRow == null
           ? conversation
           : await _conversationFromRow(existingRow, includeMessageIds: false);
       final selections = Map<String, int>.from(current.versionSelections);
       if (selectVersion) {
+        await _revokeContextForGroups(conversation.id, {
+          message.groupId ?? message.id,
+        });
         selections[message.groupId ?? message.id] = message.version;
       }
       final persisted = current.copyWith(
         versionSelections: selections,
+        truncateIndex: -1,
         updatedAt: touchUpdatedAt ? DateTime.now() : current.updatedAt,
       );
       await _db
@@ -5032,10 +5061,12 @@ class ChatDatabaseRepository {
     String content = '',
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    String? expectedContextState,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendVersion,
       () => _appendMessageVersion(
+        expectedContextState: expectedContextState,
         messageId: messageId,
         content: content,
         parts: parts,
@@ -5049,6 +5080,7 @@ class ChatDatabaseRepository {
     required String content,
     List<MessagePart>? parts,
     DraftSubmission? draftSubmission,
+    String? expectedContextState,
   }) async {
     return _db.transaction(() async {
       final originalRow = await (_db.select(
@@ -5065,10 +5097,15 @@ class ChatDatabaseRepository {
                 ..where((row) => row.id.equals(originalRow.conversationId)))
               .getSingleOrNull();
       if (conversationRow == null) return null;
+      await _assertContextState(
+        originalRow.conversationId,
+        expectedContextState,
+      );
 
       await _invalidateEmptyAcknowledgement();
       // Metadata only — body text is written via message parts.
       final groupId = originalRow.groupId ?? originalRow.id;
+      await _revokeContextForGroups(originalRow.conversationId, {groupId});
       final maxVersion = _db.messageRows.version.max();
       final maxVersionRow =
           await (_db.selectOnly(_db.messageRows)
@@ -5122,6 +5159,7 @@ class ChatDatabaseRepository {
       )..[groupId] = nextVersion;
       final conversation = currentConversation.copyWith(
         versionSelections: selections,
+        truncateIndex: -1,
         updatedAt: DateTime.now(),
       );
       final order = await _nextMessageOrder(conversation.id);
@@ -5168,10 +5206,12 @@ class ChatDatabaseRepository {
     required String conversationId,
     required String groupId,
     required int? version,
+    String? expectedContextState,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandSelectVersion,
       () => _setSelectedVersion(
+        expectedContextState: expectedContextState,
         conversationId: conversationId,
         groupId: groupId,
         version: version,
@@ -5183,6 +5223,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required String groupId,
     required int? version,
+    String? expectedContextState,
   }) async {
     if (groupId.isEmpty) {
       throw ArgumentError.value(groupId, 'groupId', 'must not be empty');
@@ -5191,6 +5232,8 @@ class ChatDatabaseRepository {
       throw ArgumentError.value(version, 'version', 'must not be negative');
     }
     return _db.transaction(() async {
+      await _assertContextState(conversationId, expectedContextState);
+      await readContextOperations(conversationId);
       final row =
           await (_db.select(_db.conversationRows)..where(
                 (conversation) => conversation.id.equals(conversationId),
@@ -5204,7 +5247,11 @@ class ChatDatabaseRepository {
       } else {
         selections[groupId] = version;
       }
+      if (jsonEncode(selections) != jsonEncode(current.versionSelections)) {
+        await _revokeContextForGroups(conversationId, {groupId});
+      }
       final conversation = current.copyWith(
+        truncateIndex: -1,
         versionSelections: selections,
         updatedAt: DateTime.now(),
       );
@@ -5774,7 +5821,7 @@ class ChatDatabaseRepository {
       ]) {
         data[field] = _fingerprintTimestamp(data[field]);
       }
-      final groupId = data.remove('group_id')?.toString() ?? '';
+      final groupId = data.remove('group_id')?.toString() ?? messageId;
       data['group_ordinal'] = groupOrdinals.putIfAbsent(
         groupId,
         () => groupOrdinals.length,
@@ -5798,6 +5845,7 @@ class ChatDatabaseRepository {
               ),
               mcpRows.map((row) => row.data).toList(),
               messages,
+              await _contextFingerprintData(schema, id, groupOrdinals),
             ]),
           ),
         )
@@ -6020,6 +6068,24 @@ class ChatDatabaseRepository {
         [targetId, entry.value, entry.key],
       );
     }
+    final sourceContext = await _db
+        .customSelect(
+          'SELECT payload FROM merge_source.extension_entity_rows WHERE kind=? AND id=?',
+          variables: [
+            Variable<String>(ContextOperation.entityKind),
+            Variable<String>(sourceId),
+          ],
+        )
+        .getSingleOrNull();
+    if (sourceContext != null) {
+      await _copyContextOperations(
+        sourceId: sourceId,
+        targetId: targetId,
+        groups: groupIdMap,
+        sourcePayload: sourceContext.read<String>('payload'),
+        completeHistory: true,
+      );
+    }
     // Merged revisions bypass _replaceMessageParts, so queue the
     // attachment-bearing ones for the asset-reference backfill before GC can
     // treat their files as unreferenced.
@@ -6098,6 +6164,14 @@ class ChatDatabaseRepository {
 
   Future<void> updateMessage(ChatMessage message) async {
     await _db.transaction(() async {
+      final before = await getMessage(message.id);
+      if (before != null &&
+          !before.isStreaming &&
+          !listEquals(before.parts, message.parts)) {
+        await _revokeContextForGroups(message.conversationId, {
+          message.groupId ?? message.id,
+        });
+      }
       await _updateMessageRow(message);
       await _replaceMessageParts(message);
     });
@@ -6187,6 +6261,16 @@ class ChatDatabaseRepository {
         _db.messageRows,
       )..where((t) => t.id.equals(messageId))).getSingleOrNull();
       if (current == null) return null;
+      if (!current.isStreaming && (content != null || parts != null)) {
+        final before = await getMessage(messageId);
+        if (before != null &&
+            ((content != null && content != before.content) ||
+                (parts != null && !listEquals(parts, before.parts)))) {
+          await _revokeContextForGroups(current.conversationId, {
+            current.groupId ?? current.id,
+          });
+        }
+      }
       await _invalidateEmptyAcknowledgement();
       if (reasoningTokens != null || cacheWriteTokens != null) {
         write = companion.copyWith(
@@ -6330,6 +6414,15 @@ class ChatDatabaseRepository {
           _db.conversationRows,
         )..where((t) => t.id.equals(id))).go();
         if (deleted == 0) return;
+        await (_db.delete(_db.extensionEntityRows)..where(
+              (row) =>
+                  row.kind.isIn([
+                    ContextOperation.entityKind,
+                    'contextCompressionTask',
+                  ]) &
+                  row.ownerId.equals(id),
+            ))
+            .go();
         final now = DateTime.now().toUtc();
         await _db
             .into(_db.tombstoneRows)
@@ -6375,11 +6468,13 @@ class ChatDatabaseRepository {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? expectedContextState,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandDeleteMessages,
       () async {
         return _deleteMessages(
+          expectedContextState: expectedContextState,
           conversationId: conversationId,
           messageIds: messageIds,
           versionSelectionChanges: versionSelectionChanges,
@@ -6392,6 +6487,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? expectedContextState,
   }) async {
     if (messageIds.isEmpty) return null;
     for (final entry in versionSelectionChanges.entries) {
@@ -6404,6 +6500,7 @@ class ChatDatabaseRepository {
       }
     }
     return _db.transaction(() async {
+      await _assertContextState(conversationId, expectedContextState);
       final conversationRow = await (_db.select(
         _db.conversationRows,
       )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
@@ -6462,6 +6559,22 @@ class ChatDatabaseRepository {
       final orderedIds = remainingRows.map((row) => row.id).toList()
         ..sort((a, b) => effectiveOrders[a]!.compareTo(effectiveOrders[b]!));
 
+      await _revokeContextForGroups(
+        conversationId,
+        {
+          for (final row in deletedRows) row.groupId ?? row.id,
+          ...versionSelectionChanges.keys,
+        },
+        removedGroups: {
+          for (final row in deletedRows)
+            if (!remainingRows.any(
+              (remaining) =>
+                  (remaining.groupId ?? remaining.id) ==
+                  (row.groupId ?? row.id),
+            ))
+              row.groupId ?? row.id,
+        },
+      );
       final deletedIds = deletedRows
           .map((row) => row.id)
           .toList(growable: false);
@@ -6520,6 +6633,7 @@ class ChatDatabaseRepository {
         }
       }
       final conversation = currentConversation.copyWith(
+        truncateIndex: -1,
         messageIds: orderedIds,
         versionSelections: selections,
         chatSuggestions: const <String>[],
@@ -6557,7 +6671,7 @@ class ChatDatabaseRepository {
 
   Future<void> _clearChatRows() async {
     await _db.customStatement(
-      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile')",
+      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile','conversationContext','contextCompressionTask')",
     );
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();

@@ -5275,11 +5275,7 @@ void main() {
         final restored = chatService.getConversation('conversation')!;
         expect(restored.truncateIndex, 2);
         expect(
-          await chatService.loadSelectedContextMessages(
-            restored.id,
-            truncateIndex: restored.truncateIndex,
-            limit: 10,
-          ),
+          await chatService.loadSelectedContextMessages(restored.id, limit: 10),
           isEmpty,
         );
         final missingBeforeKept = chatService.getConversation(
@@ -5289,7 +5285,6 @@ void main() {
         expect(
           await chatService.loadSelectedContextMessages(
             missingBeforeKept.id,
-            truncateIndex: missingBeforeKept.truncateIndex,
             limit: 10,
           ),
           isEmpty,
@@ -5301,7 +5296,6 @@ void main() {
         expect(
           await chatService.loadSelectedContextMessages(
             duplicateBeforeTruncate.id,
-            truncateIndex: duplicateBeforeTruncate.truncateIndex,
             limit: 10,
           ),
           isEmpty,
@@ -5311,7 +5305,6 @@ void main() {
         expect(
           (await chatService.loadSelectedContextMessages(
             crossReuse.id,
-            truncateIndex: crossReuse.truncateIndex,
             limit: 10,
           )).map((message) => message.id),
           ['cross-h', 'later-g'],

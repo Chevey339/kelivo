@@ -41,14 +41,12 @@ class _Chat extends ChatService {
   @override
   Future<List<ChatMessage>> loadSelectedContextMessages(
     String id, {
-    required int truncateIndex,
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
   }) async {
     final messages = await super.loadSelectedContextMessages(
       id,
-      truncateIndex: truncateIndex,
       limit: limit,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,

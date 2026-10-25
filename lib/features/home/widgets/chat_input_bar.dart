@@ -581,6 +581,7 @@ class ChatInputBar extends StatefulWidget {
     this.loading = false,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedStatusLabel,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.reasoningActive = false,
@@ -642,6 +643,7 @@ class ChatInputBar extends StatefulWidget {
   final bool loading;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final String? queuedStatusLabel;
   final VoidCallback? onCancelQueuedInput;
 
   /// Reports when the composer starts filling the chat area and when it has
@@ -3838,9 +3840,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                 ),
               if (widget.hasQueuedInput) ...[
                 _QueuedInputBanner(
-                  label: AppLocalizations.of(
-                    context,
-                  )!.chatInputBarQueuedPending,
+                  label:
+                      widget.queuedStatusLabel ??
+                      AppLocalizations.of(context)!.chatInputBarQueuedPending,
                   previewText: widget.queuedPreviewText,
                   cancelLabel: AppLocalizations.of(
                     context,

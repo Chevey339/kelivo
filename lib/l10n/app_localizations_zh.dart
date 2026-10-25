@@ -2282,7 +2282,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContext => '压缩上下文';
 
   @override
-  String get compressContextDesc => '总结对话并开始新聊天';
+  String get compressContextDesc => '总结较早消息，并在当前聊天中继续。';
 
   @override
   String get clearContextDesc => '标记上下文分界点';
@@ -2342,7 +2342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextKeepRecentMessages => '保留N条';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近条数';
+  String get compressContextKeepCountLabel => '保留用户消息数';
 
   @override
   String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
@@ -13403,6 +13403,183 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wsContextChanged => '对话上下文已变化，请求失效。';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get contextCompressMarker => '上下文已压缩';
+
+  @override
+  String get contextOperationUndone => '已撤销';
+
+  @override
+  String get contextOperationSuperseded => '已并入后续摘要';
+
+  @override
+  String get contextOperationUndo => '撤销此次上下文操作';
+
+  @override
+  String get contextSummaryTitle => '压缩摘要';
+
+  @override
+  String get contextSummaryHint => '这是后续请求实际使用的摘要，保存不会改写已有回复。附件仅使用已有文字，不会额外识图。';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能为空；需要排除历史时请使用清除上下文。';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 条消息；原样保留最近 $keep 条用户消息及后续回复。';
+  }
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要输入约 $before tokens → 摘要约 $after tokens';
+  }
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改还会撤销 $count 个受影响的上下文操作，原始消息保留。是否继续？';
+  }
+
+  @override
+  String get contextChangeTitle => '确认上下文影响';
+
+  @override
+  String get contextChanged => '历史已发生变化，请重新打开此操作并确认范围。';
+
+  @override
+  String get contextSourceLabel => '摘要来源';
+
+  @override
+  String get contextEffectiveHistory => '当前摘要及后续消息';
+
+  @override
+  String get contextPreviousHistory => '重新读取最近一层压缩原文';
+
+  @override
+  String get contextOriginalHistory => '重新读取本段全部原文';
+
+  @override
+  String get contextManualSupplement => '将手工编辑的摘要作为补充';
+
+  @override
+  String get contextSourceScopeHint => '仅处理最近清除边界之后的历史，可能包含平时发送窗口之外的较早消息。';
+
+  @override
+  String get contextLimitedInputHint => '仅读取所选字符范围；被替代历史中的其余内容不会进入摘要，原始消息仍可回看。';
+
+  @override
+  String get contextNewConversation => '使用摘要创建新聊天';
+
+  @override
+  String get contextTaskWait => '等待当前回复和工具执行结束';
+
+  @override
+  String get contextTaskPreparing => '正在准备压缩';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在压缩 $done/$total 段';
+  }
+
+  @override
+  String get contextTaskMerging => '正在合并摘要';
+
+  @override
+  String get contextTaskApplying => '正在应用摘要';
+
+  @override
+  String get contextTaskReview => '请检查摘要后再应用';
+
+  @override
+  String get contextTaskCompleted => '压缩已完成';
+
+  @override
+  String get contextTaskFailed => '压缩失败';
+
+  @override
+  String get contextTaskCancelled => '压缩已取消';
+
+  @override
+  String get contextTaskInterrupted => '压缩已中断，输入内容已保留';
+
+  @override
+  String get contextTaskQueued => '已排队，等待压缩完成';
+
+  @override
+  String get contextTaskPaused => '发送已暂停，可取消排队恢复编辑';
+
+  @override
+  String get contextTaskCancel => '取消压缩';
+
+  @override
+  String get contextTaskRetry => '重试压缩';
+
+  @override
+  String get contextOpenNewChat => '打开新聊天';
+
+  @override
+  String get contextKeepInvalid => '请输入正整数的用户消息数量。';
+
+  @override
+  String get contextOriginalMessages => '查看原始消息';
+
+  @override
+  String get contextClearDetails => '此前聊天历史不再参与后续请求；系统提示、记忆和工具定义仍然生效。';
+
+  @override
+  String get contextRestoreOperation => '恢复操作';
+
+  @override
+  String get contextChangeWaiting => '等待当前回复和工具执行结束后生效。';
+
+  @override
+  String get contextBudgetExceeded => '预计上下文超过当前模型上限，请缩短摘要、重新压缩或选择上下文更大的模型。';
+
+  @override
+  String get contextSummaryNotSmaller => '摘要没有比输入更短，请检查后再应用。';
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次请求估算（含输出预留）：$used / $limit tokens';
+  }
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤销后预计约 $used tokens（含输出预留）';
+  }
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要输入：$mode · $source';
+  }
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只读取选定的 $count 字符，摘要会替代整个选定历史范围。';
+  }
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原样保留的历史仍受当前聊天“最多发送 $count 条消息”的限制。';
+  }
+
+  @override
+  String get contextOperationHidden => '已被后续清除隔开';
+
+  @override
+  String get contextViewGenerated => '查看已生成摘要';
+
+  @override
+  String get contextTaskDismiss => '关闭状态提示';
+
+  @override
+  String get contextOperationActive => '当前生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15683,7 +15860,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContext => '压缩上下文';
 
   @override
-  String get compressContextDesc => '总结对话并开始新聊天';
+  String get compressContextDesc => '总结较早消息，并在当前聊天中继续。';
 
   @override
   String get clearContextDesc => '标记上下文分界点';
@@ -15743,7 +15920,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextKeepRecentMessages => '保留N条';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近条数';
+  String get compressContextKeepCountLabel => '保留用户消息数';
 
   @override
   String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
@@ -26730,6 +26907,183 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get wsContextChanged => '对话上下文已变化，请求失效。';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get contextCompressMarker => '上下文已压缩';
+
+  @override
+  String get contextOperationUndone => '已撤销';
+
+  @override
+  String get contextOperationSuperseded => '已并入后续摘要';
+
+  @override
+  String get contextOperationUndo => '撤销此次上下文操作';
+
+  @override
+  String get contextSummaryTitle => '压缩摘要';
+
+  @override
+  String get contextSummaryHint => '这是后续请求实际使用的摘要，保存不会改写已有回复。附件仅使用已有文字，不会额外识图。';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能为空；需要排除历史时请使用清除上下文。';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 条消息；原样保留最近 $keep 条用户消息及后续回复。';
+  }
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要输入约 $before tokens → 摘要约 $after tokens';
+  }
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改还会撤销 $count 个受影响的上下文操作，原始消息保留。是否继续？';
+  }
+
+  @override
+  String get contextChangeTitle => '确认上下文影响';
+
+  @override
+  String get contextChanged => '历史已发生变化，请重新打开此操作并确认范围。';
+
+  @override
+  String get contextSourceLabel => '摘要来源';
+
+  @override
+  String get contextEffectiveHistory => '当前摘要及后续消息';
+
+  @override
+  String get contextPreviousHistory => '重新读取最近一层压缩原文';
+
+  @override
+  String get contextOriginalHistory => '重新读取本段全部原文';
+
+  @override
+  String get contextManualSupplement => '将手工编辑的摘要作为补充';
+
+  @override
+  String get contextSourceScopeHint => '仅处理最近清除边界之后的历史，可能包含平时发送窗口之外的较早消息。';
+
+  @override
+  String get contextLimitedInputHint => '仅读取所选字符范围；被替代历史中的其余内容不会进入摘要，原始消息仍可回看。';
+
+  @override
+  String get contextNewConversation => '使用摘要创建新聊天';
+
+  @override
+  String get contextTaskWait => '等待当前回复和工具执行结束';
+
+  @override
+  String get contextTaskPreparing => '正在准备压缩';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在压缩 $done/$total 段';
+  }
+
+  @override
+  String get contextTaskMerging => '正在合并摘要';
+
+  @override
+  String get contextTaskApplying => '正在应用摘要';
+
+  @override
+  String get contextTaskReview => '请检查摘要后再应用';
+
+  @override
+  String get contextTaskCompleted => '压缩已完成';
+
+  @override
+  String get contextTaskFailed => '压缩失败';
+
+  @override
+  String get contextTaskCancelled => '压缩已取消';
+
+  @override
+  String get contextTaskInterrupted => '压缩已中断，输入内容已保留';
+
+  @override
+  String get contextTaskQueued => '已排队，等待压缩完成';
+
+  @override
+  String get contextTaskPaused => '发送已暂停，可取消排队恢复编辑';
+
+  @override
+  String get contextTaskCancel => '取消压缩';
+
+  @override
+  String get contextTaskRetry => '重试压缩';
+
+  @override
+  String get contextOpenNewChat => '打开新聊天';
+
+  @override
+  String get contextKeepInvalid => '请输入正整数的用户消息数量。';
+
+  @override
+  String get contextOriginalMessages => '查看原始消息';
+
+  @override
+  String get contextClearDetails => '此前聊天历史不再参与后续请求；系统提示、记忆和工具定义仍然生效。';
+
+  @override
+  String get contextRestoreOperation => '恢复操作';
+
+  @override
+  String get contextChangeWaiting => '等待当前回复和工具执行结束后生效。';
+
+  @override
+  String get contextBudgetExceeded => '预计上下文超过当前模型上限，请缩短摘要、重新压缩或选择上下文更大的模型。';
+
+  @override
+  String get contextSummaryNotSmaller => '摘要没有比输入更短，请检查后再应用。';
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次请求估算（含输出预留）：$used / $limit tokens';
+  }
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤销后预计约 $used tokens（含输出预留）';
+  }
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要输入：$mode · $source';
+  }
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只读取选定的 $count 字符，摘要会替代整个选定历史范围。';
+  }
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原样保留的历史仍受当前聊天“最多发送 $count 条消息”的限制。';
+  }
+
+  @override
+  String get contextOperationHidden => '已被后续清除隔开';
+
+  @override
+  String get contextViewGenerated => '查看已生成摘要';
+
+  @override
+  String get contextTaskDismiss => '关闭状态提示';
+
+  @override
+  String get contextOperationActive => '当前生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -29010,7 +29364,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContext => '壓縮上下文';
 
   @override
-  String get compressContextDesc => '總結對話並開始新聊天';
+  String get compressContextDesc => '總結較早訊息，並在目前聊天中繼續。';
 
   @override
   String get clearContextDesc => '標記上下文分界點';
@@ -29070,7 +29424,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextKeepRecentMessages => '保留N條';
 
   @override
-  String get compressContextKeepCountLabel => '保留最近條數';
+  String get compressContextKeepCountLabel => '保留使用者訊息數';
 
   @override
   String get compressContextKeepAllMessages => '保留條數涵蓋全部訊息，無內容可壓縮';
@@ -40136,4 +40490,182 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get wsContextChanged => '對話上下文已變化，請求失效。';
+
+  @override
+  String get contextClearMarker => '上下文已清除';
+
+  @override
+  String get contextCompressMarker => '上下文已壓縮';
+
+  @override
+  String get contextOperationUndone => '已撤銷';
+
+  @override
+  String get contextOperationSuperseded => '已併入後續摘要';
+
+  @override
+  String get contextOperationUndo => '撤銷此次上下文操作';
+
+  @override
+  String get contextSummaryTitle => '壓縮摘要';
+
+  @override
+  String get contextSummaryHint =>
+      '這是後續請求實際使用的摘要，儲存不會改寫既有回覆。附件僅使用已有文字，不會額外辨識圖片。';
+
+  @override
+  String get contextSummaryEmpty => '摘要不能為空；需要排除歷史時請使用清除上下文。';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return '替代 $count 則訊息；原樣保留最近 $keep 則使用者訊息及後續回覆。';
+  }
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return '摘要輸入約 $before tokens → 摘要約 $after tokens';
+  }
+
+  @override
+  String contextChangeImpact(int count) {
+    return '此次修改還會撤銷 $count 個受影響的上下文操作，原始訊息保留。是否繼續？';
+  }
+
+  @override
+  String get contextChangeTitle => '確認上下文影響';
+
+  @override
+  String get contextChanged => '歷史已發生變化，請重新開啟此操作並確認範圍。';
+
+  @override
+  String get contextSourceLabel => '摘要來源';
+
+  @override
+  String get contextEffectiveHistory => '目前摘要及後續訊息';
+
+  @override
+  String get contextPreviousHistory => '重新讀取最近一層壓縮原文';
+
+  @override
+  String get contextOriginalHistory => '重新讀取本段全部原文';
+
+  @override
+  String get contextManualSupplement => '將手動編輯的摘要作為補充';
+
+  @override
+  String get contextSourceScopeHint => '僅處理最近清除邊界之後的歷史，可能包含平時傳送範圍之外的較早訊息。';
+
+  @override
+  String get contextLimitedInputHint => '僅讀取所選字元範圍；被替代歷史中的其餘內容不會進入摘要，原始訊息仍可檢視。';
+
+  @override
+  String get contextNewConversation => '使用摘要建立新聊天';
+
+  @override
+  String get contextTaskWait => '等待目前回覆和工具執行結束';
+
+  @override
+  String get contextTaskPreparing => '正在準備壓縮';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return '正在壓縮 $done/$total 段';
+  }
+
+  @override
+  String get contextTaskMerging => '正在合併摘要';
+
+  @override
+  String get contextTaskApplying => '正在套用摘要';
+
+  @override
+  String get contextTaskReview => '請檢查摘要後再套用';
+
+  @override
+  String get contextTaskCompleted => '壓縮已完成';
+
+  @override
+  String get contextTaskFailed => '壓縮失敗';
+
+  @override
+  String get contextTaskCancelled => '壓縮已取消';
+
+  @override
+  String get contextTaskInterrupted => '壓縮已中斷，輸入內容已保留';
+
+  @override
+  String get contextTaskQueued => '已排隊，等待壓縮完成';
+
+  @override
+  String get contextTaskPaused => '傳送已暫停，可取消排隊恢復編輯';
+
+  @override
+  String get contextTaskCancel => '取消壓縮';
+
+  @override
+  String get contextTaskRetry => '重試壓縮';
+
+  @override
+  String get contextOpenNewChat => '開啟新聊天';
+
+  @override
+  String get contextKeepInvalid => '請輸入正整數的使用者訊息數量。';
+
+  @override
+  String get contextOriginalMessages => '檢視原始訊息';
+
+  @override
+  String get contextClearDetails => '此前聊天歷史不再參與後續請求；系統提示、記憶和工具定義仍然生效。';
+
+  @override
+  String get contextRestoreOperation => '恢復操作';
+
+  @override
+  String get contextChangeWaiting => '等待目前回覆與工具執行結束後生效。';
+
+  @override
+  String get contextBudgetExceeded => '預計上下文超過目前模型上限，請縮短摘要、重新壓縮或選擇上下文更大的模型。';
+
+  @override
+  String get contextSummaryNotSmaller => '摘要沒有比輸入更短，請檢查後再套用。';
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return '下次請求估算（含輸出預留）：$used / $limit tokens';
+  }
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return '撤銷後預計約 $used tokens（含輸出預留）';
+  }
+
+  @override
+  String get contextUnknownLimit => '上限未知';
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return '摘要輸入：$mode · $source';
+  }
+
+  @override
+  String contextSampledInfo(int count) {
+    return '本次只讀取選定的 $count 字元，摘要會替代整個選定歷史範圍。';
+  }
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return '原樣保留的歷史仍受目前聊天「最多傳送 $count 則訊息」的限制。';
+  }
+
+  @override
+  String get contextOperationHidden => '已被後續清除隔開';
+
+  @override
+  String get contextViewGenerated => '檢視已產生摘要';
+
+  @override
+  String get contextTaskDismiss => '關閉狀態提示';
+
+  @override
+  String get contextOperationActive => '目前生效';
 }

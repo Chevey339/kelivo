@@ -2360,7 +2360,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContext => 'Compress Context';
 
   @override
-  String get compressContextDesc => 'Summarize and start a new chat';
+  String get compressContextDesc =>
+      'Summarize earlier messages and continue in this chat.';
 
   @override
   String get clearContextDesc => 'Mark a context boundary';
@@ -2422,7 +2423,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextKeepRecentMessages => 'Keep N';
 
   @override
-  String get compressContextKeepCountLabel => 'Keep recent messages';
+  String get compressContextKeepCountLabel => 'Recent user messages';
 
   @override
   String get compressContextKeepAllMessages =>
@@ -14061,4 +14062,194 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get wsContextChanged =>
       'Conversation context changed. Request expired.';
+
+  @override
+  String get contextClearMarker => 'Context cleared';
+
+  @override
+  String get contextCompressMarker => 'Context compressed';
+
+  @override
+  String get contextOperationUndone => 'Undone';
+
+  @override
+  String get contextOperationSuperseded => 'Included in a later summary';
+
+  @override
+  String get contextOperationUndo => 'Undo this context operation';
+
+  @override
+  String get contextSummaryTitle => 'Context summary';
+
+  @override
+  String get contextSummaryHint =>
+      'This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.';
+
+  @override
+  String get contextSummaryEmpty =>
+      'The summary cannot be empty. Use Clear context to exclude history.';
+
+  @override
+  String contextRangeInfo(int count, int keep) {
+    return 'Replaces $count messages; keeps $keep recent user messages and their replies.';
+  }
+
+  @override
+  String contextTokenInfo(int before, int after) {
+    return 'Summary input ≈ $before tokens → summary ≈ $after tokens';
+  }
+
+  @override
+  String contextChangeImpact(int count) {
+    return 'This change will also undo $count affected context operations. Original messages are kept. Continue?';
+  }
+
+  @override
+  String get contextChangeTitle => 'Review affected context';
+
+  @override
+  String get contextChanged =>
+      'History changed. Reopen this action to review its current scope.';
+
+  @override
+  String get contextSourceLabel => 'Summary input';
+
+  @override
+  String get contextEffectiveHistory => 'Current summary and later messages';
+
+  @override
+  String get contextPreviousHistory => 'Re-read the last compression layer';
+
+  @override
+  String get contextOriginalHistory =>
+      'Re-read all original messages in this segment';
+
+  @override
+  String get contextManualSupplement =>
+      'Include manually edited summaries as supplements';
+
+  @override
+  String get contextSourceScopeHint =>
+      'Only history after the latest clear is included. This may include older messages outside the normal send window.';
+
+  @override
+  String get contextLimitedInputHint =>
+      'Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.';
+
+  @override
+  String get contextNewConversation => 'Create a new chat with the summary';
+
+  @override
+  String get contextTaskWait =>
+      'Waiting for the current reply and tools to finish';
+
+  @override
+  String get contextTaskPreparing => 'Preparing compression';
+
+  @override
+  String contextTaskProgress(int done, int total) {
+    return 'Compressing $done/$total segments';
+  }
+
+  @override
+  String get contextTaskMerging => 'Merging summaries';
+
+  @override
+  String get contextTaskApplying => 'Applying summary';
+
+  @override
+  String get contextTaskReview => 'Review the summary before applying';
+
+  @override
+  String get contextTaskCompleted => 'Compression complete';
+
+  @override
+  String get contextTaskFailed => 'Compression failed';
+
+  @override
+  String get contextTaskCancelled => 'Compression cancelled';
+
+  @override
+  String get contextTaskInterrupted =>
+      'Compression interrupted; input is preserved';
+
+  @override
+  String get contextTaskQueued => 'Queued — waiting for compression';
+
+  @override
+  String get contextTaskPaused => 'Sending paused — cancel the queue to edit';
+
+  @override
+  String get contextTaskCancel => 'Cancel compression';
+
+  @override
+  String get contextTaskRetry => 'Retry compression';
+
+  @override
+  String get contextOpenNewChat => 'Open new chat';
+
+  @override
+  String get contextKeepInvalid => 'Enter a positive number of user messages.';
+
+  @override
+  String get contextOriginalMessages => 'View original messages';
+
+  @override
+  String get contextClearDetails =>
+      'Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.';
+
+  @override
+  String get contextRestoreOperation => 'Restore operation';
+
+  @override
+  String get contextChangeWaiting =>
+      'Waiting for the current reply and tools to finish before applying this change.';
+
+  @override
+  String get contextBudgetExceeded =>
+      'The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.';
+
+  @override
+  String get contextSummaryNotSmaller =>
+      'The summary is not shorter than its input. Review it before applying.';
+
+  @override
+  String contextBudgetInfo(int used, String limit) {
+    return 'Estimated next request (including output reserve): $used / $limit tokens';
+  }
+
+  @override
+  String contextUndoBudgetInfo(int used) {
+    return 'After undo: approximately $used tokens including output reserve';
+  }
+
+  @override
+  String get contextUnknownLimit => 'unknown limit';
+
+  @override
+  String contextInputModeInfo(String mode, String source) {
+    return 'Input: $mode · $source';
+  }
+
+  @override
+  String contextSampledInfo(int count) {
+    return 'Only the selected $count characters were read; the summary replaces the entire selected history range.';
+  }
+
+  @override
+  String contextHistoryWindowNote(int count) {
+    return 'Recent history is still limited by the chat’s $count-message sending window.';
+  }
+
+  @override
+  String get contextOperationHidden => 'Excluded by a later clear';
+
+  @override
+  String get contextViewGenerated => 'View generated summary';
+
+  @override
+  String get contextTaskDismiss => 'Dismiss status';
+
+  @override
+  String get contextOperationActive => 'Currently applied';
 }

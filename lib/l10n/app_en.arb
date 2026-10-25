@@ -1013,7 +1013,7 @@
   "bottomToolsSheetUpload": "Upload",
   "bottomToolsSheetClearContext": "Clear Context",
   "compressContext": "Compress Context",
-  "compressContextDesc": "Summarize and start a new chat",
+  "compressContextDesc": "Summarize earlier messages and continue in this chat.",
   "clearContextDesc": "Mark a context boundary",
   "contextManagement": "Context Management",
   "compressingContext": "Compressing context...",
@@ -1033,7 +1033,7 @@
   "compressContextModelLabel": "Model",
   "compressContextModelUnset": "Select a model",
   "compressContextKeepRecentMessages": "Keep N",
-  "compressContextKeepCountLabel": "Keep recent messages",
+  "compressContextKeepCountLabel": "Recent user messages",
   "compressContextKeepAllMessages": "Keeping that many covers all messages — nothing to compress",
   "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
   "@compressContextEstimatePreview": {
@@ -6381,5 +6381,136 @@
         "type": "String"
       }
     }
-  }
+  },
+  "contextClearMarker": "Context cleared",
+  "contextCompressMarker": "Context compressed",
+  "contextOperationUndone": "Undone",
+  "contextOperationSuperseded": "Included in a later summary",
+  "contextOperationUndo": "Undo this context operation",
+  "contextSummaryTitle": "Context summary",
+  "contextSummaryHint": "This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.",
+  "contextSummaryEmpty": "The summary cannot be empty. Use Clear context to exclude history.",
+  "contextRangeInfo": "Replaces {count} messages; keeps {keep} recent user messages and their replies.",
+  "@contextRangeInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "keep": {
+        "type": "int"
+      }
+    }
+  },
+  "contextTokenInfo": "Summary input ≈ {before} tokens → summary ≈ {after} tokens",
+  "@contextTokenInfo": {
+    "placeholders": {
+      "before": {
+        "type": "int"
+      },
+      "after": {
+        "type": "int"
+      }
+    }
+  },
+  "contextChangeImpact": "This change will also undo {count} affected context operations. Original messages are kept. Continue?",
+  "@contextChangeImpact": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextChangeTitle": "Review affected context",
+  "contextChanged": "History changed. Reopen this action to review its current scope.",
+  "contextSourceLabel": "Summary input",
+  "contextEffectiveHistory": "Current summary and later messages",
+  "contextPreviousHistory": "Re-read the last compression layer",
+  "contextOriginalHistory": "Re-read all original messages in this segment",
+  "contextManualSupplement": "Include manually edited summaries as supplements",
+  "contextSourceScopeHint": "Only history after the latest clear is included. This may include older messages outside the normal send window.",
+  "contextLimitedInputHint": "Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.",
+  "contextNewConversation": "Create a new chat with the summary",
+  "contextTaskWait": "Waiting for the current reply and tools to finish",
+  "contextTaskPreparing": "Preparing compression",
+  "contextTaskProgress": "Compressing {done}/{total} segments",
+  "@contextTaskProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "contextTaskMerging": "Merging summaries",
+  "contextTaskApplying": "Applying summary",
+  "contextTaskReview": "Review the summary before applying",
+  "contextTaskCompleted": "Compression complete",
+  "contextTaskFailed": "Compression failed",
+  "contextTaskCancelled": "Compression cancelled",
+  "contextTaskInterrupted": "Compression interrupted; input is preserved",
+  "contextTaskQueued": "Queued — waiting for compression",
+  "contextTaskPaused": "Sending paused — cancel the queue to edit",
+  "contextTaskCancel": "Cancel compression",
+  "contextTaskRetry": "Retry compression",
+  "contextOpenNewChat": "Open new chat",
+  "contextKeepInvalid": "Enter a positive number of user messages.",
+  "contextOriginalMessages": "View original messages",
+  "contextClearDetails": "Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.",
+  "contextRestoreOperation": "Restore operation",
+  "contextChangeWaiting": "Waiting for the current reply and tools to finish before applying this change.",
+  "contextBudgetExceeded": "The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.",
+  "contextSummaryNotSmaller": "The summary is not shorter than its input. Review it before applying.",
+  "contextBudgetInfo": "Estimated next request (including output reserve): {used} / {limit} tokens",
+  "@contextBudgetInfo": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "contextUndoBudgetInfo": "After undo: approximately {used} tokens including output reserve",
+  "@contextUndoBudgetInfo": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "contextUnknownLimit": "unknown limit",
+  "contextInputModeInfo": "Input: {mode} · {source}",
+  "@contextInputModeInfo": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "contextSampledInfo": "Only the selected {count} characters were read; the summary replaces the entire selected history range.",
+  "@contextSampledInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextHistoryWindowNote": "Recent history is still limited by the chat’s {count}-message sending window.",
+  "@contextHistoryWindowNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextOperationHidden": "Excluded by a later clear",
+  "contextViewGenerated": "View generated summary",
+  "contextTaskDismiss": "Dismiss status",
+  "contextOperationActive": "Currently applied"
 }

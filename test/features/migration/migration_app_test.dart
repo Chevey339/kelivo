@@ -504,7 +504,9 @@ Future<void> _waitForEnabledButton(WidgetTester tester, IconData icon) async {
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
-  for (var i = 0; i < 100 && !condition(); i++) {
+  // Real database publication and fsync can exceed one second while the full
+  // suite runs in parallel. Wait for the same state with a bounded IO deadline.
+  for (var i = 0; i < 1000 && !condition(); i++) {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   expect(condition(), isTrue);

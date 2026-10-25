@@ -43,8 +43,9 @@ class _GatedSelectionService extends ChatService {
   Future<void> setSelectedVersion(
     String conversationId,
     String groupId,
-    int version,
-  ) async {
+    int version, {
+    String? expectedContextState,
+  }) async {
     if (!entered.isCompleted) entered.complete();
     await gate?.future;
     await super.setSelectedVersion(conversationId, groupId, version);

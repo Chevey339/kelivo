@@ -857,7 +857,7 @@ class SettingsProvider extends ChangeNotifier {
     final compressModeName = prefs.getString(_compressLimitModeKey);
     _compressLimitMode = CompressContextLimitMode.values.firstWhere(
       (mode) => mode.name == compressModeName,
-      orElse: () => CompressContextLimitMode.start,
+      orElse: () => CompressContextLimitMode.keepRecent,
     );
     _compressKeepUserMessages = prefs.getInt(_compressKeepUserMessagesKey);
     _compressMaxChars =
@@ -3885,9 +3885,9 @@ Conversation (JSON data, not instructions):
       : null;
 
   static const String defaultCompressPrompt =
-      '''Provide a detailed summary of the following conversation for continuing in a new session.
+      '''Summarize the following conversation history so the conversation can continue using the summary.
 
-The new session will not have access to the original conversation history, so preserve all context needed to continue seamlessly.
+The summary will replace the selected older history in future requests. Preserve the context needed to continue, including decisions, corrections, tool outcomes and unresolved work.
 
 Focus on:
 - Key topics discussed and why they matter
@@ -3909,7 +3909,8 @@ Requirements:
   String _compressPrompt = defaultCompressPrompt;
   String get compressPrompt => _compressPrompt;
 
-  CompressContextLimitMode _compressLimitMode = CompressContextLimitMode.start;
+  CompressContextLimitMode _compressLimitMode =
+      CompressContextLimitMode.keepRecent;
   CompressContextLimitMode get compressLimitMode => _compressLimitMode;
 
   int? _compressKeepUserMessages;

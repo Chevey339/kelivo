@@ -292,7 +292,6 @@ void main() {
       );
       final snapshot = (await service.loadSelectedContextMessages(
         conversation.id,
-        truncateIndex: -1,
         limit: 1,
       )).single;
       await service.updateMessage(source.id, translation: 'translated');

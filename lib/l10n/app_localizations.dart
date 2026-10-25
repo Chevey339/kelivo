@@ -4423,7 +4423,7 @@ abstract class AppLocalizations {
   /// No description provided for @compressContextDesc.
   ///
   /// In en, this message translates to:
-  /// **'Summarize and start a new chat'**
+  /// **'Summarize earlier messages and continue in this chat.'**
   String get compressContextDesc;
 
   /// No description provided for @clearContextDesc.
@@ -4543,7 +4543,7 @@ abstract class AppLocalizations {
   /// No description provided for @compressContextKeepCountLabel.
   ///
   /// In en, this message translates to:
-  /// **'Keep recent messages'**
+  /// **'Recent user messages'**
   String get compressContextKeepCountLabel;
 
   /// No description provided for @compressContextKeepAllMessages.
@@ -25049,6 +25049,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Conversation context changed. Request expired.'**
   String get wsContextChanged;
+
+  /// No description provided for @contextClearMarker.
+  ///
+  /// In en, this message translates to:
+  /// **'Context cleared'**
+  String get contextClearMarker;
+
+  /// No description provided for @contextCompressMarker.
+  ///
+  /// In en, this message translates to:
+  /// **'Context compressed'**
+  String get contextCompressMarker;
+
+  /// No description provided for @contextOperationUndone.
+  ///
+  /// In en, this message translates to:
+  /// **'Undone'**
+  String get contextOperationUndone;
+
+  /// No description provided for @contextOperationSuperseded.
+  ///
+  /// In en, this message translates to:
+  /// **'Included in a later summary'**
+  String get contextOperationSuperseded;
+
+  /// No description provided for @contextOperationUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo this context operation'**
+  String get contextOperationUndo;
+
+  /// No description provided for @contextSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context summary'**
+  String get contextSummaryTitle;
+
+  /// No description provided for @contextSummaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.'**
+  String get contextSummaryHint;
+
+  /// No description provided for @contextSummaryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The summary cannot be empty. Use Clear context to exclude history.'**
+  String get contextSummaryEmpty;
+
+  /// No description provided for @contextRangeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces {count} messages; keeps {keep} recent user messages and their replies.'**
+  String contextRangeInfo(int count, int keep);
+
+  /// No description provided for @contextTokenInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary input ≈ {before} tokens → summary ≈ {after} tokens'**
+  String contextTokenInfo(int before, int after);
+
+  /// No description provided for @contextChangeImpact.
+  ///
+  /// In en, this message translates to:
+  /// **'This change will also undo {count} affected context operations. Original messages are kept. Continue?'**
+  String contextChangeImpact(int count);
+
+  /// No description provided for @contextChangeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review affected context'**
+  String get contextChangeTitle;
+
+  /// No description provided for @contextChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'History changed. Reopen this action to review its current scope.'**
+  String get contextChanged;
+
+  /// No description provided for @contextSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary input'**
+  String get contextSourceLabel;
+
+  /// No description provided for @contextEffectiveHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Current summary and later messages'**
+  String get contextEffectiveHistory;
+
+  /// No description provided for @contextPreviousHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-read the last compression layer'**
+  String get contextPreviousHistory;
+
+  /// No description provided for @contextOriginalHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-read all original messages in this segment'**
+  String get contextOriginalHistory;
+
+  /// No description provided for @contextManualSupplement.
+  ///
+  /// In en, this message translates to:
+  /// **'Include manually edited summaries as supplements'**
+  String get contextManualSupplement;
+
+  /// No description provided for @contextSourceScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only history after the latest clear is included. This may include older messages outside the normal send window.'**
+  String get contextSourceScopeHint;
+
+  /// No description provided for @contextLimitedInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.'**
+  String get contextLimitedInputHint;
+
+  /// No description provided for @contextNewConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new chat with the summary'**
+  String get contextNewConversation;
+
+  /// No description provided for @contextTaskWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the current reply and tools to finish'**
+  String get contextTaskWait;
+
+  /// No description provided for @contextTaskPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing compression'**
+  String get contextTaskPreparing;
+
+  /// No description provided for @contextTaskProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressing {done}/{total} segments'**
+  String contextTaskProgress(int done, int total);
+
+  /// No description provided for @contextTaskMerging.
+  ///
+  /// In en, this message translates to:
+  /// **'Merging summaries'**
+  String get contextTaskMerging;
+
+  /// No description provided for @contextTaskApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying summary'**
+  String get contextTaskApplying;
+
+  /// No description provided for @contextTaskReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the summary before applying'**
+  String get contextTaskReview;
+
+  /// No description provided for @contextTaskCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression complete'**
+  String get contextTaskCompleted;
+
+  /// No description provided for @contextTaskFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression failed'**
+  String get contextTaskFailed;
+
+  /// No description provided for @contextTaskCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression cancelled'**
+  String get contextTaskCancelled;
+
+  /// No description provided for @contextTaskInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression interrupted; input is preserved'**
+  String get contextTaskInterrupted;
+
+  /// No description provided for @contextTaskQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued — waiting for compression'**
+  String get contextTaskQueued;
+
+  /// No description provided for @contextTaskPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending paused — cancel the queue to edit'**
+  String get contextTaskPaused;
+
+  /// No description provided for @contextTaskCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel compression'**
+  String get contextTaskCancel;
+
+  /// No description provided for @contextTaskRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry compression'**
+  String get contextTaskRetry;
+
+  /// No description provided for @contextOpenNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Open new chat'**
+  String get contextOpenNewChat;
+
+  /// No description provided for @contextKeepInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive number of user messages.'**
+  String get contextKeepInvalid;
+
+  /// No description provided for @contextOriginalMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'View original messages'**
+  String get contextOriginalMessages;
+
+  /// No description provided for @contextClearDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.'**
+  String get contextClearDetails;
+
+  /// No description provided for @contextRestoreOperation.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore operation'**
+  String get contextRestoreOperation;
+
+  /// No description provided for @contextChangeWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the current reply and tools to finish before applying this change.'**
+  String get contextChangeWaiting;
+
+  /// No description provided for @contextBudgetExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.'**
+  String get contextBudgetExceeded;
+
+  /// No description provided for @contextSummaryNotSmaller.
+  ///
+  /// In en, this message translates to:
+  /// **'The summary is not shorter than its input. Review it before applying.'**
+  String get contextSummaryNotSmaller;
+
+  /// No description provided for @contextBudgetInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated next request (including output reserve): {used} / {limit} tokens'**
+  String contextBudgetInfo(int used, String limit);
+
+  /// No description provided for @contextUndoBudgetInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'After undo: approximately {used} tokens including output reserve'**
+  String contextUndoBudgetInfo(int used);
+
+  /// No description provided for @contextUnknownLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown limit'**
+  String get contextUnknownLimit;
+
+  /// No description provided for @contextInputModeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Input: {mode} · {source}'**
+  String contextInputModeInfo(String mode, String source);
+
+  /// No description provided for @contextSampledInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the selected {count} characters were read; the summary replaces the entire selected history range.'**
+  String contextSampledInfo(int count);
+
+  /// No description provided for @contextHistoryWindowNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent history is still limited by the chat’s {count}-message sending window.'**
+  String contextHistoryWindowNote(int count);
+
+  /// No description provided for @contextOperationHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded by a later clear'**
+  String get contextOperationHidden;
+
+  /// No description provided for @contextViewGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'View generated summary'**
+  String get contextViewGenerated;
+
+  /// No description provided for @contextTaskDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss status'**
+  String get contextTaskDismiss;
+
+  /// No description provided for @contextOperationActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently applied'**
+  String get contextOperationActive;
 }
 
 class _AppLocalizationsDelegate

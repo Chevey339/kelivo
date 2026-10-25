@@ -343,6 +343,7 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
     required String? assistantId,
+    List<ChatMessage>? messagesOverride,
   }) async {
     final settings = contextProvider.read<SettingsProvider>();
     Assistant? assistant;
@@ -351,11 +352,18 @@ class MessageGenerationService {
       assistant = assistantId == null ? null : assistants.getById(assistantId);
     } catch (_) {}
     final conversation = chatService.getConversation(conversationId);
-    final messages = await chatService.loadMessages(conversationId);
+    final messages =
+        messagesOverride ??
+        await chatService.loadSelectedContextMessages(
+          conversationId,
+          limit: assistant?.limitContextMessages == true
+              ? assistant!.contextMessageSize
+              : 0x7fffffff,
+        );
     final packed = await assembleUnprocessedRequestContext(
       messages: messages,
       versionSelections: chatService.getVersionSelections(conversationId),
-      currentConversation: conversation,
+      currentConversation: conversation?.copyWith(truncateIndex: -1),
       settings: settings,
       assistant: assistant,
       assistantId: assistantId,
@@ -528,6 +536,40 @@ class MessageGenerationService {
       }
     }
 
+    if (currentConversation != null &&
+        chatService.contextOperationsFor(currentConversation.id).isNotEmpty) {
+      final window = ModelSpecResolver.instance
+          .spec(cfg, modelId)
+          .contextWindow;
+      if (window != null) {
+        final preview = ContextAssemblyPreview.fromApiMessages(
+          apiMessages: apiMessages,
+          tools: toolDefs,
+          mcpToolNames: const {},
+          images: imageRefsFromApiMessages(
+            apiMessages,
+            sourceMessages: messages,
+          ),
+        );
+        final used = estimateContextBuckets(
+          ContextEstimateJob(
+            preview: preview,
+            kind: ProviderConfig.classify(
+              providerKey,
+              explicitType: cfg.providerType,
+            ),
+          ),
+        ).total;
+        final reserve = assistant?.maxTokens ?? (window ~/ 10).clamp(1, 4096);
+        if (used + reserve > window) {
+          throw StateError(
+            contextProvider.mounted
+                ? AppLocalizations.of(contextProvider)!.contextBudgetExceeded
+                : 'context_budget_exceeded',
+          );
+        }
+      }
+    }
     await messageBuilderService.inlineLocalImages(apiMessages);
     if (ContextLogger.enabled) {
       final providerName = cfg.name.trim();
@@ -633,6 +675,7 @@ class MessageGenerationService {
     required String groupId,
     required int version,
     required bool truncateFuture,
+    String? expectedContextState,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
@@ -645,6 +688,7 @@ class MessageGenerationService {
       return (assistantMessage: assistantMessage, runId: null);
     }
     final result = await chatService.beginRegeneration(
+      expectedContextState: expectedContextState,
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerKey,
@@ -662,6 +706,7 @@ class MessageGenerationService {
     required String providerKey,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? expectedContextState,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
@@ -673,6 +718,7 @@ class MessageGenerationService {
       return (assistantMessage: assistantMessage, runId: null);
     }
     final result = await chatService.beginAssistantGeneration(
+      expectedContextState: expectedContextState,
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerKey,

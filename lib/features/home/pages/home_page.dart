@@ -1,3 +1,7 @@
+import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../core/models/context_operation.dart';
+import '../../chat/widgets/context_operation_actions.dart';
+import '../../chat/widgets/context_compression_status.dart';
 import '../../browser/browser_navigation.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -15,7 +19,6 @@ import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/responsive/breakpoints.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
@@ -31,7 +34,6 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/services/android_process_text.dart';
 import '../../../core/services/incoming_share_service.dart';
-import '../../../core/services/logging/flutter_logger.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_level_popover.dart';
@@ -154,9 +156,13 @@ String _compressContextErrorMessage(AppLocalizations l10n, String error) {
 }
 
 class _CompressContextOptionsDialog extends StatefulWidget {
-  const _CompressContextOptionsDialog({required this.collapsedMessages});
+  const _CompressContextOptionsDialog({
+    required this.collapsedMessages,
+    this.messageWindow,
+  });
 
   final List<ChatMessage> collapsedMessages;
+  final int? messageWindow;
 
   @override
   State<_CompressContextOptionsDialog> createState() =>
@@ -165,18 +171,29 @@ class _CompressContextOptionsDialog extends StatefulWidget {
 
 class _CompressContextOptionsDialogState
     extends State<_CompressContextOptionsDialog> {
-  CompressContextLimitMode _mode = CompressContextLimitMode.start;
+  CompressContextLimitMode _mode = CompressContextLimitMode.keepRecent;
+  ContextHistorySource _historySource = ContextHistorySource.effective;
+  bool _includeEditedSummaries = true;
+  bool _newConversation = false;
   late final TextEditingController _maxCharsController;
   late final TextEditingController _keepCountController;
   late final String _totalTextForEstimate;
   String? _error;
 
-  int get _userMessageCount => countUserMessages(widget.collapsedMessages);
-
   int? get _keepCount => int.tryParse(_keepCountController.text.trim());
 
-  bool get _keepCoversAll =>
-      _userMessageCount == 0 || (_keepCount ?? 0) >= _userMessageCount;
+  bool get _keepCoversAll {
+    final retained = selectKeepRecentMessages(
+      widget.collapsedMessages,
+      _keepCount ?? 0,
+    );
+    final prefix = widget.collapsedMessages.take(
+      widget.collapsedMessages.length - retained.length,
+    );
+    return prefix.isEmpty ||
+        (_historySource == ContextHistorySource.effective &&
+            prefix.every(ContextOperation.isSummary));
+  }
 
   @override
   void initState() {
@@ -189,7 +206,7 @@ class _CompressContextOptionsDialogState
     _keepCountController = TextEditingController(
       text:
           (settings.compressKeepUserMessages ??
-                  defaultKeepUserMessageCountFor(_userMessageCount))
+                  CompressContextOptions.defaultKeepUserMessages)
               .toString(),
     );
     _totalTextForEstimate = buildConversationTextForCompression(
@@ -226,7 +243,7 @@ class _CompressContextOptionsDialogState
     if (_mode == CompressContextLimitMode.keepRecent) {
       if (_keepCount == null || _keepCount! <= 0) {
         setState(() {
-          _error = AppLocalizations.of(context)!.compressContextInvalidLimit;
+          _error = AppLocalizations.of(context)!.contextKeepInvalid;
         });
         return;
       }
@@ -236,9 +253,15 @@ class _CompressContextOptionsDialogState
       }
       await _persistSelections(keepUserMessages: _keepCount);
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pop(CompressContextOptions(mode: _mode, keepUserMessages: _keepCount));
+      Navigator.of(context).pop(
+        CompressContextOptions(
+          mode: _mode,
+          keepUserMessages: _keepCount,
+          historySource: _historySource,
+          includeEditedSummaries: _includeEditedSummaries,
+          newConversation: _newConversation,
+        ),
+      );
       return;
     }
 
@@ -256,9 +279,15 @@ class _CompressContextOptionsDialogState
 
     await _persistSelections(maxChars: maxChars);
     if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pop(CompressContextOptions(mode: _mode, maxChars: maxChars));
+    Navigator.of(context).pop(
+      CompressContextOptions(
+        mode: _mode,
+        maxChars: maxChars,
+        historySource: _historySource,
+        includeEditedSummaries: _includeEditedSummaries,
+        newConversation: _newConversation,
+      ),
+    );
   }
 
   String _keepEstimateText(AppLocalizations l10n) {
@@ -343,7 +372,7 @@ class _CompressContextOptionsDialogState
                         const SizedBox(height: 16),
                         _CompressModeSegmented(
                           mode: _mode,
-                          keepRecentDisabled: _userMessageCount <= 1,
+                          keepRecentDisabled: widget.collapsedMessages.isEmpty,
                           onChanged: (mode) {
                             setState(() {
                               _mode = mode;
@@ -395,6 +424,97 @@ class _CompressContextOptionsDialogState
                             ),
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<ContextHistorySource>(
+                          initialValue: _historySource,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: l10n.contextSourceLabel,
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: ContextHistorySource.effective,
+                              child: Text(
+                                l10n.contextEffectiveHistory,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: ContextHistorySource.previous,
+                              child: Text(
+                                l10n.contextPreviousHistory,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: ContextHistorySource.original,
+                              child: Text(
+                                l10n.contextOriginalHistory,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _historySource = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.contextSourceScopeHint,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (widget.messageWindow != null)
+                          Text(
+                            l10n.contextHistoryWindowNote(
+                              widget.messageWindow!,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        if (_historySource != ContextHistorySource.effective)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                IosCheckbox(
+                                  value: _includeEditedSummaries,
+                                  onChanged: (value) => setState(
+                                    () => _includeEditedSummaries = value,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(l10n.contextManualSupplement),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_mode == CompressContextLimitMode.start ||
+                            _mode == CompressContextLimitMode.recent)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              l10n.contextLimitedInputHint,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              IosCheckbox(
+                                value: _newConversation,
+                                onChanged: (value) =>
+                                    setState(() => _newConversation = value),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(l10n.contextNewConversation),
+                              ),
+                            ],
+                          ),
+                        ),
                         if (_error != null) ...[
                           const SizedBox(height: 6),
                           Text(
@@ -1411,7 +1531,7 @@ class _HomePageState extends State<HomePage>
     required EdgeInsetsGeometry dividerPadding,
   }) {
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final footer =
+    final promptFooter =
         assistant?.allowConversationSystemPrompt == true &&
             !_controller.isCurrentConversationLoading &&
             !_controller.selecting
@@ -1419,6 +1539,41 @@ class _HomePageState extends State<HomePage>
             assistantId: assistant!.id,
             conversationId: _controller.currentConversation?.id,
             backgroundImageActive: _assistantBackgroundActive(context),
+          )
+        : null;
+    final chat = context.watch<ChatService>();
+    final conversationId = _controller.currentConversation?.id;
+    final compression = conversationId == null
+        ? null
+        : chat.contextCompression.taskFor(conversationId);
+    final footer = compression != null || promptFooter != null
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (compression != null)
+                ContextCompressionStatus(
+                  task: compression,
+                  onDismiss: () => chat.contextCompression.dismiss(
+                    compression.conversationId,
+                  ),
+                  onCancel: () => chat.contextCompression.cancel(
+                    compression.conversationId,
+                  ),
+                  onRetry: () =>
+                      _controller.compressContext(options: compression.options),
+                  onReview: () => showCompressionReview(
+                    context,
+                    chat: chat,
+                    task: compression,
+                  ),
+                  onOpenNewChat: compression.resultConversationId == null
+                      ? null
+                      : () => _controller.switchConversationAnimated(
+                          compression.resultConversationId!,
+                        ),
+                ),
+              if (promptFooter != null) promptFooter,
+            ],
           )
         : null;
     if (_controller.isTemporaryConversation &&
@@ -1433,6 +1588,23 @@ class _HomePageState extends State<HomePage>
     final settings = context.watch<SettingsProvider>();
     final suggestionsEnabled = settings.isSuggestionGenerationEnabled;
     return MessageListView(
+      contextOperations: conversationId == null
+          ? const []
+          : chat.contextOperationsFor(conversationId),
+      onOpenContextOperation: (operation) => showContextOperationDetails(
+        context,
+        chat: chat,
+        conversationId: conversationId!,
+        operation: operation,
+        onViewOriginal: _controller.scrollToMessageId,
+      ),
+      onUndoContextOperation: (operation) =>
+          changeContextOperationWithConfirmation(
+            context,
+            chat: chat,
+            conversationId: conversationId!,
+            operation: operation,
+          ),
       footer: footer,
       processingFilesMessageId: _controller.processingFilesMessageId,
       scrollController: _scrollController,
@@ -1646,6 +1818,11 @@ class _HomePageState extends State<HomePage>
       onStop: _controller.cancelStreaming,
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
+      queuedStatusLabel: _controller.currentQueuedInputPaused
+          ? AppLocalizations.of(context)!.contextTaskPaused
+          : _controller.isCurrentConversationCompressing
+          ? AppLocalizations.of(context)!.contextTaskQueued
+          : null,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
       onExpandedChanged: _controller.setInputBarExpanded,
       onQuickPhrase: _showQuickPhraseMenu,
@@ -2085,54 +2262,40 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _showCompressContextOptions() async {
-    final allMsgs = await _controller
-        .allMessagesForCurrentConversationContext();
-    final collapsed = _controller.collapseVersions(allMsgs);
+    final conversation = _controller.currentConversation;
+    if (conversation == null) return;
+    final chat = context.read<ChatService>();
+    final assistant = context
+        .read<AssistantProvider>()
+        .resolveConversationAssistant(conversation.assistantId);
+    final messageWindow = assistant?.limitContextMessages == true
+        ? assistant!.contextMessageSize
+        : null;
+    final snapshot = await chat.loadContextSnapshot(conversation.id);
+    final collapsed = ContextHistory.resolve(
+      snapshot.messages,
+      snapshot.operations,
+    );
     if (!mounted) return;
     final options = await showDialog<CompressContextOptions>(
       context: context,
-      barrierDismissible: true,
-      builder: (_) =>
-          _CompressContextOptionsDialog(collapsedMessages: collapsed),
+      builder: (_) => _CompressContextOptionsDialog(
+        collapsedMessages: collapsed,
+        messageWindow: messageWindow,
+      ),
     );
     if (options == null || !mounted) return;
-
-    final l10n = AppLocalizations.of(context)!;
-    final dialogContextCompleter = Completer<BuildContext>();
-    final dialogClosed = showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        if (!dialogContextCompleter.isCompleted) {
-          dialogContextCompleter.complete(dialogContext);
-        }
-        return LoadingDialogCard(label: l10n.compressingContext);
-      },
-    );
-    unawaited(dialogClosed);
-    final dialogContext = await dialogContextCompleter.future;
-
-    String? error;
-    try {
-      error = await _controller.compressContext(options: options);
-    } catch (e, st) {
-      FlutterLogger.log(
-        '[CompressContext] dialog failed: $e\n$st',
-        tag: 'HomePage',
-      );
-      error = e.toString();
-    } finally {
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext).pop();
-      }
-      await dialogClosed;
-    }
+    // Never apply an options dialog to a chat selected while it was open.
+    if (_controller.currentConversation?.id != conversation.id) return;
+    final error = await _controller.compressContext(options: options);
     if (error != null && mounted) {
       showAppSnackBar(
         context,
-        message: _compressContextErrorMessage(l10n, error),
+        message: _compressContextErrorMessage(
+          AppLocalizations.of(context)!,
+          error,
+        ),
         type: NotificationType.error,
-        duration: const Duration(seconds: 6),
       );
     }
   }

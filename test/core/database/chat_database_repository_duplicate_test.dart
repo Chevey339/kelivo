@@ -126,7 +126,19 @@ void main() {
         expect(duplicate.isPinned, isTrue);
         expect(duplicate.mcpServerIds, const ['mcp-server']);
         expect(duplicate.assistantId, 'assistant');
-        expect(duplicate.truncateIndex, 1);
+        expect(duplicate.truncateIndex, -1);
+        final contextNodes = await repository.readContextOperations(
+          duplicate.id,
+        );
+        expect(contextNodes, hasLength(1));
+        expect(contextNodes.single.anchorGroupId, duplicate.messageIds.first);
+        expect(
+          await repository.getEffectiveContextMessages(
+            duplicate.id,
+            limit: 100,
+          ),
+          isEmpty,
+        );
         expect(duplicate.summary, 'summary');
         expect(duplicate.chatSuggestions, const ['next']);
         expect(duplicate.injectedMemoryHash, isNull);

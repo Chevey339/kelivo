@@ -10,6 +10,7 @@ import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/context_operation.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/world_book.dart';
@@ -199,13 +200,17 @@ class MessageBuilderService {
         ? <ChatMessage>[]
         : await chatService.loadSelectedContextMessages(
             conversation.id,
-            truncateIndex: conversation.truncateIndex,
             limit: limit,
           );
     if (history.any((m) => m.isStreaming)) throw StateError('in_flight');
     final messages = <Map<String, dynamic>>[];
-    var remaining = 32000;
-    for (final message in history.reversed) {
+    final summaries = history.where(ContextOperation.isSummary).toList();
+    var remaining =
+        (32000 - summaries.fold<int>(0, (sum, m) => sum + m.content.length))
+            .clamp(0, 32000);
+    for (final message in history.reversed.where(
+      (m) => !ContextOperation.isSummary(m),
+    )) {
       if (message.role != 'user' && message.role != 'assistant') continue;
       if (remaining <= 0) break;
       final raw = message.role == 'assistant'
@@ -220,6 +225,10 @@ class MessageBuilderService {
       remaining -= text.length;
       messages.insert(0, {'role': message.role, 'content': text});
     }
+    messages.insertAll(0, [
+      for (final summary in summaries)
+        {'role': 'user', 'content': summary.content},
+    ]);
     if (conversation == null) {
       for (final message in assistant.presetMessages) {
         messages.add({'role': message.role, 'content': message.content});
@@ -241,6 +250,9 @@ class MessageBuilderService {
     );
     if (conversation?.summary?.trim().isNotEmpty == true &&
         conversation!.truncateIndex < 0 &&
+        chatService
+            .contextOperationsFor(conversation.id)
+            .every((op) => op.revoked) &&
         conversation.lastSummarizedMessageCount ==
             await chatService.resolveMessageCount(conversation.id)) {
       _appendToSystemMessage(
@@ -323,7 +335,7 @@ class MessageBuilderService {
 
   /// Build API messages list from current conversation state.
   ///
-  /// Applies truncation and version collapsing. Attachments come from parts.
+  /// Receives projected history and collapses versions. Attachments come from parts.
   /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
   /// [responsesScope] selects native Responses replay for matching artifacts.
   /// [claudeSource] keeps ordinary Claude blocks on their original model.
@@ -336,15 +348,7 @@ class MessageBuilderService {
     ResponsesReplayScope? responsesScope,
     ({String providerId, String modelId})? claudeSource,
   }) {
-    final tIndex = currentConversation?.truncateIndex ?? -1;
-    final List<ChatMessage> sourceAll =
-        (tIndex >= 0 && tIndex <= messages.length)
-        ? messages.sublist(tIndex)
-        : List.of(messages);
-    final List<ChatMessage> source = collapseVersions(
-      sourceAll,
-      versionSelections,
-    );
+    final source = collapseVersions(messages, versionSelections);
 
     final out = <Map<String, dynamic>>[];
 
@@ -542,7 +546,11 @@ class MessageBuilderService {
       final role = m.role == 'assistant' ? 'assistant' : 'user';
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
-        message[internalRevisionIdKey] = m.id;
+        if (ContextOperation.isSummary(m)) {
+          message['_contextSummary'] = true;
+        } else {
+          message[internalRevisionIdKey] = m.id;
+        }
       } else {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
@@ -671,6 +679,7 @@ class MessageBuilderService {
   void stripInternalRevisionIds(List<Map<String, dynamic>> apiMessages) {
     for (final message in apiMessages) {
       message.remove(internalRevisionIdKey);
+      message.remove('_contextSummary');
       message.remove(kelivoContextSegmentsKey);
     }
   }
@@ -1613,9 +1622,8 @@ class MessageBuilderService {
       pass?.snapshotCarriers.add(message.id);
     }
 
-    final templ = (assistant?.messageTemplate ?? '{{ message }}').trim().isEmpty
-        ? '{{ message }}'
-        : (assistant!.messageTemplate);
+    final template = assistant?.messageTemplate ?? '';
+    final templ = template.trim().isEmpty ? '{{ message }}' : template;
     final templated = PromptTransformer.applyMessageTemplate(
       templ,
       role: 'user',
@@ -2197,7 +2205,6 @@ class MessageBuilderService {
           chatService.initialized) {
         final fullHistory = await chatService.loadSelectedContextMessages(
           conversation.id,
-          truncateIndex: -1,
           limit: await chatService.resolveMessageCount(conversation.id),
           throughRevisionId: historyMessages.last.id,
         );
@@ -2521,22 +2528,23 @@ class MessageBuilderService {
   ) {
     if ((assistant?.limitContextMessages ?? false) &&
         (assistant?.contextMessageSize ?? 0) > 0) {
-      final int keep = (assistant!.contextMessageSize).clamp(
+      final keep = assistant!.contextMessageSize.clamp(
         Assistant.minContextMessageSize,
         Assistant.maxContextMessageSize,
       );
-      int startIdx = 0;
-      if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
-        startIdx = 1;
-      }
-      var cut = apiMessages.length - keep;
-      if (cut <= startIdx) return;
-      // Message count is a soft bound: keep the user request and its entire
-      // assistant/tool exchange instead of starting midway through a turn.
-      while (cut > startIdx && apiMessages[cut]['role'] != 'user') {
+      final counted = apiMessages
+          .where((message) => message['_contextSummary'] != true)
+          .toList();
+      final start = counted.isNotEmpty && counted.first['role'] == 'system'
+          ? 1
+          : 0;
+      var cut = counted.length - keep;
+      if (cut <= start) return;
+      while (cut > start && counted[cut]['role'] != 'user') {
         cut--;
       }
-      apiMessages.removeRange(startIdx, cut);
+      final removed = counted.sublist(start, cut).toSet();
+      apiMessages.removeWhere(removed.contains);
     }
   }
 
