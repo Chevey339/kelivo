@@ -1,5 +1,7 @@
-import '../../../shared/widgets/ios_checkbox.dart';
-import '../../../core/models/context_operation.dart';
+import '../../chat/widgets/context_dialog.dart';
+import '../../../core/models/context_compression_task.dart';
+import '../services/tool_approval_service.dart';
+import '../../chat/widgets/compress_context_options_dialog.dart';
 import '../../chat/widgets/context_operation_actions.dart';
 import '../../chat/widgets/context_compression_status.dart';
 import '../../browser/browser_navigation.dart';
@@ -8,7 +10,8 @@ import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show MissingPluginException;
+import 'package:flutter/services.dart'
+    show MissingPluginException, Clipboard, ClipboardData;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -17,8 +20,6 @@ import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/widgets/visible_route_theme.dart';
 import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/responsive/breakpoints.dart';
-import '../../../shared/widgets/ios_form_text_field.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
@@ -155,669 +156,6 @@ String _compressContextErrorMessage(AppLocalizations l10n, String error) {
   };
 }
 
-class _CompressContextOptionsDialog extends StatefulWidget {
-  const _CompressContextOptionsDialog({
-    required this.collapsedMessages,
-    this.messageWindow,
-  });
-
-  final List<ChatMessage> collapsedMessages;
-  final int? messageWindow;
-
-  @override
-  State<_CompressContextOptionsDialog> createState() =>
-      _CompressContextOptionsDialogState();
-}
-
-class _CompressContextOptionsDialogState
-    extends State<_CompressContextOptionsDialog> {
-  CompressContextLimitMode _mode = CompressContextLimitMode.keepRecent;
-  ContextHistorySource _historySource = ContextHistorySource.effective;
-  bool _includeEditedSummaries = true;
-  bool _newConversation = false;
-  late final TextEditingController _maxCharsController;
-  late final TextEditingController _keepCountController;
-  late final String _totalTextForEstimate;
-  String? _error;
-
-  int? get _keepCount => int.tryParse(_keepCountController.text.trim());
-
-  bool get _keepCoversAll {
-    final retained = selectKeepRecentMessages(
-      widget.collapsedMessages,
-      _keepCount ?? 0,
-    );
-    final prefix = widget.collapsedMessages.take(
-      widget.collapsedMessages.length - retained.length,
-    );
-    return prefix.isEmpty ||
-        (_historySource == ContextHistorySource.effective &&
-            prefix.every(ContextOperation.isSummary));
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    final settings = context.read<SettingsProvider>();
-    _mode = settings.compressLimitMode;
-    _maxCharsController = TextEditingController(
-      text: settings.compressMaxChars.toString(),
-    );
-    _keepCountController = TextEditingController(
-      text:
-          (settings.compressKeepUserMessages ??
-                  CompressContextOptions.defaultKeepUserMessages)
-              .toString(),
-    );
-    _totalTextForEstimate = buildConversationTextForCompression(
-      widget.collapsedMessages,
-    );
-  }
-
-  @override
-  void dispose() {
-    _maxCharsController.dispose();
-    _keepCountController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _persistSelections({
-    int? maxChars,
-    int? keepUserMessages,
-  }) async {
-    final settings = context.read<SettingsProvider>();
-    await settings.setCompressLimitMode(_mode);
-    if (keepUserMessages != null) {
-      await settings.setCompressKeepUserMessages(keepUserMessages);
-    } else if (_keepCount != null && _keepCount! > 0) {
-      await settings.setCompressKeepUserMessages(_keepCount);
-    }
-    final persistedMaxChars =
-        maxChars ?? int.tryParse(_maxCharsController.text.trim());
-    if (persistedMaxChars != null && persistedMaxChars > 0) {
-      await settings.setCompressMaxChars(persistedMaxChars);
-    }
-  }
-
-  Future<void> _submit() async {
-    if (_mode == CompressContextLimitMode.keepRecent) {
-      if (_keepCount == null || _keepCount! <= 0) {
-        setState(() {
-          _error = AppLocalizations.of(context)!.contextKeepInvalid;
-        });
-        return;
-      }
-      if (_keepCoversAll) {
-        // The keep-all hint is already shown inline in the preview area.
-        return;
-      }
-      await _persistSelections(keepUserMessages: _keepCount);
-      if (!mounted) return;
-      Navigator.of(context).pop(
-        CompressContextOptions(
-          mode: _mode,
-          keepUserMessages: _keepCount,
-          historySource: _historySource,
-          includeEditedSummaries: _includeEditedSummaries,
-          newConversation: _newConversation,
-        ),
-      );
-      return;
-    }
-
-    int? maxChars;
-    if (_mode == CompressContextLimitMode.start ||
-        _mode == CompressContextLimitMode.recent) {
-      maxChars = int.tryParse(_maxCharsController.text.trim());
-      if (maxChars == null || maxChars <= 0) {
-        setState(() {
-          _error = AppLocalizations.of(context)!.compressContextInvalidLimit;
-        });
-        return;
-      }
-    }
-
-    await _persistSelections(maxChars: maxChars);
-    if (!mounted) return;
-    Navigator.of(context).pop(
-      CompressContextOptions(
-        mode: _mode,
-        maxChars: maxChars,
-        historySource: _historySource,
-        includeEditedSummaries: _includeEditedSummaries,
-        newConversation: _newConversation,
-      ),
-    );
-  }
-
-  String _keepEstimateText(AppLocalizations l10n) {
-    final keptText = buildConversationTextForCompression(
-      selectKeepRecentMessages(widget.collapsedMessages, _keepCount ?? 0),
-    );
-    final summarizedChars = (_totalTextForEstimate.length - keptText.length)
-        .clamp(0, _totalTextForEstimate.length)
-        .toInt();
-    final est = estimateCompressionTokens(
-      totalText: _totalTextForEstimate,
-      keptText: keptText,
-    );
-    return l10n.compressContextEstimatePreview(
-      summarizedChars,
-      keptText.length,
-      est.minResultTokens,
-      est.maxResultTokens,
-      est.totalTokens,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final panelColor = cs.surfaceContainerHigh;
-    final constrainedWidth = MediaQuery.of(
-      context,
-    ).size.width.clamp(0.0, 420.0).toDouble();
-
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      backgroundColor: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: constrainedWidth,
-          maxHeight: MediaQuery.sizeOf(context).height,
-        ),
-        child: Material(
-          color: panelColor,
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Lucide.package2, size: 20, color: cs.primary),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                l10n.compressContextOptionsTitle,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: AppFontWeights.emphasis,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.compressContextOptionsDesc,
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.35,
-                            color: cs.onSurface.withValues(alpha: 0.62),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const _CompressModelPickerRow(),
-                        const SizedBox(height: 16),
-                        _CompressModeSegmented(
-                          mode: _mode,
-                          keepRecentDisabled: widget.collapsedMessages.isEmpty,
-                          onChanged: (mode) {
-                            setState(() {
-                              _mode = mode;
-                              _error = null;
-                            });
-                          },
-                        ),
-                        if (_mode == CompressContextLimitMode.start ||
-                            _mode == CompressContextLimitMode.recent) ...[
-                          const SizedBox(height: 10),
-                          IosFormTextField(
-                            label: l10n.compressContextMaxCharsLabel,
-                            controller: _maxCharsController,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            selectAllOnFocus: true,
-                            fieldWidth: 120,
-                            onChanged: (_) {
-                              if (_error != null) {
-                                setState(() => _error = null);
-                              }
-                            },
-                          ),
-                        ],
-                        if (_mode == CompressContextLimitMode.keepRecent) ...[
-                          const SizedBox(height: 10),
-                          IosFormTextField(
-                            label: l10n.compressContextKeepCountLabel,
-                            controller: _keepCountController,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            selectAllOnFocus: true,
-                            fieldWidth: 120,
-                            onChanged: (_) {
-                              setState(() => _error = null);
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _keepCoversAll
-                                ? l10n.compressContextKeepAllMessages
-                                : _keepEstimateText(l10n),
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.35,
-                              color: _keepCoversAll
-                                  ? cs.error
-                                  : cs.onSurface.withValues(alpha: 0.62),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<ContextHistorySource>(
-                          initialValue: _historySource,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            labelText: l10n.contextSourceLabel,
-                          ),
-                          items: [
-                            DropdownMenuItem(
-                              value: ContextHistorySource.effective,
-                              child: Text(
-                                l10n.contextEffectiveHistory,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: ContextHistorySource.previous,
-                              child: Text(
-                                l10n.contextPreviousHistory,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: ContextHistorySource.original,
-                              child: Text(
-                                l10n.contextOriginalHistory,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _historySource = value);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.contextSourceScopeHint,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (widget.messageWindow != null)
-                          Text(
-                            l10n.contextHistoryWindowNote(
-                              widget.messageWindow!,
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        if (_historySource != ContextHistorySource.effective)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              children: [
-                                IosCheckbox(
-                                  value: _includeEditedSummaries,
-                                  onChanged: (value) => setState(
-                                    () => _includeEditedSummaries = value,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(l10n.contextManualSupplement),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (_mode == CompressContextLimitMode.start ||
-                            _mode == CompressContextLimitMode.recent)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              l10n.contextLimitedInputHint,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
-                            children: [
-                              IosCheckbox(
-                                value: _newConversation,
-                                onChanged: (value) =>
-                                    setState(() => _newConversation = value),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(l10n.contextNewConversation),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            _error!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: cs.error,
-                              fontWeight: AppFontWeights.medium,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DialogActionButton(
-                        label: l10n.homePageCancel,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _DialogActionButton(
-                        label: l10n.compressContextStartButton,
-                        primary: true,
-                        onTap: _submit,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-String? _compressModelDisplayName(
-  SettingsProvider settings, {
-  required String? providerKey,
-  required String? modelId,
-}) {
-  if (providerKey == null || modelId == null) return null;
-  try {
-    final cfg = settings.getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
-    if (ov != null) {
-      final overrideName = (ov['name'] as String?)?.trim();
-      if (overrideName != null && overrideName.isNotEmpty) {
-        return overrideName;
-      }
-      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (apiId != null && apiId.isNotEmpty) return apiId;
-    }
-    return modelId;
-  } catch (_) {
-    return modelId;
-  }
-}
-
-class _CompressModelPickerRow extends StatelessWidget {
-  const _CompressModelPickerRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final settings = context.watch<SettingsProvider>();
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final resolved = resolveCompressContextModel(
-      compressProvider: settings.compressModelProvider,
-      compressModelId: settings.compressModelId,
-      summaryProvider: settings.summaryModelProvider,
-      summaryModelId: settings.summaryModelId,
-      titleProvider: settings.titleModelProvider,
-      titleModelId: settings.titleModelId,
-      assistantProvider: assistant?.chatModelProvider,
-      assistantModelId: assistant?.chatModelId,
-      currentProvider: settings.currentModelProvider,
-      currentModelId: settings.currentModelId,
-    );
-    final display =
-        _compressModelDisplayName(
-          settings,
-          providerKey: resolved.providerKey,
-          modelId: resolved.modelId,
-        ) ??
-        l10n.compressContextModelUnset;
-    final labelColor = cs.onSurface.withValues(alpha: 0.85);
-    final valueColor = cs.onSurface.withValues(alpha: 0.92);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.compressContextModelLabel,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: AppFontWeights.semibold,
-            color: labelColor,
-          ),
-        ),
-        const SizedBox(height: 6),
-        IosCardPress(
-          baseColor: context.appColors.surfaceFill,
-          borderRadius: BorderRadius.circular(12),
-          pressedScale: 0.98,
-          haptics: false,
-          onTap: () async {
-            final sel = await showModelSelector(
-              context,
-              initialProviderKey: resolved.providerKey,
-              initialModelId: resolved.modelId,
-            );
-            if (sel == null || !context.mounted) return;
-            await context.read<SettingsProvider>().setCompressModel(
-              sel.providerKey,
-              sel.modelId,
-            );
-          },
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  display,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.medium,
-                    color: valueColor,
-                  ),
-                ),
-              ),
-              Icon(
-                Lucide.ChevronRight,
-                size: 16,
-                color: cs.onSurface.withValues(alpha: 0.45),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompressModeSegmented extends StatelessWidget {
-  const _CompressModeSegmented({
-    required this.mode,
-    required this.onChanged,
-    this.keepRecentDisabled = false,
-  });
-
-  final CompressContextLimitMode mode;
-  final ValueChanged<CompressContextLimitMode> onChanged;
-  final bool keepRecentDisabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _SegmentButton(
-                label: l10n.compressContextKeepStart,
-                selected: mode == CompressContextLimitMode.start,
-                onTap: () => onChanged(CompressContextLimitMode.start),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _SegmentButton(
-                label: l10n.compressContextKeepRecent,
-                selected: mode == CompressContextLimitMode.recent,
-                onTap: () => onChanged(CompressContextLimitMode.recent),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _SegmentButton(
-                label: l10n.compressContextUnlimited,
-                selected: mode == CompressContextLimitMode.unlimited,
-                onTap: () => onChanged(CompressContextLimitMode.unlimited),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _SegmentButton(
-                label: l10n.compressContextKeepRecentMessages,
-                selected: mode == CompressContextLimitMode.keepRecent,
-                enabled: !keepRecentDisabled,
-                onTap: () => onChanged(CompressContextLimitMode.keepRecent),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SegmentButton extends StatelessWidget {
-  const _SegmentButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.enabled = true,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedBg = isDark
-        ? cs.primary.withValues(alpha: 0.22)
-        : cs.primary.withValues(alpha: 0.12);
-    final baseBg = context.appColors.surfaceFill;
-
-    return IosCardPress(
-      baseColor: selected ? selectedBg : baseBg,
-      borderRadius: BorderRadius.circular(10),
-      pressedScale: 0.98,
-      onTap: enabled ? onTap : null,
-      haptics: false,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Center(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: AppFontWeights.emphasis,
-            color: !enabled
-                ? cs.onSurface.withValues(alpha: 0.3)
-                : selected
-                ? cs.primary
-                : cs.onSurface.withValues(alpha: 0.78),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DialogActionButton extends StatelessWidget {
-  const _DialogActionButton({
-    required this.label,
-    required this.onTap,
-    this.primary = false,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final base = primary ? cs.primary : (context.appColors.surfaceFill);
-
-    return IosCardPress(
-      baseColor: base,
-      borderRadius: BorderRadius.circular(11),
-      pressedScale: 0.98,
-      onTap: onTap,
-      haptics: false,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: AppFontWeights.emphasis,
-            color: primary ? cs.onPrimary : cs.onSurface,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   // ============================================================================
@@ -946,7 +284,168 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
+  final Map<String, String> _compressionNotices = {};
+
+  void _observeCompression() {
+    final chat = context.read<ChatService>();
+    for (final task in chat.contextCompression.tasks.toList()) {
+      final state = '${task.id}:${task.phase.name}:${task.error}';
+      if (_compressionNotices[task.conversationId] == state) continue;
+      _compressionNotices[task.conversationId] = state;
+      final phase = task.phase;
+      if (task.conversationId != _controller.currentConversation?.id ||
+          (task.active && phase != CompressionPhase.review)) {
+        continue;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            task.phase != phase ||
+            chat.contextCompression.taskFor(task.conversationId)?.id !=
+                task.id ||
+            _controller.currentConversation?.id != task.conversationId) {
+          return;
+        }
+        final l10n = AppLocalizations.of(context)!;
+        void retry() => _controller.compressContext(
+          options: task.options,
+          targetConversationId: task.conversationId,
+        );
+        void options() => _showCompressContextOptions(
+          targetConversationId: task.conversationId,
+          initialOptions: task.options,
+          reviewPending: false,
+        );
+        switch (phase) {
+          case CompressionPhase.completed:
+            final node = chat
+                .contextOperationsFor(task.conversationId)
+                .where((op) => op.id == task.id)
+                .firstOrNull;
+            showAppSnackBar(
+              context,
+              message: l10n.compressSuccessSnack(
+                task.previousBudget == null
+                    ? '—'
+                    : contextTokenValue(task.previousBudget!.usedTokens),
+                task.budget == null
+                    ? '—'
+                    : contextTokenValue(task.budget!.usedTokens),
+              ),
+              actionLabel: task.resultConversationId != null
+                  ? l10n.contextOpenNewChat
+                  : l10n.contextDetailTitle,
+              onAction: () {
+                if (task.resultConversationId != null) {
+                  _controller.switchConversationAnimated(
+                    task.resultConversationId!,
+                  );
+                } else if (node != null) {
+                  showContextOperationDetails(
+                    context,
+                    chat: chat,
+                    conversationId: task.conversationId,
+                    operation: node,
+                    onViewOriginal: _controller.scrollToMessageId,
+                    onRecompress: options,
+                  );
+                }
+              },
+            );
+          case CompressionPhase.cancelled:
+            if (task.error != 'context_cleared') {
+              showAppSnackBar(context, message: l10n.compressCancelledSnack);
+            }
+          case CompressionPhase.review:
+            showAppSnackBar(
+              context,
+              message: task.error == 'context_budget_exceeded'
+                  ? l10n.compressOverSnack
+                  : l10n.contextSummaryNotSmaller,
+              type: NotificationType.warning,
+              actionLabel: l10n.compressAdjust,
+              onAction: () => showCompressionReview(
+                context,
+                chat: chat,
+                task: task,
+                onRecompress: options,
+              ),
+            );
+          case CompressionPhase.failed:
+          case CompressionPhase.interrupted:
+            final stale = task.error?.contains('context_changed') ?? false;
+            final nothing = task.error?.contains('no_messages') ?? false;
+            final reason = compressionErrorLabel(
+              l10n,
+              task.error ?? l10n.contextTaskInterrupted,
+            ).split('\n').first;
+            showAppSnackBar(
+              context,
+              message: stale
+                  ? l10n.compressStaleSnack
+                  : nothing
+                  ? l10n.compressNothingNew
+                  : l10n.compressFailedSnack(
+                      reason.length > 160
+                          ? '${reason.substring(0, 160)}…'
+                          : reason,
+                    ),
+              type: NotificationType.warning,
+              actionLabel: nothing
+                  ? l10n.compressAdjust
+                  : stale
+                  ? l10n.compressRegenerate
+                  : l10n.compressTaskRetry,
+              onAction: nothing ? options : retry,
+            );
+          default:
+            break;
+        }
+      });
+    }
+  }
+
+  String _queuedPauseReason() {
+    final l10n = AppLocalizations.of(context)!;
+    final task = context.read<ChatService>().contextCompression.taskFor(
+      _controller.currentConversation?.id ?? '',
+    );
+    if (task?.error == 'context_changed') {
+      return l10n.compressStaleSnack;
+    }
+    if (task?.phase == CompressionPhase.review) {
+      return compressionErrorLabel(l10n, task!.error ?? '');
+    }
+    if (task?.phase == CompressionPhase.failed ||
+        task?.phase == CompressionPhase.interrupted) {
+      return l10n.chatInputBarQueuedCompressionFailed;
+    }
+    if (task?.phase == CompressionPhase.cancelled) {
+      return l10n.chatInputBarQueuedCompressionCancelled;
+    }
+    return l10n.chatInputBarQueuedPausedHold;
+  }
+
+  Future<void> _clearContextWithNotice() async {
+    final id = _controller.currentConversation?.id;
+    if (id == null) return;
+    final task = context.read<ChatService>().contextCompression.taskFor(id);
+    final discarded = task?.active ?? false;
+    await _controller.clearContext();
+    if (mounted && discarded) {
+      final l10n = AppLocalizations.of(context)!;
+      showAppSnackBar(
+        context,
+        message: l10n.compressDiscardedSnack,
+        actionLabel: task!.summary.isEmpty ? null : l10n.compressCopyResult,
+        onAction: task.summary.isEmpty
+            ? null
+            : () => Clipboard.setData(ClipboardData(text: task.summary)),
+      );
+    }
+  }
+
   void _onControllerChanged() {
+    _observeCompression();
     final conversationId = _controller.currentConversation?.id;
     if (conversationId != null && conversationId != _scrollConversationId) {
       _scrollConversationId = conversationId;
@@ -1546,36 +1045,7 @@ class _HomePageState extends State<HomePage>
     final compression = conversationId == null
         ? null
         : chat.contextCompression.taskFor(conversationId);
-    final footer = compression != null || promptFooter != null
-        ? Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (compression != null)
-                ContextCompressionStatus(
-                  task: compression,
-                  onDismiss: () => chat.contextCompression.dismiss(
-                    compression.conversationId,
-                  ),
-                  onCancel: () => chat.contextCompression.cancel(
-                    compression.conversationId,
-                  ),
-                  onRetry: () =>
-                      _controller.compressContext(options: compression.options),
-                  onReview: () => showCompressionReview(
-                    context,
-                    chat: chat,
-                    task: compression,
-                  ),
-                  onOpenNewChat: compression.resultConversationId == null
-                      ? null
-                      : () => _controller.switchConversationAnimated(
-                          compression.resultConversationId!,
-                        ),
-                ),
-              if (promptFooter != null) promptFooter,
-            ],
-          )
-        : null;
+    final footer = promptFooter;
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
@@ -1588,6 +1058,29 @@ class _HomePageState extends State<HomePage>
     final settings = context.watch<SettingsProvider>();
     final suggestionsEnabled = settings.isSuggestionGenerationEnabled;
     return MessageListView(
+      contextTask: compression,
+      contextTaskRevision: compression == null
+          ? null
+          : '${compression.id}:${compression.phase.name}:${compression.anchorGroupId}',
+      contextTaskWaitingForApproval:
+          compression?.phase == CompressionPhase.waiting &&
+          context.watch<ToolApprovalService>().pendingRequests.any(
+            (request) => request.conversationId == conversationId,
+          ),
+      onOpenContextTask: (task, anchor) => showContextCompressionMenu(
+        context,
+        chat: chat,
+        task: task,
+        anchor: anchor,
+        onRetry: () => _controller.compressContext(
+          options: task.options,
+          targetConversationId: task.conversationId,
+        ),
+        onAdjust: () => _showCompressContextOptions(
+          targetConversationId: task.conversationId,
+          initialOptions: task.options,
+        ),
+      ),
       contextOperations: conversationId == null
           ? const []
           : chat.contextOperationsFor(conversationId),
@@ -1597,6 +1090,14 @@ class _HomePageState extends State<HomePage>
         conversationId: conversationId!,
         operation: operation,
         onViewOriginal: _controller.scrollToMessageId,
+        onRecompress: () =>
+            _showCompressContextOptions(targetConversationId: conversationId),
+        onContinueNewChat: () async {
+          final copy = await chat.duplicateConversation(conversationId);
+          if (mounted && copy != null) {
+            await _controller.switchConversationAnimated(copy.id);
+          }
+        },
       ),
       onUndoContextOperation: (operation) =>
           changeContextOperationWithConfirmation(
@@ -1819,9 +1320,13 @@ class _HomePageState extends State<HomePage>
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
       queuedStatusLabel: _controller.currentQueuedInputPaused
-          ? AppLocalizations.of(context)!.contextTaskPaused
+          ? AppLocalizations.of(context)!.chatInputBarQueuedPaused
+          : null,
+      queuedPaused: _controller.currentQueuedInputPaused,
+      queuedSubtitle: _controller.currentQueuedInputPaused
+          ? _queuedPauseReason()
           : _controller.isCurrentConversationCompressing
-          ? AppLocalizations.of(context)!.contextTaskQueued
+          ? AppLocalizations.of(context)!.chatInputBarQueuedAfterCompress
           : null,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
       onExpandedChanged: _controller.setInputBarExpanded,
@@ -1847,7 +1352,7 @@ class _HomePageState extends State<HomePage>
       onToggleLearningMode: _openInstructionInjectionPopover,
       onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,
-      onClearContext: _controller.clearContext,
+      onClearContext: _clearContextWithNotice,
       onCompressContext: _handleDesktopCompressContext,
       backgroundImageActive: _assistantBackgroundActive(context),
     );
@@ -2249,7 +1754,7 @@ class _HomePageState extends State<HomePage>
             },
             onClear: () async {
               Navigator.of(ctx).maybePop();
-              await _controller.clearContext();
+              await _clearContextWithNotice();
             },
           ),
         );
@@ -2261,10 +1766,30 @@ class _HomePageState extends State<HomePage>
     await _showCompressContextOptions();
   }
 
-  Future<void> _showCompressContextOptions() async {
-    final conversation = _controller.currentConversation;
-    if (conversation == null) return;
+  Future<void> _showCompressContextOptions({
+    String? targetConversationId,
+    CompressContextOptions? initialOptions,
+    bool reviewPending = true,
+  }) async {
     final chat = context.read<ChatService>();
+    final conversation = targetConversationId == null
+        ? _controller.currentConversation
+        : chat.getConversation(targetConversationId);
+    if (conversation == null) return;
+    final pending = chat.contextCompression.taskFor(conversation.id);
+    if (reviewPending && pending?.phase == CompressionPhase.review) {
+      await showCompressionReview(
+        context,
+        chat: chat,
+        task: pending!,
+        onRecompress: () => _showCompressContextOptions(
+          targetConversationId: conversation.id,
+          initialOptions: pending.options,
+          reviewPending: false,
+        ),
+      );
+      return;
+    }
     final assistant = context
         .read<AssistantProvider>()
         .resolveConversationAssistant(conversation.assistantId);
@@ -2272,22 +1797,29 @@ class _HomePageState extends State<HomePage>
         ? assistant!.contextMessageSize
         : null;
     final snapshot = await chat.loadContextSnapshot(conversation.id);
-    final collapsed = ContextHistory.resolve(
-      snapshot.messages,
-      snapshot.operations,
-    );
     if (!mounted) return;
+    final estimator = chat.contextCompression.estimateCandidate;
     final options = await showDialog<CompressContextOptions>(
       context: context,
-      builder: (_) => _CompressContextOptionsDialog(
-        collapsedMessages: collapsed,
+      builder: (_) => CompressContextOptionsDialog(
+        messages: snapshot.messages,
+        operations: snapshot.operations,
         messageWindow: messageWindow,
+        initialOptions: initialOptions,
+        prepareInput: (messages, include) => chat.messagesForCompression(
+          messages,
+          includeAttachmentsAndTools: include,
+        ),
+        estimateContext: estimator == null
+            ? null
+            : (history) => estimator(conversation.id, history),
       ),
     );
     if (options == null || !mounted) return;
-    // Never apply an options dialog to a chat selected while it was open.
-    if (_controller.currentConversation?.id != conversation.id) return;
-    final error = await _controller.compressContext(options: options);
+    final error = await _controller.compressContext(
+      options: options,
+      targetConversationId: conversation.id,
+    );
     if (error != null && mounted) {
       showAppSnackBar(
         context,
@@ -2295,7 +1827,7 @@ class _HomePageState extends State<HomePage>
           AppLocalizations.of(context)!,
           error,
         ),
-        type: NotificationType.error,
+        type: NotificationType.warning,
       );
     }
   }

@@ -1988,8 +1988,13 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> compressContext({required CompressContextOptions options}) =>
-      _viewModel.compressContext(options: options);
+  Future<String?> compressContext({
+    required CompressContextOptions options,
+    String? targetConversationId,
+  }) => _viewModel.compressContext(
+    options: options,
+    targetConversationId: targetConversationId,
+  );
 
   // ============================================================================
   // Public Methods - Message Operations
@@ -2002,6 +2007,7 @@ class HomePageController extends ChangeNotifier {
     if (!_context.mounted) return;
     final approved = await confirmContextSourceMutation(
       _context,
+      deleting: true,
       chat: _chatService,
       conversationId: message.conversationId,
       groups: {ContextHistory.group(message)},
@@ -2047,6 +2053,7 @@ class HomePageController extends ChangeNotifier {
     if (!_context.mounted) return;
     final approved = await confirmContextSourceMutation(
       _context,
+      deleting: true,
       chat: _chatService,
       conversationId: message.conversationId,
       groups: {ContextHistory.group(message)},
@@ -2202,6 +2209,7 @@ class HomePageController extends ChangeNotifier {
     if (!_context.mounted) return;
     final approved = await confirmContextSourceMutation(
       _context,
+      deleting: true,
       chat: _chatService,
       conversationId: conversationId,
       removedGroups: removedGroups,

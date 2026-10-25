@@ -1,4 +1,6 @@
 import '../../../core/models/context_operation.dart';
+import '../../../core/models/context_compression_task.dart';
+import '../../chat/widgets/context_compression_status.dart';
 import '../../chat/widgets/context_operation_widgets.dart';
 import '../../browser/models/browser_tool_presentation.dart';
 import 'dart:async';
@@ -109,6 +111,10 @@ class MessageListView extends StatefulWidget {
     required this.versionSelections,
     this.truncCollapsedIndex = -1,
     this.contextOperations = const [],
+    this.contextTask,
+    this.contextTaskRevision,
+    this.contextTaskWaitingForApproval = false,
+    this.onOpenContextTask,
     this.onOpenContextOperation,
     this.onUndoContextOperation,
     required this.reasoning,
@@ -189,6 +195,11 @@ class MessageListView extends StatefulWidget {
   /// Pre-computed truncate index in collapsed message space (-1 = none).
   final int truncCollapsedIndex;
   final List<ContextOperation> contextOperations;
+  final ContextCompressionTask? contextTask;
+  final String? contextTaskRevision;
+  final bool contextTaskWaitingForApproval;
+  final void Function(ContextCompressionTask task, Offset anchor)?
+  onOpenContextTask;
   final ValueChanged<ContextOperation>? onOpenContextOperation;
   final ValueChanged<ContextOperation>? onUndoContextOperation;
 
@@ -313,6 +324,20 @@ class _MessageListViewState extends State<MessageListView> {
   );
 
   bool get _hasFooter => _showsFooter(widget);
+
+  bool _taskAt(int index) {
+    final task = widget.contextTask;
+    if (task == null ||
+        !compressionShowsDivider(task) ||
+        widget.selecting ||
+        index < 0 ||
+        index >= _effectiveRenderModels.length) {
+      return false;
+    }
+    return task.anchorGroupId == null
+        ? !widget.hasMoreAfter && index == _effectiveRenderModels.length - 1
+        : task.anchorGroupId == _effectiveRenderModels[index].slotId;
+  }
 
   static bool _showsFooter(MessageListView view) =>
       view.footer != null &&
@@ -627,12 +652,14 @@ class _MessageListViewState extends State<MessageListView> {
         : widget.contextOperations
               .where(
                 (op) =>
+                    !op.revoked &&
                     op.anchorGroupId == _effectiveRenderModels[index].slotId,
               )
               .length;
     return _estimateMessageExtent(index, crossAxisExtent) +
         footerExtent +
-        nodes * (52 + widget.dividerPadding.vertical);
+        (nodes + (_taskAt(index) ? 1 : 0)) *
+            (28 + widget.dividerPadding.vertical);
   }
 
   double _estimateMessageExtent(int? index, double crossAxisExtent) {
@@ -1269,6 +1296,7 @@ class _MessageListViewState extends State<MessageListView> {
       }
     }
     final metricInputsChanged =
+        oldWidget.contextTaskRevision != widget.contextTaskRevision ||
         !listEquals(
           oldWidget.contextOperations
               .map((op) => (op.id, op.revoked, op.anchorGroupId))
@@ -2162,10 +2190,12 @@ class _MessageListViewState extends State<MessageListView> {
           ],
         ),
         for (final operation in widget.contextOperations)
-          if (operation.anchorGroupId == (message.groupId ?? message.id))
+          if (!operation.revoked &&
+              operation.anchorGroupId == (message.groupId ?? message.id))
             Padding(
               padding: widget.dividerPadding,
               child: ContextOperationDivider(
+                key: ValueKey('context-node-${operation.id}'),
                 operation: operation,
                 hiddenByClear: widget.contextOperations
                     .skipWhile((op) => op.id != operation.id)
@@ -2187,6 +2217,28 @@ class _MessageListViewState extends State<MessageListView> {
                     : () => widget.onUndoContextOperation!(operation),
               ),
             ),
+        if (_taskAt(index))
+          Padding(
+            padding: widget.dividerPadding,
+            child: Builder(
+              builder: (anchorContext) => ContextOperationDivider.task(
+                key: ValueKey('context-task-${widget.contextTask!.id}'),
+                task: widget.contextTask!,
+                waitingForApproval: widget.contextTaskWaitingForApproval,
+                onOpen: () {
+                  final box = anchorContext.findRenderObject() as RenderBox?;
+                  if (box != null) {
+                    widget.onOpenContextTask?.call(
+                      widget.contextTask!,
+                      box.localToGlobal(
+                        Offset(box.size.width / 2, box.size.height),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
         if (_hasFooter && index == _effectiveRenderModels.length - 1)
           widget.footer!,
       ],

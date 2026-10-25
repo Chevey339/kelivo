@@ -1580,7 +1580,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       builder: (dctx) => AlertDialog(
         backgroundColor: dctx.overlaySurface,
         title: Text(l10n.chatMessageWidgetRegenerateConfirmTitle),
-        content: Text(content),
+        content: Text('$content\n\n${l10n.branchInheritNote}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dctx).pop(false),

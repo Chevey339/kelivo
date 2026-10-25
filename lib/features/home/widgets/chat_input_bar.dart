@@ -1,3 +1,5 @@
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../theme/app_semantic_colors.dart';
 import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
@@ -582,6 +584,8 @@ class ChatInputBar extends StatefulWidget {
     this.hasQueuedInput = false,
     this.queuedPreviewText,
     this.queuedStatusLabel,
+    this.queuedSubtitle,
+    this.queuedPaused = false,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.reasoningActive = false,
@@ -644,6 +648,8 @@ class ChatInputBar extends StatefulWidget {
   final bool hasQueuedInput;
   final String? queuedPreviewText;
   final String? queuedStatusLabel;
+  final String? queuedSubtitle;
+  final bool queuedPaused;
   final VoidCallback? onCancelQueuedInput;
 
   /// Reports when the composer starts filling the chat area and when it has
@@ -3844,6 +3850,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                       widget.queuedStatusLabel ??
                       AppLocalizations.of(context)!.chatInputBarQueuedPending,
                   previewText: widget.queuedPreviewText,
+                  subtitle: widget.queuedSubtitle,
+                  paused: widget.queuedPaused,
                   cancelLabel: AppLocalizations.of(
                     context,
                   )!.chatInputBarQueuedCancel,
@@ -4427,12 +4435,16 @@ class _QueuedInputBanner extends StatelessWidget {
     required this.label,
     required this.cancelLabel,
     this.previewText,
+    this.subtitle,
+    this.paused = false,
     this.onCancel,
   });
 
   final String label;
   final String cancelLabel;
   final String? previewText;
+  final String? subtitle;
+  final bool paused;
   final VoidCallback? onCancel;
 
   @override
@@ -4462,9 +4474,11 @@ class _QueuedInputBanner extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              Icons.schedule_rounded,
+              paused ? LucideIcons.pause : LucideIcons.clock,
               size: 16,
-              color: theme.colorScheme.primary,
+              color: paused
+                  ? context.appColors.warning
+                  : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
@@ -4473,11 +4487,26 @@ class _QueuedInputBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: AppFontWeights.semibold,
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                  ],
                 ),
                 if (hasPreview) ...[
                   const SizedBox(height: 2),

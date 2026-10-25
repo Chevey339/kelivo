@@ -1538,7 +1538,9 @@ class ChatService extends ChangeNotifier {
     includeFollowingAssistant: includeFollowingAssistant,
   );
 
-  Future<List<ChatMessage>> _loadRawSelectedContextMessages(
+  /// Selected original messages for history-based bookkeeping such as world-book
+  /// timers. Model requests must use loadSelectedContextMessages instead.
+  Future<List<ChatMessage>> loadRawSelectedContextMessages(
     String conversationId, {
     required int limit,
     String? throughRevisionId,
@@ -1618,7 +1620,7 @@ class ChatService extends ChangeNotifier {
   ) async {
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
-      return _loadRawSelectedContextMessages(
+      return loadRawSelectedContextMessages(
         conversationId,
         limit: _messagesCache[conversationId]?.length ?? 0,
       );

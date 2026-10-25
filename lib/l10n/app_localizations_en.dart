@@ -2360,17 +2360,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContext => 'Compress Context';
 
   @override
-  String get compressContextDesc =>
-      'Summarize earlier messages and continue in this chat.';
+  String get compressContextDesc => 'Create a summary you can review and undo';
 
   @override
   String get clearContextDesc => 'Mark a context boundary';
 
   @override
   String get contextManagement => 'Context Management';
-
-  @override
-  String get compressingContext => 'Compressing context...';
 
   @override
   String get compressContextFailed => 'Failed to compress context';
@@ -2393,16 +2389,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressContextOptionsDesc =>
-      'Choose which part of the current chat is sent to the compression model.';
+      'Create an editable, reversible summary in this chat. Original messages are kept.';
 
   @override
-  String get compressContextKeepStart => 'Start';
+  String get compressContextKeepStart => 'Start sample';
 
   @override
-  String get compressContextKeepRecent => 'Recent';
+  String get compressContextKeepRecent => 'End sample';
 
   @override
-  String get compressContextUnlimited => 'Unlimited';
+  String get compressContextUnlimited => 'All content';
 
   @override
   String get compressContextMaxCharsLabel => 'Characters';
@@ -13836,6 +13832,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserActionExtract => 'Extract text';
 
   @override
+  String get browserActionScreenshot => 'Capture screenshot';
+
+  @override
   String get browserActionSnapshot => 'Read page structure';
 
   @override
@@ -14252,4 +14251,333 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextOperationActive => 'Currently applied';
+
+  @override
+  String get contextDividerCompressed => 'Context compressed';
+
+  @override
+  String get contextDividerRunning => 'Compressing context';
+
+  @override
+  String get contextDividerFailed => 'Compression failed';
+
+  @override
+  String get contextDividerEdited => 'edited';
+
+  @override
+  String get contextUndoCompressTooltip => 'Undo this compression';
+
+  @override
+  String get contextUndoClearTooltip => 'Undo this clear';
+
+  @override
+  String contextUndoneSnack(String from, String to) {
+    return 'Undone · $from → $to';
+  }
+
+  @override
+  String get contextRestore => 'Restore';
+
+  @override
+  String get compressTaskWaiting => 'Waiting for the current reply';
+
+  @override
+  String get compressTaskWaitingApproval => 'Waiting for tool approval';
+
+  @override
+  String get compressTaskMerging => 'Merging summaries';
+
+  @override
+  String compressTaskElapsed(int i, int n, int seconds) {
+    return 'Part $i/$n · ${seconds}s elapsed';
+  }
+
+  @override
+  String get compressTaskRetry => 'Retry';
+
+  @override
+  String get compressTaskAdjustRetry => 'Adjust options and retry';
+
+  @override
+  String get compressTaskAbandon => 'Dismiss';
+
+  @override
+  String get compressCancelledSnack =>
+      'Compression cancelled. Current context is unchanged.';
+
+  @override
+  String get compressStaleSnack =>
+      'Chat history changed; the summary was not applied.';
+
+  @override
+  String get compressOverSnack =>
+      'The summary would exceed the context limit and was not applied.';
+
+  @override
+  String get compressDiscardedSnack =>
+      'Context cleared; the running compression was discarded.';
+
+  @override
+  String compressFailedSnack(String reason) {
+    return 'Compression failed: $reason';
+  }
+
+  @override
+  String compressSuccessSnack(String from, String to) {
+    return 'Context compressed · $from → $to';
+  }
+
+  @override
+  String get compressAdjust => 'Adjust';
+
+  @override
+  String get compressCopyResult => 'Copy result';
+
+  @override
+  String get chatInputBarQueuedAfterCompress => 'Sends after compression';
+
+  @override
+  String get chatInputBarQueuedPaused => 'Paused';
+
+  @override
+  String get chatInputBarQueuedPausedReason =>
+      'Compression did not finish; sending stays paused';
+
+  @override
+  String get chatInputBarQueuedCompressionFailed =>
+      'Compression failed; sending stays paused';
+
+  @override
+  String get chatInputBarQueuedCompressionCancelled =>
+      'Compression cancelled; sending stays paused';
+
+  @override
+  String get compressUsageInput => 'Summary input';
+
+  @override
+  String get compressUsageSummary => 'Est. summary';
+
+  @override
+  String get compressUsageNext => 'Next request';
+
+  @override
+  String compressUsageOriginal(String value) {
+    return 'was $value';
+  }
+
+  @override
+  String compressApproxTokens(String value) {
+    return 'Approx. $value tokens';
+  }
+
+  @override
+  String get compressAdvanced => 'Advanced';
+
+  @override
+  String get compressAdvancedOff => 'Re-read originals off';
+
+  @override
+  String get compressAdvancedOn => 'Re-read originals on';
+
+  @override
+  String get compressReread => 'Re-read compressed originals';
+
+  @override
+  String get compressRereadDesc =>
+      'Recover details lost across summaries. Uses more tokens.';
+
+  @override
+  String get compressRereadLastLayer => 'Expand last layer';
+
+  @override
+  String get compressRereadAll => 'All originals in segment';
+
+  @override
+  String compressIncludeManual(int count) {
+    return 'Include manual edits · $count';
+  }
+
+  @override
+  String get compressIncludeAttachments => 'Attachment text & tool results';
+
+  @override
+  String get compressIncludeAttachmentsDesc =>
+      'Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.';
+
+  @override
+  String get compressNothingNew =>
+      'Nothing new to compress since the last summary';
+
+  @override
+  String get compressRegenerate => 'Recompress';
+
+  @override
+  String compressKeepDescription(int count) {
+    return 'Keep the latest $count user messages with their replies and tools. Earlier history is summarized; attachment-only messages also count.';
+  }
+
+  @override
+  String get compressModelGlobal => 'Global setting · fixed when started';
+
+  @override
+  String get contextDetailTitle => 'Summary';
+
+  @override
+  String get contextDetailClearTitle => 'Context cleared';
+
+  @override
+  String get contextDetailInUse => 'In use';
+
+  @override
+  String get contextDetailSuperseded => 'Superseded by a later summary';
+
+  @override
+  String get contextDetailReplaced => 'Replaced';
+
+  @override
+  String get contextDetailRead => 'Read';
+
+  @override
+  String get contextDetailKept => 'Kept';
+
+  @override
+  String get contextDetailModel => 'Model · time';
+
+  @override
+  String get contextDetailNext => 'Next request';
+
+  @override
+  String get contextDetailAfterUndo => 'After undo';
+
+  @override
+  String get contextDetailSummaryLabel => 'Summary used in later requests';
+
+  @override
+  String get contextDetailContinueNewChat => 'Continue in new chat';
+
+  @override
+  String get contextDetailViewOriginals => 'View originals';
+
+  @override
+  String get contextDetailLegacy => 'Converted from legacy clear';
+
+  @override
+  String contextDetailRange(String from, String to, int count) {
+    return 'Messages $from–$to · $count user messages';
+  }
+
+  @override
+  String contextDetailKeptCount(int count) {
+    return 'Latest $count user messages, replies and tools';
+  }
+
+  @override
+  String contextDetailParts(int count) {
+    return '$count segments';
+  }
+
+  @override
+  String get contextDetailExcluded => 'Excluded history';
+
+  @override
+  String get contextDetailCurrent => 'Current context';
+
+  @override
+  String get contextDetailEdited => 'Manually edited';
+
+  @override
+  String get contextEditTitle => 'Edit summary';
+
+  @override
+  String get contextEditEmpty =>
+      'Summary cannot be empty. Use Clear context to exclude all earlier history.';
+
+  @override
+  String get contextEditPending => 'Saved; applies after the current reply';
+
+  @override
+  String contextEditPreview(String value) {
+    return 'Approx. $value tokens after saving. Editing does not change active context.';
+  }
+
+  @override
+  String contextEditCharacters(int count) {
+    return '$count characters';
+  }
+
+  @override
+  String get contextImpactUndoTitle => 'Undo earlier compression?';
+
+  @override
+  String get contextImpactClearTitle => 'Undo earlier clear?';
+
+  @override
+  String get contextImpactEditTitle => 'Save earlier summary?';
+
+  @override
+  String get contextImpactSourceTitle => 'Change compressed originals?';
+
+  @override
+  String get contextImpactUndoOne => 'Undo';
+
+  @override
+  String get contextImpactUndoAlso => 'Also undone';
+
+  @override
+  String get contextImpactKeep => 'Unchanged';
+
+  @override
+  String get contextImpactSave => 'Save';
+
+  @override
+  String contextImpactConfirm(int count) {
+    return 'Undo $count nodes';
+  }
+
+  @override
+  String contextImpactSaveConfirm(int count) {
+    return 'Save and undo $count nodes';
+  }
+
+  @override
+  String get contextImpactDescription =>
+      'Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.';
+
+  @override
+  String contextImpactUsage(String from, String to) {
+    return 'Approx. $from → $to tokens';
+  }
+
+  @override
+  String get contextOverLimitWarning =>
+      'Undo may exceed the context limit. You can still undo and recompress; sending checks the limit again.';
+
+  @override
+  String get branchInheritNote =>
+      'Only inherits context nodes active before this point';
+
+  @override
+  String get contextDone => 'Done';
+
+  @override
+  String get contextMore => 'More';
+
+  @override
+  String get contextEditUnknownPreview =>
+      'Usage is unavailable; it will be checked again before saving.';
+
+  @override
+  String get contextImpactDeleteTitle => 'Delete compressed originals?';
+
+  @override
+  String get contextImpactSourceDescription =>
+      'Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.';
+
+  @override
+  String get contextImpactDeleteDescription =>
+      'Delete the originals and undo related summaries so removed content is not sent again. Other messages and independent nodes are unchanged.';
+
+  @override
+  String get chatInputBarQueuedPausedHold =>
+      'Input remains paused; cancel the queue to edit or send';
 }

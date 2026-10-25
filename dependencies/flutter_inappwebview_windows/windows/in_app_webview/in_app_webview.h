@@ -203,6 +203,7 @@ namespace flutter_inappwebview_plugin
     POINT lastCursorPos_ = { 0, 0 };
     VirtualKeyState virtualKeys_;
 
+    UINT64 currentNavigationId_ = 0;
     std::map<UINT64, std::shared_ptr<NavigationAction>> navigationActions_ = {};
     std::shared_ptr<NavigationAction> lastNavigationAction_;
     bool isLoading_ = false;

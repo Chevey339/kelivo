@@ -2201,16 +2201,39 @@ class MessageBuilderService {
       if (usesTiming &&
           conversation != null &&
           historyMessages != null &&
-          historyMessages.isNotEmpty &&
           chatService.initialized) {
-        final fullHistory = await chatService.loadSelectedContextMessages(
+        // Context summaries replace request content, not the real-message clock.
+        // Locate the last persisted source group so regeneration cannot count
+        // future turns. An unsubmitted input in a usage preview follows that
+        // prefix; a summary-only preview still represents the current history.
+        final requestHistory = historyMessages
+            .where((message) => !ContextOperation.isSummary(message))
+            .toList();
+        final selected = await chatService.loadSelectedMessageProjections(
+          conversation.id,
+        );
+        final selectedByGroup = {
+          for (final message in selected)
+            ContextHistory.group(message): message,
+        };
+        final lastRecorded = requestHistory.lastIndexWhere(
+          (message) =>
+              selectedByGroup.containsKey(ContextHistory.group(message)),
+        );
+        final cutoff = lastRecorded < 0
+            ? null
+            : selectedByGroup[ContextHistory.group(
+                requestHistory[lastRecorded],
+              )];
+        final fullHistory = await chatService.loadRawSelectedContextMessages(
           conversation.id,
           limit: await chatService.resolveMessageCount(conversation.id),
-          throughRevisionId: historyMessages.last.id,
+          throughRevisionId: cutoff?.id,
         );
-        if (fullHistory.isNotEmpty) {
-          historyMessages = fullHistory.where(isChatMessage).toList();
-        }
+        historyMessages = [
+          ...fullHistory.where(isChatMessage),
+          ...requestHistory.skip(lastRecorded + 1),
+        ];
       }
       final result = WorldBookActivation.evaluate(
         books: books,

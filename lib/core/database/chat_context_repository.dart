@@ -170,8 +170,10 @@ extension ChatContextRepository on ChatDatabaseRepository {
   Future<Object?> _contextFingerprintData(
     String schema,
     String id,
-    Map<String, int> groups,
-  ) async {
+    Map<String, int> groups, {
+    required int legacyTruncateIndex,
+    required DateTime legacyUpdatedAt,
+  }) async {
     final row = await _db
         .customSelect(
           'SELECT payload FROM $schema.extension_entity_rows WHERE kind=? AND id=?',
@@ -181,27 +183,64 @@ extension ChatContextRepository on ChatDatabaseRepository {
           ],
         )
         .getSingleOrNull();
-    if (row == null) return null;
-    final operations = (jsonDecode(row.read<String>('payload')) as List)
-        .map(
-          (value) => ContextOperation.fromJson(
-            Map<String, dynamic>.from(value as Map),
-          ),
-        )
-        .toList();
+    final operations = row == null
+        ? <ContextOperation>[]
+        : (jsonDecode(row.read<String>('payload')) as List)
+              .map(
+                (value) => ContextOperation.fromJson(
+                  Map<String, dynamic>.from(value as Map),
+                ),
+              )
+              .toList();
+    if (legacyTruncateIndex > 0) {
+      if (operations.isNotEmpty) throw StateError('context_boundary_conflict');
+      operations.add(
+        _legacyClearOperation(
+          legacyTruncateIndex,
+          groups.keys.toList(),
+          legacyUpdatedAt,
+        ),
+      );
+    }
+    if (operations.isEmpty) return null;
     final ordinals = {
       for (var i = 0; i < operations.length; i++) operations[i].id: i,
     };
     return [
       for (final op in operations)
         {
-          ...op.toJson()..remove('id'),
+          ...op.toJson()
+            ..remove('id')
+            // Conversion timestamps are bookkeeping, not clear semantics.
+            ..removeWhere(
+              (key, _) => op.convertedFromLegacyClear && key == 'createdAt',
+            ),
           'anchor': groups[op.anchorGroupId],
           'appliedAfter': groups[op.appliedAfterGroupId],
           'groups': op.sourceGroups.map((id) => groups[id]).toList(),
           'dependencies': op.dependencies.map((id) => ordinals[id]).toList(),
         },
     ];
+  }
+
+  ContextOperation _legacyClearOperation(
+    int boundary,
+    List<String> groups,
+    DateTime createdAt,
+  ) {
+    if (boundary <= 0 || boundary > groups.length) {
+      throw StateError('context_boundary_missing');
+    }
+    return ContextOperation(
+      id: const Uuid().v4(),
+      kind: ContextOperationKind.clear,
+      anchorGroupId: groups[boundary - 1],
+      appliedAfterGroupId: groups[boundary - 1],
+      sourceGroups: groups.take(boundary).toList(),
+      dependencies: const [],
+      createdAt: createdAt,
+      convertedFromLegacyClear: true,
+    );
   }
 
   Future<List<ContextOperation>> readContextOperations(String conversationId) =>
@@ -229,27 +268,17 @@ extension ChatContextRepository on ChatDatabaseRepository {
         // Explicitly approved one-time conversion. Clearing this column and
         // saving the node share a transaction, including on backup imports.
         if (conversation.truncateIndex >= 0) {
-          final selected = await _contextMetadata(conversationId);
           final index = conversation.truncateIndex;
-          if (index > selected.length) {
-            throw StateError('context_boundary_missing');
-          }
           if (index > 0) {
             if (operations.isNotEmpty) {
               throw StateError('context_boundary_conflict');
             }
+            final selected = await _contextMetadata(conversationId);
             operations.add(
-              ContextOperation(
-                id: const Uuid().v4(),
-                kind: ContextOperationKind.clear,
-                anchorGroupId: ContextHistory.group(selected[index - 1]),
-                appliedAfterGroupId: ContextHistory.group(selected[index - 1]),
-                sourceGroups: selected
-                    .take(index)
-                    .map(ContextHistory.group)
-                    .toList(),
-                dependencies: const [],
-                createdAt: conversation.updatedAt,
+              _legacyClearOperation(
+                index,
+                selected.map(ContextHistory.group).toList(),
+                conversation.updatedAt,
               ),
             );
             await _writeContextOperations(conversationId, operations);

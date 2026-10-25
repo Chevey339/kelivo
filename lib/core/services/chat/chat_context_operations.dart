@@ -23,8 +23,10 @@ extension ChatContextOperations on ChatService {
   }
 
   Future<List<ChatMessage>> messagesForCompression(
-    List<ChatMessage> messages,
-  ) async {
+    List<ChatMessage> messages, {
+    bool includeAttachmentsAndTools = true,
+  }) async {
+    if (!includeAttachmentsAndTools) return messages;
     final prompts = await _repo.getMessagePrompts(
       messages
           .where(
@@ -147,7 +149,7 @@ extension ChatContextOperations on ChatService {
       return snapshot;
     }
     final operations = await loadContextOperations(id);
-    final messages = await _loadRawSelectedContextMessages(
+    final messages = await loadRawSelectedContextMessages(
       id,
       limit: 0x7fffffff,
     );
@@ -180,7 +182,7 @@ extension ChatContextOperations on ChatService {
       return messages;
     }
     final operations = await loadContextOperations(conversationId);
-    final raw = await _loadRawSelectedContextMessages(
+    final raw = await loadRawSelectedContextMessages(
       conversationId,
       limit: 0x7fffffff,
     );

@@ -29,6 +29,9 @@ class ContextOperation {
     this.inputMaxChars,
     this.historySource = ContextHistorySource.effective,
     this.includedEditedSummaries = true,
+    this.includedAttachmentsAndTools = true,
+    this.convertedFromLegacyClear = false,
+    this.inputParts = 0,
   });
 
   static const entityKind = 'conversationContext';
@@ -52,6 +55,9 @@ class ContextOperation {
   final int? inputMaxChars;
   final ContextHistorySource historySource;
   final bool includedEditedSummaries;
+  final bool includedAttachmentsAndTools;
+  final bool convertedFromLegacyClear;
+  final int inputParts;
 
   bool get isEdited => summary != originalSummary;
   bool get isCompression => kind == ContextOperationKind.compress;
@@ -78,6 +84,9 @@ class ContextOperation {
         inputMaxChars: inputMaxChars,
         historySource: historySource,
         includedEditedSummaries: includedEditedSummaries,
+        includedAttachmentsAndTools: includedAttachmentsAndTools,
+        convertedFromLegacyClear: convertedFromLegacyClear,
+        inputParts: inputParts,
       );
 
   Map<String, dynamic> toJson() => {
@@ -98,6 +107,9 @@ class ContextOperation {
     'inputMaxChars': inputMaxChars,
     'historySource': historySource.name,
     'includedEditedSummaries': includedEditedSummaries,
+    'includedAttachmentsAndTools': includedAttachmentsAndTools,
+    'convertedFromLegacyClear': convertedFromLegacyClear,
+    'inputParts': inputParts,
   };
 
   factory ContextOperation.fromJson(Map<String, dynamic> json) =>
@@ -121,6 +133,10 @@ class ContextOperation {
           json['historySource'] as String,
         ),
         includedEditedSummaries: json['includedEditedSummaries'] as bool,
+        includedAttachmentsAndTools:
+            json['includedAttachmentsAndTools'] != false,
+        convertedFromLegacyClear: json['convertedFromLegacyClear'] == true,
+        inputParts: json['inputParts'] as int? ?? 0,
       );
 
   ContextOperation remap({
@@ -144,6 +160,9 @@ class ContextOperation {
     inputMaxChars: inputMaxChars,
     historySource: historySource,
     includedEditedSummaries: includedEditedSummaries,
+    includedAttachmentsAndTools: includedAttachmentsAndTools,
+    convertedFromLegacyClear: convertedFromLegacyClear,
+    inputParts: inputParts,
   );
 }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/services/browser/browser_workspace_resources.dart';
@@ -29,6 +30,111 @@ void main() {
   tearDown(() async {
     scope.close();
     await root.delete(recursive: true);
+  });
+
+  test(
+    'replaced screenshot leaf never truncates the replacement or its symlink target',
+    () async {
+      for (final symlink in [false, if (!Platform.isWindows) true]) {
+        final outside = File('${root.path}/outside.txt');
+        await outside.writeAsString('keep me');
+        final leaf = '${bindings['chat-a']!.path}/race-$symlink.png';
+        var checks = 0;
+        await expectLater(
+          scope.saveScreenshot(
+            'race-$symlink.png',
+            Uint8List.fromList([1, 2, 3]),
+            checkAccess: () {
+              if (++checks == 6) {
+                if (symlink) {
+                  Link(leaf).createSync(outside.path);
+                } else {
+                  File(leaf).writeAsStringSync('replacement');
+                }
+              }
+            },
+          ),
+          throwsStateError,
+        );
+        expect(await outside.readAsString(), 'keep me');
+        if (!symlink) expect(await File(leaf).readAsString(), 'replacement');
+        expect(
+          Directory(
+            bindings['chat-a']!.path,
+          ).listSync().where((e) => e.path.contains('.kelivo-screenshot-')),
+          isEmpty,
+        );
+      }
+    },
+  );
+
+  test(
+    'screenshot saves within binding, creates parents and refuses overwrite',
+    () async {
+      final png = Uint8List.fromList([137, 80, 78, 71]);
+      expect(
+        await scope.saveScreenshot('screens/shot.png', png, checkAccess: () {}),
+        'kelivo://workspace/screens/shot.png',
+      );
+      final file = File('${bindings['chat-a']!.path}/screens/shot.png');
+      expect(await file.readAsBytes(), png);
+      await expectLater(
+        scope.saveScreenshot(
+          'screens/shot.png',
+          Uint8List(1),
+          checkAccess: () {},
+        ),
+        throwsStateError,
+      );
+      expect(await file.readAsBytes(), png);
+    },
+  );
+
+  test(
+    'screenshot rejects parent symlink escapes, closed and rebound scopes',
+    () async {
+      final png = Uint8List.fromList([137, 80, 78, 71]);
+      if (!Platform.isWindows) {
+        await Link('${bindings['chat-a']!.path}/escape').create(root.path);
+        await expectLater(
+          scope.saveScreenshot(
+            'escape/nested/shot.png',
+            png,
+            checkAccess: () {},
+          ),
+          throwsStateError,
+        );
+        expect(await Directory('${root.path}/nested').exists(), false);
+      }
+      bindings['chat-a'] = await Directory('${root.path}/other').create();
+      await expectLater(
+        scope.saveScreenshot('rebound.png', png, checkAccess: () {}),
+        throwsStateError,
+      );
+      scope.close();
+      await expectLater(
+        scope.saveScreenshot('closed.png', png, checkAccess: () {}),
+        throwsStateError,
+      );
+    },
+  );
+
+  test('takeover during screenshot write removes partial output', () async {
+    var checks = 0;
+    await expectLater(
+      scope.saveScreenshot(
+        'cancelled.png',
+        Uint8List.fromList([1, 2, 3]),
+        checkAccess: () {
+          if (++checks == 6) throw StateError('browser_human_control');
+        },
+      ),
+      throwsStateError,
+    );
+    expect(
+      await File('${bindings['chat-a']!.path}/cancelled.png').exists(),
+      false,
+    );
   });
 
   test(

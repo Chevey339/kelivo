@@ -5573,7 +5573,11 @@ class ChatDatabaseRepository {
           }
         }
         if (!changed) continue;
-        await updateMessage(message.copyWith(parts: nextParts));
+        // Availability is local restore bookkeeping, not an edit of the
+        // original attachment. Preserve summaries that reference this message.
+        await _db.transaction(
+          () => _replaceMessageParts(message.copyWith(parts: nextParts)),
+        );
         updated += 1;
       }
     }
@@ -5845,7 +5849,15 @@ class ChatDatabaseRepository {
               ),
               mcpRows.map((row) => row.data).toList(),
               messages,
-              await _contextFingerprintData(schema, id, groupOrdinals),
+              await _contextFingerprintData(
+                schema,
+                id,
+                groupOrdinals,
+                legacyTruncateIndex: conversation.read<int>('truncate_index'),
+                legacyUpdatedAt: const MicrosecondDateTimeConverter().fromSql(
+                  conversation.read<int>('updated_at'),
+                ),
+              ),
             ]),
           ),
         )
@@ -5857,6 +5869,8 @@ class ChatDatabaseRepository {
     Map<String, int> groupOrdinals,
   ) {
     final normalized = Map<String, Object?>.from(data);
+    // The equivalent clear node is included in the context fingerprint below.
+    normalized['truncate_index'] = -1;
     normalized['created_at'] = _fingerprintTimestamp(normalized['created_at']);
     normalized['updated_at'] = _fingerprintTimestamp(normalized['updated_at']);
     final rawSelections = normalized['version_selections_json'];

@@ -43,6 +43,9 @@ class ContextCompressionTask {
   final CompressContextOptions options;
   CompressionRequest? request;
   CompressionPhase phase;
+  DateTime startedAt = DateTime.now();
+  String? anchorGroupId;
+  CompressionBudget? previousBudget;
   int completedParts = 0;
   int totalParts = 0;
   String? error;
@@ -69,5 +72,7 @@ class ContextCompressionTask {
     'candidate': candidate?.toJson(),
     'error': error,
     'resultConversationId': resultConversationId,
+    'startedAt': startedAt.toIso8601String(),
+    'anchorGroupId': anchorGroupId,
   };
 }

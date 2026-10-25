@@ -135,12 +135,16 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onFileProcessingStarted = _onFileProcessingStarted;
     _chatActions.onFileProcessingFinished = _onFileProcessingFinished;
     _chatService.contextCompression.isConversationBusy = _isConversationBusy;
+    _chatService.contextCompression.isInputPaused =
+        _pausedQueuedInputs.contains;
     _chatService.contextCompression.estimateCandidate =
         _estimateCompressedContext;
     _chatService.contextCompression.addListener(_onCompressionChanged);
     _chatService.contextCompression.onContextChangeFinished = (id, applied) {
       if (!applied && _queuedInputs.containsKey(id)) {
-        _pausedQueuedInputs.add(id);
+        if (_pausedQueuedInputs.add(id)) {
+          _chatService.contextCompression.refreshInputStatus();
+        }
       }
       notifyListeners();
       if (applied) unawaited(_drainQueuedInputIfReady(id));
@@ -247,19 +251,21 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _onCompressionChanged() {
+    var queueChanged = false;
     for (final task in _chatService.contextCompression.tasks) {
       final state = '${task.id}:${task.phase.name}';
       if (_compressionStates[task.conversationId] == state) continue;
       _compressionStates[task.conversationId] = state;
       if (task.phase == CompressionPhase.completed &&
           task.resultConversationId == null) {
-        _pausedQueuedInputs.remove(task.conversationId);
         unawaited(_drainQueuedInputIfReady(task.conversationId));
-      } else if (!task.active &&
+      } else if ((task.phase == CompressionPhase.review || !task.active) &&
           _queuedInputs.containsKey(task.conversationId)) {
-        _pausedQueuedInputs.add(task.conversationId);
+        queueChanged =
+            _pausedQueuedInputs.add(task.conversationId) || queueChanged;
       }
     }
+    if (queueChanged) _chatService.contextCompression.refreshInputStatus();
     notifyListeners();
   }
 
@@ -267,6 +273,7 @@ class HomeViewModel extends ChangeNotifier {
   void dispose() {
     _chatService.contextCompression.removeListener(_onCompressionChanged);
     _chatService.contextCompression.isConversationBusy = null;
+    _chatService.contextCompression.isInputPaused = null;
     _chatService.contextCompression.estimateCandidate = null;
     _chatService.contextCompression.onContextChangeFinished = null;
     super.dispose();
@@ -584,6 +591,7 @@ class HomeViewModel extends ChangeNotifier {
     }
     _queuedInputs.remove(queued.conversationId);
     _pausedQueuedInputs.remove(queued.conversationId);
+    _chatService.contextCompression.refreshInputStatus();
     notifyListeners();
     return _cloneInput(queued.input);
   }
@@ -688,6 +696,7 @@ class HomeViewModel extends ChangeNotifier {
     } finally {
       drafts?.submissionIdle(conversationId);
       _drainingQueuedInputs.remove(conversationId);
+      _chatService.contextCompression.refreshInputStatus();
       notifyListeners();
     }
   }
@@ -1364,7 +1373,10 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> clearContext() async {
     final convo = currentConversation;
     if (convo == null) return;
-    await _chatService.contextCompression.cancel(convo.id);
+    await _chatService.contextCompression.cancel(
+      convo.id,
+      reason: 'context_cleared',
+    );
     await _clearSuggestionsFor(convo.id);
     await _chatService.clearConversationContext(convo.id);
     notifyListeners();
@@ -1374,8 +1386,11 @@ class HomeViewModel extends ChangeNotifier {
   /// in the existing queue and is released only after an in-place commit.
   Future<String?> compressContext({
     required CompressContextOptions options,
+    String? targetConversationId,
   }) async {
-    final convo = currentConversation;
+    final convo = targetConversationId == null
+        ? currentConversation
+        : _chatService.getConversation(targetConversationId);
     if (convo == null) return 'no_conversation';
     final conversationId = convo.id;
     final settings = _contextProvider.read<SettingsProvider>();

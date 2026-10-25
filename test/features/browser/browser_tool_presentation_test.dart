@@ -57,6 +57,7 @@ void main() {
       'render': '渲染页面',
       'extract': '提取正文',
       'snapshot': '读取页面结构',
+      'screenshot': '截取页面',
       'click': '点击',
       'type': '输入文字',
       'press': '按键',
@@ -74,6 +75,23 @@ void main() {
     for (final entry in labels.entries) {
       expect(browserActionLabel(l, entry.key), entry.value);
     }
+  });
+  test('structured failure codes keep localized error presentation', () {
+    final failed = action(
+      'click',
+      raw: jsonEncode({
+        'ok': false,
+        'error_code': 'stale_ref',
+        'error': 'The target changed.',
+      }),
+    );
+    expect(failed.failed, true);
+    expect(browserErrorSummary(l, failed.error), l.browserErrStaleRef);
+    final old = action(
+      'open',
+      raw: '{"ok":false,"error":"browser_tab_closed"}',
+    );
+    expect(browserErrorSummary(l, old.error), l.browserErrTabClosed);
   });
   test('image suffix and malformed result never break presentation', () {
     expect(

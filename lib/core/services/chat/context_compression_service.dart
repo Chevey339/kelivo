@@ -61,6 +61,10 @@ class ContextCompressionService extends ChangeNotifier {
   }
 
   bool Function(String conversationId)? isConversationBusy;
+  // The existing HomeViewModel queue owns this state; this is only a view for
+  // sidebar indicators, never another pending-input store.
+  bool Function(String conversationId)? isInputPaused;
+  void refreshInputStatus() => notifyListeners();
   Future<CompressionBudget> Function(String id, List<ChatMessage> history)?
   estimateCandidate;
   bool _disposed = false;
@@ -79,14 +83,20 @@ class ContextCompressionService extends ChangeNotifier {
           phase == CompressionPhase.cancelled) {
         continue;
       }
-      final task = ContextCompressionTask(
-        id: value['id'] as String,
-        conversationId: entry.key,
-        options: CompressContextOptions.fromJson(
-          Map<String, dynamic>.from(value['options'] as Map),
-        ),
-        phase: CompressionPhase.interrupted,
-      )..summary = value['summary'] as String? ?? '';
+      final task =
+          ContextCompressionTask(
+              id: value['id'] as String,
+              conversationId: entry.key,
+              options: CompressContextOptions.fromJson(
+                Map<String, dynamic>.from(value['options'] as Map),
+              ),
+              phase: CompressionPhase.interrupted,
+            )
+            ..summary = value['summary'] as String? ?? ''
+            ..anchorGroupId = value['anchorGroupId'] as String?;
+      if (value['startedAt'] case final String startedAt) {
+        task.startedAt = DateTime.parse(startedAt);
+      }
       if (value['candidate'] case final Map candidate) {
         task.candidate = ContextOperation.fromJson(
           Map<String, dynamic>.from(candidate),
@@ -117,6 +127,7 @@ class ContextCompressionService extends ChangeNotifier {
   }
 
   Future<void> start(String id, CompressionRequest request) async {
+    if (taskFor(id)?.phase == CompressionPhase.review) await cancel(id);
     if (blocksSending(id)) throw StateError('in_flight');
     if (chat.getConversation(id) == null) {
       throw StateError('conversation_not_found');
@@ -164,14 +175,16 @@ class ContextCompressionService extends ChangeNotifier {
     );
   }
 
-  Future<void> cancel(String id) async {
+  Future<void> cancel(String id, {String? reason}) async {
     final task = _tasks[id];
     if (task == null ||
-        !task.active ||
+        (!task.active &&
+            (reason == null || task.phase == CompressionPhase.completed)) ||
         task.phase == CompressionPhase.applying) {
       return;
     }
     task.phase = CompressionPhase.cancelled;
+    task.error = reason;
     task.request = null;
     ChatApiService.cancelRequest(task.id);
     await _publish(task);
@@ -196,57 +209,30 @@ class ContextCompressionService extends ChangeNotifier {
       if (snapshot.messages.any((message) => message.isStreaming)) {
         throw StateError('in_flight');
       }
-      final effective = ContextHistory.resolve(
+      final selection = selectCompressionHistory(
         snapshot.messages,
         snapshot.operations,
+        task.options,
       );
-      final keep = task.options.mode == CompressContextLimitMode.keepRecent
-          ? task.options.keepUserMessages ??
-                CompressContextOptions.defaultKeepUserMessages
-          : 0;
-      final retained = keep == 0
-          ? <ChatMessage>[]
-          : selectKeepRecentMessages(effective, keep);
-      final prefix = effective
-          .take(effective.length - retained.length)
-          .toList();
-      if (prefix.isEmpty ||
-          (prefix.every(ContextOperation.isSummary) &&
-              task.options.historySource == ContextHistorySource.effective)) {
+      if (selection.covered.isEmpty || selection.needsRegeneration) {
         throw StateError('no_messages');
       }
-      final dependencies = prefix
-          .where(ContextOperation.isSummary)
-          .map((m) => m.id.substring(ContextOperation.summaryPrefix.length))
-          .toList();
-      final groups = <String>{
-        for (final m in prefix)
-          if (!ContextOperation.isSummary(m)) ContextHistory.group(m),
-        for (final op in snapshot.operations)
-          if (dependencies.contains(op.id)) ...op.sourceGroups,
-      };
-      final covered = snapshot.messages
-          .where((m) => groups.contains(ContextHistory.group(m)))
-          .toList();
-      if (covered.isEmpty) throw StateError('no_messages');
-      final expanded = ContextHistory.compressionInput(
-        snapshot.messages,
-        snapshot.operations,
-        source: task.options.historySource,
-        includeEditedSummaries: task.options.includeEditedSummaries,
+      final retained = selection.retained;
+      final covered = selection.covered;
+      final dependencies = selection.dependencies;
+      task.anchorGroupId = ContextHistory.group(covered.last);
+      try {
+        task.previousBudget = await estimateCandidate?.call(
+          task.conversationId,
+          selection.effective,
+        );
+      } catch (_) {
+        /* An unavailable before-estimate must not fail compression. */
+      }
+      final textMessages = await chat.messagesForCompression(
+        selection.input,
+        includeAttachmentsAndTools: task.options.includeAttachmentsAndTools,
       );
-      final input = expanded.where((message) {
-        if (groups.contains(ContextHistory.group(message))) return true;
-        final op = snapshot.operations
-            .where(
-              (op) =>
-                  message.id == op.summaryMessageId ||
-                  message.id == 'context-note:${op.id}',
-            )
-            .firstOrNull;
-        return op != null && op.sourceGroups.every(groups.contains);
-      }).toList();
-      final textMessages = await chat.messagesForCompression(input);
       _check(task);
       final budget = compressRequestCharBudget(
         contextWindowTokens: request.contextWindowTokens,
@@ -322,6 +308,8 @@ class ContextCompressionService extends ChangeNotifier {
         inputMaxChars: task.options.maxChars,
         historySource: task.options.historySource,
         includedEditedSummaries: task.options.includeEditedSummaries,
+        includedAttachmentsAndTools: task.options.includeAttachmentsAndTools,
+        inputParts: chunks.length,
       );
       if ((await chat.loadContextSnapshot(task.conversationId)).fingerprint !=
           snapshot.fingerprint) {

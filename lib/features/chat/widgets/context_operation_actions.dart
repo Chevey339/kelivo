@@ -1,97 +1,120 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../shared/widgets/ios_text_button.dart';
-import 'context_compression_status.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/models/context_operation.dart';
+import '../../../core/models/compress_context_options.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/context_compression_service.dart';
+import '../../../desktop/desktop_context_menu.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/responsive/screen_type_helper.dart';
-import '../../../shared/widgets/custom_bottom_sheet.dart';
+import '../../../shared/widgets/action_sheet.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'context_compression_status.dart';
+import 'context_dialog.dart';
+import 'context_impact_dialog.dart';
 import 'context_operation_widgets.dart';
+import '../pages/context_summary_editor_page.dart';
+
+Future<CompressionBudget?> _estimate(
+  ChatService chat,
+  String id,
+  ConversationContextSnapshot snapshot,
+  List<ContextOperation> operations,
+) async {
+  try {
+    return await chat.contextCompression.estimateCandidate?.call(
+      id,
+      ContextHistory.resolve(snapshot.messages, operations),
+    );
+  } catch (_) {
+    return null;
+  }
+}
 
 Future<bool> confirmContextImpact(
   BuildContext context,
-  List<ContextOperation> operations,
-) async {
-  if (operations.isEmpty) return true;
+  List<ContextOperation> operations, {
+  required Set<String> affectedIds,
+  required ContextImpactKind kind,
+  String? targetId,
+  CompressionBudget? before,
+  CompressionBudget? after,
+  String? sourceLabel,
+}) async {
+  if (affectedIds.isEmpty) return true;
   if (!context.mounted) return false;
-  final l10n = AppLocalizations.of(context)!;
+  final active = operations.where((op) => !op.revoked).toList();
+  final first = active.indexWhere((op) => affectedIds.contains(op.id));
   return await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.contextChangeTitle),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(l10n.contextChangeImpact(operations.length)),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final operation in operations)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              '${operation.isCompression ? l10n.contextCompressMarker : l10n.contextClearMarker} · '
-                              '${MaterialLocalizations.of(context).formatShortDate(operation.createdAt.toLocal())}',
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            IosTextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              label: l10n.homePageCancel,
-            ),
-            IosTextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              label: l10n.modelDetailSheetConfirmButton,
-            ),
-          ],
+        builder: (_) => ContextImpactDialog(
+          operations: active.skip(first < 0 ? 0 : first).toList(),
+          affectedIds: affectedIds,
+          targetId: targetId,
+          kind: kind,
+          before: before,
+          after: after,
+          sourceLabel: sourceLabel,
         ),
       ) ??
       false;
 }
 
-/// Returns the exact node state approved by the user, checked again inside
-/// the source write transaction. Null means the user cancelled.
 Future<String?> confirmContextSourceMutation(
   BuildContext context, {
   required ChatService chat,
   required String conversationId,
   required Set<String> groups,
   Set<String> removedGroups = const {},
+  bool deleting = false,
 }) async {
-  final operations = await chat.loadContextOperations(
-    conversationId,
-    refresh: true,
-  );
-  if (!context.mounted) return null;
-  final affected = ContextHistory.affectedOperations(
+  final operations = await chat.loadContextOperations(conversationId);
+  if (ContextHistory.affectedOperations(
     operations,
     changedGroups: groups,
     removedGroups: removedGroups,
-  );
-  if (!await confirmContextImpact(
-    context,
-    operations.where((op) => affected.contains(op.id)).toList(),
-  )) {
-    return null;
+  ).isEmpty) {
+    return ContextHistory.operationsFingerprint(operations);
   }
-  return ContextHistory.operationsFingerprint(operations);
+  // Only hydrate original bodies when an impact preview needs their budget.
+  // Recompute against this snapshot in case nodes changed during the await.
+  final snapshot = await chat.loadContextSnapshot(conversationId);
+  final affected = ContextHistory.affectedOperations(
+    snapshot.operations,
+    changedGroups: groups,
+    removedGroups: removedGroups,
+  );
+  if (affected.isNotEmpty) {
+    final budgets = await Future.wait([
+      _estimate(chat, conversationId, snapshot, snapshot.operations),
+      _estimate(chat, conversationId, snapshot, [
+        for (final op in snapshot.operations)
+          affected.contains(op.id) ? op.copyWith(revoked: true) : op,
+      ]),
+    ]);
+    if (!context.mounted ||
+        !await confirmContextImpact(
+          context,
+          snapshot.operations,
+          affectedIds: affected,
+          kind: deleting
+              ? ContextImpactKind.deleteSource
+              : ContextImpactKind.source,
+          before: budgets.first,
+          after: budgets.last,
+          sourceLabel: AppLocalizations.of(context)!.contextOriginalMessages,
+        )) {
+      return null;
+    }
+  }
+  return ContextHistory.operationsFingerprint(snapshot.operations);
 }
 
 Future<bool> changeContextOperationWithConfirmation(
@@ -101,7 +124,8 @@ Future<bool> changeContextOperationWithConfirmation(
   required ContextOperation operation,
   String? summary,
 }) async {
-  final operations = await chat.loadContextOperations(conversationId);
+  final before = await chat.loadContextSnapshot(conversationId);
+  final operations = before.operations;
   if (!context.mounted) return false;
   final current = operations.where((op) => op.id == operation.id).firstOrNull;
   if (current == null ||
@@ -118,94 +142,124 @@ Future<bool> changeContextOperationWithConfirmation(
     operations,
     operationIds: {operation.id},
   );
-  final dependents = operations
-      .where(
-        (op) =>
-            !op.revoked && op.id != operation.id && affected.contains(op.id),
-      )
-      .toList();
-  if (!await confirmContextImpact(context, dependents)) return false;
-  final before = await chat.loadContextSnapshot(conversationId);
-  if (summary != null && chat.contextCompression.estimateCandidate != null) {
-    final projected = [
-      for (final op in before.operations)
-        if (op.id == operation.id)
-          op.copyWith(summary: summary)
-        else if (affected.contains(op.id))
-          op.copyWith(revoked: true)
-        else
-          op,
-    ];
-    final budget = await chat.contextCompression.estimateCandidate!(
-      conversationId,
-      ContextHistory.resolve(before.messages, projected),
+  final projected = [
+    for (final op in operations)
+      if (op.id == operation.id && summary != null)
+        op.copyWith(summary: summary)
+      else if (affected.contains(op.id))
+        op.copyWith(revoked: true)
+      else
+        op,
+  ];
+  final budgets = await Future.wait([
+    _estimate(chat, conversationId, before, operations),
+    _estimate(chat, conversationId, before, projected),
+  ]);
+  if (!context.mounted) return false;
+  final active = operations.where((op) => !op.revoked).toList();
+  if (active.last.id != operation.id || affected.length > 1) {
+    if (!await confirmContextImpact(
+      context,
+      operations,
+      affectedIds: affected,
+      targetId: operation.id,
+      kind: summary != null
+          ? ContextImpactKind.edit
+          : operation.isCompression
+          ? ContextImpactKind.undo
+          : ContextImpactKind.clear,
+      before: budgets.first,
+      after: budgets.last,
+    )) {
+      return false;
+    }
+  }
+  if (!context.mounted) return false;
+  if (summary != null &&
+      budgets.last?.contextWindow != null &&
+      budgets.last!.usedTokens > budgets.last!.contextWindow!) {
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(context)!.contextBudgetExceeded,
+      type: NotificationType.warning,
     );
-    if (budget.contextWindow != null &&
-        budget.usedTokens > budget.contextWindow!) {
+    return false;
+  }
+  final waiting =
+      chat.contextCompression.isConversationBusy?.call(conversationId) ?? false;
+  final change = chat.changeContextOperation(
+    conversationId,
+    operation.id,
+    summary: summary,
+    includeDependents: true,
+    expectedState: ContextHistory.operationsFingerprint(operations),
+  );
+  Future<bool> finish() async {
+    try {
+      await change;
+      if (summary == null) {
+        final after = await chat.loadContextSnapshot(conversationId);
+        final budget = await _estimate(
+          chat,
+          conversationId,
+          after,
+          after.operations,
+        );
+        if (context.mounted) {
+          final l10n = AppLocalizations.of(context)!;
+          showAppSnackBar(
+            context,
+            message: l10n.contextUndoneSnack(
+              budgets.first == null
+                  ? '—'
+                  : contextTokenValue(budgets.first!.usedTokens),
+              budget == null ? '—' : contextTokenValue(budget.usedTokens),
+            ),
+            actionLabel: l10n.contextRestore,
+            onAction: () async {
+              try {
+                await chat.restoreContextOperations(
+                  conversationId,
+                  before.operations,
+                  expectedFingerprint: after.fingerprint,
+                );
+              } catch (_) {
+                if (context.mounted) {
+                  showAppSnackBar(
+                    context,
+                    message: l10n.contextChanged,
+                    type: NotificationType.warning,
+                  );
+                }
+              }
+            },
+          );
+        }
+      }
+      return true;
+    } catch (error) {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: AppLocalizations.of(context)!.contextBudgetExceeded,
+          message: '${AppLocalizations.of(context)!.contextChanged}\n$error',
           type: NotificationType.warning,
         );
       }
       return false;
     }
   }
-  if (context.mounted &&
-      (chat.contextCompression.isConversationBusy?.call(conversationId) ??
-          false)) {
+
+  if (waiting) {
     showAppSnackBar(
       context,
-      message: AppLocalizations.of(context)!.contextChangeWaiting,
+      message: summary == null
+          ? AppLocalizations.of(context)!.contextChangeWaiting
+          : AppLocalizations.of(context)!.contextEditPending,
     );
-  }
-  try {
-    await chat.changeContextOperation(
-      conversationId,
-      operation.id,
-      summary: summary,
-      includeDependents: true,
-      expectedState: ContextHistory.operationsFingerprint(operations),
-    );
-    if (summary == null) {
-      final after = await chat.loadContextSnapshot(conversationId);
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: AppLocalizations.of(context)!.contextOperationUndone,
-          actionLabel: AppLocalizations.of(context)!.contextRestoreOperation,
-          onAction: () async {
-            try {
-              await chat.restoreContextOperations(
-                conversationId,
-                before.operations,
-                expectedFingerprint: after.fingerprint,
-              );
-            } catch (_) {
-              if (context.mounted) {
-                showAppSnackBar(
-                  context,
-                  message: AppLocalizations.of(context)!.contextChanged,
-                  type: NotificationType.warning,
-                );
-              }
-            }
-          },
-        );
-      }
-    }
+    unawaited(finish());
     return true;
-  } catch (error) {
-    if (context.mounted) {
-      showAppSnackBar(
-        context,
-        message: '${AppLocalizations.of(context)!.contextChanged}\n$error',
-        type: NotificationType.warning,
-      );
-    }
-    return false;
   }
+  return finish();
 }
 
 Future<void> showContextOperationDetails(
@@ -214,74 +268,67 @@ Future<void> showContextOperationDetails(
   required String conversationId,
   required ContextOperation operation,
   Future<void> Function(String messageId)? onViewOriginal,
+  VoidCallback? onRecompress,
+  VoidCallback? onContinueNewChat,
 }) async {
   final snapshot = await chat.loadContextSnapshot(conversationId);
-  if (!context.mounted) return;
   final source = snapshot.messages
       .where((m) => operation.sourceGroups.contains(ContextHistory.group(m)))
       .toList();
-  CompressionBudget? budget;
-  CompressionBudget? undoBudget;
-  final estimate = chat.contextCompression.estimateCandidate;
-  if (estimate != null) {
-    try {
-      budget = await estimate(
-        conversationId,
-        ContextHistory.resolve(snapshot.messages, snapshot.operations),
-      );
-      final affected = ContextHistory.affectedOperations(
-        snapshot.operations,
-        operationIds: {operation.id},
-      );
-      undoBudget = await estimate(
-        conversationId,
-        ContextHistory.resolve(snapshot.messages, [
-          for (final op in snapshot.operations)
-            affected.contains(op.id) ? op.copyWith(revoked: true) : op,
-        ]),
-      );
-    } catch (_) {
-      /* Unknown model or unavailable preview: keep history readable. */
-    }
-  }
+  final affected = ContextHistory.affectedOperations(
+    snapshot.operations,
+    operationIds: {operation.id},
+  );
+  final budgets = await Future.wait([
+    _estimate(chat, conversationId, snapshot, snapshot.operations),
+    _estimate(chat, conversationId, snapshot, [
+      for (final op in snapshot.operations)
+        affected.contains(op.id) ? op.copyWith(revoked: true) : op,
+    ]),
+  ]);
   if (!context.mounted) return;
+  final l10n = AppLocalizations.of(context)!;
   final range = source.isEmpty
       ? ''
-      : '${MaterialLocalizations.of(context).formatShortDate(source.first.timestamp.toLocal())} – '
-            '${MaterialLocalizations.of(context).formatShortDate(source.last.timestamp.toLocal())}';
+      : l10n.contextDetailRange(
+          (snapshot.messages.indexOf(source.first) + 1).toString(),
+          (snapshot.messages.indexOf(source.last) + 1).toString(),
+          countUserMessages(source),
+        );
+  final hidden = snapshot.operations
+      .skipWhile((op) => op.id != operation.id)
+      .skip(1)
+      .any(
+        (op) =>
+            !op.revoked &&
+            !op.isCompression &&
+            op.sourceGroups.contains(operation.anchorGroupId),
+      );
+  final superseded = snapshot.operations.any(
+    (op) => !op.revoked && op.dependencies.contains(operation.id),
+  );
   await _showContextContent(
     context,
     title: operation.isCompression
-        ? AppLocalizations.of(context)!.contextSummaryTitle
-        : AppLocalizations.of(context)!.contextClearMarker,
-    builder: (detailContext, scroll) => ContextOperationContent(
+        ? l10n.contextDetailTitle
+        : l10n.contextDetailClearTitle,
+    maxWidth: operation.isCompression ? 560 : 500,
+    builder: (detailContext) => ContextOperationContent(
       operation: operation,
       rangeLabel: range,
-      statusLabel: operation.revoked
-          ? ''
-          : snapshot.operations
-                .skipWhile((op) => op.id != operation.id)
-                .skip(1)
-                .any(
-                  (op) =>
-                      !op.revoked &&
-                      !op.isCompression &&
-                      op.sourceGroups.contains(operation.anchorGroupId),
-                )
-          ? AppLocalizations.of(context)!.contextOperationHidden
-          : snapshot.operations.any(
-              (op) => !op.revoked && op.dependencies.contains(operation.id),
-            )
-          ? AppLocalizations.of(context)!.contextOperationSuperseded
+      budget: budgets.first,
+      undoBudget: budgets.last,
+      showHeader: PlatformUtils.isDesktopTarget,
+      statusLabel: hidden
+          ? l10n.contextOperationHidden
+          : superseded
+          ? l10n.contextDetailSuperseded
           : '',
-      budget: budget,
-      undoBudget: undoBudget,
-      scrollController: scroll,
       onClose: () => Navigator.of(detailContext).pop(),
       onSave: operation.revoked
           ? null
           : (summary) => changeContextOperationWithConfirmation(
-              detailContext,
+              context,
               chat: chat,
               conversationId: conversationId,
               operation: operation,
@@ -290,25 +337,112 @@ Future<void> showContextOperationDetails(
       onUndo: operation.revoked
           ? null
           : () => changeContextOperationWithConfirmation(
-              detailContext,
+              context,
               chat: chat,
               conversationId: conversationId,
               operation: operation,
             ),
+      estimateSummary: (summary) => _estimate(chat, conversationId, snapshot, [
+        for (final op in snapshot.operations)
+          if (op.id == operation.id)
+            op.copyWith(summary: summary)
+          else if (affected.contains(op.id))
+            op.copyWith(revoked: true)
+          else
+            op,
+      ]),
       onViewOriginal: source.isEmpty || onViewOriginal == null
           ? null
           : () {
               Navigator.of(detailContext).pop();
               onViewOriginal(source.first.id);
             },
+      onRecompress: onRecompress == null
+          ? null
+          : () {
+              Navigator.of(detailContext).pop();
+              onRecompress();
+            },
+      onContinueNewChat: onContinueNewChat == null
+          ? null
+          : () {
+              Navigator.of(detailContext).pop();
+              onContinueNewChat();
+            },
     ),
   );
+}
+
+Future<void> showContextCompressionMenu(
+  BuildContext context, {
+  required ChatService chat,
+  required ContextCompressionTask task,
+  required Offset anchor,
+  required VoidCallback onRetry,
+  required VoidCallback onAdjust,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final failed = !task.active;
+  final details = failed
+      ? compressionErrorLabel(l10n, task.error ?? l10n.contextTaskInterrupted)
+      : task.totalParts == 0
+      ? compressionDividerLabel(l10n, task)
+      : l10n.compressTaskElapsed(
+          (task.completedParts + 1).clamp(1, task.totalParts),
+          task.totalParts,
+          DateTime.now().difference(task.startedAt).inSeconds.clamp(0, 864000),
+        );
+  final items = <ActionSheetItem>[
+    if (failed) ...[
+      ActionSheetItem(
+        icon: LucideIcons.sparkles,
+        label: l10n.compressTaskRetry,
+        onTap: onRetry,
+      ),
+      ActionSheetItem(
+        icon: LucideIcons.package2,
+        label: l10n.compressTaskAdjustRetry,
+        onTap: onAdjust,
+      ),
+      ActionSheetItem(
+        icon: LucideIcons.x,
+        label: l10n.compressTaskAbandon,
+        destructive: true,
+        onTap: () => chat.contextCompression.dismiss(task.conversationId),
+      ),
+    ] else if (task.phase != CompressionPhase.applying)
+      ActionSheetItem(
+        icon: LucideIcons.x,
+        label: l10n.contextTaskCancel,
+        destructive: true,
+        onTap: () => chat.contextCompression.cancel(task.conversationId),
+      ),
+  ];
+  if (PlatformUtils.isDesktopTarget) {
+    await showDesktopContextMenuAt(
+      context,
+      globalPosition: anchor,
+      items: [
+        DesktopContextMenuItem(label: details),
+        for (final item in items)
+          DesktopContextMenuItem(
+            icon: item.icon,
+            label: item.label,
+            danger: item.destructive,
+            onTap: item.onTap,
+          ),
+      ],
+    );
+  } else {
+    await showMobileActionSheet(context, title: details, items: items);
+  }
 }
 
 Future<void> showCompressionReview(
   BuildContext context, {
   required ChatService chat,
   required ContextCompressionTask task,
+  VoidCallback? onRecompress,
 }) async {
   final operation = task.candidate;
   if (operation == null) {
@@ -316,26 +450,49 @@ Future<void> showCompressionReview(
     await _showContextContent(
       context,
       title: AppLocalizations.of(context)!.contextViewGenerated,
-      builder: (detailContext, scroll) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scroll,
-                child: SelectableText(task.summary),
-              ),
-            ),
-            IosTextButton(
-              label: AppLocalizations.of(context)!.assistantSettingsCopyButton,
-              onPressed: () =>
-                  Clipboard.setData(ClipboardData(text: task.summary)),
-            ),
-            IosTextButton(
-              label: AppLocalizations.of(context)!.statsPageClose,
-              onPressed: () => Navigator.of(detailContext).pop(),
-            ),
-          ],
+      builder: (detailContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (PlatformUtils.isDesktopTarget)
+            Text(AppLocalizations.of(context)!.contextViewGenerated),
+          Flexible(
+            child: SingleChildScrollView(child: SelectableText(task.summary)),
+          ),
+          IosTextButton(
+            label: AppLocalizations.of(context)!.assistantSettingsCopyButton,
+            onPressed: () =>
+                Clipboard.setData(ClipboardData(text: task.summary)),
+          ),
+          IosTextButton(
+            label: AppLocalizations.of(context)!.statsPageClose,
+            onPressed: () => Navigator.of(detailContext).pop(),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
+  Future<bool> save(String summary) async {
+    await chat.contextCompression.applyReviewed(task.conversationId, summary);
+    return task.phase == CompressionPhase.completed;
+  }
+
+  Future<CompressionBudget?> estimate(String summary) async {
+    final snapshot = await chat.loadContextSnapshot(task.conversationId);
+    return _estimate(chat, task.conversationId, snapshot, [
+      ...snapshot.operations,
+      operation.copyWith(summary: summary),
+    ]);
+  }
+
+  if (!PlatformUtils.isDesktopTarget && task.phase == CompressionPhase.review) {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ContextSummaryEditorPage(
+          summary: task.summary,
+          budget: task.budget,
+          estimate: estimate,
+          onSave: save,
         ),
       ),
     );
@@ -344,30 +501,19 @@ Future<void> showCompressionReview(
   await _showContextContent(
     context,
     title: AppLocalizations.of(context)!.contextTaskReview,
-    builder: (detailContext, scroll) => ContextOperationContent(
+    builder: (detailContext) => ContextOperationContent(
       operation: operation,
       initiallyEditing: task.phase == CompressionPhase.review,
       budget: task.budget,
-      scrollController: scroll,
+      showHeader: PlatformUtils.isDesktopTarget,
       onClose: () => Navigator.of(detailContext).pop(),
-      onSave: task.phase != CompressionPhase.review
+      estimateSummary: estimate,
+      onSave: task.phase != CompressionPhase.review ? null : save,
+      onRecompress: onRecompress == null
           ? null
-          : (summary) async {
-              try {
-                await chat.contextCompression.applyReviewed(
-                  task.conversationId,
-                  summary,
-                );
-              } catch (error) {
-                if (!detailContext.mounted) return false;
-                throw StateError(
-                  compressionErrorLabel(
-                    AppLocalizations.of(detailContext)!,
-                    error.toString(),
-                  ),
-                );
-              }
-              return task.phase == CompressionPhase.completed;
+          : () {
+              Navigator.of(detailContext).pop();
+              onRecompress();
             },
     ),
   );
@@ -376,38 +522,69 @@ Future<void> showCompressionReview(
 Future<void> _showContextContent(
   BuildContext context, {
   required String title,
-  required Widget Function(BuildContext context, ScrollController? scroll)
-  builder,
+  double maxWidth = 560,
+  required WidgetBuilder builder,
 }) async {
-  if (PlatformUtils.isDesktopTarget || ResponsiveHelper.isDesktop(context)) {
+  if (PlatformUtils.isDesktopTarget) {
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        child: SizedBox(
-          width: 720,
-          height: MediaQuery.sizeOf(dialogContext).height * .85,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                child: Text(
-                  title,
-                  style: Theme.of(dialogContext).textTheme.titleLarge,
-                ),
-              ),
-              Expanded(child: builder(dialogContext, null)),
-            ],
-          ),
-        ),
-      ),
+      builder: (dialogContext) =>
+          ContextDialog(maxWidth: maxWidth, child: builder(dialogContext)),
     );
   } else {
-    await showCustomBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
-      title: title,
-      partialHeightFactor: .85,
-      expandedHeightFactor: .95,
-      builder: (sheetContext, scroll) => builder(sheetContext, scroll),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      backgroundColor: context.overlaySurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .85,
+      ),
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 10, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: AppFontWeights.emphasis,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    IosIconButton(
+                      icon: LucideIcons.x,
+                      size: 20,
+                      padding: const EdgeInsets.all(10),
+                      color: cs.onSurfaceVariant,
+                      semanticLabel: AppLocalizations.of(
+                        sheetContext,
+                      )!.commonClose,
+                      onTap: () => Navigator.of(sheetContext).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(child: builder(sheetContext)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

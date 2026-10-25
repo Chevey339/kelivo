@@ -39,13 +39,13 @@ class _Chat extends ChatService {
   Future<void> Function()? afterExtrasWrite;
 
   @override
-  Future<List<ChatMessage>> loadSelectedContextMessages(
+  Future<List<ChatMessage>> loadRawSelectedContextMessages(
     String id, {
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
   }) async {
-    final messages = await super.loadSelectedContextMessages(
+    final messages = await super.loadRawSelectedContextMessages(
       id,
       limit: limit,
       throughRevisionId: throughRevisionId,

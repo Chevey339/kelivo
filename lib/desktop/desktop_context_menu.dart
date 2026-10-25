@@ -12,6 +12,7 @@ class DesktopContextMenuItem {
   final IconData? icon;
   final String? svgAsset;
   final String label;
+  final String? subtitle;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
@@ -20,6 +21,7 @@ class DesktopContextMenuItem {
     this.icon,
     this.svgAsset,
     required this.label,
+    this.subtitle,
     this.onTap,
     this.danger = false,
     this.checked = false,
@@ -49,7 +51,9 @@ Future<void> showDesktopContextMenuAt(
   );
   final screen = overlayBox.size;
   final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
-  final double estMenuHeight = (items.length * 44.0).clamp(44.0, menuMaxHeight);
+  final double estMenuHeight = items
+      .fold<double>(0, (sum, item) => sum + (item.subtitle == null ? 44 : 60))
+      .clamp(44.0, menuMaxHeight);
   const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -126,12 +130,15 @@ Future<void> showDesktopContextMenuAt(
                                         icon: it.icon,
                                         svgAsset: it.svgAsset,
                                         label: it.label,
+                                        subtitle: it.subtitle,
                                         danger: it.danger,
                                         checked: it.checked,
-                                        onTap: () {
-                                          Navigator.of(ctx).pop();
-                                          it.onTap?.call();
-                                        },
+                                        onTap: it.onTap == null
+                                            ? null
+                                            : () {
+                                                Navigator.of(ctx).pop();
+                                                it.onTap!();
+                                              },
                                       ),
                                   ],
                                 ),
@@ -168,10 +175,20 @@ double _estimateMenuWidth(
   );
   for (final it in items) {
     final tp = TextPainter(
-      text: TextSpan(text: it.label, style: textStyle),
+      text: TextSpan(
+        text: it.label,
+        style: textStyle,
+        children: [
+          if (it.subtitle != null)
+            TextSpan(
+              text: '\n${it.subtitle}',
+              style: textStyle.copyWith(fontSize: 11.5),
+            ),
+        ],
+      ),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
+      maxLines: it.subtitle == null ? 1 : 2,
     )..layout(maxWidth: maxW);
     double width = 12 /*left*/ + tp.width + 12 /*right*/;
     if (it.icon != null || it.svgAsset != null) {
@@ -249,6 +266,7 @@ class _GlassMenuItem extends StatefulWidget {
     this.icon,
     this.svgAsset,
     required this.label,
+    this.subtitle,
     this.onTap,
     this.danger = false,
     this.checked = false,
@@ -256,6 +274,7 @@ class _GlassMenuItem extends StatefulWidget {
   final IconData? icon;
   final String? svgAsset;
   final String label;
+  final String? subtitle;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
@@ -276,25 +295,29 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
     final ic = widget.danger
         ? Theme.of(context).colorScheme.error
         : cs.onSurface.withValues(alpha: 0.9);
-    final bg = _hover
+    final bg = _hover && widget.onTap != null
         ? (cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
+      cursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
       child: IosCardPress(
         focusable: true,
         borderRadius: BorderRadius.zero,
         baseColor: Colors.transparent,
-        onTap: () {
-          try {
-            Haptics.light();
-          } catch (_) {}
-          widget.onTap?.call();
-        },
+        onTap: widget.onTap == null
+            ? null
+            : () {
+                try {
+                  Haptics.light();
+                } catch (_) {}
+                widget.onTap?.call();
+              },
         child: Container(
-          height: 44,
+          height: widget.subtitle == null ? 44 : 60,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(color: bg),
@@ -313,16 +336,34 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
                 const SizedBox(width: 10),
               ],
               Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    fontWeight: AppFontWeights.medium,
-                    fontSize: 14.5,
-                    color: fg,
-                    decoration: TextDecoration.none,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontWeight: AppFontWeights.medium,
+                        fontSize: 14.5,
+                        color: fg,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    if (widget.subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (widget.checked) ...[

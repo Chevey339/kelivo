@@ -5,6 +5,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 
 void main() {
   late Directory dir;
@@ -333,6 +334,135 @@ void main() {
       }
     },
   );
+
+  test(
+    'chats-only attachment availability preserves summaries and deduplication',
+    () async {
+      await repo.updateMessage(
+        (await repo.getMessage('u1'))!.copyWith(
+          parts: [
+            const TextPart('Original u1'),
+            ImagePart(uri: '${dir.path}/photo.png'),
+            FilePart(uri: '${dir.path}/document.txt', name: 'document.txt'),
+          ],
+        ),
+      );
+      await compact('S1', ['u1', 'a1']);
+      await compact('S2', ['u1', 'a1', 'u2', 'a2'], depends: ['S1']);
+      final snapshotFile = File('${dir.path}/attachments.sqlite');
+      await ChatDatabaseRepository.createConsistentSnapshot(
+        sourceFile: File('${dir.path}/chat.sqlite'),
+        destinationFile: snapshotFile,
+      );
+      final target = ChatDatabaseRepository.open(
+        file: File('${dir.path}/import.sqlite'),
+      );
+      await target.ensureReady();
+      try {
+        final report = await target.mergeBackupSnapshot(snapshotFile);
+        expect(report.importedConversations, 1);
+        expect(
+          await target.recomputeAttachmentAvailabilityForConversations(
+            conversationIds: report.importedConversationIds,
+            filesRestored: false,
+          ),
+          1,
+        );
+        final imported = (await target.getMessage('u1'))!;
+        expect(
+          imported.parts.whereType<ImagePart>().single.unavailable,
+          isTrue,
+        );
+        expect(imported.parts.whereType<FilePart>().single.unavailable, isTrue);
+        expect(
+          (await target.readContextOperations(
+            'chat',
+          )).every((op) => !op.revoked),
+          isTrue,
+        );
+        expect(
+          (await target.getEffectiveContextMessages(
+            'chat',
+            limit: 100,
+          )).map((m) => m.content),
+          ['Summary S2', 'Original u3', 'Original a3'],
+        );
+        final again = await target.mergeBackupSnapshot(snapshotFile);
+        expect(again.importedConversations, 0);
+        expect(again.deduplicatedConversations, 1);
+        // A real source edit must still revoke both the summary and its successor.
+        await target.updateMessage(
+          imported.copyWith(content: 'Corrected original'),
+        );
+        expect(
+          (await target.readContextOperations(
+            'chat',
+          )).every((op) => op.revoked),
+          isTrue,
+        );
+      } finally {
+        await target.close();
+      }
+    },
+  );
+
+  for (final boundary in [0, 2]) {
+    for (final collision in [false, true]) {
+      test(
+        'legacy clear import remains idempotent after conversion: boundary=$boundary collision=$collision',
+        () async {
+          await repo.appendMessageVersion(
+            messageId: 'u1',
+            content: 'Selected version',
+          );
+          await repo.putConversation(
+            (await repo.getConversation(
+              'chat',
+            ))!.copyWith(truncateIndex: boundary),
+          );
+          final snapshotFile = File('${dir.path}/legacy.sqlite');
+          await ChatDatabaseRepository.createConsistentSnapshot(
+            sourceFile: File('${dir.path}/chat.sqlite'),
+            destinationFile: snapshotFile,
+          );
+          final target = ChatDatabaseRepository.open(
+            file: File('${dir.path}/import.sqlite'),
+          );
+          await target.ensureReady();
+          try {
+            if (collision) {
+              await target.putConversation(
+                Conversation(id: 'chat', title: 'Existing unrelated chat'),
+              );
+            }
+            final report = await target.mergeBackupSnapshot(snapshotFile);
+            final id = report.remappedConversationIds['chat'] ?? 'chat';
+            expect(report.importedConversations, 1);
+            final operations = await target.readContextOperations(id);
+            expect(operations.length, boundary == 0 ? 0 : 1);
+            if (boundary > 0) {
+              expect(operations.single.convertedFromLegacyClear, isTrue);
+            }
+            expect((await target.getConversation(id))!.truncateIndex, -1);
+            expect(
+              (await target.getEffectiveContextMessages(
+                id,
+                limit: 100,
+              )).first.content,
+              boundary == 0 ? 'Selected version' : 'Original u2',
+            );
+            for (var i = 0; i < 2; i++) {
+              final again = await target.mergeBackupSnapshot(snapshotFile);
+              expect(again.importedConversations, 0);
+              expect(again.deduplicatedConversations, 1);
+            }
+          } finally {
+            await target.close();
+          }
+        },
+      );
+    }
+  }
 
   test(
     'fork cutoff excludes future nodes and selected-only forks retain current nodes',

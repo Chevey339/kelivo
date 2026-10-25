@@ -13,6 +13,8 @@ class CompressContextOptions {
     this.keepUserMessages,
     this.historySource = ContextHistorySource.effective,
     this.includeEditedSummaries = true,
+    this.includeAttachmentsAndTools = true,
+    this.regenerateExisting = false,
     this.newConversation = false,
   });
 
@@ -51,6 +53,8 @@ class CompressContextOptions {
   final int? keepUserMessages;
   final ContextHistorySource historySource;
   final bool includeEditedSummaries;
+  final bool includeAttachmentsAndTools;
+  final bool regenerateExisting;
   final bool newConversation;
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +63,8 @@ class CompressContextOptions {
     'keep': keepUserMessages,
     'source': historySource.name,
     'includeEdited': includeEditedSummaries,
+    'includeAttachmentsAndTools': includeAttachmentsAndTools,
+    'regenerateExisting': regenerateExisting,
     'newConversation': newConversation,
   };
 
@@ -71,6 +77,8 @@ class CompressContextOptions {
           json['source'] as String,
         ),
         includeEditedSummaries: json['includeEdited'] as bool,
+        includeAttachmentsAndTools: json['includeAttachmentsAndTools'] != false,
+        regenerateExisting: json['regenerateExisting'] == true,
         newConversation: json['newConversation'] as bool,
       );
 }
@@ -81,6 +89,72 @@ bool isCompressionUserMessage(ChatMessage message) =>
     !message.id.startsWith('context-note:') &&
     (message.content.trim().isNotEmpty ||
         message.parts.any((part) => part is ImagePart || part is FilePart));
+
+typedef CompressionSelection = ({
+  List<ChatMessage> effective,
+  List<ChatMessage> retained,
+  List<ChatMessage> covered,
+  List<ChatMessage> input,
+  List<String> dependencies,
+  bool needsRegeneration,
+});
+
+/// The options preview and the actual task use the same range selection.
+CompressionSelection selectCompressionHistory(
+  List<ChatMessage> messages,
+  List<ContextOperation> operations,
+  CompressContextOptions options,
+) {
+  final effective = ContextHistory.resolve(messages, operations);
+  final keep = options.mode == CompressContextLimitMode.keepRecent
+      ? options.keepUserMessages ??
+            CompressContextOptions.defaultKeepUserMessages
+      : 0;
+  final retained = keep == 0
+      ? <ChatMessage>[]
+      : selectKeepRecentMessages(effective, keep);
+  final prefix = effective.take(effective.length - retained.length).toList();
+  final dependencies = prefix
+      .where(ContextOperation.isSummary)
+      .map((m) => m.id.substring(ContextOperation.summaryPrefix.length))
+      .toList();
+  final groups = <String>{
+    for (final message in prefix)
+      if (!ContextOperation.isSummary(message)) ContextHistory.group(message),
+    for (final operation in operations)
+      if (dependencies.contains(operation.id)) ...operation.sourceGroups,
+  };
+  final expanded = ContextHistory.compressionInput(
+    messages,
+    operations,
+    source: options.historySource,
+    includeEditedSummaries: options.includeEditedSummaries,
+  );
+  return (
+    effective: effective,
+    retained: retained,
+    covered: messages
+        .where((m) => groups.contains(ContextHistory.group(m)))
+        .toList(),
+    dependencies: dependencies,
+    needsRegeneration:
+        prefix.isNotEmpty &&
+        prefix.every(ContextOperation.isSummary) &&
+        options.historySource == ContextHistorySource.effective &&
+        !options.regenerateExisting,
+    input: expanded.where((message) {
+      if (groups.contains(ContextHistory.group(message))) return true;
+      final operation = operations
+          .where(
+            (op) =>
+                message.id == op.summaryMessageId ||
+                message.id == 'context-note:${op.id}',
+          )
+          .firstOrNull;
+      return operation != null && operation.sourceGroups.every(groups.contains);
+    }).toList(),
+  );
+}
 
 /// Resolve the model that [HomeViewModel.compressContext] will call.
 ///

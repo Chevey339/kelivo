@@ -71,6 +71,8 @@ class ChatInputSection extends StatelessWidget {
     this.hasQueuedInput = false,
     this.queuedPreviewText,
     this.queuedStatusLabel,
+    this.queuedSubtitle,
+    this.queuedPaused = false,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.onQuickPhrase,
@@ -119,6 +121,8 @@ class ChatInputSection extends StatelessWidget {
   final bool hasQueuedInput;
   final String? queuedPreviewText;
   final String? queuedStatusLabel;
+  final String? queuedSubtitle;
+  final bool queuedPaused;
   final VoidCallback? onCancelQueuedInput;
   final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onQuickPhrase;
@@ -239,6 +243,8 @@ class ChatInputSection extends StatelessWidget {
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       queuedStatusLabel: queuedStatusLabel,
+      queuedSubtitle: queuedSubtitle,
+      queuedPaused: queuedPaused,
       onCancelQueuedInput: onCancelQueuedInput,
       onExpandedChanged: onExpandedChanged,
       showToolsButton: supportsModelTools,

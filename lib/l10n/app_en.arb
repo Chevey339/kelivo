@@ -1013,20 +1013,19 @@
   "bottomToolsSheetUpload": "Upload",
   "bottomToolsSheetClearContext": "Clear Context",
   "compressContext": "Compress Context",
-  "compressContextDesc": "Summarize earlier messages and continue in this chat.",
+  "compressContextDesc": "Create a summary you can review and undo",
   "clearContextDesc": "Mark a context boundary",
   "contextManagement": "Context Management",
-  "compressingContext": "Compressing context...",
   "compressContextFailed": "Failed to compress context",
   "compressContextNoMessages": "No messages to compress",
   "compressContextNoConversation": "No conversation to compress",
   "compressContextNoModel": "No compression model configured",
   "compressContextEmptySummary": "Compression returned an empty summary",
   "compressContextOptionsTitle": "Compress Context",
-  "compressContextOptionsDesc": "Choose which part of the current chat is sent to the compression model.",
-  "compressContextKeepStart": "Start",
-  "compressContextKeepRecent": "Recent",
-  "compressContextUnlimited": "Unlimited",
+  "compressContextOptionsDesc": "Create an editable, reversible summary in this chat. Original messages are kept.",
+  "compressContextKeepStart": "Start sample",
+  "compressContextKeepRecent": "End sample",
+  "compressContextUnlimited": "All content",
   "compressContextMaxCharsLabel": "Characters",
   "compressContextInvalidLimit": "Enter a positive character count",
   "compressContextStartButton": "Compress",
@@ -6282,6 +6281,7 @@
   "browserActionNewTab": "New tab",
   "browserActionRender": "Render page",
   "browserActionExtract": "Extract text",
+  "browserActionScreenshot": "Capture screenshot",
   "browserActionSnapshot": "Read page structure",
   "browserActionClick": "Click",
   "browserActionType": "Type",
@@ -6512,5 +6512,231 @@
   "contextOperationHidden": "Excluded by a later clear",
   "contextViewGenerated": "View generated summary",
   "contextTaskDismiss": "Dismiss status",
-  "contextOperationActive": "Currently applied"
+  "contextOperationActive": "Currently applied",
+  "contextDividerCompressed": "Context compressed",
+  "contextDividerRunning": "Compressing context",
+  "contextDividerFailed": "Compression failed",
+  "contextDividerEdited": "edited",
+  "contextUndoCompressTooltip": "Undo this compression",
+  "contextUndoClearTooltip": "Undo this clear",
+  "contextUndoneSnack": "Undone · {from} → {to}",
+  "@contextUndoneSnack": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "contextRestore": "Restore",
+  "compressTaskWaiting": "Waiting for the current reply",
+  "compressTaskWaitingApproval": "Waiting for tool approval",
+  "compressTaskMerging": "Merging summaries",
+  "compressTaskElapsed": "Part {i}/{n} · {seconds}s elapsed",
+  "@compressTaskElapsed": {
+    "placeholders": {
+      "i": {
+        "type": "int"
+      },
+      "n": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "compressTaskRetry": "Retry",
+  "compressTaskAdjustRetry": "Adjust options and retry",
+  "compressTaskAbandon": "Dismiss",
+  "compressCancelledSnack": "Compression cancelled. Current context is unchanged.",
+  "compressStaleSnack": "Chat history changed; the summary was not applied.",
+  "compressOverSnack": "The summary would exceed the context limit and was not applied.",
+  "compressDiscardedSnack": "Context cleared; the running compression was discarded.",
+  "compressFailedSnack": "Compression failed: {reason}",
+  "@compressFailedSnack": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "compressSuccessSnack": "Context compressed · {from} → {to}",
+  "@compressSuccessSnack": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "compressAdjust": "Adjust",
+  "compressCopyResult": "Copy result",
+  "chatInputBarQueuedAfterCompress": "Sends after compression",
+  "chatInputBarQueuedPaused": "Paused",
+  "chatInputBarQueuedPausedReason": "Compression did not finish; sending stays paused",
+  "chatInputBarQueuedCompressionFailed": "Compression failed; sending stays paused",
+  "chatInputBarQueuedCompressionCancelled": "Compression cancelled; sending stays paused",
+  "compressUsageInput": "Summary input",
+  "compressUsageSummary": "Est. summary",
+  "compressUsageNext": "Next request",
+  "compressUsageOriginal": "was {value}",
+  "@compressUsageOriginal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "compressApproxTokens": "Approx. {value} tokens",
+  "@compressApproxTokens": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "compressAdvanced": "Advanced",
+  "compressAdvancedOff": "Re-read originals off",
+  "compressAdvancedOn": "Re-read originals on",
+  "compressReread": "Re-read compressed originals",
+  "compressRereadDesc": "Recover details lost across summaries. Uses more tokens.",
+  "compressRereadLastLayer": "Expand last layer",
+  "compressRereadAll": "All originals in segment",
+  "compressIncludeManual": "Include manual edits · {count}",
+  "@compressIncludeManual": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressIncludeAttachments": "Attachment text & tool results",
+  "compressIncludeAttachmentsDesc": "Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.",
+  "compressNothingNew": "Nothing new to compress since the last summary",
+  "compressRegenerate": "Recompress",
+  "compressKeepDescription": "Keep the latest {count} user messages with their replies and tools. Earlier history is summarized; attachment-only messages also count.",
+  "@compressKeepDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressModelGlobal": "Global setting · fixed when started",
+  "contextDetailTitle": "Summary",
+  "contextDetailClearTitle": "Context cleared",
+  "contextDetailInUse": "In use",
+  "contextDetailSuperseded": "Superseded by a later summary",
+  "contextDetailReplaced": "Replaced",
+  "contextDetailRead": "Read",
+  "contextDetailKept": "Kept",
+  "contextDetailModel": "Model · time",
+  "contextDetailNext": "Next request",
+  "contextDetailAfterUndo": "After undo",
+  "contextDetailSummaryLabel": "Summary used in later requests",
+  "contextDetailContinueNewChat": "Continue in new chat",
+  "contextDetailViewOriginals": "View originals",
+  "contextDetailLegacy": "Converted from legacy clear",
+  "contextDetailRange": "Messages {from}–{to} · {count} user messages",
+  "@contextDetailRange": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextDetailKeptCount": "Latest {count} user messages, replies and tools",
+  "@contextDetailKeptCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextDetailParts": "{count} segments",
+  "@contextDetailParts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextDetailExcluded": "Excluded history",
+  "contextDetailCurrent": "Current context",
+  "contextDetailEdited": "Manually edited",
+  "contextEditTitle": "Edit summary",
+  "contextEditEmpty": "Summary cannot be empty. Use Clear context to exclude all earlier history.",
+  "contextEditPending": "Saved; applies after the current reply",
+  "contextEditPreview": "Approx. {value} tokens after saving. Editing does not change active context.",
+  "@contextEditPreview": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "contextEditCharacters": "{count} characters",
+  "@contextEditCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactUndoTitle": "Undo earlier compression?",
+  "contextImpactClearTitle": "Undo earlier clear?",
+  "contextImpactEditTitle": "Save earlier summary?",
+  "contextImpactSourceTitle": "Change compressed originals?",
+  "contextImpactUndoOne": "Undo",
+  "contextImpactUndoAlso": "Also undone",
+  "contextImpactKeep": "Unchanged",
+  "contextImpactSave": "Save",
+  "contextImpactConfirm": "Undo {count} nodes",
+  "@contextImpactConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactSaveConfirm": "Save and undo {count} nodes",
+  "@contextImpactSaveConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextImpactDescription": "Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.",
+  "contextImpactUsage": "Approx. {from} → {to} tokens",
+  "@contextImpactUsage": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "contextOverLimitWarning": "Undo may exceed the context limit. You can still undo and recompress; sending checks the limit again.",
+  "branchInheritNote": "Only inherits context nodes active before this point",
+  "contextDone": "Done",
+  "contextMore": "More",
+  "contextEditUnknownPreview": "Usage is unavailable; it will be checked again before saving.",
+  "contextImpactDeleteTitle": "Delete compressed originals?",
+  "contextImpactSourceDescription": "Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.",
+  "contextImpactDeleteDescription": "Delete the originals and undo related summaries so removed content is not sent again. Other messages and independent nodes are unchanged.",
+  "chatInputBarQueuedPausedHold": "Input remains paused; cancel the queue to edit or send"
 }

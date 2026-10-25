@@ -8,6 +8,8 @@ import '../../../features/browser/models/browser_models.dart';
 String browserTabUserScriptMarker(String tabId) =>
     '/* kelivo-browser-tab:${base64Url.encode(utf8.encode(tabId))} */';
 
+enum BrowserLoadStage { none, commit, domcontentloaded, load }
+
 enum BrowserScrollPhase { reset, update, end, metrics }
 
 /// Main-document geometry in CSS pixels. End is emitted only by a real DOM
@@ -107,7 +109,10 @@ abstract class BrowserEngine {
   Future<void> forward();
   Future<void> reload();
   Future<void> stop();
-  Future<void> waitForLoad(Duration timeout);
+  Future<void> waitForLoad(
+    Duration timeout, {
+    BrowserLoadStage stage = BrowserLoadStage.load,
+  });
   Future<Object?> evaluate(String source, {bool awaitPromise = false});
   Future<Uint8List?> screenshot();
 

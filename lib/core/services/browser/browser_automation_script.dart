@@ -45,7 +45,7 @@ const rect = (el) => {
   while (view && view !== window) {
     const frame = view.frameElement;
     if (!frame) break;
-    const f = frame.getBoundingClientRect(); x += f.x; y += f.y;
+    const f = frame.getBoundingClientRect(); x += f.x + frame.clientLeft; y += f.y + frame.clientTop;
     view = frame.ownerDocument.defaultView;
   }
   return {x:Math.round(x), y:Math.round(y), width:Math.round(r.width), height:Math.round(r.height)};
@@ -67,8 +67,9 @@ const pointTarget = (x, y) => {
     if (el.tagName === 'IFRAME') {
       try {
         const r = el.getBoundingClientRect();
-        const child = el.contentDocument?.elementFromPoint(x-r.x, y-r.y);
-        if (child) { x -= r.x; y -= r.y; el = child; continue; }
+        const dx = r.x + el.clientLeft, dy = r.y + el.clientTop;
+        const child = el.contentDocument?.elementFromPoint(x-dx, y-dy);
+        if (child) { x -= dx; y -= dy; el = child; continue; }
       } catch (_) {}
     }
     break;
@@ -118,6 +119,46 @@ const inputFrame = () => new Promise(resolve => {
   frame = requestAnimationFrame(done);
   timer = setTimeout(done, 50);
 });
+// Check the element's local viewport and clipping ancestors, including
+// same-origin frames. Already visible targets do not scroll or wait a frame.
+const clipped = el => {
+  const r = el.getBoundingClientRect(), view = el.ownerDocument.defaultView;
+  if (r.top < 0 || r.left < 0 || r.bottom > view.innerHeight || r.right > view.innerWidth) return true;
+  let parent = el.parentElement || el.getRootNode().host;
+  while (parent) {
+    const style = view.getComputedStyle(parent), p = parent.getBoundingClientRect();
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowY) && (r.top < p.top || r.bottom > p.bottom)) return true;
+    if (/(auto|scroll|hidden|clip)/.test(style.overflowX) && (r.left < p.left || r.right > p.right)) return true;
+    parent = parent.parentElement || parent.getRootNode().host;
+  }
+  return view !== window && view.frameElement ? clipped(view.frameElement) : false;
+};
+const prepareTarget = async () => {
+  const el = target(), originalIdentity = identity(el);
+  const coordinate = Number.isFinite(args.x) && Number.isFinite(args.y);
+  if (!coordinate && clipped(el)) {
+    el.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+    let view = el.ownerDocument.defaultView;
+    while (view && view !== window) {
+      const frame = view.frameElement;
+      if (!frame) break;
+      frame.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+      view = frame.ownerDocument.defaultView;
+    }
+    await inputFrame();
+    roots.length = 0;
+    if (!el.isConnected || target() !== el || identity(el) !== originalIdentity) {
+      fail('stale_ref: target changed while scrolling; take a fresh snapshot');
+    }
+  }
+  if (!visible(el)) fail('element_not_visible');
+  const r = rect(el);
+  const x = coordinate ? args.x : Math.max(0,Math.min(innerWidth-1,r.x+r.width/2));
+  const y = coordinate ? args.y : Math.max(0,Math.min(innerHeight-1,r.y+r.height/2));
+  const hit = pointTarget(x,y);
+  if (!hit || (hit !== el && !el.contains(hit))) fail('element_covered: dismiss the overlay and take a fresh snapshot');
+  return {el,x,y};
+};
 const setText = (el, value) => {
   const view = el.ownerDocument.defaultView;
   if (el.isContentEditable) el.textContent = value;
@@ -201,49 +242,43 @@ try {
       break;
     }
     case 'click': {
-      const el = target();
-      if (!visible(el)) fail('element_not_visible');
-      if (el.disabled) fail('element_disabled');
-      const r = rect(el), x = Math.max(0,Math.min(innerWidth-1,r.x+r.width/2)), y = Math.max(0,Math.min(innerHeight-1,r.y+r.height/2));
-      const hit = pointTarget(x,y);
-      if (hit && hit !== el && !el.contains(hit)) fail('element_covered: dismiss the overlay and take a fresh snapshot');
-      el.focus();
-      if (args.button === 'right') el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}));
-      else { el.click(); if (args.click_count === 2) { el.click(); el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,detail:2})); } }
-      result = {clicked:true}; break;
+      result = (async () => {
+        const {el,x,y} = await prepareTarget();
+        if (el.disabled) fail('element_disabled');
+        el.focus({preventScroll:true});
+        if (args.button === 'right') el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}));
+        else { el.click(); if (args.click_count === 2) { el.click(); el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,detail:2})); } }
+        return {clicked:true};
+      })(); break;
     }
     case 'type': {
-      const el = target();
-      if (!editable(el) || el.disabled || el.readOnly) fail('element_not_editable');
-      if (!visible(el)) el.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
-      if (!visible(el)) fail('element_not_visible');
-      el.focus();
-      const desired = args.clear_first === false ? inputValue(el) + args.text : args.text;
-      setText(el, desired);
       result = (async () => {
+        const {el} = await prepareTarget();
+        if (!editable(el) || el.disabled || el.readOnly) fail('element_not_editable');
+        el.focus({preventScroll:true});
+        const desired = args.clear_first === false ? inputValue(el) + args.text : args.text;
+        setText(el, desired);
         await inputFrame();
         if (!el.isConnected) fail('input_target_replaced: input was replaced; inspect the page before retrying');
         if (inputValue(el) !== desired) fail('input_value_rejected: field did not retain the requested value; check its format or page validation before retrying');
         return {typed:true,verified:true,characters:args.text.length};
-      })();
-      break;
+      })(); break;
     }
     case 'select_option': {
-      const el = target();
-      if (el.tagName !== 'SELECT' || el.disabled) fail('element_not_selectable');
-      const matches = Array.from(el.options).filter(o => args.option_value !== undefined ? o.value === args.option_value : o.label === args.option_label);
-      if (matches.length !== 1) fail(matches.length ? 'ambiguous_option' : 'option_not_found');
-      if (matches[0].disabled || matches[0].parentElement.disabled) fail('option_disabled');
-      for (const option of el.options) option.selected = option === matches[0];
-      const view = el.ownerDocument.defaultView;
-      el.dispatchEvent(new view.Event('input',{bubbles:true}));
-      el.dispatchEvent(new view.Event('change',{bubbles:true}));
       result = (async () => {
+        const {el} = await prepareTarget();
+        if (el.tagName !== 'SELECT' || el.disabled) fail('element_not_selectable');
+        const matches = Array.from(el.options).filter(o => args.option_value !== undefined ? o.value === args.option_value : o.label === args.option_label);
+        if (matches.length !== 1) fail(matches.length ? 'ambiguous_option' : 'option_not_found');
+        if (matches[0].disabled || matches[0].parentElement.disabled) fail('option_disabled');
+        for (const option of el.options) option.selected = option === matches[0];
+        const view = el.ownerDocument.defaultView;
+        el.dispatchEvent(new view.Event('input',{bubbles:true}));
+        el.dispatchEvent(new view.Event('change',{bubbles:true}));
         await inputFrame();
         if (!el.isConnected || el.value !== matches[0].value) fail('input_value_rejected: selection was reset by the page');
         return {selected:true,verified:true,value:clean(el.value),label:clean(matches[0].label)};
-      })();
-      break;
+      })(); break;
     }
     case 'press': {
       const el = target(true) || document.activeElement || document.body;

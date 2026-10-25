@@ -572,7 +572,11 @@ namespace flutter_inappwebview_plugin
 
           UINT64 navigationId;
           if (SUCCEEDED(args->get_NavigationId(&navigationId))) {
-            navigationActions_.insert({ navigationId, navigationAction });
+            // Redirects keep the same id. Only the current navigation can
+            // change loading/error state; superseded completions may arrive late.
+            currentNavigationId_ = navigationId;
+            navigationActions_.clear();
+            navigationActions_[navigationId] = navigationAction;
           }
 
           // if shouldOverrideUrlLoading is not used, then call onLoadStart and onProgressChanged here
@@ -590,8 +594,13 @@ namespace flutter_inappwebview_plugin
       Callback<ICoreWebView2ContentLoadingEventHandler>(
         [this](ICoreWebView2* sender, ICoreWebView2ContentLoadingEventArgs* args)
         {
-          if (channelDelegate) {
+          UINT64 navigationId = 0;
+          BOOL isErrorPage = FALSE;
+          args->get_IsErrorPage(&isErrorPage);
+          if (SUCCEEDED(args->get_NavigationId(&navigationId)) &&
+              navigationId == currentNavigationId_ && channelDelegate) {
             channelDelegate->onProgressChanged(33);
+            if (!isErrorPage) channelDelegate->onPageCommitVisible(getUrl());
           }
           return S_OK;
         }
@@ -601,18 +610,13 @@ namespace flutter_inappwebview_plugin
       Callback<ICoreWebView2NavigationCompletedEventHandler>(
         [this](ICoreWebView2* sender, ICoreWebView2NavigationCompletedEventArgs* args)
         {
+          UINT64 navigationId = 0;
+          if (FAILED(args->get_NavigationId(&navigationId)) ||
+              navigationId != currentNavigationId_) return S_OK;
+          auto navigationAction = map_at_or_null(navigationActions_, navigationId);
+          navigationActions_.erase(navigationId);
           isLoading_ = false;
-
           evaluateJavascript(PLATFORM_READY_JS_SOURCE, ContentWorld::page(), nullptr);
-
-          std::shared_ptr<NavigationAction> navigationAction;
-          UINT64 navigationId;
-          if (SUCCEEDED(args->get_NavigationId(&navigationId))) {
-            navigationAction = map_at_or_null(navigationActions_, navigationId);
-            if (navigationAction) {
-              navigationActions_.erase(navigationId);
-            }
-          }
 
           COREWEBVIEW2_WEB_ERROR_STATUS webErrorType = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
           args->get_WebErrorStatus(&webErrorType);
@@ -628,8 +632,10 @@ namespace flutter_inappwebview_plugin
             if (isSuccess) {
               channelDelegate->onLoadStop(url);
             }
-            else if (!InAppWebView::isSslError(webErrorType) && navigationAction) {
-              auto webResourceRequest = std::make_unique<WebResourceRequest>(url, navigationAction->request->method, navigationAction->request->headers, navigationAction->isForMainFrame);
+            else if (navigationAction) {
+              // get_Source may already point at chrome-error://chromewebdata/.
+              // Report the request that failed, never the error document.
+              auto webResourceRequest = std::make_unique<WebResourceRequest>(navigationAction->request->url, navigationAction->request->method, navigationAction->request->headers, navigationAction->isForMainFrame);
               int httpStatusCode = 0;
               wil::com_ptr<ICoreWebView2NavigationCompletedEventArgs2> args2;
               if (SUCCEEDED(args->QueryInterface(IID_PPV_ARGS(&args2))) && SUCCEEDED(args2->get_HttpStatusCode(&httpStatusCode)) && httpStatusCode >= 400) {
@@ -642,7 +648,10 @@ namespace flutter_inappwebview_plugin
                 channelDelegate->onReceivedHttpError(std::move(webResourceRequest), std::move(webResourceResponse));
               }
               else if (httpStatusCode < 400) {
-                auto webResourceError = std::make_unique<WebResourceError>(WebErrorStatusDescription[webErrorType], webErrorType);
+                const auto index = static_cast<size_t>(webErrorType);
+                const auto description = index < sizeof(WebErrorStatusDescription) / sizeof(WebErrorStatusDescription[0])
+                  ? WebErrorStatusDescription[index] : WebErrorStatusDescription[0];
+                auto webResourceError = std::make_unique<WebResourceError>(description, webErrorType);
                 channelDelegate->onReceivedError(std::move(webResourceRequest), std::move(webResourceError));
               }
             }
@@ -651,6 +660,22 @@ namespace flutter_inappwebview_plugin
           return S_OK;
         }
       ).Get(), nullptr));
+
+    failedLog(webView->add_ProcessFailed(
+      Callback<ICoreWebView2ProcessFailedEventHandler>(
+        [this, alive = alive_](ICoreWebView2* sender, ICoreWebView2ProcessFailedEventArgs* args)
+        {
+          if (!*alive) return S_OK;
+          COREWEBVIEW2_PROCESS_FAILED_KIND kind;
+          if (SUCCEEDED(args->get_ProcessFailedKind(&kind)) &&
+              (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED ||
+               kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED)) {
+            isLoading_ = false;
+            navigationActions_.clear();
+            if (channelDelegate) channelDelegate->onRenderProcessGone(true);
+          }
+          return S_OK;
+        }).Get(), nullptr));
 
     failedLog(webView->add_DocumentTitleChanged(Callback<ICoreWebView2DocumentTitleChangedEventHandler>(
       [this](ICoreWebView2* sender, IUnknown* args)
@@ -933,7 +958,9 @@ namespace flutter_inappwebview_plugin
         Callback<ICoreWebView2DOMContentLoadedEventHandler>(
           [this](ICoreWebView2* sender, ICoreWebView2DOMContentLoadedEventArgs* args)
           {
-            if (channelDelegate) {
+            UINT64 navigationId = 0;
+            if (SUCCEEDED(args->get_NavigationId(&navigationId)) &&
+                navigationId == currentNavigationId_ && channelDelegate) {
               channelDelegate->onProgressChanged(66);
             }
             return S_OK;
