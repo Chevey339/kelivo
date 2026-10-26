@@ -8,6 +8,7 @@ export 'src/flutter/selection/stable_selection_container.dart';
 export 'src/flutter/render/inline_code_capsule.dart';
 export 'src/flutter/render/optical_baseline.dart';
 export 'src/flutter/selection/code_selection.dart';
+export 'src/flutter/selection/source_text_selection.dart';
 export 'src/flutter/selection/table_selection.dart';
 export 'src/flutter/theme/markstream_theme.dart';
 export 'src/flutter/interfaces/renderers.dart';

@@ -2,16 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../../../core/ast/nodes.dart';
 import '../../../core/ast/source_span.dart';
 import '../../../core/text_index/text_index.dart';
 import '../../../core/serialize/to_plain_text.dart';
 import '../../interfaces/renderers.dart';
-import '../../selection/code_selection.dart';
+import '../../selection/source_text_selection.dart';
 import '../../selection/selection_controller.dart';
-import '../../selection/stable_selection_container.dart';
 import '../../theme/markstream_theme.dart';
 import '../streaming_text.dart';
 import '../source_highlights.dart';
@@ -55,7 +53,7 @@ class MarkstreamCodeContent extends StatefulWidget {
 }
 
 class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
-  final _selection = _CodeChunksSelectionDelegate();
+  final _selection = SourceTextSelectionDelegate();
   final _chunks = <(int, String)>[];
   String _source = '';
   int _lastChunkStart = 0;
@@ -164,8 +162,16 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
         child: ListView.builder(
           primary: false,
           itemCount: _chunks.length,
-          itemBuilder: (_, index) =>
-              fragment(_chunks[index].$2, _chunks[index].$1),
+          itemBuilder: (context, index) {
+            // Skip the list's per-row selection keep-alive proxy. The source
+            // owner retains only endpoints; keep the Scrollable's registrar
+            // here so drag selection can still scroll the code viewport.
+            final registrar = SelectionContainer.maybeOf(context);
+            final child = fragment(_chunks[index].$2, _chunks[index].$1);
+            return registrar == null
+                ? child
+                : SelectionRegistrarScope(registrar: registrar, child: child);
+          },
         ),
       );
     } else {
@@ -175,9 +181,24 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
       textDirection: TextDirection.ltr,
       child: content,
     );
-    final selected = SelectionContainer.maybeOf(context) == null
+    _selection.selectionEnabled = SelectionContainer.maybeOf(context) != null;
+    final selected = !_selection.selectionEnabled
         ? body
-        : SelectionContainer(delegate: _selection, child: body);
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              _selection.updateTextLayout(
+                context,
+                DefaultTextStyle.of(
+                  context,
+                ).style.merge(widget.theme.code.text),
+                widget.wrap || widget.exporting
+                    ? constraints.maxWidth
+                    : double.infinity,
+                textDirection: TextDirection.ltr,
+              );
+              return SelectionContainer(delegate: _selection, child: body);
+            },
+          );
     if (DocumentSelectionScope.maybeOf(context) == null) return selected;
     var remaining = _source.length;
     final segments = <TextSegment>[];
@@ -203,108 +224,6 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
   }
 }
 
-// Logical offsets include source that is outside the virtualized viewport.
-// Each mounted fragment reports its source offset; copying a range slices the
-// original text, including the newline between adjacent chunks.
-class _CodeChunksSelectionDelegate extends StableSelectionDelegate {
-  String source = '';
-  final fragments = <_CodeTextFragmentState>{};
-  bool _all = false;
-  int? _startBoundary, _endBoundary;
-  @override
-  int get contentLength => source.length;
-  @override
-  SelectionResult dispatchSelectionEvent(SelectionEvent event) {
-    _all = event is SelectAllSelectionEvent;
-    if (event is! SelectionEdgeUpdateEvent) {
-      _startBoundary = null;
-      _endBoundary = null;
-    }
-    return super.dispatchSelectionEvent(event);
-  }
-
-  @override
-  SelectionResult handleSelectionEdgeUpdate(SelectionEdgeUpdateEvent event) {
-    final local = MatrixUtils.transformPoint(
-      Matrix4.inverted(getTransformTo(null)),
-      event.globalPosition,
-    );
-    final boundary = local.dy < 0
-        ? -1
-        : local.dy > containerSize.height
-        ? 1
-        : null;
-    if (event.type == SelectionEventType.startEdgeUpdate) {
-      _startBoundary = boundary;
-    } else {
-      _endBoundary = boundary;
-    }
-    final result = super.handleSelectionEdgeUpdate(event);
-    return boundary == null
-        ? result
-        : boundary < 0
-        ? SelectionResult.previous
-        : SelectionResult.next;
-  }
-
-  @override
-  SelectedContentRange? getSelection() {
-    if (_all && source.isNotEmpty)
-      return SelectedContentRange(startOffset: 0, endOffset: source.length);
-    final ranges = <(int, int)>[];
-    for (final fragment in fragments) {
-      final range = fragment._selection.getSelection();
-      if (range != null)
-        ranges.add((
-          fragment.widget.offset + range.startOffset,
-          fragment.widget.offset + range.endOffset,
-        ));
-    }
-    if (_startBoundary != null && _endBoundary != null)
-      return SelectedContentRange(
-        startOffset: _startBoundary! < 0 ? 0 : source.length,
-        endOffset: _endBoundary! < 0 ? 0 : source.length,
-      );
-    if (ranges.isEmpty) return null;
-    final start = ranges
-        .map((r) => math.min(r.$1, r.$2))
-        .reduce(math.min)
-        .clamp(0, source.length);
-    final end = ranges
-        .map((r) => math.max(r.$1, r.$2))
-        .reduce(math.max)
-        .clamp(start, source.length);
-    final reverse =
-        currentSelectionEndIndex < currentSelectionStartIndex ||
-        (currentSelectionEndIndex == currentSelectionStartIndex &&
-            ranges.first.$1 > ranges.first.$2);
-    return SelectedContentRange(
-      startOffset: _startBoundary == null
-          ? (reverse ? end : start)
-          : _startBoundary! < 0
-          ? 0
-          : source.length,
-      endOffset: _endBoundary == null
-          ? (reverse ? start : end)
-          : _endBoundary! < 0
-          ? 0
-          : source.length,
-    );
-  }
-
-  @override
-  SelectedContent? getSelectedContent() {
-    final range = getSelection();
-    if (range == null || range.startOffset == range.endOffset) return null;
-    return SelectedContent(
-      plainText: source.substring(
-        math.min(range.startOffset, range.endOffset),
-        math.max(range.startOffset, range.endOffset),
-      ),
-    );
-  }
-}
-
 class _CodeTextFragment extends StatefulWidget {
   const _CodeTextFragment({
     super.key,
@@ -323,7 +242,7 @@ class _CodeTextFragment extends StatefulWidget {
   final Color highlightColor;
   final String source, language;
   final int offset;
-  final _CodeChunksSelectionDelegate owner;
+  final SourceTextSelectionDelegate owner;
   final MarkstreamTheme theme;
   final CodeHighlighter? highlighter;
   @override
@@ -331,27 +250,18 @@ class _CodeTextFragment extends StatefulWidget {
 }
 
 class _CodeTextFragmentState extends State<_CodeTextFragment> {
-  late final CodeSelectionDelegate _selection = CodeSelectionDelegate(
-    widget.source,
-  );
   late TextSpan _span;
   Object? _request;
   int _generation = 0;
   @override
   void initState() {
     super.initState();
-    widget.owner.fragments.add(this);
     _updateHighlight();
   }
 
   @override
   void didUpdateWidget(_CodeTextFragment oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.owner != widget.owner) {
-      oldWidget.owner.fragments.remove(this);
-      widget.owner.fragments.add(this);
-    }
-    _selection.source = widget.source;
     _updateHighlight();
   }
 
@@ -403,15 +313,14 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
   @override
   void dispose() {
     _generation++;
-    widget.owner.fragments.remove(this);
-    _selection.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final inherited = DefaultTextStyle.of(context).style
-        .merge(widget.theme.code.text);
+    final inherited = DefaultTextStyle.of(
+      context,
+    ).style.merge(widget.theme.code.text);
     final body = Padding(
       padding: const EdgeInsets.only(right: 3),
       child: StreamingText(
@@ -431,8 +340,11 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
         ),
       ),
     );
-    return SelectionContainer.maybeOf(context) == null
-        ? body
-        : SelectionContainer(delegate: _selection, child: body);
+    return SourceTextSelectionFragment(
+      source: widget.source,
+      offset: widget.offset,
+      owner: widget.owner,
+      child: body,
+    );
   }
 }
