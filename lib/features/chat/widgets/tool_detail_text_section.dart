@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../utils/utf16_safe_cut.dart';
+
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 /// Labeled text block for the tool detail view, rendered as a sliver.
@@ -7,7 +9,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 /// Small payloads render as a single [Text]. Large payloads are split into
 /// line-bounded chunks built on demand, so opening the detail view never lays
 /// out an entire multi-megabyte tool result at once.
-class ToolDetailTextSection extends StatelessWidget {
+class ToolDetailTextSection extends StatefulWidget {
   const ToolDetailTextSection({
     super.key,
     required this.label,
@@ -21,6 +23,7 @@ class ToolDetailTextSection extends StatelessWidget {
   static const int lazyLineThreshold = 120;
   static const int lazyCharThreshold = 8000;
   static const int chunkLines = 40;
+  static const int chunkCharacters = 4000;
 
   static const ValueKey<String> lazyListKey = ValueKey(
     'tool-detail-text-lazy-list',
@@ -48,14 +51,60 @@ class ToolDetailTextSection extends StatelessWidget {
     return false;
   }
 
-  static List<String> chunksOf(String text) {
-    final lines = text.split('\n');
-    final chunks = <String>[];
-    for (var start = 0; start < lines.length; start += chunkLines) {
-      final end = (start + chunkLines).clamp(0, lines.length);
-      chunks.add(lines.sublist(start, end).join('\n'));
+  /// Contiguous UTF-16 ranges preserve the source, including line endings.
+  /// Only the visible ranges become strings during layout.
+  static List<TextRange> chunkRangesOf(String text) {
+    final ranges = <TextRange>[];
+    var start = 0;
+    while (start < text.length) {
+      var end = utf16SafeHeadEnd(
+        text,
+        (start + chunkCharacters).clamp(0, text.length),
+      );
+      // Keep CRLF together, just like a surrogate pair.
+      if (end < text.length &&
+          text.codeUnitAt(end - 1) == 0x0D &&
+          text.codeUnitAt(end) == 0x0A) {
+        end--;
+      }
+      var lines = 0;
+      for (var i = start; i < end; i++) {
+        if (text.codeUnitAt(i) == 0x0A && ++lines == chunkLines) {
+          end = i + 1;
+          break;
+        }
+      }
+      ranges.add(TextRange(start: start, end: end));
+      start = end;
     }
-    return chunks.isEmpty ? <String>[text] : chunks;
+    return ranges;
+  }
+
+  @override
+  State<ToolDetailTextSection> createState() => _ToolDetailTextSectionState();
+}
+
+class _ToolDetailTextSectionState extends State<ToolDetailTextSection> {
+  List<TextRange>? _ranges;
+  late String _text;
+
+  @override
+  void initState() {
+    super.initState();
+    _indexText();
+  }
+
+  @override
+  void didUpdateWidget(ToolDetailTextSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) _indexText();
+  }
+
+  void _indexText() {
+    _text = widget.text;
+    _ranges = ToolDetailTextSection.shouldChunk(_text)
+        ? ToolDetailTextSection.chunkRangesOf(_text)
+        : null;
   }
 
   @override
@@ -71,31 +120,31 @@ class ToolDetailTextSection extends StatelessWidget {
       fontSize: 12,
       color: cs.onSurface.withValues(alpha: 0.6),
     );
-    final labelText = Text(label, style: labelStyle);
+    final labelText = Text(widget.label, style: labelStyle);
     final header = SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: trailing == null
+        child: widget.trailing == null
             ? labelText
             : Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(child: labelText),
-                  trailing!,
+                  widget.trailing!,
                 ],
               ),
       ),
     );
-    final below = belowLabel == null
+    final below = widget.belowLabel == null
         ? null
         : SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: belowLabel,
+              child: widget.belowLabel,
             ),
           );
 
-    if (!shouldChunk(text)) {
+    if (_ranges == null) {
       return SliverMainAxisGroup(
         slivers: [
           header,
@@ -105,14 +154,14 @@ class ToolDetailTextSection extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: decoration,
-              child: Text(text, style: textStyle),
+              child: Text(_text, style: widget.textStyle),
             ),
           ),
         ],
       );
     }
 
-    final chunks = chunksOf(text);
+    final ranges = _ranges!;
     return SliverMainAxisGroup(
       slivers: [
         header,
@@ -122,12 +171,12 @@ class ToolDetailTextSection extends StatelessWidget {
           sliver: SliverPadding(
             padding: const EdgeInsets.all(10),
             sliver: SliverList.builder(
-              key: lazyListKey,
-              itemCount: chunks.length,
+              key: ToolDetailTextSection.lazyListKey,
+              itemCount: ranges.length,
               itemBuilder: (context, index) => Text(
-                chunks[index],
+                ranges[index].textInside(_text),
                 key: ValueKey('tool-detail-text-chunk-$index'),
-                style: textStyle,
+                style: widget.textStyle,
               ),
             ),
           ),
