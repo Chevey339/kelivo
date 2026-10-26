@@ -15222,4 +15222,93 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolPermissionScopeThisChat => 'This chat only';
+
+  @override
+  String get dataDirectoryTitle => 'Data directory';
+
+  @override
+  String get dataDirectoryChange => 'Change directory';
+
+  @override
+  String get dataDirectoryChoose => 'Choose an empty local folder';
+
+  @override
+  String get dataDirectoryHint =>
+      'Choose an empty folder on a local drive. Chat history, attachments and app-managed files move after a restart. Small device settings and system caches stay in their system locations.';
+
+  @override
+  String get dataDirectoryPendingHint =>
+      'The move is scheduled for the next restart. Your current data remains in place until copying and verification finish. Destination:';
+
+  @override
+  String get dataDirectoryRestart => 'Restart and move data';
+
+  @override
+  String get dataDirectoryCancelMove =>
+      'Cancel move and keep original directory';
+
+  @override
+  String get dataDirectoryPreviousHint =>
+      'The original copy was retained. Once the new directory has started successfully, you can remove the old copy to free disk space. Clean it before changing directories again.';
+
+  @override
+  String get dataDirectoryCleanPrevious => 'Clean up original copy';
+
+  @override
+  String get dataDirectoryCleanConfirm =>
+      'Remove the retained copy from the directory below? Data in the current directory will be kept. Files changed since the move will not be deleted.';
+
+  @override
+  String get dataDirectoryMoving =>
+      'Moving and verifying data… Please keep Kelivo open.';
+
+  @override
+  String get dataDirectoryStartupFailed => 'Unable to open the data directory';
+
+  @override
+  String get dataDirectoryRetry => 'Retry';
+
+  @override
+  String get dataDirectoryUnavailable =>
+      'The data directory is unavailable. Reconnect the drive or restore the folder to its original location, then retry. No empty database will be created.';
+
+  @override
+  String get dataDirectoryIdentityMismatch =>
+      'This folder does not match the configured data directory. Restore the original folder and retry.';
+
+  @override
+  String get dataDirectoryNotEmpty =>
+      'Choose an empty folder. Existing files will not be overwritten.';
+
+  @override
+  String get dataDirectoryOverlap =>
+      'Choose a separate folder outside the current data directory. Its parent folders and the drive root cannot be used.';
+
+  @override
+  String get dataDirectoryLocalOnly =>
+      'Choose a local drive rather than a network share.';
+
+  @override
+  String get dataDirectoryFinishPrevious =>
+      'Finish or cancel the pending move, and clean up the retained copy before choosing another directory.';
+
+  @override
+  String get dataDirectoryPendingRestore =>
+      'A backup restore is pending. Cancel the directory move and restart to finish restoring, then try the move again.';
+
+  @override
+  String get dataDirectorySourceChanged =>
+      'The original data has changed since the copy was made. It has been kept. Cancel the pending move before starting a new one; retained copies can be inspected manually.';
+
+  @override
+  String get dataDirectoryCopyChanged =>
+      'The destination contains unexpected or changed files. The original data has been kept. Check the destination before retrying.';
+
+  @override
+  String get dataDirectoryGenericError =>
+      'The operation could not finish. Check available disk space, folder permissions and whether another Kelivo process is running, then retry. Existing data has been kept.';
+
+  @override
+  String get dataDirectoryCancelHint =>
+      'Cancelling keeps any files already copied to the destination. You can inspect and remove that partial copy yourself.';
 }

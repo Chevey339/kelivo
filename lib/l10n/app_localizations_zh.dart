@@ -14453,6 +14453,84 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get dataDirectoryTitle => '数据存储目录';
+
+  @override
+  String get dataDirectoryChange => '更改目录';
+
+  @override
+  String get dataDirectoryChoose => '选择一个空的本地文件夹';
+
+  @override
+  String get dataDirectoryHint =>
+      '请选择本地磁盘上的空文件夹。聊天记录、附件和应用管理的文件将在重启后搬迁。少量设备设置和系统缓存仍保留在系统目录。';
+
+  @override
+  String get dataDirectoryPendingHint => '将在下次重启时搬迁。复制和校验完成前，原数据保持不变。目标目录：';
+
+  @override
+  String get dataDirectoryRestart => '重启并搬迁数据';
+
+  @override
+  String get dataDirectoryCancelMove => '取消搬迁，继续使用原目录';
+
+  @override
+  String get dataDirectoryPreviousHint =>
+      '已保留原数据副本。新目录成功启动后，可以清理旧副本以释放磁盘空间。再次更改目录前，请先清理此副本。';
+
+  @override
+  String get dataDirectoryCleanPrevious => '清理原数据副本';
+
+  @override
+  String get dataDirectoryCleanConfirm =>
+      '确定清理以下目录中的原数据副本？当前目录中的数据会保留，搬迁后发生变化的文件不会被删除。';
+
+  @override
+  String get dataDirectoryMoving => '正在搬迁并校验数据…请保持 Kelivo 开启。';
+
+  @override
+  String get dataDirectoryStartupFailed => '无法打开数据目录';
+
+  @override
+  String get dataDirectoryRetry => '重试';
+
+  @override
+  String get dataDirectoryUnavailable =>
+      '数据目录不可用。请重新连接磁盘，或将文件夹恢复到原位置后重试。应用不会创建空数据库。';
+
+  @override
+  String get dataDirectoryIdentityMismatch => '此文件夹与已设置的数据目录不匹配。请恢复原文件夹后重试。';
+
+  @override
+  String get dataDirectoryNotEmpty => '请选择空文件夹，不会覆盖已有文件。';
+
+  @override
+  String get dataDirectoryOverlap => '请选择当前数据目录之外的独立文件夹，不能选择其上级目录、子目录或磁盘根目录。';
+
+  @override
+  String get dataDirectoryLocalOnly => '请选择本地磁盘上的文件夹，不支持网络共享目录。';
+
+  @override
+  String get dataDirectoryFinishPrevious => '请先完成或取消待执行的搬迁，并清理保留的旧副本，再选择其他目录。';
+
+  @override
+  String get dataDirectoryPendingRestore => '有备份恢复尚未完成。请取消目录搬迁并重启，完成恢复后再更改目录。';
+
+  @override
+  String get dataDirectorySourceChanged =>
+      '原数据在复制后发生了变化，已保留原文件。若正在搬迁，请取消后重新开始；若正在清理，请先检查原目录。';
+
+  @override
+  String get dataDirectoryCopyChanged => '目标目录存在意外文件或文件变化，原数据已保留。请检查目标目录后重试。';
+
+  @override
+  String get dataDirectoryGenericError =>
+      '操作未完成。请检查磁盘剩余空间、文件夹权限，以及是否有其他 Kelivo 进程运行，然后重试。已有数据已保留。';
+
+  @override
+  String get dataDirectoryCancelHint => '取消搬迁会保留目标目录中已复制的文件，你可以检查后手动清理这些副本。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -28830,6 +28908,84 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get toolPermissionScopeThisChat => '仅此对话';
+
+  @override
+  String get dataDirectoryTitle => '数据存储目录';
+
+  @override
+  String get dataDirectoryChange => '更改目录';
+
+  @override
+  String get dataDirectoryChoose => '选择一个空的本地文件夹';
+
+  @override
+  String get dataDirectoryHint =>
+      '请选择本地磁盘上的空文件夹。聊天记录、附件和应用管理的文件将在重启后搬迁。少量设备设置和系统缓存仍保留在系统目录。';
+
+  @override
+  String get dataDirectoryPendingHint => '将在下次重启时搬迁。复制和校验完成前，原数据保持不变。目标目录：';
+
+  @override
+  String get dataDirectoryRestart => '重启并搬迁数据';
+
+  @override
+  String get dataDirectoryCancelMove => '取消搬迁，继续使用原目录';
+
+  @override
+  String get dataDirectoryPreviousHint =>
+      '已保留原数据副本。新目录成功启动后，可以清理旧副本以释放磁盘空间。再次更改目录前，请先清理此副本。';
+
+  @override
+  String get dataDirectoryCleanPrevious => '清理原数据副本';
+
+  @override
+  String get dataDirectoryCleanConfirm =>
+      '确定清理以下目录中的原数据副本？当前目录中的数据会保留，搬迁后发生变化的文件不会被删除。';
+
+  @override
+  String get dataDirectoryMoving => '正在搬迁并校验数据…请保持 Kelivo 开启。';
+
+  @override
+  String get dataDirectoryStartupFailed => '无法打开数据目录';
+
+  @override
+  String get dataDirectoryRetry => '重试';
+
+  @override
+  String get dataDirectoryUnavailable =>
+      '数据目录不可用。请重新连接磁盘，或将文件夹恢复到原位置后重试。应用不会创建空数据库。';
+
+  @override
+  String get dataDirectoryIdentityMismatch => '此文件夹与已设置的数据目录不匹配。请恢复原文件夹后重试。';
+
+  @override
+  String get dataDirectoryNotEmpty => '请选择空文件夹，不会覆盖已有文件。';
+
+  @override
+  String get dataDirectoryOverlap => '请选择当前数据目录之外的独立文件夹，不能选择其上级目录、子目录或磁盘根目录。';
+
+  @override
+  String get dataDirectoryLocalOnly => '请选择本地磁盘上的文件夹，不支持网络共享目录。';
+
+  @override
+  String get dataDirectoryFinishPrevious => '请先完成或取消待执行的搬迁，并清理保留的旧副本，再选择其他目录。';
+
+  @override
+  String get dataDirectoryPendingRestore => '有备份恢复尚未完成。请取消目录搬迁并重启，完成恢复后再更改目录。';
+
+  @override
+  String get dataDirectorySourceChanged =>
+      '原数据在复制后发生了变化，已保留原文件。若正在搬迁，请取消后重新开始；若正在清理，请先检查原目录。';
+
+  @override
+  String get dataDirectoryCopyChanged => '目标目录存在意外文件或文件变化，原数据已保留。请检查目标目录后重试。';
+
+  @override
+  String get dataDirectoryGenericError =>
+      '操作未完成。请检查磁盘剩余空间、文件夹权限，以及是否有其他 Kelivo 进程运行，然后重试。已有数据已保留。';
+
+  @override
+  String get dataDirectoryCancelHint => '取消搬迁会保留目标目录中已复制的文件，你可以检查后手动清理这些副本。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -43287,4 +43443,83 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get toolPermissionScopeThisChat => '僅此對話';
+
+  @override
+  String get dataDirectoryTitle => '資料儲存目錄';
+
+  @override
+  String get dataDirectoryChange => '變更目錄';
+
+  @override
+  String get dataDirectoryChoose => '選擇一個空的本機資料夾';
+
+  @override
+  String get dataDirectoryHint =>
+      '請選擇本機磁碟上的空資料夾。聊天記錄、附件和應用程式管理的檔案將在重新啟動後搬遷。少量裝置設定和系統快取仍保留在系統目錄。';
+
+  @override
+  String get dataDirectoryPendingHint => '將在下次重新啟動時搬遷。複製和驗證完成前，原資料保持不變。目標目錄：';
+
+  @override
+  String get dataDirectoryRestart => '重新啟動並搬遷資料';
+
+  @override
+  String get dataDirectoryCancelMove => '取消搬遷，繼續使用原目錄';
+
+  @override
+  String get dataDirectoryPreviousHint =>
+      '已保留原資料副本。新目錄成功啟動後，可以清理舊副本以釋放磁碟空間。再次變更目錄前，請先清理此副本。';
+
+  @override
+  String get dataDirectoryCleanPrevious => '清理原資料副本';
+
+  @override
+  String get dataDirectoryCleanConfirm =>
+      '確定清理以下目錄中的原資料副本？目前目錄中的資料會保留，搬遷後發生變化的檔案不會被刪除。';
+
+  @override
+  String get dataDirectoryMoving => '正在搬遷並驗證資料…請保持 Kelivo 開啟。';
+
+  @override
+  String get dataDirectoryStartupFailed => '無法開啟資料目錄';
+
+  @override
+  String get dataDirectoryRetry => '重試';
+
+  @override
+  String get dataDirectoryUnavailable =>
+      '資料目錄無法使用。請重新連接磁碟，或將資料夾還原至原位置後重試。應用程式不會建立空資料庫。';
+
+  @override
+  String get dataDirectoryIdentityMismatch => '此資料夾與已設定的資料目錄不符。請還原原資料夾後重試。';
+
+  @override
+  String get dataDirectoryNotEmpty => '請選擇空資料夾，不會覆寫現有檔案。';
+
+  @override
+  String get dataDirectoryOverlap => '請選擇目前資料目錄之外的獨立資料夾，不能選擇其上層目錄、子目錄或磁碟根目錄。';
+
+  @override
+  String get dataDirectoryLocalOnly => '請選擇本機磁碟上的資料夾，不支援網路共用目錄。';
+
+  @override
+  String get dataDirectoryFinishPrevious => '請先完成或取消待執行的搬遷，並清理保留的舊副本，再選擇其他目錄。';
+
+  @override
+  String get dataDirectoryPendingRestore =>
+      '有備份還原尚未完成。請取消目錄搬遷並重新啟動，完成還原後再變更目錄。';
+
+  @override
+  String get dataDirectorySourceChanged =>
+      '原資料在複製後發生了變化，已保留原檔案。若正在搬遷，請取消後重新開始；若正在清理，請先檢查原目錄。';
+
+  @override
+  String get dataDirectoryCopyChanged => '目標目錄存在非預期檔案或檔案變更，原資料已保留。請檢查目標目錄後重試。';
+
+  @override
+  String get dataDirectoryGenericError =>
+      '操作未完成。請檢查磁碟剩餘空間、資料夾權限，以及是否有其他 Kelivo 處理程序執行，然後重試。現有資料已保留。';
+
+  @override
+  String get dataDirectoryCancelHint => '取消搬遷會保留目標目錄中已複製的檔案，你可以檢查後手動清理這些副本。';
 }

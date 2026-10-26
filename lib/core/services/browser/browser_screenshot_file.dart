@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
+import '../../../utils/windows_file_path.dart';
 
 /// Publish a complete file without opening, following or replacing the target
 /// leaf. Dart's rename replaces existing targets on POSIX, and create(exclusive)
@@ -27,8 +28,8 @@ void _publish(String source, String target) {
           .lookupFunction<Uint32 Function(), int Function()>('GetLastError');
       // No MOVEFILE_REPLACE_EXISTING or cross-volume copy fallback.
       return move(
-                _windowsPath(source).toNativeUtf16(allocator: arena),
-                _windowsPath(target).toNativeUtf16(allocator: arena),
+                extendedWindowsFilePath(source).toNativeUtf16(allocator: arena),
+                extendedWindowsFilePath(target).toNativeUtf16(allocator: arena),
                 0,
               ) !=
               0
@@ -73,11 +74,4 @@ void _publish(String source, String target) {
     target,
     OSError('', code),
   );
-}
-
-String _windowsPath(String path) {
-  if (path.startsWith(r'\\?\')) return path;
-  return path.startsWith(r'\\')
-      ? r'\\?\UNC\' + path.substring(2)
-      : r'\\?\' + path;
 }

@@ -95,6 +95,8 @@ import 'shared/widgets/floating_ipad_padding.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_progress_screen.dart';
+import 'shared/widgets/windows_data_directory_startup.dart';
+import 'core/services/storage/windows_data_directory.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/update_required_screen.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -182,6 +184,11 @@ Future<void> main() async {
       // Show before the restore gate so progress and failure screens stay visible.
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
         await _initDesktopWindow();
+      }
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        await initializeWindowsDataDirectory(
+          showWindow: _initRestoreFailureWindow,
+        );
       }
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final retained = await AppDirectories.documentsDirectoryFor(
@@ -408,6 +415,14 @@ Future<void> main() async {
             ),
           );
           return;
+        }
+      }
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        try {
+          await (await WindowsDataDirectory.instance).confirmStartup();
+        } catch (error) {
+          // Keep the retained source when confirmation cannot be persisted.
+          stderr.writeln('[DataDirectoryConfirmation] $error');
         }
       }
       // Desktop exit hook: drain queued preference writes before process exit.

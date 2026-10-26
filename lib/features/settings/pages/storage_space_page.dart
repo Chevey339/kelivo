@@ -27,6 +27,7 @@ import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspaces_page.dart';
 import 'log_viewer_page.dart';
 import '../widgets/storage_contents_list.dart';
+import '../widgets/windows_data_directory_tile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 
@@ -747,6 +748,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (PlatformUtils.isWindows) const WindowsDataDirectoryTile(),
               Row(
                 children: [
                   Text(

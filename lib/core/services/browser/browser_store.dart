@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../../../utils/app_directories.dart';
 
 /// One versioned snapshot keeps active-tab and tab-list writes consistent.
 class BrowserStore {
@@ -11,7 +12,13 @@ class BrowserStore {
 
   Future<Directory> get directory async {
     final root = _directory ??= Directory(
-      p.join((await getApplicationSupportDirectory()).path, 'browser'),
+      p.join(
+        (await (Platform.isWindows
+                ? AppDirectories.getAppDataDirectory()
+                : getApplicationSupportDirectory()))
+            .path,
+        'browser',
+      ),
     );
     await root.create(recursive: true);
     return root;
