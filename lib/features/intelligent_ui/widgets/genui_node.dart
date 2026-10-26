@@ -468,7 +468,7 @@ class _PendingPainter extends CustomPainter {
       Offset.zero & size,
       Radius.circular(theme.controlRadius),
     );
-    canvas.drawRRect(rect, Paint()..color = theme.card);
+    canvas.drawRRect(rect, Paint()..color = theme.contentBackground);
     final outline = Path()..addRRect(rect.deflate(.5));
     final stroke = Paint()
       ..color = theme.hairlineStrong

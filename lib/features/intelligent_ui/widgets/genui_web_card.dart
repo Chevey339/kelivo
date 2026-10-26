@@ -88,7 +88,7 @@ class _GenUiWebCardState extends State<GenUiWebCard> {
       label: title,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.card,
+          color: theme.surface,
           borderRadius: BorderRadius.circular(theme.cardRadius),
           border: Border.all(color: theme.hairline),
         ),

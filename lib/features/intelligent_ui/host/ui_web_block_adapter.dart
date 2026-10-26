@@ -62,6 +62,7 @@ class _UiWebBlockAdapterState extends State<UiWebBlockAdapter> {
   @override
   Widget build(BuildContext context) => GenUiThemeScope(
     markdownTheme: widget.theme,
+    opaque: widget.host.exporting,
     child: GenUiWebCard(
       document: _document,
       exporting: widget.host.exporting,

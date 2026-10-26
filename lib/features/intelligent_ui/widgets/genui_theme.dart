@@ -8,29 +8,57 @@ import 'package:Kelivo/theme/surface_ladder.dart';
 /// The sole mapping from Kelivo appearance tokens to generated native content.
 /// Model declarations select semantic variants, never colors or pixel geometry.
 final class GenUiTheme {
-  GenUiTheme._(ThemeData theme, MarkstreamTheme? inheritedMarkdown) {
-    final cs = theme.colorScheme;
-    final semantic =
+  GenUiTheme._(
+    ThemeData theme,
+    MarkstreamTheme? inheritedMarkdown, {
+    bool opaque = false,
+  }) {
+    final appScheme = theme.colorScheme;
+    final backdrop =
+        !opaque && inheritedMarkdown?.backdrop != MarkstreamBackdrop.plain
+        ? inheritedMarkdown
+        : null;
+    final colors = backdrop?.colors;
+    final brightness = backdrop?.brightness ?? theme.brightness;
+    final followsApp = brightness == theme.brightness;
+    // Custom bubble colors can invert the local surface. Derive all accent
+    // pairs together so callouts, trends, charts and filled controls agree.
+    final cs = followsApp
+        ? appScheme
+        : ColorScheme.fromSeed(
+            seedColor: appScheme.primary,
+            brightness: brightness,
+          );
+    final appSemantic =
         theme.extension<AppSemanticColors>() ??
         (theme.brightness == Brightness.dark
-            ? AppSemanticColors.dark(cs)
-            : AppSemanticColors.light(cs));
-    final ladder = SurfaceLadder.fromScheme(cs, layered: semantic.layered);
+            ? AppSemanticColors.dark(appScheme)
+            : AppSemanticColors.light(appScheme));
+    final semantic = followsApp
+        ? appSemantic
+        : brightness == Brightness.dark
+        ? AppSemanticColors.dark(cs)
+        : AppSemanticColors.light(cs);
+    final ladder = SurfaceLadder.fromScheme(
+      appScheme,
+      layered: appSemantic.layered,
+    );
     page = ladder.page;
-    card = ladder.card;
+    card = colors?.fillBlockOpaque ?? ladder.card;
+    surface = colors?.fillBlock ?? card;
     previewHeader = theme.brightness == Brightness.dark
         ? card
-        : cs.inverseSurface;
+        : appScheme.inverseSurface;
     previewHeaderInk = theme.brightness == Brightness.dark
-        ? cs.onSurface
-        : cs.onInverseSurface;
-    fill = ladder.surfaceFill;
-    cardFill = ladder.surfaceCardFill;
-    hairline = ladder.hairline;
-    hairlineStrong = ladder.hairlineStrong;
-    ink = cs.onSurface;
-    secondaryInk = ink.withValues(alpha: .72);
-    captionInk = ink.withValues(alpha: .50);
+        ? appScheme.onSurface
+        : appScheme.onInverseSurface;
+    fill = colors?.fillHead ?? ladder.surfaceFill;
+    cardFill = colors?.fillInline ?? ladder.surfaceCardFill;
+    hairline = colors?.border ?? ladder.hairline;
+    hairlineStrong = colors?.borderStrong ?? ladder.hairlineStrong;
+    ink = colors?.ink ?? cs.onSurface;
+    secondaryInk = colors?.ink2 ?? ink.withValues(alpha: .72);
+    captionInk = colors?.ink3 ?? ink.withValues(alpha: .50);
     disabledInk = ink.withValues(alpha: .30);
     primary = cs.primary;
     onPrimary = cs.onPrimary;
@@ -39,14 +67,28 @@ final class GenUiTheme {
     error = cs.error;
     errorContainer = cs.errorContainer;
     onErrorContainer = cs.onErrorContainer;
-    successContainer = semantic.successContainer;
-    onSuccessContainer = semantic.onSuccessContainer;
-    warningContainer = semantic.warningContainer;
-    onWarningContainer = semantic.onWarningContainer;
+    final success = followsApp
+        ? null
+        : ColorScheme.fromSeed(
+            seedColor: semantic.success,
+            brightness: brightness,
+          );
+    final warning = followsApp
+        ? null
+        : ColorScheme.fromSeed(
+            seedColor: semantic.warning,
+            brightness: brightness,
+          );
+    successContainer = success?.primaryContainer ?? semantic.successContainer;
+    onSuccessContainer =
+        success?.onPrimaryContainer ?? semantic.onSuccessContainer;
+    warningContainer = warning?.primaryContainer ?? semantic.warningContainer;
+    onWarningContainer =
+        warning?.onPrimaryContainer ?? semantic.onWarningContainer;
     searchHighlight = semantic.searchHighlight;
     popover = Color.alphaBlend(
-      AppOverlayColors.desktopPopoverSurface(cs),
-      card,
+      AppOverlayColors.desktopPopoverSurface(appScheme),
+      ladder.card,
     );
     transparent = card.withValues(alpha: 0);
     sliderThumb = ink.computeLuminance() > card.computeLuminance() ? ink : card;
@@ -101,18 +143,22 @@ final class GenUiTheme {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     chartCenterValue = metric.copyWith(fontSize: 18 * scale, color: ink);
-    // GenUI cards are opaque even on wallpaper/tinted messages. Preserve the
-    // inherited Markdown font choices while pairing its ink with this card.
-    markdown = MarkstreamTheme.fromColorScheme(
-      cs,
-      bodyStyle: body,
-      codeFontFamily: inheritedMarkdown?.code.text.fontFamily ?? 'monospace',
-      medium: AppFontWeights.medium,
-      semibold: AppFontWeights.semibold,
-      strong: AppFontWeights.strong,
-    );
+    // Inline content shares the resolved message backdrop, including its mask
+    // strength and custom bubble colors. Standalone routes/captures instead
+    // pair opaque app surfaces with app ink while retaining the message fonts.
+    markdown =
+        backdrop?.copyWith(body: body) ??
+        MarkstreamTheme.fromColorScheme(
+          cs,
+          bodyStyle: body,
+          codeFontFamily:
+              inheritedMarkdown?.code.text.fontFamily ?? 'monospace',
+          medium: AppFontWeights.medium,
+          semibold: AppFontWeights.semibold,
+          strong: AppFontWeights.strong,
+        );
     mono = markdown.code.text;
-    final dark = theme.brightness == Brightness.dark;
+    final dark = brightness == Brightness.dark;
     chartColors = List.unmodifiable([
       primary,
       if (dark) ...const [
@@ -131,7 +177,13 @@ final class GenUiTheme {
     ]);
   }
 
-  late final Color page, card, fill, cardFill, hairline, hairlineStrong;
+  late final Color page,
+      card,
+      surface,
+      fill,
+      cardFill,
+      hairline,
+      hairlineStrong;
   late final Color previewHeader, previewHeaderInk;
   late final Color ink, secondaryInk, captionInk, disabledInk, transparent;
   late final Color sliderThumb;
@@ -166,6 +218,10 @@ final class GenUiTheme {
   double get cardRadius => MarkstreamTheme.radiusMd;
   double get controlRadius => 10;
   Color get headerFill => markdown.code.headerBackgroundColor;
+  // The outer surface already supplies the Markdown backdrop. Painting it
+  // again inside tables or donut holes would hide the wallpaper underneath.
+  Color get contentBackground =>
+      markdown.backdrop == MarkstreamBackdrop.plain ? card : transparent;
   BoxDecoration fieldDecoration({bool focused = false, bool invalid = false}) =>
       BoxDecoration(
         color: fill,
@@ -205,7 +261,10 @@ final class GenUiTheme {
     };
     return (
       fill: subtle
-          ? Color.alphaBlend(colors.fill.withValues(alpha: .2), card)
+          ? Color.alphaBlend(
+              colors.fill.withValues(alpha: .2),
+              contentBackground,
+            )
           : colors.fill,
       ink: colors.ink,
       border: colors.ink.withValues(alpha: .2),
@@ -224,9 +283,15 @@ final class GenUiTheme {
 /// Cache one derived palette per Surface, including across unrelated parent
 /// rebuilds. A theme/font change replaces only appearance, not its controller.
 class GenUiThemeScope extends StatefulWidget {
-  const GenUiThemeScope({super.key, required this.child, this.markdownTheme});
+  const GenUiThemeScope({
+    super.key,
+    required this.child,
+    this.markdownTheme,
+    this.opaque = false,
+  });
   final Widget child;
   final MarkstreamTheme? markdownTheme;
+  final bool opaque;
   @override
   State<GenUiThemeScope> createState() => _GenUiThemeScopeState();
 }
@@ -234,14 +299,19 @@ class GenUiThemeScope extends StatefulWidget {
 class _GenUiThemeScopeState extends State<GenUiThemeScope> {
   ThemeData? _theme;
   MarkstreamTheme? _markdown;
+  bool? _opaque;
   GenUiTheme? _data;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (_data == null || _theme != theme || _markdown != widget.markdownTheme) {
+    if (_data == null ||
+        _theme != theme ||
+        _markdown != widget.markdownTheme ||
+        _opaque != widget.opaque) {
       _theme = theme;
       _markdown = widget.markdownTheme;
-      _data = GenUiTheme._(theme, widget.markdownTheme);
+      _opaque = widget.opaque;
+      _data = GenUiTheme._(theme, widget.markdownTheme, opaque: widget.opaque);
     }
     return _GenUiThemeData(data: _data!, child: widget.child);
   }

@@ -12,6 +12,8 @@ import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
+import 'package:Kelivo/features/chat/widgets/chat_assistant_background.dart';
+import 'package:Kelivo/features/chat/widgets/frosted/chat_frosted_backdrop.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -84,6 +86,9 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
           ? text.replaceFirst('"version":1', '"version":9')
           : text.replaceFirst('ui 1', 'ui 9');
     }
+    text =
+        '| Markdown | Native UI |\n| --- | --- |\n'
+        '| Shared message backdrop | Interactive content below |\n\n$text';
     final message = ChatMessage(
       id: 'manual-native-$_role-$_fixture',
       conversationId: 'manual-native',
@@ -167,28 +172,69 @@ class _GenUiMessageGalleryState extends State<GenUiMessageGallery> {
                             () => _fixture = (_fixture + 1) % _fixtures.length,
                           ),
                         ),
+                        IosTextButton(
+                          label: 'Background',
+                          onPressed: () async {
+                            final provider = context.read<AssistantProvider>();
+                            await provider.loaded;
+                            if (provider.currentAssistant == null) {
+                              await provider.addAssistant(
+                                name: 'Native UI preview',
+                              );
+                            }
+                            final assistant = provider.currentAssistant;
+                            if (assistant == null) return;
+                            await provider.updateAssistant(
+                              assistant.copyWith(
+                                useGradientBackground:
+                                    !assistant.useGradientBackground,
+                                gradientBackgroundAnimated: false,
+                              ),
+                            );
+                          },
+                        ),
+                        IosTextButton(
+                          label: 'Bubble style',
+                          onPressed: () {
+                            final settings = context.read<SettingsProvider>();
+                            final styles = ChatMessageBackgroundStyle.values;
+                            settings.setChatMessageBackgroundStyle(
+                              styles[(styles.indexOf(
+                                        settings.chatMessageBackgroundStyle,
+                                      ) +
+                                      1) %
+                                  styles.length],
+                            );
+                          },
+                        ),
                       ],
                     ),
                     Expanded(
-                      child: UiActionsScope(
-                        onAsk: (intent) async => setState(
-                          () => _intent = jsonEncode(intent.context),
+                      child: ChatFrostedBackdrop(
+                        backdrop: const ChatAssistantBackground(
+                          desktop: true,
+                          includeSurfaceFill: true,
                         ),
-                        child: MessageListView(
-                          scrollController: _scroll,
-                          listController: _list,
-                          messages: [_message()],
-                          byGroup: const {},
-                          versionSelections: const {},
-                          reasoning: const {},
-                          reasoningSegments: const {},
-                          contentSplits: const {},
-                          toolParts: const {},
-                          translations: const {},
-                          selecting: false,
-                          selectedItems: const {},
-                          dividerPadding: EdgeInsets.zero,
-                          processingFilesMessageId: _processing,
+                        child: UiActionsScope(
+                          onAsk: (intent) async => setState(
+                            () => _intent = jsonEncode(intent.context),
+                          ),
+                          child: MessageListView(
+                            scrollController: _scroll,
+                            listController: _list,
+                            messages: [_message()],
+                            byGroup: const {},
+                            versionSelections: const {},
+                            reasoning: const {},
+                            reasoningSegments: const {},
+                            contentSplits: const {},
+                            toolParts: const {},
+                            translations: const {},
+                            selecting: false,
+                            selectedItems: const {},
+                            dividerPadding: EdgeInsets.zero,
+                            processingFilesMessageId: _processing,
+                          ),
                         ),
                       ),
                     ),

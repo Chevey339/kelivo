@@ -60,6 +60,7 @@ class GenUiSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GenUiThemeScope(
     markdownTheme: markdownTheme,
+    opaque: exporting || expanded,
     child: GenUiInteractionHost(
       surface: controller,
       interactions: interactions,
@@ -180,6 +181,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
       maxWidth: 720,
       child: GenUiThemeScope(
         markdownTheme: markdown,
+        opaque: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,7 +236,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                   IosTextButton(
                     label: l10n.genuiViewSource,
                     icon: LucideIcons.codeXml,
-                    color: GenUiTheme.of(context).ink,
+                    color: GenUiTheme.of(dialogContext).ink,
                     mainAxisAlignment: MainAxisAlignment.start,
                     onPressed: () => Navigator.of(dialogContext).pop('source'),
                   ),
@@ -242,7 +244,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                     IosTextButton(
                       label: l10n.genuiExpand,
                       icon: LucideIcons.expand,
-                      color: GenUiTheme.of(context).ink,
+                      color: GenUiTheme.of(dialogContext).ink,
                       mainAxisAlignment: MainAxisAlignment.start,
                       onPressed: () =>
                           Navigator.of(dialogContext).pop('expand'),
@@ -252,7 +254,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                   IosTextButton(
                     label: l10n.genuiAttachState,
                     icon: LucideIcons.paperclip,
-                    color: GenUiTheme.of(context).ink,
+                    color: GenUiTheme.of(dialogContext).ink,
                     mainAxisAlignment: MainAxisAlignment.start,
                     onPressed: () => Navigator.of(dialogContext).pop('attach'),
                   ),
@@ -260,14 +262,14 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                   IosTextButton(
                     label: l10n.genuiExportSnapshot,
                     icon: LucideIcons.image,
-                    color: GenUiTheme.of(context).ink,
+                    color: GenUiTheme.of(dialogContext).ink,
                     mainAxisAlignment: MainAxisAlignment.start,
                     onPressed: () => Navigator.of(dialogContext).pop('export'),
                   ),
                 IosTextButton(
                   label: l10n.genuiReset,
                   icon: LucideIcons.rotateCcw,
-                  color: GenUiTheme.of(context).secondaryInk,
+                  color: GenUiTheme.of(dialogContext).secondaryInk,
                   mainAxisAlignment: MainAxisAlignment.start,
                   onPressed: controller.readOnly
                       ? null
@@ -450,7 +452,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
           child: Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: theme.card,
+              color: theme.surface,
               borderRadius: BorderRadius.circular(theme.cardRadius),
               border: Border.all(color: theme.hairline),
             ),

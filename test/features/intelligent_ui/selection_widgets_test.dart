@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
@@ -9,6 +10,7 @@ import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_controller.dar
 import 'package:Kelivo/features/intelligent_ui/runtime/ui_surface_state.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_boolean_input.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_choice_input.dart';
+import 'package:Kelivo/features/intelligent_ui/widgets/genui_field_frame.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_slider.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_surface.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_theme.dart';
@@ -38,6 +40,7 @@ Widget _app(
   bool rtl = false,
   double scale = 1,
   bool dark = false,
+  double width = 390,
 }) => MaterialApp(
   theme: dark ? buildDarkTheme(null) : buildLightTheme(null),
   locale: const Locale('en'),
@@ -54,7 +57,10 @@ Widget _app(
   ),
   home: Scaffold(
     body: SingleChildScrollView(
-      child: SizedBox(width: 390, child: GenUiSurface(controller: c)),
+      child: SizedBox(
+        width: width,
+        child: GenUiSurface(controller: c),
+      ),
     ),
   ),
 );
@@ -67,6 +73,69 @@ Finder _radio() => find.byWidgetPredicate(
   (w) => w is GenUiChoiceInput && w.node.declaration.component == 'RadioGroup',
 );
 void main() {
+  testWidgets(
+    'desktop Select fills its field and opens an equally wide menu from the trailing edge',
+    (tester) async {
+      tester.view.physicalSize = const Size(1100, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final c = _controller(
+        r'''$complexity: number = 1.3
+root = Select(label="复杂度系数",bind=$complexity,options=[{"value":1,"label":"基础 ×1.0"},{"value":1.3,"label":"标准 ×1.3"},{"value":1.8,"label":"复杂 ×1.8"}])''',
+      );
+      for (final width in [360.0, 900.0]) {
+        for (final rtl in [false, true]) {
+          await tester.pumpWidget(_app(c, width: width, rtl: rtl, scale: 1.3));
+          await tester.pumpAndSettle();
+          final field = tester.getRect(find.byType(GenUiFieldSurface));
+          final trigger = find
+              .descendant(
+                of: find.byType(DesktopSelectDropdown<Object?>),
+                matching: find.byType(AnimatedContainer),
+              )
+              .first;
+          expect(tester.getRect(trigger).width, field.width);
+          final arrow = tester.getRect(
+            find.descendant(of: trigger, matching: find.byType(Icon)),
+          );
+          expect(
+            rtl ? arrow.left - field.left : field.right - arrow.right,
+            lessThan(20),
+          );
+          await tester.tapAt(
+            Offset(rtl ? field.left + 40 : field.right - 40, field.center.dy),
+          );
+          await tester.pumpAndSettle();
+          final theme = GenUiTheme.of(
+            tester.element(find.byType(GenUiChoiceInput)),
+          );
+          final menu = find.byWidgetPredicate(
+            (w) =>
+                w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration as BoxDecoration).color == theme.popover,
+          );
+          expect(tester.getSize(menu).width, field.width);
+          for (final label in ['基础 ×1.0', '标准 ×1.3', '复杂 ×1.8']) {
+            final text = find.descendant(of: menu, matching: find.text(label));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: text, matching: find.byType(RichText)),
+            );
+            expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+          }
+          await tester.tap(
+            find.descendant(of: menu, matching: find.text('复杂 ×1.8')),
+          );
+          await tester.pumpAndSettle();
+          expect(c.captureRead().inputs['complexity'], 1.8);
+          expect(find.text('复杂 ×1.8'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
   testWidgets('unselected radio arrows choose endpoints in both directions', (
     tester,
   ) async {

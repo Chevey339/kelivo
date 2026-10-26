@@ -90,6 +90,7 @@ class GenUiFieldSurface extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Stack(
+    fit: StackFit.passthrough,
     children: [
       Positioned.fill(
         top: 4,

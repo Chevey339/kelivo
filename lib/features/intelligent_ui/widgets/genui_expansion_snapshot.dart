@@ -28,7 +28,10 @@ class GenUiExpansionAnchor extends SingleChildRenderObjectWidget {
 }
 
 class RenderGenUiExpansionAnchor extends RenderProxyBox {
-  GenUiExpansionSnapshot? capture(MediaQueryData media) {
+  GenUiExpansionSnapshot? capture(
+    MediaQueryData media, {
+    bool includeBackdrop = false,
+  }) {
     final target = this;
     if (!target.attached || !target.hasSize) return null;
     final origin = target.localToGlobal(Offset.zero);
@@ -37,7 +40,10 @@ class RenderGenUiExpansionAnchor extends RenderProxyBox {
     final bounds = visible.shift(-origin);
     RenderObject? ancestor = target;
     while (ancestor != null) {
-      if (ancestor.isRepaintBoundary &&
+      // Translucent cards need the composited backdrop in their frozen pixels.
+      // Otherwise the return overlay applies the card tint a second time.
+      if (!includeBackdrop &&
+          ancestor.isRepaintBoundary &&
           ancestor is RenderBox &&
           ancestor.layer is OffsetLayer) {
         final captureBounds = MatrixUtils.transformRect(

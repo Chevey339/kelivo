@@ -59,6 +59,34 @@ void main() {
     },
   );
 
+  test('macOS loads without the unsupported UIView background API', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    platform.failAt = 'background:0';
+    final controller = UiWebController();
+    await controller.start(document);
+    expect(controller.phase, UiWebNativePhase.ready);
+    expect(platform.events, [
+      'permission',
+      'navigationPolicy',
+      'httpAuth',
+      'navigationDelegate',
+      'alert',
+      'confirm',
+      'prompt',
+      'javascript:unrestricted',
+      'load',
+    ]);
+    final permission = FakeGenUiPermission();
+    platform.controllers.single.permission!(permission);
+    await Future<void>.value();
+    expect(permission.denials, 1);
+    expect(permission.grants, 0);
+    await controller.close();
+    expect(controller.closeError, isNull);
+    controller.dispose();
+  });
+
   for (final step in [
     'permission',
     'navigationPolicy',

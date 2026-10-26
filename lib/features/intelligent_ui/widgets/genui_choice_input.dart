@@ -266,6 +266,7 @@ class _GenUiChoiceInputState extends State<GenUiChoiceInput> {
             maxLabelWidth: double.infinity,
             embedded: true,
             triggerFillColor: theme.transparent,
+            triggerForegroundColor: theme.ink,
             menuBackgroundColor: theme.popover,
           ),
         );

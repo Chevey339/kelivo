@@ -113,9 +113,12 @@ final class UiWebController extends ChangeNotifier {
         request.onCancel();
       });
       await controller.setNavigationDelegate(navigation);
-      // A platform view starts painting before its HTML is ready. Let the
-      // native shell show through instead of WebKit/Android's white canvas.
-      await controller.setBackgroundColor(const Color(0x00000000));
+      // Mobile views can show the native shell before HTML is ready. The
+      // WebKit plugin implements this through UIView APIs unavailable on
+      // macOS; the loading cover shields that platform until its first paint.
+      if (defaultTargetPlatform != TargetPlatform.macOS) {
+        await controller.setBackgroundColor(const Color(0x00000000));
+      }
       await controller.setOnJavaScriptAlertDialog((_) async {});
       await controller.setOnJavaScriptConfirmDialog((_) async => false);
       await controller.setOnJavaScriptTextInputDialog((_) async => '');

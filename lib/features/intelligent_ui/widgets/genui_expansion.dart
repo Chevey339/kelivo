@@ -231,7 +231,10 @@ class _GenUiExpansionState extends State<GenUiExpansion>
     _returnReveal.stop();
     _returnReveal.value = 1;
     if (render is RenderGenUiExpansionAnchor) {
-      _snapshot = render.capture(MediaQuery.of(context));
+      _snapshot = render.capture(
+        MediaQuery.of(context),
+        includeBackdrop: (_surface.markdownTheme?.colors.fillBlock.a ?? 1) < 1,
+      );
     }
     setState(() => _expanded = true);
     if (!controller.accepts(token) || controller != _surface.controller) {

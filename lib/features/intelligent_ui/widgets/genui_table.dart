@@ -278,8 +278,8 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                       ? LucideIcons.circleCheck
                       : LucideIcons.circle,
                   color: count == _page().pageSize
-                      ? GenUiTheme.of(context).primary
-                      : GenUiTheme.of(context).ink,
+                      ? GenUiTheme.of(dialogContext).primary
+                      : GenUiTheme.of(dialogContext).ink,
                   mainAxisAlignment: MainAxisAlignment.start,
                   onPressed: () => Navigator.of(dialogContext).pop(count),
                 ),
@@ -454,7 +454,7 @@ class _GenUiDataTableState extends State<GenUiDataTable> {
                   key: ValueKey('genui-table-viewport-${widget.id}'),
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    color: theme.card,
+                    color: theme.contentBackground,
                     borderRadius: BorderRadius.circular(theme.controlRadius),
                   ),
                   foregroundDecoration: BoxDecoration(

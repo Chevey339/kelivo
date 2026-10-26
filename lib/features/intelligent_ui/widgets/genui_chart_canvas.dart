@@ -538,7 +538,7 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
           children: [
             PieChart(
               PieChartData(
-                centerSpaceColor: theme.card,
+                centerSpaceColor: theme.contentBackground,
                 centerSpaceRadius: center,
                 sectionsSpace: 2,
                 startDegreeOffset: -90,

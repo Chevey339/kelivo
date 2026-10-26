@@ -37,6 +37,7 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
     this.borderRadius = 10,
     this.maxLabelWidth = 240,
     this.triggerFillColor,
+    this.triggerForegroundColor,
     this.menuBackgroundColor,
     this.embedded = false,
     this.enabled = true,
@@ -56,6 +57,7 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
   final double borderRadius;
   final double maxLabelWidth;
   final Color? triggerFillColor;
+  final Color? triggerForegroundColor;
   final Color? menuBackgroundColor;
   final bool enabled;
   final FocusNode? focusNode;
@@ -319,7 +321,10 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: cs.onSurface.withValues(alpha: 0.88),
+                                    color:
+                                        (widget.triggerForegroundColor ??
+                                                cs.onSurface)
+                                            .withValues(alpha: 0.88),
                                   ),
                                 ),
                               ),
@@ -340,7 +345,10 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
                             child: Icon(
                               lucide.Lucide.ChevronDown,
                               size: 16,
-                              color: cs.onSurface.withValues(alpha: 0.7),
+                              color:
+                                  (widget.triggerForegroundColor ??
+                                          cs.onSurface)
+                                      .withValues(alpha: 0.7),
                             ),
                           ),
                         ),
