@@ -359,14 +359,7 @@ Stream<StreamChunk> sendOpenAIStream(
         final parts = <Map<String, dynamic>>[];
         final seenImageSources = <String>{};
         final seenImageUrls = <String>{};
-        String normalizeSrc(String src) {
-          if (src.startsWith('http') || src.startsWith('data:')) return src;
-          try {
-            return SandboxPathResolver.fix(src);
-          } catch (_) {
-            return src;
-          }
-        }
+        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
         void addImage(String url) {
           if (url.isEmpty) return;
