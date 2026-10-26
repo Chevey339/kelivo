@@ -1329,8 +1329,11 @@ class _ChatInputBarState extends State<ChatInputBar>
     // When app resumes from background, suppress context menu briefly to avoid flickering
     if (state == AppLifecycleState.resumed) {
       _suppressContextMenu = true;
-      // Also unfocus to reset any stuck toolbar state
-      widget.focusNode?.unfocus();
+      // Only iOS needs this toolbar reset. Desktop must retain the focus
+      // restored by Flutter after switching windows (for example, Alt+Tab).
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        widget.focusNode?.unfocus();
+      }
       // Re-enable context menu after a short delay
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
@@ -1341,7 +1344,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         state == AppLifecycleState.paused) {
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
-      widget.focusNode?.unfocus();
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        widget.focusNode?.unfocus();
+      }
       if (_ownsVoiceSession) _abandonVoiceSession();
     }
   }
