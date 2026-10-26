@@ -16,17 +16,30 @@ Kelivo is a cross-platform LLM chat client built with Flutter, targeting iOS, An
 
 Format changed Dart files with `dart format`, including files under `lib/`,
 `test/`, `integration_test/`, `dependencies/markstream/lib/`, and
-`dependencies/markstream/test/`. Then run both packages before every commit;
-all checks must pass:
+`dependencies/markstream/test/`. For code changes, run static analysis before
+committing:
 
 ```bash
 dart analyze --fatal-infos lib test integration_test
-flutter test
-(cd dependencies/markstream && flutter pub get && dart analyze --fatal-infos && flutter test)
+(cd dependencies/markstream && flutter pub get && dart analyze --fatal-infos)
 ```
 
-CI (`pr-check.yml`) enforces the same gates on every PR. Root-package checks
-do not cover the `markstream` path package.
+For ordinary changes, run only the test files or directories covering the
+changed behavior and affected callers, using `flutter test <test paths>`.
+If `markstream` is affected, also run its relevant tests from
+`dependencies/markstream`; root-package checks do not cover this path package.
+
+Run the full test suites locally only when merging a major feature, such as a
+cross-feature integration or broad architectural change:
+
+```bash
+flutter test
+(cd dependencies/markstream && flutter pub get && flutter test)
+```
+
+All required checks must pass. Documentation-only changes do not require Dart
+analysis or Flutter tests. CI (`pr-check.yml`) still runs static analysis and
+the full test suites for both packages on every PR.
 
 ## Benchmarks are not tests
 
