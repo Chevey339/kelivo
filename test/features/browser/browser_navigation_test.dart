@@ -147,7 +147,15 @@ void main() {
         tester.widget<BrowserPage>(find.byType(BrowserPage)).initialTabId,
         isNull,
       );
-      expect(browser.activeTabId, first.id);
+      // Unsupported hosts show the empty state without switching sessions.
+      final expectedActiveTabId = browser.isSupported ? first.id : other.id;
+      expect(browser.activeTabId, expectedActiveTabId);
+      if (!browser.isSupported) {
+        final l = AppLocalizations.of(
+          tester.element(find.byType(BrowserPage)),
+        )!;
+        expect(find.text(l.browserUnsupported), findsOneWidget);
+      }
       Navigator.of(tester.element(find.byType(BrowserPage))).pop();
       await tester.pumpAndSettle();
       await ownRoute;
@@ -163,7 +171,7 @@ void main() {
                 ),
               ))
               as Map;
-      expect(saved['activeTabId'], first.id);
+      expect(saved['activeTabId'], expectedActiveTabId);
       expect((saved['lastTabBySession'] as Map)['chat'], first.id);
     },
   );

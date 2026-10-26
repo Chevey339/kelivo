@@ -538,7 +538,8 @@ class _MemoryStore extends BrowserStore {
 // Download callbacks are internal to BrowserService's network task. Publish
 // identical immutable snapshots here to isolate the widget subscription contract.
 class _LibraryService extends BrowserService {
-  _LibraryService({required super.store, required super.engineFactory});
+  _LibraryService({required super.store, required super.engineFactory})
+    : super(supported: true);
   List<BrowserDownload> _items = [];
   @override
   List<BrowserDownload> get downloads => List.unmodifiable(_items);
