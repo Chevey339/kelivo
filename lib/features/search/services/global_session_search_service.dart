@@ -74,7 +74,15 @@ class GlobalSessionSearchService {
     final title = first.conversationTitle.trim();
     final lowerTitle = title.toLowerCase();
 
+    final verifiedTokens = {
+      for (final match in matches) ...match.verifiedTokens,
+    };
+    final missingTokens = tokens.toSet()
+      ..removeWhere(lowerTitle.contains)
+      ..removeAll(verifiedTokens);
     final contentItems = <_ContentRef>[];
+    var firstMatchedIndex = -1;
+    var contentMatches = 0;
     for (final m in matches) {
       if (!_isVisibleVersion(m)) continue;
       // Only search visible conversation body: user + assistant messages.
@@ -84,6 +92,13 @@ class GlobalSessionSearchService {
       if (body.isEmpty) continue;
       final messageId = m.messageId;
       if (messageId == null || messageId.isEmpty) continue;
+      final lowerBody = body.toLowerCase();
+      missingTokens.removeWhere(lowerBody.contains);
+      final matchesInBody = _countMatches(lowerBody, tokens);
+      contentMatches += matchesInBody;
+      if (firstMatchedIndex < 0 && matchesInBody > 0) {
+        firstMatchedIndex = contentItems.length;
+      }
       contentItems.add(
         _ContentRef(
           messageId: messageId,
@@ -94,22 +109,9 @@ class GlobalSessionSearchService {
     }
     if (contentItems.isEmpty && title.isEmpty) return null;
 
-    final contentLower = contentItems
-        .map((e) => e.text.toLowerCase())
-        .join('\n');
-    final searchHaystack = '$lowerTitle\n$contentLower';
-    final verifiedTokens = {
-      for (final match in matches) ...match.verifiedTokens,
-    };
-    for (final t in tokens) {
-      if (!searchHaystack.contains(t) && !verifiedTokens.contains(t)) {
-        return null;
-      }
-    }
+    if (missingTokens.isNotEmpty) return null;
 
     final titleMatches = _countMatches(lowerTitle, tokens);
-    final firstMatchedIndex = _firstMatchedContentIndex(contentItems, tokens);
-    final contentMatches = _countMatches(contentLower, tokens);
     final hasTitleMatch = titleMatches > 0;
 
     final fallbackMessageId = contentItems.isNotEmpty
@@ -204,19 +206,6 @@ class GlobalSessionSearchService {
     return score;
   }
 
-  static int _firstMatchedContentIndex(
-    List<_ContentRef> items,
-    List<String> tokens,
-  ) {
-    for (var i = 0; i < items.length; i++) {
-      final lower = items[i].text.toLowerCase();
-      for (final t in tokens) {
-        if (lower.contains(t)) return i;
-      }
-    }
-    return -1;
-  }
-
   static String _contextSnippet({
     required List<_ContentRef> items,
     required int centerIndex,
@@ -232,7 +221,7 @@ class GlobalSessionSearchService {
 
     String joinWindow() {
       return [
-        for (var i = left; i <= right; i++) _normalize(items[i].text),
+        for (var i = left; i <= right; i++) items[i].text,
       ].where((e) => e.isNotEmpty).join('  ');
     }
 
