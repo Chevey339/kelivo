@@ -12,10 +12,18 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 class _Paths extends PathProviderPlatform {
   _Paths(this.root);
   final String root;
+  int reads = 0;
   @override
-  Future<String?> getApplicationDocumentsPath() async => root;
+  Future<String?> getApplicationDocumentsPath() async {
+    reads++;
+    return root;
+  }
+
   @override
-  Future<String?> getApplicationSupportPath() async => root;
+  Future<String?> getApplicationSupportPath() async {
+    reads++;
+    return root;
+  }
 }
 
 void main() {
@@ -66,21 +74,47 @@ void main() {
     },
   );
 
-  test('failed requests leave no pending entry and can be retried', () async {
-    var requests = 0;
-    await http.runWithClient(
-      () async {
-        expect(await AvatarCache.getPath('https://avatar.test/retry'), isNull);
-        expect(
-          await AvatarCache.getPath('https://avatar.test/retry'),
-          isNotNull,
-        );
-        expect(requests, 2);
-      },
-      () => MockClient(
-        (_) async => http.Response('image', ++requests == 1 ? 503 : 200),
-      ),
-    );
+  test(
+    'failed requests are cached until an explicit eviction permits retry',
+    () async {
+      var requests = 0;
+      await http.runWithClient(
+        () async {
+          expect(
+            await AvatarCache.getPath('https://avatar.test/retry'),
+            isNull,
+          );
+          for (var i = 0; i < 5; i++) {
+            expect(
+              await AvatarCache.getPath('https://avatar.test/retry'),
+              isNull,
+            );
+          }
+          expect(requests, 1);
+          await AvatarCache.evict('https://avatar.test/retry');
+          expect(
+            await AvatarCache.getPath('https://avatar.test/retry'),
+            isNotNull,
+          );
+          expect(requests, 2);
+        },
+        () => MockClient(
+          (_) async => http.Response('image', ++requests == 1 ? 503 : 200),
+        ),
+      );
+    },
+  );
+
+  test('memoized paths do not repeat platform directory lookups', () async {
+    final paths = PathProviderPlatform.instance as _Paths;
+    await http.runWithClient(() async {
+      final first = await AvatarCache.getPath('https://avatar.test/memo');
+      final reads = paths.reads;
+      for (var i = 0; i < 5; i++) {
+        expect(await AvatarCache.getPath('https://avatar.test/memo'), first);
+      }
+      expect(paths.reads, reads);
+    }, () => MockClient((_) async => http.Response('image', 200)));
   });
 
   for (final evict in [false, true]) {

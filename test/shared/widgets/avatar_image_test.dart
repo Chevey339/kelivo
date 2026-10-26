@@ -124,4 +124,80 @@ void main() {
       );
     },
   );
+  for (final unmounted in [false, true]) {
+    testWidgets(
+      'cache eviction refreshes ${unmounted ? "unmounted" : "other-size"} decoded images',
+      (tester) async {
+        final originalPaths = PathProviderPlatform.instance;
+        final root = (await tester.runAsync(
+          () => Directory.systemTemp.createTemp('avatar_revision_'),
+        ))!;
+        PathProviderPlatform.instance = _Paths(root.path);
+        AvatarCache.clearMemory();
+        addTearDown(() async {
+          PathProviderPlatform.instance = originalPaths;
+          AvatarCache.clearMemory();
+          await root.delete(recursive: true);
+        });
+        var pixels = 2;
+        var requests = 0;
+        var displaySize = 82.0;
+        const url = 'https://avatar.test/versioned.png';
+        Widget host() => MaterialApp(
+          home: Center(
+            child: AvatarImage(
+              source: url,
+              isNetwork: true,
+              size: displaySize,
+              fallback: const Text('loading'),
+            ),
+          ),
+        );
+        Future<void> ready(int expectedWidth) async {
+          for (var i = 0; i < 100; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump();
+            if (tester
+                .widgetList<RawImage>(find.byType(RawImage))
+                .any((image) => image.image?.width == expectedWidth)) {
+              return;
+            }
+          }
+          fail('Expected refreshed avatar width $expectedWidth');
+        }
+
+        await http.runWithClient(
+          () async {
+            await tester.pumpWidget(host());
+            await ready(2);
+            if (unmounted) {
+              await tester.pumpWidget(const SizedBox.shrink());
+            } else {
+              displaySize = 32;
+              await tester.pumpWidget(host());
+              await ready(2);
+            }
+            pixels = 4;
+            await tester.runAsync(() => AvatarCache.evict(url));
+            if (!unmounted) await ready(4);
+            displaySize = 82;
+            await tester.pumpWidget(host());
+            await ready(4);
+            expect(requests, 2);
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          },
+          () => MockClient((_) async {
+            requests++;
+            return http.Response.bytes(
+              image.encodePng(image.Image(width: pixels, height: pixels)),
+              200,
+            );
+          }),
+        );
+      },
+    );
+  }
 }

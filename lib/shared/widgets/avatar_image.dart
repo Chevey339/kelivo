@@ -28,7 +28,6 @@ class AvatarImage extends StatefulWidget {
 class _AvatarImageState extends State<AvatarImage> {
   late Future<String?> _path;
   ImageProvider? _image;
-  int _cacheRevision = 0;
 
   @override
   void initState() {
@@ -47,7 +46,6 @@ class _AvatarImageState extends State<AvatarImage> {
     // Evict the decoded image as well, even when the downloaded file will have
     // the same name. FutureBuilder ignores results from superseded requests.
     setState(() {
-      _cacheRevision++;
       _path = () async {
         await evicted;
         if (!mounted) return null;
@@ -87,10 +85,10 @@ class _AvatarImageState extends State<AvatarImage> {
         width: pixels,
         height: pixels,
         fit: SafeResizeFit.cover,
+        cacheRevision: widget.isNetwork ? AvatarCache.revision : null,
       );
       return ClipOval(
         child: Image(
-          key: ValueKey(_cacheRevision),
           image: _image!,
           width: widget.size,
           height: widget.size,

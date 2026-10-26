@@ -10,16 +10,20 @@ class AvatarCache {
   static final Map<String, Future<String?>> _pending = {};
   static final _changes = ValueNotifier<int>(0);
   static Listenable get changes => _changes;
-  static Future<void> _diskQueue = Future<void>.value();
+  static int get revision => _changes.value;
+  static Future<void>? _diskQueue;
 
   // Downloads run concurrently; only short file operations and cache deletion
   // are ordered, so a completed old write cannot undo a clear or eviction.
   static Future<T> _onDisk<T>(Future<T> Function() action) {
-    final result = _diskQueue.then((_) => action());
-    _diskQueue = result.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace __) {},
-    );
+    final result = (_diskQueue ?? Future<void>.value()).then((_) => action());
+    late final Future<void> tail;
+    tail = result
+        .then<void>((_) {}, onError: (Object _, StackTrace __) {})
+        .whenComplete(() {
+          if (identical(_diskQueue, tail)) _diskQueue = null;
+        });
+    _diskQueue = tail;
     return result;
   }
 
@@ -82,6 +86,9 @@ class AvatarCache {
   /// On failure, returns null.
   static Future<String?> getPath(String url) {
     if (url.isEmpty) return Future.value();
+    // Legacy callers still resolve in build. A failed URL should not retry on
+    // every rebuild; clear/evict explicitly invalidates this result as before.
+    if (_memo.containsKey(url) && _memo[url] == null) return Future.value();
     final pending = _pending[url];
     if (pending != null) return pending;
     late final Future<String?> request;
@@ -96,13 +103,15 @@ class AvatarCache {
 
   static Future<String?> _load(String url, bool Function() current) async {
     try {
-      final dir = await _cacheDir();
-      final name = _safeName(url);
-      final file = File('${dir.path}/$name');
+      late File file;
       final cached = await _onDisk(() async {
         if (!current()) return null;
-        final path = _memo[url] ?? file.path;
-        if (await File(path).exists() && current()) return path;
+        final memo = _memo[url];
+        if (memo != null && await File(memo).exists()) return memo;
+        if (!current()) return null;
+        final dir = await _cacheDir();
+        file = File('${dir.path}/${_safeName(url)}');
+        if (await file.exists() && current()) return file.path;
         return null;
       });
       if (!current()) return null;
@@ -112,13 +121,14 @@ class AvatarCache {
       if (current() && res.statusCode >= 200 && res.statusCode < 300) {
         return await _onDisk(() async {
           if (!current()) return null;
-          await dir.create(recursive: true);
+          await file.parent.create(recursive: true);
           await file.writeAsBytes(res.bodyBytes, flush: true);
           if (!current()) return null;
           return _memo[url] = file.path;
         });
       }
     } catch (_) {}
+    if (current()) _memo[url] = null;
     return null;
   }
 
