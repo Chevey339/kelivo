@@ -255,21 +255,6 @@ void main() {
     expect(selection.selectedMarkdown, '> [!NOTE] Custom &amp; title\n> Body');
   });
 
-  test(
-    'math parse cache reuses successful trees, expires old ones and accepts corrected input',
-    () {
-      final first = parseNormalizedMath('x_{12345}');
-      expect(first, isNotNull);
-      expect(parseNormalizedMath('x_{12345}'), same(first));
-      expect(parseNormalizedMath(r'\frac{'), isNull);
-      expect(parseNormalizedMath(r'\frac{1}{2}'), isNotNull);
-      for (var i = 0; i < 130; i++) {
-        parseNormalizedMath('y_{$i}');
-      }
-      expect(parseNormalizedMath('x_{12345}'), isNot(same(first)));
-    },
-  );
-
   testWidgets('cached formulas keep independent size, color and math style', (
     tester,
   ) async {
@@ -304,7 +289,7 @@ void main() {
       await tester.pumpAndSettle();
       final formulas = tester.widgetList<Math>(find.byType(Math)).toList();
       expect(formulas, hasLength(2));
-      expect(formulas[0].ast, same(formulas[1].ast));
+      expect(formulas[0].ast, isNot(same(formulas[1].ast)));
       expect(formulas[0].textStyle!.color, Colors.red);
       expect(formulas[1].textStyle!.color, Colors.blue);
       expect(formulas[0].mathStyle, MathStyle.text);

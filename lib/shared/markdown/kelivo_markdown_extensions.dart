@@ -66,18 +66,7 @@ Widget _math(
   MarkstreamRenderContext rendering,
 ) {
   final settings = context.watch<SettingsProvider>();
-  if (settings.enableMathRendering &&
-      node.closed &&
-      node.code.trim().isNotEmpty &&
-      parseNormalizedMath(normalizeMathTex(node.code)) != null) {
-    return MarkstreamMathBlock(
-      node: node,
-      tex: node.code,
-      theme: rendering.theme,
-      renderer: const KelivoMathRenderer(),
-    );
-  }
-  return MarkstreamCodeBlock(
+  final fallback = MarkstreamCodeBlock(
     node: node,
     theme: rendering.theme,
     extensions: kelivoMarkdownExtensions,
@@ -87,6 +76,16 @@ Widget _math(
     streaming: rendering.streaming,
     exporting: ExportCaptureScope.of(context),
   );
+  if (settings.enableMathRendering &&
+      node.closed &&
+      node.code.trim().isNotEmpty) {
+    return KelivoMathBlock(
+      node: node,
+      theme: rendering.theme,
+      fallback: fallback,
+    );
+  }
+  return fallback;
 }
 
 Widget _diagram(
