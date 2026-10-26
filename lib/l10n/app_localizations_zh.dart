@@ -3792,6 +3792,14 @@ class AppLocalizationsZh extends AppLocalizations {
       'thinking + output_config.effort';
 
   @override
+  String get modelSpecFormDialectAnthropicBetweenTools =>
+      'Anthropic adaptive / between_tools';
+
+  @override
+  String get modelSpecFormDialectAnthropicBetweenToolsSubtitle =>
+      '自适应思考；关闭时使用 between_tools';
+
+  @override
   String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
 
   @override
@@ -18235,6 +18243,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'thinking + output_config.effort';
 
   @override
+  String get modelSpecFormDialectAnthropicBetweenTools =>
+      'Anthropic adaptive / between_tools';
+
+  @override
+  String get modelSpecFormDialectAnthropicBetweenToolsSubtitle =>
+      '自适应思考；关闭时使用 between_tools';
+
+  @override
   String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
 
   @override
@@ -32602,6 +32618,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
       'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicBetweenTools =>
+      'Anthropic adaptive / between_tools';
+
+  @override
+  String get modelSpecFormDialectAnthropicBetweenToolsSubtitle =>
+      '自適應思考；關閉時使用 between_tools';
 
   @override
   String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';

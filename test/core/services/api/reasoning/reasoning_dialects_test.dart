@@ -60,6 +60,7 @@ ReasoningTransport _nativeTransport(ReasoningDialect dialect) {
       return ReasoningTransport.responses;
     case ReasoningDialect.anthropicBudget:
     case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicBetweenTools:
     case ReasoningDialect.anthropicEffort:
       return ReasoningTransport.anthropicMessages;
     case ReasoningDialect.geminiThinkingBudget:
@@ -211,9 +212,14 @@ Map<String, dynamic> _expectedBody({
         },
       };
     case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicBetweenTools:
       if (effective == ReasoningLevel.off) {
         return {
-          'thinking': {'type': 'disabled'},
+          'thinking': {
+            'type': dialect == ReasoningDialect.anthropicBetweenTools
+                ? 'between_tools'
+                : 'disabled',
+          },
         };
       }
       return {

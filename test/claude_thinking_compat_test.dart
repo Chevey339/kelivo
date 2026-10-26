@@ -156,6 +156,76 @@ void main() {
       );
     });
 
+    group('Claude 5.5 request shapes', () {
+      const cases = [
+        (
+          model: 'claude-haiku-5-5',
+          budget: 16000,
+          thinking: {'type': 'adaptive', 'display': 'summarized'},
+          effort: 'medium',
+        ),
+        (
+          model: 'claude-haiku-5-5',
+          budget: 0,
+          thinking: {'type': 'disabled'},
+          effort: null,
+        ),
+        (
+          model: 'claude-opus-5-5',
+          budget: 0,
+          thinking: {'type': 'adaptive', 'display': 'summarized'},
+          effort: 'low',
+        ),
+        (
+          model: 'claude-sonnet-5-5',
+          budget: 0,
+          thinking: {'type': 'between_tools'},
+          effort: null,
+        ),
+        (
+          model: 'claude-sonnet-5-5',
+          budget: -1,
+          thinking: {'type': 'adaptive', 'display': 'summarized'},
+          effort: null,
+        ),
+        (
+          model: 'claude-sonnet-5-5',
+          budget: 128000,
+          thinking: {'type': 'adaptive', 'display': 'summarized'},
+          effort: 'max',
+        ),
+      ];
+      for (final vertex in [false, true]) {
+        for (final stream in [false, true]) {
+          for (final c in cases) {
+            test(
+              '${c.model} budget=${c.budget} vertex=$vertex stream=$stream',
+              () async {
+                final exchange = await captureClaudeExchange(
+                  config: vertex ? vertexClaudeConfig() : claudeConfig(),
+                  modelId: c.model,
+                  thinkingBudget: c.budget,
+                  temperature: 0.7,
+                  topP: 0.8,
+                  stream: stream,
+                  sseRounds: stream ? [plainRound] : null,
+                );
+                final body = exchange.bodies.single;
+                expect(body['thinking'], c.thinking);
+                expect(
+                  body['output_config'],
+                  c.effort == null ? null : {'effort': c.effort},
+                );
+                expect(body['max_tokens'], 128000);
+                expect(body.containsKey('temperature'), isFalse);
+                expect(body.containsKey('top_p'), isFalse);
+              },
+            );
+          }
+        }
+      }
+    });
+
     for (final c in _claudeCases) {
       test(c.name, () async {
         final body = await captureClaudeRequestBody(
@@ -261,7 +331,7 @@ final _claudeCases = <_ClaudeCase>[
     },
   ),
   _ClaudeCase(
-    name: 'Opus 4.7 off disables thinking and keeps sampling',
+    name: 'Opus 4.7 off disables thinking and strips sampling',
     modelId: 'claude-opus-4-7',
     thinkingBudget: 0,
     temperature: 0.7,
@@ -269,8 +339,8 @@ final _claudeCases = <_ClaudeCase>[
     verify: (body) {
       expect(body['thinking'], {'type': 'disabled'});
       expect(body.containsKey('output_config'), isFalse);
-      expect(body['temperature'], 0.7);
-      expect(body['top_p'], 0.8);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
     },
   ),
   _ClaudeCase(

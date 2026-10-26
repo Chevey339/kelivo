@@ -7219,6 +7219,18 @@ abstract class AppLocalizations {
   /// **'thinking + output_config.effort'**
   String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle;
 
+  /// No description provided for @modelSpecFormDialectAnthropicBetweenTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic adaptive / between_tools'**
+  String get modelSpecFormDialectAnthropicBetweenTools;
+
+  /// No description provided for @modelSpecFormDialectAnthropicBetweenToolsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive thinking; Off uses between_tools'**
+  String get modelSpecFormDialectAnthropicBetweenToolsSubtitle;
+
   /// No description provided for @modelSpecFormDialectAnthropicEffort.
   ///
   /// In en, this message translates to:

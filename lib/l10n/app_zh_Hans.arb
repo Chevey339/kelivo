@@ -1395,6 +1395,8 @@
   "modelSpecFormDialectAnthropicBudgetSubtitle": "thinking.budget_tokens",
   "modelSpecFormDialectAnthropicAdaptiveEffort": "Anthropic adaptive effort",
   "modelSpecFormDialectAnthropicAdaptiveEffortSubtitle": "thinking + output_config.effort",
+  "modelSpecFormDialectAnthropicBetweenTools": "Anthropic adaptive / between_tools",
+  "modelSpecFormDialectAnthropicBetweenToolsSubtitle": "自适应思考；关闭时使用 between_tools",
   "modelSpecFormDialectAnthropicEffort": "Anthropic effort",
   "modelSpecFormDialectAnthropicEffortSubtitle": "thinking + output_config.effort",
   "modelSpecFormDialectGeminiThinkingBudget": "Gemini thinking budget",

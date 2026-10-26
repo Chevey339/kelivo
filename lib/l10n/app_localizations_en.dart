@@ -3930,6 +3930,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'thinking + output_config.effort';
 
   @override
+  String get modelSpecFormDialectAnthropicBetweenTools =>
+      'Anthropic adaptive / between_tools';
+
+  @override
+  String get modelSpecFormDialectAnthropicBetweenToolsSubtitle =>
+      'Adaptive thinking; Off uses between_tools';
+
+  @override
   String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
 
   @override
