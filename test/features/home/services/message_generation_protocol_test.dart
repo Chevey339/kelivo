@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +7,15 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/generation_controller.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart' as sc;
@@ -189,4 +193,158 @@ void main() {
       expect((body['messages'] as List)[1]['content'], [thinking, text]);
     },
   );
+
+  for (final stream in [true, false]) {
+    test(
+      'Gemini replays each persisted tool round as its own turn (stream=$stream)',
+      () async {
+        Map<String, dynamic> call(String id) => {
+          'functionCall': {
+            'id': id,
+            'name': 'lookup',
+            'args': {'id': id},
+          },
+          'thoughtSignature': 'sig-$id',
+        };
+        final replies = [
+          [
+            {'text': 'Checking.'},
+            call('a'),
+            call('b'),
+          ],
+          [call('c')],
+          [
+            {'text': 'Done.'},
+          ],
+          [
+            {'text': 'Ok.'},
+          ],
+        ];
+        final requests = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          requests.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          final reply = {
+            'candidates': [
+              {
+                'content': {
+                  'role': 'model',
+                  'parts': replies[requests.length - 1],
+                },
+                'finishReason': 'STOP',
+              },
+            ],
+          };
+          request.response.write(
+            stream ? 'data: ${jsonEncode(reply)}\n\n' : jsonEncode(reply),
+          );
+          await request.response.close();
+        });
+        const model = 'gemini-3.8-flash';
+        final config = ProviderConfig(
+          id: 'Gemini',
+          enabled: true,
+          name: 'Gemini',
+          apiKey: 'test',
+          baseUrl: 'http://${server.address.address}:${server.port}/v1beta',
+          providerType: ProviderKind.google,
+        );
+        final chunks = await ChatApiService.sendMessageStream(
+          config: config,
+          modelId: model,
+          messages: const [
+            {'role': 'user', 'content': 'Check.'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object', 'properties': {}},
+              },
+            },
+          ],
+          stream: stream,
+          onToolCall: (name, arguments, {toolCallId}) async =>
+              '{"result":"${arguments['id']}"}',
+        ).toList();
+        final assistant = ChatMessage(
+          role: 'assistant',
+          conversationId: 'c',
+          parts: [
+            for (final part in StreamChunkHandler.collect(chunks).parts)
+              MessagePart.fromRow(part.kind, part.encodePayload()),
+          ],
+        );
+        final chat = ChatService();
+        final context = _Context();
+        final builder = _Builder(
+          chatService: chat,
+          contextProvider: context,
+          providerArtifactLookup: (_, _) => null,
+        );
+        await expectLater(
+          MessageGenerationService(
+            chatService: chat,
+            messageBuilderService: builder,
+            generationController: _Generation(),
+            streamController: _Stream(),
+            contextProvider: context,
+          ).assembleUnprocessedRequestContext(
+            messages: [
+              ChatMessage(role: 'user', content: 'Check.', conversationId: 'c'),
+              assistant,
+              ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+            ],
+            versionSelections: {},
+            currentConversation: null,
+            settings: _Settings(config),
+            assistant: null,
+            assistantId: null,
+            providerKey: config.id,
+            modelId: model,
+          ),
+          throwsA(isA<_HistoryCaptured>()),
+        );
+        await ChatApiService.sendMessageStream(
+          config: config,
+          modelId: model,
+          messages: builder.history,
+          stream: stream,
+        ).toList();
+
+        final contents = (requests.last['contents'] as List).cast<Map>();
+        expect(contents.map((c) => c['role']), [
+          'user',
+          'model',
+          'user',
+          'model',
+          'user',
+          'model',
+          'user',
+        ]);
+        Map<String, dynamic> response(String id) => {
+          'functionResponse': {
+            'name': 'lookup',
+            'response': {'result': id},
+            'id': id,
+          },
+        };
+        expect(
+          [for (final turn in contents.sublist(1, 6)) turn['parts']],
+          [
+            replies[0],
+            [response('a'), response('b')],
+            replies[1],
+            [response('c')],
+            replies[2],
+          ],
+        );
+      },
+    );
+  }
 }

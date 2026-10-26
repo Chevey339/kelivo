@@ -163,14 +163,16 @@ Stream<StreamChunk> runProviderToolRounds({
       return;
     }
     final executed = <ExecutedClientTool>[];
-    if (executeAfterRound && calls.isNotEmpty && onToolCall != null) {
-      final usage = usageOf?.call();
-      final totalTokens = usage?.totalTokens ?? 0;
-      if (emitCalls) {
-        yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
-      }
+    final execute = executeAfterRound && calls.isNotEmpty ? onToolCall : null;
+    final usage = usageOf?.call();
+    final totalTokens = usage?.totalTokens ?? 0;
+    if (execute != null && emitCalls) {
+      yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
+    }
+    if (calls.isNotEmpty) yield const AssistantRoundEnd();
+    if (execute != null) {
       for (final call in calls) {
-        executed.add(await _executeClientTool(call, onToolCall));
+        executed.add(await _executeClientTool(call, execute));
       }
       yield* emitToolResults(
         [for (final item in executed) _emitExecuted(item)],

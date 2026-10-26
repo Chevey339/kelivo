@@ -1,7 +1,10 @@
-/// Gemini 3 (AI Studio + Vertex) allows built-in tools to coexist with
+final _geminiGeneration = RegExp(r'gemini-(\d+)', caseSensitive: false);
+
+/// Gemini 3+ (AI Studio + Vertex) allows built-in tools to coexist with
 /// `function_declarations`. Earlier generations mutually exclude them.
 bool supportsMixedBuiltInAndFunctionTools(String upstreamModelId) {
-  return upstreamModelId.toLowerCase().contains('gemini-3');
+  final generation = _geminiGeneration.firstMatch(upstreamModelId)?.group(1);
+  return generation != null && int.parse(generation) >= 3;
 }
 
 bool shouldAttachGeminiFunctionCallingConfig(List<Map<String, dynamic>> tools) {
@@ -33,7 +36,7 @@ bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
 
 /// Builds the `toolConfig` map for Gemini API requests.
 ///
-/// Gemini 3 with combined built-in + custom tools:
+/// Gemini 3+ on the Gemini API with combined built-in + custom tools:
 ///   - VALIDATED mode (AUTO not supported with server-side tool invocations)
 ///   - includeServerSideToolInvocations: true
 ///
@@ -43,12 +46,13 @@ bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
 /// Returns null if no toolConfig is needed.
 Map<String, dynamic>? buildGeminiToolConfig({
   required List<Map<String, dynamic>> tools,
-  required bool isGemini3,
+  required bool allowServerSideToolInvocations,
 }) {
   final hasFuncDecls = shouldAttachGeminiFunctionCallingConfig(tools);
   if (!hasFuncDecls) return null;
 
-  if (isGemini3 && hasBuiltInAndFunctionDeclarations(tools)) {
+  if (allowServerSideToolInvocations &&
+      hasBuiltInAndFunctionDeclarations(tools)) {
     return {
       'function_calling_config': {'mode': 'VALIDATED'},
       'includeServerSideToolInvocations': true,
