@@ -23,7 +23,6 @@
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC000000000000000000002 /* AppBackupPolicy.swift */; };
 		B610A5500000000000000001 /* BrowserGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000002 /* BrowserGlassView.swift */; };
-		B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */; };
 		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
 		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
 		A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */; };
@@ -139,7 +138,6 @@
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BAC000000000000000000002 /* AppBackupPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupPolicy.swift; sourceTree = "<group>"; };
 		B610A5500000000000000002 /* BrowserGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserGlassView.swift; sourceTree = "<group>"; };
-		B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BrowserGlass/BrowserLegacyGlassRuntime.m; sourceTree = "<group>"; };
 		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
 		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalToolsHandler.swift; sourceTree = "<group>"; };
@@ -329,7 +327,6 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				BAC000000000000000000002 /* AppBackupPolicy.swift */,
 				B610A5500000000000000002 /* BrowserGlassView.swift */,
-				B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */,
 				B610A5500000000000000006 /* BrowserScrollBridge.swift */,
 				B610A5500000000000000008 /* IosSelectionMenuHandler.swift */,
 				BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */,
@@ -760,7 +757,6 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */,
 				B610A5500000000000000001 /* BrowserGlassView.swift in Sources */,
-				B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */,
 				B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */,
 				B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */,
 				BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */,

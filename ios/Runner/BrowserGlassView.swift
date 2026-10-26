@@ -161,7 +161,7 @@ final class BrowserViewportInsetsBridge {
 }
 
 /// Browser-scoped native material. Flutter owns the controls and their gestures;
-/// UIKit owns the live backdrop sampling, refraction, and material adaptation.
+/// UIKit supplies system glass on iOS 26 and blur on earlier versions.
 final class BrowserGlassViewFactory: NSObject, FlutterPlatformViewFactory {
   private let messenger: FlutterBinaryMessenger
 
@@ -236,8 +236,6 @@ private final class BrowserGlassSurface: UIView {
   private let legacySheen = CAGradientLayer()
   private let legacyRim = CAGradientLayer()
   private let legacyRimMask = CAShapeLayer()
-  private var legacyBackdrop: KLVBrowserLegacyGlassLayer?
-  private var legacyRuntimeUnavailable = false
   private var legacyGeometry: CGRect?
   private var legacyRadius: CGFloat?
   private var radius: Double = 28
@@ -260,9 +258,8 @@ private final class BrowserGlassSurface: UIView {
     material.isUserInteractionEnabled = false
     material.isOpaque = false
     addSubview(material)
-    // A legacy backdrop mesh supplies live refraction on supported iOS 17–25
-    // runtimes. These stationary layers provide its edge lighting; neither
-    // path captures WKWebView screenshots or runs an animation timer.
+    // Earlier iOS versions use UIKit blur with stationary edge lighting.
+    // No WebView screenshots or animation timer are needed.
     legacySheen.startPoint = CGPoint(x: 0.5, y: 0)
     legacySheen.endPoint = CGPoint(x: 0.5, y: 1)
     legacySheen.locations = [0, 0.24, 0.7, 1]
@@ -337,12 +334,6 @@ private final class BrowserGlassSurface: UIView {
     if effectKey != key {
       effectKey = key
       configuredGlassRadius = nil
-      var useLegacy = style == "liquid" && !opaque
-      if #available(iOS 26.0, *) { useLegacy = false }
-      if !useLegacy {
-        legacyBackdrop?.removeFromSuperlayer()
-        legacyBackdrop = nil
-      }
       if opaque {
         material.effect = nil
         material.backgroundColor = .systemBackground
@@ -359,10 +350,6 @@ private final class BrowserGlassSurface: UIView {
           // never receives or synthesizes UITouch events.
           glass.isInteractive = false
           material.effect = glass
-        } else if useLegacy && prepareLegacyBackdrop() {
-          // The live backdrop is below this transparent foreground host.
-          // Do not blur it a second time through UIVisualEffectView.
-          material.effect = nil
         } else {
           material.effect = UIBlurEffect(
             style: style == "frosted" ? .systemMaterial : .systemUltraThinMaterial)
@@ -380,10 +367,7 @@ private final class BrowserGlassSurface: UIView {
         UIColor.clear.cgColor,
         UIColor.clear.cgColor,
       ]
-      // Only glancing white light belongs on the optical edge. A dark stroke
-      // plus a tight shadow outlined the whole capsule like a gray border.
-      // Leave the middle of the perimeter unpainted so the live mesh supplies
-      // its shape, as in Telegram's soft legacy glass artwork.
+      // Keep the edge light subtle around the blurred material.
       legacyRim.colors = [
         UIColor.white.withAlphaComponent(dark ? 0.22 : 0.44).cgColor,
         UIColor.clear.cgColor,
@@ -407,27 +391,6 @@ private final class BrowserGlassSurface: UIView {
       : nil
   }
 
-  private func prepareLegacyBackdrop() -> Bool {
-    guard #available(iOS 17.0, *), !legacyRuntimeUnavailable else { return false }
-    if legacyBackdrop == nil {
-      guard let backdrop = KLVBrowserLegacyGlassLayer.make() else {
-        legacyRuntimeUnavailable = true
-        return false
-      }
-      legacyBackdrop = backdrop
-      layer.insertSublayer(backdrop, at: 0)
-    }
-    guard let backdrop = legacyBackdrop,
-          backdrop.configure(clear: clear, dark: dark),
-          backdrop.update(bounds: bounds, radius: CGFloat(radius)) else {
-      legacyBackdrop?.removeFromSuperlayer()
-      legacyBackdrop = nil
-      legacyRuntimeUnavailable = true
-      return false
-    }
-    return true
-  }
-
   private func updateCorners() {
     if #available(iOS 26.0, *), material.effect is UIGlassEffect {
       guard configuredGlassRadius != radius else { return }
@@ -447,14 +410,6 @@ private final class BrowserGlassSurface: UIView {
       material.layer.cornerCurve = .continuous
       material.clipsToBounds = true
       let corner = CGFloat(effectiveRadius)
-      if let backdrop = legacyBackdrop,
-         !backdrop.update(bounds: bounds, radius: corner) {
-        backdrop.removeFromSuperlayer()
-        legacyBackdrop = nil
-        legacyRuntimeUnavailable = true
-        effectKey = nil
-        updateMaterial()
-      }
       if legacyGeometry != bounds || legacyRadius != corner {
         legacyGeometry = bounds
         legacyRadius = corner
@@ -480,8 +435,6 @@ private final class BrowserGlassSurface: UIView {
     disposed = true
     NotificationCenter.default.removeObserver(self)
     material.effect = nil
-    legacyBackdrop?.removeFromSuperlayer()
-    legacyBackdrop = nil
   }
 
   deinit {

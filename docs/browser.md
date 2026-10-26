@@ -1007,16 +1007,14 @@ text erased outside its child and clipped tab-overview controls during return.
   reduced motion and a later active card in a long grid are covered by tests.
 - The submenu no longer subtracts a sibling portal's geometry from parent text.
   Normal compositing covers only the rows behind the child material.
-- iOS 17–25 liquid material now uses a guarded native backdrop mesh with actual
-  background refraction. This is an intentional change from the earlier
-  public-UIKit-only approach: it uses undocumented Core Animation facilities,
-  as documented and attributed in `ios/Runner/BrowserGlass/UPSTREAM.md`.
-  Mesh geometry is bounded and retained until bounds/radius change, without
-  screenshots or display links. Qualified runtime argument encodings, failures,
-  accessibility and foreground contrast are checked. An unavailable runtime
-  retains UIKit blur. iOS 26 keeps its system glass branch.
+- iOS versions earlier than 26 use public UIKit blur with stationary edge
+  lighting for liquid material. The private Core Animation mesh implementation
+  was removed after App Store validation rejected its non-public API usage.
+  There are no screenshot or display-link loops. iOS 26 keeps its system glass
+  branch; reduced transparency and high contrast still use opaque material.
 
-Validation: 347 focused browser UI/service tests passed, fatal-info analysis
+Original validation (before removing the legacy mesh): 347 focused browser
+UI/service tests passed, fatal-info analysis
 of `lib test` is clean, formatting and `git diff --check` pass. The full
 repository Flutter suite was not rerun. C mesh checks passed with sanitizers;
 a native UIKit runtime probe successfully created/reused the legacy mesh and
