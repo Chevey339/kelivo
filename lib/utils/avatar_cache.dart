@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import './app_directories.dart';
 
@@ -6,9 +7,34 @@ class AvatarCache {
   AvatarCache._();
 
   static final Map<String, String?> _memo = <String, String?>{};
+  static final Map<String, Future<String?>> _pending = {};
+  static final _changes = ValueNotifier<int>(0);
+  static Listenable get changes => _changes;
+  static Future<void> _diskQueue = Future<void>.value();
+
+  // Downloads run concurrently; only short file operations and cache deletion
+  // are ordered, so a completed old write cannot undo a clear or eviction.
+  static Future<T> _onDisk<T>(Future<T> Function() action) {
+    final result = _diskQueue.then((_) => action());
+    _diskQueue = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
 
   static void clearMemory() {
     _memo.clear();
+    _pending.clear();
+    _changes.value++;
+  }
+
+  /// Invalidates in-flight loads before deleting cache files. New loads wait
+  /// for [deleteFiles], and old downloads cannot repopulate the cleared cache.
+  static Future<void> clearCache(Future<void> Function() deleteFiles) {
+    final cleared = _onDisk(deleteFiles);
+    clearMemory();
+    return cleared;
   }
 
   static Future<Directory> _cacheDir() async {
@@ -54,49 +80,59 @@ class AvatarCache {
 
   /// Ensures avatar at [url] is cached locally and returns the file path.
   /// On failure, returns null.
-  static Future<String?> getPath(String url) async {
-    if (url.isEmpty) return null;
-    if (_memo.containsKey(url)) {
-      final cached = _memo[url];
-      if (cached == null) return null;
-      try {
-        final f = File(cached);
-        if (await f.exists()) return cached;
-      } catch (_) {}
-      // Stale entry: file was deleted; re-resolve.
-      _memo.remove(url);
-    }
+  static Future<String?> getPath(String url) {
+    if (url.isEmpty) return Future.value();
+    final pending = _pending[url];
+    if (pending != null) return pending;
+    late final Future<String?> request;
+    request = _load(url, () => identical(_pending[url], request)).whenComplete(
+      () {
+        if (identical(_pending[url], request)) _pending.remove(url);
+      },
+    );
+    _pending[url] = request;
+    return request;
+  }
+
+  static Future<String?> _load(String url, bool Function() current) async {
     try {
       final dir = await _cacheDir();
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
       final name = _safeName(url);
       final file = File('${dir.path}/$name');
-      if (await file.exists()) {
-        _memo[url] = file.path;
-        return file.path;
-      }
+      final cached = await _onDisk(() async {
+        if (!current()) return null;
+        final path = _memo[url] ?? file.path;
+        if (await File(path).exists() && current()) return path;
+        return null;
+      });
+      if (!current()) return null;
+      if (cached != null) return _memo[url] = cached;
       // Download and save
       final res = await http.get(Uri.parse(url));
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        await file.writeAsBytes(res.bodyBytes, flush: true);
-        _memo[url] = file.path;
-        return file.path;
+      if (current() && res.statusCode >= 200 && res.statusCode < 300) {
+        return await _onDisk(() async {
+          if (!current()) return null;
+          await dir.create(recursive: true);
+          await file.writeAsBytes(res.bodyBytes, flush: true);
+          if (!current()) return null;
+          return _memo[url] = file.path;
+        });
       }
     } catch (_) {}
-    _memo[url] = null;
     return null;
   }
 
-  static Future<void> evict(String url) async {
-    try {
-      final dir = await _cacheDir();
-      if (!await dir.exists()) return;
-      final name = _safeName(url);
-      final file = File('${dir.path}/$name');
-      if (await file.exists()) await file.delete();
-    } catch (_) {}
+  static Future<void> evict(String url) {
+    _pending.remove(url);
     _memo.remove(url);
+    final removed = _onDisk(() async {
+      try {
+        final dir = await _cacheDir();
+        final file = File('${dir.path}/${_safeName(url)}');
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    });
+    _changes.value++;
+    return removed;
   }
 }

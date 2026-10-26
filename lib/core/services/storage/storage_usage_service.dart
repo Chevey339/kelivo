@@ -658,19 +658,19 @@ abstract final class StorageUsageService {
   }
 
   static Future<void> clearCache({required bool avatarsOnly}) async {
-    if (avatarsOnly) {
-      final dir = await AppDirectories.getAvatarCacheDirectory();
+    await AvatarCache.clearCache(() async {
+      if (avatarsOnly) {
+        final dir = await AppDirectories.getAvatarCacheDirectory();
+        await _deleteDirectoryContents(dir);
+        return;
+      }
+      final dir = await AppDirectories.getCacheDirectory();
       await _deleteDirectoryContents(dir);
-      AvatarCache.clearMemory();
-      return;
-    }
-    final dir = await AppDirectories.getCacheDirectory();
-    await _deleteDirectoryContents(dir);
-    try {
-      final sys = await AppDirectories.getSystemCacheDirectory();
-      await _deleteDirectoryContents(sys);
-    } catch (_) {}
-    AvatarCache.clearMemory();
+      try {
+        final sys = await AppDirectories.getSystemCacheDirectory();
+        await _deleteDirectoryContents(sys);
+      } catch (_) {}
+    });
   }
 
   static Future<void> clearOtherCache() async {
