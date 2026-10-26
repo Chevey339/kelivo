@@ -518,7 +518,7 @@ class _SurfaceBodyState extends State<_SurfaceBody>
                 Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(
                     ResponsiveHelper.isMobile(context) ? 14 : theme.md,
-                    surface.showHeader ? theme.sm : theme.xxs,
+                    surface.showHeader ? theme.sm : theme.md,
                     ResponsiveHelper.isMobile(context) ? 14 : theme.md,
                     !surface.showHeader && actions ? 0 : theme.sm,
                   ),
