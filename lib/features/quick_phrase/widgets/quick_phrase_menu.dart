@@ -1,5 +1,5 @@
+import 'package:Kelivo/desktop/desktop_overlay_backdrop.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/models/quick_phrase.dart';
@@ -56,8 +56,8 @@ class QuickPhraseMenu extends StatelessWidget {
             color: Colors.transparent,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: DesktopOverlayBackdrop(
+                sigma: 14,
                 child: Container(
                   width: menuWidth,
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),

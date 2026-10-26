@@ -1,3 +1,4 @@
+import 'package:Kelivo/desktop/desktop_overlay_backdrop.dart';
 import '../utils/message_reasoning_source.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_user_message_content.dart';
@@ -13,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, visibleForTesting, mapEquals;
-import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
@@ -1775,8 +1775,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: DesktopOverlayBackdrop(
+                      sigma: 14,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerHigh.withValues(

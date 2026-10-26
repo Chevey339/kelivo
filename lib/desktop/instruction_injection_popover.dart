@@ -1,5 +1,4 @@
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +10,7 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import 'desktop_overlay_backdrop.dart';
 
 Future<void> showDesktopInstructionInjectionPopover(
   BuildContext context, {
@@ -190,8 +190,8 @@ class _GlassPanel extends StatelessWidget {
     final radius = borderRadius ?? BorderRadius.circular(14);
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      child: DesktopOverlayBackdrop(
+        sigma: 20,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppOverlayColors.desktopPopoverSurface(cs),
