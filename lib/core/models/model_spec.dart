@@ -15,6 +15,10 @@ enum ReasoningDialect {
   openrouterReasoning,
   anthropicBudget,
   anthropicAdaptiveEffort,
+
+  /// Adaptive thinking where the off state is `between_tools` instead of
+  /// `disabled` (Claude Sonnet 5.5).
+  anthropicBetweenTools,
   anthropicEffort,
   geminiThinkingBudget,
   geminiThinkingLevel,

@@ -255,7 +255,8 @@ void _writeAutoSurfaceFlags(
     reasoning.putIfAbsent('summary', () => 'auto');
     return;
   }
-  if (dialect == ReasoningDialect.anthropicAdaptiveEffort) {
+  if (dialect == ReasoningDialect.anthropicAdaptiveEffort ||
+      dialect == ReasoningDialect.anthropicBetweenTools) {
     if (!body.containsKey('thinking')) {
       body['thinking'] = <String, dynamic>{
         'type': 'adaptive',
@@ -292,6 +293,7 @@ void _stripDialectOwnedKeys(
       body.remove('reasoning_effort');
     case ReasoningDialect.anthropicBudget:
     case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicBetweenTools:
     case ReasoningDialect.anthropicEffort:
       body.remove('thinking');
       body.remove('output_config');
@@ -345,6 +347,8 @@ void _writeDialect(
       _writeAnthropicBudget(body, resolution);
     case ReasoningDialect.anthropicAdaptiveEffort:
       _writeAnthropicAdaptive(body, resolution);
+    case ReasoningDialect.anthropicBetweenTools:
+      _writeAnthropicBetweenTools(body, resolution);
     case ReasoningDialect.anthropicEffort:
       _writeAnthropicEffort(body, resolution);
     case ReasoningDialect.geminiThinkingBudget:
@@ -434,6 +438,25 @@ void _writeAnthropicAdaptive(
   final effective = resolution.effective;
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
+    return;
+  }
+  body['thinking'] = <String, dynamic>{
+    'type': 'adaptive',
+    'display': 'summarized',
+  };
+  body['output_config'] = <String, dynamic>{'effort': effective.name};
+}
+
+void _writeAnthropicBetweenTools(
+  Map<String, dynamic> body,
+  ReasoningResolution resolution,
+) {
+  final effective = resolution.effective;
+  if (effective == ReasoningLevel.off) {
+    // Sonnet 5.5 rejects `disabled`; `between_tools` is its lowest thinking
+    // setting. It takes no other field and the request leaves effort at the
+    // model default, which is inside `between_tools`'s `high`-or-below range.
+    body['thinking'] = <String, dynamic>{'type': 'between_tools'};
     return;
   }
   body['thinking'] = <String, dynamic>{
