@@ -692,6 +692,7 @@ Stream<StreamChunk> sendGoogleStream(
             .toList();
         lastParts = parts;
         lastFunctionCallParts = functionCallParts;
+        final ids = StreamChunkIds('round-${currentContents.length}');
         // Provider-hosted code execution stays on ServerTool*, not ToolCallResult.
         var codeExecIdx = 0;
         for (final p in parts) {
@@ -701,7 +702,7 @@ Stream<StreamChunk> sendGoogleStream(
             final lang = (ec['language'] ?? '').toString().toLowerCase();
             final code = (ec['code'] ?? '').toString();
             if (code.isNotEmpty) {
-              final ceId = 'code_exec_$codeExecIdx';
+              final ceId = ids.indexed('code_exec', codeExecIdx);
               codeExecIdx++;
               yield ToolCallStart(id: ceId, toolName: 'code_execution');
               yield ToolCallDelta(
@@ -715,9 +716,10 @@ Stream<StreamChunk> sendGoogleStream(
           if (cr is Map) {
             final outcome = (cr['outcome'] ?? '').toString();
             final output = (cr['output'] ?? '').toString();
-            final resultId = codeExecIdx > 0
-                ? 'code_exec_${codeExecIdx - 1}'
-                : 'code_exec_0';
+            final resultId = ids.indexed(
+              'code_exec',
+              codeExecIdx > 0 ? codeExecIdx - 1 : 0,
+            );
             yield ServerToolStart(id: resultId, toolName: 'code_execution');
             yield ServerToolEnd(
               id: resultId,
@@ -741,7 +743,7 @@ Stream<StreamChunk> sendGoogleStream(
         final reasoningStr = reasoningBuf.toString();
         if (reasoningStr.isNotEmpty || buf.isNotEmpty) {
           yield* emitDelta(
-            ids: StreamChunkIds('round-${currentContents.length}'),
+            ids: ids,
             content: buf.toString(),
             reasoning: reasoningStr,
             usage: totalUsage,
