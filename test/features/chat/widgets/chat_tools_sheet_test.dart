@@ -240,18 +240,32 @@ void main() {
 
   for (final desktop in [false, true]) {
     testWidgets(
-      'keyboard folds workspace and announces state desktop=$desktop',
+      desktop
+          ? 'desktop tools popover omits workspace controls'
+          : 'keyboard folds workspace and announces state on mobile',
       (tester) async {
         final semantics = tester.ensureSemantics();
         await tester.runAsync(
           () => uiPreferences.setStringList(
             'display_chat_tools_expanded_groups_v1',
-            ['mcp'],
+            ['mcp', if (desktop) 'workspace'],
           ),
         );
         final l10n = await pumpSheet(tester, desktop: desktop);
         await tester.pumpAndSettle();
         final title = find.text(l10n.workspacesTitle);
+        if (desktop) {
+          final position = tester
+              .state<ScrollableState>(find.byType(Scrollable).first)
+              .position;
+          position.jumpTo(position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          expect(title, findsNothing);
+          expect(find.byType(WorkspaceSection), findsNothing);
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+          return;
+        }
         await tester.scrollUntilVisible(
           title,
           250,

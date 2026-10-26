@@ -1,11 +1,7 @@
-import 'dart:async';
-import '../core/database/business_preferences.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/mcp/widgets/mcp_server_avatar.dart';
 import '../features/mcp/utils/mcp_tool_groups.dart';
-import '../features/workspace/widgets/workspace_section.dart';
 import 'package:provider/provider.dart';
 
 import '../icons/lucide_adapter.dart';
@@ -16,7 +12,6 @@ import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
-import '../shared/widgets/ios_tactile.dart';
 import 'desktop_overlay_backdrop.dart';
 
 Future<void> showDesktopToolsPopover(
@@ -24,7 +19,6 @@ Future<void> showDesktopToolsPopover(
   required GlobalKey anchorKey,
   required String assistantId,
   required bool supportsModelTools,
-  String? conversationId,
 }) async {
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -49,7 +43,6 @@ Future<void> showDesktopToolsPopover(
       anchorWidth: size.width,
       assistantId: assistantId,
       supportsModelTools: supportsModelTools,
-      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -67,14 +60,12 @@ class _ToolsPopover extends StatefulWidget {
     required this.assistantId,
     required this.supportsModelTools,
     required this.onClose,
-    this.conversationId,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final String assistantId;
   final bool supportsModelTools;
-  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -165,7 +156,6 @@ class _ToolsPopoverState extends State<_ToolsPopover>
                         child: _ToolsContent(
                           assistantId: widget.assistantId,
                           supportsModelTools: widget.supportsModelTools,
-                          conversationId: widget.conversationId,
                           onDone: _close,
                         ),
                       ),
@@ -221,47 +211,15 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _ToolsContent extends StatefulWidget {
+class _ToolsContent extends StatelessWidget {
   const _ToolsContent({
     required this.assistantId,
     required this.supportsModelTools,
     required this.onDone,
-    this.conversationId,
   });
-  final String? conversationId;
   final String assistantId;
   final bool supportsModelTools;
   final VoidCallback onDone;
-
-  @override
-  State<_ToolsContent> createState() => _ToolsContentState();
-}
-
-class _ToolsContentState extends State<_ToolsContent> {
-  late final _preferences = context.read<BusinessPreferences>();
-  late bool _workspaceExpanded =
-      (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
-              ['mcp', 'workspace'])
-          .contains('workspace');
-
-  void _toggleWorkspace() {
-    setState(() => _workspaceExpanded = !_workspaceExpanded);
-    final expanded =
-        (_preferences.getStringList('display_chat_tools_expanded_groups_v1') ??
-                ['mcp', 'workspace'])
-            .toSet();
-    if (_workspaceExpanded) {
-      expanded.add('workspace');
-    } else {
-      expanded.remove('workspace');
-    }
-    unawaited(
-      _preferences.setStringList(
-        'display_chat_tools_expanded_groups_v1',
-        expanded.toList(),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -269,12 +227,12 @@ class _ToolsContentState extends State<_ToolsContent> {
     final cs = Theme.of(context).colorScheme;
     final mcp = context.watch<McpProvider>();
     final ap = context.watch<AssistantProvider>();
-    final a = ap.getById(widget.assistantId);
+    final a = ap.getById(assistantId);
     if (a == null) return const SizedBox.shrink();
     final selected = a.mcpServerIds.toSet();
-    final groups = [if (widget.supportsModelTools) ...mcpToolGroups(mcp)];
+    final groups = [if (supportsModelTools) ...mcpToolGroups(mcp)];
 
-    final localToolIds = widget.supportsModelTools
+    final localToolIds = supportsModelTools
         ? availableLocalToolIds()
         : const <String>[];
     final enabledLocalTools = a.localToolIds.toSet();
@@ -319,7 +277,7 @@ class _ToolsContentState extends State<_ToolsContent> {
             await context.read<AssistantProvider>().updateAssistant(
               a.copyWith(mcpServerIds: const <String>[]),
             );
-            widget.onDone();
+            onDone();
           },
         ),
       );
@@ -364,57 +322,6 @@ class _ToolsContentState extends State<_ToolsContent> {
           ),
         );
       }
-    }
-
-    rows.add(
-      (context) => Semantics(
-        button: true,
-        expanded: _workspaceExpanded,
-        child: IosCardPress(
-          focusable: true,
-          haptics: false,
-          baseColor: Colors.transparent,
-          pressedBlendStrength: 0,
-          onTap: _toggleWorkspace,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: SizedBox(
-              height: 32,
-              child: Row(
-                children: [
-                  AnimatedRotation(
-                    turns: _workspaceExpanded ? .25 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Lucide.ChevronRight,
-                      size: 12,
-                      color: cs.onSurface.withValues(alpha: .5),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    l10n.workspacesTitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: AppFontWeights.semibold,
-                      color: cs.onSurface.withValues(alpha: .5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (_workspaceExpanded) {
-      rows.add(
-        (context) => WorkspaceSection(
-          assistantId: widget.assistantId,
-          conversationId: widget.conversationId,
-          onClose: widget.onDone,
-        ),
-      );
     }
 
     return Padding(

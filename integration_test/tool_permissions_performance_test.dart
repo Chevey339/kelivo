@@ -298,7 +298,6 @@ void main() {
                 anchorKey: anchor,
                 assistantId: assistantId,
                 supportsModelTools: true,
-                conversationId: chat.conversation.id,
               ),
             );
             await tester.pump(const Duration(milliseconds: 350));

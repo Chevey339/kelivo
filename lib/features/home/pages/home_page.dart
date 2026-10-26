@@ -1318,7 +1318,6 @@ class _HomePageState extends State<HomePage>
                   chatModel.providerKey!,
                   chatModel.modelId!,
                 ),
-            conversationId: _controller.currentConversation?.id,
           );
         } else {
           _controller.dismissKeyboard();
