@@ -25,6 +25,7 @@
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    applyBackupPolicy()
     GeneratedPluginRegistrant.register(with: self)
     if let registrar = registrar(forPlugin: "BrowserGlass") {
       registrar.register(
@@ -134,10 +135,8 @@
           }
           result(nil)
 
-        // Local database copies live under Documents, which iCloud backs up in
-        // full. They can reach gigabytes and are reproducible from the live
-        // database, so backing them up would bloat -- and can break -- the
-        // user's iCloud backup without protecting anything new.
+        // Keep standalone local-copy directories excluded as well as the app
+        // roots protected by AppBackupPolicy.
         case "excludeFromBackup":
           guard
             let arguments = call.arguments as? [String: Any],
@@ -163,6 +162,22 @@
       }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    // Reapply for existing installs and directories replaced while suspended.
+    applyBackupPolicy()
+    super.applicationDidBecomeActive(application)
+  }
+
+  private func applyBackupPolicy() {
+    do {
+      try AppBackupPolicy.apply(in: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true))
+    } catch {
+      // Metadata errors must not stop users from accessing or exporting data.
+      // The next foreground activation retries the exclusion.
+      NSLog("[AppBackupPolicy] Could not exclude app data from backup: %@", String(describing: error))
+    }
   }
 
   override func userNotificationCenter(

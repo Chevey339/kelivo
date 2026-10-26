@@ -921,6 +921,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
             ],
           ),
+          if (Platform.isIOS)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Text(
+                l10n.backupPageIosSystemBackupNote,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,

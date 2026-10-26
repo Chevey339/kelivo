@@ -735,6 +735,7 @@
   "backupPageSave": "儲存",
   "backupPageBackupNow": "立即備份",
   "backupPageLocalBackup": "本機備份",
+  "backupPageIosSystemBackupNote": "Kelivo 的本機資料已設定為不參與 iCloud 系統備份。更換裝置或移除 App 前，請先匯出備份檔案。",
   "backupPageImportFromCherryStudio": "從 Cherry Studio 匯入",
   "backupPageCherryStudioUnsupportedBackupVersion": "此備份使用 Cherry Studio 格式版本 {version}，Kelivo 目前尚無法匯入。請改用 Cherry Studio v1 匯出備份，或等待後續版本支援 Cherry Studio v2。",
   "backupPageImportFromChatbox": "從 Chatbox 匯入",

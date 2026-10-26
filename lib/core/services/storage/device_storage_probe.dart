@@ -21,14 +21,13 @@ final class DeviceStorageProbe {
 
   /// Keeps [path] out of the platform's cloud backup.
   ///
-  /// On iOS the app's data lives in Documents, which iCloud backs up whole.
-  /// Local copies can run to several gigabytes and are reproducible from the
-  /// live database, so including them would inflate -- and can outright break
-  /// -- a user's iCloud backup for no protection they do not already have.
+  /// On iOS the native app excludes its Documents and Library roots at launch
+  /// and foreground activation. Local snapshot directories also carry their
+  /// own exclusion so standalone copies retain the same backup policy.
   /// Android needs nothing here: the manifest disables backup entirely.
   ///
   /// Best effort. A platform that cannot do it simply keeps backing the path
-  /// up, which is wasteful but never harmful.
+  /// up. System backup exclusion is advisory and cannot remove older backups.
   static Future<void> excludeFromCloudBackup(String path) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
