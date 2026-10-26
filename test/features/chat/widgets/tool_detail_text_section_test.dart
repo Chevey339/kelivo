@@ -55,6 +55,24 @@ void main() {
     expect(find.byKey(ToolDetailTextSection.lazyListKey), findsNothing);
   });
 
+  testWidgets(
+    'malformed tool text is safe to render without changing the source',
+    (tester) async {
+      for (final source in ['bad\uD800value\uDC00😀', '${'x' * 9000}\uD800']) {
+        await tester.pumpWidget(harness('Result', source));
+        expect(
+          tester
+              .widget<ToolDetailTextSection>(find.byType(ToolDetailTextSection))
+              .text,
+          source,
+        );
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(harness('Result', 'bad\uD800value\uDC00😀'));
+      expect(find.text('bad�value�😀'), findsOneWidget);
+    },
+  );
+
   testWidgets('small result renders as a single eager text block', (
     tester,
   ) async {

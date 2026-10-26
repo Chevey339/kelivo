@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/utf16_safe_cut.dart';
+import '../../../utils/unicode_sanitizer.dart';
 
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -101,7 +102,7 @@ class _ToolDetailTextSectionState extends State<ToolDetailTextSection> {
   }
 
   void _indexText() {
-    _text = widget.text;
+    _text = UnicodeSanitizer.sanitize(widget.text);
     _ranges = ToolDetailTextSection.shouldChunk(_text)
         ? ToolDetailTextSection.chunkRangesOf(_text)
         : null;

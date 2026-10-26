@@ -44,6 +44,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/safe_resize_image.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../shared/widgets/avatar_image.dart';
+import '../../../utils/unicode_sanitizer.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
@@ -2297,7 +2298,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     } else {
       content = Text(
-        visualText,
+        UnicodeSanitizer.sanitize(visualText),
         style: TextStyle(
           fontSize: baseUser,
           height: 1.4,
@@ -2762,7 +2763,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     } else {
       assistantContent = Text(
-        visualContent,
+        UnicodeSanitizer.sanitize(visualContent),
         style: TextStyle(
           fontSize: baseAssistant,
           height: 1.5,
@@ -3513,7 +3514,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                             );
                                       } else {
                                         translationContent = Text(
-                                          translationText,
+                                          UnicodeSanitizer.sanitize(
+                                            translationText,
+                                          ),
                                           style: TextStyle(
                                             fontSize: baseTranslation,
                                             height: 1.4,
@@ -5497,7 +5500,7 @@ class _ChainOfThoughtReasoningStepState
         );
       }
       return Text(
-        text.isNotEmpty ? text : '…',
+        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
         style: TextStyle(fontSize: 12.5, height: 1.32),
       );
     }
@@ -7981,7 +7984,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
         );
       }
       return Text(
-        text.isNotEmpty ? text : '…',
+        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
         style: baseStyle,
         strutStyle: baseStrut,
         textHeightBehavior: baseTHB,

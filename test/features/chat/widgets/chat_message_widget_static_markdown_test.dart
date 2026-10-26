@@ -101,6 +101,17 @@ void main() {
           await tester.pumpAndSettle();
           expect(view, findsNothing);
           expect(find.text(source.value), findsOneWidget);
+          source.value = 'bad\uD800value\uDC00😀';
+          await tester.pumpAndSettle();
+          expect(find.text('bad�value�😀'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          if (translation) {
+            await settings.setEnableAssistantMarkdown(true);
+          } else {
+            await settings.setEnableUserMarkdown(true);
+          }
+          await tester.pumpAndSettle();
+          expect(tester.widget<MarkstreamView>(view).source, 'bad�value�😀');
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox.shrink());
         },

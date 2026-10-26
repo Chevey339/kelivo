@@ -11,9 +11,10 @@ import 'kelivo_markdown_extensions.dart';
 import 'link_image_handlers.dart';
 import 'markdown_theme_mapper.dart';
 import 'math_adapter.dart';
+import '../../utils/unicode_sanitizer.dart';
 
 /// App fonts, settings and platform actions around the native Markdown renderer.
-class MarkdownWithCodeHighlight extends StatelessWidget {
+class MarkdownWithCodeHighlight extends StatefulWidget {
   const MarkdownWithCodeHighlight({
     super.key,
     required this.text,
@@ -41,15 +42,37 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   final List<SourceSpan> highlightRanges;
   final Color? highlightColor;
   @override
+  State<MarkdownWithCodeHighlight> createState() =>
+      _MarkdownWithCodeHighlightState();
+}
+
+class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
+  late String _source;
+
+  @override
+  void initState() {
+    super.initState();
+    _source = UnicodeSanitizer.sanitize(widget.text);
+  }
+
+  @override
+  void didUpdateWidget(MarkdownWithCodeHighlight oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _source = UnicodeSanitizer.sanitize(widget.text);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final exporting = ExportCaptureScope.of(context);
-    final theme = mapMarkdownTheme(context, settings, baseStyle);
+    final theme = mapMarkdownTheme(context, settings, widget.baseStyle);
     final view = MarkstreamView(
-      source: text,
-      highlightRanges: highlightRanges,
-      highlightColor: highlightColor,
-      streaming: streaming,
+      source: _source,
+      highlightRanges: widget.highlightRanges,
+      highlightColor: widget.highlightColor,
+      streaming: widget.streaming,
       options: markdownParserOptions(settings),
       theme: theme,
       extensions: kelivoMarkdownExtensions,
@@ -63,15 +86,15 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
       cullToViewport: !exporting,
     );
     return MarkdownLinkScope(
-      source: text,
-      conversationId: conversationId,
+      source: _source,
+      conversationId: widget.conversationId,
       child: CitationScope(
-        onTap: onCitationTap,
-        resolve: citationIndexResolver,
-        child: uiHost == null
+        onTap: widget.onCitationTap,
+        resolve: widget.citationIndexResolver,
+        child: widget.uiHost == null
             ? view
             : UiHostScope(
-                binding: uiHost!,
+                binding: widget.uiHost!,
                 renderOwner: view,
                 exporting: exporting,
                 child: view,
