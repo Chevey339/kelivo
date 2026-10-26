@@ -21,13 +21,13 @@ on:
         type: boolean
 
       build_mac:
-        description: '构建 macOS'
+        description: '构建 macOS（Impeller 和 NoImpeller 两种版本）'
         required: false
         default: true
         type: boolean
 
       build_windows:
-        description: '构建 Windows'
+        description: '构建 Windows（Impeller 和 NoImpeller 两种版本）'
         required: false
         default: true
         type: boolean
@@ -232,11 +232,20 @@ jobs:
   # macOS 构建
   macos:
     if: ${{ github.event.inputs.build_mac == 'true' }}
-    name: 构建 macOS
+    name: 构建 macOS (${{ matrix.renderer }})
     runs-on: macos-latest
     permissions: write-all
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: Impeller
+            suffix: ''
+          - renderer: Skia
+            suffix: '-NoImpeller'
     # 未配置时 tool/macos_sign_and_notarize.sh 会跳过签名。说明见 docs/macos-signing.md。
     env:
+      PACKAGE_SUFFIX: ${{ matrix.suffix }}
       MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -262,6 +271,10 @@ jobs:
       - name: 🔧 关闭 Swift Package Manager
         run: flutter config --no-enable-swift-package-manager
 
+      - name: 🔧 关闭 Impeller（Skia 构建）
+        if: matrix.renderer == 'Skia'
+        run: plutil -replace FLTEnableImpeller -bool false macos/Runner/Info.plist
+
       - name: 📝 Inject fallback
         shell: bash
         run: |
@@ -280,6 +293,11 @@ jobs:
       - name: 🏗️ 构建 macOS
         run: flutter build macos --release
 
+      - name: 🔍 验证应用已关闭 Impeller
+        if: matrix.renderer == 'Skia'
+        run: |
+          test "$(plutil -extract FLTEnableImpeller raw -expect bool build/macos/Build/Products/Release/kelivo.app/Contents/Info.plist)" = false
+
       - name: 🔐 使用 Developer ID 签名应用
         run: bash tool/macos_sign_and_notarize.sh sign-app "build/macos/Build/Products/Release/kelivo.app"
 
@@ -292,15 +310,15 @@ jobs:
             --window-size 800 400 \
             --icon-size 100 \
             --app-drop-link 600 185 \
-            "Kelivo_macos_${VERSION}.dmg" \
+            "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" \
             "build/macos/Build/Products/Release/kelivo.app" || true
           # 如果 create-dmg 失败，使用简单方式
-          if [ ! -f "Kelivo_macos_${VERSION}.dmg" ]; then
-            hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
+          if [ ! -f "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" ]; then
+            hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg"
           fi
 
       - name: 🧾 公证并验证 DMG
-        run: bash tool/macos_sign_and_notarize.sh notarize-dmg "Kelivo_macos_${VERSION}.dmg" "build/macos/Build/Products/Release/kelivo.app"
+        run: bash tool/macos_sign_and_notarize.sh notarize-dmg "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" "build/macos/Build/Products/Release/kelivo.app"
 
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
@@ -314,15 +332,25 @@ jobs:
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-DMG
+          name: macOS-DMG${{ matrix.suffix }}
           path: Kelivo_macos_*.dmg
 
   # Windows 构建
   windows:
     if: ${{ github.event.inputs.build_windows == 'true' }}
-    name: 构建 Windows
+    name: 构建 Windows (${{ matrix.renderer }})
     runs-on: windows-latest
     permissions: write-all
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: Impeller
+            suffix: ''
+          - renderer: Skia
+            suffix: '-NoImpeller'
+    env:
+      PACKAGE_SUFFIX: ${{ matrix.suffix }}
 
     steps:
       - name: 📦 检出代码
@@ -332,6 +360,23 @@ jobs:
 
       - name: 🔧 安装最新 CMake
         uses: lukka/get-cmake@latest
+
+      - name: 🔧 关闭 Impeller（Skia 构建）
+        if: matrix.renderer == 'Skia'
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('windows/runner/main.cpp')
+          source = path.read_text(encoding='utf-8')
+          anchor = '  flutter::DartProject project(L"data");'
+          if source.count(anchor) != 1 or 'set_impeller_switch(' in source:
+              raise SystemExit('Unexpected Windows Impeller configuration; review the Skia build step.')
+          source = source.replace(
+              anchor,
+              anchor + '\n  project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);',
+          )
+          path.write_text(source, encoding='utf-8')
 
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
@@ -373,7 +418,7 @@ jobs:
       - name: 📦 打包 ZIP
         shell: pwsh
         run: |
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$env:VERSION.zip"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$($env:VERSION)$($env:PACKAGE_SUFFIX).zip"
       - name: 🔧 安装 Inno Setup
         run: choco install innosetup -y
 
@@ -431,7 +476,7 @@ jobs:
           DefaultDirName={autopf}\{#MyAppName}
           DefaultGroupName={#MyAppName}
           OutputDir=.
-          OutputBaseFilename=Kelivo_windows_{#MyAppVersion}_setup
+          OutputBaseFilename=Kelivo_windows_{#MyAppVersion}$($env:PACKAGE_SUFFIX)_setup
           Compression=lzma2
           SolidCompression=yes
           WizardStyle=modern
@@ -469,13 +514,13 @@ jobs:
       - name: 📤 上传构建产物 (ZIP)
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-ZIP
+          name: Windows-ZIP${{ matrix.suffix }}
           path: Kelivo_windows_*.zip
 
       - name: 📤 上传构建产物 (Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-Installer
+          name: Windows-Installer${{ matrix.suffix }}
           path: Kelivo_windows_*_setup.exe
 
   # Linux 构建
