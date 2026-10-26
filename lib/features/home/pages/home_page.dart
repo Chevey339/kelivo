@@ -2,6 +2,7 @@ import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_host_scope.dart';
 import '../../chat/widgets/context_dialog.dart';
 import '../../../core/models/context_compression_task.dart';
+import '../../../core/models/context_operation.dart';
 import '../services/tool_approval_service.dart';
 import '../../chat/widgets/compress_context_options_dialog.dart';
 import '../../chat/widgets/context_operation_actions.dart';
@@ -1058,11 +1059,26 @@ class _HomePageState extends State<HomePage>
             backgroundImageActive: _assistantBackgroundActive(context),
           )
         : null;
-    final chat = context.watch<ChatService>();
     final conversationId = _controller.currentConversation?.id;
-    final compression = conversationId == null
-        ? null
-        : chat.contextCompression.taskFor(conversationId);
+    // Tasks mutate in place, so retain the fields that affect timeline layout
+    // as values rather than selecting only the task's identity.
+    final (compression, _, _, _) = context
+        .select<
+          ChatService,
+          (ContextCompressionTask?, CompressionPhase?, String?, String?)
+        >((chat) {
+          final task = conversationId == null
+              ? null
+              : chat.contextCompression.taskFor(conversationId);
+          return (task, task?.phase, task?.anchorGroupId, task?.error);
+        });
+    final contextOperations = context
+        .select<ChatService, List<ContextOperation>>(
+          (chat) => conversationId == null
+              ? const []
+              : chat.contextOperationsFor(conversationId),
+        );
+    final chat = context.read<ChatService>();
     final footer = promptFooter;
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
@@ -1075,11 +1091,16 @@ class _HomePageState extends State<HomePage>
 
     final settings = context.watch<SettingsProvider>();
     final suggestionsEnabled = settings.isSuggestionGenerationEnabled;
+    final suggestions = context.select<ChatService, List<String>>(
+      (chat) => suggestionsEnabled && conversationId != null
+          ? (chat.getConversation(conversationId)?.chatSuggestions ?? const [])
+          : const [],
+    );
     return MessageListView(
       contextTask: compression,
       contextTaskRevision: compression == null
           ? null
-          : '${compression.id}:${compression.phase.name}:${compression.anchorGroupId}',
+          : '${compression.id}:${compression.phase.name}:${compression.anchorGroupId}:${compression.error}',
       contextTaskWaitingForApproval:
           compression?.phase == CompressionPhase.waiting &&
           context.watch<ToolApprovalService>().pendingRequests.any(
@@ -1099,9 +1120,7 @@ class _HomePageState extends State<HomePage>
           initialOptions: task.options,
         ),
       ),
-      contextOperations: conversationId == null
-          ? const []
-          : chat.contextOperationsFor(conversationId),
+      contextOperations: contextOperations,
       onOpenContextOperation: (operation) => showContextOperationDetails(
         context,
         chat: chat,
@@ -1139,10 +1158,7 @@ class _HomePageState extends State<HomePage>
       translations: _buildTranslationUiStates(),
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
-      suggestions: suggestionsEnabled
-          ? (_controller.currentConversation?.chatSuggestions ??
-                const <String>[])
-          : const <String>[],
+      suggestions: suggestions,
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
