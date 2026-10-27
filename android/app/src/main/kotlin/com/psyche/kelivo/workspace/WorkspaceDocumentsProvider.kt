@@ -21,6 +21,11 @@ import com.psyche.kelivo.R
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 /** Workspace files in the Android system document picker. */
 class WorkspaceDocumentsProvider : DocumentsProvider() {
@@ -129,6 +134,16 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
         return WorkspaceDocumentPaths.documentId(root.id, relative)
     }
 
+    override fun deleteDocument(documentId: String) {
+        val (root, relative, file) = resolve(documentId)
+        if (relative.isEmpty()) throw FileNotFoundException("Cannot delete a workspace")
+        deleteTree(file.toPath())
+        val parentId = WorkspaceDocumentPaths.documentId(root.id, relative.substringBeforeLast('/', ""))
+        val resolver = requireNotNull(context).contentResolver
+        resolver.notifyChange(DocumentsContract.buildChildDocumentsUri(authority, parentId), null)
+        resolver.notifyChange(DocumentsContract.buildDocumentUri(authority, documentId), null)
+    }
+
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
         signal?.throwIfCanceled()
         val (root, relative, file) = resolve(documentId)
@@ -186,15 +201,34 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
     }
 
     private fun MatrixCursor.addDocument(root: WorkspaceDocumentRoot, relative: String, file: File) {
+        val isDirectory = relative.isEmpty() || file.isDirectory
+        var flags = if (isDirectory) Document.FLAG_DIR_SUPPORTS_CREATE else Document.FLAG_SUPPORTS_WRITE
+        if (relative.isNotEmpty()) flags = flags or Document.FLAG_SUPPORTS_DELETE
         addValues(mapOf(
             Document.COLUMN_DOCUMENT_ID to WorkspaceDocumentPaths.documentId(root.id, relative),
             Document.COLUMN_DISPLAY_NAME to if (relative.isEmpty()) root.name else relative.substringAfterLast('/'),
-            Document.COLUMN_MIME_TYPE to if (relative.isEmpty()) Document.MIME_TYPE_DIR else mimeType(file),
-            Document.COLUMN_FLAGS to if (relative.isEmpty() || file.isDirectory) Document.FLAG_DIR_SUPPORTS_CREATE
-                else Document.FLAG_SUPPORTS_WRITE,
+            Document.COLUMN_MIME_TYPE to if (isDirectory) Document.MIME_TYPE_DIR else mimeType(file),
+            Document.COLUMN_FLAGS to flags,
             Document.COLUMN_SIZE to if (file.isFile) file.length() else null,
             Document.COLUMN_LAST_MODIFIED to file.lastModified().takeIf { it > 0 },
         ))
+    }
+
+    /** Delete without following symlinks, so a link inside the workspace cannot
+     * erase files outside it. */
+    private fun deleteTree(path: Path) {
+        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attributes: BasicFileAttributes): FileVisitResult {
+                Files.delete(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, error: IOException?): FileVisitResult {
+                if (error != null) throw error
+                Files.delete(dir)
+                return FileVisitResult.CONTINUE
+            }
+        })
     }
 
     private fun mimeType(file: File): String {

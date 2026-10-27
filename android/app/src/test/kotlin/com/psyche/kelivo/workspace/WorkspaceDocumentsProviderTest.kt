@@ -179,6 +179,33 @@ class WorkspaceDocumentsProviderTest {
     }
 
     @Test
+    fun deletesFilesAndFoldersWithoutFollowingLinks() {
+        val root = workspace()
+        val folder = File(root, "folder").apply { mkdirs() }
+        File(folder, "nested.txt").writeText("nested")
+        File(root, "file.txt").writeText("file")
+        val outside = File(appData, "keep.txt").apply { writeText("keep") }
+        Files.createSymbolicLink(File(folder, "link").toPath(), outside.toPath())
+
+        children("workspace/one").use { cursor ->
+            val flags = mutableListOf<Int>()
+            while (cursor.moveToNext()) {
+                flags += cursor.getInt(cursor.getColumnIndexOrThrow(Document.COLUMN_FLAGS))
+            }
+            assertTrue("Files and folders must advertise deletion", flags.all { it and Document.FLAG_SUPPORTS_DELETE != 0 })
+        }
+
+        provider.deleteDocument("workspace/one/file.txt")
+        assertFalse(File(root, "file.txt").exists())
+        provider.deleteDocument("workspace/one/folder")
+        assertFalse(folder.exists())
+        assertEquals("keep", outside.readText())
+
+        assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/one") }
+        assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/unknown/x") }
+    }
+
+    @Test
     fun rejectsInvalidNamesAndNonDirectoryParents() {
         val root = workspace()
         File(root, "hello.txt").writeText("hello")
