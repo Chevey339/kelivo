@@ -1,5 +1,6 @@
 #include "../utils/log.h"
 #include "custom_platform_view.h"
+#include "texture_unregister.h"
 
 #include <flutter/event_stream_handler_functions.h>
 #include <flutter/method_result_functions.h>
@@ -199,6 +200,8 @@ namespace flutter_inappwebview_plugin
   CustomPlatformView::~CustomPlatformView()
   {
     debugLog("dealloc CustomPlatformView");
+    if (method_channel_) method_channel_->SetMethodCallHandler(nullptr);
+    if (event_channel_) event_channel_->SetStreamHandler(nullptr);
     // A retained WebView can outlive this texture wrapper. Its callbacks must
     // not keep pointing at the old wrapper while the new host is attaching.
     if (view) {
@@ -206,7 +209,8 @@ namespace flutter_inappwebview_plugin
       view->onCursorChanged(nullptr);
     }
     event_sink_ = nullptr;
-    texture_registrar_->UnregisterTexture(texture_id_, nullptr);
+    texture_bridge_->Stop();
+    unregisterTextureAndWait(texture_registrar_, texture_id_);
   }
 
   void CustomPlatformView::RegisterEventHandlers()

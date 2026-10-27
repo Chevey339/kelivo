@@ -19,12 +19,12 @@ inline auto CreateD3DDevice(D3D_DRIVER_TYPE const type,
                            D3D11_SDK_VERSION, device.put(), nullptr, nullptr);
 }
 
-inline auto CreateD3DDevice() {
+inline auto CreateD3DDevice(HRESULT& result) {
   winrt::com_ptr<ID3D11Device> device;
-  HRESULT hr = CreateD3DDevice(D3D_DRIVER_TYPE_HARDWARE, device);
+  result = CreateD3DDevice(D3D_DRIVER_TYPE_HARDWARE, device);
 
-  if (DXGI_ERROR_UNSUPPORTED == hr) {
-    CreateD3DDevice(D3D_DRIVER_TYPE_WARP, device);
+  if (DXGI_ERROR_UNSUPPORTED == result) {
+    result = CreateD3DDevice(D3D_DRIVER_TYPE_WARP, device);
   }
 
   return device;

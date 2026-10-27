@@ -12,6 +12,7 @@ import 'package:Kelivo/core/services/browser/browser_failure.dart';
 import 'package:Kelivo/core/services/browser/browser_scroll_observer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 // Exercise the Windows implementation resolved by flutter_inappwebview itself.
@@ -33,7 +34,11 @@ void main() {
     platform = _BrowserPlatform();
     InAppWebViewPlatform.instance = platform;
     store = _MemoryStore();
-    service = BrowserService(store: store, supported: true);
+    service = BrowserService(
+      store: store,
+      supported: true,
+      engineFactory: _createEngine,
+    );
   });
 
   tearDown(() async {
@@ -43,6 +48,32 @@ void main() {
       InAppWebViewPlatform.instance = previousPlatform;
     }
   });
+
+  test(
+    'initialization failure survives a second failure during cleanup',
+    () async {
+      final failure = PlatformException(
+        code: '0x80070005',
+        message:
+            'CreateCoreWebView2CompositionController failed: Access is denied.',
+        details: {'stage': 'CreateCoreWebView2CompositionController'},
+      );
+      platform.runError = failure;
+      platform.disposeError = StateError('cleanup failed');
+      await expectLater(
+        _createEngine(
+          tab: const BrowserTab(id: 'failed-initialization'),
+          settings: const BrowserSettings(),
+          onChanged: (_) {},
+          onDownload: (_, __) {},
+          onNewWindow: (_, __) async => false,
+          isAgentActive: () => false,
+        ),
+        throwsA(same(failure)),
+      );
+      expect(platform.views.single.disposed, isTrue);
+    },
+  );
 
   test(
     'workspace resources use scoped URLs and reject other tab origins',
@@ -269,7 +300,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       platform.useWindowsFindFactory = true;
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'windows', url: 'https://example.com'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1175,7 +1206,7 @@ void main() {
   );
 
   test('changing UA also invalidates the cached download header', () async {
-    final engine = await NativeBrowserEngine.create(
+    final engine = await _createEngine(
       tab: const BrowserTab(id: 'ua-download'),
       settings: const BrowserSettings(),
       onChanged: (_) {},
@@ -1206,7 +1237,7 @@ void main() {
   test(
     'download headers exclude cross-host, insecure and wrong-path credentials',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'cookies'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1246,7 +1277,7 @@ void main() {
   test(
     'tab thumbnails are small JPEGs while agent screenshots retain their PNG contract',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'preview-test'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1286,7 +1317,7 @@ void main() {
   test(
     'covered tabs clear native focus and a rapid return supersedes pause',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'focus-test'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1348,7 +1379,7 @@ void main() {
     ) async {
       debugDefaultTargetPlatformOverride = target;
       const tab = BrowserTab(id: 'composition-test');
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: tab,
         settings: const BrowserSettings(
           surfaceStyle: BrowserSurfaceStyle.solid,
@@ -1533,7 +1564,11 @@ void main() {
       expect(service.requireTab(tab.id).hasContent, isTrue);
 
       await service.flush();
-      final restored = BrowserService(store: store, supported: true);
+      final restored = BrowserService(
+        store: store,
+        supported: true,
+        engineFactory: _createEngine,
+      );
       await restored.initialize();
       expect(restored.tabs.single.id, tab.id);
       expect(restored.tabs.single.url, 'about:blank');
@@ -1605,7 +1640,11 @@ void main() {
       expect(service.requireTab(tab.id).hasContent, isTrue);
 
       await service.flush();
-      final restored = BrowserService(store: store, supported: true);
+      final restored = BrowserService(
+        store: store,
+        supported: true,
+        engineFactory: _createEngine,
+      );
       await restored.initialize();
       expect(restored.tabs.single.id, tab.id);
       expect(restored.tabs.single.url, 'about:blank');
@@ -1935,6 +1974,26 @@ void main() {
   );
 }
 
+// Mock browser tests must not initialize an actual Windows profile, including
+// when this suite itself runs on Windows. The runtime suite supplies a real,
+// isolated environment through the same factory seam.
+Future<BrowserEngine> _createEngine({
+  required BrowserTab tab,
+  required BrowserSettings settings,
+  required void Function(BrowserPageState) onChanged,
+  required void Function(String, String?) onDownload,
+  required Future<bool> Function(String?, int) onNewWindow,
+  required bool Function() isAgentActive,
+}) => NativeBrowserEngine.create(
+  tab: tab,
+  settings: settings,
+  onChanged: onChanged,
+  onDownload: onDownload,
+  onNewWindow: onNewWindow,
+  isAgentActive: isAgentActive,
+  webViewEnvironment: () async => null,
+);
+
 class _MemoryStore extends BrowserStore {
   Map<String, Object?> state = {};
   @override
@@ -1944,6 +2003,8 @@ class _MemoryStore extends BrowserStore {
 }
 
 class _BrowserPlatform extends InAppWebViewPlatform {
+  Object? runError;
+  Object? disposeError;
   bool useWindowsFindFactory = false;
   final List<_HeadlessView> views = [];
   final Map<Object, _Document> documents = {};
@@ -1997,6 +2058,8 @@ class _BrowserPlatform extends InAppWebViewPlatform {
     final document = _Document();
     documents[id] = document;
     final view = _HeadlessView(params, id, document);
+    view.runError = runError;
+    view.disposeError = disposeError;
     views.add(view);
     return view;
   }
@@ -2078,6 +2141,8 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
   final String id;
   final _Document document;
   bool disposed = false;
+  Object? runError;
+  Object? disposeError;
   late final _Controller controller = _Controller(
     PlatformInAppWebViewControllerCreationParams(id: id, webviewParams: params),
     document,
@@ -2087,9 +2152,17 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
       params.controllerFromPlatform!(controller) as InAppWebViewController;
 
   @override
-  Future<void> run() async => params.onWebViewCreated!(callbackController);
+  Future<void> run() async {
+    if (runError != null) throw runError!;
+    params.onWebViewCreated!(callbackController);
+  }
+
   @override
-  Future<void> dispose() async => disposed = true;
+  Future<void> dispose() async {
+    disposed = true;
+    if (disposeError != null) throw disposeError!;
+  }
+
   @override
   bool isRunning() => !disposed;
   @override

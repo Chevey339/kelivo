@@ -27,6 +27,7 @@ import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_native_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
+import 'package:Kelivo/core/services/browser/browser_windows_environment.dart';
 import 'package:Kelivo/features/browser/models/browser_models.dart';
 import 'package:Kelivo/features/browser/pages/browser_page.dart';
 import 'package:Kelivo/features/browser/widgets/browser_controls.dart';
@@ -41,6 +42,9 @@ void main() {
     ..framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   testWidgets('Windows native browser runtime', (tester) async {
     final directory = await Directory.systemTemp.createTemp('browser-win-');
+    final environment = BrowserWindowsEnvironment(
+      dataDirectory: () async => directory,
+    );
     final database = AppDatabase(NativeDatabase.memory());
     final preferences = BusinessPreferences(BusinessRepository(database));
     await preferences.load();
@@ -65,6 +69,7 @@ void main() {
               throw StateError('Intentional popup creation failure');
             }
             return engines[tab.id] = await NativeBrowserEngine.create(
+              webViewEnvironment: environment.get,
               tab: tab,
               settings: settings,
               onChanged: onChanged,

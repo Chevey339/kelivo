@@ -14,7 +14,7 @@ namespace flutter_inappwebview_plugin
   using namespace Microsoft::WRL;
 
   CookieManager::CookieManager(const FlutterInappwebviewWindowsPlugin* plugin)
-    : plugin(plugin), ChannelDelegate(plugin->registrar->messenger(), CookieManager::METHOD_CHANNEL_NAME_PREFIX)
+    : plugin(plugin), ChannelDelegate(plugin->messenger(), CookieManager::METHOD_CHANNEL_NAME_PREFIX)
   {}
 
   void CookieManager::HandleMethodCall(const flutter::MethodCall<flutter::EncodableValue>& method_call,

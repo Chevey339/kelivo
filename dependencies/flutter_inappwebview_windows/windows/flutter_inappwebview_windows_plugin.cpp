@@ -16,14 +16,15 @@ namespace flutter_inappwebview_plugin
 {
   // static
   void FlutterInappwebviewWindowsPlugin::RegisterWithRegistrar(
-    flutter::PluginRegistrarWindows* registrar)
+    flutter::PluginRegistrarWindows* registrar, FlutterDesktopMessengerRef messenger)
   {
-    auto plugin = std::make_unique<FlutterInappwebviewWindowsPlugin>(registrar);
+    auto plugin = std::make_unique<FlutterInappwebviewWindowsPlugin>(registrar, messenger);
     registrar->AddPlugin(std::move(plugin));
   }
 
-  FlutterInappwebviewWindowsPlugin::FlutterInappwebviewWindowsPlugin(flutter::PluginRegistrarWindows* registrar)
-    : registrar(registrar)
+  FlutterInappwebviewWindowsPlugin::FlutterInappwebviewWindowsPlugin(
+    flutter::PluginRegistrarWindows* registrar, FlutterDesktopMessengerRef messenger)
+    : registrar(registrar), pluginMessenger(std::make_unique<PluginMessenger>(registrar->messenger(), messenger, alive))
   {
     webViewEnvironmentManager = std::make_unique<WebViewEnvironmentManager>(this);
     inAppWebViewManager = std::make_unique<InAppWebViewManager>(this);
@@ -34,10 +35,14 @@ namespace flutter_inappwebview_plugin
 
   FlutterInappwebviewWindowsPlugin::~FlutterInappwebviewWindowsPlugin()
   {
-    webViewEnvironmentManager = nullptr;
-    inAppWebViewManager = nullptr;
-    inAppBrowserManager = nullptr;
-    headlessInAppWebViewManager = nullptr;
+    // Async creation callbacks may run while the dispatcher queue drains.
+    *alive = false;
     cookieManager = nullptr;
+    headlessInAppWebViewManager = nullptr;
+    inAppBrowserManager = nullptr;
+    inAppWebViewManager->disposeWebViews();
+    webViewEnvironmentManager = nullptr;
+    // All views/controllers must be closed before the compositor and its STA.
+    inAppWebViewManager = nullptr;
   }
 }

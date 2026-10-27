@@ -114,7 +114,10 @@ namespace flutter_inappwebview_plugin
       wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController);
     ~InAppWebView();
 
-    static void createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
+    static void createInAppWebViewEnv(const FlutterInappwebviewWindowsPlugin* plugin,
+      const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment,
+      const std::shared_ptr<InAppWebViewSettings> initialSettings,
+      std::function<void(HRESULT, const std::string&, wil::com_ptr<ICoreWebView2Environment> webViewEnv,
       wil::com_ptr<ICoreWebView2Controller> webViewController,
       wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler,
       wil::com_ptr<ICoreWebView2Environment> popupEnvironment = nullptr);

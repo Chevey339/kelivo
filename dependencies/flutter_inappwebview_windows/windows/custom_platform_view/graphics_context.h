@@ -13,7 +13,7 @@ namespace flutter_inappwebview_plugin
   public:
     GraphicsContext(rx::RoHelper* rohelper);
 
-    inline bool IsValid() const { return valid_; }
+    HRESULT initializationResult() const { return initializationResult_; }
 
     ABI::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice* device() const
     {
@@ -25,7 +25,7 @@ namespace flutter_inappwebview_plugin
       return device_context_.get();
     }
 
-    winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> CreateCompositor();
+    HRESULT CreateCompositor(winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor>& compositor);
 
     winrt::com_ptr<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>
       CreateGraphicsCaptureItemFromVisual(
@@ -44,7 +44,7 @@ namespace flutter_inappwebview_plugin
         INT32 numberOfBuffers, ABI::Windows::Graphics::SizeInt32 size) const;
 
   private:
-    bool valid_ = false;
+    HRESULT initializationResult_ = E_FAIL;
     rx::RoHelper* rohelper_;
     winrt::com_ptr<ABI::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>
       device_winrt_;

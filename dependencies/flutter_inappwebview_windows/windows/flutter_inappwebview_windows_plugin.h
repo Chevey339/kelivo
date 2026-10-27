@@ -3,6 +3,8 @@
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
+#include <memory>
+#include "types/plugin_messenger.h"
 
 namespace flutter_inappwebview_plugin
 {
@@ -15,15 +17,20 @@ namespace flutter_inappwebview_plugin
   class FlutterInappwebviewWindowsPlugin : public flutter::Plugin {
   public:
     flutter::PluginRegistrarWindows* registrar;
+    const std::shared_ptr<std::atomic_bool> alive = std::make_shared<std::atomic_bool>(true);
+    std::unique_ptr<PluginMessenger> pluginMessenger;
+    flutter::BinaryMessenger* messenger() const { return pluginMessenger.get(); }
     std::unique_ptr<WebViewEnvironmentManager> webViewEnvironmentManager;
     std::unique_ptr<InAppWebViewManager> inAppWebViewManager;
     std::unique_ptr<InAppBrowserManager> inAppBrowserManager;
     std::unique_ptr<HeadlessInAppWebViewManager> headlessInAppWebViewManager;
     std::unique_ptr<CookieManager> cookieManager;
 
-    static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
+    static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar,
+      FlutterDesktopMessengerRef messenger);
 
-    FlutterInappwebviewWindowsPlugin(flutter::PluginRegistrarWindows* registrar);
+    FlutterInappwebviewWindowsPlugin(flutter::PluginRegistrarWindows* registrar,
+      FlutterDesktopMessengerRef messenger);
 
     virtual ~FlutterInappwebviewWindowsPlugin();
 

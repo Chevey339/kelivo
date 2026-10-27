@@ -15,7 +15,7 @@
 namespace flutter_inappwebview_plugin
 {
   InAppBrowserManager::InAppBrowserManager(const FlutterInappwebviewWindowsPlugin* plugin)
-    : plugin(plugin), ChannelDelegate(plugin->registrar->messenger(), InAppBrowserManager::METHOD_CHANNEL_NAME)
+    : plugin(plugin), ChannelDelegate(plugin->messenger(), InAppBrowserManager::METHOD_CHANNEL_NAME)
   {}
 
   void InAppBrowserManager::HandleMethodCall(const flutter::MethodCall<flutter::EncodableValue>& method_call,

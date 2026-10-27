@@ -8,7 +8,7 @@ namespace flutter_inappwebview_plugin
   HeadlessInAppWebView::HeadlessInAppWebView(const FlutterInappwebviewWindowsPlugin* plugin, const HeadlessInAppWebViewCreationParams& params, const HWND parentWindow, std::unique_ptr<InAppWebView> webView)
     : plugin(plugin), id(params.id),
     webView(std::move(webView)),
-    channelDelegate(std::make_unique<HeadlessWebViewChannelDelegate>(this, plugin->registrar->messenger()))
+    channelDelegate(std::make_unique<HeadlessWebViewChannelDelegate>(this, plugin->messenger()))
   {
     prepare(params);
     ShowWindow(parentWindow, SW_HIDE);

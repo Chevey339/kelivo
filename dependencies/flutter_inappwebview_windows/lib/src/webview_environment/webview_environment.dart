@@ -48,7 +48,7 @@ class WindowsWebViewEnvironment extends PlatformWebViewEnvironment
 
   _debugLog(String method, dynamic args) {
     debugLog(
-        className: this.runtimeType.toString(),
+        className: runtimeType.toString(),
         id: id,
         debugLoggingSettings: PlatformWebViewEnvironment.debugLoggingSettings,
         method: method,
@@ -64,7 +64,6 @@ class WindowsWebViewEnvironment extends PlatformWebViewEnvironment
       default:
         throw UnimplementedError("Unimplemented ${call.method} method");
     }
-    return null;
   }
 
   @override
@@ -78,8 +77,8 @@ class WindowsWebViewEnvironment extends PlatformWebViewEnvironment
     args.putIfAbsent('settings', () => env.settings?.toMap());
     await _staticChannel.invokeMethod('create', args);
 
-    env.channel =
-        MethodChannel('com.pichillilorenzo/flutter_webview_environment_$id');
+    env.channel = MethodChannel(
+        'com.pichillilorenzo/flutter_webview_environment_${env.id}');
     env.handler = env.handleMethod;
     env.initMethodCallHandler();
     return env;

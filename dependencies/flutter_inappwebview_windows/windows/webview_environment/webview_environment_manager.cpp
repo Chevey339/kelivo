@@ -5,6 +5,7 @@
 #include "../in_app_webview/in_app_webview_settings.h"
 #include "../utils/flutter.h"
 #include "../utils/log.h"
+#include "../utils/initialization_error.h"
 #include "../utils/string.h"
 #include "../utils/vector.h"
 #include "webview_environment_manager.h"
@@ -13,18 +14,22 @@ namespace flutter_inappwebview_plugin
 {
   WebViewEnvironmentManager::WebViewEnvironmentManager(const FlutterInappwebviewWindowsPlugin* plugin)
     : plugin(plugin),
-    ChannelDelegate(plugin->registrar->messenger(), WebViewEnvironmentManager::METHOD_CHANNEL_NAME)
+    ChannelDelegate(plugin->messenger(), WebViewEnvironmentManager::METHOD_CHANNEL_NAME)
   {
     windowClass_.lpszClassName = WebViewEnvironmentManager::CLASS_NAME;
     windowClass_.lpfnWndProc = &DefWindowProc;
 
-    RegisterClass(&windowClass_);
+    if (!RegisterClass(&windowClass_) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+      windowCreationResult_ = HRESULT_FROM_WIN32(GetLastError());
+      return;
+    }
 
     hwnd_ = CreateWindowEx(0, windowClass_.lpszClassName, L"", 0, 0,
       0, 0, 0,
       plugin->registrar->GetView()->GetNativeWindow(),
       nullptr,
       windowClass_.hInstance, nullptr);
+    if (!hwnd_) windowCreationResult_ = HRESULT_FROM_WIN32(GetLastError());
   }
 
   void WebViewEnvironmentManager::HandleMethodCall(const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -58,20 +63,23 @@ namespace flutter_inappwebview_plugin
     auto result_ = std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>(std::move(result));
 
     auto webViewEnvironment = std::make_unique<WebViewEnvironment>(plugin, id);
-    webViewEnvironment->create(std::move(settings),
-      [this, id, result_](HRESULT errorCode)
+    auto environment = webViewEnvironment.get();
+    const auto userDataFolder = settings ? settings->userDataFolder.value_or("") : "";
+    // create() can fail synchronously; publish ownership before its callback.
+    webViewEnvironments.insert({ id, std::move(webViewEnvironment) });
+    environment->create(std::move(settings),
+      [this, id, result_, userDataFolder](HRESULT errorCode, const std::string& stage)
       {
         if (succeededOrLog(errorCode)) {
           result_->Success(true);
         }
         else {
-          result_->Error("0", "Cannot create WebViewEnvironment: " + getHRMessage(errorCode));
+          reportInitializationError(result_.get(), errorCode, stage, userDataFolder);
           if (map_contains(webViewEnvironments, id)) {
             webViewEnvironments.erase(id);
           }
         }
       });
-    webViewEnvironments.insert({ id, std::move(webViewEnvironment) });
   }
 
   void WebViewEnvironmentManager::createOrGetDefaultWebViewEnvironment(const std::function<void(WebViewEnvironment*)> completionHandler)
@@ -84,7 +92,7 @@ namespace flutter_inappwebview_plugin
     }
 
     defaultEnvironment_ = std::make_unique<WebViewEnvironment>(plugin, "-1");
-    defaultEnvironment_->create(nullptr, [this, completionHandler](HRESULT errorCode)
+    defaultEnvironment_->create(nullptr, [this, completionHandler](HRESULT errorCode, const std::string&)
       {
         if (succeededOrLog(errorCode)) {
           if (completionHandler) {

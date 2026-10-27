@@ -33,6 +33,7 @@ namespace flutter_inappwebview_plugin
 
   ChannelDelegate::~ChannelDelegate()
   {
+    UnregisterMethodCallHandler();
     messenger = nullptr;
     channel.reset();
   }

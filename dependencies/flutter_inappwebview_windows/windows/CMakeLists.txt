@@ -41,6 +41,7 @@ list(APPEND PLUGIN_SOURCES
   "flutter_inappwebview_windows_plugin.cpp"
   "flutter_inappwebview_windows_plugin.h"
   "utils/log.h"
+  "utils/initialization_error.h"
   "utils/strconv.h"
   "utils/map.h"
   "utils/vector.h"
@@ -53,6 +54,7 @@ list(APPEND PLUGIN_SOURCES
   "utils/base64.h"
   "types/channel_delegate.cpp"
   "types/channel_delegate.h"
+  "types/plugin_messenger.h"
   "types/base_callback_result.h"
   "types/url_request.cpp"
   "types/url_request.h"
@@ -97,6 +99,7 @@ list(APPEND PLUGIN_SOURCES
   "types/custom_scheme_registration.h"
   "custom_platform_view/custom_platform_view.cc"
   "custom_platform_view/custom_platform_view.h"
+  "custom_platform_view/texture_unregister.h"
   "custom_platform_view/texture_bridge.cc"
   "custom_platform_view/texture_bridge.h"
   "custom_platform_view/graphics_context.cc"
@@ -105,6 +108,7 @@ list(APPEND PLUGIN_SOURCES
   "custom_platform_view/util/direct3d11.interop.h"
   "custom_platform_view/util/rohelper.cc"
   "custom_platform_view/util/rohelper.h"
+  "custom_platform_view/util/dispatcher_queue.h"
   "custom_platform_view/util/string_converter.cc"
   "custom_platform_view/util/string_converter.h"
   "custom_platform_view/util/swizzle.h"
@@ -241,15 +245,17 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of googletest" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# The plugin's C API is not very useful for unit testing, so build the sources
-# directly into the test binary rather than using the DLL.
+# These tests exercise the error contract and real STA queue shutdown without
+# requiring a Flutter view or an installed WebView2 Runtime.
 add_executable(${TEST_RUNNER}
   test/flutter_inappwebview_windows_plugin_test.cpp
-  ${PLUGIN_SOURCES}
+  custom_platform_view/util/rohelper.cc
 )
 apply_standard_settings(${TEST_RUNNER})
+add_dependencies(${TEST_RUNNER} ${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD)
 target_include_directories(${TEST_RUNNER} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin)
+target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin runtimeobject CoreMessaging)
+target_link_libraries(${TEST_RUNNER} PRIVATE ${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets)
 target_link_libraries(${TEST_RUNNER} PRIVATE gtest_main gmock)
 # flutter_wrapper_plugin has link dependencies on the Flutter DLL.
 add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD
@@ -259,5 +265,18 @@ add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD
 
 # Enable automatic test discovery.
 include(GoogleTest)
-gtest_discover_tests(${TEST_RUNNER})
+gtest_discover_tests(${TEST_RUNNER} PROPERTIES TIMEOUT 30)
+
+# Engine-boundary regression tests also compile with the common Flutter
+# headers on macOS/Linux, without linking a platform engine DLL.
+set(LIFECYCLE_TEST "${PROJECT_NAME}_lifecycle_test")
+add_executable(${LIFECYCLE_TEST} test/portable_lifecycle_test.cpp)
+apply_standard_settings(${LIFECYCLE_TEST})
+target_include_directories(${LIFECYCLE_TEST} PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "$<TARGET_PROPERTY:flutter_wrapper_plugin,INTERFACE_INCLUDE_DIRECTORIES>"
+  "$<TARGET_PROPERTY:flutter,INTERFACE_INCLUDE_DIRECTORIES>")
+add_dependencies(${LIFECYCLE_TEST} flutter_assemble)
+add_test(NAME ${LIFECYCLE_TEST} COMMAND ${LIFECYCLE_TEST})
+set_tests_properties(${LIFECYCLE_TEST} PROPERTIES TIMEOUT 30)
 endif()

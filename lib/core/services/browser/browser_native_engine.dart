@@ -19,6 +19,7 @@ import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
 import 'browser_scroll_observer.dart';
 import 'browser_workspace_resources.dart';
+import 'browser_windows_environment.dart';
 
 const browserHistoryHandlerName = 'kelivoBrowserHistory';
 const browserHistoryDocumentScript =
@@ -105,6 +106,7 @@ class NativeBrowserEngine implements BrowserEngine {
   _WorkspacePathHandler? _workspacePathHandler;
   final Completer<InAppWebViewController> _created = Completer();
   HeadlessInAppWebView? _headless;
+  WebViewEnvironment? _environment;
   InAppWebViewController? _controller;
   bool _disposed = false;
   Future<void> _dialogBridgeReady = Future<void>.value();
@@ -207,6 +209,7 @@ class NativeBrowserEngine implements BrowserEngine {
     required void Function(String, String?) onDownload,
     required Future<bool> Function(String?, int) onNewWindow,
     required bool Function() isAgentActive,
+    Future<WebViewEnvironment?> Function()? webViewEnvironment,
   }) async {
     final engine = NativeBrowserEngine._(
       tab: tab,
@@ -217,11 +220,15 @@ class NativeBrowserEngine implements BrowserEngine {
       isAgentActive: isAgentActive,
     );
     try {
-      await engine._initialize();
+      await engine._initialize(webViewEnvironment);
       return engine;
-    } catch (_) {
-      await engine.dispose();
-      rethrow;
+    } catch (error, stack) {
+      try {
+        await engine.dispose();
+      } catch (cleanupError) {
+        debugPrint('Browser initialization cleanup failed: $cleanupError');
+      }
+      Error.throwWithStackTrace(error, stack);
     }
   }
 
@@ -264,9 +271,16 @@ class NativeBrowserEngine implements BrowserEngine {
         : '',
   );
 
-  Future<void> _initialize() async {
+  Future<void> _initialize(
+    Future<WebViewEnvironment?> Function()? webViewEnvironment,
+  ) async {
     _beginNavigation();
     _navigationUrl = tab.url;
+    if (webViewEnvironment != null) {
+      _environment = await webViewEnvironment();
+    } else if (Platform.isWindows) {
+      _environment = await BrowserWindowsEnvironment.instance.get();
+    }
     if (Platform.isAndroid) {
       _defaultUserAgent = await InAppWebViewController.getDefaultUserAgent();
     }
@@ -282,6 +296,7 @@ class NativeBrowserEngine implements BrowserEngine {
         ? URLRequest(url: WebUri(initialUrl))
         : null;
     _headless = HeadlessInAppWebView(
+      webViewEnvironment: _environment,
       initialSize: Size(
         viewport.width.clamp(320, 1280),
         viewport.height.clamp(320, 1024),
@@ -1030,6 +1045,7 @@ class NativeBrowserEngine implements BrowserEngine {
   Widget _buildNativeView(bool hybrid, Completer<void> ready) {
     return InAppWebView(
       key: ValueKey(hybrid),
+      webViewEnvironment: _environment,
       initialSettings: _viewSettings,
       initialUserScripts: _userScripts,
       keepAlive: _keepAlive,
@@ -1443,7 +1459,9 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<Map<String, String>> downloadHeaders(String url) async {
     final destination = Uri.parse(url);
     final cookies =
-        (await CookieManager.instance().getCookies(url: WebUri(url)))
+        (await CookieManager.instance(
+              webViewEnvironment: _environment,
+            ).getCookies(url: WebUri(url)))
             .where(
               (cookie) => browserDownloadCookieMatches(cookie, destination),
             )
