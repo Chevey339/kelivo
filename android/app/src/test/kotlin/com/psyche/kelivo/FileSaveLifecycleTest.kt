@@ -3,8 +3,7 @@ package com.psyche.kelivo
 import android.content.Intent
 import android.net.Uri
 import android.os.Looper
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleRegistry
+import io.flutter.FlutterInjector
 import io.flutter.plugin.common.MethodChannel
 import org.junit.After
 import org.junit.Assert.*
@@ -14,6 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
@@ -22,7 +22,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], manifest = Config.NONE, application = KelivoApplication::class)
+@Config(
+    sdk = [35],
+    manifest = Config.NONE,
+    application = KelivoApplication::class,
+    shadows = [FileSaveEngineHandoffTest.NativeBoundary::class, FileSaveEngineHandoffTest.Loader::class],
+)
 class FileSaveLifecycleTest {
     private class Result : MethodChannel.Result {
         val replies = mutableListOf<String>()
@@ -32,25 +37,28 @@ class FileSaveLifecycleTest {
     }
 
     private lateinit var activity: MainActivity
+    private lateinit var controller: ActivityController<MainActivity>
     private lateinit var directory: File
     private var destroyed = false
 
     @Before fun setUp() {
-        activity = Robolectric.buildActivity(MainActivity::class.java).get()
-        // Exercise onDestroy without starting a Flutter engine in this native test.
-        (activity.lifecycle as LifecycleRegistry).handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        FlutterInjector.reset()
+        // A real engine attachment is needed to exercise its cleanup callback.
+        controller = Robolectric.buildActivity(MainActivity::class.java).create()
+        activity = controller.get()
         directory = File(activity.cacheDir, "export-test").apply { mkdirs() }
     }
 
     @After fun tearDown() {
         if (!destroyed) destroy()
         directory.deleteRecursively()
+        (activity.application as KelivoApplication).engine.destroy()
+        FlutterInjector.reset()
     }
 
     private fun destroy() {
         destroyed = true
-        MainActivity::class.java.getDeclaredMethod("onDestroy")
-            .also { it.isAccessible = true }.invoke(activity)
+        controller.destroy()
     }
 
     private fun begin(source: File, result: Result) {
