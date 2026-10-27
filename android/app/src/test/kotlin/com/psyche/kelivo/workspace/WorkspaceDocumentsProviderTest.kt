@@ -35,6 +35,7 @@ import java.io.File
 import java.io.FileDescriptor
 import java.io.FileNotFoundException
 import java.nio.channels.FileChannel
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -203,6 +204,42 @@ class WorkspaceDocumentsProviderTest {
 
         assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/one") }
         assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/unknown/x") }
+    }
+
+    @Test
+    fun renamesFilesAndFoldersAndRefusesCollisions() {
+        val root = workspace()
+        File(root, "old.txt").writeText("old")
+        File(root, "dir").mkdirs()
+        File(root, "dir/child.txt").writeText("child")
+        File(root, "taken.txt").writeText("taken")
+
+        val fileId = provider.renameDocument("workspace/one/old.txt", "new.txt")
+        assertEquals("workspace/one/new.txt", fileId)
+        assertEquals("old", File(root, "new.txt").readText())
+        assertFalse(File(root, "old.txt").exists())
+
+        val dirId = provider.renameDocument("workspace/one/dir", "renamed")
+        assertEquals("workspace/one/renamed", dirId)
+        assertEquals("child", File(root, "renamed/child.txt").readText())
+
+        children("workspace/one").use { cursor ->
+            val flags = mutableListOf<Int>()
+            while (cursor.moveToNext()) {
+                flags += cursor.getInt(cursor.getColumnIndexOrThrow(Document.COLUMN_FLAGS))
+            }
+            assertTrue("Documents must advertise rename", flags.all { it and Document.FLAG_SUPPORTS_RENAME != 0 })
+        }
+
+        assertNull(provider.renameDocument("workspace/one/new.txt", "new.txt"))
+        assertThrows(FileAlreadyExistsException::class.java) {
+            provider.renameDocument("workspace/one/new.txt", "taken.txt")
+        }
+        assertEquals("taken", File(root, "taken.txt").readText())
+        assertThrows(IllegalArgumentException::class.java) {
+            provider.renameDocument("workspace/one/new.txt", "a/b")
+        }
+        assertThrows(FileNotFoundException::class.java) { provider.renameDocument("workspace/one", "other") }
     }
 
     @Test
