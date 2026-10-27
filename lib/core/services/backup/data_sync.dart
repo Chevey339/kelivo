@@ -672,6 +672,14 @@ class DataSync {
     if (password != null && password.isEmpty) {
       throw ArgumentError('backup_password_empty');
     }
+    // All interactive backup providers inject the shared business preferences.
+    // Enforce the saved choice here too, so a missing UI password cannot turn
+    // an encrypted backup into a plaintext export or upload.
+    await businessPreferences?.load();
+    if (password == null &&
+        businessPreferences?.getBool('backup_encryption_enabled_v1') == true) {
+      throw const FormatException('backup_password_required');
+    }
     final archive = await _prepareBackupArchive(
       chatService: chatService,
       includeChats: cfg.scope.includes(BackupCategory.chats),

@@ -13263,11 +13263,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupEncryptionOnHint =>
-      'Backups are encrypted while this page stays open.';
+      'Backups are encrypted. Enter the password again after restarting the app.';
 
   @override
   String get backupEncryptionPasswordHint =>
-      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.';
+      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept in memory until you exit the app.';
 
   @override
   String get backupEncryptionPassword => 'Password';

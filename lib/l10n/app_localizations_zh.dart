@@ -12661,10 +12661,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
 
   @override
-  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+  String get backupEncryptionOnHint => '备份将加密保存，重启应用后需重新输入口令。';
 
   @override
-  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+  String get backupEncryptionPasswordHint =>
+      '请妥善保存口令，遗忘后无法恢复备份。口令仅在内存中保留至退出应用。';
 
   @override
   String get backupEncryptionPassword => '口令';
@@ -27116,10 +27117,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupEncryptionOffHint => '未加密的备份可被直接读取。';
 
   @override
-  String get backupEncryptionOnHint => '当前页面内的备份均会加密。';
+  String get backupEncryptionOnHint => '备份将加密保存，重启应用后需重新输入口令。';
 
   @override
-  String get backupEncryptionPasswordHint => '请妥善保存口令，遗忘后无法恢复备份。口令仅在当前页面保留。';
+  String get backupEncryptionPasswordHint =>
+      '请妥善保存口令，遗忘后无法恢复备份。口令仅在内存中保留至退出应用。';
 
   @override
   String get backupEncryptionPassword => '口令';
@@ -41650,10 +41652,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupEncryptionOffHint => '未加密的備份可被直接讀取。';
 
   @override
-  String get backupEncryptionOnHint => '目前頁面內的備份均會加密。';
+  String get backupEncryptionOnHint => '備份將加密儲存，重新啟動應用程式後需重新輸入口令。';
 
   @override
-  String get backupEncryptionPasswordHint => '請妥善保存口令，遺忘後無法還原備份。口令僅在目前頁面保留。';
+  String get backupEncryptionPasswordHint =>
+      '請妥善保存口令，遺忘後無法還原備份。口令僅在記憶體中保留至結束應用程式。';
 
   @override
   String get backupEncryptionPassword => '口令';

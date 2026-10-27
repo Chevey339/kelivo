@@ -78,6 +78,7 @@ final class BusinessKeyRegistry {
     'asr_selected_service_id_v1',
     'webdav_config_v1',
     's3_config_v1',
+    'backup_encryption_enabled_v1',
     'backup_reminder_enabled_v1',
     'backup_reminder_interval_days_v1',
     'backup_reminder_minutes_of_day_v1',

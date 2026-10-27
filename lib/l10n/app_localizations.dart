@@ -23649,13 +23649,13 @@ abstract class AppLocalizations {
   /// No description provided for @backupEncryptionOnHint.
   ///
   /// In en, this message translates to:
-  /// **'Backups are encrypted while this page stays open.'**
+  /// **'Backups are encrypted. Enter the password again after restarting the app.'**
   String get backupEncryptionOnHint;
 
   /// No description provided for @backupEncryptionPasswordHint.
   ///
   /// In en, this message translates to:
-  /// **'Keep this password safe. If you lose it, the backup cannot be restored. It is kept only while this page is open.'**
+  /// **'Keep this password safe. If you lose it, the backup cannot be restored. It is kept in memory until you exit the app.'**
   String get backupEncryptionPasswordHint;
 
   /// No description provided for @backupEncryptionPassword.

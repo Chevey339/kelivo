@@ -44,7 +44,6 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
-  String? _backupPassword;
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -251,6 +250,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final webdavVm = context.watch<BackupProvider>();
@@ -343,10 +343,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             },
                     ),
                     BackupEncryptionTile(
-                      password: _backupPassword,
+                      enabled: settings.backupEncryptionEnabled,
                       onChanged: busy
                           ? null
-                          : (value) => setState(() => _backupPassword = value),
+                          : settings.setBackupEncryptionPassword,
                     ),
                   ],
                 ),
@@ -563,7 +563,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
-                                          password: _backupPassword,
+                                          password:
+                                              await backupPasswordForExport(
+                                                context,
+                                              ),
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
                                         );
@@ -859,7 +862,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       task: (handle) async {
                                         final ok = await s3BackupProvider
                                             .backup(
-                                              password: _backupPassword,
+                                              password:
+                                                  await backupPasswordForExport(
+                                                    context,
+                                                  ),
                                               onProgress: handle.report,
                                               cancelToken: handle.cancelToken,
                                             );
@@ -957,7 +963,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                       task: (handle) async {
                         file = await backupProvider.exportToFile(
-                          password: _backupPassword,
+                          password: await backupPasswordForExport(context),
                           onProgress: handle.report,
                           cancelToken: handle.cancelToken,
                         );

@@ -175,6 +175,61 @@ void main() {
 
   for (final desktop in [false, true]) {
     testWidgets(
+      '${desktop ? 'desktop' : 'mobile'} keeps encryption enabled after leaving and reopening the page',
+      (tester) async {
+        await tester.binding.setSurfaceSize(
+          desktop ? const Size(1100, 800) : const Size(390, 844),
+        );
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final business = await createBusinessTestHarness();
+        final settings = SettingsProvider(business.preferences);
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        Future<void> openPage() => desktop
+            ? _pumpDesktopBackupPane(
+                tester,
+                settings: settings,
+                business: business,
+              )
+            : _pumpBackupPage(tester, settings: settings, business: business);
+        await openPage();
+        final control = find.byKey(const ValueKey('backup-encryption-switch'));
+        await tester.ensureVisible(control);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        for (final key in ['backup-password', 'backup-password-confirmation']) {
+          await tester.enterText(
+            find.descendant(
+              of: find.byKey(ValueKey(key)),
+              matching: find.byType(TextField),
+            ),
+            'session password',
+          );
+        }
+        await tester.pump();
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(settings.backupEncryptionEnabled, isTrue);
+        expect(tester.widget<IosSwitch>(control).value, isTrue);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await openPage();
+        await tester.ensureVisible(control);
+        expect(tester.widget<IosSwitch>(control).value, isTrue);
+        expect(
+          await settings.resolveBackupEncryptionPassword(() async {
+            fail('Reopening the page must reuse the session password.');
+          }),
+          'session password',
+        );
+        expect(
+          business.preferences.getBool('backup_encryption_enabled_v1'),
+          isTrue,
+        );
+      },
+    );
+
+    testWidgets(
       '${desktop ? 'desktop' : 'mobile'} saves category switches to both backup providers',
       (tester) async {
         await tester.binding.setSurfaceSize(

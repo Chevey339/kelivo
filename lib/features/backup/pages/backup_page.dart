@@ -69,7 +69,6 @@ class BackupPage extends StatefulWidget {
 }
 
 class _BackupPageState extends State<BackupPage> {
-  String? _backupPassword;
   List<BackupFileItem> _remote = const <BackupFileItem>[];
   List<BackupFileItem> _remoteS3 = const <BackupFileItem>[];
 
@@ -333,10 +332,10 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                     _iosDivider(context),
                     BackupEncryptionTile(
-                      password: _backupPassword,
+                      enabled: settings.backupEncryptionEnabled,
                       onChanged: vm.busy || s3Vm.busy
                           ? null
-                          : (value) => setState(() => _backupPassword = value),
+                          : settings.setBackupEncryptionPassword,
                     ),
                   ],
                 ),
@@ -784,7 +783,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await vm.backup(
-                                    password: _backupPassword,
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1229,7 +1230,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await s3Vm.backup(
-                                    password: _backupPassword,
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1432,7 +1435,7 @@ class _BackupPageState extends State<BackupPage> {
       ),
       task: (handle) async {
         file = await vm.exportToFile(
-          password: _backupPassword,
+          password: await backupPasswordForExport(context),
           onProgress: handle.report,
           cancelToken: handle.cancelToken,
         );

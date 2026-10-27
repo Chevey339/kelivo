@@ -2031,6 +2031,33 @@ void main() {
     });
 
     test(
+      'saved encryption preference rejects export without a password',
+      () async {
+        final preferences = BusinessPreferences(businessRepository);
+        await preferences.setBool('backup_encryption_enabled_v1', true);
+        final chat = ChatService();
+        addTearDown(chat.dispose);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          businessPreferences: preferences,
+          chatService: chat,
+        );
+        await expectLater(
+          sync.prepareBackupFile(_withoutChatsOrAssets),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'backup_password_required',
+            ),
+          ),
+        );
+        expect(await Directory('${root.path}/tmp').exists(), isFalse);
+        expect(preferences.getBool('backup_encryption_enabled_v1'), isTrue);
+      },
+    );
+
+    test(
       'encrypted export retries before restoring and cleans plaintext',
       () async {
         final service = BusinessRestoreService(businessRepository);
