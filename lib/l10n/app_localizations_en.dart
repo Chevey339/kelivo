@@ -15311,4 +15311,69 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dataDirectoryCancelHint =>
       'Cancelling keeps any files already copied to the destination. You can inspect and remove that partial copy yourself.';
+
+  @override
+  String providerDetailPageBaseUrlExample(String url) {
+    return 'e.g. $url';
+  }
+
+  @override
+  String get providerDetailPageApiKeyExample => 'e.g. sk-…';
+
+  @override
+  String get providerDetailPageRequestUrlLabel => 'Request URL';
+
+  @override
+  String providerDetailPageUrlWillAppendVersion(String v) {
+    return 'No version in URL; $v will be added when you leave the field';
+  }
+
+  @override
+  String providerDetailPageUrlAppendedVersion(String v) {
+    return 'Added $v automatically';
+  }
+
+  @override
+  String get providerDetailPageUrlTrimmedSlash => 'Removed trailing /';
+
+  @override
+  String providerDetailPageUrlMovedPath(String path) {
+    return 'Full endpoint detected; $path moved to API Path';
+  }
+
+  @override
+  String get providerDetailPageUrlEmptyError => 'Required to send requests';
+
+  @override
+  String get providerDetailPageUrlInvalidError =>
+      'Invalid URL; must start with http:// or https://';
+
+  @override
+  String get providerDetailPageRestoreDefaultTooltip => 'Restore default';
+
+  @override
+  String get providerDetailPageClearTooltip => 'Clear';
+
+  @override
+  String providerDetailPageTestSuccessWithLatency(String ms) {
+    return 'Success · $ms ms';
+  }
+
+  @override
+  String providerDetailPageTestFailedWithCode(String code) {
+    return 'Failed · $code';
+  }
+
+  @override
+  String providerDetailPageTestHintMissingVersion(String url) {
+    return 'The URL may be missing a version; try $url';
+  }
+
+  @override
+  String providerAutoVersionAdded(String v) {
+    return 'Added $v automatically';
+  }
+
+  @override
+  String get providerUndo => 'Undo';
 }

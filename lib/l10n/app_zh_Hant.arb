@@ -5575,5 +5575,77 @@
   "dataDirectorySourceChanged": "原資料在複製後發生了變化，已保留原檔案。若正在搬遷，請取消後重新開始；若正在清理，請先檢查原目錄。",
   "dataDirectoryCopyChanged": "目標目錄存在非預期檔案或檔案變更，原資料已保留。請檢查目標目錄後重試。",
   "dataDirectoryGenericError": "操作未完成。請檢查磁碟剩餘空間、資料夾權限，以及是否有其他 Kelivo 處理程序執行，然後重試。現有資料已保留。",
-  "dataDirectoryCancelHint": "取消搬遷會保留目標目錄中已複製的檔案，你可以檢查後手動清理這些副本。"
+  "dataDirectoryCancelHint": "取消搬遷會保留目標目錄中已複製的檔案，你可以檢查後手動清理這些副本。",
+  "providerDetailPageBaseUrlExample": "例如 {url}",
+  "@providerDetailPageBaseUrlExample": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageApiKeyExample": "例如 sk-…",
+  "providerDetailPageRequestUrlLabel": "請求位址",
+  "providerDetailPageUrlWillAppendVersion": "未包含版本號，離開輸入框時將自動補全 {v}",
+  "@providerDetailPageUrlWillAppendVersion": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlAppendedVersion": "已自動補全 {v}",
+  "@providerDetailPageUrlAppendedVersion": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlTrimmedSlash": "已移除結尾的 /",
+  "providerDetailPageUrlMovedPath": "已識別完整位址，{path} 已移至「API 路徑」",
+  "@providerDetailPageUrlMovedPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlEmptyError": "未填寫，無法發起請求",
+  "providerDetailPageUrlInvalidError": "位址格式不正確，需以 http:// 或 https:// 開頭",
+  "providerDetailPageRestoreDefaultTooltip": "恢復預設位址",
+  "providerDetailPageClearTooltip": "清除",
+  "providerDetailPageTestSuccessWithLatency": "測試成功 · {ms} ms",
+  "@providerDetailPageTestSuccessWithLatency": {
+    "placeholders": {
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageTestFailedWithCode": "測試失敗 · {code}",
+  "@providerDetailPageTestFailedWithCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageTestHintMissingVersion": "位址可能缺少版本號，試試 {url}",
+  "@providerDetailPageTestHintMissingVersion": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "providerAutoVersionAdded": "已自動補全 {v}",
+  "@providerAutoVersionAdded": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerUndo": "復原"
 }

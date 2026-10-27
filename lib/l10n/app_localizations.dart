@@ -27059,6 +27059,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancelling keeps any files already copied to the destination. You can inspect and remove that partial copy yourself.'**
   String get dataDirectoryCancelHint;
+
+  /// No description provided for @providerDetailPageBaseUrlExample.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. {url}'**
+  String providerDetailPageBaseUrlExample(String url);
+
+  /// No description provided for @providerDetailPageApiKeyExample.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. sk-…'**
+  String get providerDetailPageApiKeyExample;
+
+  /// No description provided for @providerDetailPageRequestUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request URL'**
+  String get providerDetailPageRequestUrlLabel;
+
+  /// No description provided for @providerDetailPageUrlWillAppendVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'No version in URL; {v} will be added when you leave the field'**
+  String providerDetailPageUrlWillAppendVersion(String v);
+
+  /// No description provided for @providerDetailPageUrlAppendedVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {v} automatically'**
+  String providerDetailPageUrlAppendedVersion(String v);
+
+  /// No description provided for @providerDetailPageUrlTrimmedSlash.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed trailing /'**
+  String get providerDetailPageUrlTrimmedSlash;
+
+  /// No description provided for @providerDetailPageUrlMovedPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Full endpoint detected; {path} moved to API Path'**
+  String providerDetailPageUrlMovedPath(String path);
+
+  /// No description provided for @providerDetailPageUrlEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Required to send requests'**
+  String get providerDetailPageUrlEmptyError;
+
+  /// No description provided for @providerDetailPageUrlInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid URL; must start with http:// or https://'**
+  String get providerDetailPageUrlInvalidError;
+
+  /// No description provided for @providerDetailPageRestoreDefaultTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default'**
+  String get providerDetailPageRestoreDefaultTooltip;
+
+  /// No description provided for @providerDetailPageClearTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get providerDetailPageClearTooltip;
+
+  /// No description provided for @providerDetailPageTestSuccessWithLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Success · {ms} ms'**
+  String providerDetailPageTestSuccessWithLatency(String ms);
+
+  /// No description provided for @providerDetailPageTestFailedWithCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed · {code}'**
+  String providerDetailPageTestFailedWithCode(String code);
+
+  /// No description provided for @providerDetailPageTestHintMissingVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL may be missing a version; try {url}'**
+  String providerDetailPageTestHintMissingVersion(String url);
+
+  /// No description provided for @providerAutoVersionAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {v} automatically'**
+  String providerAutoVersionAdded(String v);
+
+  /// No description provided for @providerUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get providerUndo;
 }
 
 class _AppLocalizationsDelegate

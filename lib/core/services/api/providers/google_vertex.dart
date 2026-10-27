@@ -1,3 +1,4 @@
+import '../../../utils/provider_url.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -157,11 +158,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   StreamRoundRunner? retryRound,
 }) async* {
   final upstreamId = apiModelId(config, modelId);
-  final loc = (config.location ?? 'us-central1').trim();
-  final proj = (config.projectId ?? '').trim();
-  final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
   final url = Uri.parse(
-    '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
+    resolveRequestUrl(config, modelId: upstreamId, stream: stream),
   );
 
   final requestHeaders = <String, String>{'Content-Type': 'application/json'};
@@ -727,24 +725,5 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 /// Official Vertex hosts follow [location] (global, the `us` / `eu`
 /// multi-regions, or a single region); a custom [ProviderConfig.baseUrl]
 /// (tests, gateways) is used as the origin instead.
-String vertexOrigin(ProviderConfig config, String loc) {
-  final raw = config.baseUrl.trim();
-  final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
-  // Switching a Gemini provider to Vertex keeps its Gemini API base URL.
-  final official =
-      host.isEmpty ||
-      host == 'generativelanguage.googleapis.com' ||
-      host == 'aiplatform.googleapis.com' ||
-      host.endsWith('-aiplatform.googleapis.com') ||
-      RegExp(r'^aiplatform\.[a-z]+\.rep\.googleapis\.com$').hasMatch(host);
-  if (official) {
-    final l = loc.toLowerCase();
-    final regional = switch (l) {
-      'global' => 'aiplatform.googleapis.com',
-      'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
-      _ => '$l-aiplatform.googleapis.com',
-    };
-    return 'https://$regional';
-  }
-  return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
-}
+String vertexOrigin(ProviderConfig config, String loc) =>
+    providerVertexOrigin(config, loc);

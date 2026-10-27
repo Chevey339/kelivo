@@ -994,11 +994,20 @@ class DesktopProviderDetailPane extends StatefulWidget {
 }
 
 class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
+  late SettingsProvider _settings;
+  BuildContext? _notificationContext;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _settings = context.read<SettingsProvider>();
+    _notificationContext = Navigator.maybeOf(context)?.context;
+  }
+
   bool _showSearch = false;
   final TextEditingController _filterCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   bool _showApiKey = false;
-  bool _eyeHover = false;
 
   // 批量选择模式相关
   bool _isSelectionMode = false;
@@ -1018,6 +1027,8 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   // Avoid rebuilding controllers each frame which breaks focus/IME
   final TextEditingController _apiKeyCtrl = TextEditingController();
   final TextEditingController _baseUrlCtrl = TextEditingController();
+  ProviderUrlEditor? _baseEditor;
+  final _baseFieldKey = GlobalKey<ProviderBaseUrlFieldState>();
   final TextEditingController _locationCtrl = TextEditingController();
   final TextEditingController _projectIdCtrl = TextEditingController();
   final TextEditingController _saJsonCtrl = TextEditingController();
@@ -1046,7 +1057,15 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
 
   void _syncControllersFromConfig(ProviderConfig cfg) {
     _syncCtrl(_apiKeyCtrl, cfg.apiKey);
-    _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
+    if (_baseEditor == null) {
+      _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
+      _baseEditor = ProviderUrlEditor(
+        _baseUrlCtrl,
+        autoVersionDisabled: cfg.autoVersionDisabled,
+      );
+    } else {
+      _baseEditor!.sync(cfg);
+    }
     _syncCtrl(_apiPathCtrl, cfg.chatPath ?? '/chat/completions');
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
@@ -1097,6 +1116,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.providerKey == widget.providerKey) return;
     _clearProviderScopedState(cancelRunningDetection: true);
+    _commitPendingBaseUrl(oldWidget.providerKey);
+    _baseEditor?.dispose();
+    _baseEditor = null;
     final cfg = context.read<SettingsProvider>().getProviderConfig(
       widget.providerKey,
       defaultName: widget.displayName,
@@ -1105,11 +1127,78 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     _syncProviderSettingsControllersFromConfig(cfg);
   }
 
+  void _commitPendingBaseUrl(String providerKey) {
+    final editor = _baseEditor;
+    if (editor == null || !editor.dirty) return;
+    final settings = _settings;
+    if (!settings.providerConfigs.containsKey(providerKey) &&
+        !SettingsProvider.isBuiltInProvider(providerKey)) {
+      return;
+    }
+    final previous = settings.getProviderConfig(providerKey);
+    final kind = ProviderConfig.classify(
+      providerKey,
+      explicitType: previous.providerType,
+    );
+    final bare = normalizeBaseUrl(
+      editor.controller.text,
+      kind,
+      allowAutoVersion: false,
+    ).value;
+    final result = editor.commit(kind);
+    if (result.error != null) return;
+    final disabled = editor.autoVersionDisabled;
+    final notificationContext = _notificationContext;
+    // Notify settings after the old pane's subtree has finished unmounting.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!settings.providerConfigs.containsKey(providerKey) &&
+          !SettingsProvider.isBuiltInProvider(providerKey)) {
+        return;
+      }
+      final latest = settings.getProviderConfig(providerKey);
+      await settings.setProviderConfig(
+        providerKey,
+        latest.copyWith(
+          baseUrl: result.value,
+          autoVersionDisabled: disabled,
+          chatPath: kind == ProviderKind.openai ? result.movedPath : null,
+        ),
+      );
+      if (notificationContext == null ||
+          !notificationContext.mounted ||
+          !result.notes.contains(NormalizeNote.addedVersion)) {
+        return;
+      }
+      final l10n = AppLocalizations.of(notificationContext)!;
+      showAppSnackBar(
+        notificationContext,
+        message: l10n.providerAutoVersionAdded(providerUrlVersion(kind)),
+        actionLabel: l10n.providerUndo,
+        onAction: () =>
+            undoSavedProviderUrl(settings, providerKey, bare, result.value),
+      );
+    });
+  }
+
+  void _saveApiPath() {
+    final old = _settings.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    if (_apiPathCtrl.text == (old.chatPath ?? '/chat/completions')) return;
+    _settings.setProviderConfig(
+      widget.providerKey,
+      old.copyWith(chatPath: _apiPathCtrl.text),
+    );
+  }
+
   @override
   void dispose() {
+    _commitPendingBaseUrl(widget.providerKey);
     _filterCtrl.dispose();
     _searchFocus.dispose();
     _apiKeyCtrl.dispose();
+    _baseEditor?.dispose();
     _baseUrlCtrl.dispose();
     _locationCtrl.dispose();
     _projectIdCtrl.dispose();
@@ -1523,143 +1612,62 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     ],
                   )
                 else
-                  TextField(
+                  ProviderInputRow(
                     controller: _apiKeyCtrl,
-                    obscureText: !_showApiKey ? true : false,
-                    onChanged: (v) async {
-                      // For API keys, save immediately regardless of IME composition
+                    desktop: true,
+                    obscure: !_showApiKey,
+                    mono: _showApiKey,
+                    hint: l10n.providerDetailPageApiKeyExample,
+                    trailing: TrailingKind.eye,
+                    onTrailingTap: () =>
+                        setState(() => _showApiKey = !_showApiKey),
+                    onChanged: (value) {
                       final old = sp.getProviderConfig(
                         widget.providerKey,
                         defaultName: widget.displayName,
                       );
-                      await sp.setProviderConfig(
+                      sp.setProviderConfig(
                         widget.providerKey,
-                        old.copyWith(apiKey: v),
+                        old.copyWith(apiKey: value),
                       );
                     },
-                    style: TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(context).copyWith(
-                      hintText: l10n.providerDetailPageApiKeyHint,
-                      suffixIcon: MouseRegion(
-                        onEnter: (_) => setState(() => _eyeHover = true),
-                        onExit: (_) => setState(() => _eyeHover = false),
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _showApiKey = !_showApiKey),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            curve: Curves.easeOutCubic,
-                            margin: const EdgeInsets.only(right: 6),
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: _eyeHover
-                                  ? (Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? cs.onSurface.withValues(alpha: 0.06)
-                                        : cs.onSurface.withValues(alpha: 0.04))
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              transitionBuilder: (child, anim) =>
-                                  FadeTransition(opacity: anim, child: child),
-                              child: AnimatedRotation(
-                                key: ValueKey(_showApiKey),
-                                duration: const Duration(milliseconds: 180),
-                                curve: Curves.easeOutCubic,
-                                turns: _showApiKey ? 0.5 : 0.0,
-                                child: Icon(
-                                  _showApiKey
-                                      ? lucide.Lucide.EyeOff
-                                      : lucide.Lucide.Eye,
-                                  size: 18,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      suffixIconConstraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 20,
-                      ),
-                    ),
                   ),
                 const SizedBox(height: 14),
               ],
 
               // API Base URL or Vertex AI fields
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
-                _sectionLabel(
-                  context,
-                  AppLocalizations.of(
-                    context,
-                  )!.providerDetailPageApiBaseUrlLabel,
-                  bold: true,
-                ),
-                const SizedBox(height: 6),
-                Focus(
-                  onFocusChange: (has) async {
-                    if (!has) {
-                      final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(baseUrl: v),
-                      );
-                    }
-                  },
-                  child: TextField(
-                    controller: _baseUrlCtrl,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) async {
-                      final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(baseUrl: v),
-                      );
-                    },
-                    onEditingComplete: () async {
-                      final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(baseUrl: v),
-                      );
-                    },
-                    onChanged: (v) async {
-                      if (_baseUrlCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(baseUrl: v),
-                      );
-                    },
-                    style: TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(context).copyWith(
-                      hintText: ProviderConfig.defaultsFor(
-                        widget.providerKey,
-                        displayName: widget.displayName,
-                      ).baseUrl,
-                    ),
+                ProviderBaseUrlField(
+                  key: _baseFieldKey,
+                  editor: _baseEditor!,
+                  config: cfg,
+                  desktop: true,
+                  enabled: widget.providerKey.toLowerCase() != 'kelivoin',
+                  onDetachedUndo: (bare, replaced) =>
+                      undoSavedProviderUrl(sp, cfg.id, bare, replaced),
+                  restoreDefault: SettingsProvider.isBuiltInProvider(
+                    widget.providerKey,
                   ),
+                  defaultBaseUrl: ProviderConfig.defaultsFor(
+                    widget.providerKey,
+                    displayName: widget.displayName,
+                  ).baseUrl,
+                  onCommit: (result) {
+                    final old = sp.getProviderConfig(
+                      widget.providerKey,
+                      defaultName: widget.displayName,
+                    );
+                    sp.setProviderConfig(
+                      widget.providerKey,
+                      old.copyWith(
+                        baseUrl: result.value,
+                        autoVersionDisabled: _baseEditor!.autoVersionDisabled,
+                        chatPath: kind == ProviderKind.openai
+                            ? result.movedPath
+                            : null,
+                      ),
+                    );
+                  },
                 ),
               ] else ...[
                 _sectionLabel(
@@ -1786,6 +1794,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     ).copyWith(hintText: 'my-project-id'),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 5),
+                  child: ProviderRequestUrlPreview(config: cfg),
+                ),
                 const SizedBox(height: 14),
                 _sectionLabel(
                   context,
@@ -1892,66 +1904,25 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
               if (kind == ProviderKind.openai &&
                   (cfg.useResponseApi != true)) ...[
                 const SizedBox(height: 14),
-                _sectionLabel(
-                  context,
-                  l10n.providerDetailPageApiPathLabel,
-                  bold: true,
-                ),
-                const SizedBox(height: 6),
                 Focus(
-                  onFocusChange: (has) async {
-                    if (!has) {
-                      final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(chatPath: v),
-                      );
-                    }
+                  onFocusChange: (hasFocus) {
+                    if (!hasFocus) _saveApiPath();
                   },
-                  child: TextField(
+                  child: ProviderInputRow(
+                    label: l10n.providerDetailPageApiPathLabel,
                     controller: _apiPathCtrl,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) async {
-                      final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(chatPath: v),
-                      );
-                    },
-                    onEditingComplete: () async {
-                      final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(chatPath: v),
-                      );
-                    },
-                    onChanged: (v) async {
+                    desktop: true,
+                    enabled: !const [
+                      'openai',
+                      'tensdaq',
+                      'kelivoin',
+                    ].contains(widget.providerKey.toLowerCase()),
+                    hint: '/chat/completions',
+                    onSubmitted: (_) => _saveApiPath(),
+                    onChanged: (_) {
                       if (_apiPathCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(
-                        widget.providerKey,
-                        defaultName: widget.displayName,
-                      );
-                      await sp.setProviderConfig(
-                        widget.providerKey,
-                        old.copyWith(chatPath: v),
-                      );
+                      _saveApiPath();
                     },
-                    style: TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(
-                      context,
-                    ).copyWith(hintText: '/chat/completions'),
                   ),
                 ),
               ],
@@ -2448,10 +2419,20 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     ];
   }
 
-  InputDecoration _inputDecoration(BuildContext context) {
+  InputDecoration _inputDecoration(BuildContext context, {String? errorText}) {
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       isDense: true,
+      hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.32)),
+      errorText: errorText,
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: cs.error, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: cs.error, width: 1.5),
+      ),
       filled: true,
       fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
@@ -4709,10 +4690,15 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   }
 
   Future<void> _showTestConnectionDialog(BuildContext context) async {
+    if (_baseFieldKey.currentState?.commit() == false) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final cs = Theme.of(context).colorScheme;
     String? selectedModelId;
     _TestState state = _TestState.idle;
-    String errorMessage = '';
+    ProviderTestFailure? failure;
+    String requestUrl = '';
+    String testBaseUrl = '';
+    int latencyMs = 0;
     bool useStream = false;
     await showDialog<void>(
       context: context,
@@ -4730,14 +4716,17 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
           );
           if (sel != null) {
             selectedModelId = sel.modelId;
+            state = _TestState.idle;
+            failure = null;
             (ctx as Element).markNeedsBuild();
           }
         }
 
         Future<void> doTest() async {
           if (selectedModelId == null) return;
+          final stopwatch = Stopwatch()..start();
           state = _TestState.loading;
-          errorMessage = '';
+          failure = null;
           (ctx as Element).markNeedsBuild();
           try {
             final sp = context.read<SettingsProvider>();
@@ -4745,17 +4734,29 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
               widget.providerKey,
               defaultName: widget.displayName,
             );
-            await ProviderManager.testConnection(
+            testBaseUrl = cfg.baseUrl;
+            requestUrl = ProviderManager.connectionTestUrl(
               cfg,
               selectedModelId!,
               useStream: useStream,
             );
+            await ProviderManager.testConnection(
+              cfg,
+              selectedModelId!,
+              useStream: useStream,
+              onRequestUrl: (url) {
+                requestUrl = url;
+                if (ctx.mounted) ctx.markNeedsBuild();
+              },
+            );
+            latencyMs = stopwatch.elapsedMilliseconds;
             state = _TestState.success;
           } catch (e) {
             state = _TestState.error;
-            errorMessage = e.toString();
+            failure = ProviderTestFailure(e);
           }
-          (ctx).markNeedsBuild();
+          stopwatch.stop();
+          if (ctx.mounted) (ctx).markNeedsBuild();
         }
 
         final l10n = AppLocalizations.of(ctx)!;
@@ -4774,11 +4775,15 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
             color = cs.primary;
             break;
           case _TestState.success:
-            message = l10n.providerDetailPageTestSuccessMessage;
+            message = l10n.providerDetailPageTestSuccessWithLatency(
+              latencyMs.toString(),
+            );
             color = context.appColors.success;
             break;
           case _TestState.error:
-            message = errorMessage.isNotEmpty ? errorMessage : 'Error';
+            message = l10n.providerDetailPageTestFailedWithCode(
+              failure?.summary ?? '',
+            );
             color = cs.error;
             break;
         }
@@ -4868,15 +4873,25 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                       ),
                       const SizedBox(height: 14),
                       if (state == _TestState.loading)
-                        Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: cs.primary,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Text(
+                              message,
+                              style: TextStyle(
+                                color: cs.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
                         )
                       else if (state != _TestState.idle)
                         Center(
@@ -4891,6 +4906,12 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   : AppFontWeights.semibold,
                             ),
                           ),
+                        ),
+                      if (state != _TestState.idle)
+                        ProviderTestDetails(
+                          requestUrl: requestUrl,
+                          baseUrl: testBaseUrl,
+                          failure: failure,
                         ),
                       const SizedBox(height: 12),
                       Row(

@@ -1,3 +1,4 @@
+import '../utils/provider_url.dart';
 import '../services/auth/provider_oauth_service.dart';
 export '../models/model_spec.dart';
 
@@ -39,7 +40,9 @@ class OpenAIProvider extends BaseProvider {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
-      final uri = Uri.parse('${cfg.baseUrl}/models');
+      final uri = Uri.parse(
+        "${cfg.baseUrl.replaceFirst(RegExp(r'/+$'), '')}/models",
+      );
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
       final res = await client.get(
@@ -74,7 +77,9 @@ class ClaudeProvider extends BaseProvider {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
-      final uri = Uri.parse('${cfg.baseUrl}/models');
+      final uri = Uri.parse(
+        "${cfg.baseUrl.replaceFirst(RegExp(r'/+$'), '')}/models",
+      );
       final headers = <String, String>{'anthropic-version': anthropicVersion};
       if (key.isNotEmpty) headers['x-api-key'] = key;
       final res = await client.get(
@@ -270,12 +275,34 @@ class ProviderManager {
     return forConfig(cfg).listModels(cfg);
   }
 
+  static String connectionTestUrl(
+    ProviderConfig cfg,
+    String modelId, {
+    bool useStream = false,
+  }) {
+    if (ModelSpecResolver.instance.spec(cfg, modelId).isEmbedding) {
+      return EmbeddingApiService.requestUrl(cfg, modelId).toString();
+    }
+    cfg = cfg.forModelProtocol(modelId);
+    final ov = _modelOverride(cfg, modelId);
+    final upstream = (ov['apiModelId'] ?? ov['api_model_id'])
+        ?.toString()
+        .trim();
+    return resolveRequestUrl(
+      cfg,
+      modelId: upstream == null || upstream.isEmpty ? modelId : upstream,
+      stream: useStream,
+    );
+  }
+
   static Future<void> testConnection(
     ProviderConfig cfg,
     String modelId, {
     bool useStream = false,
+    void Function(String)? onRequestUrl,
   }) async {
     if (ModelSpecResolver.instance.spec(cfg, modelId).isEmbedding) {
+      onRequestUrl?.call(connectionTestUrl(cfg, modelId, useStream: useStream));
       await EmbeddingApiService.embed(
         config: cfg,
         modelId: modelId,
@@ -294,19 +321,16 @@ class ProviderManager {
       cfg.id,
       explicitType: cfg.providerType,
     );
+    onRequestUrl?.call(connectionTestUrl(cfg, modelId, useStream: useStream));
     final client = ProviderOAuthService.instance.authenticatedClient(
       providerHttpClient(cfg),
       cfg,
     );
     try {
       if (kind == ProviderKind.openai) {
-        final base = cfg.baseUrl.endsWith('/')
-            ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
-            : cfg.baseUrl;
-        final path = (cfg.useResponseApi == true)
-            ? '/responses'
-            : (cfg.chatPath ?? '/chat/completions');
-        final url = Uri.parse('$base$path');
+        final url = Uri.parse(
+          resolveRequestUrl(cfg, modelId: modelId, stream: useStream),
+        );
         final ov = _modelOverride(cfg, modelId);
         String upstreamId = modelId;
         try {
@@ -347,7 +371,9 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw HttpException(
+            'HTTP ${res.statusCode} ${res.reasonPhrase ?? ''}: ${res.body}',
+          );
         }
         // For streaming, verify the response contains SSE data
         if (useStream) {
@@ -358,10 +384,9 @@ class ProviderManager {
         }
         return;
       } else if (kind == ProviderKind.claude) {
-        final base = cfg.baseUrl.endsWith('/')
-            ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
-            : cfg.baseUrl;
-        final url = Uri.parse('$base/messages');
+        final url = Uri.parse(
+          resolveRequestUrl(cfg, modelId: modelId, stream: useStream),
+        );
         final ov = _modelOverride(cfg, modelId);
         String upstreamId = modelId;
         try {
@@ -392,7 +417,9 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw HttpException(
+            'HTTP ${res.statusCode} ${res.reasonPhrase ?? ''}: ${res.body}',
+          );
         }
         // For streaming, verify the response contains SSE data
         if (useStream) {
@@ -414,33 +441,14 @@ class ProviderManager {
           if (raw != null && raw.isNotEmpty) upstreamId = raw;
         } catch (_) {}
 
-        String url;
-        final endpoint = useStream
-            ? 'streamGenerateContent'
-            : 'generateContent';
-        final bool isVertex =
+        final url = resolveRequestUrl(
+          cfg,
+          modelId: upstreamId,
+          stream: useStream,
+        );
+        final isVertexClaude =
             cfg.vertexAI == true &&
-            (cfg.location?.isNotEmpty == true) &&
-            (cfg.projectId?.isNotEmpty == true);
-        final bool isVertexClaude =
-            isVertex && upstreamId.toLowerCase().startsWith('claude-');
-        if (isVertex) {
-          final loc = cfg.location!;
-          final proj = cfg.projectId!;
-          if (isVertexClaude) {
-            final ep = useStream ? 'streamRawPredict' : 'rawPredict';
-            url =
-                'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$ep';
-          } else {
-            url =
-                'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
-          }
-        } else {
-          final base = cfg.baseUrl.endsWith('/')
-              ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
-              : cfg.baseUrl;
-          url = '$base/models/$upstreamId:$endpoint';
-        }
+            upstreamId.toLowerCase().startsWith('claude-');
         final wantsImageOutput = ModelSpecResolver.instance
             .spec(cfg, modelId)
             .output
@@ -497,7 +505,9 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw HttpException(
+            'HTTP ${res.statusCode} ${res.reasonPhrase ?? ''}: ${res.body}',
+          );
         }
         // For streaming, verify the response is not empty
         if (useStream && res.body.isEmpty) {

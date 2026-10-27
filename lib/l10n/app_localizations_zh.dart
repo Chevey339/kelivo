@@ -14532,6 +14532,71 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dataDirectoryCancelHint => '取消搬迁会保留目标目录中已复制的文件，你可以检查后手动清理这些副本。';
+
+  @override
+  String providerDetailPageBaseUrlExample(String url) {
+    return '例如 $url';
+  }
+
+  @override
+  String get providerDetailPageApiKeyExample => '例如 sk-…';
+
+  @override
+  String get providerDetailPageRequestUrlLabel => '请求地址';
+
+  @override
+  String providerDetailPageUrlWillAppendVersion(String v) {
+    return '未包含版本号，离开输入框时将自动补全 $v';
+  }
+
+  @override
+  String providerDetailPageUrlAppendedVersion(String v) {
+    return '已自动补全 $v';
+  }
+
+  @override
+  String get providerDetailPageUrlTrimmedSlash => '已去掉末尾的 /';
+
+  @override
+  String providerDetailPageUrlMovedPath(String path) {
+    return '已识别完整地址，$path 已移到「API 路径」';
+  }
+
+  @override
+  String get providerDetailPageUrlEmptyError => '未填写，无法发起请求';
+
+  @override
+  String get providerDetailPageUrlInvalidError =>
+      '地址格式不正确，需以 http:// 或 https:// 开头';
+
+  @override
+  String get providerDetailPageRestoreDefaultTooltip => '恢复默认地址';
+
+  @override
+  String get providerDetailPageClearTooltip => '清除';
+
+  @override
+  String providerDetailPageTestSuccessWithLatency(String ms) {
+    return '测试成功 · $ms ms';
+  }
+
+  @override
+  String providerDetailPageTestFailedWithCode(String code) {
+    return '测试失败 · $code';
+  }
+
+  @override
+  String providerDetailPageTestHintMissingVersion(String url) {
+    return '地址可能缺少版本号，试试 $url';
+  }
+
+  @override
+  String providerAutoVersionAdded(String v) {
+    return '已自动补全 $v';
+  }
+
+  @override
+  String get providerUndo => '撤销';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -28988,6 +29053,71 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get dataDirectoryCancelHint => '取消搬迁会保留目标目录中已复制的文件，你可以检查后手动清理这些副本。';
+
+  @override
+  String providerDetailPageBaseUrlExample(String url) {
+    return '例如 $url';
+  }
+
+  @override
+  String get providerDetailPageApiKeyExample => '例如 sk-…';
+
+  @override
+  String get providerDetailPageRequestUrlLabel => '请求地址';
+
+  @override
+  String providerDetailPageUrlWillAppendVersion(String v) {
+    return '未包含版本号，离开输入框时将自动补全 $v';
+  }
+
+  @override
+  String providerDetailPageUrlAppendedVersion(String v) {
+    return '已自动补全 $v';
+  }
+
+  @override
+  String get providerDetailPageUrlTrimmedSlash => '已去掉末尾的 /';
+
+  @override
+  String providerDetailPageUrlMovedPath(String path) {
+    return '已识别完整地址，$path 已移到「API 路径」';
+  }
+
+  @override
+  String get providerDetailPageUrlEmptyError => '未填写，无法发起请求';
+
+  @override
+  String get providerDetailPageUrlInvalidError =>
+      '地址格式不正确，需以 http:// 或 https:// 开头';
+
+  @override
+  String get providerDetailPageRestoreDefaultTooltip => '恢复默认地址';
+
+  @override
+  String get providerDetailPageClearTooltip => '清除';
+
+  @override
+  String providerDetailPageTestSuccessWithLatency(String ms) {
+    return '测试成功 · $ms ms';
+  }
+
+  @override
+  String providerDetailPageTestFailedWithCode(String code) {
+    return '测试失败 · $code';
+  }
+
+  @override
+  String providerDetailPageTestHintMissingVersion(String url) {
+    return '地址可能缺少版本号，试试 $url';
+  }
+
+  @override
+  String providerAutoVersionAdded(String v) {
+    return '已自动补全 $v';
+  }
+
+  @override
+  String get providerUndo => '撤销';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -43525,4 +43655,69 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get dataDirectoryCancelHint => '取消搬遷會保留目標目錄中已複製的檔案，你可以檢查後手動清理這些副本。';
+
+  @override
+  String providerDetailPageBaseUrlExample(String url) {
+    return '例如 $url';
+  }
+
+  @override
+  String get providerDetailPageApiKeyExample => '例如 sk-…';
+
+  @override
+  String get providerDetailPageRequestUrlLabel => '請求位址';
+
+  @override
+  String providerDetailPageUrlWillAppendVersion(String v) {
+    return '未包含版本號，離開輸入框時將自動補全 $v';
+  }
+
+  @override
+  String providerDetailPageUrlAppendedVersion(String v) {
+    return '已自動補全 $v';
+  }
+
+  @override
+  String get providerDetailPageUrlTrimmedSlash => '已移除結尾的 /';
+
+  @override
+  String providerDetailPageUrlMovedPath(String path) {
+    return '已識別完整位址，$path 已移至「API 路徑」';
+  }
+
+  @override
+  String get providerDetailPageUrlEmptyError => '未填寫，無法發起請求';
+
+  @override
+  String get providerDetailPageUrlInvalidError =>
+      '位址格式不正確，需以 http:// 或 https:// 開頭';
+
+  @override
+  String get providerDetailPageRestoreDefaultTooltip => '恢復預設位址';
+
+  @override
+  String get providerDetailPageClearTooltip => '清除';
+
+  @override
+  String providerDetailPageTestSuccessWithLatency(String ms) {
+    return '測試成功 · $ms ms';
+  }
+
+  @override
+  String providerDetailPageTestFailedWithCode(String code) {
+    return '測試失敗 · $code';
+  }
+
+  @override
+  String providerDetailPageTestHintMissingVersion(String url) {
+    return '位址可能缺少版本號，試試 $url';
+  }
+
+  @override
+  String providerAutoVersionAdded(String v) {
+    return '已自動補全 $v';
+  }
+
+  @override
+  String get providerUndo => '復原';
 }

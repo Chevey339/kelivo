@@ -79,6 +79,26 @@ class EmbeddingApiService {
     'safetySettings',
   };
 
+  static Uri requestUrl(ProviderConfig config, String modelId) {
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
+    final upstream = apiModelId(config, modelId);
+    if (kind != ProviderKind.google) {
+      return Uri.parse('${_base(config)}/embeddings');
+    }
+    if (!_isVertex(config)) {
+      return Uri.parse('${_base(config)}/models/$upstream:batchEmbedContents');
+    }
+    final loc = config.location!.trim();
+    final project = config.projectId!.trim();
+    final endpoint = _takesInstructions(upstream) ? 'embedContent' : 'predict';
+    return Uri.parse(
+      '${vertexOrigin(config, loc)}/v1/projects/$project/locations/$loc/publishers/google/models/$upstream:$endpoint',
+    );
+  }
+
   static Future<EmbeddingResult> embed({
     required ProviderConfig config,
     required String modelId,
@@ -152,7 +172,7 @@ class EmbeddingApiService {
     };
     final json = await _post(
       client,
-      Uri.parse('${_base(config)}/embeddings'),
+      requestUrl(config, modelId),
       config,
       modelId,
       body,
@@ -203,7 +223,7 @@ class EmbeddingApiService {
     final key = effectiveApiKey(config);
     final json = await _post(
       client,
-      Uri.parse('${_base(config)}/models/$upstream:batchEmbedContents'),
+      requestUrl(config, modelId),
       config,
       modelId,
       body,
@@ -233,15 +253,12 @@ class EmbeddingApiService {
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
       'X-Goog-User-Project': proj,
     };
-    final loc = config.location!.trim();
     if (_takesInstructions(upstream)) {
       // One input per `:embedContent`; served at global and the `us` / `eu`
       // multi-regions.
       final json = await _post(
         client,
-        Uri.parse(
-          '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models/$upstream:embedContent',
-        ),
+        requestUrl(config, modelId),
         config,
         modelId,
         {
@@ -261,9 +278,7 @@ class EmbeddingApiService {
     }
     final json = await _post(
       client,
-      Uri.parse(
-        '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models/$upstream:predict',
-      ),
+      requestUrl(config, modelId),
       config,
       modelId,
       {

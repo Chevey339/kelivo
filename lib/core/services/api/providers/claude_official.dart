@@ -1,3 +1,4 @@
+import '../../../utils/provider_url.dart';
 import '../../custom_request_merger.dart';
 import '../../../models/provider_oauth.dart';
 import '../../auth/claude_oauth_request.dart';
@@ -59,7 +60,7 @@ Stream<StreamChunk> sendClaudeStream(
   final base = config.baseUrl.endsWith('/')
       ? config.baseUrl.substring(0, config.baseUrl.length - 1)
       : config.baseUrl;
-  final url = Uri.parse('$base/messages');
+  final url = Uri.parse(resolveRequestUrl(config));
 
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,

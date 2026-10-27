@@ -102,6 +102,9 @@ class SettingsProvider extends ChangeNotifier {
   static const Set<String> _builtInProviderKeys = {
     ..._builtInProviderKeysInOrder,
   };
+  static bool isBuiltInProvider(String key) =>
+      _builtInProviderKeys.contains(key);
+
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
@@ -6181,6 +6184,7 @@ class ProviderConfig {
   final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
   final String baseUrl;
+  final bool autoVersionDisabled;
   final ProviderKind?
   providerType; // Explicit provider type to avoid misclassification
   final String? chatPath; // openai only
@@ -6275,6 +6279,7 @@ class ProviderConfig {
     this.oauthModelsSyncedAt,
     this.oauthModelsClientVersion,
     required this.baseUrl,
+    this.autoVersionDisabled = false,
     this.providerType,
     this.chatPath,
     this.useResponseApi,
@@ -6329,6 +6334,7 @@ class ProviderConfig {
     DateTime? oauthModelsSyncedAt,
     Object? oauthModelsClientVersion = _sentinel,
     String? baseUrl,
+    bool? autoVersionDisabled,
     ProviderKind? providerType,
     String? chatPath,
     bool? useResponseApi,
@@ -6372,6 +6378,7 @@ class ProviderConfig {
         ? this.oauthModelsClientVersion
         : oauthModelsClientVersion as String?,
     baseUrl: baseUrl ?? this.baseUrl,
+    autoVersionDisabled: autoVersionDisabled ?? this.autoVersionDisabled,
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
     useResponseApi: useResponseApi ?? this.useResponseApi,
@@ -6423,6 +6430,7 @@ class ProviderConfig {
     if (oauthModelsClientVersion != null)
       'oauthModelsClientVersion': oauthModelsClientVersion,
     'baseUrl': baseUrl,
+    'autoVersionDisabled': autoVersionDisabled,
     'providerType': providerType?.name,
     'chatPath': chatPath,
     'useResponseApi': useResponseApi,
@@ -6474,6 +6482,7 @@ class ProviderConfig {
     ),
     oauthModelsClientVersion: json['oauthModelsClientVersion'] as String?,
     baseUrl: json['baseUrl'] as String? ?? '',
+    autoVersionDisabled: json['autoVersionDisabled'] as bool? ?? false,
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(
             (e) => e.name == json['providerType'],

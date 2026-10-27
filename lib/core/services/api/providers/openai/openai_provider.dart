@@ -11,6 +11,7 @@ import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
+import '../../../../utils/provider_url.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../../model_spec/model_spec_resolver.dart';
 import '../../../model_spec/vendor_defaults.dart';
@@ -33,25 +34,8 @@ import 'responses_api.dart';
 import 'responses_decoder.dart';
 import 'responses_history.dart';
 
-Uri _openAICompatibleUrl(ProviderConfig config) {
-  final rawBase = config.baseUrl.endsWith('/')
-      ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-      : config.baseUrl;
-  final baseUri = Uri.parse(rawBase);
-  if (config.useResponseApi == true) {
-    final normalizedPath = baseUri.path.replaceAll(RegExp(r'/$'), '');
-    if (BuiltInToolsHelper.isDashScopeProvider(config) &&
-        normalizedPath != '/api/v2/apps/protocols/compatible-mode/v1') {
-      return Uri.parse(
-        '${baseUri.scheme}://${baseUri.authority}'
-        '/api/v2/apps/protocols/compatible-mode/v1/responses',
-      );
-    }
-    return Uri.parse('$rawBase/responses');
-  }
-  final path = config.chatPath ?? '/chat/completions';
-  return Uri.parse('$rawBase$path');
-}
+Uri _openAICompatibleUrl(ProviderConfig config) =>
+    Uri.parse(resolveRequestUrl(config));
 
 Stream<StreamChunk> sendOpenAIStream(
   http.Client client,
