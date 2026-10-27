@@ -178,10 +178,7 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     if (_file == null) {
       return _image(
         widget.url,
-        markdownImageProvider(
-          widget.url,
-          currentColor: widget.theme.colors.ink,
-        ),
+        markdownImageProvider(widget.url, currentColor: widget.theme.proseInk),
       );
     }
     return FutureBuilder<File?>(
@@ -207,7 +204,7 @@ class _MarkdownImageState extends State<_MarkdownImage> {
                 file.path,
                 markdownImageProvider(
                   file.path,
-                  currentColor: widget.theme.colors.ink,
+                  currentColor: widget.theme.proseInk,
                 ),
               );
       },
@@ -301,7 +298,7 @@ class _MarkdownImageState extends State<_MarkdownImage> {
               if (isSvgImageSource(source))
                 source: SvgImageProvider(
                   source,
-                  currentColor: widget.theme.colors.ink,
+                  currentColor: widget.theme.proseInk,
                 ),
           },
         ),

@@ -589,6 +589,35 @@ final class MarkstreamTheme extends _ThemeTokens {
   final EdgeInsetsGeometry mathPadding;
   final DetailsTheme details;
   final MarkstreamFillAlphas fillAlphas;
+
+  /// Foreground for content painted directly on the surrounding message.
+  Color get proseInk => backdrop == MarkstreamBackdrop.plain
+      ? colors.ink
+      : body.color ?? colors.ink;
+
+  /// Paragraphs and nested markup inside a painted block share its ink.
+  MarkstreamTheme get blockContentTheme {
+    if (body.color == colors.ink) return this;
+    final quoteBar = colors.ink.withValues(alpha: colors.quoteBar.a);
+    return copyWith(
+      colors: colors.copyWith(quoteBar: quoteBar),
+      body: body.copyWith(color: colors.ink),
+      headings: [
+        for (var i = 0; i < headings.length; i++)
+          headings[i].copyWith(color: i == 5 ? colors.ink2 : colors.ink),
+      ],
+      quote: quote.copyWith(textColor: colors.ink2, barColor: quoteBar),
+      task: task.copyWith(
+        borderColor: colors.borderStrong,
+        checkedText: task.checkedText.copyWith(
+          color: colors.ink3,
+          decorationColor: colors.ink3,
+        ),
+      ),
+      ruleColor: colors.border,
+    );
+  }
+
   MarkstreamTheme copyWith({
     MarkstreamBackdrop? backdrop,
     MarkstreamChromeTheme? chrome,
@@ -700,13 +729,13 @@ final class MarkstreamTheme extends _ThemeTokens {
             color: bodyStyle?.color ?? colors.onSurface,
           );
     final b = body.fontSize!;
-    // Opaque surfaces keep their paired scheme ink, independently of a
-    // surrounding bubble's text override. Translucent surfaces inherit it.
-    final on = backdrop == MarkstreamBackdrop.plain
-        ? colors.onSurface
-        : body.color!;
+    // Painted blocks keep their paired scheme ink even when translucent.
+    // Text directly on the message bubble retains its inherited foreground.
+    final on = colors.onSurface;
+    final bodyInk = backdrop == MarkstreamBackdrop.plain ? on : body.color!;
     const white = Colors.white;
     final tint = dark ? white : on;
+    final bodyTint = dark ? white : bodyInk;
     final surface = colors.surface;
     final opaque = Color.alphaBlend(
       white.withValues(alpha: dark ? .04 : .70),
@@ -759,13 +788,13 @@ final class MarkstreamTheme extends _ThemeTokens {
             ? (dark ? .07 : .05)
             : (dark ? .06 : (wallpaper ? .045 : .04)),
       ),
-      fillInline: wallpaper
+      fillInline: translucent
           ? Color.alphaBlend(
               tint.withValues(alpha: dark ? .10 : .07),
-              surface.withValues(alpha: .55),
+              fillBlock,
             )
           : tint.withValues(alpha: dark ? .10 : (bubble ? .07 : .06)),
-      quoteBar: tint.withValues(alpha: dark ? .20 : .14),
+      quoteBar: bodyTint.withValues(alpha: dark ? .20 : .14),
       accent: colors.primary,
       surface: surface,
       tip: Color(dark ? 0xff75dfa3 : 0xff16a34a),
@@ -773,6 +802,8 @@ final class MarkstreamTheme extends _ThemeTokens {
       danger: colors.error,
       important: colors.tertiary,
     );
+    final mutedBodyInk = bodyInk.withValues(alpha: palette.ink2.a);
+    final faintBodyInk = bodyInk.withValues(alpha: palette.ink3.a);
     final chrome = MarkstreamChromeTheme(
       height: 36,
       padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
@@ -781,7 +812,8 @@ final class MarkstreamTheme extends _ThemeTokens {
       label: body.copyWith(
         fontSize: 12.5,
         fontWeight: FontWeight.w500,
-        color: palette.ink2,
+        // The translucent header adds another tint over the block fill.
+        color: translucent ? on.withValues(alpha: .78) : palette.ink2,
         letterSpacing: .2,
         height: 1,
       ),
@@ -830,7 +862,7 @@ final class MarkstreamTheme extends _ThemeTokens {
           fontSize: b * .88,
           fontWeight: FontWeight.w600,
           height: 1.45,
-          color: palette.ink2,
+          color: mutedBodyInk,
         ),
       ],
       headingPadding: const EdgeInsets.only(top: 4),
@@ -873,21 +905,21 @@ final class MarkstreamTheme extends _ThemeTokens {
         barWidth: 3,
         barRadius: 1.5,
         barColor: palette.quoteBar,
-        textColor: palette.ink2,
+        textColor: mutedBodyInk,
       ),
       listMarkerPadding: const EdgeInsetsDirectional.only(end: 6),
       task: TaskTheme(
         size: 16,
         radius: radiusXs,
         strokeWidth: 1.5,
-        borderColor: palette.borderStrong,
+        borderColor: bodyTint.withValues(alpha: palette.borderStrong.a),
         selectedColor: colors.primary,
         checkColor: colors.onPrimary,
         checkSize: 10,
         checkedText: body.copyWith(
           decoration: TextDecoration.lineThrough,
-          decorationColor: palette.ink3,
-          color: palette.ink3,
+          decorationColor: faintBodyInk,
+          color: faintBodyInk,
         ),
       ),
       table: MarkdownTableTheme(
@@ -919,7 +951,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       ),
       rulePadding: const EdgeInsets.symmetric(vertical: 12),
       ruleThickness: stroke,
-      ruleColor: palette.border,
+      ruleColor: bodyTint.withValues(alpha: palette.border.a),
       imageRadius: radiusMd,
       inlineMathScale: 1.1,
       mathPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -928,7 +960,7 @@ final class MarkstreamTheme extends _ThemeTokens {
         radius: radiusMd,
         backgroundColor: palette.fillBlock,
         borderColor: palette.border,
-        summary: body.copyWith(fontWeight: medium),
+        summary: body.copyWith(fontWeight: medium, color: palette.ink),
         summaryPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         chevronSize: 14,

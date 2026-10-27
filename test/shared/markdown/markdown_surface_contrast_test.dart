@@ -15,9 +15,11 @@ import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/plantuml_block.dart';
 import 'package:Kelivo/theme/chat_bubble_style.dart';
 import 'package:Kelivo/theme/palettes.dart';
+import 'package:Kelivo/utils/svg_image_provider.dart';
 
 import '../../support/business_test_harness.dart';
 import '../../support/markdown_backdrop_host.dart';
+import '../../support/markdown_render_helpers.dart';
 
 double _contrast(Color ink, Color background) {
   final a = Color.alphaBlend(ink, background).computeLuminance();
@@ -29,6 +31,14 @@ Iterable<TextSpan> _spans(TextSpan span) sync* {
   yield span;
   for (final child in span.children ?? const <InlineSpan>[]) {
     if (child is TextSpan) yield* _spans(child);
+  }
+}
+
+Iterable<(String, Color)> _textInks(TextSpan span, [Color? inherited]) sync* {
+  final ink = span.style?.color ?? inherited;
+  if (span.text?.isNotEmpty ?? false) yield (span.text!, ink!);
+  for (final child in span.children ?? const <InlineSpan>[]) {
+    if (child is TextSpan) yield* _textInks(child, ink);
   }
 }
 
@@ -174,6 +184,265 @@ void main() {
         }
       }
     });
+
+    for (final (name, backgroundArgb, textArgb) in [
+      ('background-only', dark ? 0xffffffff : 0xff000000, null),
+      ('text-only', null, dark ? 0xff000000 : 0xffffffff),
+      ('gray-777', 0xff777777, 0xff000000),
+      ('gray-999', 0xff999999, 0xff000000),
+      ('blue', 0xff1e40af, 0xffffffff),
+      ('amber', 0xffc57d22, 0xff000000),
+    ]) {
+      testWidgets('bubble overrides keep code readable, '
+          'dark=$dark colors=$name', (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(settings.dispose);
+        for (final style in [
+          ChatMessageBackgroundStyle.frosted,
+          ChatMessageBackgroundStyle.solid,
+        ]) {
+          await settings.setChatMessageBackgroundStyle(style);
+          for (final opacity in [0.0, .12, .66, 1.0]) {
+            final overrides = ChatBubbleStyleOverrides(
+              backgroundArgbLight: backgroundArgb,
+              backgroundArgbDark: backgroundArgb,
+              textArgbLight: textArgb,
+              textArgbDark: textArgb,
+              frostedOpacity: opacity,
+              solidOpacity: opacity,
+            );
+            await settings.setChatBubbleStyleOverrides(overrides);
+            for (final wallpaper in [false, true]) {
+              final code = await _mount(
+                tester,
+                settings,
+                scheme,
+                wallpaper: wallpaper,
+                source: '- Item\n\n$_source',
+              );
+              final bodyInk = textArgb == null
+                  ? scheme.onSurface
+                  : Color(textArgb);
+              expect(code.theme.body.color, bodyInk);
+              final surface = tester.widget<Container>(
+                find.byKey(const ValueKey('markstream-code-surface')),
+              );
+              final fill = (surface.decoration! as BoxDecoration).color!;
+              final bubble = resolveBubbleStyle(
+                scheme,
+                scheme.brightness,
+                style,
+                overrides,
+              ).background;
+              final highlighted =
+                  renderParagraphs(
+                        find.byType(MarkstreamCodeContent),
+                      ).single.text
+                      as TextSpan;
+              expect(highlighted.toPlainText(), '// comment\nfinal count = 1;');
+              final inks = _textInks(highlighted).toList();
+              final plainInk = inks
+                  .firstWhere((s) => s.$1.contains('count'))
+                  .$2;
+              final comment = inks
+                  .firstWhere((s) => s.$1.contains('// comment'))
+                  .$2;
+              expect(
+                tester.widget<Text>(find.text('•')).style!.color,
+                (wallpaper ? bodyInk : scheme.onSurface).withValues(
+                  alpha: code.theme.colors.ink3.a,
+                ),
+              );
+              for (final underlay in [Colors.black, Colors.white]) {
+                final background = Color.alphaBlend(
+                  fill,
+                  Color.alphaBlend(bubble, underlay),
+                );
+                final reason =
+                    '$style opacity=$opacity wallpaper=$wallpaper '
+                    'underlay=$underlay';
+                expect(
+                  _contrast(plainInk, background),
+                  greaterThanOrEqualTo(7),
+                  reason: reason,
+                );
+                expect(
+                  _contrast(comment, background),
+                  greaterThanOrEqualTo(4.5),
+                  reason: reason,
+                );
+                final header = Color.alphaBlend(
+                  code.theme.chrome.background,
+                  background,
+                );
+                expect(
+                  _contrast(code.theme.code.label.color!, header),
+                  greaterThanOrEqualTo(4.5),
+                  reason: reason,
+                );
+                expect(
+                  _contrast(code.theme.chrome.actionColor, header),
+                  greaterThanOrEqualTo(3),
+                  reason: reason,
+                );
+              }
+            }
+          }
+        }
+      });
+    }
+
+    testWidgets(
+      'plain code and inline SVG use their own surfaces, dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(settings.dispose);
+        await settings.setChatMessageBackgroundStyle(
+          ChatMessageBackgroundStyle.frosted,
+        );
+        await settings.setChatBubbleStyleOverrides(
+          const ChatBubbleStyleOverrides(
+            backgroundArgbLight: 0xff000000,
+            backgroundArgbDark: 0xffffffff,
+            frostedOpacity: .12,
+          ),
+        );
+        final svg = Uri.dataFromString(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">'
+          '<rect width="20" height="20" fill="currentColor"/></svg>',
+          mimeType: 'image/svg+xml',
+        );
+        final code = await _mount(
+          tester,
+          settings,
+          scheme,
+          source: '![20x20]($svg)\n\n```text\n分镜脚本\n镜头 01-1\n```',
+        );
+        final rendered =
+            renderParagraphs(find.byType(MarkstreamCodeContent)).single.text
+                as TextSpan;
+        expect(rendered.toPlainText(), '分镜脚本\n镜头 01-1');
+        expect(_textInks(rendered).map((s) => s.$2).toSet(), {
+          dark ? Colors.black : Colors.white,
+        });
+        final image = tester.widget<Image>(find.byType(Image).first);
+        final provider =
+            (image.image as ResizeImage).imageProvider as SvgImageProvider;
+        expect(provider.currentColor, scheme.onSurface);
+        expect(code.theme.body.color, scheme.onSurface);
+      },
+    );
+
+    testWidgets(
+      'inline code and expanded details keep their surface ink, dark=$dark',
+      (tester) async {
+        tester.view.physicalSize = const Size(1000, 1600);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(settings.dispose);
+        await settings.setChatMessageBackgroundStyle(
+          ChatMessageBackgroundStyle.frosted,
+        );
+        await settings.setChatBackgroundMaskStrength(0);
+        await settings.setChatBubbleStyleOverrides(
+          const ChatBubbleStyleOverrides(
+            backgroundArgbLight: 0xff999999,
+            backgroundArgbDark: 0xff666666,
+            textArgbLight: 0xffffffff,
+            textArgbDark: 0xff000000,
+            frostedOpacity: 0,
+          ),
+        );
+        const source = '''Body `inline`
+
+<details open>
+<summary>Markdown summary</summary>
+
+Markdown paragraph
+
+### Markdown heading
+
+> Markdown quote
+
+- Markdown item
+- [x] Markdown done
+
+</details>
+
+<div><details open><summary>HTML summary</summary><p>HTML paragraph</p><h3>HTML heading</h3><blockquote>HTML quote</blockquote><ul><li>HTML item</li></ul></details></div>
+
+```text
+Code
+```
+''';
+        final code = await _mount(tester, settings, scheme, source: source);
+        final inlineInk = tester
+            .widget<Text>(find.text('inline'))
+            .style!
+            .color!;
+        final details = tester.widgetList<MarkstreamDetailsBlock>(
+          find.byType(MarkstreamDetailsBlock),
+        );
+        expect(details, hasLength(2));
+        final paragraphs = renderParagraphs(
+          find.byType(MarkstreamDetailsBlock),
+        );
+        for (final underlay in [Colors.black, Colors.white]) {
+          expect(
+            _contrast(
+              inlineInk,
+              Color.alphaBlend(code.theme.inlineCode.backgroundColor, underlay),
+            ),
+            greaterThanOrEqualTo(4.5),
+          );
+          final background = Color.alphaBlend(
+            code.theme.details.backgroundColor,
+            underlay,
+          );
+          for (final label in [
+            'Markdown summary',
+            'Markdown paragraph',
+            'Markdown heading',
+            'Markdown quote',
+            'Markdown item',
+            'HTML summary',
+            'HTML paragraph',
+            'HTML heading',
+            'HTML quote',
+            'HTML item',
+          ]) {
+            final span =
+                paragraphs
+                        .firstWhere((p) => p.text.toPlainText().contains(label))
+                        .text
+                    as TextSpan;
+            final ink = _textInks(span).firstWhere((s) => s.$1 == label).$2;
+            expect(
+              _contrast(ink, background),
+              greaterThanOrEqualTo(4.5),
+              reason: '$label underlay=$underlay',
+            );
+          }
+          final done =
+              paragraphs
+                      .firstWhere(
+                        (p) => p.text.toPlainText() == 'Markdown done',
+                      )
+                      .text
+                  as TextSpan;
+          expect(
+            _contrast(_textInks(done).single.$2, background),
+            greaterThanOrEqualTo(3),
+          );
+        }
+        expect(code.theme.body.color, dark ? Colors.black : Colors.white);
+      },
+    );
 
     testWidgets(
       'custom bubble colors pair ink, syntax and opaque capture, dark=$dark',
