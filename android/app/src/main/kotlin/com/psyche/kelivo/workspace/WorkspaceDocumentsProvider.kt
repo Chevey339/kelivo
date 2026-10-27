@@ -22,7 +22,7 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 
-/** Read-only workspace files in the Android system document picker. */
+/** Workspace files in the Android system document picker. */
 class WorkspaceDocumentsProvider : DocumentsProvider() {
     private lateinit var appData: File
     private lateinit var store: WorkspaceDocumentsStore
@@ -43,7 +43,8 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
                 Root.COLUMN_DOCUMENT_ID to WorkspaceDocumentPaths.ROOT,
                 Root.COLUMN_TITLE to "Kelivo",
                 Root.COLUMN_ICON to R.mipmap.ic_launcher,
-                Root.COLUMN_FLAGS to (Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD),
+                Root.COLUMN_FLAGS to (Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD or
+                    Root.FLAG_SUPPORTS_CREATE),
                 Root.COLUMN_MIME_TYPES to "*/*",
             ))
         }
@@ -101,12 +102,46 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
         }
     }
 
+    override fun createDocument(parentDocumentId: String, mimeType: String, displayName: String): String {
+        val (root, parentRelative, parent) = resolve(parentDocumentId)
+        if (!parent.isDirectory) throw FileNotFoundException("Not a directory")
+        val name = displayName.trim()
+        if (!WorkspaceDocumentPaths.validFileName(name)) throw IllegalArgumentException("Invalid document name")
+        var target = File(parent, name)
+        var counter = 2
+        while (target.exists()) {
+            val dot = name.lastIndexOf('.')
+            val candidate = if (dot <= 0) "$name ($counter)"
+                else "${name.substring(0, dot)} ($counter)${name.substring(dot)}"
+            target = File(parent, candidate)
+            counter++
+        }
+        val created = if (mimeType == Document.MIME_TYPE_DIR) {
+            target.mkdir()
+        } else {
+            target.createNewFile()
+        }
+        if (!created) throw IOException("Unable to create document")
+        val relative = if (parentRelative.isEmpty()) target.name else "$parentRelative/${target.name}"
+        requireNotNull(context).contentResolver.notifyChange(
+            DocumentsContract.buildChildDocumentsUri(authority, parentDocumentId), null,
+        )
+        return WorkspaceDocumentPaths.documentId(root.id, relative)
+    }
+
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
-        if (mode != "r") throw FileNotFoundException("Workspace documents are read-only")
         signal?.throwIfCanceled()
         val (root, relative, file) = resolve(documentId)
         if (relative.isEmpty() || !file.isFile) throw FileNotFoundException("Not a file")
-        val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val truncate = mode == "w" || mode == "wt" || mode == "rwt"
+        val flags = when (mode) {
+            "r" -> ParcelFileDescriptor.MODE_READ_ONLY
+            "w", "wt" -> ParcelFileDescriptor.MODE_WRITE_ONLY
+            "wa" -> ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_APPEND
+            "rw", "rwt" -> ParcelFileDescriptor.MODE_READ_WRITE
+            else -> throw FileNotFoundException("Unsupported mode")
+        }
+        val descriptor = ParcelFileDescriptor.open(file, flags)
         try {
             // Validate the opened descriptor as well, in case a running command
             // changed a symlink between path validation and open().
@@ -114,6 +149,9 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
             if (!WorkspaceDocumentPaths.isWithin(root.directory, File(openedPath))) {
                 throw FileNotFoundException("Path outside workspace")
             }
+            // Truncate only after the descriptor is known to be inside the
+            // workspace, so a swapped symlink cannot erase an outside file.
+            if (truncate) Os.ftruncate(descriptor.fileDescriptor, 0)
             signal?.throwIfCanceled()
             return descriptor
         } catch (error: Exception) {
@@ -152,7 +190,8 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
             Document.COLUMN_DOCUMENT_ID to WorkspaceDocumentPaths.documentId(root.id, relative),
             Document.COLUMN_DISPLAY_NAME to if (relative.isEmpty()) root.name else relative.substringAfterLast('/'),
             Document.COLUMN_MIME_TYPE to if (relative.isEmpty()) Document.MIME_TYPE_DIR else mimeType(file),
-            Document.COLUMN_FLAGS to 0,
+            Document.COLUMN_FLAGS to if (relative.isEmpty() || file.isDirectory) Document.FLAG_DIR_SUPPORTS_CREATE
+                else Document.FLAG_SUPPORTS_WRITE,
             Document.COLUMN_SIZE to if (file.isFile) file.length() else null,
             Document.COLUMN_LAST_MODIFIED to file.lastModified().takeIf { it > 0 },
         ))
