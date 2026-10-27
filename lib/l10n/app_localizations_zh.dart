@@ -2876,6 +2876,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '删除 \"$title\"?';
+  }
+
+  @override
   String sideDrawerDeleteSelectedSnackbar(int count) {
     return '已删除 $count 个话题';
   }
@@ -17405,6 +17410,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '删除 \"$title\"?';
+  }
+
+  @override
   String sideDrawerDeleteSelectedSnackbar(int count) {
     return '已删除 $count 个话题';
   }
@@ -31857,6 +31867,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String sideDrawerSelectionDeleteConfirmContent(int count) {
     return '確定刪除 $count 個話題？';
+  }
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '刪除 \"$title\"?';
   }
 
   @override

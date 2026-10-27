@@ -2985,6 +2985,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return 'Delete \"$title\"?';
+  }
+
+  @override
   String sideDrawerDeleteSelectedSnackbar(int count) {
     return 'Deleted $count conversations';
   }

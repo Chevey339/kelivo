@@ -148,7 +148,7 @@ The [User Guide](https://kelivo.psycheas.top/guide) (Chinese) covers providers, 
 - Light and dark mode, Android 12+ dynamic color, built-in palettes, and custom themes that can be shared as JSON.
 - Chat wallpapers and gradient backgrounds. Message bubbles can use the theme default, frosted glass or a solid fill, with adjustable colors, borders, corner radius and blur.
 - System fonts, imported font files, or Google Fonts downloaded on demand, set separately for the interface and for code.
-- Interface in English, Simplified Chinese and Traditional Chinese.
+- Interface in English, Simplified Chinese, Traditional Chinese and Korean.
 
 ### 🔒 Data and Privacy
 

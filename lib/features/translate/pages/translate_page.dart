@@ -58,7 +58,7 @@ class _TranslatePageState extends State<TranslatePage> {
     final savedLang = _languageForCode(settings.translateTargetLang);
     final localeLang = lc.startsWith('zh')
         ? _languageForCode('zh-CN')
-        : _languageForCode('en');
+        : _languageForCode(lc) ?? _languageForCode('en');
     setState(() {
       _lang = savedLang ?? localeLang ?? supportedLanguages.first;
       _providerKey =

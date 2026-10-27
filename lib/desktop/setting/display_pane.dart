@@ -1131,6 +1131,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
             '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
             '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
             '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
+            '🇰🇷 ${AppLocalizations.of(ctx)!.languageDisplayKorean}',
           ];
           double maxText = 0;
           for (final s in labels) {
@@ -1196,6 +1197,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
         }
         return l10n.displaySettingsPageLanguageChineseLabel;
       }
+      if (l.languageCode == 'ko') return l10n.languageDisplayKorean;
       return l10n.displaySettingsPageLanguageEnglishLabel;
     }
 
@@ -1528,6 +1530,14 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
         (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en'),
       ),
+      (
+        _LangItem(
+          flag: '🇰🇷',
+          label: l10n.languageDisplayKorean,
+          tag: 'ko_KR',
+        ),
+        (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'ko'),
+      ),
     ];
     final maxH = MediaQuery.of(context).size.height * 0.5;
     return AnimatedOpacity(
@@ -1594,6 +1604,11 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                                   .read<SettingsProvider>()
                                   .setAppLocale(const Locale('en', 'US'));
                               break;
+                            case 'ko_KR':
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(const Locale('ko', 'KR'));
+                              break;
                           }
                           if (!mounted) return;
                           widget.onClose();
@@ -1613,7 +1628,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 class _LangItem {
   final String flag;
   final String label;
-  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US'
+  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US' | 'ko_KR'
   const _LangItem({required this.flag, required this.label, required this.tag});
 }
 

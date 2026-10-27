@@ -53,6 +53,7 @@
 		82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
 		8DCAD2D7AB85164F01BA9CA9 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A4542529DC8187D43E5FB488 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7CDA787C43D9F507E7690744 /* Localizable.strings */; };
+		54161FB52E6B1600001222B5 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 54161FB42E6B1600001222B5 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -133,6 +134,9 @@
 		54161FAF2E6B1465001222B5 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/LaunchScreen.strings"; sourceTree = "<group>"; };
 		54161FB02E6B1519001222B5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Main.strings; sourceTree = "<group>"; };
 		54161FB12E6B1519001222B5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/LaunchScreen.strings; sourceTree = "<group>"; };
+		54161FB22E6B1600001222B5 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Main.strings; sourceTree = "<group>"; };
+		54161FB32E6B1600001222B5 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/LaunchScreen.strings; sourceTree = "<group>"; };
+		54161FB62E6B1600001222B5 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		6AFE7891365C1A6043202DEE /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -179,6 +183,7 @@
 		32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IncomingShareInbox.swift; sourceTree = "<group>"; };
 		55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IosIncomingShareHandler.swift; sourceTree = "<group>"; };
 		6ECC4D7E49DE76801658ECA7 /* zh-Hant */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		6ECC4D7F49DE76801658ECA7 /* ko */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		94A24F1C708902710CB67D29 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		F26A26A905D84B280A4FAE80 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -321,6 +326,7 @@
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
 				97C147021CF9000F007C117D /* Info.plist */,
+				54161FB42E6B1600001222B5 /* InfoPlist.strings */,
 				A2DT00000000000000000021 /* Runner.entitlements */,
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
@@ -528,6 +534,7 @@
 				"zh-Hans",
 				"zh-Hant",
 				en,
+				ko,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
@@ -565,6 +572,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				54161FB52E6B1600001222B5 /* InfoPlist.strings in Resources */,
 				W5A0000000000000000000A6 /* alpine-rootfs.zip in Resources */,
 				W5A0000000000000000000A7 /* overlay in Resources */,
 				W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */,
@@ -820,6 +828,7 @@
 				54161FAC2E6B1084001222B5 /* zh-Hans */,
 				54161FAE2E6B1465001222B5 /* zh-Hant */,
 				54161FB02E6B1519001222B5 /* en */,
+				54161FB22E6B1600001222B5 /* ko */,
 			);
 			name = Main.storyboard;
 			sourceTree = "<group>";
@@ -831,6 +840,7 @@
 				54161FAD2E6B1084001222B5 /* zh-Hans */,
 				54161FAF2E6B1465001222B5 /* zh-Hant */,
 				54161FB12E6B1519001222B5 /* en */,
+				54161FB32E6B1600001222B5 /* ko */,
 			);
 			name = LaunchScreen.storyboard;
 			sourceTree = "<group>";
@@ -841,8 +851,17 @@
 				31790E2C03AF99B98A3F05B1 /* en */,
 				F91265C744C63BBCFA99BC1C /* zh-Hans */,
 				6ECC4D7E49DE76801658ECA7 /* zh-Hant */,
+				6ECC4D7F49DE76801658ECA7 /* ko */,
 			);
 			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		54161FB42E6B1600001222B5 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				54161FB62E6B1600001222B5 /* ko */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
