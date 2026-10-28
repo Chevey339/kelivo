@@ -7,24 +7,25 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000E2 /* RootfsPatch.bundle */; };
-		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
-		CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */; };
-		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
-		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
-		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
+		0D9F2113B38E5FFDD32D78D0 /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
+		0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04335196CAB80860F8B0B1AB /* Foundation.framework */; };
+		1050AF28EF974F7205A3DFE3 /* IosIncomingShareHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */; };
+		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
+		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		478EE76A47FFCC51A736ECBD /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A26A905D84B280A4FAE80 /* ShareViewController.swift */; };
+		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		7B4097C342D026D4865813E6 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C7611D570BED92819FE5AADD /* Pods_Runner.framework */; };
+		82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
+		8B8FA766A218889D83EE963F /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 916AC80231ED78D192677E69 /* Pods_RunnerTests.framework */; };
+		8DCAD2D7AB85164F01BA9CA9 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
+		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
+		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
 		A10000000000000000000002 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
 		A10000000000000000000003 /* GenerationActivityExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* GenerationActivityExtension.swift */; };
 		A10000000000000000000004 /* GenerationActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* GenerationActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
-		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
-		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
-		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
-		BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC000000000000000000002 /* AppBackupPolicy.swift */; };
-		B610A5500000000000000001 /* BrowserGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000002 /* BrowserGlassView.swift */; };
-		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
-		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
 		A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */; };
 		A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000012 /* LocationToolHandler.swift */; };
 		A2DT00000000000000000003 /* WeatherToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000013 /* WeatherToolHandler.swift */; };
@@ -32,8 +33,14 @@
 		A2DT00000000000000000005 /* RemindersToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000015 /* RemindersToolHandler.swift */; };
 		A2DT00000000000000000006 /* DeviceToolsSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000016 /* DeviceToolsSupport.swift */; };
 		A2DT00000000000000000031 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000032 /* HealthKit.framework */; };
+		A4542529DC8187D43E5FB488 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7CDA787C43D9F507E7690744 /* Localizable.strings */; };
+		B610A5500000000000000001 /* BrowserGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000002 /* BrowserGlassView.swift */; };
+		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
+		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
+		BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC000000000000000000002 /* AppBackupPolicy.swift */; };
+		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
+		CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */; };
 		W5A0000000000000000000A1 /* WorkspacePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B1 /* WorkspacePlugin.swift */; };
-		W5D0000000000000000000A1 /* WorkspaceDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */; };
 		W5A0000000000000000000A2 /* RootfsInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B2 /* RootfsInstaller.swift */; };
 		W5A0000000000000000000A3 /* KelivoISHKernel.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B4 /* KelivoISHKernel.m */; };
 		W5A0000000000000000000A4 /* KelivoISHExecutor.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B6 /* KelivoISHExecutor.m */; };
@@ -41,34 +48,27 @@
 		W5A0000000000000000000A6 /* alpine-rootfs.zip in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000BA /* alpine-rootfs.zip */; };
 		W5A0000000000000000000A7 /* overlay in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000BB /* overlay */; };
 		W5A0000000000000000000A8 /* VERSION in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000BC /* VERSION */; };
-		7B4097C342D026D4865813E6 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C7611D570BED92819FE5AADD /* Pods_Runner.framework */; };
-		8B8FA766A218889D83EE963F /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 916AC80231ED78D192677E69 /* Pods_RunnerTests.framework */; };
-		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
-		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
-		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
-		0D9F2113B38E5FFDD32D78D0 /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
-		0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04335196CAB80860F8B0B1AB /* Foundation.framework */; };
-		1050AF28EF974F7205A3DFE3 /* IosIncomingShareHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */; };
-		478EE76A47FFCC51A736ECBD /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A26A905D84B280A4FAE80 /* ShareViewController.swift */; };
-		82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
-		8DCAD2D7AB85164F01BA9CA9 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A4542529DC8187D43E5FB488 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7CDA787C43D9F507E7690744 /* Localizable.strings */; };
+		W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000E2 /* RootfsPatch.bundle */; };
+		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
+		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
+		W5D0000000000000000000A1 /* WorkspaceDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */; };
+		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		A10000000000000000000005 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = A10000000000000000000020;
-			remoteInfo = GenerationActivityExtension;
-		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		A10000000000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000020;
+			remoteInfo = GenerationActivityExtension;
 		};
 		EDF13361E6AF333E182FE033 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -80,6 +80,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		9705A1C41CF9048500538489 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000006 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -92,37 +102,18 @@
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9705A1C41CF9048500538489 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		W5A0000000000000000000E2 /* RootfsPatch.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; name = RootfsPatch.bundle; path = sandbox/resources/RootfsPatch.bundle; sourceTree = SOURCE_ROOT; };
-		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
-		CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskNotifications.swift; sourceTree = "<group>"; };
-		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
-		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
-		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
-		W5A0000000000000000E003 /* KelivoISHEnvironment.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHEnvironment.m; sourceTree = "<group>"; };
-		W5A0000000000000000F003 /* KelivoISHFilesystem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHFilesystem.m; sourceTree = "<group>"; };
-		W5D0000000000000000F003 /* KelivoISHMountTarget.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHMountTarget.m; sourceTree = "<group>"; };
-		A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelivoGenerationActivityAttributes.swift; sourceTree = "<group>"; };
-		A10000000000000000000011 /* GenerationActivityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationActivityExtension.swift; sourceTree = "<group>"; };
-		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A10000000000000000000013 /* GenerationActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GenerationActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		04335196CAB80860F8B0B1AB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		0495245F03CA1F742DAD1950 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		1D3F4E750538A82FAF68A312 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		1F8FF45839D55317C55B7458 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		2D37ECD2D8CBA942136040B8 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		31790E2C03AF99B98A3F05B1 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IncomingShareInbox.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
@@ -133,37 +124,14 @@
 		54161FAF2E6B1465001222B5 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/LaunchScreen.strings"; sourceTree = "<group>"; };
 		54161FB02E6B1519001222B5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Main.strings; sourceTree = "<group>"; };
 		54161FB12E6B1519001222B5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/LaunchScreen.strings; sourceTree = "<group>"; };
+		55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IosIncomingShareHandler.swift; sourceTree = "<group>"; };
 		6AFE7891365C1A6043202DEE /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		6ECC4D7E49DE76801658ECA7 /* zh-Hant */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BAC000000000000000000002 /* AppBackupPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupPolicy.swift; sourceTree = "<group>"; };
-		B610A5500000000000000002 /* BrowserGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserGlassView.swift; sourceTree = "<group>"; };
-		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
-		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalToolsHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000012 /* LocationToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationToolHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000013 /* WeatherToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherToolHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000014 /* HealthToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthToolHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000015 /* RemindersToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersToolHandler.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000016 /* DeviceToolsSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolsSupport.swift; sourceTree = "<group>"; };
-		A2DT00000000000000000021 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
-		A2DT00000000000000000032 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
-		W5A0000000000000000000B1 /* WorkspacePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePlugin.swift; sourceTree = "<group>"; };
-		W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDirectoryAccess.swift; sourceTree = "<group>"; };
-		W5A0000000000000000000B2 /* RootfsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsInstaller.swift; sourceTree = "<group>"; };
-		W5A0000000000000000000B3 /* KelivoISHKernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHKernel.h; sourceTree = "<group>"; };
-		W5A0000000000000000000B4 /* KelivoISHKernel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHKernel.m; sourceTree = "<group>"; };
-		W5A0000000000000000000B5 /* KelivoISHExecutor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHExecutor.h; sourceTree = "<group>"; };
-		W5A0000000000000000000B6 /* KelivoISHExecutor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHExecutor.m; sourceTree = "<group>"; };
-		W5A0000000000000000000B7 /* KelivoISHCrashGuards.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHCrashGuards.h; sourceTree = "<group>"; };
-		W5A0000000000000000000B8 /* KelivoISHCrashGuards.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = KelivoISHCrashGuards.c; sourceTree = "<group>"; };
-		W5A0000000000000000000B9 /* WorkspaceBridging.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WorkspaceBridging.h; sourceTree = "<group>"; };
-		W5A0000000000000000000BD /* KelivoISHCompat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHCompat.h; sourceTree = "<group>"; };
-		W5A0000000000000000000BA /* alpine-rootfs.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = "alpine-rootfs.zip"; path = "sandbox/resources/alpine-rootfs.zip"; sourceTree = SOURCE_ROOT; };
-		W5A0000000000000000000BB /* overlay */ = {isa = PBXFileReference; lastKnownFileType = folder; name = overlay; path = sandbox/overlay; sourceTree = SOURCE_ROOT; };
-		W5A0000000000000000000BC /* VERSION */ = {isa = PBXFileReference; lastKnownFileType = text; name = VERSION; path = sandbox/resources/VERSION; sourceTree = SOURCE_ROOT; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		916AC80231ED78D192677E69 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		94A24F1C708902710CB67D29 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -172,24 +140,57 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0FC04191A5EC777C16F7895 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelivoGenerationActivityAttributes.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* GenerationActivityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationActivityExtension.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000013 /* GenerationActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GenerationActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalToolsHandler.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000012 /* LocationToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationToolHandler.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000013 /* WeatherToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherToolHandler.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000014 /* HealthToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthToolHandler.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000015 /* RemindersToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersToolHandler.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000016 /* DeviceToolsSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolsSupport.swift; sourceTree = "<group>"; };
+		A2DT00000000000000000021 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
+		A2DT00000000000000000032 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
+		B610A5500000000000000002 /* BrowserGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserGlassView.swift; sourceTree = "<group>"; };
+		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
+		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
+		BAC000000000000000000002 /* AppBackupPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupPolicy.swift; sourceTree = "<group>"; };
+		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
 		C7611D570BED92819FE5AADD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		04335196CAB80860F8B0B1AB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		0495245F03CA1F742DAD1950 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		31790E2C03AF99B98A3F05B1 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IncomingShareInbox.swift; sourceTree = "<group>"; };
-		55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IosIncomingShareHandler.swift; sourceTree = "<group>"; };
-		6ECC4D7E49DE76801658ECA7 /* zh-Hant */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		94A24F1C708902710CB67D29 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskNotifications.swift; sourceTree = "<group>"; };
 		E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		F26A26A905D84B280A4FAE80 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		F91265C744C63BBCFA99BC1C /* zh-Hans */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		W5A0000000000000000000B1 /* WorkspacePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePlugin.swift; sourceTree = "<group>"; };
+		W5A0000000000000000000B2 /* RootfsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsInstaller.swift; sourceTree = "<group>"; };
+		W5A0000000000000000000B3 /* KelivoISHKernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHKernel.h; sourceTree = "<group>"; };
+		W5A0000000000000000000B4 /* KelivoISHKernel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHKernel.m; sourceTree = "<group>"; };
+		W5A0000000000000000000B5 /* KelivoISHExecutor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHExecutor.h; sourceTree = "<group>"; };
+		W5A0000000000000000000B6 /* KelivoISHExecutor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHExecutor.m; sourceTree = "<group>"; };
+		W5A0000000000000000000B7 /* KelivoISHCrashGuards.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHCrashGuards.h; sourceTree = "<group>"; };
+		W5A0000000000000000000B8 /* KelivoISHCrashGuards.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = KelivoISHCrashGuards.c; sourceTree = "<group>"; };
+		W5A0000000000000000000B9 /* WorkspaceBridging.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WorkspaceBridging.h; sourceTree = "<group>"; };
+		W5A0000000000000000000BA /* alpine-rootfs.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = "alpine-rootfs.zip"; path = "sandbox/resources/alpine-rootfs.zip"; sourceTree = SOURCE_ROOT; };
+		W5A0000000000000000000BB /* overlay */ = {isa = PBXFileReference; lastKnownFileType = folder; name = overlay; path = sandbox/overlay; sourceTree = SOURCE_ROOT; };
+		W5A0000000000000000000BC /* VERSION */ = {isa = PBXFileReference; lastKnownFileType = text; name = VERSION; path = sandbox/resources/VERSION; sourceTree = SOURCE_ROOT; };
+		W5A0000000000000000000BD /* KelivoISHCompat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHCompat.h; sourceTree = "<group>"; };
+		W5A0000000000000000000E2 /* RootfsPatch.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; name = RootfsPatch.bundle; path = sandbox/resources/RootfsPatch.bundle; sourceTree = SOURCE_ROOT; };
+		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
+		W5A0000000000000000E003 /* KelivoISHEnvironment.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHEnvironment.m; sourceTree = "<group>"; };
+		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
+		W5A0000000000000000F003 /* KelivoISHFilesystem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHFilesystem.m; sourceTree = "<group>"; };
+		W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDirectoryAccess.swift; sourceTree = "<group>"; };
+		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
+		W5D0000000000000000F003 /* KelivoISHMountTarget.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHMountTarget.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000000000014 /* Frameworks */ = {
+		3C7BE9764F9D913A3F4A4A63 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,19 +203,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B69A7C04EBB248ABE59E3E79 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				8B8FA766A218889D83EE963F /* Pods_RunnerTests.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		3C7BE9764F9D913A3F4A4A63 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,6 +238,25 @@
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
 			);
 			path = RunnerTests;
+			sourceTree = "<group>";
+		};
+		6A42D8FF3EFBE7251AEFEC44 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				04335196CAB80860F8B0B1AB /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		8566581D0EE5A7CDF6B18251 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				F26A26A905D84B280A4FAE80 /* ShareViewController.swift */,
+				94A24F1C708902710CB67D29 /* Info.plist */,
+				E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */,
+				7CDA787C43D9F507E7690744 /* Localizable.strings */,
+			);
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -275,43 +294,6 @@
 				0495245F03CA1F742DAD1950 /* ShareExtension.appex */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		W5A0000000000000000000C1 /* Workspace */ = {
-			isa = PBXGroup;
-			children = (
-				W5A0000000000000000000B9 /* WorkspaceBridging.h */,
-				W5A0000000000000000000BD /* KelivoISHCompat.h */,
-				W5A0000000000000000E002 /* KelivoISHEnvironment.h */,
-				W5A0000000000000000F002 /* KelivoISHFilesystem.h */,
-				W5D0000000000000000F002 /* KelivoISHMountTarget.h */,
-				W5A0000000000000000E003 /* KelivoISHEnvironment.m */,
-				W5A0000000000000000F003 /* KelivoISHFilesystem.m */,
-				W5D0000000000000000F003 /* KelivoISHMountTarget.m */,
-				W5A0000000000000000000B1 /* WorkspacePlugin.swift */,
-				W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */,
-				W5A0000000000000000000B2 /* RootfsInstaller.swift */,
-				W5A0000000000000000000B3 /* KelivoISHKernel.h */,
-				W5A0000000000000000000B4 /* KelivoISHKernel.m */,
-				W5A0000000000000000000B5 /* KelivoISHExecutor.h */,
-				W5A0000000000000000000B6 /* KelivoISHExecutor.m */,
-				W5A0000000000000000000B7 /* KelivoISHCrashGuards.h */,
-				W5A0000000000000000000B8 /* KelivoISHCrashGuards.c */,
-			);
-			path = Workspace;
-			sourceTree = "<group>";
-		};
-		A2DT00000000000000000020 /* DeviceTools */ = {
-			isa = PBXGroup;
-			children = (
-				A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */,
-				A2DT00000000000000000016 /* DeviceToolsSupport.swift */,
-				A2DT00000000000000000012 /* LocationToolHandler.swift */,
-				A2DT00000000000000000013 /* WeatherToolHandler.swift */,
-				A2DT00000000000000000014 /* HealthToolHandler.swift */,
-				A2DT00000000000000000015 /* RemindersToolHandler.swift */,
-			);
-			path = DeviceTools;
 			sourceTree = "<group>";
 		};
 		97C146F01CF9000F007C117D /* Runner */ = {
@@ -352,6 +334,28 @@
 			path = GenerationActivityExtension;
 			sourceTree = "<group>";
 		};
+		A2DT00000000000000000020 /* DeviceTools */ = {
+			isa = PBXGroup;
+			children = (
+				A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */,
+				A2DT00000000000000000016 /* DeviceToolsSupport.swift */,
+				A2DT00000000000000000012 /* LocationToolHandler.swift */,
+				A2DT00000000000000000013 /* WeatherToolHandler.swift */,
+				A2DT00000000000000000014 /* HealthToolHandler.swift */,
+				A2DT00000000000000000015 /* RemindersToolHandler.swift */,
+			);
+			path = DeviceTools;
+			sourceTree = "<group>";
+		};
+		BA8BE8A40AC544D84FF92C67 /* IncomingShare */ = {
+			isa = PBXGroup;
+			children = (
+				32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */,
+				55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */,
+			);
+			path = IncomingShare;
+			sourceTree = "<group>";
+		};
 		CB99E8CD1E59B0861193D1F0 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
@@ -365,56 +369,33 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
-		6A42D8FF3EFBE7251AEFEC44 /* iOS */ = {
+		W5A0000000000000000000C1 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
-				04335196CAB80860F8B0B1AB /* Foundation.framework */,
+				W5A0000000000000000000B9 /* WorkspaceBridging.h */,
+				W5A0000000000000000000BD /* KelivoISHCompat.h */,
+				W5A0000000000000000E002 /* KelivoISHEnvironment.h */,
+				W5A0000000000000000F002 /* KelivoISHFilesystem.h */,
+				W5D0000000000000000F002 /* KelivoISHMountTarget.h */,
+				W5A0000000000000000E003 /* KelivoISHEnvironment.m */,
+				W5A0000000000000000F003 /* KelivoISHFilesystem.m */,
+				W5D0000000000000000F003 /* KelivoISHMountTarget.m */,
+				W5A0000000000000000000B1 /* WorkspacePlugin.swift */,
+				W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */,
+				W5A0000000000000000000B2 /* RootfsInstaller.swift */,
+				W5A0000000000000000000B3 /* KelivoISHKernel.h */,
+				W5A0000000000000000000B4 /* KelivoISHKernel.m */,
+				W5A0000000000000000000B5 /* KelivoISHExecutor.h */,
+				W5A0000000000000000000B6 /* KelivoISHExecutor.m */,
+				W5A0000000000000000000B7 /* KelivoISHCrashGuards.h */,
+				W5A0000000000000000000B8 /* KelivoISHCrashGuards.c */,
 			);
-			name = iOS;
-			sourceTree = "<group>";
-		};
-		8566581D0EE5A7CDF6B18251 /* ShareExtension */ = {
-			isa = PBXGroup;
-			children = (
-				F26A26A905D84B280A4FAE80 /* ShareViewController.swift */,
-				94A24F1C708902710CB67D29 /* Info.plist */,
-				E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */,
-				7CDA787C43D9F507E7690744 /* Localizable.strings */,
-			);
-			name = ShareExtension;
-			path = ShareExtension;
-			sourceTree = "<group>";
-		};
-		BA8BE8A40AC544D84FF92C67 /* IncomingShare */ = {
-			isa = PBXGroup;
-			children = (
-				32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */,
-				55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */,
-			);
-			name = IncomingShare;
-			path = IncomingShare;
+			path = Workspace;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000000000000000000020 /* GenerationActivityExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000033 /* Build configuration list for PBXNativeTarget "GenerationActivityExtension" */;
-			buildPhases = (
-				A10000000000000000000022 /* Sources */,
-				A10000000000000000000014 /* Frameworks */,
-				A10000000000000000000021 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = GenerationActivityExtension;
-			productName = GenerationActivityExtension;
-			productReference = A10000000000000000000013 /* GenerationActivityExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 		331C8080294A63A400263BE5 /* RunnerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
@@ -433,6 +414,23 @@
 			productName = RunnerTests;
 			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		5D77F8F7B311DF23353EE6FB /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				9AF88A06BE3F0B2D0DA656EA /* Sources */,
+				3C7BE9764F9D913A3F4A4A63 /* Frameworks */,
+				CC7DABCE36A2DB0905437219 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			productName = ShareExtension;
+			productReference = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		97C146ED1CF9000F007C117D /* Runner */ = {
 			isa = PBXNativeTarget;
@@ -461,21 +459,21 @@
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
 		};
-		5D77F8F7B311DF23353EE6FB /* ShareExtension */ = {
+		A10000000000000000000020 /* GenerationActivityExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildConfigurationList = A10000000000000000000033 /* Build configuration list for PBXNativeTarget "GenerationActivityExtension" */;
 			buildPhases = (
-				9AF88A06BE3F0B2D0DA656EA /* Sources */,
-				3C7BE9764F9D913A3F4A4A63 /* Frameworks */,
-				CC7DABCE36A2DB0905437219 /* Resources */,
+				A10000000000000000000022 /* Sources */,
+				A10000000000000000000014 /* Frameworks */,
+				A10000000000000000000021 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = ShareExtension;
-			productName = ShareExtension;
-			productReference = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */;
+			name = GenerationActivityExtension;
+			productName = GenerationActivityExtension;
+			productReference = A10000000000000000000013 /* GenerationActivityExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -543,13 +541,6 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A10000000000000000000021 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		331C807F294A63A400263BE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -569,6 +560,13 @@
 				W5A0000000000000000000A7 /* overlay in Resources */,
 				W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */,
 				W5A0000000000000000000A8 /* VERSION in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000021 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -670,6 +668,28 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		D6AF127E7CD083F3F091647B /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RunnerTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
 		W5A0000000000000000000D1 /* Ensure Workspace Sandbox Artifacts */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -707,40 +727,9 @@
 			shellScript = "\"${SRCROOT}/sandbox/ensure_artifacts.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D6AF127E7CD083F3F091647B /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-RunnerTests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A10000000000000000000022 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A10000000000000000000003 /* GenerationActivityExtension.swift in Sources */,
-				A10000000000000000000002 /* KelivoGenerationActivityAttributes.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		331C807D294A63A400263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -791,14 +780,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000003 /* GenerationActivityExtension.swift in Sources */,
+				A10000000000000000000002 /* KelivoGenerationActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A10000000000000000000023 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = A10000000000000000000020 /* GenerationActivityExtension */;
-			targetProxy = A10000000000000000000005 /* PBXContainerItemProxy */;
-		};
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
@@ -810,9 +803,24 @@
 			target = 5D77F8F7B311DF23353EE6FB /* ShareExtension */;
 			targetProxy = EDF13361E6AF333E182FE033 /* PBXContainerItemProxy */;
 		};
+		A10000000000000000000023 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000020 /* GenerationActivityExtension */;
+			targetProxy = A10000000000000000000005 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
+		7CDA787C43D9F507E7690744 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				31790E2C03AF99B98A3F05B1 /* en */,
+				F91265C744C63BBCFA99BC1C /* zh-Hans */,
+				6ECC4D7E49DE76801658ECA7 /* zh-Hant */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
 		97C146FA1CF9000F007C117D /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -835,68 +843,30 @@
 			name = LaunchScreen.storyboard;
 			sourceTree = "<group>";
 		};
-		7CDA787C43D9F507E7690744 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				31790E2C03AF99B98A3F05B1 /* en */,
-				F91265C744C63BBCFA99BC1C /* zh-Hans */,
-				6ECC4D7E49DE76801658ECA7 /* zh-Hant */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		A10000000000000000000030 /* Debug */ = {
+		03BAA9DC0E10A4F47A1EE1B9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		A10000000000000000000031 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				DEVELOPMENT_TEAM = 5WN7Y88J52;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -905,35 +875,6 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
-		};
-		A10000000000000000000032 /* Profile */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				DEVELOPMENT_TEAM = 5WN7Y88J52;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Profile;
 		};
 		249021D3217E4FDB00AE95B9 /* Profile */ = {
 			isa = XCBuildConfiguration;
@@ -1095,6 +1036,36 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
 			};
 			name = Profile;
+		};
+		4BFA2ADB82F20990FC8B2038 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 5WN7Y88J52;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		97C147031CF9000F007C117D /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1314,27 +1285,55 @@
 			};
 			name = Release;
 		};
-		03BAA9DC0E10A4F47A1EE1B9 /* Release */ = {
+		A10000000000000000000030 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000000031 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 5WN7Y88J52;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -1344,35 +1343,34 @@
 			};
 			name = Release;
 		};
-		4BFA2ADB82F20990FC8B2038 /* Debug */ = {
+		A10000000000000000000032 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				INFOPLIST_FILE = GenerationActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.GenerationActivityExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = Profile;
 		};
 		CFEC6A17D27639C3DF44B6E8 /* Profile */ = {
 			isa = XCBuildConfiguration;
@@ -1407,12 +1405,12 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000033 /* Build configuration list for PBXNativeTarget "GenerationActivityExtension" */ = {
+		0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A10000000000000000000030 /* Debug */,
-				A10000000000000000000031 /* Release */,
-				A10000000000000000000032 /* Profile */,
+				03BAA9DC0E10A4F47A1EE1B9 /* Release */,
+				4BFA2ADB82F20990FC8B2038 /* Debug */,
+				CFEC6A17D27639C3DF44B6E8 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1447,12 +1445,12 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+		A10000000000000000000033 /* Build configuration list for PBXNativeTarget "GenerationActivityExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				03BAA9DC0E10A4F47A1EE1B9 /* Release */,
-				4BFA2ADB82F20990FC8B2038 /* Debug */,
-				CFEC6A17D27639C3DF44B6E8 /* Profile */,
+				A10000000000000000000030 /* Debug */,
+				A10000000000000000000031 /* Release */,
+				A10000000000000000000032 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
