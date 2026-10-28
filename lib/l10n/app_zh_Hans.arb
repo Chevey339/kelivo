@@ -4502,7 +4502,7 @@
   "oauthLastUpdated": "更新于 {time}",
   "oauthSyncModels": "同步",
   "oauthSyncing": "正在同步模型…",
-  "oauthModelsHint": "可用模型由账号同步。",
+  "oauthModelsHint": "可用模型由账号同步。选择要在模型列表中启用的模型，选择会在同步和重新登录后保留。",
   "oauthNoModels": "同步模型后即可开始对话",
   "oauthConnection": "接入",
   "oauthConnectionInfo": "接入信息",

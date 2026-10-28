@@ -168,6 +168,63 @@ void main() {
     },
   );
 
+  test(
+    'disabling one model clears only its assistant and conversation bindings',
+    () async {
+      final chat = createService();
+      await chat.init();
+      final assistants = await _createLoadedAssistantProvider(
+        session: session,
+        chatService: chat,
+        assistants: const [
+          {
+            'id': 'assistant-delete',
+            'name': 'Disabled model',
+            'chatModelProvider': 'p',
+            'chatModelId': 'hide',
+          },
+          {
+            'id': 'assistant-keep',
+            'name': 'Enabled model',
+            'chatModelProvider': 'p',
+            'chatModelId': 'keep',
+          },
+          {
+            'id': 'assistant-other',
+            'name': 'Other provider',
+            'chatModelProvider': 'other',
+            'chatModelId': 'hide',
+          },
+        ],
+      );
+      final conversations = <String>[];
+      for (final (provider, model) in [
+        ('p', 'hide'),
+        ('p', 'keep'),
+        ('other', 'hide'),
+      ]) {
+        final conversation = await chat.createConversation(title: model);
+        await chat.setConversationModel(
+          conversation.id,
+          providerKey: provider,
+          modelId: model,
+        );
+        conversations.add(conversation.id);
+      }
+      await assistants.clearModelSelectionsForProvider('p', modelId: 'hide');
+      expect(assistants.getById('assistant-delete')!.chatModelId, isNull);
+      expect(assistants.getById('assistant-keep')!.chatModelId, 'keep');
+      expect(assistants.getById('assistant-other')!.chatModelId, 'hide');
+      expect(chat.getConversation(conversations[0])!.chatModelId, isNull);
+      expect(chat.getConversation(conversations[1])!.chatModelId, 'keep');
+      expect(chat.getConversation(conversations[2])!.chatModelId, 'hide');
+      final reloaded = createService();
+      await reloaded.init();
+      expect(reloaded.getConversation(conversations[0])!.chatModelId, isNull);
+      expect(reloaded.getConversation(conversations[1])!.chatModelId, 'keep');
+    },
+  );
+
   group('AssistantProvider cascade delete', () {
     test(
       'deletes conversations and messages owned by the deleted assistant',

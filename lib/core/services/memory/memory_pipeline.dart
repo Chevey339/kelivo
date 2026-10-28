@@ -428,9 +428,10 @@ class MemoryPipelineService {
     }
     // Provider/model must still exist (D-20).
     final cfg = settings.getProviderConfig(provKey);
-    if (cfg.models.isNotEmpty &&
-        !cfg.models.contains(mdlId) &&
-        cfg.modelOverrides[mdlId] == null) {
+    if (cfg.disabledModels.contains(mdlId) ||
+        (cfg.models.isNotEmpty &&
+            !cfg.models.contains(mdlId) &&
+            cfg.modelOverrides[mdlId] == null)) {
       return const MemoryOrganizeResult(
         advanced: false,
         gate: null,

@@ -19,6 +19,7 @@ import '../../../desktop/model_spec_edit_dialog.dart';
 import '../../model/pages/model_spec_edit_page.dart';
 import '../widgets/oauth_account_card.dart';
 import '../widgets/oauth_login_panel.dart';
+import '../widgets/oauth_model_switch.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/oauth_connection_info.dart';
 import '../widgets/provider_prompt_cache_settings.dart';
@@ -416,7 +417,7 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${config.models.length}',
+                            '${config.enabledModels.length}/${config.models.length}',
                             style: TextStyle(
                               fontSize: 12,
                               color: cs.onSurface.withValues(alpha: .55),
@@ -468,6 +469,21 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
                                       null
                                   ? null
                                   : model,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.chevronRight,
+                                    size: 16,
+                                    color: cs.onSurface.withValues(alpha: .9),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OAuthModelSwitch(
+                                    providerId: config.id,
+                                    modelId: model,
+                                  ),
+                                ],
+                              ),
                               onTap: () => ResponsiveHelper.isDesktop(context)
                                   ? showDesktopModelSpecEditDialog(
                                       context,

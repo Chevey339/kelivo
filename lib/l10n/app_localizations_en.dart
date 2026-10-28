@@ -12485,7 +12485,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get oauthModelsHint =>
-      'Available models are synced from your account.';
+      'Available models are synced from your account. Choose which models appear in the model picker. Your choices are kept when syncing or signing in again.';
 
   @override
   String get oauthNoModels => 'Sync models to start chatting';

@@ -22344,7 +22344,7 @@ abstract class AppLocalizations {
   /// No description provided for @oauthModelsHint.
   ///
   /// In en, this message translates to:
-  /// **'Available models are synced from your account.'**
+  /// **'Available models are synced from your account. Choose which models appear in the model picker. Your choices are kept when syncing or signing in again.'**
   String get oauthModelsHint;
 
   /// No description provided for @oauthNoModels.

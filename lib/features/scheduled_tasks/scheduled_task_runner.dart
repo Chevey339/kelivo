@@ -71,7 +71,7 @@ Future<Map<String, Object?>> runScheduledTask(
       : null;
   if (modelOverride != null) {
     final config = settings.getProviderConfig(modelOverride.providerKey);
-    if (!config.enabled || !config.models.contains(modelOverride.modelId)) {
+    if (!config.enabled || !config.isModelEnabled(modelOverride.modelId)) {
       throw StateError('model_missing');
     }
   }

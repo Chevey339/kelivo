@@ -68,6 +68,52 @@ Future<({SettingsProvider settings, BusinessTestHarness harness})> loadAccounts(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'sync retains disabled models across reloads and catalog changes',
+    () async {
+      final loaded = await loadAccounts([account()]);
+      var response = catalog();
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient((_) async => response),
+      )..bind(loaded.settings);
+      addTearDown(service.dispose);
+      await loaded.settings.loaded;
+      await loaded.settings.setModelEnabled('account', 'gpt-6-sol', false);
+      await service.syncOutdatedModels(loaded.settings);
+      var saved = loaded.settings.getProviderConfig('account');
+      expect(saved.enabledModels, ['gpt-6.1-sol']);
+      expect(saved.disabledModels, {'gpt-6-sol'});
+      expect(saved.modelOverrides['gpt-6-sol']['temperature'], .7);
+
+      final reloaded = SettingsProvider(loaded.harness.preferences);
+      addTearDown(reloaded.dispose);
+      await reloaded.loaded;
+      service.bind(reloaded);
+      response = http.Response(
+        jsonEncode({
+          'models': [
+            {'slug': 'gpt-6.1-sol'},
+          ],
+        }),
+        200,
+      );
+      await service.syncModels('account');
+      expect(reloaded.getProviderConfig('account').models, ['gpt-6.1-sol']);
+      expect(reloaded.getProviderConfig('account').disabledModels, {
+        'gpt-6-sol',
+      });
+
+      response = catalog();
+      await service.syncModels('account');
+      saved = reloaded.getProviderConfig('account');
+      expect(saved.models, ['gpt-6-sol', 'gpt-6.1-sol']);
+      expect(saved.enabledModels, ['gpt-6.1-sol']);
+      await reloaded.setModelEnabled('account', 'gpt-6.1-sol', false);
+      await service.syncModels('account');
+      expect(reloaded.getProviderConfig('account').enabledModels, isEmpty);
+    },
+  );
+
   for (final previousVersion in [null, '0.153.0']) {
     test(
       'startup refreshes version $previousVersion once across reloads',
@@ -230,6 +276,7 @@ void main() {
       final automatic = service.syncOutdatedModels(loaded.settings);
       await started.future;
       final manual = service.syncModels('account');
+      await loaded.settings.setModelEnabled('account', 'gpt-6-sol', false);
       await loaded.settings.setProviderConfig(
         'account',
         loaded.settings.providerConfigs['account']!.copyWith(
@@ -251,6 +298,7 @@ void main() {
       final saved = loaded.settings.providerConfigs['account']!;
       expect(calls, 1);
       expect(saved.name, 'Renamed');
+      expect(saved.enabledModels, ['gpt-6.1-sol']);
       expect(saved.modelOverrides['gpt-6-sol']['name'], 'My Sol');
       expect(saved.modelOverrides['gpt-6-sol']['type'], 'image');
       expect(saved.modelOverrides['gpt-6-sol']['temperature'], .2);

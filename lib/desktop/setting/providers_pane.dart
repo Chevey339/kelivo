@@ -2347,7 +2347,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _GreyCapsule(label: '${config.models.length}'),
+                  _GreyCapsule(
+                    label:
+                        '${config.enabledModels.length}/${config.models.length}',
+                  ),
                   const Spacer(),
                   _IconTextBtn(
                     icon: widget.syncingModels
@@ -7122,7 +7125,10 @@ class _ModelRow extends StatelessWidget {
                       );
                     },
                   ),
-                  if (!cfg.isOAuth) ...[
+                  if (cfg.isOAuth) ...[
+                    const SizedBox(width: 4),
+                    OAuthModelSwitch(providerId: providerKey, modelId: modelId),
+                  ] else ...[
                     const SizedBox(width: 4),
                     _IconBtn(
                       key: ValueKey('desktop-provider-model-remove-$modelId'),

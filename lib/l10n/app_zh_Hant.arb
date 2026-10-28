@@ -4526,7 +4526,7 @@
   "oauthLastUpdated": "更新於 {time}",
   "oauthSyncModels": "同步",
   "oauthSyncing": "正在同步模型…",
-  "oauthModelsHint": "可用模型由帳號同步。",
+  "oauthModelsHint": "可用模型由帳號同步。選擇要在模型清單中啟用的模型，選擇會在同步和重新登入後保留。",
   "oauthNoModels": "同步模型後即可開始對話",
   "oauthConnection": "連線",
   "oauthConnectionInfo": "連線資訊",

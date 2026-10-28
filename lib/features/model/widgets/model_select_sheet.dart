@@ -114,11 +114,11 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
 
   providers.forEach((key, cfg) {
     if (!cfg.enabled) return;
-    if (cfg.models.isEmpty) return;
+    if (cfg.enabledModels.isEmpty) return;
 
     final name = cfg.name;
     final list = <_ModelItem>[
-      for (final mid in cfg.models)
+      for (final mid in cfg.enabledModels)
         () {
           final spec = ModelSpecResolver.instance.spec(cfg, mid);
           return _ModelItem(
@@ -145,6 +145,9 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (parts.length < 2) continue;
     final pk = parts[0];
     final mid = parts.sublist(1).join('::');
+    if (data.providerConfigs[pk]?.disabledModels.contains(mid) == true) {
+      continue;
+    }
     final g = groups[pk];
     if (g == null) continue;
     final found = g.items.firstWhere(
@@ -538,6 +541,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }
 
   Future<void> _jumpToCurrentSelection() async {
+    if (!mounted || _rows.isEmpty) return;
     // If user has entered a search query, decouple from previous selection
     // and jump to the first matching provider group instead.
     final currentQuery = _search.text.trim();
@@ -1029,6 +1033,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           if (parts.length < 2) continue;
           final pk = parts[0];
           final mid = parts.sublist(1).join('::');
+          if (settings.getProviderConfig(pk).disabledModels.contains(mid)) {
+            continue;
+          }
           final g = _groups[pk];
           if (g == null) continue;
           final found = g.items.firstWhere(
@@ -1977,6 +1984,9 @@ class _DesktopModelSelectDialogBodyState
           if (parts.length < 2) continue;
           final pk = parts[0];
           final mid = parts.sublist(1).join('::');
+          if (settings.getProviderConfig(pk).disabledModels.contains(mid)) {
+            continue;
+          }
           final g = _groups[pk];
           if (g == null) continue;
           final found = g.items.firstWhere(
@@ -2206,6 +2216,7 @@ class _DesktopModelSelectDialogBodyState
   }
 
   Future<void> _autoScrollToCurrent() async {
+    if (!mounted || _rows.isEmpty) return;
     // Ensure controller is attached to the list before scrolling
     if (!_itemScrollController.isAttached) {
       Future.delayed(const Duration(milliseconds: 60), () {

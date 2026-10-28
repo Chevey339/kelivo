@@ -201,6 +201,32 @@ void main() {
     });
   }
 
+  testWidgets('task cannot run with a disabled model', (tester) async {
+    final harness = await mount(tester);
+    await tester.runAsync(() async {
+      await harness.settings.setModelEnabled(
+        'task-provider',
+        'task-model',
+        false,
+      );
+      final task = ScheduledTask(
+        id: 'task',
+        name: 'Task',
+        prompt: 'Prompt',
+        assistantId: 'assistant',
+        hour: 8,
+        minute: 0,
+        modelProvider: 'task-provider',
+        modelId: 'task-model',
+      );
+      expect(
+        await harness.run(null, task),
+        isA<StateError>().having((e) => e.message, 'message', 'model_missing'),
+      );
+      expect(harness.viewModel.requests, isEmpty);
+    });
+  });
+
   testWidgets('busy target does not acquire a cancellation callback', (
     tester,
   ) async {

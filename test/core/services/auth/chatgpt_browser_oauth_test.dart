@@ -27,6 +27,17 @@ void main() {
       var exchanges = 0;
       final service = ProviderOAuthService(
         clientFactory: (_) => MockClient((request) async {
+          if (request.url.path == '/backend-api/codex/models') {
+            return http.Response(
+              jsonEncode({
+                'models': [
+                  {'slug': 'keep'},
+                  {'slug': 'hide'},
+                ],
+              }),
+              200,
+            );
+          }
           exchanges++;
           expect(request.url.toString(), OAuthProvider.chatgpt.tokenEndpoint);
           expect(request.bodyFields['code'], 'browser-code');
@@ -55,7 +66,9 @@ void main() {
           );
         }),
       )..bind(settings);
-      final saved = await service.login(
+      addTearDown(service.dispose);
+      Future<ProviderConfig> login({String? providerId}) => service.login(
+        providerId: providerId,
         provider: OAuthProvider.chatgpt,
         cancellation: OAuthCancellation(),
         deviceCode: false,
@@ -89,10 +102,24 @@ void main() {
           return true;
         },
       );
+      final saved = await login();
       expect(launches, 1);
       expect(prompts, 1);
       expect(exchanges, 1);
       expect(saved.oauthCredentials!.email, 'test@example.com');
+      await service.syncModels(saved.id);
+      await settings.setModelEnabled(saved.id, 'hide', false);
+      await service.logout(saved.id);
+      final reconnected = await login(providerId: saved.id);
+      expect(
+        reconnected.oauthCredentials!.sessionId,
+        isNot(saved.oauthCredentials!.sessionId),
+      );
+      await service.syncModels(saved.id);
+      expect(settings.getProviderConfig(saved.id).enabledModels, ['keep']);
+      expect(settings.getProviderConfig(saved.id).disabledModels, {'hide'});
+      expect(launches, 2);
+      expect(exchanges, 2);
       final rebound = await HttpServer.bind(InternetAddress.loopbackIPv4, 1455);
       await rebound.close(force: true);
     },

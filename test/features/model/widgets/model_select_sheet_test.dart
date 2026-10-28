@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -183,6 +184,76 @@ Future<void> _dismissModelSelector(WidgetTester tester) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final (platform, limited) in [
+    for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS])
+      for (final limited in [false, true]) (platform, limited),
+  ]) {
+    testWidgets(
+      'model picker excludes disabled models and pinned entries on $platform limited=$limited',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        tester.view.physicalSize = platform == TargetPlatform.iOS
+            ? const Size(390, 844)
+            : const Size(1100, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        try {
+          final settings = await _settingsWithOnlyTestProviders(tester);
+          addTearDown(settings.dispose);
+          for (final key in settings.providerConfigs.keys) {
+            await settings.removeProviderConfig(key);
+          }
+          await settings.setProviderConfig(
+            'oauth',
+            ProviderConfig(
+              id: 'oauth',
+              enabled: true,
+              name: 'OAuth account',
+              apiKey: '',
+              baseUrl: OAuthProvider.chatgpt.baseUrl,
+              oauthProvider: OAuthProvider.chatgpt,
+              models: ['enabled-model', 'disabled-model'],
+              disabledModels: {'disabled-model'},
+            ),
+          );
+          // Old/imported favorites must not bypass the disabled-model filter.
+          await settings.togglePinModel('oauth', 'disabled-model');
+          await settings.setCurrentModel('oauth', 'enabled-model');
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            limitProviderKey: limited ? 'oauth' : null,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('enabled-model'), findsOneWidget);
+          expect(
+            find.textContaining('disabled-model', findRichText: true),
+            findsNothing,
+          );
+          Navigator.of(tester.element(find.text('enabled-model'))).pop();
+          await tester.pumpAndSettle();
+          await settings.setModelEnabled('oauth', 'enabled-model', false);
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            limitProviderKey: limited ? 'oauth' : null,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('enabled-model'), findsNothing);
+          expect(
+            find.textContaining('disabled-model', findRichText: true),
+            findsNothing,
+          );
+          tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+          await tester.pumpAndSettle();
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
 
   testWidgets(
     'mobile model selector uses explicit initial model over global current model',

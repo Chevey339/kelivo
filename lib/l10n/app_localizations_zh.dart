@@ -11939,7 +11939,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oauthSyncing => '正在同步模型…';
 
   @override
-  String get oauthModelsHint => '可用模型由账号同步。';
+  String get oauthModelsHint => '可用模型由账号同步。选择要在模型列表中启用的模型，选择会在同步和重新登录后保留。';
 
   @override
   String get oauthNoModels => '同步模型后即可开始对话';
@@ -26460,7 +26460,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get oauthSyncing => '正在同步模型…';
 
   @override
-  String get oauthModelsHint => '可用模型由账号同步。';
+  String get oauthModelsHint => '可用模型由账号同步。选择要在模型列表中启用的模型，选择会在同步和重新登录后保留。';
 
   @override
   String get oauthNoModels => '同步模型后即可开始对话';
@@ -41059,7 +41059,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get oauthSyncing => '正在同步模型…';
 
   @override
-  String get oauthModelsHint => '可用模型由帳號同步。';
+  String get oauthModelsHint => '可用模型由帳號同步。選擇要在模型清單中啟用的模型，選擇會在同步和重新登入後保留。';
 
   @override
   String get oauthNoModels => '同步模型後即可開始對話';

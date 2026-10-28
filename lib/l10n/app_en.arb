@@ -5652,7 +5652,7 @@
   },
   "oauthSyncModels": "Sync",
   "oauthSyncing": "Syncing models…",
-  "oauthModelsHint": "Available models are synced from your account.",
+  "oauthModelsHint": "Available models are synced from your account. Choose which models appear in the model picker. Your choices are kept when syncing or signing in again.",
   "oauthNoModels": "Sync models to start chatting",
   "oauthConnection": "Connection",
   "oauthConnectionInfo": "Connection details",
