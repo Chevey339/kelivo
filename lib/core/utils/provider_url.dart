@@ -124,9 +124,9 @@ String resolveRequestUrl(
       if (c.vertexAI == true &&
           c.location?.isNotEmpty == true &&
           c.projectId?.isNotEmpty == true) {
-        final location = stream ? c.location!.trim() : c.location!;
-        final project = stream ? c.projectId!.trim() : c.projectId!;
-        return 'https://aiplatform.googleapis.com/v1/projects/$project/locations/$location/publishers/google/models/$model:$endpoint';
+        final location = c.location!.trim();
+        final project = c.projectId!.trim();
+        return '${vertexOfficialOrigin(location)}/v1/projects/$project/locations/$location/publishers/google/models/$model:$endpoint';
       }
       return '$base/models/$model:$endpoint';
   }
@@ -152,14 +152,16 @@ String providerVertexOrigin(ProviderConfig config, String loc) {
       host == 'aiplatform.googleapis.com' ||
       host.endsWith('-aiplatform.googleapis.com') ||
       RegExp(r'^aiplatform\.[a-z]+\.rep\.googleapis\.com$').hasMatch(host);
-  if (official) {
-    final l = loc.toLowerCase();
-    final regional = switch (l) {
-      'global' => 'aiplatform.googleapis.com',
-      'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
-      _ => '$l-aiplatform.googleapis.com',
-    };
-    return 'https://$regional';
-  }
+  if (official) return vertexOfficialOrigin(loc);
   return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
+}
+
+String vertexOfficialOrigin(String loc) {
+  final l = loc.toLowerCase();
+  final host = switch (l) {
+    'global' => 'aiplatform.googleapis.com',
+    'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
+    _ => '$l-aiplatform.googleapis.com',
+  };
+  return 'https://$host';
 }
