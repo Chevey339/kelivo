@@ -362,6 +362,28 @@ void main() {
     expect(assistants.currentAssistant?.mcpServerIds, isEmpty);
   });
 
+  testWidgets(
+    'conversation MCP mode keeps assistant defaults when the model lacks tools',
+    (tester) async {
+      final assistants = await loadAssistantWithMcp(tester);
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants.currentAssistant!.copyWith(allowConversationMcp: true),
+        ),
+      );
+      await pumpComposer(
+        tester,
+        assistants: assistants,
+        isConversationOverride: false,
+      );
+      expect(assistants.currentAssistant!.mcpServerIds, ['server-1']);
+      expect(
+        tester.widget<ChatInputBar>(find.byType(ChatInputBar)).toolsActive,
+        isFalse,
+      );
+    },
+  );
+
   Future<void> pumpTabletComposer(
     WidgetTester tester, {
     required AssistantProvider assistants,

@@ -1487,6 +1487,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantSettingsAtLeastOneAssistantRequired => '至少需要保留一个助手';
 
   @override
+  String get assistantConversationMcpTitle => '允许对话自定义 MCP';
+
+  @override
+  String get assistantConversationMcpHint => '开启后，对话可单独选择 MCP 服务器；未自定义时跟随助手设置。';
+
+  @override
+  String get mcpSelectionInherited => '跟随助手';
+
+  @override
+  String get mcpSelectionCustom => '本对话自定义';
+
+  @override
+  String get mcpInheritAssistant => '跟随助手设置';
+
+  @override
   String get mcpAssistantSheetTitle => 'MCP服务器';
 
   @override
@@ -16204,6 +16219,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantSettingsAtLeastOneAssistantRequired => '至少需要保留一个助手';
 
   @override
+  String get assistantConversationMcpTitle => '允许对话自定义 MCP';
+
+  @override
+  String get assistantConversationMcpHint => '开启后，对话可单独选择 MCP 服务器；未自定义时跟随助手设置。';
+
+  @override
+  String get mcpSelectionInherited => '跟随助手';
+
+  @override
+  String get mcpSelectionCustom => '本对话自定义';
+
+  @override
+  String get mcpInheritAssistant => '跟随助手设置';
+
+  @override
   String get mcpAssistantSheetTitle => 'MCP服务器';
 
   @override
@@ -30845,6 +30875,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantSettingsAtLeastOneAssistantRequired => '至少需要保留一個助理';
+
+  @override
+  String get assistantConversationMcpTitle => '允許對話自訂 MCP';
+
+  @override
+  String get assistantConversationMcpHint => '開啟後，對話可單獨選擇 MCP 伺服器；未自訂時跟隨助手設定。';
+
+  @override
+  String get mcpSelectionInherited => '跟隨助手';
+
+  @override
+  String get mcpSelectionCustom => '本對話自訂';
+
+  @override
+  String get mcpInheritAssistant => '跟隨助手設定';
 
   @override
   String get mcpAssistantSheetTitle => 'MCP伺服器';

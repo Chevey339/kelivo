@@ -221,11 +221,17 @@ class ToolHandlerService {
   // Tool Definitions Builder
   // ============================================================================
 
-  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
+  McpToolRouteSnapshot captureMcpToolRoutes(
+    Assistant? assistant, {
+    String? conversationId,
+  }) {
     return contextProvider.read<McpToolService>().captureRoutesForAssistant(
       contextProvider.read<McpProvider>(),
       contextProvider.read<AssistantProvider>(),
       assistantId: assistant?.id,
+      conversation: conversationId == null
+          ? null
+          : contextProvider.read<ChatService>().getConversation(conversationId),
       reservedNames: BuiltInToolNames.all,
     );
   }
@@ -235,7 +241,7 @@ class ToolHandlerService {
   /// Returns a list of tool definitions including:
   /// - Search tool (if enabled and model supports tools)
   /// - Memory tools (if assistant has memory / past-recall enabled)
-  /// - MCP tools (from selected servers for the assistant)
+  /// - MCP tools (from the effective conversation or assistant selection)
   /// Whether the chat being generated is a throwaway one.
   ///
   /// Scheduled sends can target a different conversation from the visible one.
@@ -317,6 +323,7 @@ class ToolHandlerService {
       providerKey: providerKey,
       supportsTools: supportsTools,
       mcpRouteSnapshot: mcpRouteSnapshot,
+      conversationId: conversationId,
     );
     toolDefs.addAll(mcpTools);
 
@@ -348,6 +355,7 @@ class ToolHandlerService {
     required String providerKey,
     required bool supportsTools,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    String? conversationId,
   }) {
     if (!supportsTools) return [];
 
@@ -357,6 +365,9 @@ class ToolHandlerService {
       mcp,
       contextProvider.read<AssistantProvider>(),
       assistant?.id,
+      conversation: conversationId == null
+          ? null
+          : contextProvider.read<ChatService>().getConversation(conversationId),
       routeSnapshot: mcpRouteSnapshot,
       reservedNames: BuiltInToolNames.all,
     );
@@ -426,12 +437,19 @@ class ToolHandlerService {
     // Capture AssistantProvider reference before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    ChatService? permissionChat;
+    try {
+      permissionChat = contextProvider.read<ChatService>();
+    } catch (_) {}
     final routes =
         mcpRouteSnapshot ??
         toolSvc.captureRoutesForAssistant(
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           reservedNames: BuiltInToolNames.all,
         );
 
@@ -441,10 +459,6 @@ class ToolHandlerService {
       return '${name}_${DateTime.now().microsecondsSinceEpoch}';
     }
 
-    ChatService? permissionChat;
-    try {
-      permissionChat = contextProvider.read<ChatService>();
-    } catch (_) {}
     ToolCallPermission permissionFor(String name, String? toolCallId) =>
         ToolCallPermission(
           toolName: name,
@@ -469,6 +483,9 @@ class ToolHandlerService {
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           toolName: name,
           routeSnapshot: routes,
         )) {
@@ -485,6 +502,9 @@ class ToolHandlerService {
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           toolName: name,
           routeSnapshot: routes,
           reservedNames: BuiltInToolNames.all,
@@ -496,6 +516,9 @@ class ToolHandlerService {
         mcp,
         assistantProvider,
         assistantId: assistant?.id,
+        conversation: conversationId == null
+            ? null
+            : permissionChat?.getConversation(conversationId),
         toolName: name,
         arguments: args,
         routeSnapshot: routes,

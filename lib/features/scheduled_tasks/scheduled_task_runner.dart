@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/database/generation_run.dart';
 import '../../core/models/chat_input_data.dart';
 import '../../core/models/conversation.dart';
+import '../../core/models/conversation_mcp_settings.dart';
 import '../../core/models/workspace_binding.dart';
 import '../../core/models/scheduled_task.dart';
 import '../../core/providers/assistant_provider.dart';
@@ -75,7 +76,10 @@ Future<Map<String, Object?>> runScheduledTask(
       throw StateError('model_missing');
     }
   }
-  for (final id in assistant.mcpServerIds) {
+  for (final id in ConversationMcpSettings.effectiveServerIds(
+    assistant,
+    targetConversation,
+  )) {
     cancellation.check();
     final server = mcp.getById(id);
     if (server == null || !server.enabled) continue;

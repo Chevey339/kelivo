@@ -1546,6 +1546,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'At least one assistant is required';
 
   @override
+  String get assistantConversationMcpTitle => 'Allow per-conversation MCP';
+
+  @override
+  String get assistantConversationMcpHint =>
+      'Let conversations choose their own MCP servers. Conversations use the assistant’s selection until customized.';
+
+  @override
+  String get mcpSelectionInherited => 'Following assistant';
+
+  @override
+  String get mcpSelectionCustom => 'Custom for this chat';
+
+  @override
+  String get mcpInheritAssistant => 'Use assistant settings';
+
+  @override
   String get mcpAssistantSheetTitle => 'MCP Servers';
 
   @override

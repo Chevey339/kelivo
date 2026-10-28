@@ -141,7 +141,7 @@ void main() {
       expect(fork.title, 'Fork title');
       expect(fork.assistantId, 'assistant');
       expect(fork.isPinned, isFalse);
-      expect(fork.mcpServerIds, isEmpty);
+      expect(fork.mcpServerIds, const ['mcp-server']);
       expect(fork.truncateIndex, -1);
       expect(fork.summary, isNull);
       expect(fork.chatSuggestions, isEmpty);

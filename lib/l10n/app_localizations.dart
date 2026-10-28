@@ -2938,6 +2938,36 @@ abstract class AppLocalizations {
   /// **'At least one assistant is required'**
   String get assistantSettingsAtLeastOneAssistantRequired;
 
+  /// No description provided for @assistantConversationMcpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow per-conversation MCP'**
+  String get assistantConversationMcpTitle;
+
+  /// No description provided for @assistantConversationMcpHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Let conversations choose their own MCP servers. Conversations use the assistant’s selection until customized.'**
+  String get assistantConversationMcpHint;
+
+  /// No description provided for @mcpSelectionInherited.
+  ///
+  /// In en, this message translates to:
+  /// **'Following assistant'**
+  String get mcpSelectionInherited;
+
+  /// No description provided for @mcpSelectionCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom for this chat'**
+  String get mcpSelectionCustom;
+
+  /// No description provided for @mcpInheritAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Use assistant settings'**
+  String get mcpInheritAssistant;
+
   /// No description provided for @mcpAssistantSheetTitle.
   ///
   /// In en, this message translates to:

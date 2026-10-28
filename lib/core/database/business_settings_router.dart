@@ -546,6 +546,7 @@ final class BusinessSettingsRouter {
             'useIso8601TimeFormat',
             'allowConversationSystemPrompt',
             'allowConversationPromptInjection',
+            'allowConversationMcp',
           },
           numbers: const {
             'temperature',

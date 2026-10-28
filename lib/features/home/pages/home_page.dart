@@ -1306,6 +1306,7 @@ class _HomePageState extends State<HomePage>
             context,
             anchorKey: _inputBarKey,
             assistantId: a.id,
+            conversationId: _controller.currentConversation?.id,
             supportsModelTools:
                 chatModel.providerKey != null &&
                 chatModel.modelId != null &&

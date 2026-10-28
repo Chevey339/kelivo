@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation_mcp_settings.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
@@ -180,9 +181,9 @@ class ChatInputSection extends StatelessWidget {
           );
 
     // Enforce model capabilities: disable MCP selection if model doesn't
-    // support tools. Skipped while the conversation overrides the model —
-    // these writes land on the assistant and would leak across conversations.
-    if (!chatModelIsConversationOverride) {
+    // support tools. Skip this when model or MCP selection can be scoped to
+    // a conversation: these writes would affect the shared assistant defaults.
+    if (!chatModelIsConversationOverride && a?.allowConversationMcp != true) {
       _enforceModelCapabilities(context, settings, ap, a, pk, mid);
     }
 
@@ -406,7 +407,14 @@ class ChatInputSection extends StatelessWidget {
     if (workspaceBound) return true;
     if ((a?.localToolIds ?? const <String>[]).isNotEmpty) return true;
     final connected = context.watch<McpProvider>().connectedServers;
-    final selected = a?.mcpServerIds ?? const <String>[];
+    final selected = a?.allowConversationMcp == true && conversationId != null
+        ? context.select<ChatService, List<String>>(
+            (chat) => ConversationMcpSettings.effectiveServerIds(
+              a,
+              chat.getConversation(conversationId!),
+            ),
+          )
+        : a?.mcpServerIds ?? const <String>[];
     if (selected.isEmpty || connected.isEmpty) return false;
     return connected.any((s) => selected.contains(s.id));
   }

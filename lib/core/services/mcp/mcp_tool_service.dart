@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../../providers/mcp_provider.dart';
+import '../../models/conversation.dart';
+import '../../models/conversation_mcp_settings.dart';
 import '../chat/chat_service.dart';
 import '../../providers/assistant_provider.dart';
 import '../../../utils/mcp_structured_image.dart';
@@ -52,6 +54,7 @@ class McpToolService extends ChangeNotifier {
     McpProvider mcpProvider,
     AssistantProvider assistants,
     String? assistantId, {
+    Conversation? conversation,
     McpToolRouteSnapshot? routeSnapshot,
     Set<String> reservedNames = const {},
   }) {
@@ -61,7 +64,10 @@ class McpToolService extends ChangeNotifier {
     final a = (assistantId != null)
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
-    final selected = (a?.mcpServerIds ?? const <String>[]).toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      a,
+      conversation,
+    ).toSet();
     return _exposedTools(mcpProvider, selected, reservedNames: reservedNames);
   }
 
@@ -133,17 +139,21 @@ class McpToolService extends ChangeNotifier {
   Future<McpToolResult> callToolForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
+    Conversation? conversation,
     required String? assistantId,
     required String toolName,
     Map<String, dynamic> arguments = const {},
     McpToolRouteSnapshot? routeSnapshot,
     Set<String> reservedNames = const {},
   }) async {
-    // try servers selected for the assistant
+    // Resolve selection again before executing a captured route.
     final a = (assistantId != null)
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
-    final selected = (a?.mcpServerIds ?? const <String>[]).toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      a,
+      conversation,
+    ).toSet();
     // debugPrint('[MCP/Call/Select] assistant=${assistantId ?? a?.id ?? '(current)'} tool=$toolName selectedServers=${selected.join(',')}');
     if (selected.isEmpty) return const McpToolResult();
     final routes =
@@ -184,6 +194,7 @@ class McpToolService extends ChangeNotifier {
   Future<String> callToolTextForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
+    Conversation? conversation,
     required String? assistantId,
     required String toolName,
     Map<String, dynamic> arguments = const {},
@@ -194,6 +205,7 @@ class McpToolService extends ChangeNotifier {
       mcpProvider,
       assistants,
       assistantId: assistantId,
+      conversation: conversation,
       toolName: toolName,
       arguments: arguments,
       routeSnapshot: routeSnapshot,
@@ -204,6 +216,7 @@ class McpToolService extends ChangeNotifier {
   bool toolNeedsApprovalForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
+    Conversation? conversation,
     required String? assistantId,
     required String toolName,
     McpToolRouteSnapshot? routeSnapshot,
@@ -212,7 +225,10 @@ class McpToolService extends ChangeNotifier {
     final assistant = assistantId != null
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
-    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      assistant,
+      conversation,
+    ).toSet();
     final publishedRoute = routeSnapshot != null
         ? routeSnapshot._find(toolName)
         : _findRoute(
@@ -233,6 +249,7 @@ class McpToolService extends ChangeNotifier {
   bool isToolEnabledForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
+    Conversation? conversation,
     required String? assistantId,
     required String toolName,
     required McpToolRouteSnapshot routeSnapshot,
@@ -240,7 +257,10 @@ class McpToolService extends ChangeNotifier {
     final assistant = assistantId != null
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
-    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      assistant,
+      conversation,
+    ).toSet();
     final published = routeSnapshot._find(toolName);
     return published != null &&
         _currentRouteForIdentity(mcpProvider, selected, published) != null;
@@ -249,13 +269,17 @@ class McpToolService extends ChangeNotifier {
   McpToolRouteSnapshot captureRoutesForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
+    Conversation? conversation,
     required String? assistantId,
     Set<String> reservedNames = const {},
   }) {
     final assistant = assistantId != null
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
-    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      assistant,
+      conversation,
+    ).toSet();
     return McpToolRouteSnapshot._(
       _toolRoutes(mcpProvider, selected, reservedNames: reservedNames),
     );

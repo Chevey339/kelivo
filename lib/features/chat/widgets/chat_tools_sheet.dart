@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
+import '../utils/ensure_conversation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
@@ -33,7 +36,19 @@ Future<void> showChatToolsSheet(
   BuildContext context, {
   required String assistantId,
   String? conversationId,
-}) {
+}) async {
+  if (context
+          .read<AssistantProvider>()
+          .getById(assistantId)
+          ?.allowConversationMcp ==
+      true) {
+    conversationId = await ensureConversationId(
+      context,
+      conversationId: conversationId,
+      assistantId: assistantId,
+    );
+    if (conversationId == null || !context.mounted) return;
+  }
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -173,6 +188,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
                           ),
                           _McpGroup(
                             assistantId: widget.assistantId,
+                            conversationId: widget.conversationId,
                             expanded: _expanded.contains(_ToolsGroupId.mcp),
                             onToggle: () => _toggleGroup(_ToolsGroupId.mcp),
                           ),
@@ -409,11 +425,13 @@ class _LocalToolsGroup extends StatelessWidget {
 class _McpGroup extends StatelessWidget {
   const _McpGroup({
     required this.assistantId,
+    required this.conversationId,
     required this.expanded,
     required this.onToggle,
   });
 
   final String assistantId;
+  final String? conversationId;
   final bool expanded;
   final VoidCallback onToggle;
 
@@ -425,12 +443,22 @@ class _McpGroup extends StatelessWidget {
       (provider) => provider.getById(assistantId),
     );
     if (assistant == null) return const SliverToBoxAdapter();
+    final conversationScoped =
+        assistant.allowConversationMcp && conversationId != null;
+    final conversation = conversationScoped
+        ? context.select<ChatService, Conversation?>(
+            (chat) => chat.getConversation(conversationId!),
+          )
+        : null;
+    final inherited = !ConversationMcpSettings.isOverridden(conversation);
     final groups = mcpToolGroups(mcp);
     final servers = groups
         .expand((group) => group.servers)
         .toList(growable: false);
-    // Nothing connected means nothing to choose from — skip the empty block.
-    if (servers.isEmpty) return const SliverToBoxAdapter();
+    // Keep inheritance and clear controls available when servers disconnect.
+    if (servers.isEmpty && !conversationScoped) {
+      return const SliverToBoxAdapter();
+    }
 
     final rows = <({String? title, McpServerConfig? server})>[
       for (final group in groups) ...[
@@ -440,19 +468,28 @@ class _McpGroup extends StatelessWidget {
       ],
     ];
 
-    final selected = assistant.mcpServerIds.toSet();
+    final selected = ConversationMcpSettings.effectiveServerIds(
+      assistant,
+      conversation,
+    ).toSet();
     final selectedCount = servers
         .where((server) => selected.contains(server.id))
         .length;
 
-    Future<void> setIds(Iterable<String> ids) {
+    Future<void> setIds(Iterable<String>? ids) {
+      if (conversationScoped) {
+        return context.read<ChatService>().setConversationMcpServers(
+          conversationId!,
+          ids?.toList(growable: false),
+        );
+      }
       return context.read<AssistantProvider>().updateAssistant(
-        assistant.copyWith(mcpServerIds: ids.toList(growable: false)),
+        assistant.copyWith(mcpServerIds: ids!.toList(growable: false)),
       );
     }
 
     Future<void> setSelected(String id, bool value) {
-      final next = assistant.mcpServerIds.toSet();
+      final next = selected.toSet();
       if (value) {
         next.add(id);
       } else {
@@ -467,12 +504,40 @@ class _McpGroup extends StatelessWidget {
           child: _ToolsGroup(
             key: ChatToolsSheet.mcpGroupKey,
             title: l10n.mcpAssistantSheetTitle,
-            summary: '$selectedCount/${servers.length}',
+            summary: conversationScoped
+                ? '${inherited ? l10n.mcpSelectionInherited : l10n.mcpSelectionCustom} · $selectedCount/${servers.length}'
+                : '$selectedCount/${servers.length}',
             expanded: expanded,
             onToggle: onToggle,
             children: const [],
           ),
         ),
+        if (expanded && conversationScoped)
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                ToolsSheetRow(
+                  key: const ValueKey('chat-tools-mcp-inherit'),
+                  icon: Lucide.RotateCcw,
+                  label: l10n.mcpInheritAssistant,
+                  subtitle: inherited
+                      ? l10n.mcpSelectionInherited
+                      : l10n.mcpSelectionCustom,
+                  selected: inherited,
+                  onTap: () => unawaited(setIds(null)),
+                ),
+                const SizedBox(height: 8),
+                ToolsSheetRow(
+                  key: const ValueKey('chat-tools-mcp-clear'),
+                  icon: Lucide.CircleX,
+                  label: l10n.mcpAssistantSheetClearAll,
+                  selected: !inherited && selected.isEmpty,
+                  onTap: () => unawaited(setIds(const [])),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         if (expanded)
           SliverList.builder(
             addRepaintBoundaries: false,

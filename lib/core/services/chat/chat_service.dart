@@ -39,6 +39,7 @@ import '../api/providers/google_gemini.dart';
 import '../api/providers/openai/responses_history.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
+import '../../models/conversation_mcp_settings.dart';
 import '../../models/workspace_binding.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
@@ -171,6 +172,30 @@ class ChatService extends ChangeNotifier {
   }
 
   final Map<String, Conversation> _draftConversations = {};
+
+  // Message writes publish a captured conversation after awaiting the writer.
+  // Order MCP edits with that publication so an older snapshot cannot undo them.
+  final Map<String, Future<void>> _conversationPublications = {};
+
+  Future<T> _serializeConversationPublication<T>(
+    String conversationId,
+    Future<T> Function() action,
+  ) {
+    final previous =
+        _conversationPublications[conversationId] ?? Future<void>.value();
+    final result = previous.then((_) => action());
+    late final Future<void> tail;
+    tail = result
+        .then<void>((_) {}, onError: (Object _, StackTrace __) {})
+        .whenComplete(() {
+          if (identical(_conversationPublications[conversationId], tail)) {
+            _conversationPublications.remove(conversationId);
+          }
+        });
+    _conversationPublications[conversationId] = tail;
+    return result;
+  }
+
   final Set<String> _temporaryConversationIds = <String>{};
   // Evicting these ids could reopen persistence races with background work.
   final Set<String> _discardedTemporaryConversationIds = <String>{};
@@ -2828,28 +2853,35 @@ class ChatService extends ChangeNotifier {
     return c?.mcpServerIds ?? const <String>[];
   }
 
+  /// Null restores inheritance; an empty list explicitly disables all MCP.
   Future<void> setConversationMcpServers(
     String conversationId,
-    List<String> serverIds,
-  ) async {
+    List<String>? serverIds,
+  ) => _serializeConversationPublication(conversationId, () async {
     if (!_initialized) await init();
-    if (_draftConversations.containsKey(conversationId)) {
-      final draft = _draftConversations[conversationId]!;
-      draft.mcpServerIds = List.of(serverIds);
-      draft.updatedAt = DateTime.now();
+    final ids = serverIds?.toSet().toList();
+    final draft = _draftConversations[conversationId];
+    if (draft != null) {
+      final updated = draft.copyWith(
+        mcpServerIds: ids ?? const [],
+        extras: ConversationMcpSettings.updateExtras(
+          draft.extras,
+          override: ids != null,
+        ),
+        updatedAt: DateTime.now(),
+      );
+      _draftConversations[conversationId] = updated;
+      _repo.composerDrafts.updateSeed(updated);
       _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
-    final c = _conversationsCache[conversationId];
-    if (c == null) return;
-    c.mcpServerIds = List.of(serverIds);
-    c.updatedAt = DateTime.now();
-    await _saveConversation(c);
+    await _repo.updateConversationMcpServers(conversationId, ids);
+    await _refreshConversation(conversationId);
     _bumpConversationListRevision();
     _bumpContextRevision(conversationId);
     notifyListeners();
-  }
+  });
 
   Future<void> toggleConversationMcpServer(
     String conversationId,
@@ -3143,7 +3175,7 @@ class ChatService extends ChangeNotifier {
     bool selectVersion = false,
     String? temporaryAfterGroupId,
     UiContextSubmission? uiContext,
-  }) async {
+  }) => _serializeConversationPublication(conversationId, () async {
     if (!_initialized) await init();
 
     var conversation = _conversationsCache[conversationId];
@@ -3253,7 +3285,7 @@ class ChatService extends ChangeNotifier {
 
     notifyListeners();
     return message;
-  }
+  });
 
   Future<GenerationBeginResult> beginSendGeneration({
     required String conversationId,
@@ -3262,7 +3294,7 @@ class ChatService extends ChangeNotifier {
     required String providerId,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
-  }) async {
+  }) => _serializeConversationPublication(conversationId, () async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
       throw StateError('temporary_generation_is_not_persisted');
@@ -3298,7 +3330,7 @@ class ChatService extends ChangeNotifier {
     );
     await _publishGenerationBegin(result);
     return result;
-  }
+  });
 
   Future<GenerationBeginResult> beginRegeneration({
     required String conversationId,
@@ -3308,7 +3340,7 @@ class ChatService extends ChangeNotifier {
     required int version,
     required bool truncateFuture,
     String? expectedContextState,
-  }) async {
+  }) => _serializeConversationPublication(conversationId, () async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
       throw StateError('temporary_generation_is_not_persisted');
@@ -3339,7 +3371,7 @@ class ChatService extends ChangeNotifier {
     }
     await _publishGenerationBegin(result);
     return result;
-  }
+  });
 
   Future<GenerationBeginResult> beginAssistantGeneration({
     required String conversationId,
@@ -3348,7 +3380,7 @@ class ChatService extends ChangeNotifier {
     required String anchorGroupId,
     required bool truncateFuture,
     String? expectedContextState,
-  }) async {
+  }) => _serializeConversationPublication(conversationId, () async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
       throw StateError('temporary_generation_is_not_persisted');
@@ -3376,7 +3408,7 @@ class ChatService extends ChangeNotifier {
     _firstGroupIndicesCache.remove(conversationId);
     await _publishGenerationBegin(result);
     return result;
-  }
+  });
 
   Future<void> _publishGenerationBegin(GenerationBeginResult result) async {
     final conversationId = result.conversation.id;
@@ -3985,10 +4017,14 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) await init();
     Map<String, dynamic> sourceExtras = const <String, dynamic>{};
+    List<String>? sourceMcpServerIds;
     for (final message in sourceMessages) {
       final existing = getConversation(message.conversationId);
       if (existing != null) {
         sourceExtras = Map<String, dynamic>.from(existing.extras);
+        if (ConversationMcpSettings.isOverridden(existing)) {
+          sourceMcpServerIds = List<String>.of(existing.mcpServerIds);
+        }
         break;
       }
     }
@@ -3997,6 +4033,7 @@ class ChatService extends ChangeNotifier {
       assistantId: assistantId,
       sourceMessages: sourceMessages,
       sourceExtras: sourceExtras,
+      sourceMcpServerIds: sourceMcpServerIds,
       activationOwner: _currentConversationId,
       activate: activate,
     );
@@ -4007,6 +4044,7 @@ class ChatService extends ChangeNotifier {
     required String? assistantId,
     required List<ChatMessage> sourceMessages,
     required Map<String, dynamic> sourceExtras,
+    required List<String>? sourceMcpServerIds,
     required String? activationOwner,
     bool activate = true,
   }) async {
@@ -4032,6 +4070,9 @@ class ChatService extends ChangeNotifier {
     );
     try {
       await _copyConversationSettingsFrom(persisted.id, sourceExtras);
+      if (sourceMcpServerIds != null) {
+        await setConversationMcpServers(persisted.id, sourceMcpServerIds);
+      }
       _messagesCache[persisted.id] = <ChatMessage>[];
       _messageOrderIds[persisted.id] = <String>[];
       _messageCounts[persisted.id] = 0;

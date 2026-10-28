@@ -318,6 +318,7 @@ class MessageGenerationService {
 
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,
+      conversationId: currentConversation?.id,
     );
     final toolDefs = generationController.buildToolDefinitions(
       settings,

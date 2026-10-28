@@ -28,6 +28,7 @@ import '../models/chat_message.dart';
 import '../models/context_operation.dart';
 import '../models/token_usage.dart';
 import '../models/conversation.dart';
+import '../models/conversation_mcp_settings.dart';
 import '../models/message_part.dart';
 import '../utils/multimodal_input_utils.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -4575,6 +4576,30 @@ class ChatDatabaseRepository {
     });
   }
 
+  /// Null restores inheritance; an empty list explicitly disables all MCP.
+  Future<void> updateConversationMcpServers(
+    String conversationId,
+    List<String>? serverIds,
+  ) => _db.transaction(() async {
+    final row = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+    if (row == null) throw StateError('conversation_not_found');
+    final extras = ConversationMcpSettings.updateExtras(
+      _decodeExtrasJson(row.extrasJson),
+      override: serverIds != null,
+    );
+    await (_db.update(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).write(
+      ConversationRowsCompanion(
+        extrasJson: Value(jsonEncode(extras)),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    await _replaceMcpServers(conversationId, serverIds ?? const []);
+  });
+
   Future<Conversation?> duplicateConversation(String sourceId) async {
     await genUiStates.flush();
     return _writeTransaction(() async {
@@ -4875,6 +4900,7 @@ class ChatDatabaseRepository {
                 chatModelProvider: source.chatModelProvider,
                 chatModelId: source.chatModelId,
                 chatSuggestions: suggestions,
+                mcpServerIds: source.mcpServerIds,
                 messageIds: [
                   for (final message in kept) messageIdMap[message.id]!,
                 ],
@@ -4882,6 +4908,7 @@ class ChatDatabaseRepository {
               ),
             ),
           );
+      await _replaceMcpServers(targetId, source.mcpServerIds);
       await _copyMessageRowsInto(
         targetConversationId: targetId,
         messages: kept,

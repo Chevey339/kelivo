@@ -95,8 +95,14 @@ class GenerationController {
   // Tool Definitions Builder (delegated to ToolHandlerService)
   // ============================================================================
 
-  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
-    return toolHandlerService.captureMcpToolRoutes(assistant);
+  McpToolRouteSnapshot captureMcpToolRoutes(
+    Assistant? assistant, {
+    String? conversationId,
+  }) {
+    return toolHandlerService.captureMcpToolRoutes(
+      assistant,
+      conversationId: conversationId,
+    );
   }
 
   /// Prepare tool definitions for API call.
