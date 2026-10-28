@@ -386,6 +386,7 @@ class BrandAssets {
     'anthropic.svg',
     'grok.svg',
     'xai.svg',
+    'kimi-color.svg',
     'openrouter.svg',
     'vercel.svg',
     'ollama.svg',
