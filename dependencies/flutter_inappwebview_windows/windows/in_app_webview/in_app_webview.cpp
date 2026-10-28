@@ -254,6 +254,45 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
+    if (!browserShortcutRegistered_) {
+      const auto hr = webViewController->add_AcceleratorKeyPressed(
+        Callback<ICoreWebView2AcceleratorKeyPressedEventHandler>(
+          [this, alive = alive_](ICoreWebView2Controller*, ICoreWebView2AcceleratorKeyPressedEventArgs* args) -> HRESULT {
+            if (!*alive || !plugin || !*plugin->alive || !plugin->browserShortcutsEnabled) return S_OK;
+            HWND host = nullptr;
+            webViewController->get_ParentWindow(&host);
+            if (!host || GetAncestor(host, GA_ROOT) != GetForegroundWindow()) return S_OK;
+            COREWEBVIEW2_KEY_EVENT_KIND kind;
+            args->get_KeyEventKind(&kind);
+            if (kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN && kind != COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN) return S_OK;
+            UINT key = 0;
+            args->get_VirtualKey(&key);
+            std::string command;
+            if (GetKeyState(VK_CONTROL) & 0x8000) command += "ctrl+";
+            if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000) command += "cmd+";
+            if (GetKeyState(VK_MENU) & 0x8000) command += "alt+";
+            if (GetKeyState(VK_SHIFT) & 0x8000) command += "shift+";
+            if (key >= 'A' && key <= 'Z') command += static_cast<char>(key - 'A' + 'a');
+            else if (key == VK_TAB) command += "tab";
+            else if (key == VK_F6) command += "f6";
+            else if (key == VK_ESCAPE) command += "escape";
+            else if (key == VK_OEM_COMMA) command += "comma";
+            else if (key == VK_OEM_4) command += "bracketleft";
+            else if (key == VK_OEM_6) command += "bracketright";
+            else return S_OK;
+            if (!plugin->browserShortcutCommands.count(command)) return S_OK;
+            // WebView2 requires the handled decision synchronously. Deliver only
+            // accepted commands to Dart, leaving editing keys with the page.
+            args->put_Handled(TRUE);
+            COREWEBVIEW2_PHYSICAL_KEY_STATUS status{};
+            args->get_PhysicalKeyStatus(&status);
+            if (!status.WasKeyDown) plugin->browserWindowChannel->InvokeMethod(
+              "shortcut", std::make_unique<flutter::EncodableValue>(command));
+            return S_OK;
+          }).Get(), &browserShortcutToken_);
+      browserShortcutRegistered_ = SUCCEEDED(hr);
+    }
+
     wil::com_ptr<ICoreWebView2Settings> webView2Settings;
     auto hrWebView2Settings = webView->get_Settings(&webView2Settings);
     if (succeededOrLog(hrWebView2Settings)) {
@@ -1885,6 +1924,7 @@ namespace flutter_inappwebview_plugin
   {
     debugLog("dealloc InAppWebView");
     *alive_ = false;
+    if (browserShortcutRegistered_ && webViewController) webViewController->remove_AcceleratorKeyPressed(browserShortcutToken_);
     if (screenshotQueue_) screenshotQueue_->cancel();
     if (plugin && plugin->inAppWebViewManager) {
       auto& pending = plugin->inAppWebViewManager->windowWebViews;

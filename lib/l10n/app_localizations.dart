@@ -27155,6 +27155,228 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Undo'**
   String get providerUndo;
+
+  /// No description provided for @sidePanelToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle side panel'**
+  String get sidePanelToggle;
+
+  /// No description provided for @sidePanelFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get sidePanelFiles;
+
+  /// No description provided for @sidePanelTopics.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics'**
+  String get sidePanelTopics;
+
+  /// No description provided for @sidePanelExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand panel'**
+  String get sidePanelExpand;
+
+  /// No description provided for @sidePanelCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit expanded'**
+  String get sidePanelCollapse;
+
+  /// No description provided for @sidePanelAllTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'All tabs'**
+  String get sidePanelAllTabs;
+
+  /// No description provided for @sidePanelMoreTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} more'**
+  String sidePanelMoreTabs(int count);
+
+  /// No description provided for @sidePanelSearchTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Search tabs'**
+  String get sidePanelSearchTabs;
+
+  /// No description provided for @sidePanelOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open file…'**
+  String get sidePanelOpenFile;
+
+  /// No description provided for @sidePanelCloseOthers.
+  ///
+  /// In en, this message translates to:
+  /// **'Close other tabs'**
+  String get sidePanelCloseOthers;
+
+  /// No description provided for @sidePanelCloseRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tabs to the right'**
+  String get sidePanelCloseRight;
+
+  /// No description provided for @sidePanelReopenTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen closed tab'**
+  String get sidePanelReopenTab;
+
+  /// No description provided for @sidePanelPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned · can’t close'**
+  String get sidePanelPinned;
+
+  /// No description provided for @sidePanelMoveTopicsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Move topics back to the left…'**
+  String get sidePanelMoveTopicsLeft;
+
+  /// No description provided for @sidePanelPinnedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics stay pinned while on the right. Change it in Settings › Display › Topic position.'**
+  String get sidePanelPinnedHint;
+
+  /// No description provided for @sidePanelEvictedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Page unloaded'**
+  String get sidePanelEvictedTitle;
+
+  /// No description provided for @sidePanelEvictedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Unloaded in the background to save memory (up to {count} background pages are kept). Reload to continue browsing.'**
+  String sidePanelEvictedBody(int count);
+
+  /// No description provided for @sidePanelEvictedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Unloaded · reload to continue'**
+  String get sidePanelEvictedTooltip;
+
+  /// No description provided for @sidePanelFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'File unavailable'**
+  String get sidePanelFileMissing;
+
+  /// No description provided for @sidePanelFileMissingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{path} was deleted or moved.'**
+  String sidePanelFileMissingBody(String path);
+
+  /// No description provided for @sidePanelRelocate.
+  ///
+  /// In en, this message translates to:
+  /// **'Find again'**
+  String get sidePanelRelocate;
+
+  /// No description provided for @sidePanelBackgroundIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Running in “{topic}”'**
+  String sidePanelBackgroundIn(String topic);
+
+  /// No description provided for @sidePanelWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'{px}px'**
+  String sidePanelWidth(int px);
+
+  /// No description provided for @sidePanelWidthMax.
+  ///
+  /// In en, this message translates to:
+  /// **'max'**
+  String get sidePanelWidthMax;
+
+  /// No description provided for @sidePanelWidthMin.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get sidePanelWidthMin;
+
+  /// No description provided for @sidePanelRecentFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent outputs and attachments'**
+  String get sidePanelRecentFiles;
+
+  /// No description provided for @sidePanelOpenExternalUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Open URL in system browser…'**
+  String get sidePanelOpenExternalUrl;
+
+  /// No description provided for @sidePanelWebPages.
+  ///
+  /// In en, this message translates to:
+  /// **'Web pages'**
+  String get sidePanelWebPages;
+
+  /// No description provided for @hotkeyToggleSidePanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle side panel'**
+  String get hotkeyToggleSidePanel;
+
+  /// No description provided for @hotkeySidePanelNewWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'New web tab'**
+  String get hotkeySidePanelNewWeb;
+
+  /// No description provided for @hotkeySidePanelFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Show files'**
+  String get hotkeySidePanelFiles;
+
+  /// No description provided for @hotkeySidePanelExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand side panel'**
+  String get hotkeySidePanelExpand;
+
+  /// No description provided for @hotkeySidePanelReopenTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen closed tab'**
+  String get hotkeySidePanelReopenTab;
+
+  /// No description provided for @hotkeySidePanelNextTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Next panel tab'**
+  String get hotkeySidePanelNextTab;
+
+  /// No description provided for @hotkeySidePanelPreviousTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous panel tab'**
+  String get hotkeySidePanelPreviousTab;
+
+  /// No description provided for @hotkeySidePanelAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus web address'**
+  String get hotkeySidePanelAddress;
+
+  /// No description provided for @hotkeySidePanelFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle chat and panel focus'**
+  String get hotkeySidePanelFocus;
 }
 
 class _AppLocalizationsDelegate

@@ -119,7 +119,7 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(
-            width: DesktopWorkspaceBar.width,
+            width: 520,
             height: 640,
             child: DesktopWorkspaceBar(conversationId: conversation?.id),
           ),

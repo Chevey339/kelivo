@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:Kelivo/features/browser/browser_panel_controller.dart';
-import 'package:Kelivo/features/home/pages/home_desktop_layout.dart';
+import 'package:Kelivo/desktop/sidebar_resize_handle.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -388,54 +387,6 @@ void main() {
       await mouse.up();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       expect(ends, 1);
-    },
-  );
-
-  testWidgets(
-    'resizing relayouts pane without rebuilding its browser contents',
-    (tester) async {
-      tester.view.physicalSize = const Size(1100, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final controller = BrowserPanelController();
-      var builds = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: BrowserSidePanelHost(
-            controller: controller,
-            child: const SizedBox.expand(),
-            panelBuilder: (_, id, active, close) => Builder(
-              builder: (_) {
-                builds++;
-                return const ColoredBox(
-                  key: ValueKey('pane'),
-                  color: Colors.blue,
-                  child: SizedBox.expand(),
-                );
-              },
-            ),
-          ),
-        ),
-      );
-      controller.open();
-      await tester.pump();
-      final before = builds;
-      final mouse = await tester.startGesture(
-        tester.getCenter(
-          find.byKey(const ValueKey('browserPanelResizeHandle')),
-        ),
-        kind: PointerDeviceKind.mouse,
-      );
-      for (final delta in [-20.0, -30.0, 15.0, 80.0]) {
-        await mouse.moveBy(Offset(delta, 0));
-        await tester.pump();
-      }
-      await mouse.up();
-      expect(tester.getSize(find.byKey(const ValueKey('pane'))).width, 475);
-      expect(builds, before);
-      await tester.pumpWidget(const SizedBox.shrink());
-      controller.dispose();
     },
   );
 }

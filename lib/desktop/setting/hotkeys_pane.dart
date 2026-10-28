@@ -104,9 +104,29 @@ class _HotkeyRow extends StatefulWidget {
 class _HotkeyRowState extends State<_HotkeyRow> {
   bool _recording = false;
   final FocusNode _focusNode = FocusNode(debugLabel: 'hotkey_recorder');
+  HotkeyProvider? _captureProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus && _recording && mounted) _setRecording(false);
+    });
+  }
+
+  void _setRecording(bool value) {
+    _captureProvider ??= context.read<HotkeyProvider>();
+    if (value) {
+      _captureProvider!.beginRecording(this);
+    } else {
+      _captureProvider!.endRecording(this);
+    }
+    setState(() => _recording = value);
+  }
 
   @override
   void dispose() {
+    _captureProvider?.endRecording(this);
     _focusNode.dispose();
     super.dispose();
   }
@@ -121,6 +141,24 @@ class _HotkeyRowState extends State<_HotkeyRow> {
       // Use l10n by key
       final loc = AppLocalizations.of(context)!;
       switch (item.l10nLabelKey) {
+        case 'hotkeyToggleSidePanel':
+          return loc.hotkeyToggleSidePanel;
+        case 'hotkeySidePanelNewWeb':
+          return loc.hotkeySidePanelNewWeb;
+        case 'hotkeySidePanelFiles':
+          return loc.hotkeySidePanelFiles;
+        case 'hotkeySidePanelExpand':
+          return loc.hotkeySidePanelExpand;
+        case 'hotkeySidePanelReopenTab':
+          return loc.hotkeySidePanelReopenTab;
+        case 'hotkeySidePanelNextTab':
+          return loc.hotkeySidePanelNextTab;
+        case 'hotkeySidePanelPreviousTab':
+          return loc.hotkeySidePanelPreviousTab;
+        case 'hotkeySidePanelAddress':
+          return loc.hotkeySidePanelAddress;
+        case 'hotkeySidePanelFocus':
+          return loc.hotkeySidePanelFocus;
         case 'hotkeyToggleAppVisibility':
           return loc.hotkeyToggleAppVisibility;
         case 'hotkeyCloseWindow':
@@ -169,17 +207,17 @@ class _HotkeyRowState extends State<_HotkeyRow> {
                   recording: _recording,
                   displayText: current.isEmpty ? placeholder : current,
                   onTap: () {
-                    setState(() => _recording = true);
+                    _setRecording(true);
                     _focusNode.requestFocus();
                   },
-                  onCancel: () => setState(() => _recording = false),
+                  onCancel: () => _setRecording(false),
                   onSubmit: (cmd) async {
                     // Require at least one modifier; _ShortcutEditor guarantees
                     await context.read<HotkeyProvider>().setCommand(
                       item.id,
                       cmd,
                     );
-                    if (mounted) setState(() => _recording = false);
+                    if (mounted) _setRecording(false);
                   },
                 ),
                 if (_recording)
@@ -187,7 +225,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: () => setState(() => _recording = false),
+                      onTap: () => _setRecording(false),
                     ),
                   ),
               ],
@@ -269,6 +307,10 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
         // Identify non-modifier key on key down
         if (isDown) {
           final key = e.logicalKey;
+          if (key == LogicalKeyboardKey.escape) {
+            widget.onCancel();
+            return;
+          }
           // Ignore pure modifier keys
           if (key == LogicalKeyboardKey.controlLeft ||
               key == LogicalKeyboardKey.controlRight ||
@@ -284,7 +326,11 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
 
           // Map some punctuation/letters
           String? keyToken;
-          if (key == LogicalKeyboardKey.comma) {
+          if (key == LogicalKeyboardKey.tab) {
+            keyToken = 'tab';
+          } else if (key == LogicalKeyboardKey.f6) {
+            keyToken = 'f6';
+          } else if (key == LogicalKeyboardKey.comma) {
             keyToken = 'comma';
           } else if (key == LogicalKeyboardKey.bracketLeft) {
             keyToken = 'bracketleft';
@@ -304,7 +350,8 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
           _key = keyToken;
 
           // Save only when contains at least one modifier
-          if ((_ctrl || _meta || _alt || _shift) && _key != null) {
+          if ((_ctrl || _meta || _alt || _shift || _key == 'f6') &&
+              _key != null) {
             final mods = <String>[];
             if (_ctrl) mods.add('ctrl');
             if (_meta) mods.add('cmd');

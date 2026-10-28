@@ -1,3 +1,6 @@
+import '../../side_panel/desktop_side_panel_controller.dart';
+import '../../side_panel/widgets/side_panel_web_loading.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -70,8 +73,12 @@ class BrowserPage extends StatefulWidget {
     this.onClose,
     this.onExpand,
     this.onDock,
+    this.sidePanel,
+    this.onShowAllTabs,
   });
 
+  final DesktopSidePanelController? sidePanel;
+  final VoidCallback? onShowAllTabs;
   final String? conversationId;
 
   /// Presentation handoffs preserve the selected tab without changing its owner.
@@ -85,10 +92,11 @@ class BrowserPage extends StatefulWidget {
   final VoidCallback? onDock;
 
   @override
-  State<BrowserPage> createState() => _BrowserPageState();
+  State<BrowserPage> createState() => BrowserPageViewState();
 }
 
-class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
+class BrowserPageViewState extends State<BrowserPage>
+    with WidgetsBindingObserver {
   late final BrowserService _service =
       widget.service ?? BrowserService.instance;
   final GlobalKey _startPageBoundary = GlobalKey();
@@ -316,6 +324,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _prepareOpticsWhenSettled([AnimationStatus? _]) {
+    if (widget.sidePanel != null) return;
     if (_opticsScheduled ||
         !mounted ||
         !_service.isInitialized ||
@@ -329,7 +338,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       if (_service.settings.surfaceStyle != BrowserSurfaceStyle.solid) {
         unawaited(BrowserProgressiveEdge.prewarm());
         unawaited(BrowserSwitchLens.prewarm());
-        if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+        if (widget.sidePanel == null &&
+            _service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
           unawaited(BrowserGlass.prewarm(nativeBackdrop: false));
         }
       }
@@ -359,14 +369,42 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     _chromeMotion.value = (progress: 0, animate: false);
   }
 
+  void focusAddress() => _focusAddress();
+  void focusFind() => _focusFind();
+  void reloadPage() {
+    if (_service.isSupported && !_blank) {
+      unawaited(_userRun(() => _service.reload()));
+    }
+  }
+
+  bool escapePanelEditing() {
+    if (_showFind) {
+      _toggleFind();
+      return true;
+    }
+    if (!_editingAddress && !_addressFocus.hasFocus) return false;
+    _addressFocus.unfocus();
+    setState(() => _editingAddress = false);
+    _syncAddress(force: true);
+    return true;
+  }
+
+  bool get _panelUnloaded =>
+      widget.sidePanel != null &&
+      !_blank &&
+      !_service.hasLiveEngine(_service.activeTabId!);
+
+  bool get _canFind => !_blank && _service.isSupported && !_panelUnloaded;
+
   Future<void> _initialize() async {
     try {
       await _service.initialize();
-      if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+      if (widget.sidePanel == null &&
+          _service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
         await BrowserGlass.prewarm();
       }
       if (!mounted) return;
-      if (_service.isSupported) {
+      if (_service.isSupported && widget.sidePanel == null) {
         final conversationId = widget.conversationId;
         final initialTab = _service.tabs
             .where((tab) => tab.id == widget.initialTabId)
@@ -539,7 +577,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     }
     _syncAddress();
     _releaseTabReturnCoverWhenReady();
-    if (_showFind && _findTabId != _service.activeTabId) {
+    if (_showFind && (_findTabId != _service.activeTabId || !_canFind)) {
       _findDebounce?.cancel();
       final previous = _findTabId;
       if (previous != null && _service.tabs.any((tab) => tab.id == previous)) {
@@ -647,6 +685,16 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     });
     unawaited(
       _userRun(() async {
+        if (widget.sidePanel != null && !_service.isSupported) {
+          final url = BrowserService.normalizeAddress(
+            value,
+            searchEngine: _service.settings.searchEngine,
+          );
+          final tabId = _service.activeTabId;
+          if (tabId != null) await _service.setSavedAddress(tabId, url);
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+          return;
+        }
         if (_service.activeTab == null) {
           await _service.createTab(
             url: value,
@@ -660,7 +708,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   Future<void> _newTab() => _run(() async {
-    await _service.createTab(ownerSessionId: widget.conversationId);
+    if (widget.sidePanel != null) {
+      await widget.sidePanel!.newWebTab();
+    } else {
+      await _service.createTab(ownerSessionId: widget.conversationId);
+    }
     if (mounted) _focusAddress();
   });
 
@@ -691,7 +743,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     builder: (context, _) {
       return BrowserScrollConfiguration(
         child: BrowserGlassScope(
-          style: _service.settings.surfaceStyle,
+          style: widget.sidePanel != null
+              ? BrowserSurfaceStyle.solid
+              : _service.settings.surfaceStyle,
           child: Theme(
             data: Theme.of(context).copyWith(
               splashFactory: NoSplash.splashFactory,
@@ -700,7 +754,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               hoverColor: Colors.transparent,
             ),
             child: BrowserGlassBackdrop(
-              native: _desktop || !_blank,
+              native: widget.sidePanel == null && (_desktop || !_blank),
               child: BrowserMenuHost(child: Builder(builder: _buildBrowser)),
             ),
           ),
@@ -719,7 +773,20 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         _addressFocus.hasFocus ||
         (_addressKeyboardSession && keyboardInset > 0);
     return CallbackShortcuts(
-      bindings: widget.shortcutsEnabled
+      bindings: widget.sidePanel != null
+          ? {
+              SingleActivator(
+                LogicalKeyboardKey.keyR,
+                meta: mac,
+                control: !mac,
+              ): reloadPage,
+              SingleActivator(
+                LogicalKeyboardKey.keyF,
+                meta: mac,
+                control: !mac,
+              ): _focusFind,
+            }
+          : widget.shortcutsEnabled
           ? {
               SingleActivator(
                 LogicalKeyboardKey.keyL,
@@ -780,9 +847,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           : const {},
       child: Focus(
         focusNode: _pageFocus,
-        autofocus: true,
+        autofocus: widget.sidePanel == null,
         child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: widget.sidePanel != null
+              ? Colors.transparent
+              : Theme.of(context).colorScheme.surface,
           // Keep the scene behind the system keyboard while editing the URL.
           // Webpage form keyboards retain normal viewport avoidance.
           resizeToAvoidBottomInset: _desktop || !retainKeyboardBackdrop,
@@ -818,6 +887,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                       progress: tab?.progress ?? 0,
                       secure: tab?.url.startsWith('https://') ?? false,
                       compact: _desktop,
+                      focusOutline: widget.sidePanel != null,
                       editing: _editingAddress || _addressFocus.hasFocus,
                       displayText: _displayHost,
                       onEdit: _focusAddress,
@@ -835,16 +905,22 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                     final layout = _desktop
                         ? BrowserWindowChrome(
                             windowSpacing: !widget.embedded,
-                            shortcutsEnabled: widget.shortcutsEnabled,
+                            shortcutsEnabled:
+                                widget.shortcutsEnabled &&
+                                widget.sidePanel == null,
                             onShortcut: _handleWindowShortcut,
                             child: BrowserViewportInsets(
                               tabId: _service.activeTabId,
                               viewIdentity: tab?.runtimeVersion,
-                              top: BrowserDesktopLayout.headerHeight,
+                              top: widget.sidePanel == null
+                                  ? BrowserDesktopLayout.headerHeight
+                                  : 0,
                               builder: (context, underlap) =>
                                   BrowserDesktopLayout(
                                     embedded: widget.embedded,
-                                    underlapHeader: underlap,
+                                    showTabBar: widget.sidePanel == null,
+                                    underlapHeader:
+                                        widget.sidePanel == null && underlap,
                                     tabBar: BrowserTabStrip(
                                       service: _service,
                                       tabs: _service.tabsForSession(
@@ -904,7 +980,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                     findBar: _showFind
                                         ? _findBar(context)
                                         : null,
-                                    content: _desktopContent(context, underlap),
+                                    content: _panelFrame(
+                                      context,
+                                      _desktopContent(context, underlap),
+                                    ),
                                   ),
                             ),
                           )
@@ -1388,12 +1467,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       compactActions: more(),
       actions: BrowserDesktopControlGroup(
         children: [
-          BrowserActionButton(
-            compact: true,
-            label: l.browserTabs,
-            icon: LucideIcons.panelsTopLeft,
-            onPressed: _openTabs,
-          ),
+          if (widget.sidePanel == null)
+            BrowserActionButton(
+              compact: true,
+              label: l.browserTabs,
+              icon: LucideIcons.panelsTopLeft,
+              onPressed: _openTabs,
+            ),
           more(),
         ],
       ),
@@ -1424,6 +1504,27 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       return BrowserEmptyState(
         icon: LucideIcons.globe,
         title: l.browserUnsupported,
+        action: widget.sidePanel == null
+            ? null
+            : IosTileButton(
+                label: l.browserOpenExternal,
+                icon: LucideIcons.externalLink,
+                onTap: () {
+                  final url = _service.activeTab?.url;
+                  if (url == null || url == 'about:blank') {
+                    _focusAddress();
+                  } else {
+                    unawaited(
+                      _run(() async {
+                        await launchUrl(
+                          Uri.parse(url),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }),
+                    );
+                  }
+                },
+              ),
       );
     }
     final tab = _service.activeTab;
@@ -1456,6 +1557,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                   key: const ValueKey('browserObserverInputShield'),
                   absorbing: observing,
                   child: _service.buildViewport(
+                    loadMissingViews: widget.sidePanel == null,
                     deferNewViews: _deferNativeViews,
                     previewTopInset: previewTopInset,
                   ),
@@ -1476,7 +1578,35 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-        if (tab?.error != null)
+        if (_panelUnloaded)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: BrowserEmptyState(
+                icon: LucideIcons.rotateCw,
+                title: l.sidePanelEvictedTitle,
+                subtitle:
+                    '${l.sidePanelEvictedBody(_service.liveViewLimit - 1)}\n\n${tab!.url}',
+                action: BrowserTextButton(
+                  icon: LucideIcons.rotateCw,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  onPressed: reloadPage,
+                  child: Text(l.browserReload),
+                ),
+              ),
+            ),
+          ),
+        if (widget.sidePanel != null &&
+            !_panelUnloaded &&
+            tab?.isLoading == true)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: const SidePanelWebLoading(),
+            ),
+          ),
+        if (tab?.error != null && !_panelUnloaded)
           Positioned.fill(
             child: ColoredBox(
               color: Theme.of(context).colorScheme.surface,
@@ -1619,7 +1749,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         unawaited(_newTab());
       case 'w':
         final id = _service.activeTabId;
-        if (id != null) unawaited(_userRun(() => _service.closeTab(id)));
+        if (id != null) {
+          if (widget.sidePanel != null) {
+            widget.sidePanel!.closeTab('web:$id');
+          } else {
+            unawaited(_userRun(() => _service.closeTab(id)));
+          }
+        }
       case 'f':
         _focusFind();
       case 'r':
@@ -1628,7 +1764,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _focusFind() {
-    if (_blank) return;
+    if (!_canFind) return;
     if (_showFind) {
       _findFocus.requestFocus();
       return;
@@ -1640,12 +1776,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _toggleFind() {
-    if (_blank) return;
+    if (!_showFind && !_canFind) return;
 
     if (_showFind) {
       _findDebounce?.cancel();
       unawaited(_run(() => _service.clearFind(tabId: _findTabId)));
       _find.clear();
+      _findTabId = null;
     } else {
       _findTabId = _service.activeTabId;
     }
@@ -1663,6 +1800,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _findDebounce?.cancel();
       final tabId = _findTabId;
       _findDebounce = Timer(const Duration(milliseconds: 180), () {
+        if (!_canFind || !_showFind || _findTabId != tabId) return;
         unawaited(_userRun(() => _service.findInPage(text, tabId: tabId)));
       });
     },
@@ -1768,7 +1906,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: true,
       barrierLabel: title,
-      barrierColor: Colors.black.withValues(alpha: .12),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .12),
       transitionDuration: Duration(milliseconds: reduced ? 0 : 160),
       pageBuilder: (panelContext, _, __) {
         final content = builder(panelContext, null);
@@ -1860,6 +1998,30 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     unawaited(_userRun(() => _service.selectTab(id)));
   }
 
+  Widget _panelFrame(BuildContext context, Widget child) {
+    if (widget.sidePanel == null) return child;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: dark ? const EdgeInsets.fromLTRB(8, 6, 8, 8) : EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(dark ? 10 : 0),
+        child: DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(dark ? 10 : 0),
+            border: dark
+                ? Border.all(
+                    color: Colors.white.withValues(alpha: .14),
+                    width: .5,
+                  )
+                : null,
+          ),
+          child: ColoredBox(color: Colors.white, child: child),
+        ),
+      ),
+    );
+  }
+
   Widget _desktopContent(BuildContext context, bool underlap) => IndexedStack(
     index: _showDesktopTabs ? 1 : 0,
     sizing: StackFit.expand,
@@ -1889,6 +2051,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   );
 
   void _openTabs() {
+    if (widget.onShowAllTabs != null) {
+      widget.onShowAllTabs!();
+      return;
+    }
     if (_desktop) {
       if (_showFind) _toggleFind();
       _addressFocus.unfocus();
@@ -2225,7 +2391,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           icon: LucideIcons.download,
           label: l.browserDownloads,
         ),
-        if (!_blank)
+        if (_canFind)
           BrowserMenuEntry(
             value: _BrowserMenu.find,
             secondary: true,
@@ -2308,10 +2474,14 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         final url = _service.activeTab?.url;
         if (url != null) {
           await _run(() async {
-            await _service.createTab(
-              url: url,
-              ownerSessionId: widget.conversationId,
-            );
+            if (widget.sidePanel != null) {
+              await widget.sidePanel!.newWebTab(url: url);
+            } else {
+              await _service.createTab(
+                url: url,
+                ownerSessionId: widget.conversationId,
+              );
+            }
           });
         }
       case _BrowserMenu.tabs:

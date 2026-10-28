@@ -25,6 +25,7 @@ class IosIconButton extends StatefulWidget {
     this.tooltip,
     this.enabled = true,
     this.focusNode,
+    this.mouseCursor = SystemMouseCursors.click,
   }) : assert(
          icon != null || builder != null,
          'Either icon or builder must be provided',
@@ -48,6 +49,7 @@ class IosIconButton extends StatefulWidget {
   final String? tooltip;
   final bool enabled;
   final FocusNode? focusNode;
+  final MouseCursor mouseCursor;
 
   @override
   State<IosIconButton> createState() => _IosIconButtonState();
@@ -122,7 +124,7 @@ class _IosIconButtonState extends State<IosIconButton> {
       enabled: widget.enabled,
       label: widget.semanticLabel ?? widget.tooltip,
       child: MouseRegion(
-        cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
+        cursor: _interactive ? widget.mouseCursor : MouseCursor.defer,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: Listener(
@@ -238,6 +240,7 @@ class IosCardPress extends StatefulWidget {
     this.duration,
     this.haptics = true,
     this.focusable = false,
+    this.mouseCursor = SystemMouseCursors.click,
   });
 
   final Widget child;
@@ -257,6 +260,7 @@ class IosCardPress extends StatefulWidget {
   // Whether to perform a soft haptic on tap (also gated by settings/global toggles)
   final bool haptics;
   final bool focusable;
+  final MouseCursor mouseCursor;
 
   @override
   State<IosCardPress> createState() => _IosCardPressState();
@@ -414,7 +418,7 @@ class _IosCardPressState extends State<IosCardPress> {
     }
 
     final interactiveContent = MouseRegion(
-      cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
+      cursor: _interactive ? widget.mouseCursor : MouseCursor.defer,
       onEnter: (_) {
         if (!_interactive) return;
         setState(() => _hovered = true);

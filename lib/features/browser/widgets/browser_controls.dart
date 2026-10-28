@@ -126,6 +126,7 @@ class BrowserAddressBar extends StatelessWidget {
     this.expandedContentWidth,
     this.collapsedContentWidth,
     this.stabilizeTruncation = false,
+    this.focusOutline = false,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -141,6 +142,7 @@ class BrowserAddressBar extends StatelessWidget {
   final Widget? siteIcon;
   final double? expandedContentWidth, collapsedContentWidth;
   final bool stabilizeTruncation;
+  final bool focusOutline;
 
   @override
   Widget build(BuildContext context) {
@@ -304,8 +306,10 @@ class BrowserAddressBar extends StatelessWidget {
                   : Colors.white.withValues(alpha: dark ? .08 : .38),
               borderRadius: BorderRadius.circular(1000),
               border: Border.all(
-                color: cs.onSurface.withValues(alpha: .08),
-                width: .5,
+                color: focusOutline && editing
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: .08),
+                width: focusOutline && editing ? 1 : .5,
               ),
             ),
             child: BrowserControlFeedback(radius: 1000, child: content),

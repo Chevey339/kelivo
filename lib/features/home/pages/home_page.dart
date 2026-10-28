@@ -828,13 +828,10 @@ class _HomePageState extends State<HomePage>
       providerName: providerName,
       modelDisplay: modelDisplay,
       tabletSidebarOpen: _controller.tabletSidebarOpen,
-      rightSidebarOpen: _controller.rightSidebarOpen,
       embeddedSidebarWidth: _controller.embeddedSidebarWidth,
-      rightSidebarWidth: _controller.rightSidebarWidth,
       sidebarMinWidth: HomePageController.sidebarMinWidth,
       sidebarMaxWidth: HomePageController.sidebarMaxWidth,
       onToggleSidebar: _controller.toggleTabletSidebar,
-      onToggleRightSidebar: _controller.toggleRightSidebar,
       onSelectConversation: (id) {
         _controller.switchConversationAnimated(id);
       },
@@ -865,8 +862,6 @@ class _HomePageState extends State<HomePage>
           showModelSelectSheet(context, controller: _controller),
       onSidebarWidthChanged: _controller.updateSidebarWidth,
       onSidebarWidthChangeEnd: _controller.saveSidebarWidth,
-      onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
-      onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
       appBarOverride: _controller.selecting
           ? ChatSelectionAppBar(

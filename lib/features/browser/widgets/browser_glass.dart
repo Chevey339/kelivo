@@ -413,7 +413,9 @@ class _BrowserGlassState extends State<BrowserGlass>
       builder: (context, _) => DecoratedBox(
         key: const ValueKey('browserMaterialCover'),
         decoration: BoxDecoration(
-          color: solidColor.withValues(alpha: opacity * _cover.value),
+          color: solidColor.withValues(
+            alpha: solidColor.a * opacity * _cover.value,
+          ),
           borderRadius: corners,
           border: Border.all(
             color: solidBorder.withValues(

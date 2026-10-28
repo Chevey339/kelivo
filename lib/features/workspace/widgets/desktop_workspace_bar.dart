@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
@@ -21,11 +20,15 @@ import 'package:provider/provider.dart';
 
 /// Fixed-width desktop side bar for the conversation's workspace files.
 class DesktopWorkspaceBar extends StatelessWidget {
-  const DesktopWorkspaceBar({super.key, required this.conversationId});
+  const DesktopWorkspaceBar({
+    super.key,
+    required this.conversationId,
+    this.onOpenFile,
+  });
 
   final String? conversationId;
 
-  static const double width = 320;
+  final Future<void> Function(String path, String source)? onOpenFile;
 
   static const Key emptyStateKey = ValueKey<String>('workspace-desk-bar-empty');
   static const Key openTerminalKey = ValueKey<String>(
@@ -33,7 +36,6 @@ class DesktopWorkspaceBar extends StatelessWidget {
   );
   static const Key revealKey = ValueKey<String>('workspace-desk-bar-reveal');
   static const Key manageKey = ValueKey<String>('workspace-desk-bar-manage');
-  static const Key closeKey = ValueKey<String>('workspace-desk-bar-close');
   static const Key runningKey = ValueKey<String>('workspace-desk-bar-running');
   static const Key headerTitleKey = ValueKey<String>(
     'workspace-desk-bar-title',
@@ -82,13 +84,6 @@ class DesktopWorkspaceBar extends StatelessWidget {
               onOpenTerminal: () =>
                   unawaited(_openSystemTerminal(context, workspace!)),
               onReveal: () => unawaited(_reveal(context, workspace!)),
-              onClose: () {
-                unawaited(
-                  context.read<SettingsProvider>().setDesktopWorkspaceBarOpen(
-                    false,
-                  ),
-                );
-              },
             ),
             Divider(
               height: 1,
@@ -101,6 +96,7 @@ class DesktopWorkspaceBar extends StatelessWidget {
                       key: ValueKey<String>('$conversationId-${workspace?.id}'),
                       conversationId: conversationId!,
                       embedded: true,
+                      onOpenFile: onOpenFile,
                       initialTab: ConversationFilesTab.workspace,
                     )
                   : _EmptyState(hint: l10n.workspaceDeskBarEmptyHint),
@@ -174,7 +170,6 @@ class _Header extends StatelessWidget {
     required this.showSystemActions,
     required this.onOpenTerminal,
     required this.onReveal,
-    required this.onClose,
   });
 
   final String title;
@@ -183,7 +178,6 @@ class _Header extends StatelessWidget {
   final bool showSystemActions;
   final VoidCallback onOpenTerminal;
   final VoidCallback onReveal;
-  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -262,17 +256,6 @@ class _Header extends StatelessWidget {
             tooltip: l10n.workspaceEntryManage,
             semanticLabel: l10n.workspaceEntryManage,
             onTap: () => unawaited(openWorkspacesPage(context)),
-          ),
-          Tooltip(
-            message: l10n.workspaceDeskBarClose,
-            child: IosIconButton(
-              key: DesktopWorkspaceBar.closeKey,
-              icon: Lucide.ChevronRight,
-              size: 16,
-              minSize: 32,
-              semanticLabel: l10n.workspaceDeskBarClose,
-              onTap: onClose,
-            ),
           ),
         ],
       ),

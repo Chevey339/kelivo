@@ -113,6 +113,8 @@ namespace flutter_inappwebview_plugin
       wil::com_ptr<ICoreWebView2Controller> webViewController,
       wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController);
     ~InAppWebView();
+    EventRegistrationToken browserShortcutToken_ = {};
+    bool browserShortcutRegistered_ = false;
 
     static void createInAppWebViewEnv(const FlutterInappwebviewWindowsPlugin* plugin,
       const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment,

@@ -147,6 +147,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   SettingsSearchItem? _searchTarget;
   int _searchNavigation = 0;
+  bool _showTopicPosition = false;
 
   Future<void> _openSearch() async {
     final item = await showDesktopSettingsSearch(context);
@@ -190,6 +191,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
     setState(() {
       _selected = menu;
       _searchTarget = item;
+      _showTopicPosition = false;
       _searchNavigation++;
     });
     if (item.destination == SettingsSearchDestination.messageStyle) {
@@ -206,11 +208,25 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       // Deep link into Providers tab when a provider is specified
       _selected = _SettingsMenuItem.providers;
     }
+    // The settings pane is lazy. Preserve a topic-position request delivered
+    // before this first mount, then consume later requests from the stream.
+    if (DesktopSettingsNavigationBus.instance.consumeTopicPositionRequest()) {
+      _selected = _SettingsMenuItem.display;
+      _showTopicPosition = true;
+    }
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
       target,
     ) {
       if (!mounted) return;
       switch (target) {
+        case DesktopSettingsNavigationTarget.topicPosition:
+          DesktopSettingsNavigationBus.instance.consumeTopicPositionRequest();
+          setState(() {
+            _selected = _SettingsMenuItem.display;
+            _showTopicPosition = true;
+            _searchNavigation++;
+          });
+          break;
         case DesktopSettingsNavigationTarget.backup:
           setState(() => _selected = _SettingsMenuItem.backup);
           break;
@@ -286,7 +302,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return SettingsSearchTarget(
                             key: ValueKey(('display', _searchNavigation)),
                             label:
-                                _searchTarget?.targetLabel ??
+                                (_showTopicPosition
+                                    ? l10n.desktopDisplaySettingsTopicPositionTitle
+                                    : _searchTarget?.targetLabel) ??
                                 switch (_searchTarget?.destination) {
                                   SettingsSearchDestination.messageStyle =>
                                     l10n.messageStyleSettingsPageTitle,

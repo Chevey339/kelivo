@@ -14597,6 +14597,128 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerUndo => '撤销';
+
+  @override
+  String get sidePanelToggle => '显示 / 收起侧面板';
+
+  @override
+  String get sidePanelFiles => '文件';
+
+  @override
+  String get sidePanelTopics => '话题';
+
+  @override
+  String get sidePanelExpand => '展开面板';
+
+  @override
+  String get sidePanelCollapse => '退出展开';
+
+  @override
+  String get sidePanelAllTabs => '全部标签';
+
+  @override
+  String sidePanelMoreTabs(int count) {
+    return '另有 $count 个';
+  }
+
+  @override
+  String get sidePanelSearchTabs => '搜索标签';
+
+  @override
+  String get sidePanelOpenFile => '打开文件…';
+
+  @override
+  String get sidePanelCloseOthers => '关闭其他标签';
+
+  @override
+  String get sidePanelCloseRight => '关闭右侧标签';
+
+  @override
+  String get sidePanelReopenTab => '重新打开关闭的标签';
+
+  @override
+  String get sidePanelPinned => '已固定 · 不可关闭';
+
+  @override
+  String get sidePanelMoveTopicsLeft => '把话题移回左侧…';
+
+  @override
+  String get sidePanelPinnedHint =>
+      '话题放在右侧时始终固定在面板最左。要移除，请在 设置 › 显示 › 话题位置 中改回左侧。';
+
+  @override
+  String get sidePanelEvictedTitle => '已释放';
+
+  @override
+  String sidePanelEvictedBody(int count) {
+    return '这个网页在后台被释放以节省内存（最多保留 $count 个后台网页）。重新加载后继续浏览。';
+  }
+
+  @override
+  String get sidePanelEvictedTooltip => '已释放 · 重新加载后继续';
+
+  @override
+  String get sidePanelFileMissing => '文件不可用';
+
+  @override
+  String sidePanelFileMissingBody(String path) {
+    return '$path 已被删除或移动。';
+  }
+
+  @override
+  String get sidePanelRelocate => '重新查找';
+
+  @override
+  String sidePanelBackgroundIn(String topic) {
+    return '在「$topic」中运行';
+  }
+
+  @override
+  String sidePanelWidth(int px) {
+    return '${px}px';
+  }
+
+  @override
+  String get sidePanelWidthMax => '最大';
+
+  @override
+  String get sidePanelWidthMin => '最小';
+
+  @override
+  String get sidePanelRecentFiles => '最近的输出和附件';
+
+  @override
+  String get sidePanelOpenExternalUrl => '在系统浏览器中打开网址…';
+
+  @override
+  String get sidePanelWebPages => '网页';
+
+  @override
+  String get hotkeyToggleSidePanel => '显示 / 收起侧面板';
+
+  @override
+  String get hotkeySidePanelNewWeb => '新建网页标签';
+
+  @override
+  String get hotkeySidePanelFiles => '显示文件';
+
+  @override
+  String get hotkeySidePanelExpand => '展开侧面板';
+
+  @override
+  String get hotkeySidePanelReopenTab => '重新打开关闭的标签';
+
+  @override
+  String get hotkeySidePanelNextTab => '下一个面板标签';
+
+  @override
+  String get hotkeySidePanelPreviousTab => '上一个面板标签';
+
+  @override
+  String get hotkeySidePanelAddress => '聚焦网页地址栏';
+
+  @override
+  String get hotkeySidePanelFocus => '切换聊天与面板焦点';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -29118,6 +29240,128 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerUndo => '撤销';
+
+  @override
+  String get sidePanelToggle => '显示 / 收起侧面板';
+
+  @override
+  String get sidePanelFiles => '文件';
+
+  @override
+  String get sidePanelTopics => '话题';
+
+  @override
+  String get sidePanelExpand => '展开面板';
+
+  @override
+  String get sidePanelCollapse => '退出展开';
+
+  @override
+  String get sidePanelAllTabs => '全部标签';
+
+  @override
+  String sidePanelMoreTabs(int count) {
+    return '另有 $count 个';
+  }
+
+  @override
+  String get sidePanelSearchTabs => '搜索标签';
+
+  @override
+  String get sidePanelOpenFile => '打开文件…';
+
+  @override
+  String get sidePanelCloseOthers => '关闭其他标签';
+
+  @override
+  String get sidePanelCloseRight => '关闭右侧标签';
+
+  @override
+  String get sidePanelReopenTab => '重新打开关闭的标签';
+
+  @override
+  String get sidePanelPinned => '已固定 · 不可关闭';
+
+  @override
+  String get sidePanelMoveTopicsLeft => '把话题移回左侧…';
+
+  @override
+  String get sidePanelPinnedHint =>
+      '话题放在右侧时始终固定在面板最左。要移除，请在 设置 › 显示 › 话题位置 中改回左侧。';
+
+  @override
+  String get sidePanelEvictedTitle => '已释放';
+
+  @override
+  String sidePanelEvictedBody(int count) {
+    return '这个网页在后台被释放以节省内存（最多保留 $count 个后台网页）。重新加载后继续浏览。';
+  }
+
+  @override
+  String get sidePanelEvictedTooltip => '已释放 · 重新加载后继续';
+
+  @override
+  String get sidePanelFileMissing => '文件不可用';
+
+  @override
+  String sidePanelFileMissingBody(String path) {
+    return '$path 已被删除或移动。';
+  }
+
+  @override
+  String get sidePanelRelocate => '重新查找';
+
+  @override
+  String sidePanelBackgroundIn(String topic) {
+    return '在「$topic」中运行';
+  }
+
+  @override
+  String sidePanelWidth(int px) {
+    return '${px}px';
+  }
+
+  @override
+  String get sidePanelWidthMax => '最大';
+
+  @override
+  String get sidePanelWidthMin => '最小';
+
+  @override
+  String get sidePanelRecentFiles => '最近的输出和附件';
+
+  @override
+  String get sidePanelOpenExternalUrl => '在系统浏览器中打开网址…';
+
+  @override
+  String get sidePanelWebPages => '网页';
+
+  @override
+  String get hotkeyToggleSidePanel => '显示 / 收起侧面板';
+
+  @override
+  String get hotkeySidePanelNewWeb => '新建网页标签';
+
+  @override
+  String get hotkeySidePanelFiles => '显示文件';
+
+  @override
+  String get hotkeySidePanelExpand => '展开侧面板';
+
+  @override
+  String get hotkeySidePanelReopenTab => '重新打开关闭的标签';
+
+  @override
+  String get hotkeySidePanelNextTab => '下一个面板标签';
+
+  @override
+  String get hotkeySidePanelPreviousTab => '上一个面板标签';
+
+  @override
+  String get hotkeySidePanelAddress => '聚焦网页地址栏';
+
+  @override
+  String get hotkeySidePanelFocus => '切换聊天与面板焦点';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -43720,4 +43964,126 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerUndo => '復原';
+
+  @override
+  String get sidePanelToggle => '顯示 / 收起側面板';
+
+  @override
+  String get sidePanelFiles => '檔案';
+
+  @override
+  String get sidePanelTopics => '話題';
+
+  @override
+  String get sidePanelExpand => '展開面板';
+
+  @override
+  String get sidePanelCollapse => '退出展開';
+
+  @override
+  String get sidePanelAllTabs => '全部分頁';
+
+  @override
+  String sidePanelMoreTabs(int count) {
+    return '另有 $count 個';
+  }
+
+  @override
+  String get sidePanelSearchTabs => '搜尋分頁';
+
+  @override
+  String get sidePanelOpenFile => '開啟檔案…';
+
+  @override
+  String get sidePanelCloseOthers => '關閉其他分頁';
+
+  @override
+  String get sidePanelCloseRight => '關閉右側分頁';
+
+  @override
+  String get sidePanelReopenTab => '重新開啟關閉的分頁';
+
+  @override
+  String get sidePanelPinned => '已釘選 · 無法關閉';
+
+  @override
+  String get sidePanelMoveTopicsLeft => '把話題移回左側…';
+
+  @override
+  String get sidePanelPinnedHint =>
+      '話題放在右側時始終固定在面板最左。要移除，請在 設定 › 顯示 › 話題位置 中改回左側。';
+
+  @override
+  String get sidePanelEvictedTitle => '已釋放';
+
+  @override
+  String sidePanelEvictedBody(int count) {
+    return '這個網頁在背景被釋放以節省記憶體（最多保留 $count 個背景網頁）。重新載入後繼續瀏覽。';
+  }
+
+  @override
+  String get sidePanelEvictedTooltip => '已釋放 · 重新載入後繼續';
+
+  @override
+  String get sidePanelFileMissing => '檔案無法使用';
+
+  @override
+  String sidePanelFileMissingBody(String path) {
+    return '$path 已被刪除或移動。';
+  }
+
+  @override
+  String get sidePanelRelocate => '重新尋找';
+
+  @override
+  String sidePanelBackgroundIn(String topic) {
+    return '在「$topic」中執行';
+  }
+
+  @override
+  String sidePanelWidth(int px) {
+    return '${px}px';
+  }
+
+  @override
+  String get sidePanelWidthMax => '最大';
+
+  @override
+  String get sidePanelWidthMin => '最小';
+
+  @override
+  String get sidePanelRecentFiles => '最近的輸出和附件';
+
+  @override
+  String get sidePanelOpenExternalUrl => '在系統瀏覽器中開啟網址…';
+
+  @override
+  String get sidePanelWebPages => '網頁';
+
+  @override
+  String get hotkeyToggleSidePanel => '顯示 / 收起側面板';
+
+  @override
+  String get hotkeySidePanelNewWeb => '新增網頁分頁';
+
+  @override
+  String get hotkeySidePanelFiles => '顯示檔案';
+
+  @override
+  String get hotkeySidePanelExpand => '展開側面板';
+
+  @override
+  String get hotkeySidePanelReopenTab => '重新開啟關閉的分頁';
+
+  @override
+  String get hotkeySidePanelNextTab => '下一個面板分頁';
+
+  @override
+  String get hotkeySidePanelPreviousTab => '上一個面板分頁';
+
+  @override
+  String get hotkeySidePanelAddress => '聚焦網頁網址列';
+
+  @override
+  String get hotkeySidePanelFocus => '切換聊天與面板焦點';
 }

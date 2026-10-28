@@ -364,8 +364,6 @@ class SettingsProvider extends ChangeNotifier {
   static const String _appLaunchCountKey = 'app_launch_count_v1';
   // Desktop topic panel placement + right sidebar open state
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
-  static const String _desktopRightSidebarOpenKey =
-      'desktop_right_sidebar_open_v1';
   static const String _mobileBackgroundKey = 'mobile_background_settings_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
@@ -427,10 +425,6 @@ class SettingsProvider extends ChangeNotifier {
   // Desktop UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
-  static const String _desktopRightSidebarWidthKey =
-      'desktop_right_sidebar_width_v1';
-  static const String _desktopWorkspaceBarOpenKey =
-      'desktop_workspace_bar_open_v1';
 
   // ===== Network TTS services =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
@@ -560,18 +554,12 @@ class SettingsProvider extends ChangeNotifier {
   bool _desktopSidebarOpen = true;
   double get desktopSidebarWidth => _desktopSidebarWidth;
   bool get desktopSidebarOpen => _desktopSidebarOpen;
-  double _desktopRightSidebarWidth = 300;
-  double get desktopRightSidebarWidth => _desktopRightSidebarWidth;
 
   // Desktop: topic list position (left or right) and right sidebar open state
   DesktopTopicPosition _desktopTopicPosition = DesktopTopicPosition.left;
   DesktopTopicPosition get desktopTopicPosition => _desktopTopicPosition;
   bool get desktopTopicsOnRight =>
       _desktopTopicPosition == DesktopTopicPosition.right;
-  bool _desktopRightSidebarOpen = true;
-  bool get desktopRightSidebarOpen => _desktopRightSidebarOpen;
-  bool _desktopWorkspaceBarOpen = false;
-  bool get desktopWorkspaceBarOpen => _desktopWorkspaceBarOpen;
 
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
@@ -1235,10 +1223,6 @@ class SettingsProvider extends ChangeNotifier {
       default:
         _desktopTopicPosition = DesktopTopicPosition.left;
     }
-    _desktopRightSidebarOpen =
-        prefs.getBool(_desktopRightSidebarOpenKey) ?? true;
-    _desktopWorkspaceBarOpen =
-        prefs.getBool(_desktopWorkspaceBarOpenKey) ?? false;
     // Chat message background style (default | frosted | solid)
     final bgStyleStr =
         prefs.getString(_displayChatMessageBackgroundStyleKey) ?? 'default';
@@ -1302,8 +1286,6 @@ class SettingsProvider extends ChangeNotifier {
     // desktop UI
     _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
-    _desktopRightSidebarWidth =
-        prefs.getDouble(_desktopRightSidebarWidthKey) ?? 300;
     // Load app locale; default to follow system on first launch
     final storedAppLocale = prefs.get(_appLocaleKey);
     _appLocaleTag = _readAppLocaleTag(prefs);
@@ -2108,17 +2090,6 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_desktopSidebarOpenKey, _desktopSidebarOpen);
   }
 
-  Future<void> setDesktopRightSidebarWidth(double w) async {
-    if ((_desktopRightSidebarWidth - w).abs() < 0.5) return;
-    _desktopRightSidebarWidth = w;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setDouble(
-      _desktopRightSidebarWidthKey,
-      _desktopRightSidebarWidth,
-    );
-  }
-
   // Desktop: topic panel placement (left/right)
   Future<void> setDesktopTopicPosition(DesktopTopicPosition pos) async {
     if (_desktopTopicPosition == pos) return;
@@ -2130,21 +2101,6 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // Desktop: right sidebar visible state
-  Future<void> setDesktopRightSidebarOpen(bool open) async {
-    if (_desktopRightSidebarOpen == open) return;
-    _desktopRightSidebarOpen = open;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_desktopRightSidebarOpenKey, _desktopRightSidebarOpen);
-  }
-
-  Future<void> setDesktopWorkspaceBarOpen(bool open) async {
-    if (_desktopWorkspaceBarOpen == open) return;
-    _desktopWorkspaceBarOpen = open;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_desktopWorkspaceBarOpenKey, _desktopWorkspaceBarOpen);
-  }
 
   // ===== App locale (UI language) =====
   String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'

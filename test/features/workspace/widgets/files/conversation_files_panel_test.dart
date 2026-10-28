@@ -10,6 +10,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -83,6 +84,24 @@ class _FakeChatService extends ChatService {
   }
 }
 
+class _RecordingResolver extends FileLinkResolver {
+  _RecordingResolver(WorkspaceProvider workspaces)
+    : super(workspaces: workspaces);
+
+  final calls = <({KelivoLink link, String conversationId})>[];
+
+  @override
+  Future<FileSystemEntity?> resolveToHostEntry(
+    KelivoLink link, {
+    required String conversationId,
+    required WorkspaceBinding binding,
+  }) async {
+    calls.add((link: link, conversationId: conversationId));
+    // Stop at navigation dispatch: this test does not launch a native browser.
+    return null;
+  }
+}
+
 Future<void> _awaitPanel(WidgetTester tester) async {
   await tester.runAsync(
     () => Future<void>.delayed(const Duration(milliseconds: 30)),
@@ -135,6 +154,8 @@ void main() {
     ConversationFilesTab initialTab = ConversationFilesTab.attachments,
     List<ChatMessage> messages = const [],
     AssistantProvider? assistants,
+    FileLinkResolver? resolver,
+    Future<void> Function(String, String)? onOpenFile,
   }) {
     return MultiProvider(
       providers: [
@@ -147,6 +168,7 @@ void main() {
         ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
         if (assistants != null)
           ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+        if (resolver != null) Provider<FileLinkResolver>.value(value: resolver),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -156,6 +178,7 @@ void main() {
             body: ConversationFilesPanel(
               conversationId: conversationId,
               initialTab: initialTab,
+              onOpenFile: onOpenFile,
             ),
           ),
         ),
@@ -292,6 +315,72 @@ void main() {
 
     expect(find.byKey(ConversationFilesPanel.unboundHintKey), findsNothing);
     expect(find.byKey(FileBrowser.itemKey('readme.md')), findsOneWidget);
+  });
+
+  testWidgets('panel file callbacks preserve workspace HTML navigation', (
+    tester,
+  ) async {
+    const id = 'preview-routing';
+    late String workspaceId;
+    late String root;
+    await tester.runAsync(() async {
+      final workspace = await workspaces.create(name: 'Files');
+      workspaceId = workspace.id;
+      root = await workspaces.hostRootFor(workspace);
+      File(p.join(root, 'page.HTML')).writeAsStringSync('<h1>Hello</h1>');
+      File(p.join(root, 'note.md')).writeAsStringSync('# Note');
+    });
+    final resolver = _RecordingResolver(workspaces);
+    final previews = <(String, String)>[];
+    await tester.pumpWidget(
+      harness(
+        conversation: Conversation(
+          id: id,
+          title: 'Chat',
+          extras: {WorkspaceBinding.keyId: workspaceId},
+        ),
+        conversationId: id,
+        initialTab: ConversationFilesTab.workspace,
+        resolver: resolver,
+        onOpenFile: (path, source) async => previews.add((path, source)),
+      ),
+    );
+    await _awaitPanel(tester);
+    final content = tester.widget<ConversationFilesPanel>(
+      find.byType(ConversationFilesPanel),
+    );
+    final navigator = Navigator.of(tester.element(find.byType(Scaffold)));
+    final route = PageRouteBuilder<void>(
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      pageBuilder: (_, _, _) =>
+          AppSnackBarOverlay(child: Scaffold(body: content)),
+    );
+    navigator.push(route);
+    await tester.pump();
+    await _awaitPanel(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(FileBrowser.itemKey('note.md')));
+    await tester.pump();
+    expect(previews, [(p.join(root, 'note.md'), 'workspace')]);
+    expect(resolver.calls, isEmpty);
+    previews.clear();
+    await tester.tap(find.byKey(FileBrowser.itemKey('page.HTML')));
+    await tester.pumpAndSettle();
+    expect(route.isCurrent, isTrue);
+    if (Platform.isLinux) {
+      expect(previews, [(p.join(root, 'page.HTML'), 'workspace')]);
+      expect(resolver.calls, isEmpty);
+    } else {
+      expect(previews, isEmpty);
+      expect(resolver.calls.single.link.kind, KelivoLinkKind.workspaceFile);
+      expect(resolver.calls.single.link.relativePath, 'page.HTML');
+      expect(resolver.calls.single.conversationId, id);
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(

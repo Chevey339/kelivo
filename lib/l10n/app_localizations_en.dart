@@ -15376,4 +15376,126 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerUndo => 'Undo';
+
+  @override
+  String get sidePanelToggle => 'Toggle side panel';
+
+  @override
+  String get sidePanelFiles => 'Files';
+
+  @override
+  String get sidePanelTopics => 'Topics';
+
+  @override
+  String get sidePanelExpand => 'Expand panel';
+
+  @override
+  String get sidePanelCollapse => 'Exit expanded';
+
+  @override
+  String get sidePanelAllTabs => 'All tabs';
+
+  @override
+  String sidePanelMoreTabs(int count) {
+    return '$count more';
+  }
+
+  @override
+  String get sidePanelSearchTabs => 'Search tabs';
+
+  @override
+  String get sidePanelOpenFile => 'Open file…';
+
+  @override
+  String get sidePanelCloseOthers => 'Close other tabs';
+
+  @override
+  String get sidePanelCloseRight => 'Close tabs to the right';
+
+  @override
+  String get sidePanelReopenTab => 'Reopen closed tab';
+
+  @override
+  String get sidePanelPinned => 'Pinned · can’t close';
+
+  @override
+  String get sidePanelMoveTopicsLeft => 'Move topics back to the left…';
+
+  @override
+  String get sidePanelPinnedHint =>
+      'Topics stay pinned while on the right. Change it in Settings › Display › Topic position.';
+
+  @override
+  String get sidePanelEvictedTitle => 'Page unloaded';
+
+  @override
+  String sidePanelEvictedBody(int count) {
+    return 'Unloaded in the background to save memory (up to $count background pages are kept). Reload to continue browsing.';
+  }
+
+  @override
+  String get sidePanelEvictedTooltip => 'Unloaded · reload to continue';
+
+  @override
+  String get sidePanelFileMissing => 'File unavailable';
+
+  @override
+  String sidePanelFileMissingBody(String path) {
+    return '$path was deleted or moved.';
+  }
+
+  @override
+  String get sidePanelRelocate => 'Find again';
+
+  @override
+  String sidePanelBackgroundIn(String topic) {
+    return 'Running in “$topic”';
+  }
+
+  @override
+  String sidePanelWidth(int px) {
+    return '${px}px';
+  }
+
+  @override
+  String get sidePanelWidthMax => 'max';
+
+  @override
+  String get sidePanelWidthMin => 'min';
+
+  @override
+  String get sidePanelRecentFiles => 'Recent outputs and attachments';
+
+  @override
+  String get sidePanelOpenExternalUrl => 'Open URL in system browser…';
+
+  @override
+  String get sidePanelWebPages => 'Web pages';
+
+  @override
+  String get hotkeyToggleSidePanel => 'Toggle side panel';
+
+  @override
+  String get hotkeySidePanelNewWeb => 'New web tab';
+
+  @override
+  String get hotkeySidePanelFiles => 'Show files';
+
+  @override
+  String get hotkeySidePanelExpand => 'Expand side panel';
+
+  @override
+  String get hotkeySidePanelReopenTab => 'Reopen closed tab';
+
+  @override
+  String get hotkeySidePanelNextTab => 'Next panel tab';
+
+  @override
+  String get hotkeySidePanelPreviousTab => 'Previous panel tab';
+
+  @override
+  String get hotkeySidePanelAddress => 'Focus web address';
+
+  @override
+  String get hotkeySidePanelFocus => 'Cycle chat and panel focus';
 }

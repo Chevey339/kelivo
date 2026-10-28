@@ -187,11 +187,33 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   }
 }
 
+/// Inline surface overrides intentionally do not extend InheritedTheme.
+/// Dialogs, menus and routes capture the ordinary theme, not pane materials.
+class AppSurfaceColorsScope extends InheritedWidget {
+  const AppSurfaceColorsScope({
+    super.key,
+    required this.colors,
+    required super.child,
+  });
+
+  final AppSemanticColors colors;
+
+  @override
+  bool updateShouldNotify(AppSurfaceColorsScope oldWidget) =>
+      colors != oldWidget.colors;
+}
+
 extension AppSemanticColorsX on BuildContext {
   /// The ambient [AppSemanticColors]. Falls back to deriving values from the
   /// ambient [ColorScheme] when the extension is not attached (e.g. in widget
   /// tests that pump a plain MaterialApp).
   AppSemanticColors get appColors {
+    final scoped = dependOnInheritedWidgetOfExactType<AppSurfaceColorsScope>();
+    if (scoped != null) return scoped.colors;
+    return _themeColors;
+  }
+
+  AppSemanticColors get _themeColors {
     final theme = Theme.of(this);
     final ext = theme.extension<AppSemanticColors>();
     if (ext != null) return ext;
@@ -201,6 +223,7 @@ extension AppSemanticColorsX on BuildContext {
   }
 
   /// Dialog / sheet / menu panel. See [AppSemanticColors.overlaySurface].
+  /// Callers may resolve this before opening a route, from inside a pane.
   Color get overlaySurface =>
-      appColors.overlaySurface(Theme.of(this).colorScheme);
+      _themeColors.overlaySurface(Theme.of(this).colorScheme);
 }

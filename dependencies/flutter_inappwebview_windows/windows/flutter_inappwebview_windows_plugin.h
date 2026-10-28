@@ -4,6 +4,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <memory>
+#include <set>
 #include "types/plugin_messenger.h"
 
 namespace flutter_inappwebview_plugin
@@ -25,6 +26,10 @@ namespace flutter_inappwebview_plugin
     std::unique_ptr<InAppBrowserManager> inAppBrowserManager;
     std::unique_ptr<HeadlessInAppWebViewManager> headlessInAppWebViewManager;
     std::unique_ptr<CookieManager> cookieManager;
+    std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> browserWindowChannel;
+    bool browserShortcutsEnabled = false;
+    std::set<std::string> browserShortcutCommands;
+
 
     static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar,
       FlutterDesktopMessengerRef messenger);

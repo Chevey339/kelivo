@@ -7232,5 +7232,77 @@
       }
     }
   },
-  "providerUndo": "Undo"
+  "providerUndo": "Undo",
+  "sidePanelToggle": "Toggle side panel",
+  "sidePanelFiles": "Files",
+  "sidePanelTopics": "Topics",
+  "sidePanelExpand": "Expand panel",
+  "sidePanelCollapse": "Exit expanded",
+  "sidePanelAllTabs": "All tabs",
+  "sidePanelMoreTabs": "{count} more",
+  "@sidePanelMoreTabs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sidePanelSearchTabs": "Search tabs",
+  "sidePanelOpenFile": "Open file…",
+  "sidePanelCloseOthers": "Close other tabs",
+  "sidePanelCloseRight": "Close tabs to the right",
+  "sidePanelReopenTab": "Reopen closed tab",
+  "sidePanelPinned": "Pinned · can’t close",
+  "sidePanelMoveTopicsLeft": "Move topics back to the left…",
+  "sidePanelPinnedHint": "Topics stay pinned while on the right. Change it in Settings › Display › Topic position.",
+  "sidePanelEvictedTitle": "Page unloaded",
+  "sidePanelEvictedBody": "Unloaded in the background to save memory (up to {count} background pages are kept). Reload to continue browsing.",
+  "@sidePanelEvictedBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sidePanelEvictedTooltip": "Unloaded · reload to continue",
+  "sidePanelFileMissing": "File unavailable",
+  "sidePanelFileMissingBody": "{path} was deleted or moved.",
+  "@sidePanelFileMissingBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sidePanelRelocate": "Find again",
+  "sidePanelBackgroundIn": "Running in “{topic}”",
+  "@sidePanelBackgroundIn": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "sidePanelWidth": "{px}px",
+  "@sidePanelWidth": {
+    "placeholders": {
+      "px": {
+        "type": "int"
+      }
+    }
+  },
+  "sidePanelWidthMax": "max",
+  "sidePanelWidthMin": "min",
+  "sidePanelRecentFiles": "Recent outputs and attachments",
+  "sidePanelOpenExternalUrl": "Open URL in system browser…",
+  "sidePanelWebPages": "Web pages",
+  "hotkeyToggleSidePanel": "Toggle side panel",
+  "hotkeySidePanelNewWeb": "New web tab",
+  "hotkeySidePanelFiles": "Show files",
+  "hotkeySidePanelExpand": "Expand side panel",
+  "hotkeySidePanelReopenTab": "Reopen closed tab",
+  "hotkeySidePanelNextTab": "Next panel tab",
+  "hotkeySidePanelPreviousTab": "Previous panel tab",
+  "hotkeySidePanelAddress": "Focus web address",
+  "hotkeySidePanelFocus": "Cycle chat and panel focus"
 }

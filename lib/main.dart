@@ -1,3 +1,4 @@
+import 'features/side_panel/desktop_side_panel_controller.dart';
 import 'core/services/scheduled_tasks_service.dart';
 import 'core/services/auth/provider_oauth_service.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
@@ -636,6 +637,7 @@ void _installExitFlush(BusinessPreferences businessPreferences) {
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.linux;
   if (!isDesktop || _exitFlushListener != null) return;
+  AppExitFlush.register(DesktopSidePanelController.instance.flush);
   AppExitFlush.register(businessPreferences.flushPendingWrites);
   AppExitFlush.register(ChatActions.flushActiveGenerationProgress);
   _exitFlushListener = AppLifecycleListener(
@@ -747,6 +749,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (ctx) {
             final assistants = ctx.read<AssistantProvider>();
+            DesktopSidePanelController.instance.bindPreferences(
+              businessPreferences,
+            );
             final settings = SettingsProvider(
               businessPreferences,
               onProviderModelsRetired:

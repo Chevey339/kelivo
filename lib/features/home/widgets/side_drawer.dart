@@ -2983,6 +2983,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           );
 
     if (widget.embedded) {
+      if (_isDesktop) {
+        return Material(
+          type: MaterialType.transparency,
+          child: SizedBox(width: widget.embeddedWidth ?? 300, child: inner),
+        );
+      }
       return ClipRect(
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
@@ -4656,6 +4662,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
             final double pad = 4;
             final double segW = (constraints.maxWidth - pad * 2) / 2;
             return Container(
+              key: const ValueKey('desktopSidebarTabsSurface'),
               decoration: BoxDecoration(
                 color: context.appColors.surfaceFill,
                 borderRadius: BorderRadius.circular(16),

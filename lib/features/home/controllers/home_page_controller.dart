@@ -1,3 +1,4 @@
+import '../../side_panel/desktop_side_panel_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/host/ui_draft_staging.dart';
@@ -249,9 +250,7 @@ class HomePageController extends ChangeNotifier {
 
   // Sidebar state (tablet/desktop)
   bool _tabletSidebarOpen = true;
-  bool _rightSidebarOpen = true;
   double _embeddedSidebarWidth = 300;
-  double _rightSidebarWidth = 300;
   bool _desktopUiInited = false;
 
   // Drawer state
@@ -674,9 +673,7 @@ class HomePageController extends ChangeNotifier {
   bool get showThinkingContent => _showThinkingContent;
   bool get isDragHovering => _isDragHovering;
   bool get tabletSidebarOpen => _tabletSidebarOpen;
-  bool get rightSidebarOpen => _rightSidebarOpen;
   double get embeddedSidebarWidth => _embeddedSidebarWidth;
-  double get rightSidebarWidth => _rightSidebarWidth;
   double get inputBarHeight => _inputBarHeight;
   bool get desktopUiInited => _desktopUiInited;
   bool get isGlobalSearchMode => _isGlobalSearchMode;
@@ -1063,8 +1060,12 @@ class HomePageController extends ChangeNotifier {
           break;
         case ChatAction.toggleLeftPanelTopics:
         case ChatAction.toggleLeftPanelAssistants:
-          if (settingsProvider.desktopTopicPosition !=
-              DesktopTopicPosition.left) {
+          if (settingsProvider.desktopTopicPosition ==
+                  DesktopTopicPosition.right &&
+              action == ChatAction.toggleLeftPanelTopics) {
+            DesktopSidePanelController.instance.open(
+              kind: SidePanelTabKind.topics,
+            );
             return;
           }
           final wantAssistants =
@@ -1453,11 +1454,6 @@ class HomePageController extends ChangeNotifier {
           _sidebarMaxWidth,
         );
         _tabletSidebarOpen = sp.desktopSidebarOpen;
-        _rightSidebarOpen = sp.desktopRightSidebarOpen;
-        _rightSidebarWidth = sp.desktopRightSidebarWidth.clamp(
-          _sidebarMinWidth,
-          _sidebarMaxWidth,
-        );
       } catch (_) {}
     }
   }
@@ -3302,22 +3298,6 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  void toggleRightSidebar() {
-    dismissKeyboard();
-    try {
-      if (_context.read<SettingsProvider>().hapticsOnDrawer) {
-        Haptics.drawerPulse();
-      }
-    } catch (_) {}
-    _rightSidebarOpen = !_rightSidebarOpen;
-    notifyListeners();
-    try {
-      _context.read<SettingsProvider>().setDesktopRightSidebarOpen(
-        _rightSidebarOpen,
-      );
-    } catch (_) {}
-  }
-
   void updateSidebarWidth(double dx) {
     _embeddedSidebarWidth = (_embeddedSidebarWidth + dx).clamp(
       _sidebarMinWidth,
@@ -3330,22 +3310,6 @@ class HomePageController extends ChangeNotifier {
     try {
       _context.read<SettingsProvider>().setDesktopSidebarWidth(
         _embeddedSidebarWidth,
-      );
-    } catch (_) {}
-  }
-
-  void updateRightSidebarWidth(double dx) {
-    _rightSidebarWidth = (_rightSidebarWidth - dx).clamp(
-      _sidebarMinWidth,
-      _sidebarMaxWidth,
-    );
-    notifyListeners();
-  }
-
-  void saveRightSidebarWidth() {
-    try {
-      _context.read<SettingsProvider>().setDesktopRightSidebarWidth(
-        _rightSidebarWidth,
       );
     } catch (_) {}
   }

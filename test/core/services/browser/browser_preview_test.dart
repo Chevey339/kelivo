@@ -315,10 +315,7 @@ void main() {
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
       await service.refreshActivePreview(fresh: true);
-      expect(
-        service.liveViewCount,
-        lessThanOrEqualTo(BrowserService.maxLiveViews),
-      );
+      expect(service.liveViewCount, lessThanOrEqualTo(service.liveViewLimit));
     }
     expect(service.tabs, hasLength(12));
     expect(
@@ -597,13 +594,13 @@ void main() {
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
     final firstEngine = engines[first.id]!;
-    for (var index = 0; index < BrowserService.maxLiveViews; index++) {
+    for (var index = 0; index < service.liveViewLimit; index++) {
       await service.createTab(url: 'https://$index.example');
       await tester.pumpAndSettle();
     }
     expect(firstEngine.disposed, isTrue);
     expect(service.previewForTab(first.id), [1]);
-    expect(service.liveViewCount, BrowserService.maxLiveViews);
+    expect(service.liveViewCount, service.liveViewLimit);
   });
 
   previewTest(

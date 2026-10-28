@@ -23,13 +23,25 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     BrowserStore? store,
     BrowserEngineFactory? engineFactory,
     this._supported,
-  }) : _store = store ?? BrowserStore(),
+    int? liveViewLimit,
+  }) : liveViewLimit =
+           liveViewLimit ??
+           (const {
+                 TargetPlatform.macOS,
+                 TargetPlatform.windows,
+                 TargetPlatform.linux,
+               }.contains(defaultTargetPlatform)
+               ? maxLiveViews
+               : 3),
+       _store = store ?? BrowserStore(),
        _engineFactory = engineFactory ?? NativeBrowserEngine.create;
 
   static final BrowserService instance = BrowserService();
   // Bound agent fan-out and native memory separately from saved/user tabs.
   static const int maxAgentTabsPerSession = 3;
-  static const int maxLiveViews = 3;
+  static const int maxLiveViews = 6;
+  final int liveViewLimit;
+  bool hasLiveEngine(String id) => _engines.containsKey(id);
   static const int maxCachedPreviews = 8;
   static const int maxHistory = 2000;
   static const _uuid = Uuid();
@@ -351,6 +363,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       throw StateError('browser_tab_not_owned');
     }
     final selected = selectedTabForSession(sessionId);
+    if (action == null && selected != null) {
+      final viewed = _engines.remove(selected.id);
+      if (viewed != null) _engines[selected.id] = viewed;
+    }
     if (_selectedSessionId == sessionId && _activeTabId == selected?.id) return;
     if (_activeTabId != selected?.id) unawaited(refreshActivePreview());
     _selectedSessionId = sessionId;
@@ -372,10 +388,15 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     if (_activeTabId != tab.id) unawaited(refreshActivePreview());
     _activeTabId = tab.id;
     _selectedSessionId = owner;
+    if (action == null) {
+      final engine = _engines.remove(tab.id);
+      if (engine != null) _engines[tab.id] = engine;
+    }
   }
 
   Future<BrowserTab> createTab({
     String? url,
+    String? title,
     String? ownerSessionId,
     int? windowId,
     String? openerTabId,
@@ -397,6 +418,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     }
     final tab = BrowserTab(
       id: 'tab-${_uuid.v4()}',
+      title: title ?? '',
       url: normalizeAddress(url ?? '', searchEngine: _settings.searchEngine),
       ownerSessionId: ownerSessionId,
       windowId: windowId,
@@ -419,6 +441,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> selectTab(String id) async {
     _checkAction(id);
     final tab = requireTab(id);
+    if (Zone.current[_actionKey] == null) {
+      final viewed = _engines.remove(id);
+      if (viewed != null) _engines[id] = viewed;
+    }
     if (_activeTabId == id &&
         (tab.ownerSessionId == null ||
             _lastTabBySession[tab.ownerSessionId] == id)) {
@@ -557,6 +583,16 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
 
   String _target(String? id) =>
       id ?? _activeTabId ?? (throw StateError('browser_no_active_tab'));
+
+  /// Address editing without native engine creation, used on unsupported hosts.
+  Future<void> setSavedAddress(String id, String url) async {
+    _checkAction(id);
+    requireTab(id);
+    _updateTab(
+      id,
+      BrowserPageState(url: normalizeAddress(url), isLoading: false),
+    );
+  }
 
   Future<void> navigate(String input, {String? tabId}) async {
     final id = _target(tabId);
@@ -994,8 +1030,14 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _call(_target(tabId), (engine) => engine.find(text));
   Future<void> findNext({bool forward = true, String? tabId}) =>
       _call(_target(tabId), (engine) => engine.findNext(forward));
-  Future<void> clearFind({String? tabId}) =>
-      _call(_target(tabId), (engine) => engine.clearFind());
+  Future<void> clearFind({String? tabId}) async {
+    final id = tabId ?? _activeTabId;
+    if (id == null) return;
+    _checkAction(id);
+    // Cleanup must not revive a released page or allocate an unsupported view.
+    final engine = _engines[id];
+    if (engine != null) await _runEngineOperation(id, engine.clearFind);
+  }
 
   Future<T> _call<T>(
     String id,
@@ -1058,9 +1100,8 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     _checkAction(id);
     requireTab(id);
     _idleTimer?.cancel();
-    final ready = _engines.remove(id);
+    final ready = _engines[id];
     if (ready != null) {
-      _engines[id] = ready;
       return Future<BrowserEngine>.sync(() async {
         await ready.resume();
         _checkAction(id);
@@ -1073,13 +1114,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       _checkAction(id);
       var tab = requireTab(id);
       if (!isSupported) throw UnsupportedError('browser_platform_unsupported');
-      final existing = _engines.remove(id);
+      final existing = _engines[id];
       if (existing != null) {
-        _engines[id] = existing;
         await existing.resume();
         return existing;
       }
-      if (_engines.length >= maxLiveViews) {
+      if (_engines.length >= liveViewLimit) {
         String? evictionGroup() {
           for (final key in _engines.keys) {
             final group = _engineGroups[key] ?? key;
@@ -1234,6 +1274,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
         await engine.loadHtml(document.html, baseUrl: document.baseUrl);
       }
       _scheduleIdleRelease();
+      _notify();
       return engine;
     });
     operation.then(completer.complete, onError: completer.completeError);
@@ -1385,6 +1426,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
           detachPopup: true,
           clearWindowId: true,
           runtimeVersion: tab.runtimeVersion + 1,
+          isLoading: false,
+          progress: 0,
+          canGoBack: false,
+          canGoForward: false,
           error: tab.error,
         );
       }
@@ -1838,10 +1883,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   /// Keep already visited platform views mounted until their bounded runtime
   /// is evicted. Tab selection only changes which child is painted.
   Widget buildViewport({
+    bool loadMissingViews = true,
     bool deferNewViews = false,
     double previewTopInset = 0,
   }) => _BrowserTabViewport(
     service: this,
+    loadMissingViews: loadMissingViews,
     deferNewViews: deferNewViews,
     previewTopInset: previewTopInset,
   );
@@ -2005,10 +2052,12 @@ class _BrowserAction {
 class _BrowserTabViewport extends StatefulWidget {
   const _BrowserTabViewport({
     required this.service,
+    required this.loadMissingViews,
     required this.deferNewViews,
     required this.previewTopInset,
   });
   final BrowserService service;
+  final bool loadMissingViews;
   final bool deferNewViews;
   final double previewTopInset;
 
@@ -2031,6 +2080,7 @@ class _BrowserTabViewportState extends State<_BrowserTabViewport> {
       );
       final active = service.activeTab;
       if (active != null &&
+          (widget.loadMissingViews || service.hasLiveEngine(active.id)) &&
           (active.hasContent || active.url != 'about:blank')) {
         _visited[active.id] = active.runtimeVersion;
       }

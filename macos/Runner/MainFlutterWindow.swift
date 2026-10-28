@@ -5,6 +5,7 @@ import WebKit
 class MainFlutterWindow: NSWindow {
   private let systemPower = DesktopSystemPowerState()
   private var powerChannel: FlutterMethodChannel?
+  private var browserShortcutCommands: Set<String> = ["cmd+f", "cmd+l", "cmd+t", "cmd+w", "cmd+r"]
   private var browserChromeChannel: FlutterMethodChannel?
   private var browserShortcutMonitor: Any?
   private var sidebarResizeChannel: FlutterMethodChannel?
@@ -302,13 +303,28 @@ class MainFlutterWindow: NSWindow {
     // route; the Dart host disables it while another route covers the browser.
     browserShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
       [weak self] event in
-      guard let self = self, event.window === self, self.isKeyWindow,
-            event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-              .subtracting(.capsLock) == .command,
-            let key = event.charactersIgnoringModifiers?.lowercased(),
-            ["f", "l", "t", "w", "r"].contains(key) else { return event }
+      guard let self = self, event.window === self, self.isKeyWindow else { return event }
+      let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+      let key: String
+      switch event.keyCode {
+      case 43: key = "comma"
+      case 33: key = "bracketleft"
+      case 30: key = "bracketright"
+      case 48: key = "tab"
+      case 53: key = "escape"
+      case 97: key = "f6"
+      default: key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+      }
+      var parts: [String] = []
+      if flags.contains(.control) { parts.append("ctrl") }
+      if flags.contains(.command) { parts.append("cmd") }
+      if flags.contains(.option) { parts.append("alt") }
+      if flags.contains(.shift) { parts.append("shift") }
+      parts.append(key == "," ? "comma" : key == "[" ? "bracketleft" : key == "]" ? "bracketright" : key)
+      let command = parts.joined(separator: "+")
+      guard self.browserShortcutCommands.contains(command) else { return event }
       if !event.isARepeat {
-        self.browserChromeChannel?.invokeMethod("shortcut", arguments: key)
+        self.browserChromeChannel?.invokeMethod("shortcut", arguments: command)
       }
       // Consume the original event, including autorepeat, so neither the
       // native main menu nor Flutter's fallback shortcuts execute it twice.
@@ -404,6 +420,11 @@ class MainFlutterWindow: NSWindow {
       }
       if call.method == "releaseBrowserViewportInsets" {
         if let owner = call.arguments as? String { self?.releaseBrowserInsets(owner: owner) }
+        result(nil)
+        return
+      }
+      if call.method == "setBrowserShortcutCommands", let commands = call.arguments as? [String] {
+        self?.browserShortcutCommands = Set(commands)
         result(nil)
         return
       }

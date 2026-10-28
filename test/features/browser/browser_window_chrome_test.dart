@@ -60,7 +60,15 @@ void main() {
           ),
         ),
       );
-      expect(calls.map((call) => (call.method, call.arguments)), [
+      expect(calls.first.method, 'setBrowserShortcutCommands');
+      expect(calls.first.arguments, [
+        'cmd+f',
+        'cmd+l',
+        'cmd+t',
+        'cmd+w',
+        'cmd+r',
+      ]);
+      expect(calls.skip(1).map((call) => (call.method, call.arguments)), [
         ('setBrowserChrome', true),
         ('setBrowserShortcuts', true),
       ]);
@@ -138,15 +146,14 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  chromeTestWidgets(
-    'non-macOS host leaves native window and shortcuts untouched',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-      await tester.pumpWidget(
-        BrowserWindowChrome(onShortcut: (_) {}, child: const SizedBox.shrink()),
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-      expect(calls, isEmpty);
-    },
-  );
+  chromeTestWidgets('Linux host leaves native window and shortcuts untouched', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    await tester.pumpWidget(
+      BrowserWindowChrome(onShortcut: (_) {}, child: const SizedBox.shrink()),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(calls, isEmpty);
+  });
 }

@@ -38,7 +38,11 @@ Future<void> openBrowserPage(
     final tab = await browser.createTab(ownerSessionId: id);
     selectedTabId = tab.id;
     try {
-      await browser.navigate(url, tabId: tab.id);
+      if (browser.isSupported) {
+        await browser.navigate(url, tabId: tab.id);
+      } else {
+        await browser.setSavedAddress(tab.id, url);
+      }
     } catch (_) {
       await browser.closeTab(tab.id);
       rethrow;
