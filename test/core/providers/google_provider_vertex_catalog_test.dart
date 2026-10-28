@@ -9,12 +9,15 @@ import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
 import 'package:Kelivo/core/services/model_catalog/model_catalog_service.dart';
 
 late HttpServer server;
+final paths = <String>[];
 
 void main() {
   setUp(() async {
+    paths.clear();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
     server.listen((request) async {
+      paths.add(request.uri.path);
       request.response.headers.contentType = ContentType.json;
       request.response.write(
         jsonEncode({
@@ -70,6 +73,27 @@ void main() {
     ids = await _listIds(vertexAI: true, baseUrl: _baseUrl());
     expect(ids, contains('claude-fable-5-1@default'));
     expect(ids, isNot(contains('claude-sonnet-4@20250514')));
+  });
+
+  test('Vertex listing reaches the origin the location picks', () async {
+    ModelCatalogService.instance.debugSetData(
+      _vertexAnthropicCatalog(const []),
+    );
+    final models = await ProviderManager.listModels(
+      ProviderConfig(
+        id: 'VertexCatalogTest',
+        enabled: true,
+        name: 'VertexCatalogTest',
+        apiKey: 'test-key',
+        baseUrl: 'http://${server.address.address}:${server.port}',
+        providerType: ProviderKind.google,
+        vertexAI: true,
+        location: 'eu',
+        projectId: 'proj',
+      ),
+    );
+    expect(paths, ['/v1/projects/proj/locations/eu/publishers/google/models']);
+    expect(models.map((m) => m.id), contains('gemini-2.5-pro'));
   });
 
   test(
