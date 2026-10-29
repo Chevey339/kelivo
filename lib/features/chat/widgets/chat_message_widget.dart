@@ -3290,26 +3290,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             color: cs.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
-                      Builder(
-                        builder: (context) {
-                          final List<Widget> rowChildren = [];
-                          if (showModelTimestamp) {
-                            rowChildren.add(
-                              Text(
-                                _dateFormat.format(widget.message.timestamp),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.onSurface.withValues(alpha: 0.5),
-                                ),
-                              ),
-                            );
-                          }
-                          // Token stats moved to action toolbar
-                          return rowChildren.isNotEmpty
-                              ? Row(children: rowChildren)
-                              : const SizedBox.shrink();
-                        },
-                      ),
+                      if (showModelTimestamp)
+                        Text(
+                          _dateFormat.format(widget.message.timestamp),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -3679,188 +3667,201 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   : Padding(
                       key: const ValueKey('assistant-actions'),
                       padding: const EdgeInsets.only(top: 8),
-                      child: Row(
+                      child: OverflowBar(
+                        alignment: MainAxisAlignment.spaceBetween,
+                        overflowAlignment: OverflowBarAlignment.start,
+                        spacing: 12,
+                        overflowSpacing: 4,
                         children: [
-                          SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: IosIconButton(
-                                size: 16,
-                                padding: EdgeInsets.all(4),
-                                icon: Lucide.Copy,
-                                color: cs.onSurface.withValues(alpha: 0.9),
-                                onTap:
-                                    widget.onCopy ??
-                                    () =>
-                                        copyUiMessage(context, widget.message),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: IosIconButton(
-                                size: 16,
-                                padding: EdgeInsets.all(4),
-                                icon: Lucide.RefreshCw,
-                                color: cs.onSurface.withValues(alpha: 0.9),
-                                onTap: widget.onRegenerate == null
-                                    ? null
-                                    : () => _confirmRegeneration(
-                                        widget.onRegenerate!,
-                                      ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Consumer<TtsProvider>(
-                            builder: (context, tts, _) {
-                              final ttsActive = tts.playbackState.isActive;
-                              return SizedBox(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SizedBox(
                                 width: 28,
                                 height: 28,
                                 child: Center(
                                   child: IosIconButton(
                                     size: 16,
                                     padding: EdgeInsets.all(4),
-                                    onTap: widget.onSpeak,
+                                    icon: Lucide.Copy,
                                     color: cs.onSurface.withValues(alpha: 0.9),
-                                    builder: (color) => AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      transitionBuilder: (child, anim) =>
-                                          ScaleTransition(
-                                            scale: anim,
-                                            child: FadeTransition(
-                                              opacity: anim,
-                                              child: child,
-                                            ),
-                                          ),
-                                      child: Icon(
-                                        ttsActive
-                                            ? Lucide.CircleStop
-                                            : Lucide.Volume2,
-                                        key: ValueKey(
-                                          ttsActive ? 'stop' : 'speak',
+                                    onTap:
+                                        widget.onCopy ??
+                                        () => copyUiMessage(
+                                          context,
+                                          widget.message,
                                         ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: Center(
+                                  child: IosIconButton(
+                                    size: 16,
+                                    padding: EdgeInsets.all(4),
+                                    icon: Lucide.RefreshCw,
+                                    color: cs.onSurface.withValues(alpha: 0.9),
+                                    onTap: widget.onRegenerate == null
+                                        ? null
+                                        : () => _confirmRegeneration(
+                                            widget.onRegenerate!,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                              Consumer<TtsProvider>(
+                                builder: (context, tts, _) {
+                                  final ttsActive = tts.playbackState.isActive;
+                                  return SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: Center(
+                                      child: IosIconButton(
                                         size: 16,
-                                        color: color,
+                                        padding: EdgeInsets.all(4),
+                                        onTap: widget.onSpeak,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                        builder: (color) => AnimatedSwitcher(
+                                          duration: const Duration(
+                                            milliseconds: 200,
+                                          ),
+                                          transitionBuilder: (child, anim) =>
+                                              ScaleTransition(
+                                                scale: anim,
+                                                child: FadeTransition(
+                                                  opacity: anim,
+                                                  child: child,
+                                                ),
+                                              ),
+                                          child: Icon(
+                                            ttsActive
+                                                ? Lucide.CircleStop
+                                                : Lucide.Volume2,
+                                            key: ValueKey(
+                                              ttsActive ? 'stop' : 'speak',
+                                            ),
+                                            size: 16,
+                                            color: color,
+                                          ),
+                                        ),
                                       ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: Center(
+                                  child: GestureDetector(
+                                    key: _translateBtnKey2,
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapDown: (d) {
+                                      final isDesktop =
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.macOS ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.windows ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.linux;
+                                      if (isDesktop) {
+                                        try {
+                                          DesktopMenuAnchor.setPosition(
+                                            d.globalPosition,
+                                          );
+                                        } catch (_) {}
+                                      }
+                                    },
+                                    onTap: () {
+                                      final isDesktop =
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.macOS ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.windows ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.linux;
+                                      if (isDesktop) {
+                                        _setAnchorFromKey(_translateBtnKey2);
+                                      }
+                                      widget.onTranslate?.call();
+                                    },
+                                    child: IosIconButton(
+                                      size: 16,
+                                      padding: EdgeInsets.all(4),
+                                      icon: Lucide.Languages,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      onTap: null,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 6),
-                          SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: GestureDetector(
-                                key: _translateBtnKey2,
-                                behavior: HitTestBehavior.opaque,
-                                onTapDown: (d) {
-                                  final isDesktop =
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.macOS ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.windows ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.linux;
-                                  if (isDesktop) {
-                                    try {
-                                      DesktopMenuAnchor.setPosition(
-                                        d.globalPosition,
-                                      );
-                                    } catch (_) {}
-                                  }
-                                },
-                                onTap: () {
-                                  final isDesktop =
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.macOS ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.windows ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.linux;
-                                  if (isDesktop) {
-                                    _setAnchorFromKey(_translateBtnKey2);
-                                  }
-                                  widget.onTranslate?.call();
-                                },
-                                child: IosIconButton(
-                                  size: 16,
-                                  padding: EdgeInsets.all(4),
-                                  icon: Lucide.Languages,
-                                  color: cs.onSurface.withValues(alpha: 0.9),
-                                  onTap: null,
+                              ),
+                              SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: Center(
+                                  child: GestureDetector(
+                                    key: _moreBtnKey2,
+                                    onTapDown: (d) {
+                                      final isDesktop =
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.macOS ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.windows ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.linux;
+                                      if (isDesktop) {
+                                        try {
+                                          DesktopMenuAnchor.setPosition(
+                                            d.globalPosition,
+                                          );
+                                        } catch (_) {}
+                                      }
+                                    },
+                                    onTap: () {
+                                      final isDesktop =
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.macOS ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.windows ||
+                                          defaultTargetPlatform ==
+                                              TargetPlatform.linux;
+                                      if (isDesktop) {
+                                        _setAnchorFromKey(_moreBtnKey2);
+                                      }
+                                      widget.onMore?.call();
+                                    },
+                                    child: IosIconButton(
+                                      size: 16,
+                                      padding: EdgeInsets.all(4),
+                                      icon: Lucide.Ellipsis,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.9,
+                                      ),
+                                      onTap: null,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: GestureDetector(
-                                key: _moreBtnKey2,
-                                onTapDown: (d) {
-                                  final isDesktop =
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.macOS ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.windows ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.linux;
-                                  if (isDesktop) {
-                                    try {
-                                      DesktopMenuAnchor.setPosition(
-                                        d.globalPosition,
-                                      );
-                                    } catch (_) {}
-                                  }
-                                },
-                                onTap: () {
-                                  final isDesktop =
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.macOS ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.windows ||
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.linux;
-                                  if (isDesktop) {
-                                    _setAnchorFromKey(_moreBtnKey2);
-                                  }
-                                  widget.onMore?.call();
-                                },
-                                child: IosIconButton(
-                                  size: 16,
-                                  padding: EdgeInsets.all(4),
-                                  icon: Lucide.Ellipsis,
-                                  color: cs.onSurface.withValues(alpha: 0.9),
-                                  onTap: null,
+                              if ((widget.versionCount ?? 1) > 1) ...[
+                                _BranchSelector(
+                                  index: widget.versionIndex ?? 0,
+                                  total: widget.versionCount ?? 1,
+                                  onPrev: widget.onPrevVersion,
+                                  onNext: widget.onNextVersion,
                                 ),
-                              ),
-                            ),
+                              ],
+                            ],
                           ),
-                          if ((widget.versionCount ?? 1) > 1) ...[
-                            const SizedBox(width: 6),
-                            _BranchSelector(
-                              index: widget.versionIndex ?? 0,
-                              total: widget.versionCount ?? 1,
-                              onPrev: widget.onPrevVersion,
-                              onNext: widget.onNextVersion,
-                            ),
-                          ],
                           if (widget.showTokenStats &&
                               widget.message.totalTokens != null) ...[
-                            const Spacer(),
                             TokenDisplayWidget(
                               totalTokens:
                                   finishUsage?.totalTokens ??
