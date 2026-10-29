@@ -717,6 +717,44 @@ void main() {
       },
     );
 
+    for (final sourceProvider in ['vertex', 'gemini-paid', null]) {
+      test('Gemini history scopes signatures from $sourceProvider', () {
+        const signature =
+            '{"text":{"k":"thoughtSignature","v":"vertex-signature"}}';
+        const legacy = '<!-- gemini_thought_signatures:$signature -->';
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({}),
+          contextProvider: _FakeBuildContext(),
+          providerArtifactLookup: (message, kind) =>
+              kind == geminiThoughtSignatureArtifactKind ? signature : null,
+        );
+        final original = ChatMessage(
+          id: 'signed',
+          conversationId: 'conversation-1',
+          role: 'assistant',
+          content: 'Earlier answer.$legacy',
+          providerId: sourceProvider,
+          modelId: 'gemini-4-argon',
+        );
+        final messages = service.buildApiMessages(
+          messages: [original],
+          versionSelections: {},
+          currentConversation: null,
+          googleProviderId: 'vertex',
+        );
+        final sameProvider = sourceProvider == 'vertex';
+        expect(
+          messages.single[multimodalInternalGeminiThoughtSignatureKey],
+          sameProvider ? signature : isNull,
+        );
+        expect(
+          messages.single['content'],
+          sameProvider ? original.content : 'Earlier answer.',
+        );
+        expect(original.content, 'Earlier answer.$legacy');
+      });
+    }
+
     test('a stored Gemini signature rides on the final assistant message', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),

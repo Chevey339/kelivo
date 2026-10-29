@@ -197,6 +197,7 @@ class MessageGenerationService {
       includeToolMessages: includeToolMessages,
       // Claude replays its rounds from the native turn artifact instead.
       preserveToolTurns: kind != ProviderKind.claude,
+      googleProviderId: kind == ProviderKind.google ? providerKey : null,
       claudeSource: kind == ProviderKind.claude
           ? (providerId: providerKey, modelId: modelId)
           : null,
