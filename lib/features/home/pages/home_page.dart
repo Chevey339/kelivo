@@ -77,8 +77,7 @@ import '../widgets/chat_input_section.dart';
 import '../widgets/conversation_system_prompt_button.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
-import '../widgets/chat_selection_delete_bar.dart';
-import '../widgets/chat_selection_export_bar.dart';
+import '../widgets/chat_selection_action_bar.dart';
 import '../widgets/user_message_edit_overlay.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
@@ -1001,33 +1000,22 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildSelectionActionBar(BuildContext context) {
-    if (_controller.selectionMode == ChatSelectionMode.delete) {
-      return ChatSelectionDeleteBar(
-        key: _selectionActionBarKey,
-        hasMultiVersionSelection:
-            _controller.selectedMessagesIncludeMultipleVersions,
-        onDeleteCurrentVersions: () {
-          unawaited(
-            _handleDeleteSelectedMessages(context, deleteAllVersions: false),
-          );
-        },
-        onDeleteAllVersions: () {
-          unawaited(
-            _handleDeleteSelectedMessages(context, deleteAllVersions: true),
-          );
-        },
-      );
-    }
-
-    return ChatSelectionExportBar(
+    return ChatSelectionActionBar(
       key: _selectionActionBarKey,
-      onExportMarkdown: _controller.exportSelectedAsMarkdown,
-      onExportTxt: _controller.exportSelectedAsTxt,
-      onExportImage: _controller.exportSelectedAsImage,
-      showThinkingTools: _controller.showThinkingTools,
-      showThinkingContent: _controller.showThinkingContent,
-      onToggleThinkingTools: _controller.toggleThinkingTools,
-      onToggleThinkingContent: _controller.toggleThinkingContent,
+      hasSelection: _controller.selectedCount > 0,
+      hasMultiVersionSelection:
+          _controller.selectedMessagesIncludeMultipleVersions,
+      onShare: _controller.exportSelectedMessages,
+      onDeleteCurrentVersions: () {
+        unawaited(
+          _handleDeleteSelectedMessages(context, deleteAllVersions: false),
+        );
+      },
+      onDeleteAllVersions: () {
+        unawaited(
+          _handleDeleteSelectedMessages(context, deleteAllVersions: true),
+        );
+      },
     );
   }
 
@@ -1292,12 +1280,9 @@ class _HomePageState extends State<HomePage>
       onForkConversation: _controller.isTemporaryConversation
           ? null
           : (message) => _controller.forkConversation(message),
-      onShareMessage: (index, messages) =>
-          _controller.shareMessage(index, messages),
       onSelectMessages: (index, messages) => _controller.startMessageSelection(
         messageIndex: index,
         messageList: messages,
-        mode: ChatSelectionMode.delete,
       ),
       onSpeakMessage: (message) => _controller.speakMessage(message),
       onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),

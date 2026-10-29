@@ -1,35 +1,39 @@
-import "../../../support/business_test_harness.dart";
+import '../../../support/business_test_harness.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:Kelivo/features/home/widgets/chat_selection_delete_bar.dart';
-import 'package:Kelivo/features/home/widgets/chat_selection_export_bar.dart';
-import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> _pumpBar(WidgetTester tester, Widget child) async {
-  SharedPreferences.setMockInitialValues({});
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/features/home/widgets/chat_selection_action_bar.dart';
+import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+
+Future<void> _pumpBar(
+  WidgetTester tester,
+  Widget child, {
+  Size size = const Size(390, 844),
+  Locale locale = const Locale('en'),
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) => SettingsProvider(createBusinessTestPreferences()),
       child: MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: Scaffold(
-          body: Align(
-            alignment: Alignment.bottomCenter,
-            child: SizedBox(width: 420, child: child),
-          ),
+          body: Align(alignment: Alignment.bottomCenter, child: child),
         ),
       ),
     ),
@@ -38,83 +42,122 @@ Future<void> _pumpBar(WidgetTester tester, Widget child) async {
 }
 
 void main() {
-  testWidgets('分享导出栏不展示删除操作', (tester) async {
+  testWidgets('the same selection offers sharing and deletion', (tester) async {
+    var shares = 0;
+    var deletes = 0;
     await _pumpBar(
       tester,
-      ChatSelectionExportBar(
-        onExportMarkdown: () {},
-        onExportTxt: () {},
-        onExportImage: () {},
-        showThinkingTools: false,
-        showThinkingContent: false,
-        onToggleThinkingTools: () {},
-        onToggleThinkingContent: () {},
-      ),
-    );
-
-    expect(find.text('TXT'), findsOneWidget);
-    expect(find.text('MD'), findsOneWidget);
-    expect(find.text('Image'), findsOneWidget);
-    expect(find.text('Delete Selected'), findsNothing);
-    expect(find.text('Delete This Version'), findsNothing);
-    expect(find.text('Delete All Versions'), findsNothing);
-  });
-
-  testWidgets('删除栏在单版本选择时只展示普通删除', (tester) async {
-    var currentVersionDeletes = 0;
-    var allVersionDeletes = 0;
-
-    await _pumpBar(
-      tester,
-      ChatSelectionDeleteBar(
+      ChatSelectionActionBar(
+        hasSelection: true,
         hasMultiVersionSelection: false,
-        onDeleteCurrentVersions: () {
-          currentVersionDeletes++;
-        },
-        onDeleteAllVersions: () {
-          allVersionDeletes++;
-        },
+        onShare: () => shares++,
+        onDeleteCurrentVersions: () => deletes++,
+        onDeleteAllVersions: () => fail('single version selection'),
       ),
     );
-
+    expect(find.text('Share'), findsOneWidget);
     expect(find.text('Delete'), findsOneWidget);
-    expect(find.text('Delete This Version'), findsNothing);
-    expect(find.text('Delete All Versions'), findsNothing);
-    expect(tester.getSize(find.byType(IosCardPress)).width, closeTo(396, 0.1));
-    expect(
-      tester.widget<Text>(find.text('Delete')).style?.fontWeight,
-      AppFontWeights.medium,
-    );
-
+    expect(find.text('TXT'), findsNothing);
+    await tester.tap(find.text('Share'));
     await tester.tap(find.text('Delete'));
-    expect(currentVersionDeletes, 1);
-    expect(allVersionDeletes, 0);
+    expect(shares, 1);
+    expect(deletes, 1);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('删除栏在多版本选择时展示本版本和全部版本', (tester) async {
-    var currentVersionDeletes = 0;
-    var allVersionDeletes = 0;
-
+  testWidgets('empty selection disables both actions', (tester) async {
     await _pumpBar(
       tester,
-      ChatSelectionDeleteBar(
-        hasMultiVersionSelection: true,
-        onDeleteCurrentVersions: () {
-          currentVersionDeletes++;
-        },
-        onDeleteAllVersions: () {
-          allVersionDeletes++;
-        },
+      ChatSelectionActionBar(
+        hasSelection: false,
+        hasMultiVersionSelection: false,
+        onShare: () => fail('no selection'),
+        onDeleteCurrentVersions: () => fail('no selection'),
+        onDeleteAllVersions: () => fail('no selection'),
       ),
     );
-
-    expect(find.text('Delete This Version'), findsOneWidget);
-    expect(find.text('Delete All Versions'), findsOneWidget);
-
-    await tester.tap(find.text('Delete This Version'));
-    await tester.tap(find.text('Delete All Versions'));
-
-    expect(currentVersionDeletes, 1);
-    expect(allVersionDeletes, 1);
+    expect(
+      tester
+          .widgetList<IosCardPress>(find.byType(IosCardPress))
+          .every((button) => button.onTap == null),
+      isTrue,
+    );
+    await tester.tap(find.text('Share'));
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
   });
+
+  testWidgets(
+    'version chooser can cancel or select either deletion scope',
+    (tester) async {
+      var currentDeletes = 0;
+      var allDeletes = 0;
+      await _pumpBar(
+        tester,
+        ChatSelectionActionBar(
+          hasSelection: true,
+          hasMultiVersionSelection: true,
+          onShare: () {},
+          onDeleteCurrentVersions: () => currentDeletes++,
+          onDeleteAllVersions: () => allDeletes++,
+        ),
+      );
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete This Version'), findsOneWidget);
+      expect(find.text('Delete All Versions'), findsOneWidget);
+      expect(
+        find.byType(BottomSheet),
+        defaultTargetPlatform == TargetPlatform.android
+            ? findsOneWidget
+            : findsNothing,
+      );
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(currentDeletes, 0);
+      expect(allDeletes, 0);
+      expect(find.text('Delete This Version'), findsNothing);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete This Version'));
+      await tester.pumpAndSettle();
+      expect(currentDeletes, 1);
+      expect(allDeletes, 0);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete All Versions'));
+      await tester.pumpAndSettle();
+      expect(currentDeletes, 1);
+      expect(allDeletes, 1);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.macOS,
+    }),
+  );
+
+  for (final size in [const Size(320, 640), const Size(1280, 800)]) {
+    testWidgets('actions fit $size with large Chinese text', (tester) async {
+      await _pumpBar(
+        tester,
+        ChatSelectionActionBar(
+          hasSelection: true,
+          hasMultiVersionSelection: true,
+          onShare: () {},
+          onDeleteCurrentVersions: () {},
+          onDeleteAllVersions: () {},
+        ),
+        size: size,
+        locale: const Locale('zh'),
+        textScale: 2,
+      );
+      expect(find.text('分享'), findsOneWidget);
+      expect(find.text('删除'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

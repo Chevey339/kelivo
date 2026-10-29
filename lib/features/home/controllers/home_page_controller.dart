@@ -75,8 +75,6 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
-enum ChatSelectionMode { share, delete }
-
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
   bool expanded = true; // default to expanded when translation is added
@@ -224,7 +222,6 @@ class HomePageController extends ChangeNotifier {
 
   // Selection mode
   bool _selecting = false;
-  ChatSelectionMode _selectionMode = ChatSelectionMode.share;
   final Set<String> _selectedItems = <String>{};
 
   /// Selectable projection ids from the last full-history selection load.
@@ -234,8 +231,7 @@ class HomePageController extends ChangeNotifier {
   /// Bumped when selection starts, cancels, completes, or the conversation
   /// switches so in-flight select-all / toggle / invert results are ignored.
   int _selectionEpoch = 0;
-  bool _showThinkingTools = false;
-  bool _showThinkingContent = false;
+  bool _openingSelectionExport = false;
 
   // Desktop drag-and-drop
   bool _isDragHovering = false;
@@ -668,11 +664,8 @@ class HomePageController extends ChangeNotifier {
   Set<String> get removingSlotIds => _removingSlotIds;
   ChatController get chatController => _chatController;
   bool get selecting => _selecting;
-  ChatSelectionMode get selectionMode => _selectionMode;
   Set<String> get selectedItems => _selectedItems;
   int get selectedCount => _selectedItems.length;
-  bool get showThinkingTools => _showThinkingTools;
-  bool get showThinkingContent => _showThinkingContent;
   bool get isDragHovering => _isDragHovering;
   bool get tabletSidebarOpen => _tabletSidebarOpen;
   double get embeddedSidebarWidth => _embeddedSidebarWidth;
@@ -2011,7 +2004,6 @@ class HomePageController extends ChangeNotifier {
   void _clearSelectionState() {
     _selectionEpoch++;
     _selecting = false;
-    _selectionMode = ChatSelectionMode.share;
     _selectedItems.clear();
     _selectableProjectionIds = null;
   }
@@ -2800,27 +2792,15 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
-  void shareMessage(int messageIndex, List<ChatMessage> messageList) {
-    startMessageSelection(
-      messageIndex: messageIndex,
-      messageList: messageList,
-      mode: ChatSelectionMode.share,
-    );
-  }
-
   void startMessageSelection({
     required int messageIndex,
     required List<ChatMessage> messageList,
-    required ChatSelectionMode mode,
   }) {
     dismissKeyboard();
     _selectionEpoch++;
     _selecting = true;
-    _selectionMode = mode;
     _selectedItems.clear();
     _selectableProjectionIds = null;
-    _showThinkingTools = false;
-    _showThinkingContent = false;
 
     if (messageIndex < 0 || messageIndex >= messageList.length) {
       notifyListeners();
@@ -3028,26 +3008,16 @@ class HomePageController extends ChangeNotifier {
         currentConversation?.id == conversationId;
   }
 
-  void toggleThinkingTools() {
-    _showThinkingTools = !_showThinkingTools;
-    if (!_showThinkingTools) _showThinkingContent = false;
-    notifyListeners();
-  }
-
-  void toggleThinkingContent() {
-    if (!_showThinkingTools) return;
-    _showThinkingContent = !_showThinkingContent;
-    notifyListeners();
-  }
-
-  Future<List<ChatMessage>> _selectedCollapsedMessages() async {
+  Future<List<ChatMessage>> _selectedCollapsedMessages(
+    Set<String> selectedIds,
+  ) async {
     final convo = currentConversation;
     if (convo == null) return const <ChatMessage>[];
     final projections = await _chatController
         .loadAllCollapsedMessagesForCurrentConversation();
     final ids = [
       for (final message in projections)
-        if (_selectedItems.contains(message.id)) message.id,
+        if (selectedIds.contains(message.id)) message.id,
     ];
     final storedMessages = await _chatService.loadMessagesByIds(ids);
     final storedById = {
@@ -3059,125 +3029,42 @@ class HomePageController extends ChangeNotifier {
     ];
   }
 
-  Future<void> exportSelectedAsMarkdown() async {
+  Future<void> exportSelectedMessages() async {
     final convo = currentConversation;
-    if (convo == null) return;
+    if (convo == null || !_selecting || _openingSelectionExport) return;
     final context = _context;
-
-    final selected = await _selectedCollapsedMessages();
-    if (!context.mounted) return;
-    if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(context)!;
-      showAppSnackBar(
+    final epoch = _selectionEpoch;
+    final selectedIds = Set<String>.of(_selectedItems);
+    _openingSelectionExport = true;
+    try {
+      final selected = await _selectedCollapsedMessages(selectedIds);
+      if (!context.mounted || !_selectionWriteStillValid(epoch, convo.id)) {
+        return;
+      }
+      if (selected.isEmpty) {
+        final l10n = AppLocalizations.of(context)!;
+        showAppSnackBar(
+          context,
+          message: l10n.homePageSelectMessagesToShare,
+          type: NotificationType.info,
+        );
+        return;
+      }
+      // Keep the selection while choosing a format, cancelling a picker, or
+      // returning from an image preview so another action can use the same ids.
+      await showChatExportSheet(
         context,
-        message: l10n.homePageSelectMessagesToShare,
-        type: NotificationType.info,
+        conversation: convo,
+        selectedMessages: selected,
       );
-      return;
+    } finally {
+      _openingSelectionExport = false;
     }
-
-    final showThinkingTools = _showThinkingTools;
-    final showThinkingContent = _showThinkingContent;
-    cancelSelection();
-    await exportChatMessagesMarkdown(
-      context,
-      conversation: convo,
-      messages: selected,
-      showThinkingAndToolCards: showThinkingTools,
-      expandThinkingContent: showThinkingContent,
-    );
-  }
-
-  Future<void> exportSelectedAsTxt() async {
-    final convo = currentConversation;
-    if (convo == null) return;
-    final context = _context;
-
-    final selected = await _selectedCollapsedMessages();
-    if (!context.mounted) return;
-    if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(context)!;
-      showAppSnackBar(
-        context,
-        message: l10n.homePageSelectMessagesToShare,
-        type: NotificationType.info,
-      );
-      return;
-    }
-
-    final showThinkingTools = _showThinkingTools;
-    final showThinkingContent = _showThinkingContent;
-    cancelSelection();
-    await exportChatMessagesTxt(
-      context,
-      conversation: convo,
-      messages: selected,
-      showThinkingAndToolCards: showThinkingTools,
-      expandThinkingContent: showThinkingContent,
-    );
-  }
-
-  Future<void> exportSelectedAsImage() async {
-    final convo = currentConversation;
-    if (convo == null) return;
-    final context = _context;
-
-    final selected = await _selectedCollapsedMessages();
-    if (!context.mounted) return;
-    if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(context)!;
-      showAppSnackBar(
-        context,
-        message: l10n.homePageSelectMessagesToShare,
-        type: NotificationType.info,
-      );
-      return;
-    }
-
-    final showThinkingTools = _showThinkingTools;
-    final showThinkingContent = _showThinkingContent;
-    cancelSelection();
-    await exportChatMessagesImage(
-      context,
-      conversation: convo,
-      messages: selected,
-      showThinkingAndToolCards: showThinkingTools,
-      expandThinkingContent: showThinkingContent,
-    );
-  }
-
-  Future<void> confirmSelection() async {
-    final convo = currentConversation;
-    if (convo == null) return;
-    final context = _context;
-    final selected = await _selectedCollapsedMessages();
-    if (!context.mounted) return;
-    if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(context)!;
-      showAppSnackBar(
-        context,
-        message: l10n.homePageSelectMessagesToShare,
-        type: NotificationType.info,
-      );
-      return;
-    }
-    _selectionEpoch++;
-    _selecting = false;
-    notifyListeners();
-    await showChatExportSheet(
-      context,
-      conversation: convo,
-      selectedMessages: selected,
-    );
-    _selectedItems.clear();
-    _selectableProjectionIds = null;
-    notifyListeners();
   }
 
   void cancelSelection() {
     _selectionEpoch++;
     _selecting = false;
-    _selectionMode = ChatSelectionMode.share;
     _selectedItems.clear();
     _selectableProjectionIds = null;
     notifyListeners();

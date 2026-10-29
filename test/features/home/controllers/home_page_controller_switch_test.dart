@@ -849,14 +849,9 @@ void main() {
     void enterSelection(HomePageController controller) {
       final messages = controller.messages.toList();
       expect(messages, isNotEmpty);
-      controller.startMessageSelection(
-        messageIndex: 0,
-        messageList: messages,
-        mode: ChatSelectionMode.delete,
-      );
+      controller.startMessageSelection(messageIndex: 0, messageList: messages);
       expect(controller.selecting, isTrue);
       expect(controller.selectedItems, isNotEmpty);
-      expect(controller.selectionMode, ChatSelectionMode.delete);
     }
 
     testWidgets('successful switch clears selection UI and old ids', (
@@ -877,7 +872,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-b');
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
         expect(
           previousSelected.intersection(controller.selectedItems),
           isEmpty,
@@ -906,7 +900,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-a');
         expect(controller.selecting, isTrue);
         expect(controller.selectedItems, selectedBefore);
-        expect(controller.selectionMode, ChatSelectionMode.delete);
       });
     });
 
@@ -926,7 +919,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-a');
         expect(controller.selecting, isTrue);
         expect(controller.selectedItems, selectedBefore);
-        expect(controller.selectionMode, ChatSelectionMode.delete);
       });
     });
 
@@ -945,7 +937,6 @@ void main() {
         expect(controller.currentConversation?.id, isNot('conv-a'));
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
       });
     });
   });
@@ -954,14 +945,9 @@ void main() {
     void enterSelection(HomePageController controller) {
       final messages = controller.messages.toList();
       expect(messages, isNotEmpty);
-      controller.startMessageSelection(
-        messageIndex: 0,
-        messageList: messages,
-        mode: ChatSelectionMode.delete,
-      );
+      controller.startMessageSelection(messageIndex: 0, messageList: messages);
       expect(controller.selecting, isTrue);
       expect(controller.selectedItems, isNotEmpty);
-      expect(controller.selectionMode, ChatSelectionMode.delete);
     }
 
     testWidgets('successful switch clears selection', (tester) async {
@@ -981,7 +967,6 @@ void main() {
         expect(service.currentConversationId, 'conv-b');
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
         expect(
           previousSelected.intersection(controller.selectedItems),
           isEmpty,
@@ -1027,7 +1012,6 @@ void main() {
           expect(controller.messages.map((m) => m.id), messagesBefore);
           expect(controller.selecting, isTrue);
           expect(controller.selectedItems, selectedBefore);
-          expect(controller.selectionMode, ChatSelectionMode.delete);
         });
       },
     );

@@ -39,6 +39,8 @@ import '../../../core/models/assistant.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/platform_utils.dart';
+import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
@@ -1557,32 +1559,22 @@ Future<void> showChatExportSheet(
   required Conversation conversation,
   required List<ChatMessage> selectedMessages,
 }) async {
-  try {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // Desktop: show centered dialog
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) => Dialog(
-          elevation: 12,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: _BatchExportDialog(
-            conversation: conversation,
-            messages: selectedMessages,
-            parentContext: context,
-          ),
+  if (PlatformUtils.isDesktopTarget || ResponsiveHelper.isDesktop(context)) {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        elevation: 12,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: _BatchExportDialog(
+          conversation: conversation,
+          messages: selectedMessages,
+          parentContext: context,
         ),
-      );
-      return;
-    }
-  } catch (_) {
-    // Fallback to bottom sheet below
+      ),
+    );
+    return;
   }
   await showModalBottomSheet<void>(
     context: context,
@@ -1899,12 +1891,20 @@ class _BatchExportDialog extends StatefulWidget {
 }
 
 class _BatchExportDialogState extends State<_BatchExportDialog> {
-  final bool _exporting = false;
+  final _scrollController = ScrollController();
+  bool _exporting = false;
   bool _showThinkingAndToolCards = false;
   bool _expandThinkingContent = false;
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _onExportMarkdown() async {
     if (_exporting) return;
+    setState(() => _exporting = true);
     final pctx = widget.parentContext;
     final exporting = exportChatMessagesMarkdown(
       pctx,
@@ -1919,6 +1919,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
 
   Future<void> _onExportTxt() async {
     if (_exporting) return;
+    setState(() => _exporting = true);
     final pctx = widget.parentContext;
     final exporting = exportChatMessagesTxt(
       pctx,
@@ -1933,45 +1934,16 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
 
   Future<void> _onExportImage() async {
     if (_exporting) return;
-    try {
-      final pctx = widget.parentContext;
-      final uiCaptures = await captureUiExportMessages(pctx, widget.messages);
-      if (!pctx.mounted) return;
-      if (!mounted) return;
-      await Navigator.of(context).maybePop();
-      if (!pctx.mounted) return;
-      _ExportedImageResult? file;
-      await _runWithExportingOverlay(pctx, (progress) async {
-        file = await _renderAndSaveChatImage(
-          pctx,
-          widget.conversation,
-          widget.messages,
-          progress: progress,
-          uiCaptures: uiCaptures,
-          showThinkingAndToolCards: _showThinkingAndToolCards,
-          expandThinkingContent: _expandThinkingContent,
-        );
-      });
-      if (file == null) throw 'render error';
-      if (!pctx.mounted) return;
-      await showImagePreviewSheet(
-        pctx,
-        file: file!.file,
-        preparedPreview: file!.preview,
-      );
-      return;
-    } catch (e) {
-      final pctx = widget.parentContext;
-      if (!pctx.mounted) return;
-      final l10n = AppLocalizations.of(pctx)!;
-      showAppSnackBar(
-        pctx,
-        message: e is ExportImageTooLarge
-            ? l10n.genuiExportTooLarge
-            : l10n.messageExportSheetExportFailed('$e'),
-        type: NotificationType.error,
-      );
-    }
+    setState(() => _exporting = true);
+    final parentContext = widget.parentContext;
+    Navigator.of(context).pop();
+    await exportChatMessagesImage(
+      parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   @override
@@ -1979,11 +1951,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: 480,
-        maxWidth: 720,
-        maxHeight: 460,
-      ),
+      constraints: const BoxConstraints(maxWidth: 720, maxHeight: 460),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
@@ -2025,7 +1993,9 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   child: Scrollbar(
+                    controller: _scrollController,
                     child: ListView(
+                      controller: _scrollController,
                       children: [
                         _ExportOptionTile(
                           icon: Lucide.BookOpenText,
@@ -2161,6 +2131,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
 
   Future<void> _onExportMarkdown() async {
     if (_exporting) return;
+    setState(() => _exporting = true);
 
     // Dismiss dialog immediately
     if (mounted) Navigator.of(context).maybePop();
@@ -2176,6 +2147,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
 
   Future<void> _onExportTxt() async {
     if (_exporting) return;
+    setState(() => _exporting = true);
 
     // Dismiss dialog immediately
     if (mounted) Navigator.of(context).maybePop();
@@ -2192,46 +2164,15 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
   Future<void> _onExportImage() async {
     if (_exporting) return;
     setState(() => _exporting = true);
-    try {
-      final pctx = widget.parentContext;
-      final uiCaptures = await captureUiExportMessages(pctx, widget.messages);
-      if (!pctx.mounted) return;
-      _ExportedImageResult? file;
-      await _runWithExportingOverlay(pctx, (progress) async {
-        file = await _renderAndSaveChatImage(
-          pctx,
-          widget.conversation,
-          widget.messages,
-          progress: progress,
-          uiCaptures: uiCaptures,
-          showThinkingAndToolCards: _showThinkingAndToolCards,
-          expandThinkingContent: _expandThinkingContent,
-        );
-      });
-      if (file == null) throw 'render error';
-      // After generation, close current sheet then open preview
-      if (mounted) await Navigator.of(context).maybePop();
-      if (!pctx.mounted) return;
-      await showImagePreviewSheet(
-        pctx,
-        file: file!.file,
-        preparedPreview: file!.preview,
-      );
-      return; // do not fall through to setState after pop
-    } catch (e) {
-      final pctx = widget.parentContext;
-      if (!pctx.mounted) return;
-      final l10n = AppLocalizations.of(pctx)!;
-      showAppSnackBar(
-        pctx,
-        message: e is ExportImageTooLarge
-            ? l10n.genuiExportTooLarge
-            : l10n.messageExportSheetExportFailed('$e'),
-        type: NotificationType.error,
-      );
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
+    final parentContext = widget.parentContext;
+    Navigator.of(context).pop();
+    await exportChatMessagesImage(
+      parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   @override

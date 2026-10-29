@@ -57,8 +57,6 @@ typedef OnDeleteAllVersions =
       Map<String, List<ChatMessage>> byGroup,
     );
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
-typedef OnShareMessage =
-    void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSelectMessages =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
@@ -146,7 +144,6 @@ class MessageListView extends StatefulWidget {
     this.onDeleteMessage,
     this.onDeleteAllVersions,
     this.onForkConversation,
-    this.onShareMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
     this.suggestions = const <String>[],
@@ -248,7 +245,6 @@ class MessageListView extends StatefulWidget {
   final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
-  final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
@@ -2535,8 +2531,6 @@ class _MessageListViewState extends State<MessageListView> {
           widget.onEditMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {
           await widget.onForkConversation?.call(message);
-        } else if (action == MessageMoreAction.share) {
-          widget.onShareMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.selectMessages) {
           widget.onSelectMessages?.call(index, widget.messages);
         }

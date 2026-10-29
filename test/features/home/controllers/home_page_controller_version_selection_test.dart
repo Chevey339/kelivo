@@ -19,7 +19,7 @@ import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
-import 'package:Kelivo/features/home/widgets/chat_selection_delete_bar.dart';
+import 'package:Kelivo/features/home/widgets/chat_selection_action_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 
@@ -280,6 +280,83 @@ ChatMessage _msg({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final restartSelection in [false, true]) {
+    testWidgets(
+      'pending export ignores cancelled selection, restart=$restartSelection',
+      (tester) async {
+        final service = _SelectionFakeChatService(
+          conversation: Conversation(id: 'conversation-1', title: 'Chat'),
+          seededMessages: [
+            _msg(id: 'user-1', role: 'user'),
+            _msg(id: 'assistant-1', role: 'assistant'),
+          ],
+        );
+        late HomePageController controller;
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider(
+                create: (_) =>
+                    SettingsProvider(createBusinessTestPreferences()),
+              ),
+              ChangeNotifierProvider<ChatService>.value(value: service),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: _ControllerHarness(
+                onCreated: (value) => controller = value,
+              ),
+            ),
+          ),
+        );
+        await controller.chatController.setCurrentConversationAndLoad(
+          service.conversation,
+        );
+        await tester.pumpAndSettle();
+        controller.startMessageSelection(
+          messageIndex: 0,
+          messageList: controller.messages.toList(),
+        );
+        final gate = Completer<void>();
+        service.gateProjections = gate;
+        final pending = controller.exportSelectedMessages();
+        // Repeated taps while reading messages must not open another route.
+        await controller.exportSelectedMessages();
+        await tester.pump();
+        controller.cancelSelection();
+        if (restartSelection) {
+          controller.startMessageSelection(
+            messageIndex: -1,
+            messageList: const [],
+          );
+          controller.toggleSelection('assistant-1', true);
+        }
+        gate.complete();
+        await pending;
+        await tester.pumpAndSettle();
+        expect(find.text('Export Format'), findsNothing);
+        expect(controller.selecting, restartSelection);
+        expect(
+          controller.selectedItems,
+          restartSelection ? {'assistant-1'} : isEmpty,
+        );
+
+        if (restartSelection) {
+          final reopened = controller.exportSelectedMessages();
+          await tester.pumpAndSettle();
+          expect(find.text('Export Format'), findsOneWidget);
+          Navigator.of(tester.element(find.text('Export Format'))).pop();
+          await tester.pumpAndSettle();
+          await reopened;
+          expect(controller.selecting, isTrue);
+          expect(controller.selectedItems, {'assistant-1'});
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   group('multi-version selection without full order (Issue 4)', () {
     testWidgets(
       'two-version group shows both delete options after window+group preload',
@@ -332,7 +409,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 1,
           messageList: collapsed,
-          mode: ChatSelectionMode.delete,
         );
         await tester.pump();
 
@@ -353,7 +429,9 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
-                body: ChatSelectionDeleteBar(
+                body: ChatSelectionActionBar(
+                  hasSelection: true,
+                  onShare: () {},
                   hasMultiVersionSelection:
                       controller!.selectedMessagesIncludeMultipleVersions,
                   onDeleteCurrentVersions: () {},
@@ -363,6 +441,8 @@ void main() {
             ),
           ),
         );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
         await tester.pumpAndSettle();
         expect(find.text('Delete This Version'), findsOneWidget);
         expect(find.text('Delete All Versions'), findsOneWidget);
@@ -411,7 +491,6 @@ void main() {
       controller!.startMessageSelection(
         messageIndex: 1,
         messageList: collapsed,
-        mode: ChatSelectionMode.delete,
       );
       expect(controller!.selectedMessagesIncludeMultipleVersions, isFalse);
 
@@ -420,7 +499,9 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ChatSelectionDeleteBar(
+            body: ChatSelectionActionBar(
+              hasSelection: true,
+              onShare: () {},
               hasMultiVersionSelection:
                   controller!.selectedMessagesIncludeMultipleVersions,
               onDeleteCurrentVersions: () {},
@@ -482,7 +563,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 1,
           messageList: collapsed,
-          mode: ChatSelectionMode.delete,
         );
         // startMessageSelection pairs the prior user turn; isolate the
         // multi-version assistant group so delete paths exercise group APIs.
@@ -494,7 +574,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 1,
           messageList: collapsed,
-          mode: ChatSelectionMode.delete,
         );
         controller!.toggleSelection('user-1', false);
         await controller!.deleteSelectedMessages(deleteAllVersions: true);
@@ -579,7 +658,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 0,
           messageList: controller!.chatController.collapsedMessages,
-          mode: ChatSelectionMode.delete,
         );
         controller!.selectAll();
         await tester.pumpAndSettle();
@@ -660,7 +738,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 0,
           messageList: collapsed,
-          mode: ChatSelectionMode.delete,
         );
         // Anchor pairing may select user+assistant; isolate a known baseline.
         controller!.toggleSelection('assistant-1', false);
@@ -681,7 +758,6 @@ void main() {
         controller!.startMessageSelection(
           messageIndex: 2,
           messageList: collapsed,
-          mode: ChatSelectionMode.delete,
         );
         // New selection: only the newly chosen pair (user-2 + assistant-2).
         expect(controller!.selectedItems.contains('user-2'), isTrue);

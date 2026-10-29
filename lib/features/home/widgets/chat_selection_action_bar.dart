@@ -5,20 +5,55 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/option_sheet.dart';
 import '../../../theme/design_tokens.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-class ChatSelectionDeleteBar extends StatelessWidget {
-  const ChatSelectionDeleteBar({
+class ChatSelectionActionBar extends StatelessWidget {
+  const ChatSelectionActionBar({
     super.key,
+    required this.hasSelection,
     required this.hasMultiVersionSelection,
+    required this.onShare,
     required this.onDeleteCurrentVersions,
     required this.onDeleteAllVersions,
   });
 
+  final bool hasSelection;
   final bool hasMultiVersionSelection;
+  final VoidCallback onShare;
   final VoidCallback onDeleteCurrentVersions;
   final VoidCallback onDeleteAllVersions;
+
+  Future<void> _delete(BuildContext context) async {
+    if (!hasMultiVersionSelection) {
+      onDeleteCurrentVersions();
+      return;
+    }
+    final l10n = AppLocalizations.of(context)!;
+    final allVersions = await showOptionSheet<bool>(
+      context,
+      title: l10n.homePageDelete,
+      items: [
+        OptionSheetItem(
+          value: false,
+          icon: Lucide.Trash2,
+          label: l10n.homePageDeleteMessage,
+        ),
+        OptionSheetItem(
+          value: true,
+          icon: Lucide.Trash,
+          label: l10n.homePageDeleteAllVersions,
+        ),
+      ],
+    );
+    if (!context.mounted || allVersions == null) return;
+    if (allVersions) {
+      onDeleteAllVersions();
+    } else {
+      onDeleteCurrentVersions();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,37 +97,24 @@ class ChatSelectionDeleteBar extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final compact = constraints.maxWidth < 380;
-                    if (!hasMultiVersionSelection) {
-                      return SizedBox(
-                        width: double.infinity,
-                        child: _DeleteButton(
-                          icon: Lucide.Trash2,
-                          label: l10n.homePageDelete,
-                          color: cs.error,
-                          onTap: onDeleteCurrentVersions,
-                          dense: compact,
-                        ),
-                      );
-                    }
-
                     return Row(
                       children: [
                         Expanded(
-                          child: _DeleteButton(
-                            icon: Lucide.Trash2,
-                            label: l10n.homePageDeleteMessage,
-                            color: cs.error,
-                            onTap: onDeleteCurrentVersions,
+                          child: _ActionButton(
+                            icon: Lucide.Share,
+                            label: l10n.messageMoreSheetShare,
+                            color: cs.primary,
+                            onTap: hasSelection ? onShare : null,
                             dense: compact,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: _DeleteButton(
-                            icon: Lucide.Trash,
-                            label: l10n.homePageDeleteAllVersions,
+                          child: _ActionButton(
+                            icon: Lucide.Trash2,
+                            label: l10n.homePageDelete,
                             color: cs.error,
-                            onTap: onDeleteAllVersions,
+                            onTap: hasSelection ? () => _delete(context) : null,
                             dense: compact,
                           ),
                         ),
@@ -109,8 +131,8 @@ class ChatSelectionDeleteBar extends StatelessWidget {
   }
 }
 
-class _DeleteButton extends StatelessWidget {
-  const _DeleteButton({
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
@@ -121,7 +143,7 @@ class _DeleteButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool dense;
 
   @override
@@ -133,31 +155,39 @@ class _DeleteButton extends StatelessWidget {
       color.withValues(alpha: isDark ? 0.18 : 0.14),
     );
 
-    return IosCardPress(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      baseColor: bg,
-      pressedBlendStrength: isDark ? 0.20 : 0.16,
-      pressedScale: 0.98,
-      padding: dense
-          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
-          : const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: dense ? 16 : 18, color: color),
-            SizedBox(width: dense ? 4 : 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: dense ? 13 : 14,
-                fontWeight: AppFontWeights.medium,
-                color: color,
-              ),
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      child: Opacity(
+        opacity: onTap == null ? 0.45 : 1,
+        child: IosCardPress(
+          onTap: onTap,
+          focusable: true,
+          borderRadius: BorderRadius.circular(14),
+          baseColor: bg,
+          pressedBlendStrength: isDark ? 0.20 : 0.16,
+          pressedScale: 0.98,
+          padding: dense
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 10)
+              : const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: dense ? 16 : 18, color: color),
+                SizedBox(width: dense ? 4 : 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: dense ? 13 : 14,
+                    fontWeight: AppFontWeights.medium,
+                    color: color,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
