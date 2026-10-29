@@ -2,6 +2,109 @@ import 'package:Kelivo/core/services/asr/asr_service_options.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('Qwen Audio endpoints and persistence', () {
+    for (final mode in QwenAudioAsrMode.values) {
+      for (final region in ['cn-beijing', 'ap-southeast-1']) {
+        test('${mode.name} builds the $region Token Plan endpoint', () {
+          final options = QwenAudioAsrOptions(
+            apiKey: 'key',
+            workspaceId: ' token-plan ',
+            region: region,
+            mode: mode,
+          );
+          final uri = Uri.parse(options.endpointUrl);
+          expect(uri.host, 'token-plan.$region.maas.aliyuncs.com');
+          expect(
+            uri.scheme,
+            mode == QwenAudioAsrMode.realtime ? 'wss' : 'https',
+          );
+          expect(
+            uri.path,
+            mode == QwenAudioAsrMode.realtime
+                ? '/api-ws/v1/inference'
+                : '/api/v1/services/aigc/multimodal-generation/generation',
+          );
+          expect(options.model, mode.defaultModel);
+          expect(options.isConfigured, isTrue);
+        });
+      }
+    }
+
+    test('Singapore without a workspace uses the international endpoint', () {
+      expect(
+        Uri.parse(
+          QwenAudioAsrOptions(region: 'ap-southeast-1').endpointUrl,
+        ).host,
+        'dashscope-intl.aliyuncs.com',
+      );
+    });
+
+    test('round-trips HTTP settings and a complete custom endpoint', () {
+      final options = QwenAudioAsrOptions(
+        id: 'token-plan',
+        name: 'Singapore',
+        apiKey: 'key',
+        mode: QwenAudioAsrMode.transcription,
+        workspaceId: 'token-plan',
+        region: 'ap-southeast-1',
+        endpoint: 'https://proxy.test/custom/asr?project=one',
+        model: 'custom-model',
+        language: 'en',
+        sampleRate: 8000,
+        segmentDurationSec: 17,
+      );
+      final restored =
+          AsrServiceOptions.fromJson(options.toJson()) as QwenAudioAsrOptions;
+      expect(restored.toJson(), options.toJson());
+      expect(restored.endpointUrl, options.endpoint);
+      expect(restored.copyWith(name: 'Edited').endpointUrl, options.endpoint);
+      expect(
+        restored.copyWith(endpoint: '').endpointUrl,
+        startsWith('https://token-plan.ap-southeast-1.'),
+      );
+      final defaults =
+          AsrServiceOptions.fromJson({
+                'kind': 'qwen_audio',
+                'mode': 'transcription',
+              })
+              as QwenAudioAsrOptions;
+      expect(defaults.model, 'qwen-audio-3.0-asr-flash');
+    });
+
+    test('rejects a URL in Workspace ID and incompatible endpoint schemes', () {
+      final options = QwenAudioAsrOptions(apiKey: 'key');
+      expect(
+        options
+            .copyWith(workspaceId: 'https://token-plan.example')
+            .isConfigured,
+        isFalse,
+      );
+      for (final endpoint in [
+        'https://example.test/asr',
+        'file:///audio',
+        'wss://user:password@example.test/asr',
+        'wss://example.test/asr#part',
+      ]) {
+        expect(options.copyWith(endpoint: endpoint).isConfigured, isFalse);
+      }
+      expect(
+        options
+            .copyWith(
+              mode: QwenAudioAsrMode.transcription,
+              endpoint: 'wss://example.test/asr',
+            )
+            .isConfigured,
+        isFalse,
+      );
+      expect(
+        options
+            .copyWith(endpoint: 'wss://example.test/custom?x=1')
+            .isConfigured,
+        isTrue,
+      );
+    });
+  });
+
   group('AsrServiceKind', () {
     test('uses stable serialized ids', () {
       expect(AsrServiceKind.sherpaOnnx.id, 'sherpa_onnx');

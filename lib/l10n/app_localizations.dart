@@ -10573,6 +10573,60 @@ abstract class AppLocalizations {
   /// **'Endpoint'**
   String get asrServicesEndpointLabel;
 
+  /// No description provided for @asrServicesRecognitionModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognition mode'**
+  String get asrServicesRecognitionModeLabel;
+
+  /// No description provided for @asrServicesRealtimeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time'**
+  String get asrServicesRealtimeMode;
+
+  /// No description provided for @asrServicesRecordedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded audio'**
+  String get asrServicesRecordedMode;
+
+  /// No description provided for @asrServicesQwenAudioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time or recorded audio transcription'**
+  String get asrServicesQwenAudioSubtitle;
+
+  /// No description provided for @asrServicesQwenTokenPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For Token Plan, choose Recorded audio, enter token-plan as the Workspace ID, and select the region for your key.'**
+  String get asrServicesQwenTokenPlanHint;
+
+  /// No description provided for @asrServicesEndpointOverrideLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom endpoint (optional)'**
+  String get asrServicesEndpointOverrideLabel;
+
+  /// No description provided for @asrServicesWorkspaceIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a workspace ID, not a URL.'**
+  String get asrServicesWorkspaceIdInvalid;
+
+  /// No description provided for @asrServicesWebSocketEndpointInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a complete ws:// or wss:// endpoint without credentials or a fragment.'**
+  String get asrServicesWebSocketEndpointInvalid;
+
+  /// No description provided for @asrServicesHttpEndpointInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a complete http:// or https:// endpoint without credentials or a fragment.'**
+  String get asrServicesHttpEndpointInvalid;
+
   /// No description provided for @asrServicesModelLabel.
   ///
   /// In en, this message translates to:

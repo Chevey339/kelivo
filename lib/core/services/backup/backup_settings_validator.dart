@@ -17,6 +17,7 @@ final class BackupSettingsValidator {
     'mistral',
     'dashscope',
     'dashScope',
+    'qwen_audio',
     'volcengine',
     'mimo',
     'step',

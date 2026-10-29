@@ -122,6 +122,45 @@ void main() {
     );
   }
 
+  test(
+    'Qwen Token Plan records and returns HTTP transcription to the composer',
+    () async {
+      final capture = _FakeAudioCapture();
+      final cloud = CloudAsrService(
+        httpClient: MockClient((request) async {
+          expect(
+            request.url.host,
+            'token-plan.ap-southeast-1.maas.aliyuncs.com',
+          );
+          final body = jsonDecode(request.body) as Map;
+          expect(body['model'], 'qwen-audio-3.0-asr-flash');
+          return http.Response.bytes(
+            utf8.encode('{"output":{"text":"语音输入"}}'),
+            200,
+          );
+        }),
+      );
+      final provider = AsrProvider(
+        audioCaptureFactory: () => capture,
+        cloudSessionStarter: cloud.startSession,
+      );
+      addTearDown(provider.dispose);
+      final options = QwenAudioAsrOptions(
+        apiKey: 'key',
+        workspaceId: 'token-plan',
+        region: 'ap-southeast-1',
+        mode: QwenAudioAsrMode.transcription,
+      );
+      expect(provider.canUse(options), isTrue);
+      await provider.start(options);
+      expect(provider.state, AsrSessionState.listening);
+      capture.add(_pcm16(6000));
+      expect(await provider.finish(), '语音输入');
+      expect(provider.state, AsrSessionState.idle);
+      expect(capture.stopped, isTrue);
+    },
+  );
+
   test('Groq finishes native resampled audio with a sub-10ms tail', () async {
     final capture = _FakeAudioCapture();
     final uploadedSamples = <int>[];

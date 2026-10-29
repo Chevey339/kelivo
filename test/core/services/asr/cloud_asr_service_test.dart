@@ -456,6 +456,43 @@ void main() {
   });
 
   group('Qwen Audio ASR', () {
+    for (final endpoint in [
+      '',
+      'wss://proxy.test/custom/inference?project=one',
+    ]) {
+      test(
+        'uses Singapore Workspace ID and endpoint override "$endpoint"',
+        () async {
+          final socket = _FakeWebSocket();
+          final session =
+              await CloudAsrService(
+                websocketConnector: (uri, headers) async {
+                  expect(
+                    uri.toString(),
+                    endpoint.isEmpty
+                        ? 'wss://token-plan.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference'
+                        : endpoint,
+                  );
+                  expect(headers['X-DashScope-WorkSpace'], 'token-plan');
+                  return socket;
+                },
+              ).startSession(
+                QwenAudioAsrOptions(
+                  apiKey: 'key',
+                  workspaceId: 'token-plan',
+                  region: 'ap-southeast-1',
+                  endpoint: endpoint,
+                ),
+              );
+          expect(
+            socket.sentJson.single['payload']['model'],
+            'qwen-audio-3.0-asr-flash-streaming',
+          );
+          await session.cancel();
+        },
+      );
+    }
+
     test(
       'combineQwenAudioTranscript inserts space after Latin punctuation',
       () {

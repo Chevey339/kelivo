@@ -5570,6 +5570,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get asrServicesEndpointLabel => '服务地址';
 
   @override
+  String get asrServicesRecognitionModeLabel => '识别方式';
+
+  @override
+  String get asrServicesRealtimeMode => '实时识别';
+
+  @override
+  String get asrServicesRecordedMode => '录音转写';
+
+  @override
+  String get asrServicesQwenAudioSubtitle => '实时识别或录音转写';
+
+  @override
+  String get asrServicesQwenTokenPlanHint =>
+      '使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。';
+
+  @override
+  String get asrServicesEndpointOverrideLabel => '自定义端点（可选）';
+
+  @override
+  String get asrServicesWorkspaceIdInvalid => '请输入业务空间 ID，不要填写网址。';
+
+  @override
+  String get asrServicesWebSocketEndpointInvalid =>
+      '请输入完整的 ws:// 或 wss:// 端点，不含用户名、密码或 URL 片段。';
+
+  @override
+  String get asrServicesHttpEndpointInvalid =>
+      '请输入完整的 http:// 或 https:// 端点，不含用户名、密码或 URL 片段。';
+
+  @override
   String get asrServicesModelLabel => '模型';
 
   @override
@@ -20349,6 +20379,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get asrServicesEndpointLabel => '服务地址';
 
   @override
+  String get asrServicesRecognitionModeLabel => '识别方式';
+
+  @override
+  String get asrServicesRealtimeMode => '实时识别';
+
+  @override
+  String get asrServicesRecordedMode => '录音转写';
+
+  @override
+  String get asrServicesQwenAudioSubtitle => '实时识别或录音转写';
+
+  @override
+  String get asrServicesQwenTokenPlanHint =>
+      '使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。';
+
+  @override
+  String get asrServicesEndpointOverrideLabel => '自定义端点（可选）';
+
+  @override
+  String get asrServicesWorkspaceIdInvalid => '请输入业务空间 ID，不要填写网址。';
+
+  @override
+  String get asrServicesWebSocketEndpointInvalid =>
+      '请输入完整的 ws:// 或 wss:// 端点，不含用户名、密码或 URL 片段。';
+
+  @override
+  String get asrServicesHttpEndpointInvalid =>
+      '请输入完整的 http:// 或 https:// 端点，不含用户名、密码或 URL 片段。';
+
+  @override
   String get asrServicesModelLabel => '模型';
 
   @override
@@ -35051,6 +35111,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get asrServicesEndpointLabel => '服務位址';
+
+  @override
+  String get asrServicesRecognitionModeLabel => '辨識方式';
+
+  @override
+  String get asrServicesRealtimeMode => '即時辨識';
+
+  @override
+  String get asrServicesRecordedMode => '錄音轉寫';
+
+  @override
+  String get asrServicesQwenAudioSubtitle => '即時辨識或錄音轉寫';
+
+  @override
+  String get asrServicesQwenTokenPlanHint =>
+      '使用 Token Plan 時，選擇錄音轉寫，業務空間 ID 填 token-plan，並選擇與金鑰對應的地域。';
+
+  @override
+  String get asrServicesEndpointOverrideLabel => '自訂端點（選填）';
+
+  @override
+  String get asrServicesWorkspaceIdInvalid => '請輸入業務空間 ID，不要填寫網址。';
+
+  @override
+  String get asrServicesWebSocketEndpointInvalid =>
+      '請輸入完整的 ws:// 或 wss:// 端點，不含使用者名稱、密碼或 URL 片段。';
+
+  @override
+  String get asrServicesHttpEndpointInvalid =>
+      '請輸入完整的 http:// 或 https:// 端點，不含使用者名稱、密碼或 URL 片段。';
 
   @override
   String get asrServicesModelLabel => '模型';
