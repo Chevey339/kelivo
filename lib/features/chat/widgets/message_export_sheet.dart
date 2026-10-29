@@ -1,4 +1,4 @@
-import '../../../core/models/quote_ref.dart';
+import '../../../shared/markdown/quote_syntax.dart';
 import '../utils/message_reasoning_source.dart';
 import 'package:markstream/markstream_core.dart'
     show MarkdownParser, toPlainText;
@@ -110,15 +110,15 @@ String _getRoleNameFromDependencies({
   return msg.role;
 }
 
-/// Build export payload from structured [MessagePart]s.
+/// Build image-export content from structured [MessagePart]s.
 ///
 /// Text comes from [textOverride] (e.g. thinking-stripped assistant body) or
 /// [ChatMessage.content] (TextPart join). Attachments are taken from ImagePart /
-/// FilePart only — never reconstructed as legacy marker strings.
-_Parsed _exportPartsFromMessage(
+/// FilePart only — never reconstructed as legacy marker strings. Keep quote
+/// placeholders for the image renderer; only text exports expand references.
+_Parsed _imageExportPartsFromMessage(
   ChatMessage message, {
   String? textOverride,
-  required String Function(int) quoteMarker,
 }) {
   final images = <String>[];
   final docs = <_DocRef>[];
@@ -136,11 +136,7 @@ _Parsed _exportPartsFromMessage(
       );
     }
   }
-  final text = formatQuotedMessage(
-    textOverride ?? message.content,
-    message.quotes,
-    quoteMarker: quoteMarker,
-  ).trim();
+  final text = (textOverride ?? message.content).trim();
   return _Parsed(text, images, docs);
 }
 
@@ -2898,10 +2894,9 @@ class _ExportedBubble extends StatelessWidget {
 
     // Keep attachments from the original message parts. copyWith(content:)
     // rewrites parts to a single TextPart and would drop ImagePart/FilePart.
-    final parsed = _exportPartsFromMessage(
+    final parsed = _imageExportPartsFromMessage(
       message,
       textOverride: messageForExport.content,
-      quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
     );
     final mdText = StringBuffer();
     if (parsed.text.isNotEmpty) mdText.writeln(_softBreakMd(parsed.text));
@@ -2911,11 +2906,18 @@ class _ExportedBubble extends StatelessWidget {
     for (final d in parsed.docs) {
       mdText.writeln('\n- ${d.fileName}  `(${d.mime})`');
     }
-    final Widget contentWidget = (mdText.toString().trim().isNotEmpty)
+    final source = mdText.toString();
+    final Widget contentWidget = source.trim().isNotEmpty
         ? DefaultTextStyle.merge(
             style: TextStyle(fontSize: contentFontSize, height: 1.5),
-            child: AppSelectionArea(
-              child: MarkdownWithCodeHighlight(text: mdText.toString()),
+            child: QuoteRenderScope(
+              // Soft breaks and attachment captions change source offsets.
+              // Index the final render source so every token keeps its quote.
+              source: source,
+              quotes: messageForExport.quotes,
+              child: AppSelectionArea(
+                child: MarkdownWithCodeHighlight(text: source),
+              ),
             ),
           )
         : Text('—', style: TextStyle(color: bubbleFg.withValues(alpha: 0.5)));
