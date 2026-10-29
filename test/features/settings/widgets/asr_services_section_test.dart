@@ -43,6 +43,7 @@ void main() {
     expect(find.text('OpenAI Realtime'), findsOneWidget);
     expect(find.text('Groq'), findsOneWidget);
     expect(find.text('Mistral'), findsOneWidget);
+    expect(find.text('ElevenLabs'), findsOneWidget);
     expect(find.text('DashScope'), findsOneWidget);
     expect(find.text('Volcengine'), findsOneWidget);
     expect(find.text('MiMo'), findsOneWidget);
@@ -208,7 +209,11 @@ void main() {
       },
     );
 
-    for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+    for (final (kind, title) in [
+      (AsrServiceKind.groq, 'Groq'),
+      (AsrServiceKind.mistral, 'Mistral'),
+      (AsrServiceKind.elevenLabs, 'ElevenLabs'),
+    ]) {
       testWidgets(
         '${kind.name} can be added, edited and restored on ${desktop ? 'desktop' : 'mobile'}',
         (tester) async {
@@ -235,7 +240,6 @@ void main() {
             );
             await tester.pumpAndSettle();
           }
-          final title = kind == AsrServiceKind.groq ? 'Groq' : 'Mistral';
           await tester.ensureVisible(find.text(title));
           await tester.tap(find.text(title));
           await tester.pumpAndSettle();

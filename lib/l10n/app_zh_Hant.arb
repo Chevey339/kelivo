@@ -2001,6 +2001,7 @@
   "asrServicesOpenAiSubtitle": "低延遲串流轉寫",
   "asrServicesGroqSubtitle": "Whisper 分段雲端轉寫",
   "asrServicesMistralSubtitle": "Voxtral 分段雲端轉寫",
+  "asrServicesElevenLabsSubtitle": "Scribe 分段雲端轉寫",
   "asrServicesDashScopeTitle": "DashScope",
   "asrServicesDashScopeSubtitle": "Qwen 即時轉寫",
   "asrServicesVolcengineTitle": "火山引擎",

@@ -15,6 +15,7 @@ final class BackupSettingsValidator {
     'openAiRealtime',
     'groq',
     'mistral',
+    'elevenlabs',
     'dashscope',
     'dashScope',
     'qwen_audio',

@@ -138,7 +138,7 @@ void main() {
       );
     });
 
-    for (final kind in ['groq', 'mistral', 'qwen_audio']) {
+    for (final kind in ['groq', 'mistral', 'elevenlabs', 'qwen_audio']) {
       test(
         'portable ASR export preserves $kind configuration and selection',
         () {

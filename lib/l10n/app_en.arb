@@ -2524,6 +2524,7 @@
   "asrServicesOpenAiSubtitle": "Low-latency streaming transcription",
   "asrServicesGroqSubtitle": "Whisper segmented transcription",
   "asrServicesMistralSubtitle": "Voxtral segmented transcription",
+  "asrServicesElevenLabsSubtitle": "Scribe segmented transcription",
   "asrServicesDashScopeTitle": "DashScope",
   "asrServicesDashScopeSubtitle": "Qwen real-time transcription",
   "asrServicesVolcengineTitle": "Volcengine",

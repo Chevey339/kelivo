@@ -6,6 +6,7 @@ enum AsrServiceKind {
   openAiRealtime('openai_realtime'),
   groq('groq'),
   mistral('mistral'),
+  elevenLabs('elevenlabs'),
   dashScope('dashscope'),
   qwenAudio('qwen_audio'),
   volcengine('volcengine'),
@@ -30,6 +31,8 @@ enum AsrServiceKind {
         return AsrServiceKind.groq;
       case 'mistral':
         return AsrServiceKind.mistral;
+      case 'elevenlabs':
+        return AsrServiceKind.elevenLabs;
       case 'dashscope':
       case 'dashScope':
         return AsrServiceKind.dashScope;
@@ -99,6 +102,7 @@ abstract class AsrServiceOptions {
         );
       case AsrServiceKind.groq:
       case AsrServiceKind.mistral:
+      case AsrServiceKind.elevenLabs:
         return AudioTranscriptionAsrOptions(
           id: id,
           kind: kind,
@@ -322,7 +326,7 @@ class OpenAiRealtimeAsrOptions extends AsrServiceOptions {
   };
 }
 
-/// File transcription settings shared by Groq Whisper and Mistral Voxtral.
+/// File transcription settings shared by Groq, Mistral, and ElevenLabs.
 class AudioTranscriptionAsrOptions extends AsrServiceOptions {
   factory AudioTranscriptionAsrOptions({
     String? id,
@@ -345,6 +349,11 @@ class AudioTranscriptionAsrOptions extends AsrServiceOptions {
         name: 'Mistral',
         baseUrl: 'https://api.mistral.ai/v1',
         model: 'voxtral-mini-latest',
+      ),
+      AsrServiceKind.elevenLabs => (
+        name: 'ElevenLabs',
+        baseUrl: 'https://api.elevenlabs.io/v1',
+        model: 'scribe_v2',
       ),
       _ => throw ArgumentError.value(
         kind,

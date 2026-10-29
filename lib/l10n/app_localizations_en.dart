@@ -5735,6 +5735,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get asrServicesMistralSubtitle => 'Voxtral segmented transcription';
 
   @override
+  String get asrServicesElevenLabsSubtitle => 'Scribe segmented transcription';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override

@@ -69,7 +69,7 @@ class CloudAsrService {
       case OpenAiRealtimeAsrOptions():
         return _startOpenAi(options);
       case AudioTranscriptionAsrOptions():
-        final endpoint = _audioTranscriptionEndpoint(options.baseUrl);
+        final endpoint = _audioTranscriptionEndpoint(options);
         return _AudioTranscriptionAsrSession(
           options: options,
           endpoint: endpoint,
@@ -996,7 +996,12 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
     required super.completionTimeout,
   }) : _options = options,
        super(
-         label: options.kind == AsrServiceKind.groq ? 'Groq' : 'Mistral',
+         label: switch (options.kind) {
+           AsrServiceKind.groq => 'Groq',
+           AsrServiceKind.mistral => 'Mistral',
+           AsrServiceKind.elevenLabs => 'ElevenLabs',
+           _ => throw ArgumentError.value(options.kind, 'kind'),
+         },
          apiKey: options.apiKey,
          sampleRate: options.sampleRate,
          segmentDurationSec: options.segmentDurationSec,
@@ -1007,22 +1012,24 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
 
   @override
   http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
-    if (_options.kind == AsrServiceKind.groq) {
-      // Groq requires at least 10ms, even for the final slice of a recording.
-      final minimumBytes = ((_options.sampleRate + 99) ~/ 100) * 2;
-      if (pcm.length < minimumBytes) {
-        pcm = Uint8List(minimumBytes)..setAll(0, pcm);
-      }
+    // Keep every captured sample and pad short tails to the API's minimum.
+    final minimumDurationMs = switch (_options.kind) {
+      AsrServiceKind.groq => 10,
+      AsrServiceKind.elevenLabs => 100,
+      _ => 0,
+    };
+    final minimumBytes =
+        ((_options.sampleRate * minimumDurationMs + 999) ~/ 1000) * 2;
+    if (pcm.length < minimumBytes) {
+      pcm = Uint8List(minimumBytes)..setAll(0, pcm);
     }
+    final isElevenLabs = _options.kind == AsrServiceKind.elevenLabs;
     final request =
         http.AbortableMultipartRequest(
             'POST',
             _endpoint,
             abortTrigger: abortTrigger,
           )
-          ..headers[HttpHeaders.authorizationHeader] =
-              'Bearer ${_options.apiKey.trim()}'
-          ..fields['model'] = _options.model.trim()
           ..files.add(
             http.MultipartFile.fromBytes(
               'file',
@@ -1031,9 +1038,19 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
               contentType: MediaType('audio', 'wav'),
             ),
           );
+    if (isElevenLabs) {
+      request.headers['xi-api-key'] = _options.apiKey.trim();
+      request.fields['model_id'] = _options.model.trim();
+      request.fields['tag_audio_events'] = 'false';
+      request.fields['timestamps_granularity'] = 'none';
+    } else {
+      request.headers[HttpHeaders.authorizationHeader] =
+          'Bearer ${_options.apiKey.trim()}';
+      request.fields['model'] = _options.model.trim();
+    }
     final language = _options.language.trim();
     if (language.isNotEmpty && language.toLowerCase() != 'auto') {
-      request.fields['language'] = language;
+      request.fields[isElevenLabs ? 'language_code' : 'language'] = language;
     }
     if (_options.kind == AsrServiceKind.groq) {
       request.fields['response_format'] = 'json';
@@ -1889,19 +1906,18 @@ Uri _webSocketUri(String value, String label) {
   return uri;
 }
 
-Uri _audioTranscriptionEndpoint(String value) {
-  final uri = Uri.tryParse(value.trim());
+Uri _audioTranscriptionEndpoint(AudioTranscriptionAsrOptions options) {
+  final uri = Uri.tryParse(options.baseUrl.trim());
   if (uri == null ||
       (uri.scheme != 'http' && uri.scheme != 'https') ||
       uri.host.isEmpty) {
     throw const AsrException('Audio transcription base URL is invalid');
   }
-  final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
-  return uri.replace(
-    path: path.endsWith('/audio/transcriptions')
-        ? path
-        : '$path/audio/transcriptions',
-  );
+  final isElevenLabs = options.kind == AsrServiceKind.elevenLabs;
+  final suffix = isElevenLabs ? '/speech-to-text' : '/audio/transcriptions';
+  var path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+  if (isElevenLabs && path.isEmpty) path = '/v1';
+  return uri.replace(path: path.endsWith(suffix) ? path : '$path$suffix');
 }
 
 Uri _mimoEndpoint(String value) {
@@ -2102,6 +2118,11 @@ String _responseError(String body) {
       if (decoded['message'] != null) {
         return decoded['message'].toString().trim();
       }
+      final detail = decoded['detail'];
+      if (detail is Map && detail['message'] is String) {
+        return (detail['message'] as String).trim();
+      }
+      if (detail is String) return detail.trim();
     }
   } catch (_) {
     // Do not include arbitrary response bodies in errors; they may echo secrets.

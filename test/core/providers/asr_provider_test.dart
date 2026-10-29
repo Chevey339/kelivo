@@ -86,7 +86,11 @@ void main() {
     });
   }
 
-  for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+  for (final kind in [
+    AsrServiceKind.groq,
+    AsrServiceKind.mistral,
+    AsrServiceKind.elevenLabs,
+  ]) {
     test(
       '${kind.name} records, uploads and returns a final transcription',
       () async {
@@ -95,7 +99,14 @@ void main() {
         final cloud = CloudAsrService(
           httpClient: MockClient((request) async {
             requestCount++;
-            expect(request.url.path, endsWith('/audio/transcriptions'));
+            expect(
+              request.url.path,
+              endsWith(
+                kind == AsrServiceKind.elevenLabs
+                    ? '/speech-to-text'
+                    : '/audio/transcriptions',
+              ),
+            );
             return http.Response.bytes(utf8.encode('{"text":"语音输入"}'), 200);
           }),
         );

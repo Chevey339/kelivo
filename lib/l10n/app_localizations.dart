@@ -10453,6 +10453,12 @@ abstract class AppLocalizations {
   /// **'Voxtral segmented transcription'**
   String get asrServicesMistralSubtitle;
 
+  /// No description provided for @asrServicesElevenLabsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scribe segmented transcription'**
+  String get asrServicesElevenLabsSubtitle;
+
   /// No description provided for @asrServicesDashScopeTitle.
   ///
   /// In en, this message translates to:

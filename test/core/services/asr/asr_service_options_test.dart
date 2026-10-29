@@ -112,6 +112,7 @@ void main() {
       expect(AsrServiceKind.openAiRealtime.id, 'openai_realtime');
       expect(AsrServiceKind.groq.id, 'groq');
       expect(AsrServiceKind.mistral.id, 'mistral');
+      expect(AsrServiceKind.elevenLabs.id, 'elevenlabs');
       expect(AsrServiceKind.dashScope.id, 'dashscope');
       expect(AsrServiceKind.volcengine.id, 'volcengine');
       expect(AsrServiceKind.mimo.id, 'mimo');
@@ -127,7 +128,26 @@ void main() {
   });
 
   group('AsrServiceOptions', () {
-    for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+    for (final (kind, name, baseUrl, model) in [
+      (
+        AsrServiceKind.groq,
+        'Groq',
+        'https://api.groq.com/openai/v1',
+        'whisper-large-v3',
+      ),
+      (
+        AsrServiceKind.mistral,
+        'Mistral',
+        'https://api.mistral.ai/v1',
+        'voxtral-mini-latest',
+      ),
+      (
+        AsrServiceKind.elevenLabs,
+        'ElevenLabs',
+        'https://api.elevenlabs.io/v1',
+        'scribe_v2',
+      ),
+    ]) {
       test(
         '${kind.name} restores defaults and custom transcription settings',
         () {
@@ -135,22 +155,9 @@ void main() {
               AsrServiceOptions.fromJson({'kind': kind.id})
                   as AudioTranscriptionAsrOptions;
           expect(defaults.kind, kind);
-          expect(
-            defaults.name,
-            kind == AsrServiceKind.groq ? 'Groq' : 'Mistral',
-          );
-          expect(
-            defaults.baseUrl,
-            kind == AsrServiceKind.groq
-                ? 'https://api.groq.com/openai/v1'
-                : 'https://api.mistral.ai/v1',
-          );
-          expect(
-            defaults.model,
-            kind == AsrServiceKind.groq
-                ? 'whisper-large-v3'
-                : 'voxtral-mini-latest',
-          );
+          expect(defaults.name, name);
+          expect(defaults.baseUrl, baseUrl);
+          expect(defaults.model, model);
           expect(defaults.sampleRate, 16000);
           expect(defaults.segmentDurationSec, 30);
           expect(defaults.language, isEmpty);

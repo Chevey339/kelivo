@@ -9,7 +9,15 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
-  for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+  for (final kind in [
+    AsrServiceKind.groq,
+    AsrServiceKind.mistral,
+    AsrServiceKind.elevenLabs,
+  ]) {
+    final isElevenLabs = kind == AsrServiceKind.elevenLabs;
+    final endpoint = isElevenLabs ? '/speech-to-text' : '/audio/transcriptions';
+    final modelField = isElevenLabs ? 'model_id' : 'model';
+    final languageField = isElevenLabs ? 'language_code' : 'language';
     group(kind.name, () {
       test(
         'uploads authenticated multipart WAV and reads UTF-8 text',
@@ -28,25 +36,40 @@ void main() {
             httpClient: client,
           ).startSession(options);
           final partials = session.partialTranscripts.toList();
-          final pcm = Uint8List(320)..setAll(0, [0, 128, 255, 127]);
+          final pcm = Uint8List(3200)..setAll(0, [0, 128, 255, 127]);
           await session.addPcm16(pcm);
           final finish = session.finish();
           expect(session.finish(), same(finish));
           expect(await finish, '你好，世界');
           expect(await partials, ['你好，世界']);
           expect(captured.method, 'POST');
-          expect(
-            captured.url.toString(),
-            '${options.baseUrl}/audio/transcriptions',
-          );
-          expect(captured.headers['authorization'], 'Bearer test-key');
+          expect(captured.url.toString(), '${options.baseUrl}$endpoint');
+          if (isElevenLabs) {
+            expect(captured.headers['xi-api-key'], 'test-key');
+            expect(captured.headers, isNot(contains('authorization')));
+          } else {
+            expect(captured.headers['authorization'], 'Bearer test-key');
+            expect(captured.headers, isNot(contains('xi-api-key')));
+          }
           expect(
             captured.headers['content-type'],
             startsWith('multipart/form-data; boundary='),
           );
           final body = latin1.decode(captured.bodyBytes);
-          expect(body, contains('name="model"\r\n\r\n${options.model}\r\n'));
-          expect(body, contains('name="language"\r\n\r\nzh\r\n'));
+          expect(
+            body,
+            contains('name="$modelField"\r\n\r\n${options.model}\r\n'),
+          );
+          expect(body, contains('name="$languageField"\r\n\r\nzh\r\n'));
+          if (isElevenLabs) {
+            expect(body, isNot(contains('name="model"')));
+            expect(body, isNot(contains('name="language"')));
+            expect(body, contains('name="tag_audio_events"\r\n\r\nfalse\r\n'));
+            expect(
+              body,
+              contains('name="timestamps_granularity"\r\n\r\nnone\r\n'),
+            );
+          }
           expect(body, contains('name="file"; filename="recording.wav"'));
           expect(body, contains('content-type: audio/wav'));
           expect(
@@ -78,23 +101,26 @@ void main() {
             final client = MockClient((request) async {
               expect(
                 request.url.toString(),
-                'https://proxy.test/prefix/audio/transcriptions?project=one',
+                'https://proxy.test/prefix$endpoint?project=one',
               );
               final body = latin1.decode(request.bodyBytes);
-              expect(body, contains('name="model"\r\n\r\ncustom-model\r\n'));
-              expect(body, isNot(contains('name="language"')));
+              expect(
+                body,
+                contains('name="$modelField"\r\n\r\ncustom-model\r\n'),
+              );
+              expect(body, isNot(contains('name="$languageField"')));
               return http.Response('{"text":"ok"}', 200);
             });
-            final session = await CloudAsrService(httpClient: client).startSession(
-              AudioTranscriptionAsrOptions(
-                kind: kind,
-                apiKey: 'key',
-                baseUrl:
-                    'https://proxy.test/prefix/audio/transcriptions/?project=one',
-                model: 'custom-model',
-                language: language,
-              ),
-            );
+            final session = await CloudAsrService(httpClient: client)
+                .startSession(
+                  AudioTranscriptionAsrOptions(
+                    kind: kind,
+                    apiKey: 'key',
+                    baseUrl: 'https://proxy.test/prefix$endpoint/?project=one',
+                    model: 'custom-model',
+                    language: language,
+                  ),
+                );
             await session.addPcm16(Uint8List(2));
             expect(await session.finish(), 'ok');
           },
@@ -158,7 +184,13 @@ void main() {
               httpClient: MockClient((_) async {
                 return http.Response(
                   jsonEncode({
-                    'error': {'message': 'invalid $secret'},
+                    if (isElevenLabs)
+                      'detail': {
+                        'status': 'invalid_api_key',
+                        'message': 'invalid $secret',
+                      }
+                    else
+                      'error': {'message': 'invalid $secret'},
                   }),
                   401,
                 );
@@ -178,7 +210,11 @@ void main() {
             isA<AsrException>().having(
               (error) => error.message,
               'message',
-              allOf(contains('HTTP 401'), isNot(contains(secret))),
+              allOf(
+                contains('HTTP 401'),
+                contains('invalid'),
+                isNot(contains(secret)),
+              ),
             ),
           ),
         );
@@ -312,32 +348,108 @@ void main() {
     });
   }
 
-  for (final (sampleRate, expectedBytes) in [(16000, 320), (22050, 442)]) {
-    test('Groq pads a short tail to at least 10ms at $sampleRate Hz', () async {
-      final pcm = Uint8List(128)..fillRange(0, 128, 3);
-      final client = MockClient((request) async {
-        final start = latin1.decode(request.bodyBytes).indexOf('RIFF');
-        final header = ByteData.sublistView(request.bodyBytes, start);
-        expect(header.getUint32(24, Endian.little), sampleRate);
-        expect(header.getUint32(40, Endian.little), expectedBytes);
-        final audio = request.bodyBytes.sublist(
-          start + 44,
-          start + 44 + expectedBytes,
+  for (final (kind, sampleRate, expectedBytes) in [
+    (AsrServiceKind.groq, 16000, 320),
+    (AsrServiceKind.groq, 22050, 442),
+    (AsrServiceKind.elevenLabs, 16000, 3200),
+    (AsrServiceKind.elevenLabs, 22051, 4412),
+  ]) {
+    test(
+      '${kind.name} pads a short tail to its minimum at $sampleRate Hz',
+      () async {
+        final pcm = Uint8List(128)..fillRange(0, 128, 3);
+        final client = MockClient((request) async {
+          final start = latin1.decode(request.bodyBytes).indexOf('RIFF');
+          final header = ByteData.sublistView(request.bodyBytes, start);
+          expect(header.getUint32(24, Endian.little), sampleRate);
+          expect(header.getUint32(40, Endian.little), expectedBytes);
+          final audio = request.bodyBytes.sublist(
+            start + 44,
+            start + 44 + expectedBytes,
+          );
+          expect(audio.take(pcm.length), pcm);
+          expect(audio.skip(pcm.length), everyElement(0));
+          return http.Response('{"text":"tail"}', 200);
+        });
+        final session = await CloudAsrService(httpClient: client).startSession(
+          AudioTranscriptionAsrOptions(
+            kind: kind,
+            apiKey: 'key',
+            sampleRate: sampleRate,
+          ),
         );
-        expect(audio.take(pcm.length), pcm);
-        expect(audio.skip(pcm.length), everyElement(0));
-        return http.Response('{"text":"tail"}', 200);
-      });
-      final session = await CloudAsrService(httpClient: client).startSession(
-        AudioTranscriptionAsrOptions(
-          kind: AsrServiceKind.groq,
-          apiKey: 'key',
-          sampleRate: sampleRate,
-        ),
-      );
-      await session.addPcm16(pcm);
-      expect(await session.finish(), 'tail');
-    });
+        await session.addPcm16(pcm);
+        expect(await session.finish(), 'tail');
+      },
+    );
+  }
+
+  for (final baseUrl in [
+    'https://api.elevenlabs.io',
+    'https://api.elevenlabs.io/',
+    'https://api.elevenlabs.io/v1',
+    'https://api.elevenlabs.io/v1/',
+    'https://api.elevenlabs.io/v1/speech-to-text',
+  ]) {
+    test(
+      'ElevenLabs resolves the transcription endpoint from $baseUrl',
+      () async {
+        final client = MockClient((request) async {
+          expect(
+            request.url.toString(),
+            'https://api.elevenlabs.io/v1/speech-to-text',
+          );
+          return http.Response('{"text":"ok"}', 200);
+        });
+        final session = await CloudAsrService(httpClient: client).startSession(
+          AudioTranscriptionAsrOptions(
+            kind: AsrServiceKind.elevenLabs,
+            apiKey: 'key',
+            baseUrl: baseUrl,
+          ),
+        );
+        await session.addPcm16(Uint8List(3200));
+        expect(await session.finish(), 'ok');
+      },
+    );
+  }
+
+  for (final detail in [
+    {'status': 'quota_exceeded', 'message': 'Quota exhausted for test-key'},
+    'Quota exhausted for test-key',
+  ]) {
+    test(
+      'ElevenLabs reports quota errors without exposing the key: $detail',
+      () async {
+        final session =
+            await CloudAsrService(
+              httpClient: MockClient(
+                (_) async => http.Response(jsonEncode({'detail': detail}), 429),
+              ),
+            ).startSession(
+              AudioTranscriptionAsrOptions(
+                kind: AsrServiceKind.elevenLabs,
+                apiKey: 'test-key',
+              ),
+            );
+        await session.addPcm16(Uint8List(3200));
+        await expectLater(
+          session.finish(),
+          throwsA(
+            isA<AsrException>().having(
+              (error) => error.message,
+              'message',
+              allOf(
+                contains('ElevenLabs'),
+                contains('HTTP 429'),
+                contains('Quota exhausted'),
+                isNot(contains('test-key')),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   test(

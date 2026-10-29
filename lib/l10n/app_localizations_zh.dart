@@ -5510,6 +5510,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
 
   @override
+  String get asrServicesElevenLabsSubtitle => 'Scribe 分段云端转写';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override
@@ -20319,6 +20322,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
 
   @override
+  String get asrServicesElevenLabsSubtitle => 'Scribe 分段云端转写';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override
@@ -35051,6 +35057,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get asrServicesMistralSubtitle => 'Voxtral 分段雲端轉寫';
+
+  @override
+  String get asrServicesElevenLabsSubtitle => 'Scribe 分段雲端轉寫';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';

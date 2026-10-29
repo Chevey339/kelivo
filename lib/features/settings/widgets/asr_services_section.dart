@@ -519,6 +519,7 @@ String? _kindBrandAsset(AsrServiceKind kind) {
     AsrServiceKind.openAiRealtime => 'OpenAI',
     AsrServiceKind.groq => 'Groq',
     AsrServiceKind.mistral => 'Mistral',
+    AsrServiceKind.elevenLabs => 'ElevenLabs',
     AsrServiceKind.dashScope => 'Qwen',
     AsrServiceKind.qwenAudio => 'Qwen',
     AsrServiceKind.volcengine => 'Doubao',
@@ -923,6 +924,7 @@ class _AsrEditorState extends State<_AsrEditor> {
         return;
       case AsrServiceKind.groq:
       case AsrServiceKind.mistral:
+      case AsrServiceKind.elevenLabs:
         final initial = widget.initial is AudioTranscriptionAsrOptions
             ? widget.initial as AudioTranscriptionAsrOptions
             : null;
@@ -1299,6 +1301,7 @@ class _AsrEditorState extends State<_AsrEditor> {
                       AsrServiceKind.openAiRealtime,
                       AsrServiceKind.groq,
                       AsrServiceKind.mistral,
+                      AsrServiceKind.elevenLabs,
                       AsrServiceKind.dashScope,
                       AsrServiceKind.qwenAudio,
                       AsrServiceKind.volcengine,
@@ -1419,6 +1422,7 @@ class _ProviderChoiceGrid extends StatelessWidget {
               AsrServiceKind.openAiRealtime,
               AsrServiceKind.groq,
               AsrServiceKind.mistral,
+              AsrServiceKind.elevenLabs,
               AsrServiceKind.dashScope,
               AsrServiceKind.qwenAudio,
               AsrServiceKind.volcengine,
@@ -2171,6 +2175,7 @@ IconData _kindIcon(AsrServiceKind kind) {
       return Lucide.Globe;
     case AsrServiceKind.groq:
     case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
       return Lucide.AudioWaveform;
     case AsrServiceKind.step:
       return Lucide.AudioWaveform;
@@ -2215,6 +2220,7 @@ bool _isDefaultServiceName(AsrServiceKind kind, String name) {
     }.contains(name),
     AsrServiceKind.groq => name == 'Groq',
     AsrServiceKind.mistral => name == 'Mistral',
+    AsrServiceKind.elevenLabs => name == 'ElevenLabs',
     AsrServiceKind.dashScope => const {
       'DashScope ASR',
       'DashScope Realtime',
@@ -2265,6 +2271,8 @@ String _kindTitle(AppLocalizations l10n, AsrServiceKind kind) {
       return 'Groq';
     case AsrServiceKind.mistral:
       return 'Mistral';
+    case AsrServiceKind.elevenLabs:
+      return 'ElevenLabs';
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeTitle;
     case AsrServiceKind.qwenAudio:
@@ -2290,6 +2298,8 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesGroqSubtitle;
     case AsrServiceKind.mistral:
       return l10n.asrServicesMistralSubtitle;
+    case AsrServiceKind.elevenLabs:
+      return l10n.asrServicesElevenLabsSubtitle;
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeSubtitle;
     case AsrServiceKind.qwenAudio:
@@ -2369,6 +2379,7 @@ String _defaultEndpoint(AsrServiceKind kind) {
       return 'wss://api.openai.com/v1/realtime?intent=transcription';
     case AsrServiceKind.groq:
     case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
       return AudioTranscriptionAsrOptions(kind: kind).baseUrl;
     case AsrServiceKind.dashScope:
       return 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
@@ -2392,6 +2403,7 @@ String _defaultModel(AsrServiceKind kind) {
       return 'gpt-live-transcribe';
     case AsrServiceKind.groq:
     case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
       return AudioTranscriptionAsrOptions(kind: kind).model;
     case AsrServiceKind.dashScope:
       return 'qwen3-asr-flash-realtime';
