@@ -1108,11 +1108,17 @@ class _AsrEditorState extends State<_AsrEditor> {
           }),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          padding: EdgeInsets.fromLTRB(
+            widget.desktop ? 4 : 12,
+            8,
+            widget.desktop ? 4 : 12,
+            widget.desktop ? 12 : 16,
+          ),
           child: Text(
             l10n.asrServicesQwenTokenPlanHint,
             style: TextStyle(
               fontSize: 12,
+              height: 1.5,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
