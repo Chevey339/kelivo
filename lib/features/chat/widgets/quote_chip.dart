@@ -7,6 +7,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/models/quote_ref.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../desktop/desktop_glass_popover.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import 'selection_panel.dart';
 import 'quote_interaction_scope.dart';
@@ -129,7 +132,7 @@ class _QuoteChipState extends State<QuoteChip> {
     _closeTimer = Timer(const Duration(milliseconds: 150), _portal.hide);
   }
 
-  Widget _preview(BuildContext context, {required bool mobile}) {
+  Widget _mobilePreview(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final timestamp = MaterialLocalizations.of(
@@ -137,7 +140,7 @@ class _QuoteChipState extends State<QuoteChip> {
     ).formatTimeOfDay(TimeOfDay.fromDateTime(widget.quote.createdAt.toLocal()));
     return SelectionPanel(
       title: l10n.selectionQuote,
-      onClose: mobile ? () => Navigator.pop(context) : null,
+      onClose: () => Navigator.pop(context),
       actions: Row(
         children: [
           Expanded(
@@ -145,12 +148,12 @@ class _QuoteChipState extends State<QuoteChip> {
               label: l10n.quoteJumpToSource,
               icon: LucideIcons.arrowUpRight,
               onPressed: () {
-                if (mobile) Navigator.pop(context);
+                Navigator.pop(context);
                 unawaited(_jump());
               },
             ),
           ),
-          if (mobile && widget.onRemove != null)
+          if (widget.onRemove != null)
             Expanded(
               child: IosTextButton(
                 label: l10n.quoteRemove,
@@ -195,6 +198,111 @@ class _QuoteChipState extends State<QuoteChip> {
     );
   }
 
+  Widget _desktopPreview(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final timestamp = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(widget.quote.createdAt.toLocal()));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                LucideIcons.messageCircleMore,
+                size: 13,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                l10n.selectionQuote,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: AppFontWeights.medium,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                timestamp,
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: SingleChildScrollView(
+              child: SelectableText(
+                widget.quote.text,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: cs.onSurface,
+                ),
+              ),
+            ),
+          ),
+          if (_missing)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                l10n.quoteSourceMissing,
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.quote.model ?? l10n.userProviderDefaultUserName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Semantics(
+                button: true,
+                child: IosCardPress(
+                  focusable: true,
+                  haptics: false,
+                  mouseCursor: SystemMouseCursors.basic,
+                  baseColor: Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 5,
+                  ),
+                  onTap: () => unawaited(_jump()),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.quoteJumpToSource,
+                        style: TextStyle(fontSize: 12, color: cs.onSurface),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        LucideIcons.arrowUpRight,
+                        size: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _tap() async {
     if (widget.onRemove == null || selectionUsesDesktop) {
       await _jump();
@@ -202,10 +310,7 @@ class _QuoteChipState extends State<QuoteChip> {
     }
     await _checkSource();
     if (!mounted) return;
-    await showSelectionSheet(
-      context,
-      builder: (context) => _preview(context, mobile: true),
-    );
+    await showSelectionSheet(context, builder: _mobilePreview);
   }
 
   @override
@@ -299,10 +404,11 @@ class _QuoteChipState extends State<QuoteChip> {
               onEnter: (_) => _closeTimer?.cancel(),
               onExit: (_) => _exit(),
               child:
-                  SelectionPopoverSurface(
+                  DesktopGlassPanel(
+                        borderRadius: BorderRadius.circular(10),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 280),
-                          child: _preview(context, mobile: false),
+                          child: _desktopPreview(context),
                         ),
                       )
                       .animate()
