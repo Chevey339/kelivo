@@ -88,7 +88,7 @@ const List<LanguageOption> supportedLanguages = [
   // LanguageOption(code: 'vi', displayName: 'Vietnamese', displayNameZh: 'Tiếng Việt', flag: '🇻🇳'),
 ];
 
-String _displayNameFor(AppLocalizations l10n, String languageCode) {
+String languageDisplayName(AppLocalizations l10n, String languageCode) {
   switch (languageCode) {
     case 'zh-CN':
       return l10n.languageDisplaySimplifiedChinese;
@@ -137,7 +137,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
     ...supportedLanguages.map(
       (lang) => DesktopContextMenuItem(
         icon: null,
-        label: '${lang.flag} ${_displayNameFor(l10n, lang.code)}',
+        label: '${lang.flag} ${languageDisplayName(l10n, lang.code)}',
         onTap: () => selected = lang,
       ),
     ),

@@ -1,4 +1,5 @@
 import 'package:Kelivo/utils/protected_text.dart';
+import 'package:Kelivo/utils/source_text_map.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:markstream/markstream_core.dart';
 
@@ -269,19 +270,31 @@ final class UiTextSlice {
     this.firstWebMessageOrdinal,
     this.trackedOffsets = const [],
     this.trackedBeforeInsertion = const [],
+    this.sourceMap,
   }) : fences = List.unmodifiable(fences);
   factory UiTextSlice.original(UiTextRun run, int start, int end) =>
-      UiTextSlice._(run, start, end, run.source.substring(start, end), true, [
-        for (final fence in run.fences)
-          if (fence.node.span.start >= start && fence.node.span.end <= end)
-            UiMappedFence(
-              fence,
-              SourceSpan(
-                fence.node.span.start - start,
-                fence.node.span.end - start,
+      UiTextSlice._(
+        run,
+        start,
+        end,
+        run.source.substring(start, end),
+        true,
+        [
+          for (final fence in run.fences)
+            if (fence.node.span.start >= start && fence.node.span.end <= end)
+              UiMappedFence(
+                fence,
+                SourceSpan(
+                  fence.node.span.start - start,
+                  fence.node.span.end - start,
+                ),
               ),
-            ),
-      ]);
+        ],
+        sourceMap: SourceTextMap.identity(
+          end - start,
+          offset: run.joinedStart + start,
+        ),
+      );
   final UiTextRun run;
   final int originalStart, originalEnd;
   final String text;
@@ -290,6 +303,7 @@ final class UiTextSlice {
   final int? firstMessageOrdinal, firstWebMessageOrdinal;
   final List<int> trackedOffsets;
   final List<bool> trackedBeforeInsertion;
+  final SourceTextMap? sourceMap;
 
   /// Remove hidden reasoning before matching whole-run visual expressions and
   /// retain split anchors in the same coordinate system as the protected code.
@@ -318,6 +332,7 @@ final class UiTextSlice {
       buffer.toString(),
       false,
       fences,
+      sourceMap: SourceTextMap.join(pieces.map((piece) => piece.sourceMap!)),
       trackedBeforeInsertion: [
         for (final offset in offsets)
           offset <= (pieces.firstOrNull?.originalStart ?? 0),
@@ -351,6 +366,7 @@ final class UiTextSlice {
         fences,
         firstMessageOrdinal: ordinal,
         firstWebMessageOrdinal: webOrdinal,
+        sourceMap: sourceMap,
       );
 
   int? messageOrdinalOf(UiSourceFence fence) {
@@ -384,6 +400,7 @@ final class UiTextSlice {
         [for (final f in fences) f.span],
         offsets: trackedOffsets,
         beforeInsertion: trackedBeforeInsertion,
+        sourceMap: sourceMap,
       ),
     );
     if (transformed.ranges.length != fences.length) {
@@ -403,6 +420,7 @@ final class UiTextSlice {
       firstWebMessageOrdinal: firstWebMessageOrdinal,
       trackedOffsets: transformed.offsets,
       trackedBeforeInsertion: transformed.beforeInsertion,
+      sourceMap: transformed.sourceMap,
     );
   }
 
@@ -421,6 +439,7 @@ final class UiTextSlice {
             SourceSpan(item.span.start - start, item.span.end - start),
           ),
     ],
+    sourceMap: sourceMap?.slice(start, end),
     firstMessageOrdinal: firstMessageOrdinal == null
         ? null
         : firstMessageOrdinal! +

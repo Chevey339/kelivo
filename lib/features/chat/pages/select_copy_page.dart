@@ -6,6 +6,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
+import '../widgets/quote_chip.dart';
+import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import '../../intelligent_ui/host/ui_copy_actions.dart';
 import '../../intelligent_ui/text/ui_message_text.dart';
 import '../../intelligent_ui/widgets/genui_clipboard.dart';
@@ -64,7 +67,9 @@ class _SelectCopyPageState extends State<SelectCopyPage> {
                     ? null
                     : () => copyGenUiText(
                         context,
-                        text,
+                        widget.message.quotes.isEmpty
+                            ? text
+                            : widget.message.quotedContent,
                         successMessage: l10n.selectCopyPageCopiedAll,
                       ),
                 icon: Icon(Lucide.Copy, size: 18, color: cs.primary),
@@ -88,9 +93,20 @@ class _SelectCopyPageState extends State<SelectCopyPage> {
                   : Scrollbar(
                       child: SingleChildScrollView(
                         child: AppSelectionArea(
+                          message: widget.message,
+                          sourceText: text,
+                          sourceMap: snapshot.data?.copySourceMap,
+                          onQuoteSelected: () => Navigator.of(context).pop(),
                           copyByteLimit: UiBudgets.copyBytes,
-                          child: Text(
-                            text,
+                          child: Text.rich(
+                            buildQuoteTextSpan(
+                              text: text,
+                              quotes: widget.message.quotes,
+                              token: (quote, _) => SelectableSpanAdapter(
+                                selectedText: '\uFFFC',
+                                child: QuoteChip(quote: quote),
+                              ),
+                            ),
                             style: const TextStyle(fontSize: 15, height: 1.5),
                           ),
                         ),

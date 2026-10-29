@@ -3,6 +3,71 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
 
 void main() {
+  testWidgets(
+    'literal code widgets keep source offsets, selection and tap actions',
+    (tester) async {
+      const source = 'Before `a\uFFFCb`\n\n```dart\nx\uFFFCy\n```\n\nAfter';
+      final positions = <int>{};
+      var taps = 0;
+      String? copied;
+      final extensions = MarkstreamExtensions(
+        literalSpanBuilder: (context, span, segments) {
+          final text = span.toPlainText();
+          final offset = text.indexOf('\uFFFC');
+          if (offset < 0) return span;
+          final original = TextIndex.fromSegments(
+            segments,
+          ).sourceSpanForRange(offset, offset + 1).start;
+          positions.add(original);
+          return TextSpan(
+            style: span.style,
+            children: [
+              TextSpan(text: text.substring(0, offset)),
+              WidgetSpan(
+                alignment: PlaceholderAlignment.baseline,
+                baseline: TextBaseline.alphabetic,
+                child: SelectableSpanAdapter(
+                  selectedText: '\uFFFC',
+                  child: GestureDetector(
+                    key: ValueKey(original),
+                    onTap: () => taps++,
+                    child: const Text('reference'),
+                  ),
+                ),
+              ),
+              TextSpan(text: text.substring(offset + 1)),
+            ],
+          );
+        },
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SelectionArea(
+              onSelectionChanged: (value) => copied = value?.plainText,
+              child: MarkstreamView(source: source, extensions: extensions),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(positions, {
+        source.indexOf('\uFFFC'),
+        source.lastIndexOf('\uFFFC'),
+      });
+      for (final offset in positions) {
+        await tester.tap(find.byKey(ValueKey(offset)));
+      }
+      expect(taps, 2);
+      tester
+          .state<SelectableRegionState>(find.byType(SelectableRegion))
+          .selectAll(SelectionChangedCause.keyboard);
+      await tester.pumpAndSettle();
+      expect('\uFFFC'.allMatches(copied!), hasLength(2));
+      expect(copied, isNot(contains('reference')));
+    },
+  );
+
   final theme = MarkstreamTheme.fromColorScheme(
     ColorScheme.fromSeed(seedColor: Colors.blue),
   );

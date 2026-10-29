@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
@@ -87,6 +88,7 @@ class _GatedChatService extends ChatService {
     required String role,
     String content = '',
     List<MessagePart>? parts,
+    List<QuoteRef> quotes = const [],
     String? modelId,
     String? providerId,
     int? totalTokens,
@@ -109,6 +111,7 @@ class _GatedChatService extends ChatService {
       role: role,
       content: content,
       parts: parts,
+      quotes: quotes,
       modelId: modelId,
       providerId: providerId,
       totalTokens: totalTokens,
@@ -149,6 +152,7 @@ class _GatedChatService extends ChatService {
     required String messageId,
     String content = '',
     List<MessagePart>? parts,
+    List<QuoteRef>? quotes,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
     String? expectedContextState,
@@ -161,6 +165,7 @@ class _GatedChatService extends ChatService {
       messageId: messageId,
       content: content,
       parts: parts,
+      quotes: quotes,
       draftSubmission: draftSubmission,
       uiContext: uiContext,
       expectedContextState: expectedContextState,

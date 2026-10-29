@@ -1,5 +1,6 @@
 import 'package:markstream/markstream_core.dart';
 import 'package:Kelivo/core/services/tts/tts_text_selection.dart';
+import 'package:Kelivo/utils/source_text_map.dart';
 import '../catalog/ui_budgets.dart';
 import '../runtime/ui_surface_controller.dart';
 import '../runtime/ui_surface_state.dart';
@@ -15,14 +16,19 @@ final class UiMessageText {
     required this.hasUi,
     Iterable<UiMessageReplacement> replacements = const [],
     Iterable<UiCapturedSurface> surfaces = const [],
+    Iterable<SourceTextMap>? partSourceMaps,
   }) : parts = List.unmodifiable(parts),
        replacements = List.unmodifiable(replacements),
-       surfaces = List.unmodifiable(surfaces);
+       surfaces = List.unmodifiable(surfaces),
+       _partSourceMaps = partSourceMaps == null
+           ? null
+           : List.unmodifiable(partSourceMaps);
   final String source, omitted;
   final List<TtsTextPart> parts;
   final bool hasUi;
   final List<UiMessageReplacement> replacements;
   final List<UiCapturedSurface> surfaces;
+  final List<SourceTextMap>? _partSourceMaps;
 
   /// Original joined TextPart coordinates. A fence spanning adjacent parts is
   /// emitted exactly once; image/file/tool positions remain the caller's own.
@@ -51,47 +57,102 @@ final class UiMessageText {
     return output.toString();
   }
 
-  late final String copyText = _copyText();
+  late final (String, SourceTextMap?) _copyProjection = _copyText();
+  String get copyText => _copyProjection.$1;
+  SourceTextMap? get copySourceMap => _copyProjection.$2;
 
   /// Bound input work as well as output. Huge ordinary prose is omitted as one
   /// source unit before parsing; semantic fields are kept or omitted whole.
-  late final List<TtsTextPart> _boundedParts = _bound();
-  List<TtsTextPart> _bound() {
+  late final List<_MappedPart> _boundedParts = _bound();
+  SourceTextMap get _omissionMap => SourceTextMap.replacement(
+    omitted.length,
+    SourceSpan(source.length, source.length),
+  );
+  List<_MappedPart> _bound() {
     final budget = UiBoundedText(UiBudgets.copyBytes, omission: omitted);
-    final result = <TtsTextPart>[];
-    for (final part in parts) {
+    final result = <_MappedPart>[];
+    for (final (index, part) in parts.indexed) {
+      final map = _partSourceMaps?[index];
       if (!part.literal) {
-        if (budget.add(part.text)) result.add(part);
+        if (budget.add(part.text)) result.add(_MappedPart(part, map));
         continue;
       }
-      final kept = [
-        for (final line in part.text.split('\n'))
-          if (budget.add(line)) line,
-      ];
+      final kept = <String>[];
+      final maps = <SourceTextMap?>[];
+      var offset = 0;
+      for (final line in part.text.split('\n')) {
+        if (budget.add(line)) {
+          kept.add(line);
+          maps.add(map?.slice(offset, offset + line.length));
+        }
+        offset += line.length + 1;
+      }
       if (kept.isNotEmpty) {
-        result.add(TtsTextPart(kept.join('\n'), literal: true));
+        result.add(
+          _MappedPart(
+            TtsTextPart(kept.join('\n'), literal: true),
+            _joinMaps(maps),
+          ),
+        );
       }
     }
-    if (budget.omitted) result.add(TtsTextPart(omitted, literal: true));
+    if (budget.omitted) {
+      result.add(
+        _MappedPart(TtsTextPart(omitted, literal: true), _omissionMap),
+      );
+    }
     return List.unmodifiable(result);
   }
 
-  String _copyText() {
-    if (!hasUi) return source;
+  (String, SourceTextMap?) _copyText() {
+    if (!hasUi) return (source, SourceTextMap.identity(source.length));
     final result = UiBoundedText(UiBudgets.copyBytes, omission: omitted);
-    for (final part in _boundedParts) {
-      final text = part.literal
-          ? part.text
-          : toPlainText(const MarkdownParser().parse(part.text));
+    final maps = <SourceTextMap?>[];
+    for (final mapped in _boundedParts) {
+      final part = mapped.part;
+      final index = part.literal
+          ? null
+          : plainTextIndex(const MarkdownParser().parse(part.text));
+      final text = index?.text ?? part.text;
+      final map = index == null
+          ? mapped.sourceMap
+          : mapped.sourceMap == null
+          ? null
+          : SourceTextMap.fromSegments(
+              index.entries.map((entry) => entry.segment),
+            ).through(mapped.sourceMap!);
+      var offset = 0;
       for (final line in text.split('\n')) {
-        result.add(line);
+        if (result.add(line) && line.isNotEmpty) {
+          maps.add(map?.slice(offset, offset + line.length));
+        }
+        offset += line.length + 1;
       }
     }
-    return result.finish();
+    if (result.omitted) maps.add(_omissionMap);
+    return (result.finish(), _joinMaps(maps));
   }
 
-  String speech(TtsTextSelectionMode mode) =>
-      TtsTextSelection.prepareParts(_boundedParts, mode: mode);
+  String speech(TtsTextSelectionMode mode) => TtsTextSelection.prepareParts(
+    _boundedParts.map((mapped) => mapped.part),
+    mode: mode,
+  );
+}
+
+class _MappedPart {
+  const _MappedPart(this.part, this.sourceMap);
+  final TtsTextPart part;
+  final SourceTextMap? sourceMap;
+}
+
+SourceTextMap? _joinMaps(List<SourceTextMap?> maps) {
+  if (maps.any((map) => map == null)) return null;
+  return SourceTextMap.join([
+    for (var i = 0; i < maps.length; i++) ...[
+      if (i > 0) SourceTextMap.replacement(1, maps[i]!.sourceRange(0, 0)),
+      maps[i]!,
+    ],
+  ]);
 }
 
 /// The fenced form prevents model-authored semantic values from becoming

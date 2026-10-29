@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'chat_input_data.dart';
+import 'quote_ref.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 
 /// The editor value, before the send path trims text or filters attachments.
 class ComposerDraftInput {
   const ComposerDraftInput({
     this.text = '',
+    this.quotes = const [],
     this.selectionBase = -1,
     this.selectionExtent = -1,
     this.images = const [],
@@ -15,6 +17,7 @@ class ComposerDraftInput {
   });
 
   final String text;
+  final List<QuoteRef> quotes;
   final int selectionBase;
   final int selectionExtent;
   final List<DraftImage> images;
@@ -30,6 +33,7 @@ class ComposerDraftInput {
 
   ComposerDraftInput copyWith({
     String? text,
+    List<QuoteRef>? quotes,
     int? selectionBase,
     int? selectionExtent,
     List<DraftImage>? images,
@@ -38,6 +42,7 @@ class ComposerDraftInput {
     bool clearUiContext = false,
   }) => ComposerDraftInput(
     text: text ?? this.text,
+    quotes: quotes ?? this.quotes,
     selectionBase: selectionBase ?? this.selectionBase,
     selectionExtent: selectionExtent ?? this.selectionExtent,
     images: images ?? this.images,
@@ -48,6 +53,7 @@ class ComposerDraftInput {
 
   ChatInputData toInput({DraftSubmission? submission}) => ChatInputData(
     text: text,
+    quotes: quotes,
     imagePaths: images.map((image) => image.path).toList(),
     documents: documents,
     allowImagesApiRouting: allowImagesApiRouting,
@@ -58,6 +64,7 @@ class ComposerDraftInput {
   factory ComposerDraftInput.fromInput(ChatInputData input) =>
       ComposerDraftInput(
         text: input.text,
+        quotes: input.quotes,
         images: [for (final path in input.imagePaths) DraftImage(path: path)],
         documents: List.of(input.documents),
         allowImagesApiRouting: input.allowImagesApiRouting,
@@ -66,6 +73,7 @@ class ComposerDraftInput {
 
   Map<String, dynamic> toJson() => {
     'text': text,
+    'quotes': quotes.map((quote) => quote.toJson()).toList(),
     'selectionBase': selectionBase,
     'selectionExtent': selectionExtent,
     'images': images.map((image) => image.toJson()).toList(),
@@ -80,6 +88,7 @@ class ComposerDraftInput {
   factory ComposerDraftInput.fromJson(Map<String, dynamic> json) =>
       ComposerDraftInput(
         text: json['text'] as String,
+        quotes: QuoteRef.decodeList(json['quotes']),
         selectionBase: json['selectionBase'] as int,
         selectionExtent: json['selectionExtent'] as int,
         images: [
@@ -104,6 +113,7 @@ class ComposerDraftInput {
 
   bool sameValue(ComposerDraftInput other) =>
       text == other.text &&
+      listEquals(quotes, other.quotes) &&
       selectionBase == other.selectionBase &&
       selectionExtent == other.selectionExtent &&
       allowImagesApiRouting == other.allowImagesApiRouting &&

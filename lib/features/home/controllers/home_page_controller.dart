@@ -1,3 +1,4 @@
+import '../../chat/controllers/quote_editing_controller.dart';
 import '../../side_panel/desktop_side_panel_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
@@ -591,7 +592,8 @@ class HomePageController extends ChangeNotifier {
     final wasApplying = _applyingComposer;
     _applyingComposer = true;
     try {
-      _inputController.value = TextEditingValue(
+      _inputController.value = QuoteEditingValue(
+        quotes: input.quotes,
         text: input.text,
         selection: TextSelection(
           baseOffset: input.selectionBase < 0
@@ -2633,6 +2635,7 @@ class HomePageController extends ChangeNotifier {
       expectedContextState: approved,
       messageId: editState.messageId,
       parts: parts,
+      quotes: input.quotes,
       draftSubmission: input.draftSubmission,
       uiContext: input.uiContext == null
           ? null

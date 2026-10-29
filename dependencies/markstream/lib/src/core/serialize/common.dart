@@ -1,11 +1,11 @@
 import '../ast/nodes.dart';
 
 /// Shared iterative postorder traversal, also safe for deeply nested containers.
-Map<MarkdownNode, String> serializeNodes(
+Map<MarkdownNode, T> serializeNodes<T>(
   MarkdownNode root,
-  String Function(MarkdownNode, Map<MarkdownNode, String>) render,
+  T Function(MarkdownNode, Map<MarkdownNode, T>) render,
 ) {
-  final output = <MarkdownNode, String>{};
+  final output = <MarkdownNode, T>{};
   final pending = <(MarkdownNode, bool)>[(root, false)];
   while (pending.isNotEmpty) {
     final (node, visited) = pending.removeLast();

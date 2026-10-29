@@ -5689,5 +5689,19 @@
   "hotkeySidePanelNextTab": "下一个面板标签",
   "hotkeySidePanelPreviousTab": "上一个面板标签",
   "hotkeySidePanelAddress": "聚焦网页地址栏",
-  "hotkeySidePanelFocus": "切换聊天与面板焦点"
+  "hotkeySidePanelFocus": "切换聊天与面板焦点",
+  "selectionQuote": "引用",
+  "selectionTranslate": "翻译",
+  "selectionAiTranslateIos": "AI翻译",
+  "selectionCopyMarkdown": "复制为 Markdown",
+  "selectionCopyRich": "复制富文本",
+  "quoteJumpToSource": "跳到原文",
+  "quoteRemove": "移除引用",
+  "quoteDuplicate": "这段已在引用中",
+  "quoteLimit": "一条消息最多引用 10 段",
+  "quoteLocated": "已定位到引用原文",
+  "quoteSourceMissing": "原文已不存在",
+  "selectionRegenerate": "重新生成",
+  "translating": "正在翻译…",
+  "retry": "重试"
 }

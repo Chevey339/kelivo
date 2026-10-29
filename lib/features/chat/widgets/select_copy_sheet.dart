@@ -5,9 +5,14 @@ import '../../intelligent_ui/host/ui_copy_actions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/chat_message.dart';
+import '../../../utils/source_text_map.dart';
 import '../../../l10n/app_localizations.dart';
 
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
+import 'quote_interaction_scope.dart';
+import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
+import 'quote_chip.dart';
+import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
@@ -19,6 +24,7 @@ Future<void> showSelectCopySheet(
 }) async {
   final projection = await readUiMessageText(context, message);
   if (projection == null || !context.mounted) return;
+  final quotes = QuoteInteractionScope.maybeOf(context);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -28,19 +34,37 @@ Future<void> showSelectCopySheet(
     ),
     builder: (ctx) => SafeArea(
       top: false,
-      child: _SelectCopySheet(message: message, content: projection.copyText),
+      child: quotes == null
+          ? _SelectCopySheet(
+              message: message,
+              content: projection.copyText,
+              sourceMap: projection.copySourceMap,
+            )
+          : QuoteInteractionScope(
+              controller: quotes,
+              child: _SelectCopySheet(
+                message: message,
+                content: projection.copyText,
+                sourceMap: projection.copySourceMap,
+              ),
+            ),
     ),
   );
 }
 
 class _SelectCopySheet extends StatelessWidget {
-  const _SelectCopySheet({required this.message, required this.content});
+  const _SelectCopySheet({
+    required this.message,
+    required this.content,
+    this.sourceMap,
+  });
   final String content;
   final ChatMessage message;
+  final SourceTextMap? sourceMap;
 
   Future<void> _copyAll(BuildContext context) => copyGenUiText(
     context,
-    content,
+    message.quotes.isEmpty ? content : message.quotedContent,
     successMessage: AppLocalizations.of(context)!.selectCopyPageCopiedAll,
   );
 
@@ -125,9 +149,20 @@ class _SelectCopySheet extends StatelessWidget {
                   controller: sc,
                   primary: false,
                   child: AppSelectionArea(
+                    message: message,
+                    sourceText: content,
+                    sourceMap: sourceMap,
+                    onQuoteSelected: () => Navigator.of(context).pop(),
                     copyByteLimit: UiBudgets.copyBytes,
-                    child: Text(
-                      content,
+                    child: Text.rich(
+                      buildQuoteTextSpan(
+                        text: content,
+                        quotes: message.quotes,
+                        token: (quote, _) => SelectableSpanAdapter(
+                          selectedText: '\uFFFC',
+                          child: QuoteChip(quote: quote),
+                        ),
+                      ),
                       style: TextStyle(fontSize: 15, height: 1.5),
                     ),
                   ),

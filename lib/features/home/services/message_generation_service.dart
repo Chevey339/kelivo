@@ -1,6 +1,7 @@
 import '../../intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
+import '../../../core/models/quote_ref.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
@@ -631,6 +632,11 @@ class MessageGenerationService {
       input,
       assistant: assistant,
     );
+    if (input.quotes.isNotEmpty && body.first is TextPart) {
+      body[0] = TextPart(
+        formatQuotedMessage((body.first as TextPart).text, input.quotes),
+      );
+    }
     if (uiContext == null) return body;
     final source = uiContext.attachment.source;
     final current =
@@ -653,6 +659,7 @@ class MessageGenerationService {
       conversationId: conversationId,
       role: 'user',
       parts: parts,
+      quotes: input.quotes,
       uiContext: uiContext,
     );
   }
@@ -677,6 +684,7 @@ class MessageGenerationService {
         conversationId: conversationId,
         role: 'user',
         parts: userParts,
+        quotes: input.quotes,
         uiContext: uiContext,
       );
       final assistantMessage = await createAssistantPlaceholder(
@@ -693,6 +701,7 @@ class MessageGenerationService {
     final result = await chatService.beginSendGeneration(
       conversationId: conversationId,
       userParts: userParts,
+      quotes: input.quotes,
       modelId: modelId,
       providerId: providerKey,
       draftSubmission: input.draftSubmission,
@@ -773,12 +782,19 @@ class MessageGenerationService {
     ChatInputData input, {
     required Assistant? assistant,
   }) async {
-    final processedUserText = applyAssistantRegexes(
-      input.text.trim(),
+    String transform(String text) => applyAssistantRegexes(
+      text,
       assistant: assistant,
       scope: AssistantRegexScope.user,
       target: AssistantRegexTransformTarget.persist,
     );
+    final processedUserText = input.quotes.isEmpty
+        ? transform(input.text.trim())
+        : input.text
+              .trim()
+              .split(quotePlaceholder)
+              .map(transform)
+              .join(quotePlaceholder);
 
     final parts = <MessagePart>[TextPart(processedUserText)];
     for (final path in input.imagePaths) {

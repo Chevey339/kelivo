@@ -1,3 +1,4 @@
+import '../../models/quote_ref.dart';
 import '../../../features/intelligent_ui/host/ui_context_submission.dart';
 import '../../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
@@ -1786,6 +1787,11 @@ class ChatService extends ChangeNotifier {
     return hits;
   }
 
+  Future<bool> messageExists(String id) async {
+    if (_cachedTemporaryMessage(id) != null) return true;
+    return _repo.messageExists(id);
+  }
+
   Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async {
     if (ids.isEmpty) return const <ChatMessage>[];
     final temporaryById = <String, ChatMessage>{
@@ -3163,6 +3169,7 @@ class ChatService extends ChangeNotifier {
     required String role,
     String content = '',
     List<MessagePart>? parts,
+    List<QuoteRef> quotes = const [],
     String? modelId,
     String? providerId,
     int? totalTokens,
@@ -3202,6 +3209,7 @@ class ChatService extends ChangeNotifier {
       role: role,
       content: parts == null ? content : null,
       parts: parts,
+      quotes: quotes,
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerId,
@@ -3290,6 +3298,7 @@ class ChatService extends ChangeNotifier {
   Future<GenerationBeginResult> beginSendGeneration({
     required String conversationId,
     required List<MessagePart> userParts,
+    List<QuoteRef> quotes = const [],
     required String modelId,
     required String providerId,
     DraftSubmission? draftSubmission,
@@ -3310,6 +3319,7 @@ class ChatService extends ChangeNotifier {
       id: draftSubmission?.id,
       role: 'user',
       parts: userParts,
+      quotes: quotes,
       conversationId: conversationId,
     );
     final assistantMessage = ChatMessage(
@@ -4129,9 +4139,18 @@ class ChatService extends ChangeNotifier {
     );
 
     final cloned = <ChatMessage>[];
-    final messageIdMap = <String, String>{};
+    final messageIdMap = {
+      for (final message in sourceMessages) message.id: const Uuid().v4(),
+    };
     for (final message in sourceMessages) {
       final forked = ChatMessage(
+        id: messageIdMap[message.id],
+        quotes: [
+          for (final quote in message.quotes)
+            quote.withMessageId(
+              messageIdMap[quote.messageId] ?? quote.messageId,
+            ),
+        ],
         role: message.role,
         parts: message.parts,
         timestamp: message.timestamp,
@@ -4202,6 +4221,7 @@ class ChatService extends ChangeNotifier {
     required String messageId,
     String content = '',
     List<MessagePart>? parts,
+    List<QuoteRef>? quotes,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
     String? expectedContextState,
@@ -4240,6 +4260,7 @@ class ChatService extends ChangeNotifier {
         ChatMessage(
           role: temporaryOriginal.role,
           parts: resolvedParts,
+          quotes: quotes ?? temporaryOriginal.quotes,
           conversationId: conversationId,
           modelId: temporaryOriginal.modelId,
           providerId: temporaryOriginal.providerId,
@@ -4302,6 +4323,7 @@ class ChatService extends ChangeNotifier {
       messageId: messageId,
       content: content,
       parts: parts,
+      quotes: quotes,
       draftSubmission: draftSubmission,
       uiContext: uiContext,
     );

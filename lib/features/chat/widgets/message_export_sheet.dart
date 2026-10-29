@@ -129,7 +129,7 @@ _Parsed _exportPartsFromMessage(ChatMessage message, {String? textOverride}) {
       );
     }
   }
-  final text = (textOverride ?? message.content).trim();
+  final text = (textOverride ?? message.quotedContent).trim();
   return _Parsed(text, images, docs);
 }
 
@@ -144,6 +144,15 @@ Future<void> _writeExportBlocks(
   required Future<void> Function(String uri) writeImage,
 }) async {
   var wroteReasoningPart = false;
+  if (message.quotes.isNotEmpty) {
+    message = message.copyWith(
+      parts: ChatMessage.partsWithReplacedText(
+        message.parts,
+        message.quotedContent,
+      ),
+      quotes: const [],
+    );
+  }
   final stripThink =
       message.role == 'assistant' && !messageHasProviderReasoning(message);
   final joinedText = stripThink ? message.content : '';
@@ -319,6 +328,12 @@ class _ThinkingExportData {
 }
 
 _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
+  if (message.quotes.isNotEmpty) {
+    return _ThinkingExportData(
+      cleanedContent: message.quotedContent,
+      thinkingTexts: const [],
+    );
+  }
   final structuredReasoning = [
     for (final part in message.parts)
       if (part is ReasoningPart && part.text.trim().isNotEmpty)

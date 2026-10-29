@@ -217,7 +217,7 @@ class MessageBuilderService {
       if (remaining <= 0) break;
       final raw = message.role == 'assistant'
           ? ThinkingTagParser.parseWithRanges(message.content).visibleContent
-          : message.content;
+          : message.quotedContent;
       if (raw.trim().isEmpty) continue;
       final text = truncateHeadTailUtf16Safe(
         raw,
@@ -386,7 +386,7 @@ class MessageBuilderService {
           continue;
         }
       }
-      var content = m.content;
+      var content = m.quotedContent;
       var hasClaudeToolTurn = false;
       // Signed native blocks belong to the provider/model that produced them.
       // Tool turns carry their artifact on the tool-call message below.
@@ -835,6 +835,7 @@ class MessageBuilderService {
     }
     return ChatInputData(
       text: textParts.join().trim(),
+      quotes: message.quotes,
       imagePaths: images,
       documents: docs,
       uiContext: contextParts?.context == null
@@ -1318,7 +1319,7 @@ class MessageBuilderService {
 
       // Apply replace-only regexes at send-time on user text.
       final replacedUserText = applyAssistantRegexes(
-        parsedUser.text,
+        parsedUser.quotedText,
         assistant: assistant,
         scope: AssistantRegexScope.user,
         target: AssistantRegexTransformTarget.send,
@@ -2269,6 +2270,9 @@ class MessageBuilderService {
                   {
                     'role': message.role,
                     'content': message.content,
+                    'quotes': [
+                      for (final quote in message.quotes) quote.toJson(),
+                    ],
                     'attachments': [
                       for (final part in message.parts)
                         if (part is ImagePart || part is FilePart)

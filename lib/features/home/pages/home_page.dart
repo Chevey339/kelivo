@@ -9,6 +9,9 @@ import '../../chat/widgets/context_operation_actions.dart';
 import '../../chat/widgets/context_compression_status.dart';
 import '../../browser/browser_navigation.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
+import '../../chat/controllers/quote_editing_controller.dart';
+import '../../chat/widgets/quote_interaction_scope.dart';
+import '../../../core/models/quote_ref.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -170,7 +173,7 @@ class _HomePageState extends State<HomePage>
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = MessageEditingController();
+  final QuoteEditingController _inputController = QuoteEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
@@ -191,6 +194,66 @@ class _HomePageState extends State<HomePage>
   // ============================================================================
 
   late HomePageController _controller;
+  late final QuoteInteractionController _quoteInteractions;
+  bool _quoteSyncScheduled = false;
+  (String?, int)? _quoteSourceVersion;
+
+  void _syncQuoteHighlights() {
+    if (_quoteSyncScheduled) return;
+    _quoteSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _quoteSyncScheduled = false;
+      if (mounted) _quoteInteractions.setDraftQuotes(_inputController.quotes);
+    });
+  }
+
+  Future<void> _insertSelectionQuote(QuoteRef quote) async {
+    final conversationId = _controller.currentConversation?.id;
+    await _inputController.retireMessageInput();
+    if (!mounted) return;
+    try {
+      if (_controller.currentConversation?.id != conversationId) return;
+      final result = _inputController.insertQuote(quote);
+      final l10n = AppLocalizations.of(context)!;
+      if (result == QuoteInsertion.duplicate ||
+          result == QuoteInsertion.limit) {
+        showAppSnackBar(
+          context,
+          message: result == QuoteInsertion.duplicate
+              ? l10n.quoteDuplicate
+              : l10n.quoteLimit,
+        );
+      }
+    } finally {
+      _inputController.resumeInput();
+    }
+    _inputFocus.requestFocus();
+  }
+
+  Future<bool> _jumpToQuote(QuoteRef quote) async {
+    final source = (await context.read<ChatService>().loadMessagesByIds([
+      quote.messageId,
+    ])).firstOrNull;
+    if (!mounted) return false;
+    final labels = AppLocalizations.of(context)!;
+    if (source == null) {
+      showAppSnackBar(context, message: labels.quoteSourceMissing);
+      return false;
+    }
+    if (_controller.currentConversation?.id != source.conversationId) {
+      await _controller.switchConversationAnimated(source.conversationId);
+    }
+    if (!mounted) return false;
+    await _controller.setSelectedVersion(
+      source.groupId ?? source.id,
+      source.version,
+    );
+    await _controller.scrollToMessageId(source.id);
+    if (!mounted) return false;
+    _quoteInteractions.reveal(quote);
+    showAppSnackBar(context, message: labels.quoteLocated);
+    return true;
+  }
 
   // ============================================================================
   // Lifecycle
@@ -214,6 +277,12 @@ class _HomePageState extends State<HomePage>
       scrollController: _scrollController,
     );
 
+    _quoteInteractions = QuoteInteractionController(
+      onQuote: _insertSelectionQuote,
+      onJump: _jumpToQuote,
+      sourceExists: (id) => context.read<ChatService>().messageExists(id),
+    );
+    _inputController.addListener(_syncQuoteHighlights);
     _controller.onRevealConversation = () => _drawerController.jumpTo(0);
     _controller.addListener(_onControllerChanged);
     _drawerController.addListener(_onDrawerValueChanged);
@@ -280,6 +349,8 @@ class _HomePageState extends State<HomePage>
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);
     _controller.dispose();
+    _inputController.removeListener(_syncQuoteHighlights);
+    _quoteInteractions.dispose();
     _inputFocus.dispose();
     _inputController.dispose();
     _scrollController.dispose();
@@ -450,6 +521,16 @@ class _HomePageState extends State<HomePage>
   void _onControllerChanged() {
     _observeCompression();
     final conversationId = _controller.currentConversation?.id;
+    final quoteVersion = (
+      conversationId,
+      conversationId == null
+          ? 0
+          : context.read<ChatService>().getMessageCount(conversationId),
+    );
+    if (quoteVersion != _quoteSourceVersion) {
+      _quoteSourceVersion = quoteVersion;
+      _quoteInteractions.refreshSources();
+    }
     if (conversationId != null && conversationId != _scrollConversationId) {
       _scrollConversationId = conversationId;
       final previous = _scrollController;
@@ -637,7 +718,10 @@ class _HomePageState extends State<HomePage>
             onDraft: _controller.stageUiDraft,
             child: UiSearchNavigationScope(
               navigation: _controller.uiSearchNavigation,
-              child: _buildPage(context),
+              child: QuoteInteractionScope(
+                controller: _quoteInteractions,
+                child: _buildPage(context),
+              ),
             ),
           ),
         ),
@@ -1606,7 +1690,10 @@ class _HomePageState extends State<HomePage>
       context,
       anchorKey: _inputBarKey,
       conversationId: conversationId,
-      draftText: _inputController.text,
+      draftText: formatQuotedMessage(
+        _inputController.text,
+        _inputController.quotes,
+      ),
     );
   }
 
@@ -1780,7 +1867,10 @@ class _HomePageState extends State<HomePage>
           top: false,
           child: ContextManagementSheet(
             conversationId: _controller.currentConversation?.id,
-            draftText: _inputController.text,
+            draftText: formatQuotedMessage(
+              _inputController.text,
+              _inputController.quotes,
+            ),
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();

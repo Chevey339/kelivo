@@ -105,7 +105,10 @@ String _attributes(String tag, Map<String, String> attributes) {
 }
 
 /// Portable HTML for export and clipboard use; active tags and URL schemes are excluded.
-String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
+String toHtml(MarkdownNode root) => serializeNodes<String>(root, (
+  node,
+  output,
+) {
   final body = joinChildren(node, output);
   if (node is TextNode) return escapeHtml(node.text);
   if (node is LineBreakNode) return node.hard ? '<br />\n' : '\n';

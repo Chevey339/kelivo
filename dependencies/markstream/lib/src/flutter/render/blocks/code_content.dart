@@ -8,6 +8,7 @@ import '../../../core/ast/source_span.dart';
 import '../../../core/text_index/text_index.dart';
 import '../../../core/serialize/to_plain_text.dart';
 import '../../interfaces/renderers.dart';
+import '../../extensions/registry.dart' show LiteralSpanBuilder;
 import '../../selection/source_text_selection.dart';
 import '../../selection/selection_controller.dart';
 import '../../theme/markstream_theme.dart';
@@ -42,12 +43,14 @@ class MarkstreamCodeContent extends StatefulWidget {
     this.wrap = true,
     this.highlight = true,
     this.maxLines,
+    this.literalSpanBuilder,
   });
   final CodeBlockNode node;
   final MarkstreamTheme theme;
   final CodeHighlighter? highlighter;
   final bool streaming, exporting, wrap, highlight;
   final int? maxLines;
+  final LiteralSpanBuilder? literalSpanBuilder;
   @override
   State<MarkstreamCodeContent> createState() => _MarkstreamCodeContentState();
 }
@@ -57,6 +60,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
   final _chunks = <(int, String)>[];
   String _source = '';
   int _lastChunkStart = 0;
+  TextIndex? _literalIndex;
 
   @override
   void initState() {
@@ -67,6 +71,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
   @override
   void didUpdateWidget(MarkstreamCodeContent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.node != widget.node) _literalIndex = null;
     _update();
   }
 
@@ -125,6 +130,13 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
               TextSegment(text: part.text, sourceSpan: part.span, node: part),
           ]);
     Widget fragment(String text, int offset) {
+      final literal = widget.literalSpanBuilder;
+      if (literal != null) {
+        _literalIndex ??= TextIndex.fromSegments([
+          for (final part in widget.node.children)
+            TextSegment(text: part.text, sourceSpan: part.span, node: part),
+        ]);
+      }
       Widget child = _CodeTextFragment(
         key: ValueKey(offset),
         source: text,
@@ -143,6 +155,10 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
               ),
         ],
         highlightColor: highlights.color,
+        literalSpanBuilder: literal,
+        sourceSegments: literal == null
+            ? const []
+            : _literalIndex!.segmentsForRange(offset, offset + text.length),
       );
       if (!widget.wrap && !widget.exporting)
         child = SingleChildScrollView(
@@ -236,6 +252,8 @@ class _CodeTextFragment extends StatefulWidget {
     this.cullToViewport = true,
     this.highlightRanges = const [],
     this.highlightColor = const Color(0x00000000),
+    this.literalSpanBuilder,
+    this.sourceSegments = const [],
   });
   final bool cullToViewport;
   final List<SourceSpan> highlightRanges;
@@ -245,6 +263,8 @@ class _CodeTextFragment extends StatefulWidget {
   final SourceTextSelectionDelegate owner;
   final MarkstreamTheme theme;
   final CodeHighlighter? highlighter;
+  final LiteralSpanBuilder? literalSpanBuilder;
+  final List<TextSegment> sourceSegments;
   @override
   State<_CodeTextFragment> createState() => _CodeTextFragmentState();
 }
@@ -328,7 +348,12 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
         cullToViewport: widget.cullToViewport,
         text: Text.rich(
           paintTextHighlights(
-            _span,
+            widget.literalSpanBuilder?.call(
+                  context,
+                  _span,
+                  widget.sourceSegments,
+                ) ??
+                _span,
             widget.highlightRanges,
             widget.highlightColor,
           ),

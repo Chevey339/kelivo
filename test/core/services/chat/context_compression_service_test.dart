@@ -7,6 +7,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/chat/context_compression_service.dart';
 
@@ -279,6 +280,40 @@ void main() {
       expect(input.first.content, contains('image content not summarized'));
       expect(input.last.content.length, lessThan(8200));
       expect(input.last.content, contains('truncated'));
+    },
+  );
+
+  test(
+    'compression preparation expands quote snapshots once with and without attachment prompts',
+    () async {
+      final quote = QuoteRef(
+        id: 'q',
+        messageId: 'missing',
+        start: 0,
+        end: 8,
+        text: 'retained original',
+        model: null,
+        createdAt: DateTime(2026),
+      );
+      final message = await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        content: 'Explain \uFFFC',
+        quotes: [quote],
+      );
+      for (final include in [false, true]) {
+        final input = await chat.messagesForCompression([
+          message,
+        ], includeAttachmentsAndTools: include);
+        final text = buildCompressRequestContents(
+          input,
+          const CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          ),
+        ).join();
+        expect('retained original'.allMatches(text), hasLength(1));
+        expect(text, isNot(contains(quotePlaceholder)));
+      }
     },
   );
 

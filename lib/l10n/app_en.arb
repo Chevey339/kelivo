@@ -7309,5 +7309,19 @@
   "hotkeySidePanelNextTab": "Next panel tab",
   "hotkeySidePanelPreviousTab": "Previous panel tab",
   "hotkeySidePanelAddress": "Focus web address",
-  "hotkeySidePanelFocus": "Cycle chat and panel focus"
+  "hotkeySidePanelFocus": "Cycle chat and panel focus",
+  "selectionQuote": "Quote",
+  "selectionTranslate": "Translate",
+  "selectionAiTranslateIos": "AI Translate",
+  "selectionCopyMarkdown": "Copy as Markdown",
+  "selectionCopyRich": "Copy rich text",
+  "quoteJumpToSource": "Jump to source",
+  "quoteRemove": "Remove quote",
+  "quoteDuplicate": "Already quoted",
+  "quoteLimit": "Up to 10 quotes per message",
+  "quoteLocated": "Jumped to quoted text",
+  "quoteSourceMissing": "Source no longer exists",
+  "selectionRegenerate": "Regenerate",
+  "translating": "Translating…",
+  "retry": "Retry"
 }

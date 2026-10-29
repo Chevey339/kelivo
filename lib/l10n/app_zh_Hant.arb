@@ -5689,5 +5689,19 @@
   "hotkeySidePanelNextTab": "下一個面板分頁",
   "hotkeySidePanelPreviousTab": "上一個面板分頁",
   "hotkeySidePanelAddress": "聚焦網頁網址列",
-  "hotkeySidePanelFocus": "切換聊天與面板焦點"
+  "hotkeySidePanelFocus": "切換聊天與面板焦點",
+  "selectionQuote": "引用",
+  "selectionTranslate": "翻譯",
+  "selectionAiTranslateIos": "AI翻譯",
+  "selectionCopyMarkdown": "複製為 Markdown",
+  "selectionCopyRich": "複製富文字",
+  "quoteJumpToSource": "跳至原文",
+  "quoteRemove": "移除引用",
+  "quoteDuplicate": "這段已在引用中",
+  "quoteLimit": "一則訊息最多引用 10 段",
+  "quoteLocated": "已定位至引用原文",
+  "quoteSourceMissing": "原文已不存在",
+  "selectionRegenerate": "重新產生",
+  "translating": "正在翻譯…",
+  "retry": "重試"
 }

@@ -1,4 +1,5 @@
 import 'package:markstream/markstream_core.dart';
+import '../../../utils/source_text_map.dart';
 
 /// Splits assistant markdown into paragraph chunks, one per bubble.
 ///
@@ -20,9 +21,12 @@ List<String> splitAssistantParagraphs(String text) => [
 /// Display text retains the existing normalization; [span] also preserves the
 /// exact original interval for widgets whose identity belongs to source text.
 class AssistantParagraph {
-  const AssistantParagraph(this.text, this.span);
+  const AssistantParagraph(this.text, this.span, {this._sourceMap});
   final String text;
   final SourceSpan span;
+  final SourceTextMap? _sourceMap;
+  SourceTextMap get sourceMap =>
+      _sourceMap ?? SourceTextMap.identity(text.length, offset: span.start);
 }
 
 List<AssistantParagraph> splitAssistantParagraphsWithSource(String text) {
@@ -37,10 +41,19 @@ List<AssistantParagraph> splitAssistantParagraphsWithSource(String text) {
   var currentStart = 0, currentEnd = 0;
 
   void flush() {
-    final chunk = current.join('\n').trim();
+    final raw = current.join('\n');
+    final chunk = raw.trim();
+    final trimStart = raw.length - raw.trimLeft().length;
     if (chunk.isNotEmpty) {
       chunks.add(
-        AssistantParagraph(chunk, SourceSpan(currentStart, currentEnd)),
+        AssistantParagraph(
+          chunk,
+          SourceSpan(currentStart, currentEnd),
+          sourceMap: SourceTextMap.identity(
+            chunk.length,
+            offset: currentStart + trimStart,
+          ),
+        ),
       );
     }
     current.clear();
@@ -86,9 +99,19 @@ List<AssistantParagraph> _mergeRelatedChunks(List<AssistantParagraph> chunks) {
   final merged = <AssistantParagraph>[];
   for (final chunk in chunks) {
     if (merged.isNotEmpty && _shouldMerge(merged.last.text, chunk.text)) {
+      final previous = merged.last;
+      final gap = chunk.span.start - previous.span.end;
       merged[merged.length - 1] = AssistantParagraph(
         '${merged.last.text}\n\n${chunk.text}',
         SourceSpan(merged.last.span.start, chunk.span.end),
+        sourceMap: SourceTextMap.join([
+          previous.sourceMap,
+          SourceTextMap.identity(
+            gap,
+            offset: previous.span.end,
+          ).replace([(0, gap, 2)]),
+          chunk.sourceMap,
+        ]),
       );
       continue;
     }

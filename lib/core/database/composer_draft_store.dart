@@ -739,6 +739,7 @@ class ComposerDraftStore extends ChangeNotifier {
     checkOwner();
     return ChatInputData(
       text: input.text,
+      quotes: input.quotes,
       imagePaths: [for (final path in input.imagePaths) paths[path]!],
       documents: [
         for (final doc in input.documents)
@@ -845,6 +846,7 @@ class ComposerDraftStore extends ChangeNotifier {
         : '${first.text}\n\n${second.text}';
     return first.copyWith(
       text: text,
+      quotes: [...first.quotes, ...second.quotes],
       selectionBase: text.length,
       selectionExtent: text.length,
       images: [...first.images, ...second.images],

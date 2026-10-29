@@ -40,7 +40,7 @@ extension ChatContextOperations on ChatService {
       for (final message in messages)
         (() {
           final frozen = prompts[message.id];
-          var body = message.content;
+          var body = message.quotedContent;
           if (frozen != null) {
             body = frozen.carriesMemorySnapshot
                 ? MemoryBlockBuilder.splitInjectedPrefix(
@@ -89,7 +89,7 @@ extension ChatContextOperations on ChatService {
               );
             }
           }
-          return message.copyWith(content: buffer.toString());
+          return message.copyWith(content: buffer.toString(), quotes: const []);
         })(),
     ];
   }

@@ -1,4 +1,5 @@
 import 'composer_draft.dart' show DraftSubmission;
+import 'quote_ref.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 
 class DocumentAttachment {
@@ -15,6 +16,7 @@ class DocumentAttachment {
 
 class ChatInputData {
   final String text;
+  final List<QuoteRef> quotes;
   final List<String> imagePaths; // absolute file paths or data URLs
   final List<DocumentAttachment> documents; // selected files
   final bool allowImagesApiRouting;
@@ -23,12 +25,15 @@ class ChatInputData {
 
   const ChatInputData({
     required this.text,
+    this.quotes = const [],
     this.imagePaths = const [],
     this.documents = const [],
     this.allowImagesApiRouting = true,
     this.draftSubmission,
     this.uiContext,
   });
+
+  String get quotedText => formatQuotedMessage(text, quotes);
 
   bool get isEmpty =>
       text.trim().isEmpty &&

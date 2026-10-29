@@ -2,6 +2,9 @@ import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart
 import "../../../support/business_test_harness.dart";
 import 'dart:async';
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/quote_ref.dart';
+import 'package:Kelivo/features/chat/controllers/quote_editing_controller.dart';
+import 'package:Kelivo/features/chat/widgets/quote_chip.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
@@ -94,6 +97,112 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'quote-only draft enables send, and rejection restores its references beside new edits',
+    (tester) async {
+      final controller = QuoteEditingController(nativeInputEnabled: false);
+      final focus = FocusNode();
+      final media = ChatInputBarController();
+      final result = Completer<ChatInputSubmissionResult>();
+      ChatInputData? submitted;
+      QuoteRef reference(String id) => QuoteRef(
+        id: id,
+        messageId: 'source$id',
+        start: 0,
+        end: 6,
+        text: 'source',
+        model: 'Model',
+        createdAt: DateTime(2026),
+      );
+      final first = reference('1'), next = reference('2');
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focus,
+          mediaController: media,
+          onSend: (input) {
+            submitted = input;
+            return result.future;
+          },
+        ),
+      );
+      controller.insertQuote(first);
+      await tester.pumpAndSettle();
+      expect(find.byType(QuoteChip), findsOneWidget);
+      expect(media.snapshotDraft(controller.text).quotes, [first]);
+      await tapSendButton(tester);
+      expect(submitted!.text, quotePlaceholder);
+      expect(submitted!.quotes, [first]);
+      expect(controller.quotes, isEmpty);
+      controller.insertQuote(next);
+      result.complete(ChatInputSubmissionResult.rejected);
+      await tester.pumpAndSettle();
+      expect(controller.text, '$quotePlaceholder$quotePlaceholder');
+      expect(controller.quotes, [first, next]);
+      expect(find.byType(QuoteChip), findsNWidgets(2));
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      focus.dispose();
+    },
+  );
+
+  testWidgets(
+    'restoring a quote draft without a saved caret resumes at its end',
+    (tester) async {
+      final controller = QuoteEditingController(nativeInputEnabled: false),
+          focus = FocusNode();
+      final media = ChatInputBarController();
+      final quote = QuoteRef(
+        id: 'q',
+        messageId: 'source',
+        start: 0,
+        end: 4,
+        text: 'text',
+        model: null,
+        createdAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focus,
+          mediaController: media,
+          onSend: (_) async => ChatInputSubmissionResult.sent,
+        ),
+      );
+      const text = 'Existing \uFFFC message';
+      controller.restore(
+        const TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        ),
+        [quote],
+      );
+      media.restoreDraft(ComposerDraftInput(text: text, quotes: [quote]));
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        const TextSelection.collapsed(offset: text.length),
+      );
+      expect(controller.quotes, [quote]);
+      media.restoreDraft(
+        ComposerDraftInput(
+          text: text,
+          quotes: [quote],
+          selectionBase: 3,
+          selectionExtent: 5,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 3, extentOffset: 5),
+      );
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      focus.dispose();
+    },
+  );
 
   testWidgets(
     'chip-only draft can send and carries the exact frozen attachment',

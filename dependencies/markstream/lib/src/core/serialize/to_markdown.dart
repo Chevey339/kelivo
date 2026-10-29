@@ -60,7 +60,7 @@ String toMarkdown(MarkdownNode root, {String? source}) {
     for (final child in node.children)
       scan.add((child, inside || node is TableNode));
   }
-  return serializeNodes(root, (node, output) {
+  return serializeNodes<String>(root, (node, output) {
     final body = joinChildren(node, output);
     if (node is TextNode) {
       final escaped = _escape(node.text);

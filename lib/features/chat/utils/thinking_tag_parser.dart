@@ -1,14 +1,17 @@
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/utils/source_text_map.dart';
 import 'package:markstream/markstream_core.dart';
 
 class ThinkingTagParseResult {
   const ThinkingTagParseResult({
     required this.visibleContent,
     required this.thinkingTexts,
+    this.sourceMap,
   });
 
   final String visibleContent;
   final List<String> thinkingTexts;
+  final SourceTextMap? sourceMap;
 
   bool get hasThinking => thinkingTexts.isNotEmpty;
 }
@@ -244,6 +247,18 @@ class ThinkingTagParser {
     );
     return ThinkingTagParseResult(
       visibleContent: parsed.visibleContent.trim(),
+      sourceMap: SourceTextMap.identity(input.length)
+          .replace([
+            for (final range in parsed.hiddenRanges)
+              (range.start, range.end, 0),
+          ])
+          .slice(
+            parsed.visibleContent.length -
+                parsed.visibleContent.trimLeft().length,
+            parsed.visibleContent.length -
+                parsed.visibleContent.trimLeft().length +
+                parsed.visibleContent.trim().length,
+          ),
       thinkingTexts: List.unmodifiable(
         parsed.thinkingTexts.map((s) => s.trim()).where((s) => s.isNotEmpty),
       ),

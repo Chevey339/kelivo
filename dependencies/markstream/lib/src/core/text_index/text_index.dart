@@ -119,12 +119,32 @@ final class TextIndex {
       final position = _sourceOffset(entry, start, endBoundary: false);
       return SourceSpan(position, position);
     }
-    final first = entries[_entryAt(start)];
-    final last = entries[_entryAt(end - 1)];
-    return SourceSpan(
-      _sourceOffset(first, start, endBoundary: false),
-      _sourceOffset(last, end, endBoundary: true),
-    );
+    int? sourceStart, sourceEnd;
+    final first = _entryAt(start);
+    for (var i = first; i < entries.length && entries[i].start < end; i++) {
+      final entry = entries[i];
+      if (entry.sourceSpan.isEmpty) continue;
+      final a = _sourceOffset(
+        entry,
+        start.clamp(entry.start, entry.end),
+        endBoundary: false,
+      );
+      final b = _sourceOffset(
+        entry,
+        end.clamp(entry.start, entry.end),
+        endBoundary: true,
+      );
+      sourceStart = sourceStart == null || a < sourceStart ? a : sourceStart;
+      sourceEnd = sourceEnd == null || b > sourceEnd ? b : sourceEnd;
+    }
+    // Clipboard-only separators have no source width. They must not move a
+    // real selected range backwards to their generated anchor.
+    return sourceStart == null
+        ? SourceSpan(
+            entries[first].sourceSpan.start,
+            entries[first].sourceSpan.start,
+          )
+        : SourceSpan(sourceStart, sourceEnd!);
   }
 
   ({int start, int end})? textRangeForSource(SourceSpan source) {

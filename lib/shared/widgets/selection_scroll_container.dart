@@ -23,6 +23,18 @@ class SelectionScrollContainer extends StatefulWidget {
 class SelectionScrollContainerState extends State<SelectionScrollContainer> {
   late final _delegate = _ScrollSelectionDelegate(_edgeUpdated, _stop);
   String? get selectedText => _delegate.getSelectedContent()?.plainText;
+  SelectedContentRange? get selectedRange => _delegate.getSelection();
+  List<Rect> get globalSelectionRects => [
+    for (final rect in _delegate.getSelectionGeometry().selectionRects)
+      MatrixUtils.transformRect(_delegate.getTransformTo(null), rect),
+  ];
+  Rect? get globalViewport {
+    final box = _scrollable?.context.findRenderObject();
+    return box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+  }
+
   ScrollableState? _scrollable;
   ScrollPosition? _position;
   EdgeDraggingAutoScroller? _autoScroller;

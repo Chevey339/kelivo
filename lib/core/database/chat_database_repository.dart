@@ -1,3 +1,4 @@
+import '../models/quote_ref.dart';
 import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
 import 'package:Kelivo/features/intelligent_ui/storage/ui_search_index.dart';
@@ -2581,6 +2582,13 @@ class ChatDatabaseRepository {
     return row?.messageOrder ?? -1;
   }
 
+  Future<bool> messageExists(String messageId) async =>
+      await (_db.selectOnly(_db.messageRows)
+            ..addColumns([_db.messageRows.id])
+            ..where(_db.messageRows.id.equals(messageId)))
+          .getSingleOrNull() !=
+      null;
+
   Future<ChatMessage?> getMessage(String messageId) async {
     final row = await (_db.select(
       _db.messageRows,
@@ -4737,7 +4745,9 @@ class ChatDatabaseRepository {
               // copy. updatedAt deliberately stays null: the copy is a fresh
               // row, so its effective updated_at is its (copied) timestamp.
               senderId: Value(message.senderId),
-              extrasJson: Value(message.extrasJson),
+              extrasJson: Value(
+                _remapQuoteExtras(message.extrasJson, messageIdMap),
+              ),
             ),
           );
       await _db.customStatement(
@@ -5419,6 +5429,7 @@ class ChatDatabaseRepository {
     required String messageId,
     String content = '',
     List<MessagePart>? parts,
+    List<QuoteRef>? quotes,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
     String? expectedContextState,
@@ -5430,6 +5441,7 @@ class ChatDatabaseRepository {
         messageId: messageId,
         content: content,
         parts: parts,
+        quotes: quotes,
         draftSubmission: draftSubmission,
         uiContext: uiContext,
       ),
@@ -5440,6 +5452,7 @@ class ChatDatabaseRepository {
     required String messageId,
     required String content,
     List<MessagePart>? parts,
+    List<QuoteRef>? quotes,
     DraftSubmission? draftSubmission,
     UiContextSubmission? uiContext,
     String? expectedContextState,
@@ -5497,6 +5510,7 @@ class ChatDatabaseRepository {
           id: draftSubmission?.id,
           role: original.role,
           parts: resolvedParts,
+          quotes: quotes ?? original.quotes,
           conversationId: original.conversationId,
           modelId: original.modelId,
           providerId: original.providerId,
@@ -5791,6 +5805,18 @@ class ChatDatabaseRepository {
         var skipped = 0;
         final remapped = <String, String>{};
         final importedIds = <String>[];
+        final allMessageIds = <String, String>{};
+        final importedQuoteExtras = <String, String>{};
+
+        Future<void> mapExistingMessages(
+          List<String> sourceIds,
+          String targetId,
+        ) async {
+          final targetIds = await _messageIds('main', targetId);
+          for (var i = 0; i < sourceIds.length; i++) {
+            allMessageIds[sourceIds[i]] = targetIds[i];
+          }
+        }
 
         for (final sourceRow in sourceRows) {
           final sourceId = sourceRow.read<String>('id');
@@ -5812,12 +5838,13 @@ class ChatDatabaseRepository {
             'main',
             sourceId,
           );
+          final sourceMessageIds = await _messageIds('merge_source', sourceId);
           if (existingFingerprint == sourceFingerprint) {
+            await mapExistingMessages(sourceMessageIds, sourceId);
             deduplicated += 1;
             continue;
           }
 
-          final sourceMessageIds = await _messageIds('merge_source', sourceId);
           final hasConversationConflict = existingFingerprint != null;
           final hasMessageConflict = await _anyMessageIdExists(
             sourceMessageIds,
@@ -5839,6 +5866,7 @@ class ChatDatabaseRepository {
               );
               if (candidateFingerprint == null) break;
               if (candidateFingerprint == sourceFingerprint) {
+                await mapExistingMessages(sourceMessageIds, targetId);
                 deduplicated += 1;
                 remapped[sourceId] = targetId;
                 targetId = '';
@@ -5858,13 +5886,28 @@ class ChatDatabaseRepository {
                 ? _deterministicMergeId('message', messageId, targetId)
                 : messageId;
           }
+          allMessageIds.addAll(messageIdMap);
           await _insertMergedConversation(
             sourceId: sourceId,
             targetId: targetId,
             messageIdMap: messageIdMap,
+            importedQuoteExtras: importedQuoteExtras,
           );
           imported += 1;
           importedIds.add(targetId);
+        }
+
+        // A quote can refer to a different conversation, including one sorted
+        // later or deduplicated against an earlier import. Resolve only after
+        // every source revision has its final destination, in this transaction.
+        for (final entry in importedQuoteExtras.entries) {
+          final remappedExtras = _remapQuoteExtras(entry.value, allMessageIds);
+          if (remappedExtras != entry.value) {
+            await _db.customStatement(
+              'UPDATE main.message_rows SET extras_json = ? WHERE id = ?',
+              [remappedExtras, entry.key],
+            );
+          }
         }
 
         final foreignKeyFailures = await _db
@@ -6193,6 +6236,17 @@ class ChatDatabaseRepository {
       final messageId = row.read<String>('id');
       final payloads = partPayloads[messageId];
       final data = Map<String, Object?>.from(row.data)..remove('id');
+      final extras = _decodeExtrasJson(row.read<String>('extras_json'));
+      final quotes = QuoteRef.decodeList(extras['quotes']);
+      if (quotes.isNotEmpty) {
+        // QuoteRef.id identifies the frozen reference through copies/imports.
+        // Its destination messageId is remapped, including across conversations;
+        // every other snapshot field still participates in deduplication.
+        extras['quotes'] = [
+          for (final quote in quotes) quote.toJson()..remove('messageId'),
+        ];
+        data['extras_json'] = jsonEncode(extras);
+      }
       data['is_streaming'] = 0;
       for (final field in const [
         'timestamp',
@@ -6350,6 +6404,7 @@ class ChatDatabaseRepository {
     required String sourceId,
     required String targetId,
     required Map<String, String> messageIdMap,
+    required Map<String, String> importedQuoteExtras,
   }) async {
     await _invalidateEmptyAcknowledgement();
     final transfer = UiStateTransfer(_db);
@@ -6359,7 +6414,7 @@ class ChatDatabaseRepository {
     );
     final sourceMessages = await _db
         .customSelect(
-          'SELECT id, group_id FROM merge_source.message_rows '
+          'SELECT id, group_id, extras_json FROM merge_source.message_rows '
           'WHERE conversation_id = ? ORDER BY message_order, id;',
           variables: [Variable<String>(sourceId)],
         )
@@ -6446,6 +6501,12 @@ class ChatDatabaseRepository {
         'FROM merge_source.message_rows WHERE id = ?;',
         [entry.value, targetId, targetGroupId, entry.key],
       );
+      final quoteExtras = sourceMessage.read<String>('extras_json');
+      if (QuoteRef.decodeList(
+        _decodeExtrasJson(quoteExtras)['quotes'],
+      ).isNotEmpty) {
+        importedQuoteExtras[entry.value] = quoteExtras;
+      }
       await _db.customStatement(
         'INSERT INTO main.message_part_rows '
         '(conversation_id, revision_id, ordinal, kind, payload, '
@@ -6573,7 +6634,8 @@ class ChatDatabaseRepository {
       final before = await getMessage(message.id);
       if (before != null &&
           !before.isStreaming &&
-          !listEquals(before.parts, message.parts)) {
+          (!listEquals(before.parts, message.parts) ||
+              !listEquals(before.quotes, message.quotes))) {
         await _revokeContextForGroups(message.conversationId, {
           message.groupId ?? message.id,
         });
@@ -6600,6 +6662,7 @@ class ChatDatabaseRepository {
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
             firstTokenMs: message.firstTokenMs,
+            quotes: message.quotes,
           ),
         ),
       ),
@@ -7784,6 +7847,7 @@ class ChatDatabaseRepository {
     );
     final extras = _decodeExtrasJson(row.extrasJson);
     return ChatMessage(
+      quotes: QuoteRef.decodeList(extras['quotes']),
       id: row.id,
       role: row.role,
       parts: parts,
@@ -8067,6 +8131,7 @@ class ChatDatabaseRepository {
           cacheWriteTokens: message.cacheWriteTokens,
           finishUsage: message.finishUsage,
           firstTokenMs: message.firstTokenMs,
+          quotes: message.quotes,
         ),
       ),
       messageOrder: messageOrder,
@@ -8132,12 +8197,24 @@ class ChatDatabaseRepository {
     return null;
   }
 
+  String _remapQuoteExtras(String raw, Map<String, String> ids) {
+    final extras = _decodeExtrasJson(raw);
+    final quotes = QuoteRef.decodeList(extras['quotes']);
+    if (quotes.isEmpty) return raw;
+    extras['quotes'] = [
+      for (final quote in quotes)
+        quote.withMessageId(ids[quote.messageId] ?? quote.messageId).toJson(),
+    ];
+    return jsonEncode(extras);
+  }
+
   String _encodeTokenExtras(
     String existing, {
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
     int? firstTokenMs,
+    List<QuoteRef>? quotes,
   }) {
     final extras = Map<String, dynamic>.from(_decodeExtrasJson(existing));
     if (reasoningTokens != null) {
@@ -8151,6 +8228,13 @@ class ChatDatabaseRepository {
     }
     if (firstTokenMs != null) {
       extras[_firstTokenMsExtraKey] = firstTokenMs;
+    }
+    if (quotes != null) {
+      if (quotes.isEmpty) {
+        extras.remove('quotes');
+      } else {
+        extras['quotes'] = quotes.map((quote) => quote.toJson()).toList();
+      }
     }
     if (extras.isEmpty) return '{}';
     return jsonEncode(extras);

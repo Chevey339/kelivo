@@ -7,6 +7,7 @@ import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_host_scope.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_generation_state.dart';
 import 'package:markstream/markstream_core.dart' show SourceSpan;
+import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
@@ -46,9 +47,15 @@ import '../../../utils/utf16_safe_cut.dart';
 import '../../../shared/widgets/avatar_image.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import '../../../utils/assistant_regex.dart';
+import '../../../utils/protected_text.dart';
+import '../../../utils/source_text_map.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/markdown/markdown_with_code_highlight.dart';
+import '../../../shared/markdown/quote_syntax.dart';
+import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
+import 'quote_chip.dart';
+import 'quote_source_highlight.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
@@ -1989,11 +1996,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // inside TextPart stays plain text and is never re-parsed.
     final assistant = _assistantForMessage();
     final uiContent = UiUserMessageContent(widget.message);
-    final visualText = _applyVisualAssistantRegexes(
-      uiContent.text,
+    final mappedUser = applyAssistantRegexesProtected(
+      ProtectedText(
+        uiContent.text,
+        const [],
+        sourceMap: SourceTextMap.identity(
+          uiContent.text.length,
+          offset: widget.message.content.length - uiContent.text.length,
+        ),
+      ),
       assistant: assistant,
       scope: AssistantRegexScope.user,
+      target: AssistantRegexTransformTarget.visual,
     );
+    final visualText = mappedUser.text;
     final showUserActions = userMessageSettings.showActions;
     final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
     final mediaPreview = _buildAttachmentPreview(
@@ -2012,6 +2028,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 _buildUserTextContent(
                   context,
                   visualText,
+                  mappedUser.sourceMap!,
                   userMessageSettings.enableMarkdown,
                   widget.collapseLongUserText
                       ? userMessageSettings.collapseChars
@@ -2279,6 +2296,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   Widget _buildUserTextContent(
     BuildContext context,
     String visualText,
+    SourceTextMap sourceMap,
     bool enableUserMarkdown,
     int collapseChars,
   ) {
@@ -2287,6 +2305,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseUser = isDesktop ? 14.0 : 15.5;
+    final highlights = quoteSourceHighlights(
+      context,
+      widget.message,
+      visualText,
+      sourceMap: sourceMap,
+    );
+    final highlightColor = Theme.of(
+      context,
+    ).colorScheme.primary.withValues(alpha: .22);
 
     Widget content;
     if (enableUserMarkdown) {
@@ -2296,11 +2323,41 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           text: visualText,
           baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
           conversationId: widget.message.conversationId,
+          highlightRanges: highlights,
         ),
       );
     } else {
-      content = Text(
-        UnicodeSanitizer.sanitize(visualText),
+      content = Text.rich(
+        widget.message.quotes.isNotEmpty
+            ? buildQuoteTextSpan(
+                text: visualText,
+                quotes: widget.message.quotes,
+                quoteAtOffset: (offset) => quoteAtSourceOffset(
+                  widget.message.content,
+                  widget.message.quotes,
+                  sourceMap.sourceRange(offset, offset + 1).start,
+                ),
+                highlights: [
+                  for (final range in highlights)
+                    TextRange(start: range.start, end: range.end),
+                ],
+                highlightColor: highlightColor,
+                token: (quote, offset) => SelectableSpanAdapter(
+                  selectedText: '\uFFFC',
+                  child: QuoteChip(
+                    quote: quote,
+                    selected: highlights.any(
+                      (range) => range.start <= offset && range.end > offset,
+                    ),
+                    style: TextStyle(fontSize: baseUser, height: 1.4),
+                  ),
+                ),
+              )
+            : highlightedQuoteSource(
+                UnicodeSanitizer.sanitize(visualText),
+                highlights,
+                highlightColor,
+              ),
         style: TextStyle(
           fontSize: baseUser,
           height: 1.4,
@@ -2309,9 +2366,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
+    content = QuoteRenderScope(
+      source: widget.message.content,
+      sourceMap: sourceMap,
+      quotes: widget.message.quotes,
+      child: content,
+    );
     if (isDesktop) {
       content = AppSelectionArea(
         key: ValueKey('user_${widget.message.id}'),
+        message: widget.message,
+        sourceText: visualText,
+        sourceMap: sourceMap,
         child: content,
       );
     }
@@ -2322,6 +2388,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       content = CollapsibleUserText(
         key: ValueKey('user-collapse:${widget.message.id}'),
         collapsedHeight: lineHeight * _collapsedUserTextLines,
+        reveal: highlights.isNotEmpty,
         child: content,
       );
     }
@@ -2738,17 +2805,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
     UiTextSlice? uiSource,
+    SourceTextMap? sourceMap,
   }) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseAssistant = isDesktop ? 14.0 : 15.7;
+    final highlights = quoteSourceHighlights(
+      context,
+      widget.message,
+      visualContent,
+      sourceMap: sourceMap,
+    );
 
     Widget assistantContent;
     if (enableAssistantMarkdown) {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
+        highlightRanges: highlights,
         uiHost: widget.message.role != 'assistant' || uiSource == null
             ? null
             : UiHostBinding(
@@ -2764,8 +2839,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         conversationId: widget.message.conversationId,
       );
     } else {
-      assistantContent = Text(
-        UnicodeSanitizer.sanitize(visualContent),
+      assistantContent = Text.rich(
+        highlightedQuoteSource(
+          UnicodeSanitizer.sanitize(visualContent),
+          highlights,
+          Theme.of(context).colorScheme.primary.withValues(alpha: .22),
+        ),
         style: TextStyle(
           fontSize: baseAssistant,
           height: 1.5,
@@ -2789,6 +2868,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: AppSelectionArea(
+        message: widget.message,
+        sourceText: visualContent,
+        sourceMap: sourceMap,
         key: ValueKey(
           contentKey.isEmpty
               ? 'assistant_${widget.message.id}'
@@ -2850,6 +2932,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     String? Function(String) citationIndexResolver, {
     required String blockKey,
     UiTextSlice? uiSource,
+    SourceTextMap? sourceMap,
   }) {
     final split = context.select<SettingsProvider, bool>(
       (s) => s.assistantBubbleSplitParagraphs,
@@ -2871,6 +2954,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           enableAssistantMarkdown,
           citationIndexResolver,
           contentKey: parts.length == 1 ? '' : '$blockKey.$i',
+          sourceMap: sourceMap == null
+              ? null
+              : uiSource == null
+              ? parts[i].sourceMap.through(sourceMap)
+              : sourceMap.slice(parts[i].span.start, parts[i].span.end),
         ),
     ];
   }
@@ -2882,6 +2970,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
     UiTextSlice? uiSource,
+    SourceTextMap? sourceMap,
   }) {
     return _assistantBlockWidth(
       context,
@@ -2894,6 +2983,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           citationIndexResolver,
           contentKey: contentKey,
           uiSource: uiSource,
+          sourceMap: sourceMap,
         ),
       ),
     );
@@ -2925,6 +3015,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   TimelineProjection _projectAssistantTimeline(
     String visualContent, {
     List<ReasoningSegment>? reasoningSegments,
+    SourceTextMap? sourceMap,
   }) {
     final assistant = _assistantForMessage();
     return projectAssistantTimeline(
@@ -2954,6 +3045,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ),
       ],
       visualContent: visualContent,
+      visualSourceMap: sourceMap,
       contentSplitOffsets: widget.contentSplitOffsets,
       reasoningCountAtSplit: widget.reasoningCountAtSplit,
       toolCountAtSplit: widget.toolCountAtSplit,
@@ -3106,11 +3198,19 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final parsedInlineThinking = _legacyInlineThinkingFor(widget);
     final extractedThinking = parsedInlineThinking.thinkingTexts.join('\n\n');
     final contentWithoutThink = parsedInlineThinking.visibleContent;
-    final visualContent = _applyVisualAssistantRegexes(
-      contentWithoutThink,
+    final mappedVisual = applyAssistantRegexesProtected(
+      ProtectedText(
+        contentWithoutThink,
+        const [],
+        sourceMap:
+            parsedInlineThinking.sourceMap ??
+            SourceTextMap.identity(widget.message.content.length),
+      ),
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
+      target: AssistantRegexTransformTarget.visual,
     );
+    final visualContent = mappedVisual.text;
     final visualTranslation = widget.message.translation != null
         ? _applyVisualAssistantRegexes(
             widget.message.translation!,
@@ -3132,6 +3232,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final timelineProjection = _projectAssistantTimeline(
       visualContent,
       reasoningSegments: effectiveReasoningSegments,
+      sourceMap: mappedVisual.sourceMap,
     );
     final mediaPreview = _buildAttachmentPreview(
       context,
@@ -3345,6 +3446,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     citationIndexResolver,
                     blockKey: 'text$blockIndex',
                     uiSource: block.uiSource,
+                    sourceMap: block.sourceMap,
                   )) {
                     addVisible(bubble);
                   }

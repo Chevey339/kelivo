@@ -14734,6 +14734,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hotkeySidePanelFocus => '切换聊天与面板焦点';
+
+  @override
+  String get selectionQuote => '引用';
+
+  @override
+  String get selectionTranslate => '翻译';
+
+  @override
+  String get selectionAiTranslateIos => 'AI翻译';
+
+  @override
+  String get selectionCopyMarkdown => '复制为 Markdown';
+
+  @override
+  String get selectionCopyRich => '复制富文本';
+
+  @override
+  String get quoteJumpToSource => '跳到原文';
+
+  @override
+  String get quoteRemove => '移除引用';
+
+  @override
+  String get quoteDuplicate => '这段已在引用中';
+
+  @override
+  String get quoteLimit => '一条消息最多引用 10 段';
+
+  @override
+  String get quoteLocated => '已定位到引用原文';
+
+  @override
+  String get quoteSourceMissing => '原文已不存在';
+
+  @override
+  String get selectionRegenerate => '重新生成';
+
+  @override
+  String get translating => '正在翻译…';
+
+  @override
+  String get retry => '重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -29392,6 +29434,48 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hotkeySidePanelFocus => '切换聊天与面板焦点';
+
+  @override
+  String get selectionQuote => '引用';
+
+  @override
+  String get selectionTranslate => '翻译';
+
+  @override
+  String get selectionAiTranslateIos => 'AI翻译';
+
+  @override
+  String get selectionCopyMarkdown => '复制为 Markdown';
+
+  @override
+  String get selectionCopyRich => '复制富文本';
+
+  @override
+  String get quoteJumpToSource => '跳到原文';
+
+  @override
+  String get quoteRemove => '移除引用';
+
+  @override
+  String get quoteDuplicate => '这段已在引用中';
+
+  @override
+  String get quoteLimit => '一条消息最多引用 10 段';
+
+  @override
+  String get quoteLocated => '已定位到引用原文';
+
+  @override
+  String get quoteSourceMissing => '原文已不存在';
+
+  @override
+  String get selectionRegenerate => '重新生成';
+
+  @override
+  String get translating => '正在翻译…';
+
+  @override
+  String get retry => '重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -44131,4 +44215,46 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hotkeySidePanelFocus => '切換聊天與面板焦點';
+
+  @override
+  String get selectionQuote => '引用';
+
+  @override
+  String get selectionTranslate => '翻譯';
+
+  @override
+  String get selectionAiTranslateIos => 'AI翻譯';
+
+  @override
+  String get selectionCopyMarkdown => '複製為 Markdown';
+
+  @override
+  String get selectionCopyRich => '複製富文字';
+
+  @override
+  String get quoteJumpToSource => '跳至原文';
+
+  @override
+  String get quoteRemove => '移除引用';
+
+  @override
+  String get quoteDuplicate => '這段已在引用中';
+
+  @override
+  String get quoteLimit => '一則訊息最多引用 10 段';
+
+  @override
+  String get quoteLocated => '已定位至引用原文';
+
+  @override
+  String get quoteSourceMissing => '原文已不存在';
+
+  @override
+  String get selectionRegenerate => '重新產生';
+
+  @override
+  String get translating => '正在翻譯…';
+
+  @override
+  String get retry => '重試';
 }

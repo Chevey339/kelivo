@@ -1,4 +1,5 @@
 import 'package:markstream/markstream_core.dart';
+import 'source_text_map.dart';
 
 /// Executes regexes in whole-text coordinates (including ^/$ and lookarounds),
 /// while retaining immutable source intervals and their line boundaries.
@@ -8,6 +9,7 @@ final class ProtectedText {
     Iterable<SourceSpan> ranges, {
     Iterable<int> offsets = const [],
     Iterable<bool>? beforeInsertion,
+    SourceTextMap? sourceMap,
   }) {
     final positions = List<int>.unmodifiable(offsets);
     return ProtectedText._(
@@ -22,13 +24,21 @@ final class ProtectedText {
                     (text.isNotEmpty || index < positions.length - 1),
             ],
       ),
+      sourceMap,
     );
   }
-  ProtectedText._(this.text, this.ranges, this.offsets, this.beforeInsertion);
+  ProtectedText._(
+    this.text,
+    this.ranges,
+    this.offsets,
+    this.beforeInsertion,
+    this.sourceMap,
+  );
   final String text;
   final List<SourceSpan> ranges;
   final List<int> offsets;
   final List<bool> beforeInsertion;
+  final SourceTextMap? sourceMap;
 
   ProtectedText replaceAll(Pattern pattern, String replacement) =>
       replaceAllMapped(pattern, (_) => replacement);
@@ -39,6 +49,7 @@ final class ProtectedText {
   ) {
     final buffer = StringBuffer();
     final changes = <(int, int, int)>[];
+    final sourceChanges = <(int, int, int)>[];
     var cursor = 0;
     for (final match in pattern.allMatches(text)) {
       final blocked = ranges.any((span) {
@@ -60,6 +71,9 @@ final class ProtectedText {
       final value = replacement(match);
       buffer.write(value);
       changes.add((match.start, match.end, value.length));
+      if (value != match[0]) {
+        sourceChanges.add((match.start, match.end, value.length));
+      }
       cursor = match.end;
     }
     if (changes.isEmpty) return this;
@@ -95,6 +109,7 @@ final class ProtectedText {
           mapOffset(offsets[i], beforeInsertion[i]),
       ],
       beforeInsertion: beforeInsertion,
+      sourceMap: sourceMap?.replace(sourceChanges),
     );
   }
 }

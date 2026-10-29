@@ -96,6 +96,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
       wrap: widget.exporting || !mobile || widget.options.mobileWrap,
       highlight: widget.options.highlight,
       maxLines: expanded ? null : widget.options.collapsedLines,
+      literalSpanBuilder: widget.extensions.literalSpanBuilder,
     );
     if (!expanded &&
         lines > widget.options.collapsedLines &&

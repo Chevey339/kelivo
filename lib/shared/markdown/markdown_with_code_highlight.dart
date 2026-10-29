@@ -75,7 +75,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       streaming: widget.streaming,
       options: markdownParserOptions(settings),
       theme: theme,
-      extensions: kelivoMarkdownExtensions,
+      extensions: markdownExtensionsFor(context),
       codeHighlighter: KelivoCodeHighlighter.forTheme(theme),
       mathRenderer: const KelivoMathRenderer(),
       imageBuilder: const KelivoImageBuilder(),

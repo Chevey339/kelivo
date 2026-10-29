@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
+import 'package:markstream/markstream_core.dart' show SourceSpan;
 import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/utils/source_text_map.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/tts/tts_text_selection.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -53,6 +55,7 @@ Future<UiMessageText> projectUiMessageText(
   final generation = uiGenerationStatus(message);
   final frozen = List<UiSurfaceSnapshot>.unmodifiable(snapshots);
   final parts = <TtsTextPart>[];
+  final sourceMaps = <SourceTextMap>[];
   final replacements = <UiMessageReplacement>[];
   final surfaces = <UiCapturedSurface>[];
   final source = message.content;
@@ -62,6 +65,7 @@ Future<UiMessageText> projectUiMessageText(
     final end = fence.run.joinedStart + fence.node.span.end;
     if (start > cursor) {
       parts.add(TtsTextPart(source.substring(cursor, start)));
+      sourceMaps.add(SourceTextMap.identity(start - cursor, offset: cursor));
     }
     String text;
     if (ordinal >= UiBudgets.blocksPerMessage) {
@@ -118,12 +122,21 @@ Future<UiMessageText> projectUiMessageText(
     }
     replacements.add(UiMessageReplacement(start, end, text, fence.source));
     parts.add(TtsTextPart(text, literal: true));
+    sourceMaps.add(
+      SourceTextMap.replacement(text.length, SourceSpan(start, end)),
+    );
     cursor = end;
   }
-  if (cursor < source.length) parts.add(TtsTextPart(source.substring(cursor)));
+  if (cursor < source.length) {
+    parts.add(TtsTextPart(source.substring(cursor)));
+    sourceMaps.add(
+      SourceTextMap.identity(source.length - cursor, offset: cursor),
+    );
+  }
   return UiMessageText(
     source: source,
     parts: parts,
+    partSourceMaps: sourceMaps,
     omitted: projection.labels.omitted,
     hasUi: fences.isNotEmpty,
     replacements: replacements,

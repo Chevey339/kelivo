@@ -236,8 +236,9 @@ String buildCompressContextContent(
 }
 
 String? conversationLineForCompression(ChatMessage message) {
-  if (message.content.trim().isEmpty) return null;
-  return '${message.role == "assistant" ? "Assistant" : "User"}: ${message.content}';
+  final content = message.quotedContent;
+  if (content.trim().isEmpty) return null;
+  return '${message.role == "assistant" ? "Assistant" : "User"}: $content';
 }
 
 String buildConversationTextForCompression(List<ChatMessage> messages) {
@@ -269,7 +270,8 @@ String _buildStartBoundedConversationText(
 ) {
   final buf = StringBuffer();
   for (final message in messages) {
-    if (message.content.trim().isEmpty) continue;
+    final body = message.quotedContent;
+    if (body.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sep = buf.isEmpty ? '' : '\n\n';
     final remaining = maxChars - buf.length;
@@ -280,13 +282,13 @@ String _buildStartBoundedConversationText(
       break;
     }
     final contentBudget = remaining - head.length;
-    final content = message.content.length <= contentBudget
-        ? message.content
-        : truncateHeadUtf16Safe(message.content, contentBudget);
+    final content = body.length <= contentBudget
+        ? body
+        : truncateHeadUtf16Safe(body, contentBudget);
     buf
       ..write(head)
       ..write(content);
-    if (message.content.length > contentBudget) break;
+    if (body.length > contentBudget) break;
   }
   return buf.toString();
 }
@@ -299,18 +301,19 @@ String _buildRecentBoundedConversationText(
   var used = 0;
   for (var i = messages.length - 1; i >= 0; i--) {
     final message = messages[i];
-    if (message.content.trim().isEmpty) continue;
+    final body = message.quotedContent;
+    if (body.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sepLen = parts.isEmpty ? 0 : 2;
     final remaining = maxChars - used - sepLen;
     if (remaining <= 0) break;
-    final lineLen = prefix.length + message.content.length;
+    final lineLen = prefix.length + body.length;
     if (lineLen <= remaining) {
-      parts.add('$prefix${message.content}');
+      parts.add('$prefix$body');
       used += lineLen + sepLen;
       continue;
     }
-    final tail = _utf16SafeTailOfPrefixed(prefix, message.content, remaining);
+    final tail = _utf16SafeTailOfPrefixed(prefix, body, remaining);
     if (tail.isNotEmpty) parts.add(tail);
     break;
   }
