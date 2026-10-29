@@ -69,7 +69,11 @@ class _SelectCopyPageState extends State<SelectCopyPage> {
                         context,
                         widget.message.quotes.isEmpty
                             ? text
-                            : widget.message.quotedContent,
+                            : widget.message.quotedContent(
+                                AppLocalizations.of(
+                                  context,
+                                )!.selectionQuoteMarker,
+                              ),
                         successMessage: l10n.selectCopyPageCopiedAll,
                       ),
                 icon: Icon(Lucide.Copy, size: 18, color: cs.primary),

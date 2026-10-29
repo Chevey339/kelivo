@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'selection_panel.dart';
 
 String get quoteKeyboardHint =>
     defaultTargetPlatform == TargetPlatform.macOS ? '⌘L' : 'Ctrl+L';
@@ -17,65 +21,86 @@ class SelectionQuickToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final buttonStyle = TextButton.styleFrom(
-      foregroundColor: cs.onSurface,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      minimumSize: const Size(0, 32),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-    );
-    return Material(
-      elevation: 6,
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(9),
+    return SelectionPopoverSurface(
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: TextButton(
-                onPressed: onQuote,
-                style: buttonStyle,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(LucideIcons.messageCircleMore, size: 15),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        labels.selectionQuote,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      quoteKeyboardHint,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              child: _SelectionAction(
+                onTap: onQuote,
+                icon: LucideIcons.messageCircleMore,
+                label: labels.selectionQuote,
+                shortcut: quoteKeyboardHint,
               ),
             ),
-            SizedBox(
-              height: 20,
-              child: VerticalDivider(width: 9, color: cs.outlineVariant),
-            ),
+            Container(width: 1, height: 16, color: context.appColors.hairline),
             Flexible(
-              child: TextButton.icon(
-                onPressed: onTranslate,
-                style: buttonStyle,
-                icon: const Icon(LucideIcons.languages, size: 15),
-                label: Text(
-                  labels.selectionTranslate,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              child: _SelectionAction(
+                onTap: onTranslate,
+                icon: LucideIcons.languages,
+                label: labels.selectionTranslate,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionAction extends StatelessWidget {
+  const _SelectionAction({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.shortcut,
+    this.expanded = false,
+  });
+  final String label;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final String? shortcut;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Text(
+      label,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: AppFontWeights.medium,
+        color: cs.onSurface,
+      ),
+    );
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      child: IosCardPress(
+        focusable: true,
+        haptics: false,
+        onTap: onTap,
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 15, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+            ],
+            if (expanded) Expanded(child: text) else Flexible(child: text),
+            if (shortcut != null) ...[
+              const SizedBox(width: 14),
+              Text(
+                shortcut!,
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       ),
@@ -130,50 +155,39 @@ class SelectionDesktopContextMenu extends StatelessWidget {
       anchorAbove: anchors.primaryAnchor,
       anchorBelow: anchors.secondaryAnchor ?? anchors.primaryAnchor,
     ),
-    child: Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(10),
-      color: Theme.of(context).colorScheme.surface,
+    child: SelectionPopoverSurface(
       child: SizedBox(
-        width: 230,
+        width: 244,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
+          padding: const EdgeInsets.all(4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               for (var group = 0; group < groups.length; group++) ...[
-                if (group != 0) const Divider(height: 9),
+                if (group != 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Divider(
+                      height: 1,
+                      color: context.appColors.hairline,
+                    ),
+                  ),
                 for (final item in groups[group])
-                  TextButton(
-                    onPressed: item.onPressed,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.onSurface,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      alignment: AlignmentDirectional.centerStart,
+                  _SelectionAction(
+                    expanded: true,
+                    label: AdaptiveTextSelectionToolbar.getButtonLabel(
+                      context,
+                      item,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            AdaptiveTextSelectionToolbar.getButtonLabel(
-                              context,
-                              item,
-                            ),
-                          ),
-                        ),
-                        if (item.label ==
-                            AppLocalizations.of(context)!.selectionQuote)
-                          Text(
-                            quoteKeyboardHint,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
+                    onTap: item.onPressed,
+                    shortcut:
+                        item.label ==
+                            AppLocalizations.of(context)!.selectionQuote
+                        ? quoteKeyboardHint
+                        : null,
                   ),
               ],
             ],

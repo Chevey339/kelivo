@@ -999,6 +999,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
 
+  AppLocalizations? _usageLocalizations;
   String? _usageDraftConversationId;
   String? _usageDraftText;
   List<QuoteRef> _observedQuotes = const [];
@@ -1012,13 +1013,17 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _syncUsageDraft() {
-    if (!mounted) return;
+    final l10n = _usageLocalizations;
+    // A pending draft can restore from _bind during initState, before the
+    // inherited locale is available. didChangeDependencies publishes it next.
+    if (!mounted || l10n == null) return;
     final id = widget.conversationId;
     if (id == null || id.isEmpty) return;
     final text = _controller is QuoteEditingController
         ? formatQuotedMessage(
             _controller.text,
             (_controller as QuoteEditingController).quotes,
+            quoteMarker: l10n.selectionQuoteMarker,
           )
         : _controller.text;
     if (_usageDraftConversationId == id && _usageDraftText == text) return;
@@ -1357,11 +1362,19 @@ class _ChatInputBarState extends State<ChatInputBar>
     _controller = widget.controller ?? QuoteEditingController();
     _controller.addListener(_syncUsageDraft);
     _controller.addListener(_onQuoteEdits);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
     widget.mediaController?._bind(this);
     if (widget.mediaController == null) _ownedNativeMedia._bind(this);
     widget.asrProvider?.addListener(_handleAsrChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context)!;
+    if (identical(_usageLocalizations, l10n)) return;
+    _usageLocalizations = l10n;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
   }
 
   @override

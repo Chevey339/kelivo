@@ -103,6 +103,11 @@ class _CompressContextOptionsDialogState
           (initial?.keepUserMessages ?? settings.compressKeepUserMessages ?? 6)
               .toString(),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _refreshEstimate();
   }
 
@@ -120,6 +125,7 @@ class _CompressContextOptionsDialogState
 
   Future<void> _refreshEstimate() async {
     final revision = ++_estimateRevision;
+    final quoteMarker = AppLocalizations.of(context)!.selectionQuoteMarker;
     final options = _options();
     final selection = selectCompressionHistory(
       widget.messages,
@@ -133,7 +139,11 @@ class _CompressContextOptionsDialogState
             _includeAttachments,
           ) ??
           selection.input;
-      final chunks = buildCompressRequestContents(input, options);
+      final chunks = buildCompressRequestContents(
+        input,
+        options,
+        quoteMarker: quoteMarker,
+      );
       final inputTokens = chunks.fold<int>(
         0,
         (sum, text) => sum + estimateTokens(text),

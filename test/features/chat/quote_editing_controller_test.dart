@@ -110,7 +110,9 @@ void main() {
       expect(loaded.quotes, refs);
       expect(loaded.copyWith(content: '$body?').quotes, refs);
       expect(
-        loaded.quotedContent,
+        loaded.quotedContent(
+          lookupAppLocalizations(const Locale('zh')).selectionQuoteMarker,
+        ),
         '> [引用1] 引文 1\n> 第二行\n> [引用2] 引文 2\n> 第二行\n\n比较 [引用1] 与 [引用2]',
       );
     },

@@ -1693,6 +1693,7 @@ class _HomePageState extends State<HomePage>
       draftText: formatQuotedMessage(
         _inputController.text,
         _inputController.quotes,
+        quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
       ),
     );
   }
@@ -1870,6 +1871,7 @@ class _HomePageState extends State<HomePage>
             draftText: formatQuotedMessage(
               _inputController.text,
               _inputController.quotes,
+              quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
             ),
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
@@ -1934,6 +1936,7 @@ class _HomePageState extends State<HomePage>
         prepareInput: (messages, include) => chat.messagesForCompression(
           messages,
           includeAttachmentsAndTools: include,
+          quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
         ),
         estimateContext: estimator == null
             ? null

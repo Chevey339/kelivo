@@ -27414,6 +27414,12 @@ abstract class AppLocalizations {
   /// **'Quote'**
   String get selectionQuote;
 
+  /// Numbered quote reference in sent, copied, and exported messages
+  ///
+  /// In en, this message translates to:
+  /// **'[Quote {index}]'**
+  String selectionQuoteMarker(int index);
+
   /// No description provided for @selectionTranslate.
   ///
   /// In en, this message translates to:

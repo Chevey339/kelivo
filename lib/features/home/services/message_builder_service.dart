@@ -1,3 +1,4 @@
+import '../../../l10n/app_localizations.dart';
 import '../../intelligent_ui/host/ui_user_context_parts.dart';
 import '../../intelligent_ui/models/ui_context_attachment.dart';
 import '../../../utils/utf16_safe_cut.dart';
@@ -148,6 +149,12 @@ class MessageBuilderService {
   /// Build context (used for accessing providers via context.read)
   final BuildContext contextProvider;
 
+  String _quotedContent(ChatMessage message) => message.quotes.isEmpty
+      ? message.content
+      : message.quotedContent(
+          AppLocalizations.of(contextProvider)!.selectionQuoteMarker,
+        );
+
   /// OCR handler for processing images (optional, injected from home_page)
   final Future<String?> Function(
     List<String> imagePaths, {
@@ -217,7 +224,7 @@ class MessageBuilderService {
       if (remaining <= 0) break;
       final raw = message.role == 'assistant'
           ? ThinkingTagParser.parseWithRanges(message.content).visibleContent
-          : message.quotedContent;
+          : _quotedContent(message);
       if (raw.trim().isEmpty) continue;
       final text = truncateHeadTailUtf16Safe(
         raw,
@@ -386,7 +393,7 @@ class MessageBuilderService {
           continue;
         }
       }
-      var content = m.quotedContent;
+      var content = _quotedContent(m);
       var hasClaudeToolTurn = false;
       // Signed native blocks belong to the provider/model that produced them.
       // Tool turns carry their artifact on the tool-call message below.
@@ -983,6 +990,14 @@ class MessageBuilderService {
     bool previewOnly = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) async {
+    late final quoteMarker = lookupAppLocalizations(
+      basicLocaleListResolution(
+        settings.isFollowingSystemLocale
+            ? WidgetsBinding.instance.platformDispatcher.locales
+            : [settings.appLocale],
+        AppLocalizations.supportedLocales,
+      ),
+    ).selectionQuoteMarker;
     final bool ocrActive =
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
@@ -1319,7 +1334,9 @@ class MessageBuilderService {
 
       // Apply replace-only regexes at send-time on user text.
       final replacedUserText = applyAssistantRegexes(
-        parsedUser.quotedText,
+        parsedUser.quotes.isEmpty
+            ? parsedUser.text
+            : parsedUser.quotedText(quoteMarker),
         assistant: assistant,
         scope: AssistantRegexScope.user,
         target: AssistantRegexTransformTarget.send,

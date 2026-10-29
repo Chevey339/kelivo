@@ -64,7 +64,11 @@ class _SelectCopySheet extends StatelessWidget {
 
   Future<void> _copyAll(BuildContext context) => copyGenUiText(
     context,
-    message.quotes.isEmpty ? content : message.quotedContent,
+    message.quotes.isEmpty
+        ? content
+        : message.quotedContent(
+            AppLocalizations.of(context)!.selectionQuoteMarker,
+          ),
     successMessage: AppLocalizations.of(context)!.selectCopyPageCopiedAll,
   );
 

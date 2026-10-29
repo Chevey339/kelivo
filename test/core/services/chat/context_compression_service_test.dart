@@ -1,3 +1,4 @@
+import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -66,7 +67,12 @@ void main() {
       mode: CompressContextLimitMode.keepRecent,
       keepUserMessages: 6,
     ),
-  }) => CompressionRequest(options: options, model: 'test', generate: generate);
+  }) => CompressionRequest(
+    options: options,
+    model: 'test',
+    generate: generate,
+    quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+  );
   Future<void> until(bool Function() condition) async {
     for (var i = 0; i < 500; i++) {
       if (condition()) return;
@@ -276,7 +282,10 @@ void main() {
           ToolCallPart('{"name":"read_file","content":"${'a' * 10000}"}'),
         ],
       );
-      final input = await chat.messagesForCompression([source, tool]);
+      final input = await chat.messagesForCompression([
+        source,
+        tool,
+      ], quoteMarker: AppLocalizationsEn().selectionQuoteMarker);
       expect(input.first.content, contains('image content not summarized'));
       expect(input.last.content.length, lessThan(8200));
       expect(input.last.content, contains('truncated'));
@@ -302,14 +311,17 @@ void main() {
         quotes: [quote],
       );
       for (final include in [false, true]) {
-        final input = await chat.messagesForCompression([
-          message,
-        ], includeAttachmentsAndTools: include);
+        final input = await chat.messagesForCompression(
+          [message],
+          includeAttachmentsAndTools: include,
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+        );
         final text = buildCompressRequestContents(
           input,
           const CompressContextOptions(
             mode: CompressContextLimitMode.unlimited,
           ),
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
         ).join();
         expect('retained original'.allMatches(text), hasLength(1));
         expect(text, isNot(contains(quotePlaceholder)));

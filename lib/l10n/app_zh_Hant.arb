@@ -5691,6 +5691,7 @@
   "hotkeySidePanelAddress": "聚焦網頁網址列",
   "hotkeySidePanelFocus": "切換聊天與面板焦點",
   "selectionQuote": "引用",
+  "selectionQuoteMarker": "[引用{index}]",
   "selectionTranslate": "翻譯",
   "selectionAiTranslateIos": "AI翻譯",
   "selectionCopyMarkdown": "複製為 Markdown",

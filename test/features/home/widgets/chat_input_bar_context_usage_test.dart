@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/quote_ref.dart';
+import 'package:Kelivo/features/chat/controllers/quote_editing_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -79,6 +82,8 @@ void main() {
     required Size surfaceSize,
     VoidCallback? onOpenContextUsage,
     String? conversationId = 'c1',
+    Locale locale = const Locale('en'),
+    ChatInputBarController? mediaController,
   }) {
     tester.view.physicalSize = surfaceSize;
     tester.view.devicePixelRatio = 1;
@@ -92,7 +97,7 @@ void main() {
           ChangeNotifierProvider<ContextUsageService>(create: (_) => usage),
         ],
         child: MaterialApp(
-          locale: const Locale('en'),
+          locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
@@ -100,6 +105,7 @@ void main() {
             child: Scaffold(
               body: ChatInputBar(
                 controller: controller,
+                mediaController: mediaController,
                 focusNode: focusNode,
                 conversationId: conversationId,
                 onOpenContextUsage: onOpenContextUsage,
@@ -110,6 +116,52 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'restored quote drafts use the current locale without another edit',
+    (tester) async {
+      final providers = await createProviders();
+      final controller = QuoteEditingController(nativeInputEnabled: false);
+      final focusNode = FocusNode();
+      final media = ChatInputBarController();
+      final quote = QuoteRef(
+        id: 'quote',
+        messageId: 'source',
+        start: 0,
+        end: 8,
+        text: 'original',
+        model: null,
+        createdAt: DateTime(2026),
+      );
+      media.restoreDraft(
+        ComposerDraftInput(text: 'Discuss \uFFFC', quotes: [quote]),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+      for (final locale in [const Locale('en'), const Locale('zh')]) {
+        await pumpBar(
+          tester,
+          settings: providers.settings,
+          assistants: providers.assistants,
+          usage: providers.usage,
+          controller: controller,
+          mediaController: media,
+          focusNode: focusNode,
+          surfaceSize: const Size(1024, 768),
+          locale: locale,
+        );
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        final marker = locale.languageCode == 'en' ? '[Quote 1]' : '[引用1]';
+        expect(
+          providers.usage.drafts['c1'],
+          '> $marker original\n\nDiscuss $marker',
+        );
+        expect(controller.text, 'Discuss \uFFFC');
+        expect(controller.quotes, [quote]);
+      }
+    },
+  );
 
   testWidgets(
     'composer edits and programmatic clear update the draft contribution',

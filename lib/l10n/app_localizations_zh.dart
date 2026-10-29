@@ -14739,6 +14739,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectionQuote => '引用';
 
   @override
+  String selectionQuoteMarker(int index) {
+    return '[引用$index]';
+  }
+
+  @override
   String get selectionTranslate => '翻译';
 
   @override
@@ -29437,6 +29442,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get selectionQuote => '引用';
+
+  @override
+  String selectionQuoteMarker(int index) {
+    return '[引用$index]';
+  }
 
   @override
   String get selectionTranslate => '翻译';
@@ -44218,6 +44228,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get selectionQuote => '引用';
+
+  @override
+  String selectionQuoteMarker(int index) {
+    return '[引用$index]';
+  }
 
   @override
   String get selectionTranslate => '翻譯';

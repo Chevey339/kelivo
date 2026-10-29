@@ -15519,6 +15519,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectionQuote => 'Quote';
 
   @override
+  String selectionQuoteMarker(int index) {
+    return '[Quote $index]';
+  }
+
+  @override
   String get selectionTranslate => 'Translate';
 
   @override

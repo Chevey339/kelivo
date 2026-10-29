@@ -80,19 +80,23 @@ class QuoteRef {
 
 /// The stored body stays editable: one code unit per quote, in list order.
 /// Only request/export boundaries expand it into provider-independent text.
-String formatQuotedMessage(String content, List<QuoteRef> quotes) {
+String formatQuotedMessage(
+  String content,
+  List<QuoteRef> quotes, {
+  required String Function(int) quoteMarker,
+}) {
   if (quotes.isEmpty) return content;
   var index = 0;
   final body = content.replaceAllMapped(RegExp(quotePlaceholder), (_) {
     final number = ++index;
-    return number <= quotes.length ? '[引用$number]' : '';
+    return number <= quotes.length ? quoteMarker(number) : '';
   });
   final blocks = <String>[];
   for (var i = 0; i < index && i < quotes.length; i++) {
     final lines = quotes[i].text.replaceAll('\r\n', '\n').split('\n');
     blocks.add(
       [
-        '> [引用${i + 1}] ${lines.first}',
+        '> ${quoteMarker(i + 1)} ${lines.first}',
         for (final line in lines.skip(1)) '> $line',
       ].join('\n'),
     );

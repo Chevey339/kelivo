@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/form_sheet.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+
+/// The same compact sheet chrome and surfaces used by the app's form sheets.
+Future<void> showSelectionSheet(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) => showFormSheet<void>(
+  context,
+  builder: (context) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .55,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: .2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Flexible(child: builder(context)),
+          ],
+        ),
+      ),
+    ),
+  ),
+);
+
+class SelectionPanel extends StatelessWidget {
+  const SelectionPanel({
+    super.key,
+    required this.title,
+    required this.children,
+    required this.actions,
+    this.headerAction,
+    this.onClose,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final Widget actions;
+  final Widget? headerAction;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              if (headerAction != null) Flexible(child: headerAction!),
+              if (onClose != null)
+                IosIconButton(
+                  icon: LucideIcons.x,
+                  size: 18,
+                  minSize: 40,
+                  color: cs.onSurface.withValues(alpha: .62),
+                  tooltip: AppLocalizations.of(context)!.commonClose,
+                  onTap: onClose,
+                ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+        Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 8), child: actions),
+      ],
+    );
+  }
+}
+
+/// A popover uses the app's overlay color and hairline, without Material tint.
+class SelectionPopoverSurface extends StatelessWidget {
+  const SelectionPopoverSurface({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: context.overlaySurface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.appColors.hairline),
+      boxShadow: [
+        BoxShadow(
+          color: Theme.of(context).colorScheme.shadow.withValues(alpha: .12),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Material(type: MaterialType.transparency, child: child),
+    ),
+  );
+}

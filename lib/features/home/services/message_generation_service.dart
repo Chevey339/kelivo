@@ -627,6 +627,9 @@ class MessageGenerationService {
     ChatInputData input, {
     required Assistant? assistant,
   }) async {
+    final quoteMarker = input.quotes.isEmpty
+        ? null
+        : AppLocalizations.of(contextProvider)!.selectionQuoteMarker;
     final uiContext = _uiContext(input);
     final body = await buildPersistedUserMessageParts(
       input,
@@ -634,7 +637,11 @@ class MessageGenerationService {
     );
     if (input.quotes.isNotEmpty && body.first is TextPart) {
       body[0] = TextPart(
-        formatQuotedMessage((body.first as TextPart).text, input.quotes),
+        formatQuotedMessage(
+          (body.first as TextPart).text,
+          input.quotes,
+          quoteMarker: quoteMarker!,
+        ),
       );
     }
     if (uiContext == null) return body;

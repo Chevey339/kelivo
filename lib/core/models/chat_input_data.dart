@@ -33,7 +33,8 @@ class ChatInputData {
     this.uiContext,
   });
 
-  String get quotedText => formatQuotedMessage(text, quotes);
+  String quotedText(String Function(int) quoteMarker) =>
+      formatQuotedMessage(text, quotes, quoteMarker: quoteMarker);
 
   bool get isEmpty =>
       text.trim().isEmpty &&

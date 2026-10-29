@@ -27,7 +27,10 @@ Future<UiMessageText?> readUiMessageText(
 
 Future<void> copyUiMessage(BuildContext context, ChatMessage message) async {
   if (message.quotes.isNotEmpty) {
-    await copyGenUiText(context, message.quotedContent);
+    await copyGenUiText(
+      context,
+      message.quotedContent(AppLocalizations.of(context)!.selectionQuoteMarker),
+    );
     return;
   }
   final projection = await readUiMessageText(context, message);
@@ -37,4 +40,7 @@ Future<void> copyUiMessage(BuildContext context, ChatMessage message) async {
 }
 
 Future<void> copyUiMessageSource(BuildContext context, ChatMessage message) =>
-    copyGenUiText(context, message.quotedContent);
+    copyGenUiText(
+      context,
+      message.quotedContent(AppLocalizations.of(context)!.selectionQuoteMarker),
+    );

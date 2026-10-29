@@ -1,3 +1,4 @@
+import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_user_context_parts.dart';
@@ -1676,6 +1677,7 @@ void main() {
                 entered = true;
                 return hold.future;
               },
+              quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
             ),
           );
           await waitFor(() => entered, 'compression generation');
@@ -1748,6 +1750,7 @@ void main() {
             aEntered = true;
             return aHold.future;
           },
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
         ),
       );
       await waitFor(() => aEntered, 'A compression');
@@ -1779,6 +1782,7 @@ void main() {
             bEntered = true;
             return bHold.future;
           },
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
         ),
       );
       await waitFor(() => bEntered, 'B compression');
@@ -1836,6 +1840,7 @@ void main() {
               entered = true;
               return hold.future;
             },
+            quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
           ),
         );
         await waitFor(() => entered, 'compression started');
@@ -1888,6 +1893,7 @@ void main() {
               entered = true;
               return generated.future;
             },
+            quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
           ),
         );
         expect(
@@ -1945,6 +1951,7 @@ void main() {
               entered = true;
               return generated.future;
             },
+            quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
           ),
         );
         await waitFor(() => entered, 'compression');
@@ -2017,6 +2024,7 @@ void main() {
               entered = true;
               return generated.future;
             },
+            quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
           ),
         );
         await waitFor(() => entered, 'compression');

@@ -1,3 +1,4 @@
+import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
@@ -106,6 +107,7 @@ void main() {
           ),
           model: 'fixture',
           generate: (_, _) async => 'summary',
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
         ),
       );
       await tester.pump();

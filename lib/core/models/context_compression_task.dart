@@ -22,10 +22,12 @@ class CompressionRequest {
     required this.options,
     required this.model,
     required this.generate,
+    required this.quoteMarker,
     this.contextWindowTokens,
   });
   final CompressContextOptions options;
   final String model;
+  final String Function(int) quoteMarker;
   final int? contextWindowTokens;
   final Future<String> Function(String content, String requestId) generate;
 }

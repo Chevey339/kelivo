@@ -76,7 +76,8 @@ class ChatMessage extends HiveObject {
   String get content => _content;
 
   final List<QuoteRef> quotes;
-  String get quotedContent => formatQuotedMessage(content, quotes);
+  String quotedContent(String Function(int) quoteMarker) =>
+      formatQuotedMessage(content, quotes, quoteMarker: quoteMarker);
 
   @HiveField(3)
   final DateTime timestamp;

@@ -1,3 +1,5 @@
+import 'ios_tactile.dart';
+import 'option_sheet.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -567,14 +569,23 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
               AdaptiveTextSelectionToolbar.getButtonLabel(context, item),
             ),
           ),
-        PopupMenuButton<ContextMenuButtonItem>(
+        IosIconButton(
           tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
-          icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
-          onSelected: (item) => item.onPressed?.call(),
-          itemBuilder: (_) => [
-            for (final item in [markdown, rich])
-              PopupMenuItem(value: item, child: Text(item.label!)),
-          ],
+          icon: LucideIcons.ellipsisVertical,
+          size: 18,
+          minSize: 44,
+          onTap: () async {
+            region.hideToolbar();
+            final item = await showOptionSheet<ContextMenuButtonItem>(
+              this.context,
+              title: MaterialLocalizations.of(this.context).copyButtonLabel,
+              items: [
+                for (final item in [markdown, rich])
+                  OptionSheetItem(value: item, label: item.label!),
+              ],
+            );
+            if (mounted) item?.onPressed?.call();
+          },
         ),
       ],
     );

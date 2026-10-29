@@ -235,16 +235,25 @@ String buildCompressContextContent(
   };
 }
 
-String? conversationLineForCompression(ChatMessage message) {
-  final content = message.quotedContent;
+String? conversationLineForCompression(
+  ChatMessage message, {
+  required String Function(int) quoteMarker,
+}) {
+  final content = message.quotedContent(quoteMarker);
   if (content.trim().isEmpty) return null;
   return '${message.role == "assistant" ? "Assistant" : "User"}: $content';
 }
 
-String buildConversationTextForCompression(List<ChatMessage> messages) {
+String buildConversationTextForCompression(
+  List<ChatMessage> messages, {
+  required String Function(int) quoteMarker,
+}) {
   final lines = <String>[];
   for (final message in messages) {
-    final line = conversationLineForCompression(message);
+    final line = conversationLineForCompression(
+      message,
+      quoteMarker: quoteMarker,
+    );
     if (line != null) lines.add(line);
   }
   return lines.join('\n\n');
@@ -256,21 +265,23 @@ String buildBoundedConversationText(
   List<ChatMessage> messages, {
   required CompressContextLimitMode mode,
   required int maxChars,
+  required String Function(int) quoteMarker,
 }) {
   if (maxChars <= 0) return '';
   if (mode == CompressContextLimitMode.recent) {
-    return _buildRecentBoundedConversationText(messages, maxChars);
+    return _buildRecentBoundedConversationText(messages, maxChars, quoteMarker);
   }
-  return _buildStartBoundedConversationText(messages, maxChars);
+  return _buildStartBoundedConversationText(messages, maxChars, quoteMarker);
 }
 
 String _buildStartBoundedConversationText(
   List<ChatMessage> messages,
   int maxChars,
+  String Function(int) quoteMarker,
 ) {
   final buf = StringBuffer();
   for (final message in messages) {
-    final body = message.quotedContent;
+    final body = message.quotedContent(quoteMarker);
     if (body.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sep = buf.isEmpty ? '' : '\n\n';
@@ -296,12 +307,13 @@ String _buildStartBoundedConversationText(
 String _buildRecentBoundedConversationText(
   List<ChatMessage> messages,
   int maxChars,
+  String Function(int) quoteMarker,
 ) {
   final parts = <String>[];
   var used = 0;
   for (var i = messages.length - 1; i >= 0; i--) {
     final message = messages[i];
-    final body = message.quotedContent;
+    final body = message.quotedContent(quoteMarker);
     if (body.trim().isEmpty) continue;
     final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
     final sepLen = parts.isEmpty ? 0 : 2;
@@ -338,6 +350,7 @@ String _utf16SafeTailOfPrefixed(String prefix, String content, int maxChars) {
 List<String> chunkMessagesForCompression(
   List<ChatMessage> messages, {
   required int maxChars,
+  required String Function(int) quoteMarker,
 }) {
   if (maxChars <= 0) return const <String>[];
   final chunks = <String>[];
@@ -350,7 +363,10 @@ List<String> chunkMessagesForCompression(
   }
 
   for (final message in messages) {
-    final line = conversationLineForCompression(message);
+    final line = conversationLineForCompression(
+      message,
+      quoteMarker: quoteMarker,
+    );
     if (line == null) continue;
     if (line.length > maxChars) {
       flush();
@@ -408,6 +424,7 @@ List<String> buildCompressRequestContents(
   List<ChatMessage> messages,
   CompressContextOptions options, {
   int safeRequestChars = CompressContextOptions.safeRequestChars,
+  required String Function(int) quoteMarker,
 }) {
   if (options.mode == CompressContextLimitMode.start ||
       options.mode == CompressContextLimitMode.recent) {
@@ -416,12 +433,17 @@ List<String> buildCompressRequestContents(
       messages,
       mode: options.mode,
       maxChars: maxChars,
+      quoteMarker: quoteMarker,
     );
     if (bounded.trim().isEmpty) return const <String>[];
     if (bounded.length <= safeRequestChars) return [bounded];
     return splitUtf16SafeChunks(bounded, safeRequestChars);
   }
-  return chunkMessagesForCompression(messages, maxChars: safeRequestChars);
+  return chunkMessagesForCompression(
+    messages,
+    maxChars: safeRequestChars,
+    quoteMarker: quoteMarker,
+  );
 }
 
 /// Select the trailing messages starting at the last [keepUserMessages]

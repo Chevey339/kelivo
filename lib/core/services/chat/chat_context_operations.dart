@@ -25,6 +25,7 @@ extension ChatContextOperations on ChatService {
   Future<List<ChatMessage>> messagesForCompression(
     List<ChatMessage> messages, {
     bool includeAttachmentsAndTools = true,
+    required String Function(int) quoteMarker,
   }) async {
     if (!includeAttachmentsAndTools) return messages;
     final prompts = await _repo.getMessagePrompts(
@@ -40,7 +41,7 @@ extension ChatContextOperations on ChatService {
       for (final message in messages)
         (() {
           final frozen = prompts[message.id];
-          var body = message.quotedContent;
+          var body = message.quotedContent(quoteMarker);
           if (frozen != null) {
             body = frozen.carriesMemorySnapshot
                 ? MemoryBlockBuilder.splitInjectedPrefix(

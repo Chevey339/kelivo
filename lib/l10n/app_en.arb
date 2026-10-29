@@ -7311,6 +7311,13 @@
   "hotkeySidePanelAddress": "Focus web address",
   "hotkeySidePanelFocus": "Cycle chat and panel focus",
   "selectionQuote": "Quote",
+  "selectionQuoteMarker": "[Quote {index}]",
+  "@selectionQuoteMarker": {
+    "description": "Numbered quote reference in sent, copied, and exported messages",
+    "placeholders": {
+      "index": {"type": "int"}
+    }
+  },
   "selectionTranslate": "Translate",
   "selectionAiTranslateIos": "AI Translate",
   "selectionCopyMarkdown": "Copy as Markdown",

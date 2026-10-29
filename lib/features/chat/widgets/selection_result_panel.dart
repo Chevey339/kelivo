@@ -12,6 +12,13 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_text_button.dart';
+import '../../../shared/widgets/option_sheet.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'selection_panel.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 import '../controllers/selection_translation_controller.dart';
@@ -92,16 +99,7 @@ Future<void> showSelectionTranslationPanel(
   );
   try {
     if (!selectionUsesDesktop) {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
-        builder: (context) => SizedBox(
-          height: MediaQuery.sizeOf(context).height * .55,
-          child: panel(context),
-        ),
-      );
+      await showSelectionSheet(context, builder: panel);
     } else {
       await showGeneralDialog<void>(
         context: context,
@@ -129,16 +127,12 @@ Future<void> showSelectionTranslationPanel(
                 top: top.toDouble(),
                 left: left.toDouble(),
                 width: width,
-                child: Material(
-                  elevation: 10,
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  clipBehavior: Clip.antiAlias,
+                child: SelectionPopoverSurface(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxHeight: math.max(
-                        100,
-                        size.height - top - padding.bottom - 12,
+                      maxHeight: math.min(
+                        480,
+                        math.max(100, size.height - top - padding.bottom - 12),
                       ),
                     ),
                     child: panel(context),
@@ -170,11 +164,49 @@ class SelectionResultPanel extends StatefulWidget {
 }
 
 class _SelectionResultPanelState extends State<SelectionResultPanel> {
+  final _languageAnchor = GlobalKey();
   late LanguageOption _language;
+
   @override
   void initState() {
     super.initState();
     _language = widget.initialLanguage;
+    unawaited(widget.controller.translate(_language.displayName));
+  }
+
+  Future<void> _selectLanguage() async {
+    final l10n = AppLocalizations.of(context)!;
+    LanguageOption? selected;
+    if (selectionUsesDesktop) {
+      await showDesktopAnchoredMenu(
+        context,
+        anchorKey: _languageAnchor,
+        items: [
+          for (final language in supportedLanguages)
+            DesktopContextMenuItem(
+              label: languageDisplayName(l10n, language.code),
+              checked: language.code == _language.code,
+              onTap: () => selected = language,
+            ),
+        ],
+      );
+    } else {
+      selected = await showOptionSheet<LanguageOption>(
+        context,
+        title: l10n.languageSelectSheetTitle,
+        selected: _language,
+        items: [
+          for (final language in supportedLanguages)
+            OptionSheetItem(
+              value: language,
+              label: languageDisplayName(l10n, language.code),
+            ),
+        ],
+      );
+    }
+    if (!mounted || selected == null || selected == _language) return;
+    setState(() => _language = selected!);
+    widget.onLanguageChanged?.call(_language);
     unawaited(widget.controller.translate(_language.displayName));
   }
 
@@ -188,140 +220,128 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
       final busy =
           state.status == SelectionTranslationStatus.loading ||
           state.status == SelectionTranslationStatus.streaming;
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      return SelectionPanel(
+        title: l10n.selectionTranslate,
+        onClose: () => Navigator.of(context).pop(),
+        headerAction: Semantics(
+          button: true,
+          label: l10n.languageSelectSheetTitle,
+          child: IosCardPress(
+            key: _languageAnchor,
+            focusable: true,
+            baseColor: context.appColors.surfaceFill,
+            borderRadius: BorderRadius.circular(8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            onTap: _selectLanguage,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  LucideIcons.languages,
-                  size: 16,
-                  color: cs.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  l10n.selectionTranslate,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<LanguageOption>(
-                      value: _language,
-                      isExpanded: true,
-                      items: [
-                        for (final language in supportedLanguages)
-                          DropdownMenuItem(
-                            value: language,
-                            child: Text(
-                              languageDisplayName(l10n, language.code),
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                      ],
-                      onChanged: (language) {
-                        if (language == null || language == _language) return;
-                        setState(() => _language = language);
-                        widget.onLanguageChanged?.call(language);
-                        unawaited(state.translate(language.displayName));
-                      },
+                Flexible(
+                  child: Text(
+                    languageDisplayName(l10n, _language.code),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),
-                IconButton(
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(LucideIcons.x, size: 18),
+                const SizedBox(width: 6),
+                Icon(
+                  LucideIcons.chevronDown,
+                  size: 14,
+                  color: cs.onSurfaceVariant,
                 ),
               ],
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsetsDirectional.only(start: 10),
-                      decoration: BoxDecoration(
-                        border: BorderDirectional(
-                          start: BorderSide(color: cs.outlineVariant, width: 2),
-                        ),
-                      ),
-                      child: Text(
-                        state.text,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.6,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (state.status == SelectionTranslationStatus.loading)
-                      Row(
-                        children: [
-                          const SizedBox.square(
-                            dimension: 14,
-                            child: CircularProgressIndicator(strokeWidth: 1.5),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(child: Text(l10n.translating)),
-                        ],
-                      ),
-                    if (state.result.isNotEmpty)
-                      SelectableText(
-                        state.result,
-                        style: const TextStyle(fontSize: 15, height: 1.6),
-                      ),
-                    if (state.status == SelectionTranslationStatus.failed)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            state.error ?? '',
-                            style: TextStyle(color: cs.error),
-                          ),
-                          TextButton.icon(
-                            onPressed: () =>
-                                state.translate(_language.displayName),
-                            icon: const Icon(LucideIcons.rotateCw, size: 16),
-                            label: Text(l10n.retry),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+          ),
+        ),
+        actions: Row(
+          children: [
+            Expanded(
+              child: IosTextButton(
+                label: MaterialLocalizations.of(context).copyButtonLabel,
+                color: cs.onSurfaceVariant,
+                icon: LucideIcons.copy,
+                onPressed: busy || state.result.isEmpty
+                    ? null
+                    : () =>
+                          Clipboard.setData(ClipboardData(text: state.result)),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: MaterialLocalizations.of(context).copyButtonLabel,
-                  onPressed: busy || state.result.isEmpty
-                      ? null
-                      : () => Clipboard.setData(
-                          ClipboardData(text: state.result),
-                        ),
-                  icon: const Icon(LucideIcons.copy, size: 18),
-                ),
-                IconButton(
-                  tooltip: l10n.selectionRegenerate,
-                  onPressed: busy
-                      ? null
-                      : () => state.translate(_language.displayName),
-                  icon: const Icon(LucideIcons.refreshCw, size: 18),
-                ),
-              ],
+            Expanded(
+              child: IosTextButton(
+                label: l10n.selectionRegenerate,
+                color: cs.onSurfaceVariant,
+                icon: LucideIcons.refreshCw,
+                onPressed: busy
+                    ? null
+                    : () => state.translate(_language.displayName),
+              ),
             ),
           ],
         ),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.appColors.surfaceFill,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              state.text,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (state.status == SelectionTranslationStatus.loading)
+            Row(
+              children: [
+                SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    l10n.translating,
+                    style: TextStyle(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          if (state.result.isNotEmpty)
+            SelectableText(
+              state.result,
+              style: TextStyle(fontSize: 15, height: 1.6, color: cs.onSurface),
+            ),
+          if (state.status == SelectionTranslationStatus.failed) ...[
+            Text(
+              state.error ?? '',
+              style: TextStyle(fontSize: 13, color: cs.error),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: IosTextButton(
+                label: l10n.retry,
+                icon: LucideIcons.rotateCw,
+                padding: EdgeInsets.zero,
+                onPressed: () => state.translate(_language.displayName),
+              ),
+            ),
+          ],
+        ],
       );
     },
   );

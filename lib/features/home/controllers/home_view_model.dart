@@ -1419,6 +1419,9 @@ class HomeViewModel extends ChangeNotifier {
       await _chatService.contextCompression.start(
         conversationId,
         CompressionRequest(
+          quoteMarker: AppLocalizations.of(
+            _contextProvider,
+          )!.selectionQuoteMarker,
           options: options,
           model: modelId,
           contextWindowTokens: ModelSpecResolver.instance

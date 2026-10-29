@@ -7,6 +7,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/models/quote_ref.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_text_button.dart';
+import 'selection_panel.dart';
 import 'quote_interaction_scope.dart';
 
 bool get selectionUsesDesktop => switch (defaultTargetPlatform) {
@@ -133,80 +135,63 @@ class _QuoteChipState extends State<QuoteChip> {
     final timestamp = MaterialLocalizations.of(
       context,
     ).formatTimeOfDay(TimeOfDay.fromDateTime(widget.quote.createdAt.toLocal()));
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return SelectionPanel(
+      title: l10n.selectionQuote,
+      onClose: mobile ? () => Navigator.pop(context) : null,
+      actions: Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                LucideIcons.messageCircleMore,
-                size: 16,
+          Expanded(
+            child: IosTextButton(
+              label: l10n.quoteJumpToSource,
+              icon: LucideIcons.arrowUpRight,
+              onPressed: () {
+                if (mobile) Navigator.pop(context);
+                unawaited(_jump());
+              },
+            ),
+          ),
+          if (mobile && widget.onRemove != null)
+            Expanded(
+              child: IosTextButton(
+                label: l10n.quoteRemove,
+                icon: LucideIcons.x,
                 color: cs.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(l10n.selectionQuote),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  [
-                    widget.quote.model ?? l10n.userProviderDefaultUserName,
-                    timestamp,
-                  ].join(' · '),
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                ),
-              ),
-              if (mobile)
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(LucideIcons.x, size: 18),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Flexible(
-            child: SingleChildScrollView(
-              child: SelectableText(widget.quote.text),
-            ),
-          ),
-          if (_missing)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                l10n.quoteSourceMissing,
-                style: TextStyle(color: cs.onSurfaceVariant),
-              ),
-            ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              TextButton.icon(
                 onPressed: () {
-                  if (mobile) Navigator.pop(context);
-                  unawaited(_jump());
+                  Navigator.pop(context);
+                  widget.onRemove!();
                 },
-                icon: const Icon(LucideIcons.arrowRight, size: 16),
-                label: Text(l10n.quoteJumpToSource),
               ),
-              if (mobile && widget.onRemove != null) ...[
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onRemove!();
-                  },
-                  icon: const Icon(LucideIcons.x, size: 16),
-                  label: Text(l10n.quoteRemove),
-                  style: TextButton.styleFrom(foregroundColor: cs.error),
-                ),
-              ],
-            ],
-          ),
+            ),
         ],
       ),
+      children: [
+        Text(
+          [
+            widget.quote.model ?? l10n.userProviderDefaultUserName,
+            timestamp,
+          ].join(' · '),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SelectableText(
+          widget.quote.text,
+          style: TextStyle(fontSize: 15, height: 1.6, color: cs.onSurface),
+        ),
+        if (_missing)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              l10n.quoteSourceMissing,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
+      ],
     );
   }
 
@@ -217,17 +202,9 @@ class _QuoteChipState extends State<QuoteChip> {
     }
     await _checkSource();
     if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (context) => ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .55,
-        ),
-        child: _preview(context, mobile: true),
-      ),
+    await showSelectionSheet(
+      context,
+      builder: (context) => _preview(context, mobile: true),
     );
   }
 
@@ -322,11 +299,7 @@ class _QuoteChipState extends State<QuoteChip> {
               onEnter: (_) => _closeTimer?.cancel(),
               onExit: (_) => _exit(),
               child:
-                  Material(
-                        elevation: 8,
-                        borderRadius: BorderRadius.circular(14),
-                        color: cs.surfaceContainerLow,
-                        clipBehavior: Clip.antiAlias,
+                  SelectionPopoverSurface(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxHeight: 280),
                           child: _preview(context, mobile: false),

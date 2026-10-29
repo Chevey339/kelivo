@@ -232,6 +232,7 @@ class ContextCompressionService extends ChangeNotifier {
       final textMessages = await chat.messagesForCompression(
         selection.input,
         includeAttachmentsAndTools: task.options.includeAttachmentsAndTools,
+        quoteMarker: request.quoteMarker,
       );
       _check(task);
       final budget = compressRequestCharBudget(
@@ -241,6 +242,7 @@ class ContextCompressionService extends ChangeNotifier {
         textMessages,
         task.options,
         safeRequestChars: budget,
+        quoteMarker: request.quoteMarker,
       );
       if (chunks.isEmpty) throw StateError('no_messages');
       final inputTokens = chunks.fold<int>(

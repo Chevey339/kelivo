@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'dart:ui' as ui;
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
@@ -340,11 +341,22 @@ void main() {
       } else {
         expect(find.text('Translate'), findsOneWidget);
         expect(find.text('Copy as Markdown'), findsNothing);
-        await tester.tap(find.byType(PopupMenuButton<ContextMenuButtonItem>));
+        await tester.tap(
+          find.byWidgetPredicate(
+            (w) =>
+                w is IosIconButton &&
+                w.tooltip ==
+                    MaterialLocalizations.of(
+                      tester.element(find.byType(SelectionArea)),
+                    ).moreButtonTooltip,
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('Copy as Markdown'), findsOneWidget);
         expect(find.text('Copy rich text'), findsOneWidget);
-        await tester.tapAt(const Offset(600, 500));
+        await tester.tapAt(const Offset(600, 20));
+        await tester.pumpAndSettle();
+        await tester.longPress(find.text('alpha beta gamma'));
         await tester.pumpAndSettle();
       }
       await tester.tap(find.text('Quote'));

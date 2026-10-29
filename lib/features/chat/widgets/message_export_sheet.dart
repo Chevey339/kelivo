@@ -1,3 +1,4 @@
+import '../../../core/models/quote_ref.dart';
 import '../utils/message_reasoning_source.dart';
 import 'package:markstream/markstream_core.dart'
     show MarkdownParser, toPlainText;
@@ -112,7 +113,11 @@ String _getRoleNameFromDependencies({
 /// Text comes from [textOverride] (e.g. thinking-stripped assistant body) or
 /// [ChatMessage.content] (TextPart join). Attachments are taken from ImagePart /
 /// FilePart only — never reconstructed as legacy marker strings.
-_Parsed _exportPartsFromMessage(ChatMessage message, {String? textOverride}) {
+_Parsed _exportPartsFromMessage(
+  ChatMessage message, {
+  String? textOverride,
+  required String Function(int) quoteMarker,
+}) {
   final images = <String>[];
   final docs = <_DocRef>[];
   for (final part in message.parts) {
@@ -129,7 +134,11 @@ _Parsed _exportPartsFromMessage(ChatMessage message, {String? textOverride}) {
       );
     }
   }
-  final text = (textOverride ?? message.quotedContent).trim();
+  final text = formatQuotedMessage(
+    textOverride ?? message.content,
+    message.quotes,
+    quoteMarker: quoteMarker,
+  ).trim();
   return _Parsed(text, images, docs);
 }
 
@@ -139,6 +148,7 @@ Future<void> _writeExportBlocks(
   required bool includeThinking,
   required bool includeTools,
   required String thinkingLabel,
+  required String Function(int) quoteMarker,
   required bool markdown,
   UiMessageText? uiText,
   required Future<void> Function(String uri) writeImage,
@@ -148,7 +158,7 @@ Future<void> _writeExportBlocks(
     message = message.copyWith(
       parts: ChatMessage.partsWithReplacedText(
         message.parts,
-        message.quotedContent,
+        message.quotedContent(quoteMarker),
       ),
       quotes: const [],
     );
@@ -268,6 +278,7 @@ Future<String> exportMessageBlocksForTesting(
   required bool showThinkingAndToolCards,
   UiMessageText? uiText,
   bool markdown = false,
+  Locale locale = const Locale('en'),
 }) async {
   final buf = StringBuffer();
   await _writeExportBlocks(
@@ -276,6 +287,7 @@ Future<String> exportMessageBlocksForTesting(
     includeThinking: showThinkingAndToolCards,
     includeTools: showThinkingAndToolCards,
     thinkingLabel: 'Thinking',
+    quoteMarker: lookupAppLocalizations(locale).selectionQuoteMarker,
     markdown: markdown,
     uiText: uiText,
     writeImage: (uri) async {
@@ -330,7 +342,7 @@ class _ThinkingExportData {
 _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
   if (message.quotes.isNotEmpty) {
     return _ThinkingExportData(
-      cleanedContent: message.quotedContent,
+      cleanedContent: message.content,
       thinkingTexts: const [],
     );
   }
@@ -929,6 +941,7 @@ Future<void> exportChatMessagesMarkdown(
         includeThinking: includeThinking,
         includeTools: showThinkingAndToolCards,
         thinkingLabel: thinkingLabel,
+        quoteMarker: l10n.selectionQuoteMarker,
         uiText: captures.projections[msg.id],
         markdown: true,
         writeImage: (imageUri) async {
@@ -1042,6 +1055,7 @@ Future<void> exportChatMessagesTxt(
         includeThinking: includeThinking,
         includeTools: showThinkingAndToolCards,
         thinkingLabel: thinkingLabel,
+        quoteMarker: l10n.selectionQuoteMarker,
         uiText: captures.projections[msg.id],
         markdown: false,
         writeImage: (imageUri) async {
@@ -2946,6 +2960,7 @@ class _ExportedBubble extends StatelessWidget {
     final parsed = _exportPartsFromMessage(
       message,
       textOverride: messageForExport.content,
+      quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
     );
     final mdText = StringBuffer();
     if (parsed.text.isNotEmpty) mdText.writeln(_softBreakMd(parsed.text));
