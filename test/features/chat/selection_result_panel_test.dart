@@ -1,7 +1,6 @@
 import 'package:provider/provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import '../../support/business_test_harness.dart';
-import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'dart:async';
 
 import 'package:Kelivo/features/chat/controllers/selection_translation_controller.dart';
@@ -69,17 +68,20 @@ void main() {
           ),
         ),
       );
-      Finder button(String label) =>
-          find.byWidgetPredicate((w) => w is IosTextButton && w.label == label);
+      Finder button(String label) => find.text(label);
       await tester.pump();
       expect(find.text('正在翻译…'), findsOneWidget);
-      expect(tester.widget<IosTextButton>(button('重新生成')).onPressed, isNull);
+      await tester.tap(button('重新生成'));
+      await tester.pump();
+      expect(languages, ['Simplified Chinese']);
       runs.first.add('部分译文');
       await tester.pump();
       expect(find.text('部分译文'), findsOneWidget);
-      expect(tester.widget<IosTextButton>(button('重新生成')).onPressed, isNull);
-      runs.first.addError(StateError('offline'));
+      await tester.tap(button('重新生成'));
       await tester.pump();
+      expect(languages, ['Simplified Chinese']);
+      runs.first.addError(StateError('offline'));
+      await tester.pumpAndSettle();
       expect(find.text('重试'), findsOneWidget);
       await tester.tap(find.text('重试'));
       await tester.pump();
@@ -88,7 +90,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('完整译文'), findsOneWidget);
       expect(find.text('重试'), findsNothing);
-      expect(tester.widget<IosTextButton>(button('重新生成')).onPressed, isNotNull);
       final copyLabel = MaterialLocalizations.of(
         tester.element(find.byType(SelectionResultPanel)),
       ).copyButtonLabel;

@@ -5,7 +5,6 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
-import '../../../theme/app_semantic_colors.dart';
 
 /// The same compact sheet chrome and surfaces used by the app's form sheets.
 Future<void> showSelectionSheet(
@@ -123,31 +122,4 @@ class SelectionPanel extends StatelessWidget {
       ],
     );
   }
-}
-
-/// A popover uses the app's overlay color and hairline, without Material tint.
-class SelectionPopoverSurface extends StatelessWidget {
-  const SelectionPopoverSurface({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: context.overlaySurface,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: context.appColors.hairline),
-      boxShadow: [
-        BoxShadow(
-          color: Theme.of(context).colorScheme.shadow.withValues(alpha: .12),
-          blurRadius: 20,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Material(type: MaterialType.transparency, child: child),
-    ),
-  );
 }
