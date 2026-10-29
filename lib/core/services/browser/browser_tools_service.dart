@@ -51,6 +51,8 @@ class BrowserToolsService {
     'type': 'function',
     'function': {
       'name': toolName,
+      // Keep action-specific fields optional when using the Responses API.
+      'strict': false,
       'description':
           'Control the visible in-app browser, using its login state. The user '
           'must enable browser control for this assistant and in browser settings. '
