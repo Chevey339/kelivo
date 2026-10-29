@@ -16,8 +16,6 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/option_sheet.dart';
-import '../../../theme/app_font_weights.dart';
-import '../../../theme/app_semantic_colors.dart';
 import 'selection_panel.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../settings/widgets/language_select_sheet.dart';
@@ -229,9 +227,9 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
           child: IosCardPress(
             key: _languageAnchor,
             focusable: true,
-            baseColor: context.appColors.surfaceFill,
+            baseColor: Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             onTap: _selectLanguage,
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -241,17 +239,13 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
                     languageDisplayName(l10n, _language.code),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.medium,
-                      color: cs.onSurface,
-                    ),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Icon(
                   LucideIcons.chevronDown,
-                  size: 14,
+                  size: 12,
                   color: cs.onSurfaceVariant,
                 ),
               ],
@@ -284,24 +278,17 @@ class _SelectionResultPanelState extends State<SelectionResultPanel> {
           ],
         ),
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: context.appColors.surfaceFill,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              state.text,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: cs.onSurfaceVariant,
-              ),
+          Text(
+            state.text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: cs.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           if (state.status == SelectionTranslationStatus.loading)
             Row(
               children: [

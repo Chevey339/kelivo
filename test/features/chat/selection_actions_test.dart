@@ -218,6 +218,61 @@ void main() {
   );
 
   testWidgets(
+    'selection replacement in one frame still shows the latest quick actions',
+    (tester) async {
+      final received = <QuoteRef>[];
+      await mount(tester, received);
+      final region = tester.state<SelectableRegionState>(
+        find.byType(SelectableRegion),
+      );
+      region.selectAll(SelectionChangedCause.keyboard);
+      // A new drag can clear and replace a selection before the queued frame.
+      region.clearSelection();
+      region.selectAll(SelectionChangedCause.keyboard);
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectionQuickToolbar), findsOneWidget);
+      await tester.tap(find.text('Quote'));
+      await tester.pumpAndSettle();
+      expect(received.single.text, 'alpha beta gamma');
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
+
+  testWidgets(
+    'mouse release schedules quick actions after the last selection frame',
+    (tester) async {
+      await mount(tester, []);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText).first,
+      );
+      Offset point(int index) {
+        final box = paragraph
+            .getBoxesForSelection(
+              TextSelection(baseOffset: index, extentOffset: index + 1),
+            )
+            .single;
+        return paragraph.localToGlobal(
+          Offset(box.left + 1, box.toRect().center.dy),
+        );
+      }
+
+      final gesture = await tester.startGesture(
+        point(0),
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await gesture.moveTo(point(5));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectionQuickToolbar), findsNothing);
+      await gesture.up();
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectionQuickToolbar), findsOneWidget);
+      await gesture.removePointer();
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
+
+  testWidgets(
     'toolbar flips below clipped list top; keyboard shortcut quotes snapshot',
     (tester) async {
       final received = <QuoteRef>[];
@@ -280,11 +335,11 @@ void main() {
       await gesture.up();
       await gesture.removePointer();
       await tester.pumpAndSettle();
-      expect(find.byType(SelectionDesktopContextMenu), findsOneWidget);
-      final menu = tester.widget<SelectionDesktopContextMenu>(
-        find.byType(SelectionDesktopContextMenu),
+      expect(find.byType(AppTextSelectionToolbar), findsOneWidget);
+      final menu = tester.widget<AppTextSelectionToolbar>(
+        find.byType(AppTextSelectionToolbar),
       );
-      expect(menu.groups.last.single.type, ContextMenuButtonType.selectAll);
+      expect(menu.buttonItems.last.type, ContextMenuButtonType.selectAll);
       for (final label in [
         'Copy',
         'Copy as Markdown',

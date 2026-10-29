@@ -75,6 +75,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   Rect? _quickAnchor;
   bool _quickScheduled = false;
   int _toolbarRevision = 0;
+  int _quickRequestedRevision = 0;
   late final _copyAction = _SelectionCopyAction(
     intercept: () =>
         _regionFocus.hasPrimaryFocus &&
@@ -209,15 +210,18 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   }
 
   void _scheduleQuickToolbar() {
-    if (!selectionUsesDesktop || widget.message == null || _quickScheduled) {
+    if (!selectionUsesDesktop || widget.message == null) {
       return;
     }
+    // Coalesce to the latest selection. Clearing/reselecting before the frame
+    // must not strand the new request behind a cancelled callback.
+    _quickRequestedRevision = _toolbarRevision;
+    if (_quickScheduled) return;
     _quickScheduled = true;
-    final revision = _toolbarRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _quickScheduled = false;
       if (!mounted ||
-          revision != _toolbarRevision ||
+          _quickRequestedRevision != _toolbarRevision ||
           _pointerSelecting ||
           _keyboardSelecting ||
           _contextClick) {
@@ -233,6 +237,9 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       _areaKey.currentState?.selectableRegion.hideToolbar(false);
       _quickToolbar.show();
     });
+    // Pointer-up may change no render object after the last drag frame.
+    // A post-frame callback alone does not request that next frame.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _quote(SelectionSnapshot snapshot) {
@@ -511,13 +518,13 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
         );
     if (selectionUsesDesktop) {
       if (!_contextClick) return const SizedBox.shrink();
-      return SelectionDesktopContextMenu(
+      return AppTextSelectionToolbar(
         anchors: anchors,
-        groups: [
-          [copy, markdown, rich],
-          [quote, translate],
-          [selectAll],
-        ],
+        buttonItems: [copy, markdown, rich, quote, translate, selectAll],
+        separatorsBefore: {quote, selectAll},
+        shortcuts: {quote: quoteKeyboardHint},
+        selectionContext: region.context,
+        onDismiss: () => region.hideToolbar(false),
       );
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -653,10 +660,12 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
                 onPointerDown: (event) {
                   _contextClick = event.buttons == kSecondaryMouseButton;
                   _pointerSelecting = !_contextClick;
+                  _keyboardSelecting = false;
                   _hideQuickToolbar();
                 },
                 onPointerUp: (_) {
                   _pointerSelecting = false;
+                  _keyboardSelecting = false;
                   _scheduleQuickToolbar();
                 },
                 onPointerCancel: (_) {

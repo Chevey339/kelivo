@@ -73,21 +73,34 @@ class SelectionPanel extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.semibold,
-                    color: cs.onSurface,
-                  ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: AppFontWeights.semibold,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    if (headerAction != null) ...[
+                      const SizedBox(width: 8),
+                      Flexible(child: headerAction!),
+                    ],
+                  ],
                 ),
               ),
-              if (headerAction != null) Flexible(child: headerAction!),
               if (onClose != null)
                 IosIconButton(
                   icon: LucideIcons.x,
-                  size: 18,
+                  size: 16,
                   minSize: 40,
+                  visualSize: 28,
+                  borderRadius: 14,
                   color: cs.onSurface.withValues(alpha: .62),
                   tooltip: AppLocalizations.of(context)!.commonClose,
                   onTap: onClose,
