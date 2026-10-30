@@ -124,9 +124,9 @@ String resolveRequestUrl(
       if (c.vertexAI == true &&
           c.location?.isNotEmpty == true &&
           c.projectId?.isNotEmpty == true) {
-        final location = stream ? c.location!.trim() : c.location!;
-        final project = stream ? c.projectId!.trim() : c.projectId!;
-        return 'https://aiplatform.googleapis.com/v1/projects/$project/locations/$location/publishers/google/models/$model:$endpoint';
+        final location = c.location!.trim();
+        final project = c.projectId!.trim();
+        return '${providerVertexOrigin(c, location)}/v1/projects/$project/locations/$location/publishers/google/models/$model:$endpoint';
       }
       return '$base/models/$model:$endpoint';
   }

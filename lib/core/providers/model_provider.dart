@@ -114,9 +114,9 @@ class GoogleProvider extends BaseProvider {
     if (cfg.vertexAI == true &&
         (cfg.location?.isNotEmpty == true) &&
         (cfg.projectId?.isNotEmpty == true)) {
-      final loc = cfg.location!;
-      final proj = cfg.projectId!;
-      return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
+      final loc = cfg.location!.trim();
+      final proj = cfg.projectId!.trim();
+      return '${providerVertexOrigin(cfg, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models';
     }
     final base = cfg.baseUrl.endsWith('/')
         ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
