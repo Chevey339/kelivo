@@ -130,149 +130,242 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'desktop actions stay below the table and never cover neighbors',
-    (tester) async {
-      String? copied;
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets('desktop floating toolbar is clickable without moving the table', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        (call) async {
-          if (call.method == 'Clipboard.setData') {
-            copied = (call.arguments as Map)['text'] as String;
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform,
-          null,
-        ),
-      );
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: _source), width: 390),
+    );
+    await tester.pumpAndSettle();
+    final table = tester.getRect(find.byType(Table));
+    expect(table.top, 4);
+    final toolbar = find.byKey(
+      const ValueKey('markstream-table-hover-toolbar'),
+    );
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(790, 590));
+    addTearDown(mouse.removePointer);
+    // The invisible overlay must not catch the pointer over neighboring prose.
+    await mouse.moveTo(tester.getCenter(toolbar));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    await mouse.moveTo(table.center);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    expect(tester.getRect(find.byType(Table)), table);
+    expect(tester.getRect(toolbar).overlaps(table), isFalse);
+    await mouse.moveTo(tester.getCenter(find.text('Copy Markdown')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    await tester.tap(find.text('Copy Markdown'));
+    expect(copied, contains('| :--- | :---: | ---: |'));
+    await mouse.moveTo(const Offset(790, 590));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    expect(tester.getRect(find.byType(Table)), table);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.desktop());
+
+  testWidgets(
+    'keyboard focus reveals desktop actions without reserving space',
+    (tester) async {
       await tester.pumpWidget(
-        host(
-          const MarkstreamView(source: 'Before\n\n$_source\n\nAfter'),
-          width: 390,
-        ),
+        host(const MarkstreamView(source: _source), width: 390),
       );
       await tester.pumpAndSettle();
       final table = tester.getRect(find.byType(Table));
-      final toolbar = find.byKey(const ValueKey('markstream-table-toolbar'));
-      final footer = tester.getRect(toolbar);
-      expect(
-        table.top,
-        closeTo(
-          tester.getTopLeft(find.byType(MarkstreamTableBlock)).dy + 4,
-          .1,
-        ),
-      );
-      expect(footer.top, closeTo(table.bottom + 4, .1));
-      expect(footer.height, 28);
-      expect(
-        paragraph(
-          'Before',
-        ).localToGlobal(Offset(0, paragraph('Before').size.height)).dy,
-        lessThan(table.top),
-      );
-      expect(
-        paragraph('After').localToGlobal(Offset.zero).dy,
-        greaterThan(footer.bottom),
-      );
-      expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
-      final mouse = await tester.createGesture(
-        kind: ui.PointerDeviceKind.mouse,
-      );
-      await mouse.addPointer(location: const Offset(790, 590));
-      addTearDown(mouse.removePointer);
-      await mouse.moveTo(table.center);
-      await tester.pumpAndSettle();
-      expect(tester.getRect(toolbar), footer);
-      expect(tester.getRect(find.byType(Table)), table);
-      await tester.tap(find.text('Copy Markdown'));
-      expect(copied, contains('| :--- | :---: | ---: |'));
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.desktop(),
-  );
-
-  testWidgets('desktop table actions remain directly keyboard accessible', (
-    tester,
-  ) async {
-    await tester.pumpWidget(host(const MarkstreamView(source: _source)));
-    await tester.pumpAndSettle();
-    final table = tester.getRect(find.byType(Table));
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pumpAndSettle();
-    expect(
-      Focus.of(tester.element(find.text('Copy Markdown'))).hasFocus,
-      isTrue,
-    );
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pumpAndSettle();
-    expect(Focus.of(tester.element(find.text('Copy CSV'))).hasFocus, isTrue);
-    expect(tester.getRect(find.byType(Table)), table);
-    expect(tester.takeException(), isNull);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
-
-  testWidgets(
-    'focused actions scroll out with the table inside a local viewport',
-    (tester) async {
-      final controller = ScrollController();
-      addTearDown(controller.dispose);
-      const viewportKey = ValueKey('table-test-viewport');
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 200),
-                SizedBox(
-                  key: viewportKey,
-                  width: 320,
-                  height: 250,
-                  child: SingleChildScrollView(
-                    controller: controller,
-                    child: const Column(
-                      children: [
-                        SizedBox(height: 100),
-                        MarkstreamView(
-                          source: '| A | B |\n| - | - |\n| x | y |',
-                        ),
-                        SizedBox(height: 500),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final viewport = tester.getRect(find.byKey(viewportKey));
-      final toolbar = find.byKey(const ValueKey('markstream-table-toolbar'));
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pumpAndSettle();
-      expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
-      controller.jumpTo(240);
-      await tester.pumpAndSettle();
-      expect(tester.getRect(toolbar).bottom, lessThan(viewport.top));
-      expect(find.text('Copy Markdown').hitTestable(), findsNothing);
-      controller.jumpTo(0);
-      await tester.pumpAndSettle();
-      expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
       expect(
-        tester.getRect(toolbar).overlaps(tester.getRect(find.byType(Table))),
-        isFalse,
+        tester
+            .widget<AnimatedOpacity>(
+              find.byKey(const ValueKey('markstream-table-hover-toolbar')),
+            )
+            .opacity,
+        1,
+      );
+      expect(tester.getRect(find.byType(Table)), table);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        Focus.of(tester.element(find.text('Copy Markdown'))).hasFocus,
+        isTrue,
       );
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
+  testWidgets('desktop toolbar follows scrolling and clears hover off screen', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            controller: controller,
+            child: const Column(
+              children: [
+                SizedBox(height: 100),
+                MarkstreamView(source: '| A | B |\n| - | - |\n| x | y |'),
+                SizedBox(height: 1000),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final toolbar = find.byKey(
+      const ValueKey('markstream-table-hover-toolbar'),
+    );
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(790, 590));
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.byType(Table)));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getBottomLeft(toolbar).dy,
+      tester.getTopLeft(find.byType(Table)).dy,
+    );
+    controller.jumpTo(40);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getBottomLeft(toolbar).dy,
+      tester.getTopLeft(find.byType(Table)).dy,
+    );
+    await mouse.moveTo(tester.getCenter(find.byType(Table)));
+    await tester.pumpAndSettle();
+    await mouse.moveTo(tester.getCenter(toolbar));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    controller.jumpTo(500);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    await mouse.moveTo(const Offset(790, 590));
+    controller.jumpTo(0);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('desktop toolbar survives export and accessibility changes', (
+    tester,
+  ) async {
+    Future<void> pump({bool exporting = false, bool accessible = false}) async {
+      await tester.pumpWidget(
+        host(
+          MediaQuery(
+            data: MediaQueryData(accessibleNavigation: accessible),
+            child: MarkstreamView(source: _source, exporting: exporting),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final toolbar = find.byKey(
+      const ValueKey('markstream-table-hover-toolbar'),
+    );
+    await pump();
+    expect(toolbar, findsOneWidget);
+    await pump(exporting: true);
+    expect(toolbar, findsNothing);
+    await pump();
+    expect(toolbar, findsOneWidget);
+    await pump(accessible: true);
+    expect(toolbar, findsOneWidget);
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    await pump();
+    expect(toolbar, findsOneWidget);
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(790, 590));
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.byType(Table)));
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('focused toolbar stays inside its local scroll viewport', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    const viewportKey = ValueKey('table-test-viewport');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 200),
+              SizedBox(
+                key: viewportKey,
+                width: 320,
+                height: 250,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: const Column(
+                    children: [
+                      SizedBox(height: 100),
+                      MarkstreamView(source: '| A | B |\n| - | - |\n| x | y |'),
+                      SizedBox(height: 500),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final viewport = tester.getRect(find.byKey(viewportKey));
+    final toolbar = find.byKey(
+      const ValueKey('markstream-table-hover-toolbar'),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+    controller.jumpTo(70);
+    await tester.pumpAndSettle();
+    final shown = tester.getRect(toolbar);
+    expect(shown.top, greaterThanOrEqualTo(viewport.top));
+    expect(shown.bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(shown.overlaps(tester.getRect(find.byType(Table))), isFalse);
+    controller.jumpTo(220);
+    await tester.pumpAndSettle();
+    final table = tester.getRect(find.byType(Table));
+    expect(table.bottom, lessThan(viewport.top));
+    expect(table.bottom, greaterThan(0));
+    expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+    expect(find.text('Copy Markdown').hitTestable(), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets(
-    'long tables keep their actions after the cells instead of over them',
+    'long table toolbar never covers cells when no outside space is available',
     (tester) async {
       final controller = ScrollController();
       addTearDown(controller.dispose);
@@ -294,83 +387,109 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final toolbar = find.byKey(const ValueKey('markstream-table-toolbar'));
-      final table = tester.getRect(find.byType(Table));
-      expect(table.bottom, greaterThan(600));
+      final toolbar = find.byKey(
+        const ValueKey('markstream-table-hover-toolbar'),
+      );
+      expect(tester.getRect(find.byType(Table)).bottom, greaterThan(600));
       final mouse = await tester.createGesture(
         kind: ui.PointerDeviceKind.mouse,
       );
-      await mouse.addPointer(location: const Offset(100, 100));
+      await mouse.addPointer(location: const Offset(790, 590));
       addTearDown(mouse.removePointer);
+      await mouse.moveTo(const Offset(100, 100));
       await tester.pumpAndSettle();
-      expect(tester.getRect(toolbar).top, greaterThan(table.bottom));
+      expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
       expect(find.text('Copy Markdown').hitTestable(), findsNothing);
       controller.jumpTo(controller.position.maxScrollExtent);
       await tester.pumpAndSettle();
-      expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
+      expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
       expect(
         tester.getRect(toolbar).overlaps(tester.getRect(find.byType(Table))),
         isFalse,
       );
+      expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
   testWidgets(
-    'desktop actions are excluded from export and available with accessibility',
+    'accessible navigation reveals floating actions without reserving space',
     (tester) async {
-      Future<void> pump({
-        bool exporting = false,
-        bool accessible = false,
-      }) async {
-        await tester.pumpWidget(
-          host(
-            MediaQuery(
-              data: MediaQueryData(accessibleNavigation: accessible),
-              child: MarkstreamView(source: _source, exporting: exporting),
-            ),
+      await tester.pumpWidget(
+        host(
+          MediaQuery(
+            data: const MediaQueryData(accessibleNavigation: true),
+            child: const MarkstreamView(source: _source),
           ),
-        );
-        await tester.pumpAndSettle();
-      }
-
-      final toolbar = find.byKey(const ValueKey('markstream-table-toolbar'));
-      await pump();
+        ),
+      );
+      await tester.pumpAndSettle();
       final table = tester.getRect(find.byType(Table));
-      expect(toolbar, findsOneWidget);
-      await pump(exporting: true);
-      expect(toolbar, findsNothing);
-      expect(tester.getRect(find.byType(Table)), table);
-      await pump(accessible: true);
+      final block = tester.getRect(find.byType(MarkstreamTableBlock));
+      expect(table.top, 4);
+      expect(block.height, closeTo(table.height + 8, .01));
+      final toolbar = find.byKey(
+        const ValueKey('markstream-table-hover-toolbar'),
+      );
+      expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
       expect(find.text('Copy Markdown').hitTestable(), findsOneWidget);
-      expect(tester.getRect(toolbar).top, greaterThan(table.bottom));
-      expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
   for (final brightness in Brightness.values) {
     testWidgets(
-      'desktop action row leaves backdrop pixels unchanged in $brightness',
+      'transparent hover strip paints only buttons and passes clear-area taps in $brightness',
       (tester) async {
         const background = Color(0xff753b5a);
         final key = GlobalKey();
+        var taps = 0;
+        var pointerDowns = 0;
         await tester.pumpWidget(
-          host(
-            RepaintBoundary(
-              key: key,
-              child: ColoredBox(
-                color: background,
-                child: MarkstreamView(
-                  source: '| A | B |\n| - | - |\n| x | y |',
-                  theme: MarkstreamTheme.fromColorScheme(
-                    ColorScheme.fromSeed(
-                      seedColor: Colors.blue,
-                      brightness: brightness,
+          RepaintBoundary(
+            key: key,
+            child: MaterialApp(
+              theme: ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: Colors.blue,
+                  brightness: brightness,
+                ),
+              ),
+              home: Scaffold(
+                backgroundColor: background,
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 390,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 72),
+                        Listener(
+                          onPointerDown: (_) => pointerDowns++,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => taps++,
+                            child: const SizedBox(
+                              height: 28,
+                              width: 390,
+                              child: Text('Underlying text remains visible'),
+                            ),
+                          ),
+                        ),
+                        MarkstreamView(
+                          source: '| A | B |\n| - | - |\n| x | y |',
+                          theme: MarkstreamTheme.fromColorScheme(
+                            ColorScheme.fromSeed(
+                              seedColor: Colors.blue,
+                              brightness: brightness,
+                            ),
+                            backdrop: MarkstreamBackdrop.wallpaper,
+                            desktop: true,
+                          ),
+                        ),
+                      ],
                     ),
-                    backdrop: MarkstreamBackdrop.wallpaper,
-                    desktop: true,
                   ),
                 ),
               ),
@@ -380,29 +499,65 @@ void main() {
         await tester.pumpAndSettle();
         final boundary =
             key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-        final footer = tester.getRect(
-          find.byKey(const ValueKey('markstream-table-toolbar')),
+        final before = boundary.toImageSync();
+        final beforeData = await tester.runAsync(
+          () => before.toByteData(format: ui.ImageByteFormat.rawRgba),
         );
-        final sample = boundary.globalToLocal(
-          Offset(footer.left + 8, footer.center.dy),
+        final table = tester.getRect(find.byType(Table));
+        final block = tester.getRect(find.byType(MarkstreamTableBlock));
+        expect(block.height, closeTo(table.height + 8, .01));
+        final mouse = await tester.createGesture(
+          kind: ui.PointerDeviceKind.mouse,
         );
-        final image = boundary.toImageSync();
-        final data = await tester.runAsync(
-          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        await mouse.addPointer(location: const Offset(790, 590));
+        addTearDown(mouse.removePointer);
+        await mouse.moveTo(table.center);
+        await tester.pumpAndSettle();
+        final toolbar = find.byKey(
+          const ValueKey('markstream-table-hover-toolbar'),
         );
-        final offset =
-            (sample.dy.floor() * image.width + sample.dx.floor()) * 4;
-        final pixels = data!.buffer.asUint8List();
+        expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+        final buttons = tester.getRect(toolbar);
+        expect(buttons.width, lessThan(table.width));
+        expect(buttons.height, closeTo(28, .01));
+        expect(buttons.right, closeTo(table.right, .01));
+        expect(buttons.bottom, closeTo(table.top, .01));
+        expect(tester.getRect(find.byType(Table)), table);
+        expect(tester.getRect(find.byType(MarkstreamTableBlock)), block);
+        final after = boundary.toImageSync();
+        final afterData = await tester.runAsync(
+          () => after.toByteData(format: ui.ImageByteFormat.rawRgba),
+        );
+        final beforePixels = beforeData!.buffer.asUint8List();
+        final afterPixels = afterData!.buffer.asUint8List();
+        for (var y = buttons.top.ceil(); y < buttons.bottom.floor(); y++) {
+          final start = (y * after.width + table.left.ceil()) * 4;
+          final end = (y * after.width + buttons.left.floor() - 2) * 4;
+          expect(
+            afterPixels.sublist(start, end),
+            beforePixels.sublist(start, end),
+            reason:
+                'Transparent strip must preserve the text/background behind it at y=$y.',
+          );
+        }
+        before.dispose();
+        after.dispose();
+        await mouse.moveTo(Offset(table.left + 8, buttons.center.dy));
+        await tester.pumpAndSettle();
+        expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
+        await tester.tapAt(Offset(table.left + 8, buttons.center.dy));
+        expect(taps, 1, reason: 'Only actual buttons may intercept clicks.');
+        expect(pointerDowns, 1);
+        final press = await tester.startGesture(
+          tester.getCenter(find.text('Copy Markdown')),
+        );
+        final receivedPointerDowns = pointerDowns;
+        await press.cancel();
         expect(
-          Color.fromARGB(
-            pixels[offset + 3],
-            pixels[offset],
-            pixels[offset + 1],
-            pixels[offset + 2],
-          ),
-          background,
+          receivedPointerDowns,
+          1,
+          reason: 'Button presses must not reach underlying listeners.',
         );
-        image.dispose();
         expect(tester.takeException(), isNull);
       },
       variant: TargetPlatformVariant.only(TargetPlatform.macOS),
