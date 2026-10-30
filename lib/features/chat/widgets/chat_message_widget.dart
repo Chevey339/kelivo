@@ -3037,6 +3037,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         for (final segment in reasoningSegments ?? const <ReasoningSegment>[])
           TimelineReasoningRef(
             text: segment.text,
+            summaryText: segment.summaryText,
             expanded: segment.expanded,
             loading: segment.loading,
             startAt: segment.startAt,
@@ -3061,6 +3062,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         scope: AssistantRegexScope.assistant,
       ),
       partsArrivalOrdered: widget.message.isStreaming,
+      isStreaming: widget.message.isStreaming,
+      reasoningFinishedAt: widget.reasoningFinishedAt,
       parseInlineThinking: _legacyInlineThinkingFor(widget).hasThinking,
     );
   }
@@ -3086,17 +3089,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       for (final step in steps)
         if (step.isReasoning)
           _TimelineStepData.reasoning(
-            reasoning: ReasoningSegment(
-              text: step.reasoning!.text,
-              expanded: step.reasoning!.expanded,
-              loading: step.reasoning!.loading,
-              startAt: step.reasoning!.startAt,
-              finishedAt: step.reasoning!.finishedAt,
+            reasoning: ReasoningSegment.fromTimeline(
+              source: step.reasoning!,
               onToggle: _projectedReasoningToggle(
                 step.reasoningOverlayIndex,
                 reasoningSegments,
               ),
-              toolStartIndex: step.reasoning!.toolStartIndex,
             ),
             reasoningCountAfter: step.reasoningCountAfter,
             toolCountAfter: step.toolCountAfter,
@@ -4580,7 +4578,19 @@ List<WorkspaceToolPart> _producedWorkspaceParts(List<ToolUIPart>? parts) {
 
 // Data for a reasoning segment (for mixed display)
 class ReasoningSegment {
-  final String text;
+  ReasoningSegment.fromTimeline({
+    required TimelineReasoningRef source,
+    this.onToggle,
+  }) : _text = '',
+       _source = source,
+       summaryText = source.latestSummary,
+       expanded = source.expanded,
+       loading = source.loading,
+       startAt = source.startAt,
+       finishedAt = source.finishedAt,
+       toolStartIndex = source.toolStartIndex;
+
+  final String? summaryText;
   final bool expanded;
   final bool loading;
   final DateTime? startAt;
@@ -4590,30 +4600,52 @@ class ReasoningSegment {
   final int toolStartIndex;
 
   const ReasoningSegment({
-    required this.text,
+    required this._text,
+    this.summaryText,
     required this.expanded,
     required this.loading,
     this.startAt,
     this.finishedAt,
     this.onToggle,
     this.toolStartIndex = 0,
-  });
+  }) : _source = null;
+
+  final String _text;
+  final TimelineReasoningRef? _source;
+
+  String get text => _source?.text ?? _text;
 
   /// Toggle is excluded: the step State looks it up on tap so a new
   /// closure every parent rebuild does not bust widget memoization.
   @override
-  bool operator ==(Object other) =>
-      other is ReasoningSegment &&
-      other.text == text &&
-      other.expanded == expanded &&
-      other.loading == loading &&
-      other.startAt == startAt &&
-      other.finishedAt == finishedAt &&
-      other.toolStartIndex == toolStartIndex;
+  bool operator ==(Object other) {
+    if (other is! ReasoningSegment) return false;
+    final content = expanded ? text : (summaryText ?? text);
+    final otherContent = other.expanded
+        ? other.text
+        : (other.summaryText ?? other.text);
+    return otherContent == content &&
+        other.summaryText == summaryText &&
+        other.expanded == expanded &&
+        other.loading == loading &&
+        other.startAt == startAt &&
+        other.finishedAt == finishedAt &&
+        other.toolStartIndex == toolStartIndex;
+  }
 
   @override
-  int get hashCode =>
-      Object.hash(text, expanded, loading, startAt, finishedAt, toolStartIndex);
+  int get hashCode {
+    final content = expanded ? text : (summaryText ?? text);
+    return Object.hash(
+      content,
+      summaryText,
+      expanded,
+      loading,
+      startAt,
+      finishedAt,
+      toolStartIndex,
+    );
+  }
 }
 
 class _TimelineStepData {
@@ -4776,7 +4808,7 @@ List<_TimelineStepData> _visibleChatTimelineSteps(
   ];
 }
 
-enum _ReasoningStepState { collapsed, preview, expanded }
+enum _ReasoningStepState { collapsed, expanded }
 
 const double _timelineStepPaddingV = 8;
 const double _timelineIconSize = 18;
@@ -4891,9 +4923,13 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     required double textScale,
     required bool hasToggle,
   }) {
+    final contentSignature = step.expanded
+        ? step.text
+        : (step.summaryText ?? step.text);
     return (
       'reasoning',
-      step.text,
+      contentSignature,
+      step.summaryText,
       step.expanded,
       step.loading,
       step.startAt,
@@ -5457,11 +5493,6 @@ class _ChainOfThoughtReasoningStepState
             ? _localExpanded
             : null) ??
         widget.step.expanded;
-    if (widget.step.loading) {
-      return expanded
-          ? _ReasoningStepState.expanded
-          : _ReasoningStepState.preview;
-    }
     return expanded
         ? _ReasoningStepState.expanded
         : _ReasoningStepState.collapsed;
@@ -5557,7 +5588,12 @@ class _ChainOfThoughtReasoningStepState
       (s) => s.enableReasoningMarkdown,
     );
     final state = _stepState;
-    final display = _sanitize(widget.step.text);
+    final display = state == _ReasoningStepState.expanded
+        ? _sanitize(widget.step.text)
+        : null;
+    final summary = _sanitize(
+      widget.step.summaryText ?? display ?? widget.step.text,
+    );
     final label = ThinkingSheen(
       enabled: widget.step.loading,
       color: fg.strong,
@@ -5611,7 +5647,7 @@ class _ChainOfThoughtReasoningStepState
     }
 
     Widget? content;
-    if (state == _ReasoningStepState.preview) {
+    if (state == _ReasoningStepState.collapsed && widget.step.loading) {
       content = ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 100),
         child: OptionalShaderMask(
@@ -5674,7 +5710,7 @@ class _ChainOfThoughtReasoningStepState
         color: fg.muted,
       ),
       content: content,
-      contentVisible: state != _ReasoningStepState.collapsed,
+      contentVisible: content != null,
       expectContent: true,
     );
   }
@@ -8058,7 +8094,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
       ),
     );
 
-    // 抽公共样式，继承当前 DefaultTextStyle（从而继承正确的颜色）
+    // Share the current DefaultTextStyle to inherit the correct text color.
     final TextStyle baseStyle = DefaultTextStyle.of(
       context,
     ).style.copyWith(fontSize: 12.5, height: 1.32);
@@ -8079,7 +8115,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     final bool isLoading = loading;
     final display = _sanitize(widget.text);
 
-    // 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
+    // Inherit the same text color in both loading and completed states.
     Widget reasoningContent(String text) {
       if (enableReasoningMarkdown) {
         return RepaintBoundary(

@@ -10,6 +10,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -549,12 +550,30 @@ void main() {
   });
 
   testWidgets(
-    'reasoning without timing metadata starts collapsed and toggles',
+    'reasoning shows summaries only while running and expands full history',
     (tester) async {
       tester.view.physicalSize = const Size(1170, 2000);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
 
+      var parts = const <MessagePart>[
+        ReasoningPart('imported plan'),
+        ReasoningPart('second plan'),
+        ReasoningPart('latest summary'),
+      ];
+      List<ReasoningSegment>? reasoningSegments;
+      var isStreaming = false;
+      DateTime? reasoningFinishedAt;
+      late StateSetter rebuild;
+      Finder fullReasoningFinder() => find.byWidgetPredicate(
+        (widget) =>
+            widget is MarkdownWithCodeHighlight &&
+            widget.text ==
+                parts
+                    .whereType<ReasoningPart>()
+                    .map((part) => part.text)
+                    .join('\n\n'),
+      );
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -582,14 +601,22 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: ChatMessageWidget(
-                message: ChatMessage(
-                  id: 'imported-reasoning',
-                  role: 'assistant',
-                  conversationId: 'c1',
-                  parts: const [ReasoningPart('imported plan')],
-                ),
-                showModelIcon: false,
+              body: StatefulBuilder(
+                builder: (context, setState) {
+                  rebuild = setState;
+                  return ChatMessageWidget(
+                    message: ChatMessage(
+                      id: 'imported-reasoning',
+                      role: 'assistant',
+                      conversationId: 'c1',
+                      parts: parts,
+                      isStreaming: isStreaming,
+                    ),
+                    reasoningSegments: reasoningSegments,
+                    reasoningFinishedAt: reasoningFinishedAt,
+                    showModelIcon: false,
+                  );
+                },
               ),
             ),
           ),

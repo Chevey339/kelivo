@@ -948,6 +948,8 @@ class _MessageListViewState extends State<MessageListView> {
         target: AssistantRegexTransformTarget.visual,
       ),
       partsArrivalOrdered: message.isStreaming,
+      isStreaming: message.isStreaming,
+      reasoningFinishedAt: reasoning?.finishedAt,
       inlineThinkingExpanded: !settings.collapseThinking,
     );
     bool isPending(TimelineToolRef tool) => _isPendingApproval(
@@ -1095,24 +1097,26 @@ class _MessageListViewState extends State<MessageListView> {
     required double textWidth,
     required double fontScale,
   }) {
-    if (reasoning.text.isEmpty) return 0;
+    if (!reasoning.hasText) return 0;
     var extent = _estimateCollapsedCard;
     if (!reasoning.expanded) {
       if (reasoning.loading) return extent + 100;
       return extent;
     }
     final fontSize = 13.0 * fontScale;
-    final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoning.text));
+    final text = reasoning.text;
+    final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(text));
     final charsPerLine = math.max(1.0, textWidth / charWidth);
-    return extent +
+    final bodyHeight =
         _wrappedLineCount(
-              reasoning.text,
-              charsPerLine: charsPerLine,
-              codeCharsPerLine: null,
-              codeLineRatio: 1.0,
-              collapsedCodeLines: null,
-            ) *
-            (fontSize * 1.5);
+          text,
+          charsPerLine: charsPerLine,
+          codeCharsPerLine: null,
+          codeLineRatio: 1.0,
+          collapsedCodeLines: null,
+        ) *
+        (fontSize * 1.5);
+    return extent + bodyHeight;
   }
 
   /// Identity of the tool-card inputs an estimate was computed from.

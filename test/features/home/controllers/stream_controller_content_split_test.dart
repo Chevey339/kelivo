@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import "../../../support/business_test_harness.dart";
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -122,6 +123,23 @@ void main() {
     expect(restoredSplits.toolCounts, const [2]);
   });
 
+  test('reasoning payload preserves structured summary identity', () {
+    final controller = buildController();
+    final segment = ReasoningSegmentData()
+      ..id = 'summary-1'
+      ..reasoningType = ReasoningType.summaryText
+      ..summaryEnded = true
+      ..text = '**Title** body';
+
+    final json = controller.serializeReasoningSegments([segment]);
+    final restored = controller.deserializeReasoningSegments(json).single;
+
+    expect(restored.id, 'summary-1');
+    expect(restored.reasoningType, ReasoningType.summaryText);
+    expect(restored.summaryEnded, isTrue);
+    expect(restored.text, '**Title** body');
+  });
+
   test('segments plus reasoningDetails omit empty contentSplits', () {
     final controller = buildController();
     final segment = ReasoningSegmentData()
@@ -215,9 +233,12 @@ void main() {
 
   test('StreamingState resumes from existing assistant content', () {
     final settings = SettingsProvider(createBusinessTestPreferences());
-    final state = buildStreamingStateWithContent(settings, '先确认一下。');
+    final state = buildStreamingStateWithContent(
+      settings,
+      'Let me confirm first.',
+    );
 
-    expect(state.fullContentRaw, '先确认一下。');
+    expect(state.fullContentRaw, 'Let me confirm first.');
   });
 
   test('finishReasoningAndPersist no longer writes content splits', () async {
@@ -291,7 +312,7 @@ void main() {
     final message = ChatMessage(
       id: 'assistant-1',
       role: 'assistant',
-      content: '让我帮你搜索一下',
+      content: 'Let me search for you',
       conversationId: 'conversation-1',
       reasoningSegmentsJson:
           '{"v":2,"segments":[],"contentSplits":{"offsets":[],"reasoningCounts":[],"toolCounts":[]}}',

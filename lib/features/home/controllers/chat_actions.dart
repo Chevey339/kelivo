@@ -2313,12 +2313,22 @@ class ChatActions {
       case TextDelta(:final text):
         await _handleContentChunk(state, text);
         _scheduleStreamingCheckpoint(state);
-      case ReasoningDelta(:final text, :final details):
+      case ReasoningDelta(
+        :final id,
+        :final text,
+        :final details,
+        :final reasoningType,
+      ):
         if (details != null) {
           streamController.setReasoningDetails(state.messageId, details);
         }
         if (text.isNotEmpty && state.ctx.supportsReasoning) {
-          await _handleReasoningChunk(text, state);
+          await _handleReasoningChunk(
+            text,
+            state,
+            segmentId: id,
+            reasoningType: reasoningType,
+          );
         }
         _scheduleStreamingCheckpoint(state);
       case ToolCallStart(:final id, :final toolName):
@@ -2357,10 +2367,13 @@ class ChatActions {
           GeneratedFile():
         _publishAssistantParts(state);
         _scheduleStreamingCheckpoint(state);
+      case ReasoningEnd(:final id):
+        streamController.finishReasoningSegment(state.messageId, id);
+        _publishAssistantParts(state);
+        _scheduleStreamingCheckpoint(state);
       case TextStart() ||
           TextEnd() ||
           ReasoningStart() ||
-          ReasoningEnd() ||
           ServerToolInputDelta() ||
           ServerToolInputEnd():
         break;
@@ -2421,9 +2434,16 @@ class ChatActions {
   /// Handle reasoning chunk from stream.
   Future<void> _handleReasoningChunk(
     String reasoning,
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleReasoningChunk(reasoning, state);
+    stream_ctrl.StreamingState state, {
+    String? segmentId,
+    ReasoningType reasoningType = ReasoningType.reasoningText,
+  }) async {
+    await streamController.handleReasoningChunk(
+      reasoning,
+      state,
+      segmentId: segmentId,
+      reasoningType: reasoningType,
+    );
     _publishAssistantParts(state);
   }
 

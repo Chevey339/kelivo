@@ -28,6 +28,133 @@ List<TimelineToolRef> _toolsIn(TimelineProjection projected) {
 }
 
 void main() {
+  for (final count in [1, 2]) {
+    test('completed summaries keep the reasoning timer running ($count)', () {
+      final start = DateTime.utc(2026, 10, 11);
+      final projected = projectAssistantTimeline(
+        parts: [for (var i = 0; i < count; i++) ReasoningPart('summary $i')],
+        liveTools: const [],
+        reasoningSegments: [
+          for (var i = 0; i < count; i++)
+            TimelineReasoningRef(
+              text: 'summary $i',
+              startAt: start.add(Duration(seconds: i)),
+              finishedAt: start.add(Duration(seconds: i + 1)),
+              expanded: false,
+            ),
+        ],
+        visualContent: '',
+        partsArrivalOrdered: true,
+        isStreaming: true,
+      );
+      final reasoning = projected.blocks.single.steps.single.reasoning!;
+      expect(reasoning.loading, isTrue);
+      expect(reasoning.startAt, start);
+      expect(reasoning.finishedAt, isNull);
+    });
+  }
+
+  for (final boundary in <MessagePart>[
+    const TextPart('answer'),
+    const ToolCallPart('{"id":"t1","name":"search","arguments":{}}'),
+  ]) {
+    test('a ${boundary.kind} stops the preceding reasoning timer', () {
+      final start = DateTime.utc(2026, 10, 11);
+      final end = start.add(const Duration(seconds: 4));
+      final projected = projectAssistantTimeline(
+        parts: [const ReasoningPart('summary'), boundary],
+        liveTools: const [],
+        reasoningSegments: [
+          TimelineReasoningRef(
+            text: 'summary',
+            startAt: start,
+            finishedAt: end,
+          ),
+        ],
+        visualContent: boundary is TextPart ? boundary.text : '',
+        partsArrivalOrdered: true,
+        isStreaming: true,
+        reasoningFinishedAt: start.add(const Duration(seconds: 6)),
+      );
+      final reasoning = projected.blocks.first.steps.first.reasoning!;
+      expect(reasoning.loading, isFalse);
+      expect(
+        reasoning.finishedAt,
+        boundary is TextPart ? start.add(const Duration(seconds: 6)) : end,
+      );
+    });
+  }
+
+  for (final fromParts in [true, false]) {
+    test('adjacent reasoning retains summary and state ($fromParts)', () {
+      final start = DateTime.utc(2026, 10, 11);
+      final projected = projectAssistantTimeline(
+        parts: const [
+          ReasoningPart('first sentence'),
+          ReasoningPart('second sentence\nlatest summary'),
+        ],
+        liveTools: const [],
+        reasoningSegments: [
+          TimelineReasoningRef(
+            text: 'first sentence',
+            startAt: start,
+            expanded: false,
+          ),
+          const TimelineReasoningRef(
+            text: 'second sentence\nlatest summary',
+            loading: true,
+          ),
+        ],
+        visualContent: '',
+        renderFromParts: fromParts,
+      );
+      final step = projected.blocks.single.steps.single;
+      expect(
+        step.reasoning!.text,
+        'first sentence\n\nsecond sentence\nlatest summary',
+      );
+      expect(step.reasoning!.latestSummary, 'second sentence\nlatest summary');
+      expect(step.reasoning!.expanded, isFalse);
+      expect(step.reasoning!.loading, isTrue);
+      expect(step.reasoning!.startAt, start);
+      expect(step.reasoningOverlayIndex, 0);
+      expect(step.reasoningCountAfter, 2);
+    });
+  }
+
+  test('adjacent reasoning does not merge across tool calls or text', () {
+    final projected = projectAssistantTimeline(
+      parts: const [
+        ReasoningPart('reasoning one'),
+        ReasoningPart('reasoning two'),
+        ToolCallPart('{"id":"t1","name":"search","arguments":{}}'),
+        ReasoningPart('reasoning three'),
+        ReasoningPart('reasoning four'),
+        TextPart('answer'),
+        ReasoningPart('reasoning five'),
+      ],
+      liveTools: const [],
+      reasoningSegments: const [],
+      visualContent: 'answer',
+    );
+    expect(projected.blocks, hasLength(3));
+    expect(
+      projected.blocks.first.steps.map(
+        (step) => step.isReasoning ? step.reasoning!.text : step.tool!.id,
+      ),
+      [
+        'reasoning one\n\nreasoning two',
+        't1',
+        'reasoning three\n\nreasoning four',
+      ],
+    );
+    expect(projected.blocks[1].text, 'answer');
+    expect(
+      projected.blocks.last.steps.single.reasoning!.text,
+      'reasoning five',
+    );
+  });
+
   test('tool parsing is reused until its immutable payload changes', () {
     const first = ToolCallPart(
       '{"id":"t","name":"search","arguments":{},"content":"same","metadata":{"version":1}}',

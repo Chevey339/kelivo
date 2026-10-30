@@ -88,6 +88,9 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Map<String, String> _toolEventIdsByKey = <String, String>{};
   final Set<String> _openToolIds = <String>{};
   final Set<String> _endedToolIds = <String>{};
+  final Map<String, String> _reasoningSummaryIdsByKey = <String, String>{};
+  final Set<String> _openReasoningIds = <String>{};
+  final Set<String> _endedReasoningIds = <String>{};
   final Map<int, String> _imageIdsByIndex = <int, String>{};
   final Set<String> _openImageIds = <String>{};
   final Set<String> _endedImageIds = <String>{};
@@ -214,6 +217,19 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   String _reasoningSeriesId(Map<String, dynamic> obj) =>
       _ids.indexed('reasoning', _readInt(obj['output_index']));
 
+  String _reasoningSummarySeriesId(Map<String, dynamic> obj) {
+    final itemId = (obj['item_id'] ?? '').toString().trim();
+    final outputIndex = _readInt(obj['output_index']);
+    final summaryIndex = _readInt(obj['summary_index']);
+    final key = itemId.isNotEmpty
+        ? '$itemId:$summaryIndex'
+        : '$outputIndex:$summaryIndex';
+    return _reasoningSummaryIdsByKey.putIfAbsent(
+      key,
+      () => _ids.next('reasoning-summary'),
+    );
+  }
+
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final type = obj['type'];
     if (type == 'response.output_text.delta') {
@@ -224,12 +240,36 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       }
       return;
     }
+    if (type == 'response.reasoning_summary_part.added') {
+      final id = _reasoningSummarySeriesId(obj);
+      chunks.addAll(_startReasoning(id, ReasoningType.summaryText));
+      return;
+    }
     if (type == 'response.reasoning_summary_text.delta' ||
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: _reasoningSeriesId(obj), text: delta));
+        final isSummary = type == 'response.reasoning_summary_text.delta';
+        final id = isSummary
+            ? _reasoningSummarySeriesId(obj)
+            : _reasoningSeriesId(obj);
+        final reasoningType = isSummary
+            ? ReasoningType.summaryText
+            : ReasoningType.reasoningText;
+        if (isSummary) {
+          if (_endedReasoningIds.contains(id)) return;
+          chunks.addAll(_startReasoning(id, reasoningType));
+        }
+        chunks.add(
+          ReasoningDelta(id: id, text: delta, reasoningType: reasoningType),
+        );
       }
+      return;
+    }
+    if (type == 'response.reasoning_summary_text.done' ||
+        type == 'response.reasoning_summary_part.done') {
+      final id = _reasoningSummarySeriesId(obj);
+      chunks.addAll(_endReasoning(id));
       return;
     }
     if (type == 'response.output_item.added') {
@@ -694,7 +734,23 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         _finishServerTool(id, <String, dynamic>{'id': id}, serverStatus),
       );
     }
+    for (final id in _openReasoningIds.toList()) {
+      chunks.addAll(_endReasoning(id));
+    }
     return chunks;
+  }
+
+  List<StreamChunk> _startReasoning(String id, ReasoningType reasoningType) {
+    if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
+      return const <StreamChunk>[];
+    }
+    return <StreamChunk>[ReasoningStart(id: id, reasoningType: reasoningType)];
+  }
+
+  List<StreamChunk> _endReasoning(String id) {
+    _openReasoningIds.remove(id);
+    if (!_endedReasoningIds.add(id)) return const <StreamChunk>[];
+    return <StreamChunk>[ReasoningEnd(id: id)];
   }
 }
 
