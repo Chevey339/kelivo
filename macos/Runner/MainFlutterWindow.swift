@@ -23,6 +23,7 @@ class MainFlutterWindow: NSWindow {
   private var sidebarCursorFocusObserver: Any?
   private var sidebarCursorPoint: NSPoint?
   private let browserInsetLeases = BrowserViewportInsetLeases()
+  private let trafficLightSize: CGFloat = 12
   private var trafficLightConstraints: [(top: NSLayoutConstraint, left: NSLayoutConstraint)] = []
 
   deinit {
@@ -91,6 +92,9 @@ class MainFlutterWindow: NSWindow {
   // Layout helper: re-position the traffic light buttons
   private func layoutTrafficLightButton(titlebarView: NSView, button: NSButton, offsetTop: CGFloat, offsetLeft: CGFloat) {
     button.translatesAutoresizingMaskIntoConstraints = false
+    // Scale the native artwork along with its frame instead of clipping it.
+    button.setFrameSize(NSSize(width: trafficLightSize, height: trafficLightSize))
+    button.setBoundsSize(button.intrinsicContentSize)
     let top = NSLayoutConstraint(
       item: button,
       attribute: .top,
@@ -109,7 +113,11 @@ class MainFlutterWindow: NSWindow {
       multiplier: 1,
       constant: offsetLeft
     )
-    NSLayoutConstraint.activate([top, left])
+    NSLayoutConstraint.activate([
+      top, left,
+      button.widthAnchor.constraint(equalToConstant: trafficLightSize),
+      button.heightAnchor.constraint(equalToConstant: trafficLightSize),
+    ])
     trafficLightConstraints.append((top: top, left: left))
   }
 
@@ -283,10 +291,10 @@ class MainFlutterWindow: NSWindow {
   }
 
   private func setBrowserChrome(_ enabled: Bool) {
-    // Center the 14-point system buttons within the browser's 44-point tab row.
+    // Center the compact system buttons within the browser's 44-point tab row.
     // Restore the existing app layout when its route closes.
     for (index, constraints) in trafficLightConstraints.enumerated() {
-      constraints.top.constant = enabled ? 15 : 14
+      constraints.top.constant = enabled ? (44 - trafficLightSize) / 2 : 14
       constraints.left.constant = enabled ? 20 + CGFloat(index) * 24 : 12 + CGFloat(index) * 18
     }
     standardWindowButton(.closeButton)?.superview?.layoutSubtreeIfNeeded()
