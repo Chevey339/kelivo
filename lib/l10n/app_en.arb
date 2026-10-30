@@ -1288,6 +1288,8 @@
   "displaySettingsPageEnableDollarLatexSubtitle": "Render inline math inside $...$",
   "displaySettingsPageEnableMathTitle": "Math Formula Rendering",
   "displaySettingsPageEnableMathSubtitle": "Render LaTeX math (inline and block)",
+  "displaySettingsPageUseLegacyInlineCodeStyleTitle": "Legacy inline code style",
+  "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "Use a lighter background, a thin border, and more line spacing for inline code.",
   "displaySettingsPageEnableUserMarkdownTitle": "Render user messages with Markdown",
   "displaySettingsPageEnableReasoningMarkdownTitle": "Render reasoning (thinking) with Markdown",
   "displaySettingsPageEnableAssistantMarkdownTitle": "Render assistant messages with Markdown",

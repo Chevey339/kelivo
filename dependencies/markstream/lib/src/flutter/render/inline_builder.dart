@@ -128,36 +128,30 @@ class InlineSpanBuilder {
       bool keyboard = false,
       List<TextSegment>? segments,
     }) {
+      final codeTheme = keyboard ? theme.keyboard : theme.inlineCode;
       Widget capsule = InlineCodeCapsule(
         text: value,
         textSpan: segments == null
             ? null
             : extensions.literalSpanBuilder?.call(
                 context,
-                TextSpan(text: value, style: theme.inlineCode.text),
+                TextSpan(text: value, style: codeTheme.text),
                 segments,
               ),
         mouseCursor: onTap == null
             ? SystemMouseCursors.text
             : SystemMouseCursors.click,
-        style: theme.inlineCode.text,
-        backgroundColor: keyboard
-            ? (theme.backdrop == MarkstreamBackdrop.plain
-                  ? theme.colors.fillBlock
-                  : theme.colors.fillRaised)
-            : theme.inlineCode.backgroundColor,
-        borderColor: theme.inlineCode.borderColor,
-        padding: theme.inlineCode.padding,
-        radius: keyboard ? MarkstreamTheme.radiusXs : theme.inlineCode.radius,
+        style: codeTheme.text,
+        backgroundColor: codeTheme.backgroundColor,
+        borderColor: codeTheme.borderColor,
+        padding: codeTheme.padding,
+        radius: codeTheme.radius,
         border: keyboard
             ? Border(
-                top: BorderSide(color: theme.colors.borderStrong),
-                left: BorderSide(color: theme.colors.borderStrong),
-                right: BorderSide(color: theme.colors.borderStrong),
-                bottom: BorderSide(
-                  color: theme.colors.borderStrong,
-                  width: 1.5,
-                ),
+                top: BorderSide(color: codeTheme.borderColor),
+                left: BorderSide(color: codeTheme.borderColor),
+                right: BorderSide(color: codeTheme.borderColor),
+                bottom: BorderSide(color: codeTheme.borderColor, width: 1.5),
               )
             : null,
       );
@@ -172,10 +166,7 @@ class InlineSpanBuilder {
         child: unscaled(
           highlights.atom(
             node.span,
-            OpticalBaseline(
-              center: theme.inlineCode.opticalCenter,
-              child: capsule,
-            ),
+            OpticalBaseline(center: codeTheme.opticalCenter, child: capsule),
           ),
         ),
       );

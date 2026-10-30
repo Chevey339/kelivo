@@ -2833,6 +2833,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Render LaTeX math (inline and block)';
 
   @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleTitle =>
+      'Legacy inline code style';
+
+  @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle =>
+      'Use a lighter background, a thin border, and more line spacing for inline code.';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle =>
       'Render user messages with Markdown';
 

@@ -2292,6 +2292,8 @@
   "displaySettingsPageEnableDollarLatexTitle": "启用 $...$ 渲染",
   "displaySettingsPageEnableDollarLatexSubtitle": "将 $...$ 之间的内容按行内数学公式渲染",
   "displaySettingsPageEnableMathTitle": "启用数学公式渲染",
+  "displaySettingsPageUseLegacyInlineCodeStyleTitle": "旧版行内代码样式",
+  "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "为行内代码使用较浅的底色、细边框和更宽松的行距。",
   "displaySettingsPageEnableUserMarkdownTitle": "用户消息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维链 Markdown 渲染",
   "displaySettingsPageEnableAssistantMarkdownTitle": "助手消息 Markdown 渲染",

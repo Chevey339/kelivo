@@ -1538,6 +1538,17 @@ class RenderingSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Code,
+                label: l10n.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+                tip: l10n.displaySettingsPageUseLegacyInlineCodeStyleSubtitle,
+                value: sp.useLegacyInlineCodeStyle,
+                onChanged: (value) => context
+                    .read<SettingsProvider>()
+                    .setUseLegacyInlineCodeStyle(value),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.TextSelect,
                 label: l10n.displaySettingsPageEnableUserMarkdownTitle,
                 value: sp.enableUserMarkdown,

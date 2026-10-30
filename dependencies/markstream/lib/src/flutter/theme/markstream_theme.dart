@@ -550,6 +550,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.blockSpacing,
     required this.link,
     required this.inlineCode,
+    required this.keyboard,
     required this.code,
     required this.quote,
     required this.listMarkerPadding,
@@ -576,6 +577,7 @@ final class MarkstreamTheme extends _ThemeTokens {
   final double blockSpacing;
   final TextStyle link;
   final InlineCodeTheme inlineCode;
+  final InlineCodeTheme keyboard;
   final CodeBlockTheme code;
   final QuoteTheme quote;
   final EdgeInsetsGeometry listMarkerPadding;
@@ -630,6 +632,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     double? blockSpacing,
     TextStyle? link,
     InlineCodeTheme? inlineCode,
+    InlineCodeTheme? keyboard,
     CodeBlockTheme? code,
     QuoteTheme? quote,
     EdgeInsetsGeometry? listMarkerPadding,
@@ -655,6 +658,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     blockSpacing: blockSpacing ?? this.blockSpacing,
     link: link ?? this.link,
     inlineCode: inlineCode ?? this.inlineCode,
+    keyboard: keyboard ?? this.keyboard,
     code: code ?? this.code,
     quote: quote ?? this.quote,
     listMarkerPadding: listMarkerPadding ?? this.listMarkerPadding,
@@ -682,6 +686,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     blockSpacing,
     link,
     inlineCode,
+    keyboard,
     code,
     quote,
     listMarkerPadding,
@@ -829,6 +834,19 @@ final class MarkstreamTheme extends _ThemeTokens {
       fontFamily: codeFontFamily,
       fontFamilyFallback: body.fontFamilyFallback,
     );
+    final inlineCode = InlineCodeTheme(
+      text: mono.copyWith(
+        fontSize: b * .86,
+        height: 1,
+        leadingDistribution: TextLeadingDistribution.even,
+        color: palette.ink.withValues(alpha: .92),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      opticalCenter: b * .35,
+      radius: radiusSm,
+      backgroundColor: palette.fillInline,
+      borderColor: Colors.transparent,
+    );
     return MarkstreamTheme(
       backdrop: backdrop,
       colors: palette,
@@ -857,18 +875,13 @@ final class MarkstreamTheme extends _ThemeTokens {
         decorationColor: palette.accent.withValues(alpha: .35),
         decorationThickness: 1,
       ),
-      inlineCode: InlineCodeTheme(
-        text: mono.copyWith(
-          fontSize: b * .86,
-          height: 1,
-          leadingDistribution: TextLeadingDistribution.even,
-          color: palette.ink.withValues(alpha: .92),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-        opticalCenter: b * .35,
-        radius: radiusSm,
-        backgroundColor: palette.fillInline,
-        borderColor: Colors.transparent,
+      inlineCode: inlineCode,
+      keyboard: inlineCode.copyWith(
+        radius: radiusXs,
+        backgroundColor: backdrop == MarkstreamBackdrop.plain
+            ? palette.fillBlock
+            : palette.fillRaised,
+        borderColor: palette.borderStrong,
       ),
       code: CodeBlockTheme(
         text: mono,

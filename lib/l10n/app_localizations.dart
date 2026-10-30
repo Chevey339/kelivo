@@ -5242,6 +5242,18 @@ abstract class AppLocalizations {
   /// **'Render LaTeX math (inline and block)'**
   String get displaySettingsPageEnableMathSubtitle;
 
+  /// No description provided for @displaySettingsPageUseLegacyInlineCodeStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy inline code style'**
+  String get displaySettingsPageUseLegacyInlineCodeStyleTitle;
+
+  /// No description provided for @displaySettingsPageUseLegacyInlineCodeStyleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a lighter background, a thin border, and more line spacing for inline code.'**
+  String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle;
+
   /// No description provided for @displaySettingsPageEnableUserMarkdownTitle.
   ///
   /// In en, this message translates to:

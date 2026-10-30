@@ -169,6 +169,7 @@ void main() {
           colors: first.colors.copyWith(),
           chrome: first.chrome.copyWith(),
           inlineCode: first.inlineCode.copyWith(),
+          keyboard: first.keyboard.copyWith(),
           quote: first.quote.copyWith(),
           task: first.task.copyWith(),
           table: first.table.copyWith(),
@@ -180,6 +181,7 @@ void main() {
         first.copyWith(colors: first.colors.copyWith(border: Colors.red)),
         first.copyWith(chrome: first.chrome.copyWith(height: 40)),
         first.copyWith(inlineCode: first.inlineCode.copyWith(opticalCenter: 8)),
+        first.copyWith(keyboard: first.keyboard.copyWith(opticalCenter: 8)),
         first.copyWith(quote: first.quote.copyWith(textColor: Colors.red)),
         first.copyWith(task: first.task.copyWith(strokeWidth: 2)),
         first.copyWith(

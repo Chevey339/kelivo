@@ -57,7 +57,7 @@ MarkstreamTheme mapMarkdownTheme(
       );
     }
   }
-  return MarkstreamTheme.fromColorScheme(
+  final theme = MarkstreamTheme.fromColorScheme(
     scheme,
     backdrop: backdrop,
     maskStrength: backdrop == MarkstreamBackdrop.plain
@@ -71,6 +71,27 @@ MarkstreamTheme mapMarkdownTheme(
     medium: AppFontWeights.medium,
     semibold: AppFontWeights.semibold,
     strong: AppFontWeights.strong,
+  );
+  if (!settings.useLegacyInlineCodeStyle) return theme;
+  final translucent =
+      backdrop == MarkstreamBackdrop.wallpaper ||
+      backdrop == MarkstreamBackdrop.frostedBubble;
+  return theme.copyWith(
+    inlineCode: theme.inlineCode.copyWith(
+      text: theme.inlineCode.text.copyWith(
+        height: 1.4,
+        color: theme.colors.ink,
+      ),
+      // Keep short code within the paragraph's line height while giving
+      // wrapped code room between lines.
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      backgroundColor: translucent
+          ? theme.colors.fillBlock
+          : theme.brightness == Brightness.dark
+          ? Colors.white12
+          : const Color(0x66F1F3F5),
+      borderColor: theme.colors.border,
+    ),
   );
 }
 

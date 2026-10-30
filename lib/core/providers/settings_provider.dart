@@ -294,6 +294,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_dollar_latex_v1';
   static const String _displayEnableMathRenderingKey =
       'display_enable_math_rendering_v1';
+  static const String _displayUseLegacyInlineCodeStyleKey =
+      'display_use_legacy_inline_code_style_v1';
   static const String _displayEnableUserMarkdownKey =
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
@@ -1139,6 +1141,8 @@ class SettingsProvider extends ChangeNotifier {
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
+    _useLegacyInlineCodeStyle =
+        prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -5179,6 +5183,16 @@ Requirements:
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
+  // Display: opt in to the previous inline code appearance.
+  bool _useLegacyInlineCodeStyle = false;
+  bool get useLegacyInlineCodeStyle => _useLegacyInlineCodeStyle;
+  Future<void> setUseLegacyInlineCodeStyle(bool value) async {
+    if (_useLegacyInlineCodeStyle == value) return;
+    _useLegacyInlineCodeStyle = value;
+    notifyListeners();
+    await _preferences.setBool(_displayUseLegacyInlineCodeStyleKey, value);
+  }
+
   // Display: render user messages with Markdown
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
@@ -5909,6 +5923,7 @@ Requirements:
     copy._autoScrollEnabled = _autoScrollEnabled;
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
+    copy._useLegacyInlineCodeStyle = _useLegacyInlineCodeStyle;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;

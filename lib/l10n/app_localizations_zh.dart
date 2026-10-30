@@ -2736,6 +2736,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
 
   @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '旧版行内代码样式';
+
+  @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle =>
+      '为行内代码使用较浅的底色、细边框和更宽松的行距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -17548,6 +17555,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
 
   @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '旧版行内代码样式';
+
+  @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle =>
+      '为行内代码使用较浅的底色、细边框和更宽松的行距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -32284,6 +32298,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 數學公式（行內與區塊）';
+
+  @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleTitle => '舊版行內程式碼樣式';
+
+  @override
+  String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle =>
+      '為行內程式碼使用較淺的底色、細邊框和更寬鬆的行距。';
 
   @override
   String get displaySettingsPageEnableUserMarkdownTitle => '使用者訊息 Markdown 渲染';

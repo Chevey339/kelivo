@@ -16,29 +16,32 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_backdrop_host.dart';
 
 Widget host(
   Widget child, {
   SettingsProvider? settings,
   bool dark = false,
+  bool wallpaper = false,
   double width = 390,
   Locale locale = const Locale('en'),
-}) => ChangeNotifierProvider.value(
-  value: settings ?? SettingsProvider(createBusinessTestPreferences()),
-  child: MaterialApp(
-    locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
-    home: AppSnackBarOverlay(
-      child: Scaffold(
-        body: SingleChildScrollView(
-          child: SizedBox(width: width, child: child),
-        ),
-      ),
+}) {
+  Widget body = SingleChildScrollView(
+    child: SizedBox(width: width, child: child),
+  );
+  if (wallpaper) body = MarkdownWallpaperTestHost(child: body);
+  return ChangeNotifierProvider.value(
+    value: settings ?? SettingsProvider(createBusinessTestPreferences()),
+    child: MaterialApp(
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
+      home: AppSnackBarOverlay(child: Scaffold(body: body)),
     ),
-  ),
-);
+  );
+}
+
 List<MarkdownNode> nodes(MarkdownNode root) {
   final result = <MarkdownNode>[], pending = [root];
   while (pending.isNotEmpty) {
@@ -51,6 +54,94 @@ List<MarkdownNode> nodes(MarkdownNode root) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final dark in [false, true]) {
+    for (final wallpaper in [false, true]) {
+      for (final streaming in [false, true]) {
+        testWidgets('inline code style switches live and preserves content: '
+            'dark=$dark wallpaper=$wallpaper streaming=$streaming', (
+          tester,
+        ) async {
+          final settings = SettingsProvider(createBusinessTestPreferences());
+          addTearDown(settings.dispose);
+          await settings.loaded;
+          final selection = MarkstreamSelectionController();
+          addTearDown(selection.dispose);
+          final code = List.filled(8, 'wrapped code 中文').join(' ');
+          final child = MarkstreamSelectionScope(
+            controller: selection,
+            child: SelectionArea(
+              child: MarkdownWithCodeHighlight(
+                text: 'Before `$code` after <kbd>Ctrl</kbd>\n\nTail',
+                streaming: streaming,
+              ),
+            ),
+          );
+          await tester.pumpWidget(
+            host(child, settings: settings, dark: dark, wallpaper: wallpaper),
+          );
+          await tester.pumpAndSettle();
+          final view = find.byType(MarkstreamView);
+          final state = tester.state(view);
+          final current = tester.widget<MarkstreamView>(view).theme!;
+          InlineCodeCapsule keyboard() => tester.widget<InlineCodeCapsule>(
+            find.byWidgetPredicate(
+              (widget) => widget is InlineCodeCapsule && widget.text == 'Ctrl',
+            ),
+          );
+          final originalKeyboard = keyboard();
+          expect(current.inlineCode.text.height, 1);
+          expect(current.inlineCode.borderColor, Colors.transparent);
+
+          String? selected;
+          for (final enabled in [false, true, false]) {
+            await settings.setUseLegacyInlineCodeStyle(enabled);
+            await tester.pumpAndSettle();
+            final updated = tester.widget<MarkstreamView>(view).theme!;
+            expect(tester.state(view), same(state));
+            expect(updated.copyWith(inlineCode: current.inlineCode), current);
+            final key = keyboard();
+            expect(
+              (
+                key.style,
+                key.padding,
+                key.backgroundColor,
+                key.border,
+                key.radius,
+              ),
+              (
+                originalKeyboard.style,
+                originalKeyboard.padding,
+                originalKeyboard.backgroundColor,
+                originalKeyboard.border,
+                originalKeyboard.radius,
+              ),
+              reason: 'The inline code preference must not restyle <kbd>.',
+            );
+            if (enabled) {
+              expect(updated.inlineCode.text.height, 1.4);
+              expect(updated.inlineCode.borderColor.a, greaterThan(0));
+              if (wallpaper) {
+                expect(
+                  updated.inlineCode.backgroundColor,
+                  updated.colors.fillBlock,
+                );
+              }
+            } else {
+              expect(updated, current);
+            }
+            tester
+                .state<SelectableRegionState>(find.byType(SelectableRegion))
+                .selectAll(SelectionChangedCause.keyboard);
+            await tester.pumpAndSettle();
+            selected ??= selection.selectedPlainText;
+            expect(selection.selectedPlainText, contains(code));
+            expect(selection.selectedPlainText, selected);
+            expect(tester.takeException(), isNull);
+          }
+        });
+      }
+    }
+  }
   testWidgets('directive cards follow the app locale when it changes', (
     tester,
   ) async {

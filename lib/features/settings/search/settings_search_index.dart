@@ -653,6 +653,12 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageEnableMathTitle,
     );
     add(
+      'displaySettingsPageUseLegacyInlineCodeStyleTitle',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+      keywords: 'inline code legacy classic style 行内代码 行內程式碼 旧版 舊版 样式 樣式',
+    );
+    add(
       'displaySettingsPageEnableUserMarkdownTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageEnableUserMarkdownTitle,
