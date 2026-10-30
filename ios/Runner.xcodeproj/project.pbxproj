@@ -698,11 +698,12 @@
 			inputPaths = (
 				"$(SRCROOT)/sandbox/ensure_artifacts.sh",
 				"$(SRCROOT)/sandbox/build_ish.sh",
-				"$(SRCROOT)/sandbox/patches/0001-kernel-time-interruptible-nanosleep.patch",
 				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
 				"$(SRCROOT)/sandbox/patches/0003-kernel-host-managed-lifetime.patch",
 				"$(SRCROOT)/sandbox/patches/0004-kernel-node-random-seed.patch",
 				"$(SRCROOT)/sandbox/patches/0005-kernel-init-exit-status.patch",
+				"$(SRCROOT)/sandbox/patches/0006-kernel-uname-hostname-bounds.patch",
+				"$(SRCROOT)/sandbox/patches/0008-kernel-memory-refresh-hook.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
 				"$(SRCROOT)/sandbox/overlay/usr/local/bin/kelivo-repair-rootfs",
 				"$(SRCROOT)/sandbox/resources/VERSION",

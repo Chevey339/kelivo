@@ -62,7 +62,7 @@ OUTPUT_RESOURCES="$SCRIPT_DIR/resources"
 # Follow the deps/ish gitlink in OpenMinis/OpenMinis main, using our fork.
 # Update this fixed SHA when their main project adopts a new iSH revision.
 ISH_REPO="https://github.com/Chevey339/ish-arm64.git"
-ISH_SHA="3f6384c70eefd1a370f121d3492a5f21f7767df9"
+ISH_SHA="0fd17a135e78b7a0cf08a4f5831217bbb76ed22f"
 
 ARCHS="arm64"
 IOS_DEPLOYMENT_TARGET="15.0"
@@ -304,11 +304,13 @@ build_ish_sdk() {
             -Dlog_handler=nslog \
             -Dkernel=ish \
             -Dengine=asbestos \
+            -Djit=false \
             -Dguest_arch=arm64
     else
         meson configure "$build_dir" \
             --buildtype="$MESON_BUILDTYPE" \
-            -Db_ndebug="$MESON_NDEBUG"
+            -Db_ndebug="$MESON_NDEBUG" \
+            -Djit=false
     fi
 
     log_info "Building static libraries ($sdk)..."
@@ -366,11 +368,10 @@ build_host_tools() {
             -Dlog="" \
             -Dkernel=ish \
             -Dengine=asbestos \
+            -Djit=false \
             -Dguest_arch=arm64
     fi
     log_info "Building host iSH tools..."
-    # Upstream main.c includes this generated header without a Meson edge.
-    env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" cpu-offsets.h
     env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" tools/fakefsify ish
     mkdir -p "$OUTPUT_DIR"
     cp "$BUILD_DIR/tools/fakefsify" "$OUTPUT_DIR/fakefsify"

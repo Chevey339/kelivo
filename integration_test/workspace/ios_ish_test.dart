@@ -61,6 +61,7 @@ void main() {
     workspaceHost = Directory(p.join(tmp.path, 'workspace'))..createSync();
     sessionHost = Directory(p.join(tmp.path, 'session'))..createSync();
     skillsHost = Directory(p.join(tmp.path, 'skills'))..createSync();
+    Directory(p.join(sessionHost.path, 'tmp')).createSync();
     mounts = WorkspacePaths.sandboxed(
       workspaceHostRoot: workspaceHost.path,
       sessionHostDir: sessionHost.path,
@@ -180,6 +181,7 @@ void main() {
       final secondChat = await Directory(
         p.join(secondRoot.path, 'chat'),
       ).create();
+      await Directory(p.join(secondChat.path, 'tmp')).create();
       final secondPaths = WorkspacePaths.sandboxed(
         workspaceHostRoot: secondWorkspace.path,
         sessionHostDir: secondChat.path,

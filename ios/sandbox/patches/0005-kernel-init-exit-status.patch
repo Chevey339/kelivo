@@ -1,15 +1,16 @@
+diff --git a/kernel/exit.c b/kernel/exit.c
 --- a/kernel/exit.c
 +++ b/kernel/exit.c
-@@ -14,7 +14,7 @@
- #include "fs/fd.h"
- #include "fs/tty.h"
+@@ -17,7 +17,7 @@
+ #include "asbestos/guest-arm64/jit.h"
+ #endif
  
 -static void halt_system(void);
 +static void halt_system(int status);
  
  // Weak default: overridden by main.c in CLI builds.
  // In iOS/Xcode builds where main.c is not linked into libish.a,
-@@ -170,7 +170,7 @@
+@@ -197,7 +197,7 @@
  
          if (parent == NULL) {
              // init died
@@ -18,7 +19,7 @@
          } else {
              leader->zombie = true;
              notify(&parent->group->child_exit);
-@@ -400,7 +400,7 @@
+@@ -438,7 +438,7 @@
  }
  
  // always called from init process
@@ -27,7 +28,7 @@
      int max_iterations = 10; // Timeout: wait maximum 10 seconds
      for (int state = 0; state < 3; state++) {
          int tasks_found = 0;
-@@ -453,7 +453,9 @@
+@@ -491,7 +491,9 @@
      // (stuck in JIT loops after do_exit_group force cleanup) keep
      // the host process alive indefinitely. _exit is safe here since
      // init dying means we're shutting down completely.
