@@ -2092,6 +2092,101 @@ void main() {
 
   group('ChatService fork conversations', () {
     for (final preserveVersions in [false, true]) {
+      for (final editedRole in ['user', 'assistant']) {
+        test('fork keeps earlier $editedRole revisions in logical order '
+            '(preserveVersions: $preserveVersions)', () async {
+          final service = createService();
+          final source = await service.createConversation(title: 'Source');
+          final messages = <ChatMessage>[];
+          for (final (role, content) in const [
+            ('user', 'q1'),
+            ('assistant', 'a1'),
+            ('user', 'q2'),
+            ('assistant', 'a2'),
+            ('user', 'q3'),
+            ('assistant', 'a3'),
+          ]) {
+            messages.add(
+              await service.addMessage(
+                conversationId: source.id,
+                role: role,
+                content: content,
+              ),
+            );
+          }
+          final original = messages.firstWhere((m) => m.role == editedRole);
+          final edited = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: '${original.content} edited',
+          ))!;
+          await service.appendMessageVersion(
+            messageId: original.id,
+            content: '${original.content} another edit',
+          );
+          await service.setSelectedVersion(
+            source.id,
+            original.groupId ?? original.id,
+            edited.version,
+          );
+          final expected = [
+            for (final message in messages.take(4))
+              message.id == original.id ? edited.content : message.content,
+          ];
+          final sourceExpected = [...expected, 'q3', 'a3'];
+
+          Future<void> expectHistory(
+            ChatService reader,
+            String id,
+            List<String> contents,
+          ) async {
+            expect(
+              (await reader.loadActiveTimelineMessages(
+                id,
+              )).map((m) => m.content),
+              contents,
+            );
+            expect(
+              (await reader.loadSelectedContextMessages(
+                id,
+                limit: 100,
+              )).map((m) => m.content),
+              contents,
+            );
+          }
+
+          await expectHistory(service, source.id, sourceExpected);
+          final fork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: messages[3].id,
+            title: 'Fork',
+            preserveVersions: preserveVersions,
+          );
+          await expectHistory(service, fork.id, expected);
+          final followUp = await service.addMessage(
+            conversationId: fork.id,
+            role: 'user',
+            content: 'branch follow-up',
+          );
+          final continued = [...expected, followUp.content];
+          await expectHistory(service, fork.id, continued);
+          final nested = await service.forkConversationAtRevision(
+            sourceConversationId: fork.id,
+            sourceRevisionId: followUp.id,
+            title: 'Nested fork',
+            preserveVersions: preserveVersions,
+          );
+          await expectHistory(service, nested.id, continued);
+
+          await service.close();
+          services.remove(service);
+          final reopened = createService();
+          await reopened.init();
+          await expectHistory(reopened, source.id, sourceExpected);
+          await expectHistory(reopened, fork.id, continued);
+          await expectHistory(reopened, nested.id, continued);
+        });
+      }
+
       for (final selectedVersion in [0, 1]) {
         test(
           'latest reply suggestions survive fork and restart '

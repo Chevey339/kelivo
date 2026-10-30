@@ -491,6 +491,45 @@ void main() {
     },
   );
   test(
+    'selected-only fork keeps a compression boundary after an earlier revision',
+    () async {
+      await repo.appendMessageVersion(messageId: 'a1', content: 'Revised a1');
+      await compact('S1', ['u1', 'a1']);
+      final expected = await effective();
+      final fork = (await repo.forkConversationWithVersions(
+        sourceId: 'chat',
+        targetRevisionId: 'a3',
+        title: 'Fork',
+        preserveVersions: false,
+      ))!;
+      expect(
+        (await repo.getEffectiveContextMessages(
+          fork.id,
+          limit: 100,
+        )).map((m) => m.content),
+        expected,
+      );
+      expect(
+        (await repo.readContextSnapshot(
+          fork.id,
+        )).messages.map((m) => m.content),
+        [
+          'Original u1',
+          'Revised a1',
+          'Original u2',
+          'Original a2',
+          'Original u3',
+          'Original a3',
+        ],
+      );
+      expect(
+        (await repo.readContextOperations(fork.id)).single.revoked,
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'new chat copies independent summaries inside its retained tail atomically',
     () async {
       final old = await compact('S1', ['u1', 'a1']);

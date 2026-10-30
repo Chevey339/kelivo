@@ -4846,7 +4846,17 @@ class ChatDatabaseRepository {
       final selected = await _contextMetadata(sourceId);
       final selectedIds = {for (final m in selected) m.id};
       if (!preserveVersions) {
-        kept = kept.where((row) => selectedIds.contains(row.id)).toList();
+        // Revisions are appended in storage, but selected is in group order.
+        // Once the other versions are removed, each copied row must carry its
+        // logical position instead of the revision's original append order.
+        final keptById = {for (final row in kept) row.id: row};
+        kept = [];
+        for (final message in selected) {
+          final row = keptById[message.id];
+          if (row != null) {
+            kept.add(row.copyWith(messageOrder: kept.length));
+          }
+        }
       }
       const uuid = Uuid();
       final targetId = uuid.v4();
