@@ -925,30 +925,32 @@ Inline ***strong emphasis*** text.
 
   for (final width in [360.0, 700.0]) {
     testWidgets(
-      'desktop table fades five actions on hover without shifting content at $width',
+      'desktop table shows five compact footer actions without covering content at $width',
       (tester) async {
         final previous = debugDefaultTargetPlatformOverride;
         debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
         try {
           await tester.pumpWidget(
             _markdownHarness(
-              '| A | B |\n| - | - |\n| alpha | beta |',
+              'Before\n\n| A | B |\n| - | - |\n| alpha | beta |\n\nAfter',
               width: width,
             ),
           );
           await tester.pumpAndSettle();
           final toolbar = find.byKey(
-            const ValueKey('markstream-table-hover-toolbar'),
+            const ValueKey('markstream-table-toolbar'),
           );
           expect(
             find.byKey(const ValueKey('markdown-mobile-table-toolbar')),
             findsNothing,
           );
-          expect(
-            find.descendant(of: toolbar, matching: find.byType(IosIconButton)),
-            findsNWidgets(5),
+          final actions = find.descendant(
+            of: toolbar,
+            matching: find.byType(IosIconButton),
           );
+          expect(actions, findsNWidgets(5));
           final bounds = tester.getRect(find.byType(Table));
+          final footer = tester.getRect(toolbar);
           expect(
             bounds.top,
             closeTo(
@@ -956,33 +958,26 @@ Inline ***strong emphasis*** text.
               .1,
             ),
           );
-          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
+          expect(footer.top, closeTo(bounds.bottom + 4, .1));
+          expect(footer.height, closeTo(28, .01));
+          expect(
+            _paragraphContaining('After').localToGlobal(Offset.zero).dy,
+            greaterThan(footer.bottom),
+          );
+          expect(tester.getRect(actions.last).right, closeTo(bounds.right, .1));
+          for (var i = 0; i < 5; i++) {
+            expect(actions.at(i).hitTestable(), findsOneWidget);
+          }
           final mouse = await tester.createGesture(
             kind: ui.PointerDeviceKind.mouse,
           );
           await mouse.addPointer(location: Offset.zero);
           await mouse.moveTo(bounds.center);
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 80));
-          final fade = find
-              .descendant(of: toolbar, matching: find.byType(FadeTransition))
-              .first;
-          expect(
-            tester.widget<FadeTransition>(fade).opacity.value,
-            inExclusiveRange(0, 1),
-          );
           await tester.pumpAndSettle();
-          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
           expect(tester.getRect(find.byType(Table)), bounds);
-          expect(tester.getRect(toolbar).overlaps(bounds), isFalse);
-          await mouse.moveTo(tester.getCenter(toolbar));
-          await tester.pumpAndSettle();
-          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
-          await mouse.moveTo(Offset.zero);
-          await tester.pumpAndSettle();
-          expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
-          expect(tester.getRect(find.byType(Table)), bounds);
+          expect(tester.getRect(toolbar), footer);
           await mouse.removePointer();
+          expect(tester.takeException(), isNull);
         } finally {
           debugDefaultTargetPlatformOverride = previous;
         }

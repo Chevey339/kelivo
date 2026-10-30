@@ -279,27 +279,23 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                 )
               : Container(
                   key: const ValueKey('markstream-table-toolbar'),
-                  height: widget.theme.chrome.height,
-                  padding: widget.theme.chrome.padding,
-                  decoration: BoxDecoration(
-                    color: mobile
-                        ? widget.theme.chrome.background
-                        : Color.alphaBlend(
-                            widget.theme.chrome.background,
-                            widget.theme.colors.fillBlockOpaque,
-                          ),
-                    border: mobile
-                        ? Border(
+                  height: mobile
+                      ? widget.theme.chrome.height
+                      : widget.theme.chrome.actionSize,
+                  padding: mobile
+                      ? widget.theme.chrome.padding
+                      : EdgeInsets.zero,
+                  decoration: mobile
+                      ? BoxDecoration(
+                          color: widget.theme.chrome.background,
+                          border: Border(
                             bottom: BorderSide(
                               color: widget.theme.chrome.divider,
                               width: MarkstreamTheme.stroke,
                             ),
-                          )
-                        : Border.all(color: theme.outerBorderColor),
-                    borderRadius: mobile
-                        ? null
-                        : BorderRadius.circular(theme.wideRadius),
-                  ),
+                          ),
+                        )
+                      : null,
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     primary: false,
@@ -308,12 +304,16 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                         minWidth: math.max(
                           0,
                           width -
-                              widget.theme.chrome.padding
-                                  .resolve(Directionality.of(context))
-                                  .horizontal,
+                              (mobile
+                                  ? widget.theme.chrome.padding
+                                        .resolve(Directionality.of(context))
+                                        .horizontal
+                                  : 0),
                         ),
-                        minHeight:
-                            widget.theme.chrome.height - MarkstreamTheme.stroke,
+                        minHeight: mobile
+                            ? widget.theme.chrome.height -
+                                  MarkstreamTheme.stroke
+                            : widget.theme.chrome.actionSize,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -342,13 +342,11 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                   ),
                 ),
         );
-        final media = MediaQuery.maybeOf(context);
-        final accessibleNavigation = media?.accessibleNavigation ?? false;
         Widget result = Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!widget.exporting && (mobile || accessibleNavigation)) toolbar,
+            if (!widget.exporting && mobile) toolbar,
             if (scroll)
               SingleChildScrollView(
                 key: const ValueKey('markstream-table-scroll'),
@@ -360,6 +358,8 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
               )
             else
               surface,
+            if (!widget.exporting && desktop)
+              Padding(padding: const EdgeInsets.only(top: 4), child: toolbar),
             if (!all &&
                 !widget.streaming &&
                 rows.length > PerformanceLimits.initialTableRows)
@@ -413,12 +413,6 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             clipBehavior: Clip.antiAlias,
             child: result,
           );
-        } else if (!widget.exporting && !accessibleNavigation) {
-          result = _DesktopTableToolbar(
-            height: widget.theme.chrome.height,
-            toolbar: toolbar,
-            child: result,
-          );
         }
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -429,119 +423,5 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
     return SelectionContainer.maybeOf(context) == null
         ? content
         : SelectionContainer(delegate: _selection, child: content);
-  }
-}
-
-/// Keeps actions outside table layout so hovering cannot move selection targets.
-class _DesktopTableToolbar extends StatefulWidget {
-  const _DesktopTableToolbar({
-    required this.height,
-    required this.toolbar,
-    required this.child,
-  });
-  final double height;
-  final Widget toolbar, child;
-
-  @override
-  State<_DesktopTableToolbar> createState() => _DesktopTableToolbarState();
-}
-
-class _DesktopTableToolbarState extends State<_DesktopTableToolbar> {
-  final _overlay = OverlayPortalController()..show();
-  bool _hovered = false, _toolbarHovered = false, _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = _hovered || _toolbarHovered || _focused;
-    final reducedMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    return Focus(
-      onFocusChange: (value) => setState(() => _focused = value),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: OverlayPortal.overlayChildLayoutBuilder(
-          controller: _overlay,
-          overlayChildBuilder: (context, info) {
-            final anchor = MatrixUtils.transformRect(
-              info.childPaintTransform,
-              Offset.zero & info.childSize,
-            );
-            final overlayBounds = Offset.zero & info.overlaySize;
-            var visibleBounds = overlayBounds;
-            // Read the main-tree anchor, not the overlay's rendering ancestors.
-            // Unlike paragraph culling, floating controls need the exact clip.
-            final clip = viewportClips(
-              this.context.findRenderObject()! as RenderBox,
-              paintOverflow: 0,
-            ).paint;
-            if (clip != null) {
-              visibleBounds = visibleBounds.intersect(
-                MatrixUtils.transformRect(info.childPaintTransform, clip),
-              );
-            }
-            final above = anchor.top - widget.height;
-            bool fitsAbove(Rect area) =>
-                above >= area.top && anchor.top <= area.bottom;
-            bool fitsBelow(Rect area) =>
-                anchor.bottom >= area.top &&
-                anchor.bottom + widget.height <= area.bottom;
-            final fullyVisible =
-                anchor.left >= visibleBounds.left &&
-                anchor.right <= visibleBounds.right &&
-                anchor.top >= visibleBounds.top &&
-                anchor.bottom <= visibleBounds.bottom;
-            // Short embedded scroll views can shrink to exactly the content.
-            // Their fully visible tables may borrow outside overlay space.
-            final bounds =
-                fullyVisible &&
-                    !fitsAbove(visibleBounds) &&
-                    !fitsBelow(visibleBounds)
-                ? overlayBounds
-                : visibleBounds;
-            // A table can fill the viewport. Wait for an outside edge to become
-            // visible rather than covering cells and intercepting selection.
-            final canShow =
-                !visibleBounds.isEmpty &&
-                anchor.overlaps(visibleBounds) &&
-                (fitsAbove(bounds) || fitsBelow(bounds));
-            final show = visible && canShow;
-            final width = math.min(anchor.width, math.max(0.0, bounds.width));
-            final top = fitsAbove(bounds) ? above : anchor.bottom;
-            return Positioned(
-              left: anchor.left.clamp(
-                bounds.left,
-                math.max(bounds.left, bounds.right - width),
-              ),
-              top: top.clamp(
-                bounds.top,
-                math.max(bounds.top, bounds.bottom - widget.height),
-              ),
-              width: width,
-              child: IgnorePointer(
-                ignoring: !show,
-                child: MouseRegion(
-                  onEnter: (_) => setState(() => _toolbarHovered = true),
-                  onExit: (_) => setState(() => _toolbarHovered = false),
-                  child: ExcludeFocus(
-                    excluding: !show,
-                    child: AnimatedOpacity(
-                      key: const ValueKey('markstream-table-hover-toolbar'),
-                      opacity: show ? 1 : 0,
-                      duration: reducedMotion || !canShow
-                          ? Duration.zero
-                          : const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      child: widget.toolbar,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          child: widget.child,
-        ),
-      ),
-    );
   }
 }
