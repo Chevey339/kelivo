@@ -562,11 +562,13 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       anchorBelow: anchors.secondaryAnchor ?? anchors.primaryAnchor,
       children: [
         for (final item in [
-          for (final item in items)
-            if (item.type != ContextMenuButtonType.selectAll)
-              item.type == ContextMenuButtonType.copy ? copy : item,
+          copy,
           quote,
           translate,
+          for (final item in items)
+            if (item.type != ContextMenuButtonType.copy &&
+                item.type != ContextMenuButtonType.selectAll)
+              item,
           selectAll,
         ])
           TextSelectionToolbarTextButton(
