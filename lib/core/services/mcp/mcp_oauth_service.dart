@@ -477,7 +477,7 @@ final class McpOAuthService {
           final value = decoded.cast<String, dynamic>();
           final metadataIssuer = value['issuer'];
           if (metadataIssuer is! String ||
-              !_matchesAuthorizationIssuer(metadataIssuer, issuer, server)) {
+              !_matchesAuthorizationIssuer(metadataIssuer, issuer)) {
             issuerMismatch = true;
             continue;
           }
@@ -1548,16 +1548,12 @@ final class McpOAuthService {
     ];
   }
 
-  static bool _matchesAuthorizationIssuer(
-    String actual,
-    Uri expected,
-    Uri server,
-  ) {
+  static bool _matchesAuthorizationIssuer(String actual, Uri expected) {
     final value = expected.toString();
     if (actual == value) return true;
-    // Dhan and Zomato disagree on the root's trailing slash. This exception
-    // applies only to the MCP origin, never delegated issuers or tenant paths.
-    if (!_sameOrigin(expected, server)) return false;
+    // Some servers disagree with resource metadata about a root issuer's
+    // trailing slash. Allow only that difference, including delegated issuers;
+    // tenant paths and every other part of the identifier must match exactly.
     return (expected.path.isEmpty && actual == '$value/') ||
         (expected.path == '/' &&
             actual == value.substring(0, value.length - 1));

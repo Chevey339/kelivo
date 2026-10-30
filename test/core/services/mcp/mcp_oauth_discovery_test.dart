@@ -125,13 +125,31 @@ void main() {
   }
 
   test(
-    'root fallback still rejects an authorization issuer mismatch',
+    'root fallback accepts a delegated root issuer slash difference',
     () async {
       const endpoint = 'https://mcp.example.com/mcp';
       final service = _service(
         endpoint,
         rootFallbackFor: endpoint,
         metadataIssuer: '$_issuer/',
+      );
+      addTearDown(service.dispose);
+
+      final discovery = await service.discover(endpoint);
+
+      expect(discovery.authorizationServer.toString(), '$_issuer/');
+      expect(discovery.resource.toString(), endpoint);
+    },
+  );
+
+  test(
+    'root fallback still rejects an authorization issuer mismatch',
+    () async {
+      const endpoint = 'https://mcp.example.com/mcp';
+      final service = _service(
+        endpoint,
+        rootFallbackFor: endpoint,
+        metadataIssuer: '$_issuer/tenant',
       );
       addTearDown(service.dispose);
 

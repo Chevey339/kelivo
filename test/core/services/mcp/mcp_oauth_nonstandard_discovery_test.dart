@@ -67,6 +67,67 @@ void main() {
     },
   );
 
+  for (final metadataPath in [
+    _authorizationPath,
+    '/.well-known/openid-configuration',
+  ]) {
+    test(
+      'Google discovery accepts a delegated root issuer via $metadataPath',
+      () async {
+        const resource = 'https://developerknowledge.googleapis.com/mcp';
+        const metadataUrl =
+            'https://developerknowledge.googleapis.com'
+            '$_resourcePath/search_documents';
+        const issuer = 'https://accounts.google.com';
+        const scope =
+            'https://www.googleapis.com/auth/devprofiles.full_control';
+        final requests = <http.Request>[];
+        final service = McpOAuthService(
+          httpClient: _client({
+            metadataUrl: _json({
+              'resource': resource,
+              'authorization_servers': ['$issuer/'],
+              'scopes_supported': [scope],
+            }),
+            '$issuer$metadataPath': _json({
+              'issuer': issuer,
+              'authorization_endpoint': '$issuer/o/oauth2/v2/auth',
+              'token_endpoint': 'https://oauth2.googleapis.com/token',
+              'code_challenge_methods_supported': ['plain', 'S256'],
+            }),
+          }, requests),
+        );
+        addTearDown(service.dispose);
+
+        final result = await service.discover(
+          resource,
+          headers: const {'X-Api-Key': 'resource-only-secret'},
+          wwwAuthenticate: const ['Bearer resource_metadata="$metadataUrl"'],
+        );
+
+        expect(result.authorizationServer.toString(), issuer);
+        expect(result.resource.toString(), resource);
+        expect(
+          result.authorizationEndpoint.toString(),
+          '$issuer/o/oauth2/v2/auth',
+        );
+        expect(
+          result.tokenEndpoint.toString(),
+          'https://oauth2.googleapis.com/token',
+        );
+        expect(result.registrationEndpoint, isNull);
+        expect(result.scopes, [scope]);
+        final authorizationRequests = requests.where(
+          (request) => request.url.origin == issuer,
+        );
+        expect(authorizationRequests, isNotEmpty);
+        for (final request in authorizationRequests) {
+          expect(request.headers, isNot(contains('x-api-key')));
+        }
+      },
+    );
+  }
+
   test(
     'origin discovery preserves resource path, query and challenged scopes',
     () async {
@@ -256,6 +317,51 @@ void main() {
     );
   });
 
+  for (final expectedIssuer in [_dhan, '$_dhan/']) {
+    for (final issuer in [
+      null,
+      'https://other.example.com/',
+      'http://mcp.dhan.co/',
+      '$_dhan:8443/',
+      '$_dhan/tenant',
+      '$_dhan//',
+      '$_dhan/?tenant=one',
+      '$_dhan/#fragment',
+      'https://user@mcp.dhan.co/',
+    ]) {
+      test(
+        'delegated root $expectedIssuer still rejects issuer $issuer',
+        () async {
+          const origin = 'https://mcp.example.com';
+          final service = McpOAuthService(
+            httpClient: _client({
+              '$origin$_resourcePath/mcp': _json({
+                'resource': '$origin/mcp',
+                'authorization_servers': [expectedIssuer],
+              }),
+              '$_dhan$_authorizationPath': _json({
+                ..._authorizationMetadata(_dhan),
+                'issuer': issuer,
+              }),
+            }),
+          );
+          addTearDown(service.dispose);
+
+          await expectLater(
+            service.discover('$origin/mcp'),
+            throwsA(
+              isA<McpOAuthException>().having(
+                (error) => error.message,
+                'message',
+                contains('issuer is missing or does not match discovery'),
+              ),
+            ),
+          );
+        },
+      );
+    }
+  }
+
   final invalidAuthorization = <String, Map<String, Object?>>{
     'wrong origin issuer': {'issuer': 'https://other.example.com'},
     'missing issuer': {'issuer': null},
@@ -292,14 +398,27 @@ void main() {
     );
   }
 
-  for (final origin in [_zomato, _dhan]) {
+  for (final (serverOrigin, origin) in [
+    (_zomato, _zomato),
+    (_dhan, _dhan),
+    ('https://mcp.example.com', _zomato),
+    ('https://mcp.example.com', _dhan),
+  ]) {
     for (final wrongCallbackIssuer in [false, true]) {
       test(
-        '$origin authorization binds tokens and callbacks to discovered issuer (wrong callback: $wrongCallbackIssuer)',
+        '$serverOrigin via $origin authorization binds tokens and callbacks to discovered issuer (wrong callback: $wrongCallbackIssuer)',
         () async {
           final responses = _responses(origin);
           final metadata = _authorizationMetadata(origin);
           final issuer = metadata['issuer']! as String;
+          if (serverOrigin != origin) {
+            responses['$serverOrigin$_resourcePath/mcp'] = _json({
+              'resource': '$serverOrigin/mcp',
+              'authorization_servers': [
+                issuer.endsWith('/') ? origin : '$origin/',
+              ],
+            });
+          }
           responses['$origin$_authorizationPath'] = _json({
             ...metadata,
             'authorization_response_iss_parameter_supported': true,
@@ -330,7 +449,7 @@ void main() {
           addTearDown(service.dispose);
 
           final authorization = service.authorize(
-            serverUrl: '$origin/mcp',
+            serverUrl: '$serverOrigin/mcp',
             serverName: 'Nonstandard MCP',
             onClientRegistered: (value) async => registered = value,
           );
@@ -352,13 +471,13 @@ void main() {
           } else {
             final state = await authorization;
             expect(state.authorizationServer, issuer);
-            expect(state.resource, '$origin/mcp');
+            expect(state.resource, '$serverOrigin/mcp');
             expect(state.accessToken, 'access-token');
             final tokenRequest = requests.singleWhere(
               (request) => request.url.path == '/token',
             );
             final tokenForm = Uri.splitQueryString(tokenRequest.body);
-            expect(tokenForm['resource'], '$origin/mcp');
+            expect(tokenForm['resource'], '$serverOrigin/mcp');
             expect(tokenForm['client_id'], 'registered-client');
             expect(
               oauthPkceChallenge(tokenForm['code_verifier']!),
@@ -372,7 +491,7 @@ void main() {
             );
             expect(
               callback.authorizationUrl!.queryParameters['resource'],
-              '$origin/mcp',
+              '$serverOrigin/mcp',
             );
           }
           expect(callbackServer.toString(), issuer);
