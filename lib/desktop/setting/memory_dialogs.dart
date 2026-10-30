@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/memory_entry.dart';
 import '../../core/services/memory/memory_trace.dart';
+import '../../features/assistant/pages/assistant_memory_page.dart';
 import '../../features/settings/pages/legacy_memory_page.dart';
 import '../../features/settings/pages/memory_about_page.dart';
 import '../../features/settings/pages/memory_entries_page.dart';
@@ -199,6 +200,18 @@ Future<void> showDesktopMemoryEntriesDialog(BuildContext context) {
     body: const MemoryEntriesContent(
       padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
     ),
+  );
+}
+
+Future<void> showDesktopAssistantMemoryDialog(
+  BuildContext context, {
+  required String assistantId,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  return showDesktopMemoryDialog<void>(
+    context,
+    title: l10n.assistantMemoryManageTitle,
+    body: AssistantMemoryContent(assistantId: assistantId),
   );
 }
 

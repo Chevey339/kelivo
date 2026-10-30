@@ -15145,6 +15145,18 @@ abstract class AppLocalizations {
   /// **'Memories visible to this assistant'**
   String get assistantEditManageMemoryTitle;
 
+  /// No description provided for @assistantMemoryManageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage assistant memory'**
+  String get assistantMemoryManageTitle;
+
+  /// No description provided for @assistantMemoryManageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 memory visible to this assistant} other{{count} memories visible to this assistant}}'**
+  String assistantMemoryManageSubtitle(int count);
+
   /// No description provided for @assistantEditWriteScopeTitle.
   ///
   /// In en, this message translates to:

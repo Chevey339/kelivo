@@ -8354,6 +8354,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Memories visible to this assistant';
 
   @override
+  String get assistantMemoryManageTitle => 'Manage assistant memory';
+
+  @override
+  String assistantMemoryManageSubtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count memories visible to this assistant',
+      one: '1 memory visible to this assistant',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get assistantEditWriteScopeTitle => 'Memory write scope';
 
   @override

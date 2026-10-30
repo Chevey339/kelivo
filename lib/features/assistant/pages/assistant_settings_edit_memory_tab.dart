@@ -33,8 +33,6 @@ class _MemoryTab extends StatefulWidget {
 }
 
 class _MemoryTabState extends State<_MemoryTab> {
-  bool _organizing = false;
-
   @override
   void initState() {
     super.initState();
@@ -46,101 +44,6 @@ class _MemoryTabState extends State<_MemoryTab> {
     });
   }
 
-  Future<void> _showAddEditSheet({MemoryEntry? existing}) {
-    final assistant = context.read<AssistantProvider>().getById(
-      widget.assistantId,
-    );
-    final writeScope = assistant?.memoryWriteScope;
-    final prefersAssistant =
-        writeScope == MemoryWriteScope.alwaysAssistant ||
-        writeScope == MemoryWriteScope.toolDefaultAssistant;
-    return showMemoryEntryEditor(
-      context,
-      existing: existing,
-      defaultAssistantId: widget.assistantId,
-      defaultScope: existing == null && prefersAssistant
-          ? MemoryScope.assistant
-          : MemoryScope.global,
-    );
-  }
-
-  Future<void> _runOrganize() async {
-    final l10n = AppLocalizations.of(context)!;
-    final settings = context.read<SettingsProvider>();
-    if (settings.memoryModelProvider == null ||
-        settings.memoryModelId == null) {
-      showAppSnackBar(
-        context,
-        message: l10n.memoryOrganizeNeedsModel,
-        type: NotificationType.warning,
-      );
-      return;
-    }
-    final chat = context.read<ChatService>();
-    final convId = chat.currentConversationId;
-    final conv = convId == null ? null : chat.getConversation(convId);
-    if (conv == null || conv.assistantId != widget.assistantId) {
-      showAppSnackBar(
-        context,
-        message: l10n.memoryOrganizeNeedsConversation,
-        type: NotificationType.warning,
-      );
-      return;
-    }
-    setState(() => _organizing = true);
-    try {
-      final pipeline = context.read<MemoryPipelineService>();
-      await pipeline.runNow(
-        conversationId: conv.id,
-        assistantId: widget.assistantId,
-      );
-      if (mounted) {
-        await context.read<MemoryProviderV2>().refresh(
-          assistantId: widget.assistantId,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _organizing = false);
-    }
-  }
-
-  String _statusLine(AppLocalizations l10n, MemoryOrganizeStatus status) {
-    final lastAt = status.lastAt;
-    final result = status.lastResult;
-    if (lastAt == null || result == null) {
-      return l10n.memoryOrganizeStatusNever;
-    }
-    final when = _formatRelative(l10n, lastAt);
-    final parts = <String>[l10n.memoryOrganizeStatusLast(when)];
-    if (result.error != null && result.error!.isNotEmpty) {
-      final code = result.error!;
-      final label = memoryOutcomeLabel(l10n, code);
-      if (MemoryPipelineService.skipReasonCodes.contains(code)) {
-        parts.add(l10n.memoryOrganizeStatusSkippedReason(label));
-      } else {
-        parts.add(l10n.memoryOrganizeStatusFailed(label));
-      }
-    } else if (result.gate == MemoryGateParseResult.skip ||
-        (result.extractedCount == 0 && result.advanced)) {
-      parts.add(l10n.memoryOrganizeStatusSkipped);
-    } else {
-      parts.add(l10n.memoryOrganizeStatusExtracted(result.extractedCount));
-    }
-    return parts.join(' · ');
-  }
-
-  String _formatRelative(AppLocalizations l10n, DateTime at) {
-    final delta = DateTime.now().difference(at);
-    if (delta.inMinutes < 1) return l10n.memoryOrganizeJustNow;
-    if (delta.inHours < 1) {
-      return l10n.memoryOrganizeMinutesAgo(delta.inMinutes);
-    }
-    if (delta.inDays < 1) {
-      return l10n.memoryOrganizeHoursAgo(delta.inHours);
-    }
-    return l10n.memoryOrganizeDaysAgo(delta.inDays);
-  }
-
   Future<void> _goMemorySettings() async {
     if (PlatformUtils.isDesktopTarget) {
       await showDesktopMemorySettingsDialog(context);
@@ -149,6 +52,21 @@ class _MemoryTabState extends State<_MemoryTab> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const MemorySettingsPage()));
+  }
+
+  Future<void> _goAssistantMemory() async {
+    if (PlatformUtils.isDesktopTarget) {
+      await showDesktopAssistantMemoryDialog(
+        context,
+        assistantId: widget.assistantId,
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AssistantMemoryPage(assistantId: widget.assistantId),
+      ),
+    );
   }
 
   bool get _isDesktopPlatform {
@@ -173,20 +91,8 @@ class _MemoryTabState extends State<_MemoryTab> {
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
     final mp = context.watch<MemoryProviderV2>();
-    final pipeline = context.read<MemoryPipelineService>();
     final modelMissing =
         settings.memoryModelProvider == null || settings.memoryModelId == null;
-
-    final visible = mp.visibleFor(widget.assistantId);
-    final archived = mp.archivedFor(widget.assistantId);
-    final chat = context.watch<ChatService>();
-    final convId = chat.currentConversationId;
-    final conv = convId == null ? null : chat.getConversation(convId);
-    final canOrganize =
-        !modelMissing &&
-        conv != null &&
-        conv.assistantId == widget.assistantId &&
-        !_organizing;
 
     Widget sectionCard({
       required Widget child,
@@ -333,150 +239,20 @@ class _MemoryTabState extends State<_MemoryTab> {
         _MemorySettingsNavCard(onTap: _goMemorySettings),
 
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: MemorySectionCard(
+            padding: EdgeInsets.zero,
             children: [
-              Expanded(
-                child: Text(
-                  l10n.assistantEditManageMemoryTitle,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.emphasis,
-                  ),
+              MemoryNavRow(
+                title: l10n.assistantMemoryManageTitle,
+                subtitle: l10n.assistantMemoryManageSubtitle(
+                  mp.visibleFor(widget.assistantId).length,
                 ),
-              ),
-              Tooltip(
-                message: modelMissing
-                    ? l10n.memoryOrganizeNeedsModel
-                    : (!canOrganize && !_organizing
-                          ? l10n.memoryOrganizeNeedsConversation
-                          : l10n.memoryOrganizeButton),
-                child: _TactileRow(
-                  onTap: canOrganize ? _runOrganize : null,
-                  pressedScale: 0.97,
-                  builder: (pressed) {
-                    final enabled = canOrganize;
-                    final color = !enabled
-                        ? cs.onSurface.withValues(alpha: 0.35)
-                        : (pressed
-                              ? cs.primary.withValues(alpha: 0.7)
-                              : cs.primary);
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_organizing)
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: color,
-                            ),
-                          )
-                        else
-                          Icon(Lucide.Sparkles, size: 16, color: color),
-                        const SizedBox(width: 4),
-                        Text(
-                          l10n.memoryOrganizeButton,
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              _TactileRow(
-                onTap: () => _showAddEditSheet(),
-                pressedScale: 0.97,
-                builder: (pressed) {
-                  final color = pressed
-                      ? cs.primary.withValues(alpha: 0.7)
-                      : cs.primary;
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Lucide.Plus, size: 16, color: color),
-                      const SizedBox(width: 4),
-                      Text(
-                        l10n.memoryEntryActionAdd,
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: AppFontWeights.semibold,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                onTap: _goAssistantMemory,
               ),
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text(
-            _statusLine(l10n, pipeline.lastStatus),
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-        ),
-
-        if (!a.enableMemory)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              l10n.memoryEntryEmptyDisabled,
-              style: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
-              ),
-            ),
-          )
-        else if (visible.isEmpty && archived.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              l10n.memoryEntryEmpty,
-              style: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
-              ),
-            ),
-          ),
-
-        ...visible.map(
-          (m) => MemoryEntryCard(
-            entry: m,
-            useThisAssistantLabel: true,
-            scopeToggleAssistantId: widget.assistantId,
-            onEdit: () => _showAddEditSheet(existing: m),
-          ),
-        ),
-        if (archived.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              l10n.memoryEntryArchivedSection,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: AppFontWeights.emphasis,
-              ),
-            ),
-          ),
-          ...archived.map(
-            (m) => MemoryEntryCard(
-              entry: m,
-              useThisAssistantLabel: true,
-              scopeToggleAssistantId: widget.assistantId,
-              onEdit: () => _showAddEditSheet(existing: m),
-            ),
-          ),
-        ],
 
         if (a.allowPastConversationRecall && a.generateConversationSummary) ...[
           Padding(

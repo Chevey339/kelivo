@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
+import '../../../core/models/assistant.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/memory_provider_v2.dart';
@@ -12,6 +13,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../utils/platform_utils.dart';
+import '../widgets/memory_navigable_list.dart';
 import '../widgets/memory_ui.dart';
 
 /// Global memory list with search, filters, batch delete, orphan cleanup (§14.4).
@@ -44,9 +46,21 @@ class MemoryEntriesPage extends StatelessWidget {
 }
 
 class MemoryEntriesContent extends StatefulWidget {
-  const MemoryEntriesContent({super.key, this.padding});
+  const MemoryEntriesContent({
+    super.key,
+    this.padding,
+    this.assistantId,
+    this.header,
+  });
 
   final EdgeInsetsGeometry? padding;
+
+  /// Limits the list to memories visible to this assistant: global ones plus
+  /// its own. Null lists every memory.
+  final String? assistantId;
+
+  /// Shown between the filters and the list.
+  final Widget? header;
 
   @override
   State<MemoryEntriesContent> createState() => _MemoryEntriesContentState();
@@ -71,7 +85,10 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<MemoryProviderV2>().initialize(loadAll: true);
+      context.read<MemoryProviderV2>().initialize(
+        assistantId: widget.assistantId,
+        loadAll: widget.assistantId == null,
+      );
     });
   }
 
@@ -99,7 +116,29 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
       type: _type,
     );
     if (!mounted) return;
-    setState(() => _searchResults = results);
+    final assistantId = widget.assistantId;
+    setState(
+      () => _searchResults = assistantId == null
+          ? results
+          : results
+                .where(
+                  (e) =>
+                      e.scope == MemoryScope.global ||
+                      e.assistantId == assistantId,
+                )
+                .toList(growable: false),
+    );
+  }
+
+  String _scopeLabel(AppLocalizations l10n, _ScopeFilter scope) {
+    return switch (scope) {
+      _ScopeFilter.all => l10n.memoryFilterScopeAll,
+      _ScopeFilter.global => l10n.memoryFilterScopeGlobal,
+      _ScopeFilter.assistant =>
+        widget.assistantId == null
+            ? l10n.memoryFilterScopeAssistant
+            : l10n.memoryEntryScopeAssistant,
+    };
   }
 
   List<MemoryEntry> _filtered(List<MemoryEntry> source) {
@@ -132,10 +171,28 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
   }
 
   Future<void> _showEditSheet({MemoryEntry? existing}) {
+    final assistantId = widget.assistantId;
+    if (assistantId == null) {
+      return showMemoryEntryEditor(
+        context,
+        existing: existing,
+        allowAssistantPicker: true,
+      );
+    }
+    final writeScope = context
+        .read<AssistantProvider>()
+        .getById(assistantId)
+        ?.memoryWriteScope;
+    final prefersAssistant =
+        writeScope == MemoryWriteScope.alwaysAssistant ||
+        writeScope == MemoryWriteScope.toolDefaultAssistant;
     return showMemoryEntryEditor(
       context,
       existing: existing,
-      allowAssistantPicker: true,
+      defaultAssistantId: assistantId,
+      defaultScope: existing == null && prefersAssistant
+          ? MemoryScope.assistant
+          : MemoryScope.global,
     );
   }
 
@@ -178,14 +235,7 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
             maxLabelWidth: 160,
             options: [
               for (final v in _ScopeFilter.values)
-                DesktopSelectOption(
-                  value: v,
-                  label: switch (v) {
-                    _ScopeFilter.all => l10n.memoryFilterScopeAll,
-                    _ScopeFilter.global => l10n.memoryFilterScopeGlobal,
-                    _ScopeFilter.assistant => l10n.memoryFilterScopeAssistant,
-                  },
-                ),
+                DesktopSelectOption(value: v, label: _scopeLabel(l10n, v)),
             ],
             onSelected: (v) => setState(() => _scope = v),
           ),
@@ -222,7 +272,7 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
             ],
             onSelected: (v) => setState(() => _status = v),
           ),
-          if (_scope == _ScopeFilter.assistant)
+          if (_scope == _ScopeFilter.assistant && widget.assistantId == null)
             DesktopSelectDropdown<String?>(
               value: _assistantFilterId,
               minWidth: 140,
@@ -256,16 +306,12 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
   }
 
   Widget _mobileToolbar(AppLocalizations l10n, AssistantProvider ap) {
-    return MemoryFadingHorizontalScroll(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+    final filters = MemoryFadingHorizontalScroll(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
       child: Row(
         children: [
           _FilterChip(
-            label: switch (_scope) {
-              _ScopeFilter.all => l10n.memoryFilterScopeAll,
-              _ScopeFilter.global => l10n.memoryFilterScopeGlobal,
-              _ScopeFilter.assistant => l10n.memoryFilterScopeAssistant,
-            },
+            label: _scopeLabel(l10n, _scope),
             onTap: () async {
               final next = await showMemoryOptionPicker<_ScopeFilter>(
                 context,
@@ -273,21 +319,14 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
                 selected: _scope,
                 options: [
                   for (final v in _ScopeFilter.values)
-                    MemoryPickerOption(
-                      value: v,
-                      label: switch (v) {
-                        _ScopeFilter.all => l10n.memoryFilterScopeAll,
-                        _ScopeFilter.global => l10n.memoryFilterScopeGlobal,
-                        _ScopeFilter.assistant =>
-                          l10n.memoryFilterScopeAssistant,
-                      },
-                    ),
+                    MemoryPickerOption(value: v, label: _scopeLabel(l10n, v)),
                 ],
               );
               if (next != null) setState(() => _scope = next);
             },
           ),
-          if (_scope == _ScopeFilter.assistant) ...[
+          if (_scope == _ScopeFilter.assistant &&
+              widget.assistantId == null) ...[
             const SizedBox(width: 8),
             _FilterChip(
               label: _assistantFilterId == null
@@ -378,14 +417,47 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
             emphasized: _selecting,
             onTap: _toggleBatchDelete,
           ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: l10n.memoryEntryActionAdd,
-            emphasized: true,
-            onTap: () => _showEditSheet(),
-          ),
         ],
       ),
+    );
+    // Add stays pinned outside the scroller so it is never cut off.
+    return Row(
+      children: [
+        Expanded(child: filters),
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: MemorySelectChip(
+            label: l10n.memoryEntryActionAdd,
+            emphasized: true,
+            icon: Lucide.Plus,
+            onTap: () => _showEditSheet(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _entryCard(BuildContext context, MemoryEntry e) {
+    final assistantId = widget.assistantId;
+    return MemoryEntryCard(
+      entry: e,
+      assistantName: assistantId == null
+          ? resolveAssistantName(context, e.assistantId)
+          : null,
+      useThisAssistantLabel: assistantId != null,
+      scopeToggleAssistantId: assistantId,
+      selectable: _selecting,
+      selected: _selected.contains(e.id),
+      onSelectedChanged: (v) {
+        setState(() {
+          if (v) {
+            _selected.add(e.id);
+          } else {
+            _selected.remove(e.id);
+          }
+        });
+      },
+      onEdit: () => _showEditSheet(existing: e),
     );
   }
 
@@ -395,7 +467,12 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
     final cs = Theme.of(context).colorScheme;
     final mp = context.watch<MemoryProviderV2>();
     final ap = context.watch<AssistantProvider>();
-    final source = _searchResults ?? mp.entries;
+    final assistantId = widget.assistantId;
+    final source =
+        _searchResults ??
+        (assistantId == null
+            ? mp.entries
+            : [...mp.visibleFor(assistantId), ...mp.archivedFor(assistantId)]);
     final filtered = _filtered(source);
     final active = filtered
         .where((e) => e.status == MemoryStatus.active)
@@ -403,6 +480,11 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
     final archived = filtered
         .where((e) => e.status == MemoryStatus.archived)
         .toList();
+    // `null` marks the archived section header.
+    final rows = <MemoryEntry?>[
+      ...active,
+      if (archived.isNotEmpty) ...[null, ...archived],
+    ];
     final desktop = PlatformUtils.isDesktopTarget;
     final listPadding = desktop
         ? (widget.padding ?? const EdgeInsets.fromLTRB(4, 0, 4, 20))
@@ -429,9 +511,10 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
           )
         else
           _mobileToolbar(l10n, ap),
-        const MemoryOrphanBanner(),
+        if (assistantId == null) const MemoryOrphanBanner(),
+        if (widget.header != null) widget.header!,
         Expanded(
-          child: filtered.isEmpty
+          child: rows.isEmpty
               ? Center(
                   child: Text(
                     _searchResults != null
@@ -442,71 +525,29 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
                     ),
                   ),
                 )
-              : ListView(
+              : MemoryNavigableList(
                   padding: listPadding,
-                  children: [
-                    ...active.map(
-                      (e) => MemoryEntryCard(
-                        entry: e,
-                        assistantName: resolveAssistantName(
-                          context,
-                          e.assistantId,
-                        ),
-                        selectable: _selecting,
-                        selected: _selected.contains(e.id),
-                        onSelectedChanged: (v) {
-                          setState(() {
-                            if (v) {
-                              _selected.add(e.id);
-                            } else {
-                              _selected.remove(e.id);
-                            }
-                          });
-                        },
-                        onEdit: () => _showEditSheet(existing: e),
+                  itemCount: rows.length,
+                  isEntry: (i) => rows[i] != null,
+                  itemBuilder: (context, i) {
+                    final entry = rows[i];
+                    if (entry != null) return _entryCard(context, entry);
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        desktop ? 8 : 16,
+                        16,
+                        desktop ? 8 : 16,
+                        4,
                       ),
-                    ),
-                    if (archived.isNotEmpty &&
-                        (_status == _StatusFilter.all ||
-                            _status == _StatusFilter.archived)) ...[
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          desktop ? 8 : 16,
-                          16,
-                          desktop ? 8 : 16,
-                          4,
-                        ),
-                        child: Text(
-                          l10n.memoryEntryArchivedSection,
-                          style: TextStyle(
-                            fontSize: desktop ? 13.5 : 15,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
+                      child: Text(
+                        l10n.memoryEntryArchivedSection,
+                        style: TextStyle(
+                          fontSize: desktop ? 13.5 : 15,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
-                      ...archived.map(
-                        (e) => MemoryEntryCard(
-                          entry: e,
-                          assistantName: resolveAssistantName(
-                            context,
-                            e.assistantId,
-                          ),
-                          selectable: _selecting,
-                          selected: _selected.contains(e.id),
-                          onSelectedChanged: (v) {
-                            setState(() {
-                              if (v) {
-                                _selected.add(e.id);
-                              } else {
-                                _selected.remove(e.id);
-                              }
-                            });
-                          },
-                          onEdit: () => _showEditSheet(existing: e),
-                        ),
-                      ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
         ),
       ],
