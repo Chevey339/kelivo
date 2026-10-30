@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'selection_edge_initialization.dart';
+import 'selection_rect_collection.dart';
 
 /// Preserves inline widget identity while the paragraph's selectable fragments
 /// change. Plain text keeps Flutter's ordinary Text rendering path.
@@ -176,7 +177,7 @@ TextSpan _withSpacing(TextSpan span, TextStyle spacing) => TextSpan(
 
 class _ParagraphSelectionDelegate
     extends MultiSelectableSelectionContainerDelegate
-    with SelectionEdgeInitialization {
+    with SelectionEdgeInitialization, SelectionRectCollection {
   _ParagraphSelectionDelegate(this._paragraph) {
     addListener(WidgetsBinding.instance.ensureVisualUpdate);
   }

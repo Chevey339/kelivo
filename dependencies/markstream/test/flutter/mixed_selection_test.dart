@@ -178,6 +178,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(selected, expected);
         } else {
+          List<List<Rect>>? forwardRects;
           for (final reverse in [false, true]) {
             region.clearSelection();
             await tester.pump(const Duration(milliseconds: 600));
@@ -192,6 +193,26 @@ void main() {
             await gesture.removePointer();
             await tester.pumpAndSettle();
             expect(selected, expected);
+            final rects = tester
+                .widgetList<SelectionContainer>(
+                  find.descendant(
+                    of: find.byType(MixedDocument),
+                    matching: find.byType(SelectionContainer),
+                  ),
+                )
+                .map((container) => container.delegate?.value)
+                .whereType<SelectionGeometry>()
+                .where((geometry) => geometry.hasSelection)
+                .map((geometry) => geometry.selectionRects)
+                .toList();
+            expect(rects, isNotEmpty);
+            if (reverse) {
+              // Nested blocks and inline fragments must publish the same
+              // selected rectangles regardless of which edge was dragged.
+              expect(rects, forwardRects);
+            } else {
+              forwardRects = rects;
+            }
           }
         }
         expect(tester.takeException(), isNull);

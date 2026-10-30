@@ -2,10 +2,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'selection_edge_initialization.dart';
+import 'selection_rect_collection.dart';
 
 /// Publishes incoming selectables before replaying selection edge events.
 class StableSelectionDelegate extends StaticSelectionContainerDelegate
-    with SelectionEdgeInitialization {
+    with SelectionEdgeInitialization, SelectionRectCollection {
   StableSelectionDelegate() {
     addListener(WidgetsBinding.instance.ensureVisualUpdate);
   }

@@ -196,10 +196,11 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     );
   }
 
-  Rect _selectionAnchor() {
+  Rect _selectionAnchor({Offset? fallbackAnchor}) {
     final rects = _selectionKey.currentState?.globalSelectionRects;
     if (rects != null && rects.isNotEmpty) return rects.first;
     final anchor =
+        fallbackAnchor ??
         _areaKey
             .currentState
             ?.selectableRegion
@@ -395,10 +396,11 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
 
   Widget _buildMenu(BuildContext context, SelectableRegionState region) {
     final text = _selectedText;
+    // Reading these anchors consumes Flutter's saved right-click position.
     final anchors = region.contextMenuAnchors;
     final snapshot = _captureSelection();
     if (widget.message != null && snapshot != null) {
-      return _buildMessageMenu(context, region, snapshot);
+      return _buildMessageMenu(context, region, snapshot, anchors);
     }
     return AppTextSelectionToolbar(
       anchors: anchors,
@@ -454,10 +456,10 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     BuildContext context,
     SelectableRegionState region,
     SelectionSnapshot snapshot,
+    TextSelectionToolbarAnchors anchors,
   ) {
     final l10n = AppLocalizations.of(context)!;
-    final anchors = region.contextMenuAnchors;
-    final anchor = _selectionAnchor();
+    final anchor = _selectionAnchor(fallbackAnchor: anchors.primaryAnchor);
     final items = region.contextMenuButtonItems;
     final selectedMarkdown = _markdownSelection.hasSelection
         ? snapshot.markdown
