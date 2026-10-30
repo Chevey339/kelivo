@@ -207,6 +207,7 @@ void main() {
       const migratedOrder = <String>[
         ...legacyOrder,
         'Vercel',
+        'Atlas Cloud',
         '随想AI中转站',
         'MaruCode',
       ];
