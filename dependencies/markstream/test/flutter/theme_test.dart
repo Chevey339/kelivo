@@ -52,7 +52,7 @@ void main() {
     );
   });
   test(
-    'app font families propagate while heading and chrome weights follow tokens',
+    'app font families and platform-adjusted weights propagate to all text',
     () {
       final theme = MarkstreamTheme.fromColorScheme(
         light,
@@ -73,13 +73,17 @@ void main() {
       expect(theme.body.height, 1.55);
       expect(theme.body.letterSpacing, 0);
       expect(theme.blockSpacing, 18);
-      expect(theme.headings.first.fontWeight, FontWeight.w700);
+      expect(theme.headings.first.fontWeight, FontWeight.w600);
       expect(theme.strongWeight, FontWeight.w600);
       expect(theme.link.fontSize, isNull);
-      expect(theme.headings[1].fontWeight, FontWeight.w600);
+      expect(
+        theme.headings.skip(1).map((style) => style.fontWeight),
+        everyElement(FontWeight.w500),
+      );
+      expect(theme.chrome.label.fontWeight, FontWeight.w400);
       expect(theme.details.summary.fontWeight, FontWeight.w400);
       expect(theme.table.heading.fontFamily, 'AppFont');
-      expect(theme.table.heading.fontWeight, FontWeight.w600);
+      expect(theme.table.heading.fontWeight, FontWeight.w500);
       expect(theme.code.text.fontFamily, 'AppMono');
       expect(theme.code.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamilyFallback, ['AppCjk']);

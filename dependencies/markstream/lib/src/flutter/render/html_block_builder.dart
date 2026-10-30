@@ -297,13 +297,20 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
         if (owner == null) return content;
         return DocumentSelectionGroup(
           node: owner,
-          child: Align(
-            alignment: switch (owner.attributes['align']) {
-              'center' => Alignment.center,
-              'right' => Alignment.centerRight,
-              _ => AlignmentDirectional.centerStart,
+          child: DefaultTextStyle.merge(
+            textAlign: switch (owner.attributes['align']) {
+              'center' => TextAlign.center,
+              'right' => TextAlign.right,
+              _ => TextAlign.start,
             },
-            child: content,
+            child: Align(
+              alignment: switch (owner.attributes['align']) {
+                'center' => Alignment.center,
+                'right' => Alignment.centerRight,
+                _ => AlignmentDirectional.centerStart,
+              },
+              child: content,
+            ),
           ),
         );
       },

@@ -949,6 +949,13 @@ Inline ***strong emphasis*** text.
             findsNWidgets(5),
           );
           final bounds = tester.getRect(find.byType(Table));
+          expect(
+            bounds.top,
+            closeTo(
+              tester.getTopLeft(find.byType(MarkstreamTableBlock)).dy + 4,
+              .1,
+            ),
+          );
           expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 0);
           final mouse = await tester.createGesture(
             kind: ui.PointerDeviceKind.mouse,
@@ -967,6 +974,7 @@ Inline ***strong emphasis*** text.
           await tester.pumpAndSettle();
           expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
           expect(tester.getRect(find.byType(Table)), bounds);
+          expect(tester.getRect(toolbar).overlaps(bounds), isFalse);
           await mouse.moveTo(tester.getCenter(toolbar));
           await tester.pumpAndSettle();
           expect(tester.widget<AnimatedOpacity>(toolbar).opacity, 1);
@@ -4585,22 +4593,33 @@ press5
     expect(_paragraphsWith('链接', contains: false), hasLength(1));
   });
 
-  testWidgets('MarkdownWithCodeHighlight normalizes strong weight on Android', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    try {
-      await tester.pumpWidget(_markdownHarness('这是 **粗体** 文本'));
-      await tester.pump();
+  testWidgets(
+    'MarkdownWithCodeHighlight normalizes headings and table weight on Android',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        await tester.pumpWidget(
+          _markdownHarness(
+            '# 一级标题\n\n## 二级标题\n\n这是 **粗体** 文本\n\n| 表头 |\n| --- |\n| 正文 |',
+          ),
+        );
+        await tester.pump();
 
-      final spans = _resolvedTextSpansFromRichText(tester);
-      final strongSpan = spans.singleWhere((span) => span.text == '粗体');
+        final spans = _resolvedTextSpansFromRichText(tester);
+        final strongSpan = spans.singleWhere((span) => span.text == '粗体');
 
-      expect(strongSpan.style.fontWeight, FontWeight.w500);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+        expect(strongSpan.style.fontWeight, FontWeight.w500);
+        for (final text in ['一级标题', '二级标题', '表头']) {
+          expect(
+            spans.singleWhere((span) => span.text == text).style.fontWeight,
+            FontWeight.w500,
+          );
+        }
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight keeps p tag spacing compact', (
     tester,
