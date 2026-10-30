@@ -1806,6 +1806,13 @@ void main() {
         renderedParagraphsWith('Final answer', exact: false),
         hasLength(1),
       );
+
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(
+        renderedParagraphsWith('inline reasoning', exact: false),
+        isNotEmpty,
+      );
       expect(tester.takeException(), isNull);
     });
 

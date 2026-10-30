@@ -78,6 +78,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
+import '../utils/reasoning_preview.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
 import 'select_copy_sheet.dart';
@@ -4785,8 +4786,54 @@ const double _timelineGap = 8;
 const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
 
-/// Holds the latest reasoning-toggle callbacks so memoized step widgets can
-/// look them up on tap without baking a new closure into the cache key.
+class _AnimatedReasoningPreview extends StatelessWidget {
+  const _AnimatedReasoningPreview({
+    required this.text,
+    required this.loading,
+    required this.color,
+    required this.style,
+  });
+
+  final String text;
+  final bool loading;
+  final Color color;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = latestReasoningPreview(text);
+    final visibleText = preview.isEmpty && loading ? '…' : preview;
+    if (visibleText.isEmpty) return const SizedBox.shrink();
+
+    return ThinkingSheen(
+      enabled: loading,
+      color: color,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final offset = Tween<Offset>(
+            begin: const Offset(0, 0.12),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        child: Text(
+          visibleText,
+          key: ValueKey<String>(visibleText),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        ),
+      ),
+    );
+  }
+}
+
 class _ChainOfThoughtActions extends InheritedWidget {
   const _ChainOfThoughtActions({required this.toggles, required super.child});
 
@@ -5556,6 +5603,8 @@ class _ChainOfThoughtReasoningStepState
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
     );
+    final showCollapsedReasoningPreview = context
+        .select<SettingsProvider, bool>((s) => s.showCollapsedReasoningPreview);
     final state = _stepState;
     final display = _sanitize(widget.step.text);
     final label = ThinkingSheen(
@@ -5611,7 +5660,18 @@ class _ChainOfThoughtReasoningStepState
     }
 
     Widget? content;
-    if (state == _ReasoningStepState.preview) {
+    if (state == _ReasoningStepState.expanded) {
+      content = AppSelectionArea(child: reasoningContent(display));
+    } else if (showCollapsedReasoningPreview && widget.step.loading) {
+      content = AppSelectionArea(
+        child: _AnimatedReasoningPreview(
+          text: display,
+          loading: widget.step.loading,
+          color: fg.strong,
+          style: const TextStyle(fontSize: 12.5, height: 1.32),
+        ),
+      );
+    } else if (state == _ReasoningStepState.preview) {
       content = ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 100),
         child: OptionalShaderMask(
@@ -5644,8 +5704,6 @@ class _ChainOfThoughtReasoningStepState
           ),
         ),
       );
-    } else if (state == _ReasoningStepState.expanded) {
-      content = AppSelectionArea(child: reasoningContent(display));
     }
 
     return _TimelineStepShell(
@@ -5674,7 +5732,8 @@ class _ChainOfThoughtReasoningStepState
         color: fg.muted,
       ),
       content: content,
-      contentVisible: state != _ReasoningStepState.collapsed,
+      contentVisible:
+          state == _ReasoningStepState.expanded || widget.step.loading,
       expectContent: true,
     );
   }
@@ -7999,12 +8058,15 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
     );
+    final showCollapsedReasoningPreview = context
+        .select<SettingsProvider, bool>((s) => s.showCollapsedReasoningPreview);
     final loading = widget.loading;
 
     // Android-like surface style
     final curve = const Cubic(0.2, 0.8, 0.2, 1);
 
-    // Build a compact header with optional scrolling preview when loading
+    // Build a compact header; while reasoning is active, the current summary
+    // is rendered below it when the card is collapsed.
     Widget header = IosCardPress(
       borderRadius: BorderRadius.circular(12),
       baseColor: Colors.transparent,
@@ -8106,50 +8168,64 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     if (isLoading && !widget.expanded) {
       body = Padding(
         padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 80),
-          child: OptionalShaderMask(
-            enabled: _hasOverflow,
-            shaderCallback: (rect) {
-              final h = rect.height;
-              const double topFade = 12.0;
-              const double bottomFade = 28.0;
-              final double sTop = (topFade / h).clamp(0.0, 1.0);
-              final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
-              return LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: const [
-                  Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
-                  Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
-                  Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
-                  Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
-                ],
-                stops: [0.0, sTop, sBot, 1.0],
-              ).createShader(rect);
-            },
-            blendMode: BlendMode.dstIn,
-            child: NotificationListener<ScrollUpdateNotification>(
-              onNotification: (_) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => _checkOverflow(),
-                );
-                return false;
-              },
-              child: SingleChildScrollView(
-                controller: _scroll,
-                physics: const BouncingScrollPhysics(),
-                child: reasoningContent(display),
+        child: showCollapsedReasoningPreview
+            ? _AnimatedReasoningPreview(
+                text: display,
+                loading: isLoading,
+                color: fg.strong,
+                style: baseStyle,
+              )
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 80),
+                child: OptionalShaderMask(
+                  enabled: _hasOverflow,
+                  shaderCallback: (rect) {
+                    final h = rect.height;
+                    const double topFade = 12.0;
+                    const double bottomFade = 28.0;
+                    final double sTop = (topFade / h).clamp(0.0, 1.0);
+                    final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
+                    return LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: const [
+                        Color(
+                          0x00FFFFFF,
+                        ), // color-gate: ignore (dstIn alpha mask)
+                        Color(
+                          0xFFFFFFFF,
+                        ), // color-gate: ignore (dstIn alpha mask)
+                        Color(
+                          0xFFFFFFFF,
+                        ), // color-gate: ignore (dstIn alpha mask)
+                        Color(
+                          0x00FFFFFF,
+                        ), // color-gate: ignore (dstIn alpha mask)
+                      ],
+                      stops: [0.0, sTop, sBot, 1.0],
+                    ).createShader(rect);
+                  },
+                  blendMode: BlendMode.dstIn,
+                  child: NotificationListener<ScrollUpdateNotification>(
+                    onNotification: (_) {
+                      WidgetsBinding.instance.addPostFrameCallback(
+                        (_) => _checkOverflow(),
+                      );
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      physics: const BouncingScrollPhysics(),
+                      child: reasoningContent(display),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
       );
     }
 
     // Enable long-press text selection in reasoning body
     body = AppSelectionArea(child: body);
-
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: curve,
@@ -8165,7 +8241,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [header, if (widget.expanded || isLoading) body],
+            children: [header, body],
           ),
         ),
       ),
