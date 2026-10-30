@@ -4601,7 +4601,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServicesPageWebFetchFooter =>
-      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。';
+      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。\n\n如已使用此处的网页抓取，建议前往「设置 → MCP」关闭内置 @kelivo/fetch，避免模型混用两个抓取工具。此处配置的网页抓取仍可正常使用。';
 
   @override
   String get searchServicesPageWebFetchSupported => '支持网页抓取';
@@ -19420,7 +19420,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesPageWebFetchFooter =>
-      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。';
+      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。\n\n如已使用此处的网页抓取，建议前往「设置 → MCP」关闭内置 @kelivo/fetch，避免模型混用两个抓取工具。此处配置的网页抓取仍可正常使用。';
 
   @override
   String get searchServicesPageWebFetchSupported => '支持网页抓取';
@@ -34164,7 +34164,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesPageWebFetchFooter =>
-      '開啟連網搜尋後，模型還可以讀取網頁全文。搜尋服務不支援抓取時會改用本機抓取，本機抓取無法處理需要 JavaScript 渲染或有反爬限制的頁面。';
+      '開啟連網搜尋後，模型還可以讀取網頁全文。搜尋服務不支援抓取時會改用本機抓取，本機抓取無法處理需要 JavaScript 渲染或有反爬限制的頁面。\n\n如已使用此處的網頁抓取，建議前往「設定 → MCP」關閉內建 @kelivo/fetch，避免模型混用兩個抓取工具。此處設定的網頁抓取仍可正常使用。';
 
   @override
   String get searchServicesPageWebFetchSupported => '支援網頁抓取';

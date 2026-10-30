@@ -4761,7 +4761,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServicesPageWebFetchFooter =>
-      'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.';
+      'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.\n\nIf you use the page reader configured here, disable the built-in @kelivo/fetch in Settings → MCP to avoid overlapping tools. The page reader configured here will still work.';
 
   @override
   String get searchServicesPageWebFetchSupported => 'Can read web pages';

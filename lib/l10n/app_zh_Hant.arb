@@ -1636,7 +1636,7 @@
   "searchServicesPageWebFetchProviderSubtitle": "使用該服務商的 API Key 與額度",
   "searchServicesPageWebFetchOff": "關閉",
   "searchServicesPageWebFetchOffSubtitle": "連網時只搜尋，不讀取網頁",
-  "searchServicesPageWebFetchFooter": "開啟連網搜尋後，模型還可以讀取網頁全文。搜尋服務不支援抓取時會改用本機抓取，本機抓取無法處理需要 JavaScript 渲染或有反爬限制的頁面。",
+  "searchServicesPageWebFetchFooter": "開啟連網搜尋後，模型還可以讀取網頁全文。搜尋服務不支援抓取時會改用本機抓取，本機抓取無法處理需要 JavaScript 渲染或有反爬限制的頁面。\n\n如已使用此處的網頁抓取，建議前往「設定 → MCP」關閉內建 @kelivo/fetch，避免模型混用兩個抓取工具。此處設定的網頁抓取仍可正常使用。",
   "searchServicesPageWebFetchSupported": "支援網頁抓取",
   "searchServicesPageMaxResults": "最大結果數",
   "searchServicesPageTimeoutSeconds": "超時時間（秒）",

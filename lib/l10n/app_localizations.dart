@@ -8740,7 +8740,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServicesPageWebFetchFooter.
   ///
   /// In en, this message translates to:
-  /// **'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.'**
+  /// **'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.\n\nIf you use the page reader configured here, disable the built-in @kelivo/fetch in Settings → MCP to avoid overlapping tools. The page reader configured here will still work.'**
   String get searchServicesPageWebFetchFooter;
 
   /// No description provided for @searchServicesPageWebFetchSupported.
