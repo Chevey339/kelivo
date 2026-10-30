@@ -28,6 +28,7 @@ import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
+import '../storage/attachment_file_lock.dart';
 import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
@@ -771,6 +772,7 @@ class DataSync {
     File? manifestTmp;
     File? settingsTmp;
     File? databaseTmp;
+    AttachmentFileLock? attachmentLease;
     var abandonWorkDir = false;
     try {
       onProgress?.call(
@@ -782,6 +784,24 @@ class DataSync {
       );
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
+      }
+      if (includeFiles) {
+        final pending = AttachmentFileLock.acquire();
+        try {
+          attachmentLease = cancelToken == null
+              ? await pending
+              : await Future.any([
+                  pending,
+                  cancelToken.whenCancelled.then<AttachmentFileLock>(
+                    (_) => throw const BackupCancelledException(),
+                  ),
+                ]);
+          cancelToken?.throwIfCancelled();
+        } catch (_) {
+          // Cancellation must not leave a queued acquisition holding the lock.
+          unawaited(pending.then((lease) => lease.release()));
+          rethrow;
+        }
       }
       // --- Step 1: Prepare temp files that need the main isolate ---
       // settings.json
@@ -868,6 +888,15 @@ class DataSync {
         appVersion: appVersion,
       );
     } catch (error) {
+      if (backupIsolateStillAlive(error)) {
+        final lease = attachmentLease;
+        attachmentLease = null;
+        final exited = backupIsolateExitFuture(error);
+        if (lease != null && exited != null) {
+          unawaited(exited.then((_) => lease.release()));
+        }
+        // Without exit proof, retain the lease for the process lifetime.
+      }
       if (shouldDeleteTempPathsAfterIsolateError(error)) {
         unregisterLiveTempPath(workDir.path);
         await _deleteDirectoryQuietly(workDir);
@@ -877,6 +906,7 @@ class DataSync {
       }
       rethrow;
     } finally {
+      attachmentLease?.release();
       // Cleanup temp intermediate files. The final zip is returned to callers
       // and must be deleted by the upload/export caller after it is consumed.
       // If a snapshot/pack isolate is still alive, leave the directory alone.

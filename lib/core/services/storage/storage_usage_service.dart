@@ -19,6 +19,7 @@ import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
 import '../workspace/workspace_session_sync.dart';
 import 'storage_image_usage.dart';
+import 'attachment_file_lock.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -824,6 +825,13 @@ abstract final class StorageUsageService {
   }
 
   static Future<int> deleteUploadFiles(
+    Iterable<String> paths, {
+    required bool images,
+  }) => AttachmentFileLock.synchronized(
+    () => _deleteUploadFiles(paths, images: images),
+  );
+
+  static Future<int> _deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
   }) async {

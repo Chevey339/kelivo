@@ -80,8 +80,14 @@ class ChatController extends ChangeNotifier {
   bool _isLoadingWindow = false;
   bool get isLoadingWindow => _isLoadingWindow;
 
-  /// Serial of the latest window load; only it may clear [_isLoadingWindow].
+  /// Serial of the latest window load; only it may publish a loaded page.
   int _windowLoadSerial = 0;
+
+  /// Supersede an asynchronous navigation while retaining the visible page.
+  void cancelPendingWindowLoad() {
+    _windowLoadSerial++;
+    _isLoadingWindow = false;
+  }
 
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
@@ -137,6 +143,7 @@ class ChatController extends ChangeNotifier {
         _chatService.getMessageCount(conversation.id) != 0) {
       throw StateError('persisted_conversation_requires_async_open');
     }
+    cancelPendingWindowLoad();
     _currentConversation = conversation;
     _messages = [];
     _versionHeaders.clear();
@@ -150,6 +157,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> setCurrentConversationAndLoad(Conversation? conversation) async {
+    cancelPendingWindowLoad();
     _currentConversation = conversation;
     _messages = [];
     _versionHeaders.clear();
@@ -220,8 +228,7 @@ class ChatController extends ChangeNotifier {
     FetchedConversationWindow fetched, {
     VoidCallback? onDeferredGroupDataLoaded,
   }) {
-    _windowLoadSerial++;
-    _isLoadingWindow = false;
+    cancelPendingWindowLoad();
     _currentConversation = fetched.conversation;
     _replaceWindow(fetched.page);
     _versionSelections = fetched.versionSelections;
@@ -297,6 +304,7 @@ class ChatController extends ChangeNotifier {
   }
 
   void _clearCurrentConversationState() {
+    cancelPendingWindowLoad();
     _currentConversation = null;
     _messages = [];
     _versionHeaders.clear();
@@ -317,7 +325,10 @@ class ChatController extends ChangeNotifier {
         limit: ChatService.defaultTimelineInitialSlots,
       );
       // Discard the page if the conversation changed while loading.
-      if (_currentConversation?.id != conversationId) return;
+      if (_currentConversation?.id != conversationId ||
+          serial != _windowLoadSerial) {
+        return;
+      }
       _replaceWindow(page);
     } finally {
       if (serial == _windowLoadSerial) _isLoadingWindow = false;
@@ -425,13 +436,18 @@ class ChatController extends ChangeNotifier {
   Future<bool> loadStartWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
+    final serial = ++_windowLoadSerial;
+    _isLoadingWindow = false;
     final page = await _chatService.loadTimelinePage(
       conversation.id,
       fromStart: true,
       limit: ChatService.defaultLoadedWindowMax,
     );
     // Discard the page if the conversation changed while loading.
-    if (_currentConversation?.id != conversation.id) return false;
+    if (_currentConversation?.id != conversation.id ||
+        serial != _windowLoadSerial) {
+      return false;
+    }
     _replaceWindow(page);
     await _preloadVisibleGroupData();
     notifyListeners();
@@ -441,12 +457,17 @@ class ChatController extends ChangeNotifier {
   Future<bool> loadEndWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
+    final serial = ++_windowLoadSerial;
+    _isLoadingWindow = false;
     final page = await _chatService.loadTimelinePage(
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
     );
     // Discard the page if the conversation changed while loading.
-    if (_currentConversation?.id != conversation.id) return false;
+    if (_currentConversation?.id != conversation.id ||
+        serial != _windowLoadSerial) {
+      return false;
+    }
     _replaceWindow(page);
     await _preloadVisibleGroupData();
     notifyListeners();
@@ -489,7 +510,10 @@ class ChatController extends ChangeNotifier {
         limit: limit,
       );
       // Discard the page if the conversation changed while loading.
-      if (_currentConversation?.id != conversation.id) return false;
+      if (_currentConversation?.id != conversation.id ||
+          serial != _windowLoadSerial) {
+        return false;
+      }
       if (page == null || page.slots.isEmpty) return false;
       _replaceWindow(page);
     } finally {
@@ -1405,6 +1429,7 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _windowLoadSerial++;
     _pendingVersionSelections.clear();
     _chatService.removeListener(_syncCurrentConversationWithService);
     cancelAllStreams();

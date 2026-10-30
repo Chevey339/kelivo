@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -40,6 +41,7 @@ import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 const _withoutAssets = WebDavConfig(
@@ -107,6 +109,30 @@ class _FailingRestoreChatService extends ChatService {
   }) async {
     replaceCalls++;
     throw StateError('chat replacement failed');
+  }
+}
+
+class _PausedSnapshotChatService extends ChatService {
+  final snapshotStarted = Completer<void>();
+  final resumeSnapshot = Completer<void>();
+  Object? snapshotFailure;
+
+  @override
+  Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
+    File destinationFile, {
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    if (!snapshotStarted.isCompleted) snapshotStarted.complete();
+    await resumeSnapshot.future;
+    if (snapshotFailure case final error?) throw error;
+    return super.createBackupDatabaseSnapshot(
+      destinationFile,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+      timeout: timeout,
+    );
   }
 }
 
@@ -1342,6 +1368,177 @@ void main() {
       );
     }
 
+    for (final automaticCleanup in [true, false]) {
+      test(
+        'packing preserves attachments during cleanup (automatic=$automaticCleanup)',
+        () async {
+          SandboxPathResolver.debugSetDirs(
+            docsDir: root.path,
+            supportDir: root.path,
+          );
+          addTearDown(() => SandboxPathResolver.debugSetDirs());
+          // Settings are packed before attachments. Keep the real ZIP worker
+          // busy long enough for the concurrent database/file cleanup to run.
+          await businessRepository.setPreference(
+            'backup_test_padding',
+            'x' * (16 * 1024 * 1024),
+          );
+          final file = File('${root.path}/upload/expired-attachment.txt');
+          final chat = ChatService();
+          Future<void>? maintenance;
+          try {
+            await chat.init();
+            await file.parent.create(recursive: true);
+            await file.writeAsString('attachment bytes at backup start');
+            final conversation = await chat.createConversation(title: 'Old');
+            await chat.addMessage(
+              conversationId: conversation.id,
+              role: 'user',
+              parts: [
+                FilePart(
+                  uri: SandboxPathResolver.canonicalize(file.path),
+                  name: 'expired-attachment.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+            );
+            if (automaticCleanup) {
+              await chat.deleteConversation(conversation.id);
+            }
+            expect(await file.exists(), isTrue);
+            final sync = DataSync(
+              businessRepository: businessRepository,
+              chatService: chat,
+            );
+            final backup = await sync.prepareBackupFile(
+              const WebDavConfig(),
+              onProgress: (progress) {
+                if (progress.phase == BackupPhase.packing) {
+                  maintenance ??= automaticCleanup
+                      ? chat.runAssetMaintenance(
+                          now: DateTime.now().toUtc().add(
+                            const Duration(days: 8),
+                          ),
+                        )
+                      : StorageUsageService.deleteUploadFiles(
+                          [file.path],
+                          images: false,
+                        ).then<void>((removed) => expect(removed, 1));
+                }
+              },
+            );
+            addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+            expect(maintenance, isNotNull);
+            await maintenance;
+            expect(await file.exists(), isFalse);
+            final input = InputFileStream(backup.path);
+            final archive = ZipDecoder().decodeStream(input);
+            try {
+              final attachment = archive.findFile(
+                'upload/expired-attachment.txt',
+              );
+              expect(attachment, isNotNull);
+              expect(
+                utf8.decode(attachment!.readBytes()!),
+                'attachment bytes at backup start',
+              );
+            } finally {
+              archive.clearSync();
+              input.closeSync();
+            }
+          } finally {
+            await maintenance;
+            await chat.close();
+          }
+        },
+      );
+    }
+
+    test('queued backup cancellation leaves later exports usable', () async {
+      final chat = _PausedSnapshotChatService();
+      await chat.init();
+      addTearDown(chat.close);
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chat,
+      );
+      final first = sync.prepareBackupFile(const WebDavConfig());
+      await chat.snapshotStarted.future;
+      final token = BackupCancelToken();
+      addTearDown(token.dispose);
+      final preparing = Completer<void>();
+      try {
+        final cancelled = sync.prepareBackupFile(
+          const WebDavConfig(),
+          cancelToken: token,
+          onProgress: (progress) {
+            if (progress.phase == BackupPhase.preparing &&
+                !preparing.isCompleted) {
+              preparing.complete();
+            }
+          },
+        );
+        final rejected = expectLater(
+          cancelled,
+          throwsA(isA<BackupCancelledException>()),
+        );
+        await preparing.future;
+        token.cancel();
+        await rejected.timeout(const Duration(seconds: 3));
+      } finally {
+        chat.resumeSnapshot.complete();
+        final backup = await first;
+        await DataSync.cleanupTemporaryBackupFile(backup);
+      }
+      try {
+        final backup = await sync.prepareBackupFile(const WebDavConfig());
+        expect(await backup.exists(), isTrue);
+        await DataSync.cleanupTemporaryBackupFile(backup);
+      } finally {
+        await chat.close();
+      }
+    });
+
+    test(
+      'attachment deletion waits for a cancelled snapshot worker to exit',
+      () async {
+        final chat = _PausedSnapshotChatService();
+        await chat.init();
+        addTearDown(chat.close);
+        final exited = Completer<void>();
+        chat.snapshotFailure = BackupCancelledException(
+          isolateExited: false,
+          isolateExit: exited.future,
+        );
+        final file = File('${root.path}/upload/retained.txt');
+        await file.parent.create(recursive: true);
+        await file.writeAsString('still in use by worker');
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        );
+        final backup = sync.prepareBackupFile(const WebDavConfig());
+        final rejected = expectLater(
+          backup,
+          throwsA(isA<BackupCancelledException>()),
+        );
+        await chat.snapshotStarted.future;
+        chat.resumeSnapshot.complete();
+        await rejected;
+        final deleting = StorageUsageService.deleteUploadFiles([
+          file.path,
+        ], images: false);
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          expect(await file.exists(), isTrue);
+        } finally {
+          exited.complete();
+          expect(await deleting, 1);
+        }
+        expect(await file.exists(), isFalse);
+      },
+    );
+
     test(
       'packs files as deflated zip entries and removes staging files',
       () async {
@@ -1707,6 +1904,13 @@ void main() {
           isEmpty,
         );
       }
+      final retry = await sync.prepareBackupFile(
+        const WebDavConfig(
+          scope: BackupScope(excluded: {BackupCategory.chats}),
+        ),
+      );
+      expect(await retry.exists(), isTrue);
+      await DataSync.cleanupTemporaryBackupFile(retry);
     });
 
     test('cancel after pack worker success does not return the zip', () async {

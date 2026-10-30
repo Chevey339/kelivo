@@ -186,6 +186,8 @@ class HomePageController extends ChangeNotifier {
   /// Serial of the latest animated conversation transition; superseded
   /// transitions check it to discard their pre-commit work.
   int _switchSerial = 0;
+  int _messageJumpSerial = 0;
+  bool _messageJumpInProgress = false;
 
   // Startup warm-up (cache plan measure 14): after the initial restore
   // completes, an idle-time serial prefetch of the most recent conversations.
@@ -961,6 +963,8 @@ class HomePageController extends ChangeNotifier {
           );
         };
     _viewModel.onConversationSwitched = () {
+      // Committing the new window already invalidated its predecessor's read.
+      _resetMessageJump();
       _restoreMessageUiState();
       _scrollCtrl.positionAtBottomOnNextLayout();
     };
@@ -1828,6 +1832,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> switchConversationAnimated(String id) async {
     final serial = ++_switchSerial;
+    _cancelMessageJump();
     _warmupSerial++;
     if (currentConversation?.id == id) {
       // Already on the target: the serial bump above cancels any in-flight
@@ -1880,7 +1885,7 @@ class HomePageController extends ChangeNotifier {
             !identical(_scrollCtrl, activeScrollController)) {
           return;
         }
-        await _convoFadeController.forward();
+        await _convoFadeController.forward().orCancel;
       } catch (_) {}
     } else {
       // Desktop uses the same prepare/commit atomicity as mobile, without
@@ -1909,13 +1914,13 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> _reverseConvoFade() async {
     try {
-      await _convoFadeController.reverse();
+      await _convoFadeController.reverse().orCancel;
     } catch (_) {}
   }
 
   Future<void> _forwardConvoFade() async {
     try {
-      await _convoFadeController.forward();
+      await _convoFadeController.forward().orCancel;
     } catch (_) {}
   }
 
@@ -1930,6 +1935,7 @@ class HomePageController extends ChangeNotifier {
   }) async {
     // Cancel any in-flight conversation switch fetch.
     final serial = ++_switchSerial;
+    _cancelMessageJump();
     final assistantId = _context.read<AssistantProvider>().currentAssistantId;
     _warmupSerial++;
     _selectionEpoch++;
@@ -3686,9 +3692,33 @@ class HomePageController extends ChangeNotifier {
   Future<List<MiniMapSearchHit>> searchMiniMapMatches(String query) =>
       _chatController.searchMiniMapMatches(query);
 
-  // Issue 7 audit: jumps via collapsed-index + loadUntilMessageVisible only.
-  // Does not call ChatService.getMessageIndex, so an absent message-order
-  // skeleton during loadTimelinePage backfill does not require a guard here.
+  void _cancelMessageJump() {
+    if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
+    _resetMessageJump();
+  }
+
+  int _beginMessageJump() {
+    if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
+    _messageJumpInProgress = true;
+    return ++_messageJumpSerial;
+  }
+
+  void _resetMessageJump() {
+    _messageJumpSerial++;
+    _messageJumpInProgress = false;
+    // This opacity wraps every conversation. An old page read must not keep
+    // a newly selected conversation invisible until that read completes.
+    _messageJumpTransitionController.value = 1.0;
+  }
+
+  bool _ownsMessageJump(int serial) =>
+      !_composerDisposed && serial == _messageJumpSerial;
+
+  bool _isMessageJumpCurrent(int serial, String? conversationId) =>
+      _ownsMessageJump(serial) && currentConversation?.id == conversationId;
+
+  // Jumps use the collapsed index and bounded window reads, without relying
+  // on a cached full message-order skeleton.
   Future<void> scrollToMessageId(
     String targetId, {
     bool useRikkaTransition = false,
@@ -3696,21 +3726,24 @@ class HomePageController extends ChangeNotifier {
   }) async {
     _warmupSerial++;
     uiSearchNavigation.clear();
+    final serial = _beginMessageJump();
     final conversationId = currentConversation?.id;
-    if (useRikkaTransition) {
-      try {
-        await _messageJumpTransitionController.reverse();
-      } catch (_) {}
-    }
 
     try {
+      if (useRikkaTransition) {
+        await _messageJumpTransitionController.reverse().orCancel;
+      } else {
+        _messageJumpTransitionController.value = 1.0;
+      }
+      if (!_isMessageJumpCurrent(serial, conversationId)) return;
       if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
         final loaded = await _viewModel.loadUntilMessageVisible(targetId);
-        if (!loaded) return;
+        if (!loaded || !_isMessageJumpCurrent(serial, conversationId)) return;
         try {
           await WidgetsBinding.instance.endOfFrame;
         } catch (_) {}
       }
+      if (!_isMessageJumpCurrent(serial, conversationId)) return;
       final index = _chatController.indexOfCollapsedMessageId(targetId);
       if (index < 0) return;
       await _scrollCtrl.scrollToMessageId(
@@ -3719,15 +3752,20 @@ class HomePageController extends ChangeNotifier {
       );
       if (surfaceKey != null &&
           conversationId != null &&
-          currentConversation?.id == conversationId) {
+          _isMessageJumpCurrent(serial, conversationId)) {
         uiSearchNavigation.reveal(conversationId, targetId, surfaceKey);
       }
+    } on TickerCanceled {
+      // A newer navigation owns the animation and its visibility.
     } finally {
-      if (useRikkaTransition) {
+      if (useRikkaTransition && _ownsMessageJump(serial)) {
         try {
-          await _messageJumpTransitionController.forward();
-        } catch (_) {}
+          await _messageJumpTransitionController.forward().orCancel;
+        } on TickerCanceled {
+          // Superseded while revealing the list.
+        }
       }
+      if (serial == _messageJumpSerial) _messageJumpInProgress = false;
     }
   }
 
@@ -3806,16 +3844,20 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> forceScrollToBottom({bool animate = true}) async {
+    final serial = _beginMessageJump();
+    final conversationId = currentConversation?.id;
     final useJumpTransition = animate && _chatController.hasMoreAfter;
-    if (useJumpTransition) {
-      try {
-        await _messageJumpTransitionController.reverse();
-      } catch (_) {}
-    }
 
     try {
+      if (useJumpTransition) {
+        await _messageJumpTransitionController.reverse().orCancel;
+      } else {
+        _messageJumpTransitionController.value = 1.0;
+      }
+      if (!_isMessageJumpCurrent(serial, conversationId)) return;
       if (_chatController.hasMoreAfter) {
         final loaded = await _chatController.loadEndWindow();
+        if (!_isMessageJumpCurrent(serial, conversationId)) return;
         if (loaded) {
           _viewModel.restoreMessageUiState();
         }
@@ -3824,16 +3866,22 @@ class HomePageController extends ChangeNotifier {
         try {
           await WidgetsBinding.instance.endOfFrame;
         } catch (_) {}
+        if (!_isMessageJumpCurrent(serial, conversationId)) return;
         await _scrollCtrl.settleAtBottomBeforeReveal();
       } else {
         _scrollCtrl.forceScrollToBottom(animate: animate);
       }
+    } on TickerCanceled {
+      // A newer navigation owns the animation and its visibility.
     } finally {
-      if (useJumpTransition) {
+      if (useJumpTransition && _ownsMessageJump(serial)) {
         try {
-          await _messageJumpTransitionController.forward();
-        } catch (_) {}
+          await _messageJumpTransitionController.forward().orCancel;
+        } on TickerCanceled {
+          // Superseded while revealing the list.
+        }
       }
+      if (serial == _messageJumpSerial) _messageJumpInProgress = false;
     }
   }
 
