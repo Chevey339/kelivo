@@ -930,6 +930,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       };
       applyMaxTokens(body2);
       maybeAddStreamingUsageOptions(body2, stream: true, config: config);
+      applyOpenRouterClaudePromptCaching(body2, config: config, spec: spec);
       applyOpenAIResolvedRequest(
         body2,
         spec: spec,
