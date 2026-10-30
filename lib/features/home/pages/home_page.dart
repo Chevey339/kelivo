@@ -1196,12 +1196,7 @@ class _HomePageState extends State<HomePage>
         onViewOriginal: _controller.scrollToMessageId,
         onRecompress: () =>
             _showCompressContextOptions(targetConversationId: conversationId),
-        onContinueNewChat: () async {
-          final copy = await chat.duplicateConversation(conversationId);
-          if (mounted && copy != null) {
-            await _controller.switchConversationAnimated(copy.id);
-          }
-        },
+        onOpenConversation: _controller.switchConversationAnimated,
       ),
       onUndoContextOperation: (operation) =>
           changeContextOperationWithConfirmation(

@@ -269,7 +269,7 @@ Future<void> showContextOperationDetails(
   required ContextOperation operation,
   Future<void> Function(String messageId)? onViewOriginal,
   VoidCallback? onRecompress,
-  VoidCallback? onContinueNewChat,
+  Future<void> Function(String conversationId)? onOpenConversation,
 }) async {
   final snapshot = await chat.loadContextSnapshot(conversationId);
   final source = snapshot.messages
@@ -363,11 +363,32 @@ Future<void> showContextOperationDetails(
               Navigator.of(detailContext).pop();
               onRecompress();
             },
-      onContinueNewChat: onContinueNewChat == null
+      onContinueNewChat:
+          onOpenConversation == null ||
+              !operation.isCompression ||
+              operation.revoked ||
+              hidden ||
+              superseded
           ? null
-          : () {
+          : () async {
               Navigator.of(detailContext).pop();
-              onContinueNewChat();
+              try {
+                final created = await chat.continueFromContextSummary(
+                  conversationId,
+                  operation.id,
+                );
+                if (context.mounted &&
+                    chat.currentConversationId == conversationId) {
+                  await onOpenConversation(created.id);
+                }
+              } catch (error) {
+                if (!context.mounted) return;
+                showAppSnackBar(
+                  context,
+                  message: compressionErrorLabel(l10n, error.toString()),
+                  type: NotificationType.error,
+                );
+              }
             },
     ),
   );

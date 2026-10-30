@@ -239,6 +239,22 @@ void main() {
   );
 
   test(
+    'continuing from an installed summary leaves its compression task unchanged',
+    () async {
+      await compression.start(id, request((_, _) async => 'summary'));
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+      );
+      final before = await chat.readCompressionTaskRecords();
+      final operation = (await chat.loadContextOperations(id)).single;
+      final created = await chat.continueFromContextSummary(id, operation.id);
+      expect(created.id, isNot(id));
+      expect(await chat.readCompressionTaskRecords(), before);
+      expect(compression.taskFor(id)!.resultConversationId, isNull);
+    },
+  );
+
+  test(
     'restore interrupted work exposes saved summary without starting a request',
     () async {
       var calls = 0;
