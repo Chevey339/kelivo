@@ -2001,22 +2001,29 @@ class BrowserPageViewState extends State<BrowserPage>
   Widget _panelFrame(BuildContext context, Widget child) {
     if (widget.sidePanel == null) return child;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final radius = dark ? 10.0 : 0.0;
+    final borderWidth = dark ? .5 : 0.0;
     return Padding(
       padding: dark ? const EdgeInsets.fromLTRB(8, 6, 8, 8) : EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(dark ? 10 : 0),
-        child: DecoratedBox(
-          position: DecorationPosition.foreground,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(dark ? 10 : 0),
-            border: dark
-                ? Border.all(
-                    color: Colors.white.withValues(alpha: .14),
-                    width: .5,
-                  )
-                : null,
+      // AppKit excludes foreground Flutter paint bounds from native hit tests.
+      // A foreground rounded border blocks the entire WebView rectangle, even
+      // with IgnorePointer. Paint the frame behind an inset native viewport.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: dark
+              ? Border.all(
+                  color: Colors.white.withValues(alpha: .14),
+                  width: borderWidth,
+                )
+              : null,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(borderWidth),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius - borderWidth),
+            child: ColoredBox(color: Colors.white, child: child),
           ),
-          child: ColoredBox(color: Colors.white, child: child),
         ),
       ),
     );
