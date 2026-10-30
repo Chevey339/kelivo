@@ -4415,6 +4415,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageByteDanceName => '火山引擎';
 
   @override
+  String get providersPageSambaNovaName => 'SambaNova';
+
+  @override
   String get providersPageEnabledStatus => '启用';
 
   @override
@@ -19234,6 +19237,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providersPageByteDanceName => '火山引擎';
 
   @override
+  String get providersPageSambaNovaName => 'SambaNova';
+
+  @override
   String get providersPageEnabledStatus => '启用';
 
   @override
@@ -33977,6 +33983,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providersPageByteDanceName => '火山引擎';
+
+  @override
+  String get providersPageSambaNovaName => 'SambaNova';
 
   @override
   String get providersPageEnabledStatus => '啟用';

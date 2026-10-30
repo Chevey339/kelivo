@@ -4572,6 +4572,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providersPageByteDanceName => 'ByteDance';
 
   @override
+  String get providersPageSambaNovaName => 'SambaNova';
+
+  @override
   String get providersPageEnabledStatus => 'ON';
 
   @override
