@@ -29,21 +29,23 @@ class MarkstreamMathBlock extends StatelessWidget {
     ],
     child: SourceHighlightScope.of(context).atom(
       node.span,
-      Padding(
-        padding: theme.mathPadding,
-        child: SelectableSpanAdapter(
-          selectedText: toPlainText(node),
-          child: SelectionContainer.disabled(
-            child: LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                primary: false,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: constraints.hasBoundedWidth
-                        ? constraints.maxWidth
-                        : 0,
-                  ),
+      SelectableSpanAdapter(
+        selectedText: toPlainText(node),
+        child: SelectionContainer.disabled(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              primary: false,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: constraints.hasBoundedWidth
+                      ? constraints.maxWidth
+                      : 0,
+                ),
+                child: Padding(
+                  // Glyphs can paint slightly beyond their TeX layout bounds.
+                  // Keep their vertical breathing room inside the scroll clip.
+                  padding: theme.mathPadding,
                   child: Center(
                     child:
                         renderer?.build(
