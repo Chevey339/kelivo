@@ -216,7 +216,9 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
 
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final type = obj['type'];
-    if (type == 'response.output_text.delta') {
+    // A refusal replaces the output text, so it is shown as the reply.
+    if (type == 'response.output_text.delta' ||
+        type == 'response.refusal.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
         approxCompletionChars += delta.length;
