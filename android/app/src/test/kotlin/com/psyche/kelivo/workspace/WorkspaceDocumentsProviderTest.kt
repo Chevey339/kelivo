@@ -32,8 +32,13 @@ import org.robolectric.annotation.Implements
 import org.robolectric.annotation.RealObject
 import org.robolectric.annotation.Resetter
 import java.io.File
+import java.io.FileDescriptor
 import java.io.FileNotFoundException
+import java.nio.channels.FileChannel
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
@@ -123,16 +128,21 @@ class WorkspaceDocumentsProviderTest {
     }
 
     @Test
-    fun honorsRequestedProjectionsAndReadOnlyFlags() {
+    fun honorsRequestedProjectionsAndCreateFlags() {
         workspace()
-        provider.queryRoots(arrayOf(Root.COLUMN_TITLE)).use {
-            assertEquals(1, it.columnCount)
+        provider.queryRoots(arrayOf(Root.COLUMN_TITLE, Root.COLUMN_FLAGS)).use {
+            assertEquals(2, it.columnCount)
             assertTrue(it.moveToFirst())
             assertEquals("Kelivo", it.getString(0))
+            assertTrue(it.getInt(1) and Root.FLAG_SUPPORTS_CREATE != 0)
+        }
+        provider.queryDocument(WorkspaceDocumentPaths.ROOT, null).use {
+            assertTrue(it.moveToFirst())
+            assertEquals(0, it.getInt(it.getColumnIndexOrThrow(Document.COLUMN_FLAGS)) and Document.FLAG_DIR_SUPPORTS_CREATE)
         }
         children().use {
             assertTrue(it.moveToFirst())
-            assertEquals(0, it.getInt(it.getColumnIndexOrThrow(Document.COLUMN_FLAGS)))
+            assertTrue(it.getInt(it.getColumnIndexOrThrow(Document.COLUMN_FLAGS)) and Document.FLAG_DIR_SUPPORTS_CREATE != 0)
         }
     }
 
@@ -148,25 +158,149 @@ class WorkspaceDocumentsProviderTest {
     }
 
     @Test
+    fun createsFilesAndFoldersInsideAWorkspace() {
+        val root = workspace()
+        val folderId = provider.createDocument("workspace/one", Document.MIME_TYPE_DIR, "新建文件夹")
+        assertEquals("workspace/one/新建文件夹", folderId)
+        assertTrue(File(root, "新建文件夹").isDirectory)
+
+        val fileId = provider.createDocument("workspace/one/新建文件夹", "text/plain", "note.txt")
+        assertEquals("workspace/one/新建文件夹/note.txt", fileId)
+        val file = File(root, "新建文件夹/note.txt")
+        assertTrue(file.isFile)
+        assertEquals(0L, file.length())
+        assertEquals("note.txt", provider.queryDocument(fileId, arrayOf(Document.COLUMN_DISPLAY_NAME))
+            .strings(Document.COLUMN_DISPLAY_NAME).single())
+        assertTrue(provider.isChildDocument("workspace/one/新建文件夹", fileId))
+
+        // Existing names must not be overwritten.
+        val duplicateId = provider.createDocument("workspace/one/新建文件夹", "text/plain", "note.txt")
+        assertEquals("workspace/one/新建文件夹/note (2).txt", duplicateId)
+        assertTrue(File(root, "新建文件夹/note (2).txt").isFile)
+    }
+
+    @Test
+    fun deletesFilesAndFoldersWithoutFollowingLinks() {
+        val root = workspace()
+        val folder = File(root, "folder").apply { mkdirs() }
+        File(folder, "nested.txt").writeText("nested")
+        File(root, "file.txt").writeText("file")
+        val outside = File(appData, "keep.txt").apply { writeText("keep") }
+        Files.createSymbolicLink(File(folder, "link").toPath(), outside.toPath())
+
+        children("workspace/one").use { cursor ->
+            val flags = mutableListOf<Int>()
+            while (cursor.moveToNext()) {
+                flags += cursor.getInt(cursor.getColumnIndexOrThrow(Document.COLUMN_FLAGS))
+            }
+            assertTrue("Files and folders must advertise deletion", flags.all { it and Document.FLAG_SUPPORTS_DELETE != 0 })
+        }
+
+        provider.deleteDocument("workspace/one/file.txt")
+        assertFalse(File(root, "file.txt").exists())
+        provider.deleteDocument("workspace/one/folder")
+        assertFalse(folder.exists())
+        assertEquals("keep", outside.readText())
+
+        assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/one") }
+        assertThrows(FileNotFoundException::class.java) { provider.deleteDocument("workspace/unknown/x") }
+    }
+
+    @Test
+    fun renamesFilesAndFoldersAndRefusesCollisions() {
+        val root = workspace()
+        File(root, "old.txt").writeText("old")
+        File(root, "dir").mkdirs()
+        File(root, "dir/child.txt").writeText("child")
+        File(root, "taken.txt").writeText("taken")
+
+        val fileId = provider.renameDocument("workspace/one/old.txt", "new.txt")
+        assertEquals("workspace/one/new.txt", fileId)
+        assertEquals("old", File(root, "new.txt").readText())
+        assertFalse(File(root, "old.txt").exists())
+
+        val dirId = provider.renameDocument("workspace/one/dir", "renamed")
+        assertEquals("workspace/one/renamed", dirId)
+        assertEquals("child", File(root, "renamed/child.txt").readText())
+
+        children("workspace/one").use { cursor ->
+            val flags = mutableListOf<Int>()
+            while (cursor.moveToNext()) {
+                flags += cursor.getInt(cursor.getColumnIndexOrThrow(Document.COLUMN_FLAGS))
+            }
+            assertTrue("Documents must advertise rename", flags.all { it and Document.FLAG_SUPPORTS_RENAME != 0 })
+        }
+
+        assertNull(provider.renameDocument("workspace/one/new.txt", "new.txt"))
+        assertThrows(FileAlreadyExistsException::class.java) {
+            provider.renameDocument("workspace/one/new.txt", "taken.txt")
+        }
+        assertEquals("taken", File(root, "taken.txt").readText())
+        assertThrows(IllegalArgumentException::class.java) {
+            provider.renameDocument("workspace/one/new.txt", "a/b")
+        }
+        assertThrows(FileNotFoundException::class.java) { provider.renameDocument("workspace/one", "other") }
+    }
+
+    @Test
+    fun rejectsInvalidNamesAndNonDirectoryParents() {
+        val root = workspace()
+        File(root, "hello.txt").writeText("hello")
+        for (name in listOf("", "..", ".", "a/b", "a\\b", "a\u0000b")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                provider.createDocument("workspace/one", "text/plain", name)
+            }
+        }
+        assertThrows(FileNotFoundException::class.java) {
+            provider.createDocument("workspace/one/hello.txt", "text/plain", "child.txt")
+        }
+        assertThrows(FileNotFoundException::class.java) {
+            provider.createDocument("workspace/unknown", "text/plain", "child.txt")
+        }
+    }
+
+    @Test
     @Config(shadows = [DocumentDescriptorOsShadow::class])
-    fun readsSelectedFileAndRejectsEveryWriteMode() {
+    fun writesSelectedFileAndRejectsUnsupportedModes() {
+        val root = workspace()
+        val file = File(root, "hello.txt").apply { writeText("内容") }
+        DocumentDescriptorOsShadow.openedPath = file.path
+
+        provider.openDocument("workspace/one/hello.txt", "w", null).use { descriptor ->
+            ParcelFileDescriptor.AutoCloseOutputStream(descriptor).use { it.write("新".toByteArray()) }
+        }
+        assertEquals("新", file.readText())
+
+        file.writeText("内容")
+        provider.openDocument("workspace/one/hello.txt", "rwt", null).use { descriptor ->
+            ParcelFileDescriptor.AutoCloseOutputStream(descriptor).use { it.write("新".toByteArray()) }
+        }
+        assertEquals("新", file.readText())
+
+        provider.openDocument("workspace/one/hello.txt", "wa", null).close()
+        provider.openDocument("workspace/one/hello.txt", "rw", null).close()
+        assertEquals("新", file.readText())
+
+        for (mode in listOf("x", "rx", "")) {
+            assertThrows(FileNotFoundException::class.java) {
+                provider.openDocument("workspace/one/hello.txt", mode, null)
+            }
+        }
+        assertThrows(FileNotFoundException::class.java) {
+            provider.openDocument("workspace/one", "w", null)
+        }
+    }
+
+    @Test
+    @Config(shadows = [DocumentDescriptorOsShadow::class])
+    fun readsSelectedFileAndRejectsAnOpenedDescriptorThatMovedOutsideTheWorkspace() {
         val root = workspace()
         File(root, "hello.txt").writeText("工作区内容")
-        for (mode in listOf("w", "wa", "rw", "rwt")) {
-            assertThrows(FileNotFoundException::class.java) { provider.openDocument("workspace/one/hello.txt", mode, null) }
-        }
         DocumentDescriptorOsShadow.openedPath = File(root, "hello.txt").path
         val descriptor = provider.openDocument("workspace/one/hello.txt", "r", null)
         val content = ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
         assertEquals("工作区内容", content)
         assertEquals("工作区内容", File(root, "hello.txt").readText())
-    }
-
-    @Test
-    @Config(shadows = [DocumentDescriptorOsShadow::class])
-    fun rejectsAnOpenedDescriptorThatMovedOutsideTheWorkspace() {
-        val root = workspace()
-        File(root, "hello.txt").writeText("hello")
         DocumentDescriptorOsShadow.openedPath = File(appData, "kelivo.db").path
         assertThrows(FileNotFoundException::class.java) {
             provider.openDocument("workspace/one/hello.txt", "r", null)
@@ -384,6 +518,14 @@ class DocumentDescriptorOsShadow {
         fun readlink(path: String): String {
             require(path.startsWith("/proc/self/fd/"))
             return checkNotNull(openedPath)
+        }
+
+        @JvmStatic
+        @Implementation
+        fun ftruncate(fd: FileDescriptor, length: Long) {
+            FileChannel.open(Paths.get("/proc/self/fd/$fd"), StandardOpenOption.WRITE).use {
+                it.truncate(length)
+            }
         }
 
         @JvmStatic
