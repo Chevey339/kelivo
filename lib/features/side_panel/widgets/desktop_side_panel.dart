@@ -548,6 +548,9 @@ class _DesktopSidePanelState extends State<DesktopSidePanel> {
 
       final hotkeys = context.watch<HotkeyProvider?>();
       final mac = Theme.of(context).platform == TargetPlatform.macOS;
+      final addressShortcut = hotkeys == null
+          ? SingleActivator(LogicalKeyboardKey.keyL, meta: mac, control: !mac)
+          : hotkeys.shortcutFor('side_panel_address');
       final commands =
           hotkeys?.nativeCommands ??
           {
@@ -648,6 +651,24 @@ class _DesktopSidePanelState extends State<DesktopSidePanel> {
                     label: overlay ? l.sidePanelToggle : null,
                     child: FocusScope(
                       node: _scope,
+                      onKeyEvent: (_, event) {
+                        if (event is KeyDownEvent &&
+                            _controller.hasFocus &&
+                            _controller.activeTab is WebTab &&
+                            addressShortcut?.accepts(
+                                  event,
+                                  HardwareKeyboard.instance,
+                                ) ==
+                                true) {
+                          if (hotkeys == null) {
+                            _hotkey(HotkeyAction.sidePanelAddress);
+                          } else {
+                            hotkeys.invoke('side_panel_address');
+                          }
+                          return KeyEventResult.handled;
+                        }
+                        return KeyEventResult.ignored;
+                      },
                       child: Focus(
                         onKeyEvent: (_, event) {
                           if (event is! KeyDownEvent) {

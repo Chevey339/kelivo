@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -265,9 +264,12 @@ class HotkeyProvider extends ChangeNotifier {
     }
     _registered.clear();
 
-    // Register each enabled item with valid command
+    // Register each enabled app-wide item with a valid command.
     for (final e in _items.values) {
       if (!e.enabled) continue;
+      // Address focus belongs to the side panel's focus subtree. Registering
+      // it here also claims Ctrl/Cmd+L while the chat selection owns focus.
+      if (e.id == 'side_panel_address') continue;
       final cmd = e.command;
       if (cmd == null || cmd.trim().isEmpty) continue;
       final scope = (e.id == 'toggle_app_visibility')
@@ -373,6 +375,23 @@ class HotkeyProvider extends ChangeNotifier {
   };
 
   void invoke(String id) => _invoke(id);
+
+  /// Uses the same configured command for a focus-scoped Flutter handler.
+  ShortcutActivator? shortcutFor(String id) {
+    final item = _items[id]!;
+    if (!item.enabled || item.command == null) return null;
+    final hotkey = _parseCommandToHotKey(item.command!);
+    if (hotkey == null) return null;
+    final modifiers = hotkey.modifiers ?? const [];
+    return SingleActivator(
+      hotkey.logicalKey,
+      control: modifiers.contains(HotKeyModifier.control),
+      meta: modifiers.contains(HotKeyModifier.meta),
+      alt: modifiers.contains(HotKeyModifier.alt),
+      shift: modifiers.contains(HotKeyModifier.shift),
+      includeRepeats: false,
+    );
+  }
 
   // ===== Helpers for parsing/displaying hotkey strings =====
 
