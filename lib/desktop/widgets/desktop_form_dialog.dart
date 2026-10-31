@@ -29,18 +29,23 @@ class DesktopFormDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: ConstrainedBox(
-        constraints: constraints,
-        child: Material(
-          color: context.overlaySurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cornerRadius),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(cornerRadius),
-            child: child,
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: constraints,
+          child: Material(
+            color: context.overlaySurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(cornerRadius),
+              side: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.25),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(cornerRadius),
+              child: child,
+            ),
           ),
         ),
       ),
@@ -55,44 +60,71 @@ class DesktopFormDialogHeader extends StatelessWidget {
     required this.onClose,
     this.closeTooltip,
     this.closeSemanticLabel,
+    this.actions = const [],
   });
 
   final String title;
   final VoidCallback onClose;
   final String? closeTooltip;
   final String? closeSemanticLabel;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 52,
-      color: context.overlaySurface,
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: AppFontWeights.emphasis,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackActions = constraints.maxWidth < 520 && actions.isNotEmpty;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              color: context.overlaySurface,
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (!stackActions) ...actions,
+                  IosIconButton(
+                    icon: Lucide.X,
+                    size: 20,
+                    minSize: 36,
+                    tooltip: closeTooltip,
+                    semanticLabel: closeSemanticLabel,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                    onTap: onClose,
+                  ),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          IosIconButton(
-            icon: Lucide.X,
-            size: 20,
-            minSize: 36,
-            tooltip: closeTooltip,
-            semanticLabel: closeSemanticLabel,
-            color: cs.onSurface.withValues(alpha: 0.9),
-            onTap: onClose,
-          ),
-        ],
-      ),
+            if (stackActions)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: actions,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

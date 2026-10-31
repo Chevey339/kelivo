@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -123,7 +124,10 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
     // Slightly narrower than input width
-    final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
+    final width = math.min(
+      (widget.anchorWidth - 16).clamp(260.0, 720.0),
+      math.max(0.0, screen.width - 16),
+    );
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
           8.0,

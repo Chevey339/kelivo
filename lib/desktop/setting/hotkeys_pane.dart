@@ -1,3 +1,4 @@
+import '../widgets/desktop_labeled_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -183,80 +184,81 @@ class _HotkeyRowState extends State<_HotkeyRow> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Row(
-        children: [
-          // Left: label
-          Expanded(
-            child: Text(
-              displayLabel(),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.medium,
-                color: cs.onSurface.withValues(alpha: 0.92),
+      child: DesktopLabeledControl(
+        controlWidth: 400,
+        label: Text(
+          displayLabel(),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: AppFontWeights.medium,
+            color: cs.onSurface.withValues(alpha: 0.92),
+          ),
+        ),
+        control: Wrap(
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.end,
+          children: [
+            SizedBox(
+              width: 240,
+              child: Stack(
+                children: [
+                  _ShortcutEditor(
+                    focusNode: _focusNode,
+                    recording: _recording,
+                    displayText: current.isEmpty ? placeholder : current,
+                    onTap: () {
+                      _setRecording(true);
+                      _focusNode.requestFocus();
+                    },
+                    onCancel: () => _setRecording(false),
+                    onSubmit: (cmd) async {
+                      // Require at least one modifier; _ShortcutEditor guarantees
+                      await context.read<HotkeyProvider>().setCommand(
+                        item.id,
+                        cmd,
+                      );
+                      if (mounted) _setRecording(false);
+                    },
+                  ),
+                  if (_recording)
+                    // Tap outside cancel overlay
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () => _setRecording(false),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Middle: shortcut editor
-          SizedBox(
-            width: 240,
-            child: Stack(
-              children: [
-                _ShortcutEditor(
-                  focusNode: _focusNode,
-                  recording: _recording,
-                  displayText: current.isEmpty ? placeholder : current,
-                  onTap: () {
-                    _setRecording(true);
-                    _focusNode.requestFocus();
-                  },
-                  onCancel: () => _setRecording(false),
-                  onSubmit: (cmd) async {
-                    // Require at least one modifier; _ShortcutEditor guarantees
-                    await context.read<HotkeyProvider>().setCommand(
-                      item.id,
-                      cmd,
-                    );
-                    if (mounted) _setRecording(false);
-                  },
-                ),
-                if (_recording)
-                  // Tap outside cancel overlay
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () => _setRecording(false),
-                    ),
-                  ),
-              ],
+            const SizedBox(width: 12),
+            // Right actions: reset, clear, enable
+            Tooltip(
+              message: l10n.hotkeysResetDefault,
+              child: _SmallIconBtn(
+                icon: lucide.Lucide.RotateCcw,
+                onTap: () async =>
+                    context.read<HotkeyProvider>().resetToDefault(item.id),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Right actions: reset, clear, enable
-          Tooltip(
-            message: l10n.hotkeysResetDefault,
-            child: _SmallIconBtn(
-              icon: lucide.Lucide.RotateCcw,
-              onTap: () async =>
-                  context.read<HotkeyProvider>().resetToDefault(item.id),
+            const SizedBox(width: 8),
+            Tooltip(
+              message: l10n.hotkeysClearShortcut,
+              child: _SmallIconBtn(
+                icon: lucide.Lucide.Eraser,
+                onTap: () async =>
+                    context.read<HotkeyProvider>().clearCommand(item.id),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Tooltip(
-            message: l10n.hotkeysClearShortcut,
-            child: _SmallIconBtn(
-              icon: lucide.Lucide.Eraser,
-              onTap: () async =>
-                  context.read<HotkeyProvider>().clearCommand(item.id),
+            const SizedBox(width: 12),
+            IosSwitch(
+              value: item.enabled,
+              onChanged: (v) =>
+                  context.read<HotkeyProvider>().setEnabled(item.id, v),
             ),
-          ),
-          const SizedBox(width: 12),
-          IosSwitch(
-            value: item.enabled,
-            onChanged: (v) =>
-                context.read<HotkeyProvider>().setEnabled(item.id, v),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

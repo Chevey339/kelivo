@@ -10,6 +10,7 @@ class _DesktopProvidersBody extends StatefulWidget {
 }
 
 class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
+  bool _showDetail = false;
   static const Duration _groupReorderRestoreDelay = Duration(milliseconds: 300);
   static const Duration _groupReorderCollapseDelay = Duration(milliseconds: 32);
 
@@ -29,6 +30,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   @override
   void initState() {
     super.initState();
+    _showDetail = widget.initialSelectedKey != null;
     unawaited(ModelCatalogService.instance.ensureLoaded());
   }
 
@@ -226,15 +228,24 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           (cfg.oauthCredentials == null || cfg.oauthCredentials!.requiresLogin),
       selected: selected,
       background: bg,
-      onTap: () => setState(() => _selectedKey = item.key),
+      onTap: () => setState(() {
+        _selectedKey = item.key;
+        _showDetail = true;
+      }),
       onEdit: () {
-        setState(() => _selectedKey = item.key);
+        setState(() {
+          _selectedKey = item.key;
+          _showDetail = true;
+        });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _detailKey.currentState?._showProviderSettingsDialog(context);
         });
       },
       onShare: () {
-        setState(() => _selectedKey = item.key);
+        setState(() {
+          _selectedKey = item.key;
+          _showDetail = true;
+        });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showShareDialog(
             item.key,
@@ -386,394 +397,385 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: Row(
-            children: [
-              // Left providers list
-              SizedBox(
-                width: 256,
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DesktopProvidersSearchField(
-                            controller: _searchController,
-                            hintText: l10n.providersPageSearchHint,
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = _normalizeSearchQuery(value);
-                              });
-                            },
-                            onClear: () {
-                              if (_searchController.text.isEmpty) return;
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          ),
+          child: DesktopAdaptivePanes(
+            sidebarWidth: 269,
+            showDetail: _showDetail,
+            onBack: () => setState(() => _showDetail = false),
+            backLabel: l10n.settingsPageProviders,
+            sidebar: SizedBox(
+              width: 256,
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DesktopProvidersSearchField(
+                          controller: _searchController,
+                          hintText: l10n.providersPageSearchHint,
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = _normalizeSearchQuery(value);
+                            });
+                          },
+                          onClear: () {
+                            if (_searchController.text.isEmpty) return;
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
                         ),
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          message: l10n.modelCatalogTitle,
-                          child: KeyedSubtree(
-                            key: _catalogAnchorKey,
-                            child: _IconBtn(
-                              icon: lucide.Lucide.BookOpen,
-                              onTap: () {
-                                unawaited(
-                                  showDesktopModelCatalogPopover(
-                                    context,
-                                    anchorKey: _catalogAnchorKey,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          message: l10n.providersPageImportTooltip,
+                      ),
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: l10n.modelCatalogTitle,
+                        child: KeyedSubtree(
+                          key: _catalogAnchorKey,
                           child: _IconBtn(
-                            icon: lucide.Lucide.cloudDownload,
-                            onTap: () async {
-                              final keys =
-                                  await showDesktopImportProviderDialog(
-                                    context,
-                                  );
-                              if (!mounted || keys == null || keys.isEmpty) {
+                            icon: lucide.Lucide.BookOpen,
+                            onTap: () {
+                              unawaited(
+                                showDesktopModelCatalogPopover(
+                                  context,
+                                  anchorKey: _catalogAnchorKey,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: l10n.providersPageImportTooltip,
+                        child: _IconBtn(
+                          icon: lucide.Lucide.cloudDownload,
+                          onTap: () async {
+                            final keys = await showDesktopImportProviderDialog(
+                              context,
+                            );
+                            if (!mounted || keys == null || keys.isEmpty) {
+                              return;
+                            }
+                            setState(() {
+                              _selectedKey = keys.first;
+                              _showDetail = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: groupingActive
+                        ? ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
+                            padding: EdgeInsets.zero,
+                            itemCount: groupingRows.length,
+                            onReorderStart: (index) {
+                              if (index < 0 || index >= groupingRows.length) {
                                 return;
                               }
-                              setState(() => _selectedKey = keys.first);
+                              if (groupingRows[index]
+                                  is! _DesktopProviderGroupingHeaderVM) {
+                                return;
+                              }
+                              _groupHeaderDragActive = true;
+                              _scheduleTemporaryGroupCollapse();
                             },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: groupingActive
-                          ? ReorderableListView.builder(
-                              buildDefaultDragHandles: false,
-                              padding: EdgeInsets.zero,
-                              itemCount: groupingRows.length,
-                              onReorderStart: (index) {
-                                if (index < 0 || index >= groupingRows.length) {
-                                  return;
-                                }
-                                if (groupingRows[index]
-                                    is! _DesktopProviderGroupingHeaderVM) {
-                                  return;
-                                }
-                                _groupHeaderDragActive = true;
-                                _scheduleTemporaryGroupCollapse();
-                              },
-                              onReorderEnd: (_) {
-                                if (!_groupHeaderDragActive) return;
-                                _groupHeaderDragActive = false;
-                                if (_temporarilyCollapseGroupedProviders) {
-                                  _scheduleTemporaryGroupRestore();
-                                } else {
-                                  _groupReorderCollapseTimer?.cancel();
-                                  _groupReorderRestoreStartTimer?.cancel();
-                                }
-                              },
-                              onReorderItem: (oldIndex, newIndex) async {
-                                if (_searchQuery.isNotEmpty) {
-                                  return;
-                                }
-                                if (groupingRows.isEmpty) return;
-                                final sp = context.read<SettingsProvider>();
+                            onReorderEnd: (_) {
+                              if (!_groupHeaderDragActive) return;
+                              _groupHeaderDragActive = false;
+                              if (_temporarilyCollapseGroupedProviders) {
+                                _scheduleTemporaryGroupRestore();
+                              } else {
+                                _groupReorderCollapseTimer?.cancel();
+                                _groupReorderRestoreStartTimer?.cancel();
+                              }
+                            },
+                            onReorderItem: (oldIndex, newIndex) async {
+                              if (_searchQuery.isNotEmpty) {
+                                return;
+                              }
+                              if (groupingRows.isEmpty) return;
+                              final sp = context.read<SettingsProvider>();
 
-                                final logicRows = <ProviderGroupingRowVM>[
-                                  for (final r in groupingRows)
-                                    if (r is _DesktopProviderGroupingHeaderVM)
-                                      ProviderGroupingHeaderVM(
-                                        groupKey: r.groupKey,
-                                      )
-                                    else if (r
-                                        is _DesktopProviderGroupingProviderVM)
-                                      ProviderGroupingProviderVM(
-                                        providerKey: r.item.key,
-                                        groupKey: r.groupKey,
-                                      ),
-                                ];
+                              final logicRows = <ProviderGroupingRowVM>[
+                                for (final r in groupingRows)
+                                  if (r is _DesktopProviderGroupingHeaderVM)
+                                    ProviderGroupingHeaderVM(
+                                      groupKey: r.groupKey,
+                                    )
+                                  else if (r
+                                      is _DesktopProviderGroupingProviderVM)
+                                    ProviderGroupingProviderVM(
+                                      providerKey: r.item.key,
+                                      groupKey: r.groupKey,
+                                    ),
+                              ];
 
-                                if (logicRows[oldIndex]
-                                    is ProviderGroupingHeaderVM) {
-                                  final intent =
-                                      analyzeProviderGroupingHeaderReorder(
-                                        rows: logicRows,
-                                        oldIndex: oldIndex,
-                                        newIndex: newIndex,
-                                      );
-                                  if (intent == null) return;
-
-                                  final visibleHeaderKeys = [
-                                    for (final row in groupingRows)
-                                      if (row
-                                          is _DesktopProviderGroupingHeaderVM)
-                                        row.groupKey,
-                                  ];
-                                  final fullDisplayKeys =
-                                      buildProviderGroupDisplayKeys(
-                                        groups: sp.providerGroups,
-                                        ungroupedIndex:
-                                            sp.providerUngroupedDisplayIndex,
-                                      );
-                                  final oldActualIndex = fullDisplayKeys
-                                      .indexOf(intent.groupKey);
-                                  if (oldActualIndex < 0) return;
-
-                                  final targetInsertIndex =
-                                      mapVisibleGroupTargetToActualInsertIndex(
-                                        fullDisplayKeys: fullDisplayKeys,
-                                        visibleHeaderKeys: visibleHeaderKeys,
-                                        movedGroupKey: intent.groupKey,
-                                        targetVisibleIndex:
-                                            intent.targetDisplayIndex,
-                                      );
-                                  final rawNewIndex =
-                                      targetInsertIndex > oldActualIndex
-                                      ? targetInsertIndex + 1
-                                      : targetInsertIndex;
-
-                                  try {
-                                    await sp.reorderProviderGroupsWithUngrouped(
-                                      oldActualIndex,
-                                      rawNewIndex,
+                              if (logicRows[oldIndex]
+                                  is ProviderGroupingHeaderVM) {
+                                final intent =
+                                    analyzeProviderGroupingHeaderReorder(
+                                      rows: logicRows,
+                                      oldIndex: oldIndex,
+                                      newIndex: newIndex,
                                     );
-                                  } finally {
-                                    if (!_groupHeaderDragActive) {
-                                      _scheduleTemporaryGroupRestore();
-                                    }
-                                  }
-                                  return;
-                                }
-
-                                final analysis = analyzeProviderGroupingReorder(
-                                  rows: logicRows,
-                                  oldIndex: oldIndex,
-                                  newIndex: newIndex,
-                                  isGroupCollapsed: sp.isGroupCollapsed,
-                                );
-
-                                if (analysis.blockedReason ==
-                                    ProviderGroupingReorderBlockedReason
-                                        .targetGroupCollapsed) {
-                                  showAppSnackBar(
-                                    context,
-                                    message:
-                                        l10n.providerGroupsExpandToMoveToast,
-                                    type: NotificationType.info,
-                                  );
-                                  if (mounted) setState(() {});
-                                  return;
-                                }
-
-                                final intent = analysis.intent;
                                 if (intent == null) return;
-                                final targetGroupId =
-                                    intent.targetGroupKey ==
-                                        SettingsProvider
-                                            .providerUngroupedGroupKey
-                                    ? null
-                                    : intent.targetGroupKey;
-                                await sp.moveProvider(
-                                  intent.providerKey,
-                                  targetGroupId,
-                                  intent.targetPos,
-                                );
-                              },
-                              proxyDecorator: (child, index, animation) {
-                                return AnimatedBuilder(
-                                  animation: animation,
-                                  builder: (context, _) => ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              itemBuilder: (ctx, i) {
-                                final row = groupingRows[i];
-                                if (row is _DesktopProviderGroupingHeaderVM) {
-                                  return KeyedSubtree(
-                                    key: ValueKey(
-                                      'desktop-provider-group-header-${row.groupKey}',
-                                    ),
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: 6,
-                                        top: i == 0 ? 0 : 6,
-                                      ),
-                                      child:
-                                          _searchQuery.isNotEmpty ||
-                                              _groupHeaderRestorePending
-                                          ? _DesktopProviderGroupHeaderRow(
-                                              title: row.title,
-                                              count: row.count,
-                                              collapsed: row.collapsed,
-                                              onToggle: _searchQuery.isNotEmpty
-                                                  ? null
-                                                  : () => unawaited(
-                                                      context
-                                                          .read<
-                                                            SettingsProvider
-                                                          >()
-                                                          .toggleGroupCollapsed(
-                                                            row.groupKey,
-                                                          ),
-                                                    ),
-                                            )
-                                          : ReorderableDragStartListener(
-                                              index: i,
-                                              child:
-                                                  _DesktopProviderGroupHeaderRow(
-                                                    title: row.title,
-                                                    count: row.count,
-                                                    collapsed: row.collapsed,
-                                                    onToggle: () => unawaited(
-                                                      context
-                                                          .read<
-                                                            SettingsProvider
-                                                          >()
-                                                          .toggleGroupCollapsed(
-                                                            row.groupKey,
-                                                          ),
-                                                    ),
-                                                  ),
-                                            ),
-                                    ),
-                                  );
-                                }
-                                if (row is _DesktopProviderGroupingProviderVM) {
-                                  final collapsed = _searchQuery.isNotEmpty
-                                      ? false
-                                      : _effectiveGroupCollapsed(
-                                          settings,
-                                          row.groupKey,
-                                        );
-                                  return KeyedSubtree(
-                                    key: ValueKey(
-                                      'desktop-prov-${row.item.key}',
-                                    ),
-                                    child: AnimatedSize(
-                                      duration: const Duration(
-                                        milliseconds: 260,
-                                      ),
-                                      curve: Curves.easeInOutCubic,
-                                      alignment: Alignment.topCenter,
-                                      child: collapsed
-                                          ? const SizedBox.shrink()
-                                          : Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 8,
-                                              ),
-                                              child: _searchQuery.isNotEmpty
-                                                  ? _buildDesktopProviderRow(
-                                                      item: row.item,
-                                                      settings: settings,
-                                                      ordered: ordered,
-                                                      baseKeys: baseKeys,
-                                                      colorScheme: cs,
-                                                    )
-                                                  : ReorderableDragStartListener(
-                                                      index: i,
-                                                      child:
-                                                          _buildDesktopProviderRow(
-                                                            item: row.item,
-                                                            settings: settings,
-                                                            ordered: ordered,
-                                                            baseKeys: baseKeys,
-                                                            colorScheme: cs,
-                                                          ),
-                                                    ),
-                                            ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            )
-                          : ReorderableListView.builder(
-                              buildDefaultDragHandles: false,
-                              padding: EdgeInsets.zero,
-                              itemCount: filteredOrdered.length,
-                              onReorderItem: (oldIndex, newIndex) async {
-                                if (_searchQuery.isNotEmpty) return;
-                                final list =
-                                    List<({String name, String key})>.from(
-                                      ordered,
+
+                                final visibleHeaderKeys = [
+                                  for (final row in groupingRows)
+                                    if (row is _DesktopProviderGroupingHeaderVM)
+                                      row.groupKey,
+                                ];
+                                final fullDisplayKeys =
+                                    buildProviderGroupDisplayKeys(
+                                      groups: sp.providerGroups,
+                                      ungroupedIndex:
+                                          sp.providerUngroupedDisplayIndex,
                                     );
-                                final item = list.removeAt(oldIndex);
-                                list.insert(newIndex, item);
-                                final newOrder = [for (final e in list) e.key];
-                                await settings.setProvidersOrder(newOrder);
+                                final oldActualIndex = fullDisplayKeys.indexOf(
+                                  intent.groupKey,
+                                );
+                                if (oldActualIndex < 0) return;
+
+                                final targetInsertIndex =
+                                    mapVisibleGroupTargetToActualInsertIndex(
+                                      fullDisplayKeys: fullDisplayKeys,
+                                      visibleHeaderKeys: visibleHeaderKeys,
+                                      movedGroupKey: intent.groupKey,
+                                      targetVisibleIndex:
+                                          intent.targetDisplayIndex,
+                                    );
+                                final rawNewIndex =
+                                    targetInsertIndex > oldActualIndex
+                                    ? targetInsertIndex + 1
+                                    : targetInsertIndex;
+
+                                try {
+                                  await sp.reorderProviderGroupsWithUngrouped(
+                                    oldActualIndex,
+                                    rawNewIndex,
+                                  );
+                                } finally {
+                                  if (!_groupHeaderDragActive) {
+                                    _scheduleTemporaryGroupRestore();
+                                  }
+                                }
+                                return;
+                              }
+
+                              final analysis = analyzeProviderGroupingReorder(
+                                rows: logicRows,
+                                oldIndex: oldIndex,
+                                newIndex: newIndex,
+                                isGroupCollapsed: sp.isGroupCollapsed,
+                              );
+
+                              if (analysis.blockedReason ==
+                                  ProviderGroupingReorderBlockedReason
+                                      .targetGroupCollapsed) {
+                                showAppSnackBar(
+                                  context,
+                                  message: l10n.providerGroupsExpandToMoveToast,
+                                  type: NotificationType.info,
+                                );
                                 if (mounted) setState(() {});
-                              },
-                              proxyDecorator: (child, index, animation) {
-                                // No shadow; clip to rounded corners to avoid white outside of the grey card
-                                return AnimatedBuilder(
-                                  animation: animation,
-                                  builder: (context, _) => ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              itemBuilder: (ctx, i) {
-                                final item = filteredOrdered[i];
-                                final row = _buildDesktopProviderRow(
-                                  item: item,
-                                  settings: settings,
-                                  ordered: ordered,
-                                  baseKeys: baseKeys,
-                                  colorScheme: cs,
-                                );
+                                return;
+                              }
+
+                              final intent = analysis.intent;
+                              if (intent == null) return;
+                              final targetGroupId =
+                                  intent.targetGroupKey ==
+                                      SettingsProvider.providerUngroupedGroupKey
+                                  ? null
+                                  : intent.targetGroupKey;
+                              await sp.moveProvider(
+                                intent.providerKey,
+                                targetGroupId,
+                                intent.targetPos,
+                              );
+                            },
+                            proxyDecorator: (child, index, animation) {
+                              return AnimatedBuilder(
+                                animation: animation,
+                                builder: (context, _) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            itemBuilder: (ctx, i) {
+                              final row = groupingRows[i];
+                              if (row is _DesktopProviderGroupingHeaderVM) {
                                 return KeyedSubtree(
-                                  key: ValueKey('desktop-prov-${item.key}'),
+                                  key: ValueKey(
+                                    'desktop-provider-group-header-${row.groupKey}',
+                                  ),
                                   child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: _searchQuery.isNotEmpty
-                                        ? row
+                                    padding: EdgeInsets.only(
+                                      bottom: 6,
+                                      top: i == 0 ? 0 : 6,
+                                    ),
+                                    child:
+                                        _searchQuery.isNotEmpty ||
+                                            _groupHeaderRestorePending
+                                        ? _DesktopProviderGroupHeaderRow(
+                                            title: row.title,
+                                            count: row.count,
+                                            collapsed: row.collapsed,
+                                            onToggle: _searchQuery.isNotEmpty
+                                                ? null
+                                                : () => unawaited(
+                                                    context
+                                                        .read<
+                                                          SettingsProvider
+                                                        >()
+                                                        .toggleGroupCollapsed(
+                                                          row.groupKey,
+                                                        ),
+                                                  ),
+                                          )
                                         : ReorderableDragStartListener(
                                             index: i,
-                                            child: row,
+                                            child:
+                                                _DesktopProviderGroupHeaderRow(
+                                                  title: row.title,
+                                                  count: row.count,
+                                                  collapsed: row.collapsed,
+                                                  onToggle: () => unawaited(
+                                                    context
+                                                        .read<
+                                                          SettingsProvider
+                                                        >()
+                                                        .toggleGroupCollapsed(
+                                                          row.groupKey,
+                                                        ),
+                                                  ),
+                                                ),
                                           ),
                                   ),
                                 );
-                              },
-                            ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Bottom add button
-                    _AddFullWidthButton(
-                      height: 36,
-                      label: l10n.addProviderSheetAddButton,
-                      onTap: () async {
-                        final created = await showDesktopAddProviderDialog(
-                          context,
-                        );
-                        if (!mounted) return;
-                        if (created != null && created.isNotEmpty) {
-                          setState(() {
-                            _selectedKey = created;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
+                              }
+                              if (row is _DesktopProviderGroupingProviderVM) {
+                                final collapsed = _searchQuery.isNotEmpty
+                                    ? false
+                                    : _effectiveGroupCollapsed(
+                                        settings,
+                                        row.groupKey,
+                                      );
+                                return KeyedSubtree(
+                                  key: ValueKey('desktop-prov-${row.item.key}'),
+                                  child: AnimatedSize(
+                                    duration: const Duration(milliseconds: 260),
+                                    curve: Curves.easeInOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: collapsed
+                                        ? const SizedBox.shrink()
+                                        : Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 8,
+                                            ),
+                                            child: _searchQuery.isNotEmpty
+                                                ? _buildDesktopProviderRow(
+                                                    item: row.item,
+                                                    settings: settings,
+                                                    ordered: ordered,
+                                                    baseKeys: baseKeys,
+                                                    colorScheme: cs,
+                                                  )
+                                                : ReorderableDragStartListener(
+                                                    index: i,
+                                                    child:
+                                                        _buildDesktopProviderRow(
+                                                          item: row.item,
+                                                          settings: settings,
+                                                          ordered: ordered,
+                                                          baseKeys: baseKeys,
+                                                          colorScheme: cs,
+                                                        ),
+                                                  ),
+                                          ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          )
+                        : ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
+                            padding: EdgeInsets.zero,
+                            itemCount: filteredOrdered.length,
+                            onReorderItem: (oldIndex, newIndex) async {
+                              if (_searchQuery.isNotEmpty) return;
+                              final list =
+                                  List<({String name, String key})>.from(
+                                    ordered,
+                                  );
+                              final item = list.removeAt(oldIndex);
+                              list.insert(newIndex, item);
+                              final newOrder = [for (final e in list) e.key];
+                              await settings.setProvidersOrder(newOrder);
+                              if (mounted) setState(() {});
+                            },
+                            proxyDecorator: (child, index, animation) {
+                              // No shadow; clip to rounded corners to avoid white outside of the grey card
+                              return AnimatedBuilder(
+                                animation: animation,
+                                builder: (context, _) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            itemBuilder: (ctx, i) {
+                              final item = filteredOrdered[i];
+                              final row = _buildDesktopProviderRow(
+                                item: item,
+                                settings: settings,
+                                ordered: ordered,
+                                baseKeys: baseKeys,
+                                colorScheme: cs,
+                              );
+                              return KeyedSubtree(
+                                key: ValueKey('desktop-prov-${item.key}'),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _searchQuery.isNotEmpty
+                                      ? row
+                                      : ReorderableDragStartListener(
+                                          index: i,
+                                          child: row,
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Bottom add button
+                  _AddFullWidthButton(
+                    height: 36,
+                    label: l10n.addProviderSheetAddButton,
+                    onTap: () async {
+                      final created = await showDesktopAddProviderDialog(
+                        context,
+                      );
+                      if (!mounted) return;
+                      if (created != null && created.isNotEmpty) {
+                        setState(() {
+                          _selectedKey = created;
+                          _showDetail = true;
+                        });
+                      }
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              VerticalDivider(
-                width: 1,
-                thickness: 0.5,
-                color: cs.outlineVariant.withValues(alpha: 0.12),
-              ),
-              // Right detail pane
-              Expanded(child: rightPane),
-            ],
+            ),
+            detail: rightPane,
           ),
         ),
       ),
@@ -1929,246 +1931,269 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
 
               const SizedBox(height: 18),
               // Models header with count + search + actions (test / add / fetch)
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          AppLocalizations.of(
-                            context,
-                          )!.providerDetailPageModelsTitle,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: AppFontWeights.emphasis,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final leading = Row(
+                    children: [
+                      Text(
+                        AppLocalizations.of(
+                          context,
+                        )!.providerDetailPageModelsTitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _GreyCapsule(label: '${models.length}'),
+                      const Spacer(),
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            width: _showSearch ? 180 : 28,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 140),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(opacity: anim, child: child),
+                              child: _showSearch
+                                  ? TextField(
+                                      key: const ValueKey('search-field'),
+                                      controller: _filterCtrl,
+                                      focusNode: _searchFocus,
+                                      autofocus: true,
+                                      style: TextStyle(fontSize: 14),
+                                      decoration: _inputDecoration(context)
+                                          .copyWith(
+                                            hintText: l10n
+                                                .providerDetailPageFilterHint,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 8,
+                                                ),
+                                          ),
+                                      onChanged: (_) => setState(() {}),
+                                    )
+                                  : _IconBtn(
+                                      key: const ValueKey('search-icon'),
+                                      icon: lucide.Lucide.Search,
+                                      onTap: () => setState(() {
+                                        _showSearch = true;
+                                        _searchFocus.addListener(() {
+                                          if (!_searchFocus.hasFocus) {
+                                            setState(() => _showSearch = false);
+                                          }
+                                        });
+                                      }),
+                                    ),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        _GreyCapsule(label: '${models.length}'),
-                        const Spacer(),
-                        Flexible(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
-                              width: _showSearch ? 180 : 28,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 140),
-                                transitionBuilder: (child, anim) =>
-                                    FadeTransition(opacity: anim, child: child),
-                                child: _showSearch
-                                    ? TextField(
-                                        key: const ValueKey('search-field'),
-                                        controller: _filterCtrl,
-                                        focusNode: _searchFocus,
-                                        autofocus: true,
-                                        style: TextStyle(fontSize: 14),
-                                        decoration: _inputDecoration(context)
-                                            .copyWith(
-                                              hintText: l10n
-                                                  .providerDetailPageFilterHint,
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 8,
-                                                  ),
-                                            ),
-                                        onChanged: (_) => setState(() {}),
-                                      )
-                                    : _IconBtn(
-                                        key: const ValueKey('search-icon'),
-                                        icon: lucide.Lucide.Search,
-                                        onTap: () => setState(() {
-                                          _showSearch = true;
-                                          _searchFocus.addListener(() {
-                                            if (!_searchFocus.hasFocus) {
-                                              setState(
-                                                () => _showSearch = false,
-                                              );
-                                            }
-                                          });
-                                        }),
-                                      ),
+                      ),
+                    ],
+                  );
+                  final actions = <Widget>[
+                    if (_isSelectionMode) ...[
+                      Tooltip(
+                        message: l10n.homePageCancel,
+                        child: _IconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: _exitSelectionMode,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: allSelected
+                            ? l10n.mcpAssistantSheetClearAll
+                            : l10n.mcpAssistantSheetSelectAll,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 160),
+                          transitionBuilder: (child, anim) =>
+                              ScaleTransition(scale: anim, child: child),
+                          child: _IconBtn(
+                            key: ValueKey(allSelected),
+                            icon: allSelected
+                                ? lucide.Lucide.Square
+                                : lucide.Lucide.CheckSquare,
+                            color: cs.onSurface.withValues(alpha: 0.85),
+                            onTap: () {
+                              setState(() {
+                                if (allSelected) {
+                                  _selectedModels.clear();
+                                } else {
+                                  _selectedModels.clear();
+                                  _selectedModels.addAll(models);
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.providerDetailPageUseStreamingLabel,
+                        child: GestureDetector(
+                          onTap: () => setState(
+                            () => _detectUseStream = !_detectUseStream,
+                          ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: _detectUseStream
+                                  ? cs.onSurface.withValues(alpha: 0.08)
+                                  : Colors.transparent,
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 160),
+                              transitionBuilder: (child, anim) =>
+                                  ScaleTransition(scale: anim, child: child),
+                              child: Icon(
+                                _detectUseStream
+                                    ? lucide.Lucide.AudioWaveform
+                                    : lucide.Lucide.SquareEqual,
+                                key: ValueKey(_detectUseStream),
+                                size: 18,
+                                color: cs.onSurface.withValues(alpha: 0.85),
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (_isSelectionMode) ...[
-                    Tooltip(
-                      message: l10n.homePageCancel,
-                      child: _IconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: _exitSelectionMode,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: allSelected
-                          ? l10n.mcpAssistantSheetClearAll
-                          : l10n.mcpAssistantSheetSelectAll,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 160),
-                        transitionBuilder: (child, anim) =>
-                            ScaleTransition(scale: anim, child: child),
-                        child: _IconBtn(
-                          key: ValueKey(allSelected),
-                          icon: allSelected
-                              ? lucide.Lucide.Square
-                              : lucide.Lucide.CheckSquare,
-                          color: cs.onSurface.withValues(alpha: 0.85),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: _isDetecting
+                            ? l10n.providerDetailPageBatchDetecting
+                            : l10n.providerDetailPageBatchDetectStart,
+                        child: _IconTextBtn(
+                          icon: _isDetecting
+                              ? lucide.Lucide.Loader
+                              : lucide.Lucide.HeartPulse,
+                          label: _isDetecting
+                              ? l10n.providerDetailPageBatchDetecting
+                              : l10n.providerDetailPageBatchDetectButton,
+                          color: _selectedModels.isEmpty
+                              ? cs.onSurface.withValues(alpha: 0.4)
+                              : null,
                           onTap: () {
-                            setState(() {
-                              if (allSelected) {
-                                _selectedModels.clear();
-                              } else {
-                                _selectedModels.clear();
-                                _selectedModels.addAll(models);
-                              }
-                            });
+                            if (_selectedModels.isEmpty) return;
+                            _startDetection();
                           },
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: l10n.providerDetailPageUseStreamingLabel,
-                      child: GestureDetector(
-                        onTap: () => setState(
-                          () => _detectUseStream = !_detectUseStream,
-                        ),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: _detectUseStream
-                                ? cs.onSurface.withValues(alpha: 0.08)
-                                : Colors.transparent,
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 160),
-                            transitionBuilder: (child, anim) =>
-                                ScaleTransition(scale: anim, child: child),
-                            child: Icon(
-                              _detectUseStream
-                                  ? lucide.Lucide.AudioWaveform
-                                  : lucide.Lucide.SquareEqual,
-                              key: ValueKey(_detectUseStream),
-                              size: 18,
-                              color: cs.onSurface.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: _isDetecting
-                          ? l10n.providerDetailPageBatchDetecting
-                          : l10n.providerDetailPageBatchDetectStart,
-                      child: _IconTextBtn(
-                        icon: _isDetecting
-                            ? lucide.Lucide.Loader
-                            : lucide.Lucide.HeartPulse,
-                        label: _isDetecting
-                            ? l10n.providerDetailPageBatchDetecting
-                            : l10n.providerDetailPageBatchDetectButton,
-                        color: _selectedModels.isEmpty
-                            ? cs.onSurface.withValues(alpha: 0.4)
-                            : null,
-                        onTap: () {
-                          if (_selectedModels.isEmpty) return;
-                          _startDetection();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: l10n
-                          .providerDetailPageDeleteFailedDetectedModelsTooltip,
-                      child: _IconBtn(
-                        icon: lucide.Lucide.CircleX,
-                        color: !hasFailedDetectedModels || _isDetecting
-                            ? cs.onSurface.withValues(alpha: 0.4)
-                            : cs.error,
-                        onTap: _confirmDeleteFailedDetectedModels,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message:
-                          l10n.providerDetailPageDeleteSelectedModelsTooltip,
-                      child: _IconTextBtn(
-                        icon: lucide.Lucide.Trash2,
-                        label:
-                            l10n.providerDetailPageDeleteSelectedModelsButton,
-                        color: _selectedModels.isEmpty || _isDetecting
-                            ? cs.onSurface.withValues(alpha: 0.4)
-                            : cs.error,
-                        onTap: _confirmDeleteSelectedModels,
-                      ),
-                    ),
-                  ] else ...[
-                    if (!_isDetecting)
-                      Tooltip(
-                        message: l10n.providerDetailPageMultiSelectButton,
-                        child: _IconBtn(
-                          icon: lucide.Lucide.CheckSquare,
-                          onTap: _enterSelectionMode,
-                        ),
-                      )
-                    else
-                      Tooltip(
-                        message: l10n.providerDetailPageBatchDetecting,
-                        child: _IconBtn(
-                          icon: lucide.Lucide.Loader,
-                          onTap: () {},
-                        ),
-                      ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: l10n.providerDetailPageAddNewModelButton,
-                      child: _IconBtn(
-                        icon: lucide.Lucide.Plus,
-                        onTap: () => _createModel(context),
-                      ),
-                    ),
-                    if (models.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Tooltip(
-                        message: l10n.providerDetailPageDeleteAllModelsTooltip,
+                        message: l10n
+                            .providerDetailPageDeleteFailedDetectedModelsTooltip,
                         child: _IconBtn(
+                          icon: lucide.Lucide.CircleX,
+                          color: !hasFailedDetectedModels || _isDetecting
+                              ? cs.onSurface.withValues(alpha: 0.4)
+                              : cs.error,
+                          onTap: _confirmDeleteFailedDetectedModels,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message:
+                            l10n.providerDetailPageDeleteSelectedModelsTooltip,
+                        child: _IconTextBtn(
                           icon: lucide.Lucide.Trash2,
-                          color: cs.onSurface.withValues(alpha: 0.85),
-                          onTap: _confirmDeleteAllModels,
+                          label:
+                              l10n.providerDetailPageDeleteSelectedModelsButton,
+                          color: _selectedModels.isEmpty || _isDetecting
+                              ? cs.onSurface.withValues(alpha: 0.4)
+                              : cs.error,
+                          onTap: _confirmDeleteSelectedModels,
+                        ),
+                      ),
+                    ] else ...[
+                      if (!_isDetecting)
+                        Tooltip(
+                          message: l10n.providerDetailPageMultiSelectButton,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.CheckSquare,
+                            onTap: _enterSelectionMode,
+                          ),
+                        )
+                      else
+                        Tooltip(
+                          message: l10n.providerDetailPageBatchDetecting,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.Loader,
+                            onTap: () {},
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.providerDetailPageAddNewModelButton,
+                        child: _IconBtn(
+                          icon: lucide.Lucide.Plus,
+                          onTap: () => _createModel(context),
+                        ),
+                      ),
+                      if (models.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message:
+                              l10n.providerDetailPageDeleteAllModelsTooltip,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.Trash2,
+                            color: cs.onSurface.withValues(alpha: 0.85),
+                            onTap: _confirmDeleteAllModels,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.providerDetailPageFetchModelsButton,
+                        child: _IconTextBtn(
+                          icon: lucide.Lucide.RefreshCcwDot,
+                          label: l10n.providerDetailPageFetchModelsButton,
+                          onTap: () async {
+                            final providerName = widget.displayName;
+                            await showModelFetchDialog(
+                              context,
+                              providerKey: widget.providerKey,
+                              providerDisplayName: providerName,
+                            );
+                          },
                         ),
                       ),
                     ],
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: l10n.providerDetailPageFetchModelsButton,
-                      child: _IconTextBtn(
-                        icon: lucide.Lucide.RefreshCcwDot,
-                        label: l10n.providerDetailPageFetchModelsButton,
-                        onTap: () async {
-                          final providerName = widget.displayName;
-                          await showModelFetchDialog(
-                            context,
-                            providerKey: widget.providerKey,
-                            providerDisplayName: providerName,
-                          );
-                        },
+                  ];
+                  final compact =
+                      constraints.maxWidth < (_isSelectionMode ? 800 : 520);
+                  return Flex(
+                    direction: compact ? Axis.vertical : Axis.horizontal,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: compact
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        fit: compact ? FlexFit.loose : FlexFit.tight,
+                        child: leading,
                       ),
-                    ),
-                  ],
-                ],
+                      SizedBox(width: compact ? 0 : 6, height: compact ? 8 : 0),
+                      Flexible(
+                        flex: compact ? 1 : 0,
+                        fit: FlexFit.loose,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          runSpacing: 8,
+                          children: actions,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 6),
@@ -2654,20 +2679,16 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                 ];
                 Widget row(String label, Widget trailing) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: cs.onSurface.withValues(alpha: 0.9),
-                          ),
-                        ),
+                  child: DesktopLabeledControl(
+                    label: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.9),
                       ),
-                      const SizedBox(width: 10),
-                      SizedBox(width: 260, child: trailing),
-                    ],
+                    ),
+                    control: trailing,
+                    controlWidth: 260,
                   ),
                 );
                 return SingleChildScrollView(

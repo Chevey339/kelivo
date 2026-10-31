@@ -1,3 +1,4 @@
+import '../../../desktop/widgets/desktop_adaptive_panes.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File;
@@ -1614,12 +1615,15 @@ class _IosButtonState extends State<_IosButton> {
                 ),
                 const SizedBox(width: 8),
               ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: AppFontWeights.semibold,
-                  fontSize: widget.dense ? 13 : 14,
+              Flexible(
+                child: Text(
+                  widget.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: AppFontWeights.semibold,
+                    fontSize: widget.dense ? 13 : 14,
+                  ),
                 ),
               ),
             ],
@@ -1693,6 +1697,7 @@ class _DesktopAssistantDialogShell extends StatefulWidget {
 class _DesktopAssistantDialogShellState
     extends State<_DesktopAssistantDialogShell> {
   _AssistantDesktopMenu _menu = _AssistantDesktopMenu.basic;
+  bool _showDetail = true;
 
   @override
   Widget build(BuildContext context) {
@@ -1736,56 +1741,51 @@ class _DesktopAssistantDialogShellState
           color: cs.outlineVariant.withValues(alpha: 0.12),
         ),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _DesktopAssistantMenu(
-                selected: _menu,
-                onSelect: (m) => setState(() => _menu = m),
-              ),
-              VerticalDivider(
-                width: 1,
-                thickness: 0.5,
-                color: cs.outlineVariant.withValues(alpha: 0.12),
-              ),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOutCubic,
-                  child: () {
-                    switch (_menu) {
-                      case _AssistantDesktopMenu.basic:
-                        return _DesktopAssistantBasicPane(
-                          assistantId: widget.assistantId,
-                          key: const ValueKey('basic'),
-                        );
-                      case _AssistantDesktopMenu.prompts:
-                        return _PromptTab(assistantId: widget.assistantId);
-                      case _AssistantDesktopMenu.memory:
-                        return _MemoryTab(assistantId: widget.assistantId);
-                      case _AssistantDesktopMenu.localTools:
-                        return _LocalToolsTab(assistantId: widget.assistantId);
-                      case _AssistantDesktopMenu.skills:
-                        return AssistantSettingsEditSkillsTab(
-                          assistantId: widget.assistantId,
-                        );
-                      case _AssistantDesktopMenu.mcp:
-                        return _McpTab(assistantId: widget.assistantId);
-                      case _AssistantDesktopMenu.quick:
-                        return _QuickPhraseTab(assistantId: widget.assistantId);
-                      case _AssistantDesktopMenu.custom:
-                        return _CustomRequestTab(
-                          assistantId: widget.assistantId,
-                        );
-                      case _AssistantDesktopMenu.regex:
-                        return AssistantRegexDesktopPane(
-                          assistantId: widget.assistantId,
-                        );
-                    }
-                  }(),
-                ),
-              ),
-            ],
+          child: DesktopAdaptivePanes(
+            sidebarWidth: 220,
+            showDetail: _showDetail,
+            onBack: () => setState(() => _showDetail = false),
+            backLabel: AppLocalizations.of(context)!.assistantEditPageTitle,
+            sidebar: _DesktopAssistantMenu(
+              selected: _menu,
+              onSelect: (m) => setState(() {
+                _menu = m;
+                _showDetail = true;
+              }),
+            ),
+            detail: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeOutCubic,
+              child: () {
+                switch (_menu) {
+                  case _AssistantDesktopMenu.basic:
+                    return _DesktopAssistantBasicPane(
+                      assistantId: widget.assistantId,
+                      key: const ValueKey('basic'),
+                    );
+                  case _AssistantDesktopMenu.prompts:
+                    return _PromptTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.memory:
+                    return _MemoryTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.localTools:
+                    return _LocalToolsTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.skills:
+                    return AssistantSettingsEditSkillsTab(
+                      assistantId: widget.assistantId,
+                    );
+                  case _AssistantDesktopMenu.mcp:
+                    return _McpTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.quick:
+                    return _QuickPhraseTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.custom:
+                    return _CustomRequestTab(assistantId: widget.assistantId);
+                  case _AssistantDesktopMenu.regex:
+                    return AssistantRegexDesktopPane(
+                      assistantId: widget.assistantId,
+                    );
+                }
+              }(),
+            ),
           ),
         ),
       ],

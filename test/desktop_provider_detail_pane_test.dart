@@ -86,6 +86,49 @@ Future<void> _pumpProviderSettings(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    '360px settings navigates provider list and preserves edits on resize',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings);
+      tester.view.physicalSize = const Size(360, 640);
+      await tester.pumpAndSettle();
+      expect(find.byType(DesktopProviderDetailPane), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('search-icon')));
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('search-field'));
+      await tester.enterText(search, 'same');
+      final state = tester.state(find.byType(DesktopProviderDetailPane));
+      tester.view.physicalSize = const Size(1400, 900);
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(DesktopProviderDetailPane)), same(state));
+      expect(tester.widget<TextField>(search).controller!.text, 'same');
+      expect(tester.widget<TextField>(search).focusNode!.hasFocus, isTrue);
+
+      tester.view.physicalSize = const Size(360, 640);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('desktop-pane-back')).last);
+      await tester.pumpAndSettle();
+      expect(find.byType(DesktopProviderDetailPane), findsNothing);
+      await tester.tap(find.text('ProviderB').first);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DesktopProviderDetailPane>(
+              find.byType(DesktopProviderDetailPane),
+            )
+            .providerKey,
+        'ProviderB',
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-pane-back')).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(DesktopProviderDetailPane), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('desktop conversation cache key switch saves and restores', (
     tester,
   ) async {

@@ -75,117 +75,155 @@ void main() {
     }
   });
 
-  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
-    testWidgets('picks and clears a default from basic settings on $platform', (
-      tester,
-    ) async {
-      debugDefaultTargetPlatformOverride = platform;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      const haptics = MethodChannel('haptic_feedback');
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(haptics, (_) async => true);
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(haptics, null),
-      );
-      final workspace = await tester.runAsync(
-        () => workspaces.create(name: 'verification-ws'),
-      );
-      if (workspace == null) fail('workspace create failed');
+  for (final (platform, width) in [
+    (TargetPlatform.iOS, 400.0),
+    (TargetPlatform.macOS, 1200.0),
+    (TargetPlatform.macOS, 360.0),
+  ]) {
+    testWidgets(
+      'picks and clears a default from basic settings on $platform at $width',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        const haptics = MethodChannel('haptic_feedback');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, (_) async => true);
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(haptics, null),
+        );
+        final workspace = await tester.runAsync(
+          () => workspaces.create(name: 'verification-ws'),
+        );
+        if (workspace == null) fail('workspace create failed');
 
-      final harness = await createBusinessTestHarness(
-        initial: {
-          'assistants_v1': Assistant.encodeList([
-            Assistant(id: _assistantId, name: 'Default Assistant'),
-          ]),
-        },
-      );
-      final ap = AssistantProvider(preferences: harness.preferences);
-      await tester.runAsync(() => ap.loaded);
-      expect(ap.getById(_assistantId)?.defaultWorkspaceId, isNull);
+        final background = p.join(tempDir.path, 'background.png');
+        final hasBackground = platform == TargetPlatform.macOS && width == 360;
+        if (hasBackground) File('assets/icons/kelivo.png').copySync(background);
+        final harness = await createBusinessTestHarness(
+          initial: {
+            'assistants_v1': Assistant.encodeList([
+              Assistant(
+                id: _assistantId,
+                name: 'Default Assistant',
+                background: hasBackground ? background : null,
+              ),
+            ]),
+          },
+        );
+        final ap = AssistantProvider(preferences: harness.preferences);
+        await tester.runAsync(() => ap.loaded);
+        expect(ap.getById(_assistantId)?.defaultWorkspaceId, isNull);
 
-      tester.view.physicalSize = platform == TargetPlatform.iOS
-          ? const Size(400, 900)
-          : const Size(1200, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.physicalSize = Size(width, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider(
-              create: (_) => SettingsProvider(createBusinessTestPreferences()),
-            ),
-            ChangeNotifierProvider.value(value: ap),
-            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(fontFamily: 'WorkspaceTest'),
-            locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: Builder(
-              builder: (context) => Scaffold(
-                body: TextButton(
-                  onPressed: () => openAssistantBasicSettings(
-                    context,
-                    assistantId: _assistantId,
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider(
+                create: (_) =>
+                    SettingsProvider(createBusinessTestPreferences()),
+              ),
+              ChangeNotifierProvider.value(value: ap),
+              ChangeNotifierProvider<WorkspaceProvider>.value(
+                value: workspaces,
+              ),
+            ],
+            child: MaterialApp(
+              theme: ThemeData(fontFamily: 'WorkspaceTest'),
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => openAssistantBasicSettings(
+                      context,
+                      assistantId: _assistantId,
+                    ),
+                    child: const Text('Open settings'),
                   ),
-                  child: const Text('Open settings'),
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.tap(find.text('Open settings'));
-      await tester.pumpAndSettle();
+        );
+        await tester.tap(find.text('Open settings'));
+        await tester.pumpAndSettle();
 
-      final row = find.byKey(AssistantDefaultWorkspaceRow.defaultWorkspaceKey);
-      await tester.ensureVisible(row);
-      await tester.pumpAndSettle();
-      expect(row, findsOneWidget);
-      expect(find.text('Not set'), findsOneWidget);
-      expect(find.text('Workspace'), findsNothing);
+        final row = find.byKey(
+          AssistantDefaultWorkspaceRow.defaultWorkspaceKey,
+        );
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        expect(row, findsOneWidget);
+        expect(find.text('Not set'), findsOneWidget);
+        expect(find.text('Workspace'), findsNothing);
 
-      await tester.tap(row);
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(AssistantDefaultWorkspaceRow.manageKey),
-        findsOneWidget,
-      );
-      expect(
-        find.byType(BottomSheet),
-        platform == TargetPlatform.iOS ? findsOneWidget : findsNothing,
-      );
-      await tester.tap(find.text('None'));
-      await tester.pumpAndSettle();
-      expect(ap.getById(_assistantId)!.defaultWorkspaceId, isNull);
-      expect(
-        ap.getById(_assistantId)!.defaultWorkspaceSetup,
-        DefaultWorkspaceSetup.completed,
-      );
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(AssistantDefaultWorkspaceRow.manageKey),
+          findsOneWidget,
+        );
+        expect(
+          find.byType(BottomSheet),
+          platform == TargetPlatform.iOS ? findsOneWidget : findsNothing,
+        );
+        await tester.tap(find.text('None'));
+        await tester.pumpAndSettle();
+        expect(ap.getById(_assistantId)!.defaultWorkspaceId, isNull);
+        expect(
+          ap.getById(_assistantId)!.defaultWorkspaceSetup,
+          DefaultWorkspaceSetup.completed,
+        );
 
-      await tester.tap(row);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('verification-ws'));
-      await tester.pumpAndSettle();
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('verification-ws'));
+        await tester.pumpAndSettle();
 
-      expect(ap.getById(_assistantId)!.defaultWorkspaceId, workspace.id);
-      expect(find.text('verification-ws'), findsOneWidget);
-      expect(find.text('Default workspace'), findsWidgets);
-      await tester.tap(row);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('None').last);
-      await tester.pumpAndSettle();
-      expect(ap.getById(_assistantId)!.defaultWorkspaceId, isNull);
-      expect(
-        ap.getById(_assistantId)!.defaultWorkspaceSetup,
-        DefaultWorkspaceSetup.completed,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-      debugDefaultTargetPlatformOverride = null;
-    });
+        expect(ap.getById(_assistantId)!.defaultWorkspaceId, workspace.id);
+        expect(find.text('verification-ws'), findsOneWidget);
+        expect(find.text('Default workspace'), findsWidgets);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('None').last);
+        await tester.pumpAndSettle();
+        expect(ap.getById(_assistantId)!.defaultWorkspaceId, isNull);
+        expect(
+          ap.getById(_assistantId)!.defaultWorkspaceSetup,
+          DefaultWorkspaceSetup.completed,
+        );
+        if (platform == TargetPlatform.macOS && width == 360) {
+          final l10n = AppLocalizations.of(tester.element(row))!;
+          final choose = find.text(l10n.assistantEditChooseImageButton);
+          await tester.ensureVisible(choose);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.text(l10n.assistantEditClearButton).last);
+          for (
+            var i = 0;
+            i < 100 && (ap.getById(_assistantId)!.background ?? '').isNotEmpty;
+            i++
+          ) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+          await tester.pumpAndSettle();
+          expect(ap.getById(_assistantId)!.background, isEmpty);
+          expect(tester.takeException(), isNull);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
   }
 }

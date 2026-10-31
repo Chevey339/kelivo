@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../icons/lucide_adapter.dart';
@@ -41,38 +42,8 @@ Future<void> showDesktopContextMenuAt(
   final overlayBox = overlay.context.findRenderObject() as RenderBox?;
   if (overlayBox == null) return;
 
-  const double minMenuWidth = 160;
-  const double maxMenuWidth = 360;
-  final double menuWidth = _estimateMenuWidth(
-    context,
-    items,
-    minMenuWidth,
-    maxMenuWidth,
-  );
-  final screen = overlayBox.size;
-  final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
-  final double estMenuHeight = items
-      .fold<double>(0, (sum, item) => sum + (item.subtitle == null ? 44 : 60))
-      .clamp(44.0, menuMaxHeight);
-  const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final padding = MediaQuery.of(overlay.context).padding;
-  final minX = padding.left + 8;
-  final maxX = screen.width - padding.right - menuWidth - 8;
-  final minY = padding.top + 8;
-  final maxY = screen.height - padding.bottom - estMenuHeight - 8;
-
   final local = overlayBox.globalToLocal(globalPosition);
-  double x = (local.dx + gap).clamp(minX, maxX);
-  // Decide above/below based on available space
-  final availableBelow = screen.height - padding.bottom - local.dy - 8;
-  final availableAbove = local.dy - padding.top - 8;
-  final placeAbove =
-      availableBelow < estMenuHeight && availableAbove > availableBelow;
-  double y = placeAbove
-      ? (local.dy - gap - estMenuHeight).clamp(minY, maxY)
-      : (local.dy + gap).clamp(minY, maxY);
 
   await showGeneralDialog<void>(
     context: context,
@@ -81,6 +52,45 @@ Future<void> showDesktopContextMenuAt(
     barrierDismissible: true,
     barrierColor: cs.scrim.withValues(alpha: 0.06),
     pageBuilder: (ctx, _, __) {
+      const double minMenuWidth = 160;
+      const double maxMenuWidth = 360;
+      final double estimatedWidth = _estimateMenuWidth(
+        ctx,
+        items,
+        minMenuWidth,
+        maxMenuWidth,
+      );
+      final screen = MediaQuery.sizeOf(ctx);
+      final padding = MediaQuery.paddingOf(ctx);
+      final menuWidth = math.min(
+        estimatedWidth,
+        math.max(0.0, screen.width - padding.horizontal - 16),
+      );
+      final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
+      final double estMenuHeight = items
+          .fold<double>(
+            0,
+            (sum, item) => sum + (item.subtitle == null ? 44 : 60),
+          )
+          .clamp(44.0, menuMaxHeight);
+      const double gap = 8; // offset from cursor
+      final cs = Theme.of(ctx).colorScheme;
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      final minX = padding.left + 8;
+      final maxX = screen.width - padding.right - menuWidth - 8;
+      final minY = padding.top + 8;
+      final maxY = screen.height - padding.bottom - estMenuHeight - 8;
+
+      double x = (local.dx + gap).clamp(minX, maxX);
+      // Decide above/below based on available space
+      final availableBelow = screen.height - padding.bottom - local.dy - 8;
+      final availableAbove = local.dy - padding.top - 8;
+      final placeAbove =
+          availableBelow < estMenuHeight && availableAbove > availableBelow;
+      double y = placeAbove
+          ? (local.dy - gap - estMenuHeight).clamp(minY, maxY)
+          : (local.dy + gap).clamp(minY, maxY);
+
       return Material(
         type: MaterialType.transparency,
         child: Stack(

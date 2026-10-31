@@ -21,6 +21,29 @@ void main() {
 
   tearDown(AppExitFlush.debugReset);
 
+  testWidgets('360px tool settings can open, edit and return to the list', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await _pumpPane(tester, settings);
+    tester.view.physicalSize = const Size(360, 640);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(SearchToolService.toolName).first);
+    await tester.pumpAndSettle();
+    await tester.enterText(_descriptionField, 'Compact description');
+    await tester.pump();
+    expect(
+      settings.toolSchemaOverrides[SearchToolService.toolName]?.description,
+      'Compact description',
+    );
+    await tester.tap(find.byKey(const ValueKey('desktop-pane-back')));
+    await tester.pumpAndSettle();
+    expect(_descriptionField, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('editing a field writes through to SettingsProvider', (
     tester,
   ) async {

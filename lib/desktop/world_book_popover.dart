@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 
 import 'package:flutter/material.dart';
@@ -114,7 +115,10 @@ class _WorldBookPopoverState extends State<_WorldBookPopover>
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
+    final width = math.min(
+      (widget.anchorWidth - 16).clamp(260.0, 720.0),
+      math.max(0.0, screen.width - 16),
+    );
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
           8.0,

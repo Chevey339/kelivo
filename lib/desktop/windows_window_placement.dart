@@ -63,7 +63,7 @@ Rect? resolveWindowsWindowBounds({
   final target = overlapping ?? primary ?? screens.first;
   final work = target.workArea;
   final desiredSize = size * target.scale;
-  // The desktop UI itself requires at least 960 x 640 logical pixels. On a
+  // The desktop UI itself requires at least 360 x 640 logical pixels. On a
   // smaller work area, anchor that minimum-sized window at the top left rather
   // than shrinking its viewport and clipping its custom title bar.
   final fittedSize = Size(

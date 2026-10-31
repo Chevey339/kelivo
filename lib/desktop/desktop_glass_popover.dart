@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -164,7 +165,7 @@ class _DesktopGlassPopoverOverlayState
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    final width = widget.width;
+    final width = math.min(widget.width, math.max(0.0, screen.width - 16));
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
           8.0,

@@ -6,6 +6,9 @@ import 'package:flutter/foundation.dart'
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
+import '../shared/responsive/screen_type_helper.dart';
+import '../shared/widgets/ios_tactile.dart';
+import '../icons/lucide_adapter.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
@@ -39,6 +42,7 @@ class DesktopHomePage extends StatefulWidget {
 class _DesktopHomePageState extends State<DesktopHomePage> {
   int _tabIndex = 0; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
   bool _storageVisited = false;
+  bool _navigationOpen = false;
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
@@ -197,141 +201,139 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     });
   }
 
+  void _selectTab(int index, {bool search = false}) {
+    setState(() {
+      _tabIndex = index;
+      _globalSearchActive = search;
+      _navigationOpen = false;
+      if (index == 2) _storageVisited = true;
+    });
+    ChatActionBus.instance.fire(
+      search ? ChatAction.enterGlobalSearch : ChatAction.exitGlobalSearch,
+    );
+    if (index == 0 && !search) {
+      ChatActionBus.instance.fire(ChatAction.focusInput);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Ensure a reasonable min size to avoid overflow on aggressive resize.
-    const minWidth = 960.0;
-    const minHeight = 640.0;
-
+    final compact = ResponsiveHelper.isMobile(context);
     final isWindows = defaultTargetPlatform == TargetPlatform.windows;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final h = constraints.maxHeight;
-        final needsWidthPad = w < minWidth;
-        final needsHeightPad = h < minHeight;
-
-        Widget body = Row(
-          children: [
-            DesktopNavRail(
-              activeIndex: _tabIndex,
-              globalSearchActive: _globalSearchActive,
-              onTapChat: () {
-                setState(() {
-                  _tabIndex = 0;
-                  _globalSearchActive = false;
-                });
-                ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-                // 切换到聊天页时聚焦输入框
-                ChatActionBus.instance.fire(ChatAction.focusInput);
-              },
-              onTapGlobalSearch: () {
-                setState(() {
-                  _tabIndex = 0;
-                  _globalSearchActive = true;
-                });
-                ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
-              },
-              onTapTranslate: () {
-                setState(() {
-                  _tabIndex = 1;
-                  _globalSearchActive = false;
-                });
-                ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-              },
-              onTapStorage: () => setState(() {
-                _tabIndex = 2;
-                _globalSearchActive = false;
-                _storageVisited = true;
-                ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-              }),
-              onTapSettings: () {
-                setState(() {
-                  _tabIndex = 3;
-                  _globalSearchActive = false;
-                });
-                ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-              },
-            ),
-            Expanded(
-              // Keep all pages alive so ongoing chat streams are not canceled
-              // when switching tabs (Chat/Translate/Settings) on desktop.
-              child: ClipRect(
-                key: const ValueKey('desktopWorkspaceFrame'),
-                child: IndexedStack(
-                  index: _tabIndex,
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+    final menu = IosIconButton(
+      key: const ValueKey('desktop-navigation-menu'),
+      icon: Lucide.Menu,
+      minSize: 40,
+      tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+      onTap: () => setState(() => _navigationOpen = !_navigationOpen),
+    );
+    return ChatFrostedBackdrop(
+      backdrop: ColoredBox(
+        color: SurfaceLadder.fromScheme(
+          Theme.of(context).colorScheme,
+        ).surfaceFill,
+        child: const ChatAssistantBackground(desktop: true),
+      ),
+      child: Column(
+        children: [
+          if (isWindows)
+            WindowTitleBar(
+              leftChildren: [if (compact) menu, const _TitleBarLeading()],
+            )
+          else
+            SizedBox(
+              height: compact ? 40 : 0,
+              child: Offstage(
+                offstage: !compact,
+                child: Stack(
                   children: [
-                    // Chat page remains mounted
-                    const DesktopChatPage(),
-                    // Translate page remains mounted
-                    const DesktopTranslatePage(key: ValueKey('translate_page')),
-                    _storageVisited
-                        ? const StorageSpacePage(
-                            key: ValueKey('storage_space_page'),
-                            embedded: true,
-                          )
-                        : const SizedBox.shrink(),
-                    DesktopSettingsPage(
-                      key: const ValueKey('settings_page'),
-                      initialProviderKey: widget.initialProviderKey,
+                    const Positioned.fill(
+                      child: DragToMoveArea(child: SizedBox.expand()),
+                    ),
+                    Row(
+                      children: [
+                        if (isMac) const SizedBox(width: 72),
+                        menu,
+                        const _TitleBarLeading(),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-        );
-
-        // Wrap with Windows custom title bar when on Windows platform.
-        final content = isWindows
-            ? Column(
-                children: [
-                  WindowTitleBar(
-                    leftChildren: [
-                      SizedBox(width: DesktopNavRail.width / 2 - 8 - 6 - 12),
-                      const _TitleBarLeading(),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  key: const ValueKey('desktop-pages'),
+                  child: Row(
+                    children: [
+                      SizedBox(width: compact ? 0 : DesktopNavRail.width),
+                      Expanded(
+                        // Keep the same subtree across resizing and tab changes.
+                        child: ClipRect(
+                          key: const ValueKey('desktopWorkspaceFrame'),
+                          child: IndexedStack(
+                            index: _tabIndex,
+                            children: [
+                              const DesktopChatPage(),
+                              const DesktopTranslatePage(
+                                key: ValueKey('translate_page'),
+                              ),
+                              _storageVisited
+                                  ? const StorageSpacePage(
+                                      key: ValueKey('storage_space_page'),
+                                      embedded: true,
+                                    )
+                                  : const SizedBox.shrink(),
+                              DesktopSettingsPage(
+                                key: const ValueKey('settings_page'),
+                                initialProviderKey: widget.initialProviderKey,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        body,
-                        // Inject the lazily-built settings page into the IndexedStack when needed
-                        // to pass initialProviderKey without dropping chat state.
-                        if (_tabIndex == 3) const SizedBox.shrink(),
-                      ],
+                ),
+                if (compact && _navigationOpen)
+                  Positioned.fill(
+                    child: ModalBarrier(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.scrim.withValues(alpha: .16),
+                      onDismiss: () => setState(() => _navigationOpen = false),
                     ),
                   ),
-                ],
-              )
-            : body;
-
-        // if (!needsWidthPad && !needsHeightPad) return content;
-
-        // Center a constrained area if window is smaller than our minimum
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: minWidth,
-              minHeight: minHeight,
-            ),
-            child: SizedBox(
-              width: needsWidthPad ? minWidth : w,
-              height: needsHeightPad ? minHeight : h,
-              child: ChatFrostedBackdrop(
-                backdrop: ColoredBox(
-                  color: SurfaceLadder.fromScheme(
-                    Theme.of(context).colorScheme,
-                  ).surfaceFill,
-                  child: const ChatAssistantBackground(desktop: true),
+                Positioned(
+                  key: const ValueKey('desktop-navigation'),
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: DesktopNavRail.width,
+                  child: ExcludeFocus(
+                    excluding: compact && !_navigationOpen,
+                    child: Offstage(
+                      offstage: compact && !_navigationOpen,
+                      child: DesktopNavRail(
+                        activeIndex: _tabIndex,
+                        globalSearchActive: _globalSearchActive,
+                        onTapChat: () => _selectTab(0),
+                        onTapGlobalSearch: () => _selectTab(0, search: true),
+                        onTapTranslate: () => _selectTab(1),
+                        onTapStorage: () => _selectTab(2),
+                        onTapSettings: () => _selectTab(3),
+                      ),
+                    ),
+                  ),
                 ),
-                child: content,
-              ),
+              ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 

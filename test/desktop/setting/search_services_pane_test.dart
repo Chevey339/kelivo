@@ -10,6 +10,30 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('360px search dialog edits and saves credentials', (
+    tester,
+  ) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          DeepSeekOptions(id: 'narrow', apiKey: 'old'),
+        );
+      },
+    );
+    tester.view.physicalSize = const Size(360, 640);
+    await tester.pump();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'compact-key');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect((updated! as DeepSeekOptions).apiKey, 'compact-key');
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('desktop adds DeepSeek from its provider picker', (tester) async {
     SearchServiceOptions? created;
     await _pumpDialogHost(

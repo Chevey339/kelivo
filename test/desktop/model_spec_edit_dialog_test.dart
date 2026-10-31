@@ -65,6 +65,50 @@ void main() {
     return settings;
   }
 
+  testWidgets('360px model dialog navigates, resizes and saves a draft', (
+    tester,
+  ) async {
+    bool? popped;
+    final settings = await pumpApp(
+      tester,
+      open: (context) => showDesktopModelSpecEditDialog(
+        context,
+        providerKey: 'Test',
+        modelKey: 'plain-model',
+      ),
+      onPopped: (value) => popped = value,
+    );
+    tester.view.physicalSize = const Size(360, 640);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('open-model-spec-dialog')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('desktop-pane-back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('model-spec-nav-limits')));
+    await tester.pumpAndSettle();
+    final field = find.descendant(
+      of: find.byKey(const ValueKey('model-spec-context-window')),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(field, '8192');
+    for (final width in [1200.0, 360.0]) {
+      tester.view.physicalSize = Size(width, 640);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, '8192');
+      expect(tester.takeException(), isNull);
+    }
+    await tester.tap(find.byKey(const ValueKey('model-spec-confirm')));
+    await tester.pumpAndSettle();
+    expect(popped, isTrue);
+    expect(
+      settings
+          .getProviderConfig('Test')
+          .modelOverrides['plain-model']?['contextWindow'],
+      8192,
+    );
+  });
+
   testWidgets('edit dialog saves context window and pops true', (tester) async {
     bool? popped;
     final settings = await pumpApp(

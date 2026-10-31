@@ -439,35 +439,22 @@ class _LabeledRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              // Match other settings row labels (14, normal, slightly dimmed)
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.regular,
-                color: cs.onSurface.withValues(alpha: 0.9),
-                decoration: TextDecoration.none,
-              ),
-            ),
+      child: DesktopLabeledControl(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: AppFontWeights.regular,
+            color: cs.onSurface.withValues(alpha: 0.9),
+            decoration: TextDecoration.none,
           ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: trailing,
-              ),
-            ),
-          ),
-        ],
+        ),
+        controlWidth: 400,
+        control: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: trailing,
+        ),
       ),
     );
     return SettingsSearchTarget.wrap(context, label, row);

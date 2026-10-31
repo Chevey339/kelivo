@@ -46,6 +46,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.modelDisplay,
     // Sidebar state
     required this.tabletSidebarOpen,
+    this.compact = false,
     required this.embeddedSidebarWidth,
     required this.sidebarMinWidth,
     required this.sidebarMaxWidth,
@@ -78,6 +79,7 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   // Sidebar state
   final bool tabletSidebarOpen;
+  final bool compact;
   final double embeddedSidebarWidth;
   final double sidebarMinWidth;
   final double sidebarMaxWidth;
@@ -136,14 +138,25 @@ class HomeDesktopScaffold extends StatelessWidget {
           color: cs.surface.withValues(alpha: wallpaper ? .12 : 1),
           child: chat,
         );
-        return SizedBox.expand(
+        final sidebarWidth = compact
+            ? embeddedSidebarWidth.clamp(
+                0.0,
+                MediaQuery.sizeOf(context).width - 48,
+              )
+            : embeddedSidebarWidth;
+        return ClipRect(
           child: Stack(
             fit: StackFit.expand,
             children: [
               Row(
                 children: [
-                  _buildLeftSidebar(context, cs, topicsOnRight),
-                  if (!_isDesktop) SizedBox(width: tabletSidebarOpen ? .6 : 0),
+                  AnimatedContainer(
+                    duration: compact || MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : _sidebarAnimDuration,
+                    curve: _sidebarAnimCurve,
+                    width: !compact && tabletSidebarOpen ? sidebarWidth : 0,
+                  ),
                   Expanded(
                     child: _isDesktop
                         ? DesktopSidePanel(
@@ -160,7 +173,36 @@ class HomeDesktopScaffold extends StatelessWidget {
                   ),
                 ],
               ),
-              if (_isDesktop)
+              if (compact && tabletSidebarOpen)
+                Positioned.fill(
+                  child: ModalBarrier(
+                    color: cs.scrim.withValues(alpha: .16),
+                    onDismiss: onToggleSidebar,
+                  ),
+                ),
+              AnimatedPositioned(
+                key: const ValueKey('desktop-chat-sidebar'),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : _sidebarAnimDuration,
+                curve: _sidebarAnimCurve,
+                left: tabletSidebarOpen ? 0 : -sidebarWidth,
+                top: 0,
+                bottom: 0,
+                width: sidebarWidth,
+                child: ExcludeFocus(
+                  excluding: !tabletSidebarOpen,
+                  child: IgnorePointer(
+                    ignoring: !tabletSidebarOpen,
+                    child: _buildLeftSidebar(
+                      context,
+                      topicsOnRight,
+                      sidebarWidth,
+                    ),
+                  ),
+                ),
+              ),
+              if (_isDesktop && !compact)
                 AnimatedPositioned(
                   duration: MediaQuery.disableAnimationsOf(context)
                       ? Duration.zero
@@ -196,12 +238,12 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   Widget _buildLeftSidebar(
     BuildContext context,
-    ColorScheme cs,
     bool topicsOnRight,
+    double width,
   ) {
     final sidebar = SideDrawer(
       embedded: true,
-      embeddedWidth: embeddedSidebarWidth,
+      embeddedWidth: width,
       userName: context.watch<UserProvider>().name,
       assistantName: _getAssistantName(context),
       closePickerTicker: assistantPickerCloseTick,
@@ -223,25 +265,7 @@ class HomeDesktopScaffold extends StatelessWidget {
           onSelectConversation(id),
     );
 
-    return AnimatedContainer(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : _sidebarAnimDuration,
-      curve: _sidebarAnimCurve,
-      width: tabletSidebarOpen ? embeddedSidebarWidth : 0,
-      color: Colors.transparent,
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: Alignment.centerLeft,
-          minWidth: 0,
-          maxWidth: embeddedSidebarWidth,
-          child: SizedBox(
-            width: embeddedSidebarWidth,
-            child: _isDesktop ? DesktopPaneSurface(child: sidebar) : sidebar,
-          ),
-        ),
-      ),
-    );
+    return _isDesktop ? DesktopPaneSurface(child: sidebar) : sidebar;
   }
 
   Widget _buildTopics(BuildContext context, double width) => SideDrawer(
@@ -405,6 +429,22 @@ class HomeDesktopScaffold extends StatelessWidget {
             ),
           ),
         ),
+      );
+    }
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14),
+          ),
+          if (capsule != null) capsule,
+        ],
       );
     }
 

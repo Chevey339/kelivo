@@ -1,3 +1,4 @@
+import 'widgets/desktop_form_dialog.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_budgets.dart';
 import '../features/intelligent_ui/widgets/genui_clipboard.dart';
@@ -62,46 +63,29 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        l10n.selectCopyPageTitle,
+                DesktopFormDialogHeader(
+                  title: l10n.selectCopyPageTitle,
+                  closeTooltip: l10n.mcpPageClose,
+                  onClose: () => Navigator.of(context).maybePop(),
+                  actions: [
+                    TextButton.icon(
+                      onPressed: () => _copyAll(context),
+                      icon: Icon(Lucide.Copy, size: 18, color: cs.primary),
+                      label: Text(
+                        l10n.selectCopyPageCopyAll,
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
+                          color: cs.primary,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () => _copyAll(context),
-                        icon: Icon(Lucide.Copy, size: 18, color: cs.primary),
-                        label: Text(
-                          l10n.selectCopyPageCopyAll,
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                      ),
-                      IosIconButton(
-                        icon: Lucide.Code,
-                        tooltip: l10n.genuiCopySourceMarkdown,
-                        minSize: 44,
-                        onTap: () => copyUiMessageSource(context, message),
-                      ),
-                      IconButton(
-                        tooltip: l10n.mcpPageClose,
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        icon: Icon(
-                          Lucide.X,
-                          size: 18,
-                          color: cs.onSurface.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    IosIconButton(
+                      icon: Lucide.Code,
+                      tooltip: l10n.genuiCopySourceMarkdown,
+                      minSize: 44,
+                      onTap: () => copyUiMessageSource(context, message),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Expanded(

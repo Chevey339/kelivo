@@ -249,6 +249,8 @@ class HomePageController extends ChangeNotifier {
 
   // Sidebar state (tablet/desktop)
   bool _tabletSidebarOpen = true;
+  bool _compactDesktop = false;
+  bool _compactSidebarOpen = false;
   double _embeddedSidebarWidth = 300;
   bool _desktopUiInited = false;
 
@@ -669,7 +671,8 @@ class HomePageController extends ChangeNotifier {
   Set<String> get selectedItems => _selectedItems;
   int get selectedCount => _selectedItems.length;
   bool get isDragHovering => _isDragHovering;
-  bool get tabletSidebarOpen => _tabletSidebarOpen;
+  bool get tabletSidebarOpen =>
+      _compactDesktop ? _compactSidebarOpen : _tabletSidebarOpen;
   double get embeddedSidebarWidth => _embeddedSidebarWidth;
   double get inputBarHeight => _inputBarHeight;
   bool get desktopUiInited => _desktopUiInited;
@@ -1069,13 +1072,7 @@ class HomePageController extends ChangeNotifier {
           }
           final wantAssistants =
               (action == ChatAction.toggleLeftPanelAssistants);
-          if (!_tabletSidebarOpen) {
-            _tabletSidebarOpen = true;
-            notifyListeners();
-            try {
-              settingsProvider.setDesktopSidebarOpen(true);
-            } catch (_) {}
-          }
+          if (!tabletSidebarOpen) toggleTabletSidebar();
           if (wantAssistants) {
             DesktopSidebarTabBus.instance.switchToAssistants();
           } else {
@@ -1279,6 +1276,7 @@ class HomePageController extends ChangeNotifier {
 
   void enterGlobalSearchMode({bool preserveQuery = true}) {
     _isGlobalSearchMode = true;
+    if (_compactDesktop) _compactSidebarOpen = true;
     if (!preserveQuery) _globalSearchQuery = '';
     notifyListeners();
   }
@@ -3178,7 +3176,26 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Sidebar Management
   // ============================================================================
 
+  // Called by the page while building; changing width does not overwrite the
+  // user's wide-window sidebar preference or notify during a build.
+  void setCompactDesktopLayout(bool compact) {
+    if (_compactDesktop == compact) return;
+    _compactDesktop = compact;
+    _compactSidebarOpen = compact && _isGlobalSearchMode;
+  }
+
+  void closeCompactSidebar() {
+    if (!_compactDesktop || !_compactSidebarOpen) return;
+    _compactSidebarOpen = false;
+    notifyListeners();
+  }
+
   void toggleTabletSidebar() {
+    if (_compactDesktop) {
+      _compactSidebarOpen = !_compactSidebarOpen;
+      notifyListeners();
+      return;
+    }
     dismissKeyboard();
     try {
       if (_context.read<SettingsProvider>().hapticsOnDrawer) {

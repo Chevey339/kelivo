@@ -1,4 +1,12 @@
+import 'package:Kelivo/desktop/hotkeys/hotkey_event_bus.dart';
+import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/features/side_panel/widgets/desktop_side_panel.dart';
 import 'dart:io';
+import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
+import 'package:Kelivo/core/providers/workspace_provider.dart';
+import 'package:Kelivo/desktop/desktop_home_page.dart';
+import 'package:Kelivo/desktop/hotkeys/chat_action_bus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
@@ -95,7 +103,11 @@ Future<void> _finishIo(WidgetTester tester, Future<void> operation) async {
 }
 
 void main() {
-  for (final size in [const Size(390, 844), const Size(800, 1100)]) {
+  for (final size in [
+    const Size(360, 640),
+    const Size(390, 844),
+    const Size(800, 1100),
+  ]) {
     testWidgets(
       'selection survives cancelled exports and deletion at $size, then exits on back',
       (tester) async {
@@ -105,6 +117,22 @@ void main() {
         final picker = _CancelSavePicker();
         FilePicker.platform = picker;
         final platformCalls = <MethodCall>[];
+        final windowCalls = <String>[];
+        const windowChannel = MethodChannel('window_manager');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          windowChannel,
+          (call) async {
+            windowCalls.add(call.method);
+            if (call.method == 'isMaximized') return false;
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            windowChannel,
+            null,
+          ),
+        );
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           SystemChannels.platform,
           (call) async => platformCalls.add(call),
@@ -163,6 +191,12 @@ void main() {
               ChangeNotifierProvider.value(value: settings),
               ChangeNotifierProvider.value(value: assistants),
               ChangeNotifierProvider.value(value: chat),
+              ChangeNotifierProvider(create: (_) => WorkspaceRuntimeProvider()),
+              ChangeNotifierProvider(
+                create: (_) => WorkspaceProvider(
+                  store: ExtensionEntityStore(harness.database),
+                ),
+              ),
               ChangeNotifierProvider(create: (_) => AsrProvider()),
               ChangeNotifierProvider(
                 create: (_) => UserProvider(preferences: harness.preferences),
@@ -194,10 +228,12 @@ void main() {
                     WorldBookProvider(preferences: harness.preferences),
               ),
             ],
-            child: const MaterialApp(
+            child: MaterialApp(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              home: HomePage(),
+              home: defaultTargetPlatform == TargetPlatform.android
+                  ? const HomePage()
+                  : const DesktopHomePage(),
             ),
           ),
         );
@@ -239,7 +275,7 @@ void main() {
         }
 
         await openExport();
-        if (defaultTargetPlatform == TargetPlatform.macOS) {
+        if (defaultTargetPlatform != TargetPlatform.android) {
           expect(find.byType(Dialog), findsOneWidget);
           expect(find.byType(BottomSheet), findsNothing);
         } else {
@@ -271,25 +307,139 @@ void main() {
         expect(find.byType(ChatSelectionAppBar), findsOneWidget);
         expect(tester.takeException(), isNull);
 
-        if (defaultTargetPlatform == TargetPlatform.macOS) return;
-
-        final drawer = tester
-            .widget<InteractiveDrawer>(find.byType(InteractiveDrawer))
-            .controller!;
-        await drawer.open();
-        await tester.pumpAndSettle();
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(drawer.isClosed, isTrue);
-        expect(find.byType(ChatSelectionAppBar), findsOneWidget);
-
-        await drawer.open();
-        await tester.pumpAndSettle();
-        tester.view.physicalSize = const Size(1100, 800);
-        await tester.pumpAndSettle();
+        final pageState = tester.state(find.byType(HomePage));
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          final drawer = tester
+              .widget<InteractiveDrawer>(find.byType(InteractiveDrawer))
+              .controller!;
+          await drawer.open();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(drawer.isClosed, isTrue);
+          expect(find.byType(ChatSelectionAppBar), findsOneWidget);
+          await drawer.open();
+          await tester.pumpAndSettle();
+          tester.view.physicalSize = const Size(1100, 800);
+          await tester.pumpAndSettle();
+          expect(drawer.isOpen, isTrue);
+        } else {
+          expect(find.byType(HomeDesktopScaffold), findsOneWidget);
+          final panelState = tester.state(find.byType(DesktopSidePanel));
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(HomePage)),
+          )!;
+          await tester.dragFrom(
+            Offset(
+              defaultTargetPlatform == TargetPlatform.windows ? 170 : 300,
+              20,
+            ),
+            const Offset(30, 0),
+          );
+          await tester.pumpAndSettle();
+          expect(windowCalls, contains('startDragging'));
+          HotkeyEventBus.instance.fire(HotkeyAction.openSettings);
+          await tester.pumpAndSettle();
+          expect(find.byType(DesktopSettingsPage), findsOneWidget);
+          await tester.tap(
+            find.byKey(const ValueKey('desktop-navigation-menu')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.desktopNavChatTooltip));
+          await tester.pumpAndSettle();
+          ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<HomeDesktopScaffold>(find.byType(HomeDesktopScaffold))
+                .tabletSidebarOpen,
+            isTrue,
+          );
+          for (final width in [1100.0, 360.0]) {
+            tester.view.physicalSize = Size(width, 640);
+            await tester.pumpAndSettle();
+            if (width == 1100 &&
+                !tester
+                    .widget<HomeDesktopScaffold>(
+                      find.byType(HomeDesktopScaffold),
+                    )
+                    .tabletSidebarOpen) {
+              ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
+              await tester.pumpAndSettle();
+            }
+            expect(
+              tester.state(find.byType(DesktopSidePanel)),
+              same(panelState),
+            );
+            expect(tester.state(find.byType(HomePage)), same(pageState));
+            expect(tester.takeException(), isNull);
+          }
+        }
         expect(find.byType(HomeDesktopScaffold), findsOneWidget);
         expect(find.byType(InteractiveDrawer), findsNothing);
-        expect(drawer.isOpen, isTrue);
+        if (defaultTargetPlatform != TargetPlatform.android) {
+          tester
+              .widget<ChatSelectionAppBar>(find.byType(ChatSelectionAppBar))
+              .onClose();
+          await tester.pumpAndSettle();
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(HomePage)),
+          )!;
+          final wideSidebarPreference = settings.desktopSidebarOpen;
+          await tester.tap(
+            find.byKey(const ValueKey('desktop-navigation-menu')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.desktopNavGlobalSearchTooltip));
+          await tester.pumpAndSettle();
+          HomeDesktopScaffold scaffold() => tester.widget<HomeDesktopScaffold>(
+            find.byType(HomeDesktopScaffold),
+          );
+          expect(scaffold().globalSearchMode, isTrue);
+          expect(scaffold().tabletSidebarOpen, isTrue);
+          final searchField = find.byWidgetPredicate(
+            (widget) =>
+                widget is TextField &&
+                widget.decoration?.hintText == l10n.sideDrawerGlobalSearchHint,
+          );
+          expect(searchField, findsOneWidget);
+          await tester.enterText(searchField, 'retained search');
+          for (final width in [1100.0, 360.0]) {
+            tester.view.physicalSize = Size(width, 640);
+            await tester.pumpAndSettle();
+            expect(scaffold().tabletSidebarOpen, isTrue);
+            expect(
+              tester.widget<TextField>(searchField).controller!.text,
+              'retained search',
+            );
+          }
+          expect(settings.desktopSidebarOpen, wideSidebarPreference);
+          await tester.tap(
+            find.byKey(const ValueKey('desktop-navigation-menu')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.desktopNavChatTooltip));
+          await tester.pumpAndSettle();
+          if (scaffold().tabletSidebarOpen) scaffold().onToggleSidebar();
+          await tester.pumpAndSettle();
+          final field = find
+              .descendant(
+                of: find.byType(ChatInputBar),
+                matching: find.byType(TextField),
+              )
+              .first;
+          await tester.enterText(field, 'Retained compact draft');
+          for (final width in [1100.0, 360.0]) {
+            tester.view.physicalSize = Size(width, 640);
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<TextField>(field).controller!.text,
+              'Retained compact draft',
+            );
+            expect(tester.takeException(), isNull);
+          }
+          return;
+        }
 
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -314,6 +464,7 @@ void main() {
       variant: TargetPlatformVariant({
         TargetPlatform.android,
         TargetPlatform.macOS,
+        TargetPlatform.windows,
       }),
     );
   }

@@ -41,7 +41,7 @@ class MainFlutterWindow: NSWindow {
   private let autosaveName = NSWindow.FrameAutosaveName("KelivoMainWindowFrame")
 
   // Minimum reasonable content size to ensure the window is visible and usable.
-  private let minContentSize = NSSize(width: 960, height: 640)
+  private let minContentSize = NSSize(width: 360, height: 640)
 
   // Clamp a size within min bounds and the given screen's visible frame
   private func clampedSize(_ size: NSSize, for screen: NSScreen?) -> NSSize {

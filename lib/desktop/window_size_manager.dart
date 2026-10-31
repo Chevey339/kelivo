@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Manages desktop window size/position persistence and defaults.
 class WindowSizeManager {
   // Constraints
-  static const double minWindowWidth = 960.0;
+  static const double minWindowWidth = 360.0;
   static const double minWindowHeight = 640.0;
   static const double maxWindowWidth = 8192.0;
   static const double maxWindowHeight = 8192.0;
