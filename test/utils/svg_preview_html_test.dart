@@ -86,14 +86,14 @@ void main() {
       '<svg xmlns="urn:config"/>',
     ]) {
       expect(svgPreviewDataUri(source), isNull);
-      expect(() => buildSvgPreviewHtml(source), returnsNormally);
+      expect(() => buildSvgPreviewHtml(source, generation: 1), returnsNormally);
     }
   });
 
   test('SVG content is isolated in an image data URI', () {
     const source =
         '<svg><script>alert("untrusted")</script><text>中文</text></svg>';
-    final html = buildSvgPreviewHtml(source);
+    final html = buildSvgPreviewHtml(source, generation: 1);
     expect(html, contains(svgPreviewDataUri(source)!));
     expect(html, isNot(contains('alert("untrusted")')));
     expect(html, isNot(contains('<svg>')));

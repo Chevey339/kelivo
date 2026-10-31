@@ -516,10 +516,10 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     for (var i = 0; i < 4; i++) {
       try {
-        final bytes = await exportBytes().timeout(
-          const Duration(milliseconds: 900),
-          onTimeout: () => null,
-        );
+        // The native bridge waits for Mermaid's render-complete event and
+        // bounds its own waits. Timing out here leaves an export in flight
+        // while the next retry replaces its result callback.
+        final bytes = await exportBytes();
         if (bytes != null && bytes.isNotEmpty) {
           return MermaidBitmapRenderResult.success(bytes);
         }
