@@ -11,16 +11,17 @@ List<SourceSpan> quoteSourceHighlights(
   int? sourceOffset,
   SourceTextMap? sourceMap,
 }) {
-  final base = sourceOffset ?? message.content.indexOf(source);
   final quotes =
       QuoteInteractionScope.maybeOf(context)?.highlightsFor(message.id) ??
       const [];
+  if (quotes.isEmpty) return const [];
   if (sourceMap != null) {
     return [
       for (final quote in quotes)
         ...sourceMap.displayRanges(SourceSpan(quote.start, quote.end)),
     ];
   }
+  final base = sourceOffset ?? message.content.indexOf(source);
   if (base < 0) return const [];
   return [
     for (final quote in quotes)

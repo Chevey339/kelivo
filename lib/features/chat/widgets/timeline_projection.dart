@@ -270,6 +270,8 @@ class TimelineProjection {
     required this.fromParts,
     required this.blocks,
     this.partsArrivalOrdered = false,
+    this.previous,
+    this.unchangedBlockPrefix = 0,
   });
 
   final bool fromParts;
@@ -281,6 +283,12 @@ class TimelineProjection {
   /// Legal historical [contentSplits] still restore prefix → tool/thinking →
   /// suffix when this is false.
   final bool partsArrivalOrdered;
+
+  /// Incremental projections retain only a weak link to the preceding result.
+  /// Blocks before [unchangedBlockPrefix] have the same identity and contents.
+  /// Ordinary projections leave these unset and require a complete filter.
+  final WeakReference<TimelineProjection>? previous;
+  final int unchangedBlockPrefix;
 }
 
 /// One visible assistant block after role settings and approval filters.
@@ -1196,53 +1204,97 @@ List<TimelineVisibleBlock> visibleAssistantTimeline(
   required bool showToolCards,
   required bool Function(TimelineToolRef tool) isPendingApproval,
 }) {
-  final visible = <TimelineVisibleBlock>[];
-  for (final block in projection.blocks) {
-    // With tool cards visible, approval changes cannot affect filtering.
-    // Reuse completed blocks across ordinary text-only snapshots.
-    final cached = showToolCards ? _visibleBlockMemo[block] : null;
-    if (cached != null && cached.$1 == showThinkingCards) {
-      if (cached.$2 != null) visible.add(cached.$2!);
-      continue;
-    }
-    void add(TimelineVisibleBlock? value) {
-      if (showToolCards) _visibleBlockMemo[block] = (showThinkingCards, value);
-      if (value != null) visible.add(value);
-    }
+  return [
+    for (final block in projection.blocks)
+      if (_visibleAssistantBlock(
+            block,
+            showThinkingCards: showThinkingCards,
+            showToolCards: showToolCards,
+            isPendingApproval: isPendingApproval,
+          )
+          case final visible?)
+        visible,
+  ];
+}
 
-    if (block.isText && (block.text?.trim().isNotEmpty ?? false)) {
-      add(
-        TimelineVisibleBlock.text(
-          block.text!,
-          uiSource: block.uiSource,
-          sourceMap: block.sourceMap,
-        ),
+/// Per-message visibility state. Only a changed suffix visits the block memo;
+/// published lists stay immutable for widgets that still hold an older result.
+class TimelineVisibilityCache {
+  TimelineProjection? _projection;
+  List<TimelineVisibleBlock> _visible = const [];
+  final _visiblePrefixCounts = <int>[0];
+  bool? _showThinkingCards, _showToolCards;
+  int filteredBlockCount = 0;
+
+  List<TimelineVisibleBlock> project(
+    TimelineProjection projection, {
+    required bool showThinkingCards,
+    required bool showToolCards,
+    required bool Function(TimelineToolRef tool) isPendingApproval,
+  }) {
+    final canReuse =
+        showToolCards &&
+        _showToolCards == showToolCards &&
+        _showThinkingCards == showThinkingCards;
+    if (canReuse && identical(projection, _projection)) return _visible;
+    final prefix =
+        canReuse &&
+            _projection != null &&
+            identical(projection.previous?.target, _projection)
+        ? projection.unchangedBlockPrefix
+        : 0;
+    final visible = _visible.sublist(0, _visiblePrefixCounts[prefix]);
+    _visiblePrefixCounts.length = prefix + 1;
+    for (var i = prefix; i < projection.blocks.length; i++) {
+      filteredBlockCount++;
+      final block = _visibleAssistantBlock(
+        projection.blocks[i],
+        showThinkingCards: showThinkingCards,
+        showToolCards: showToolCards,
+        isPendingApproval: isPendingApproval,
       );
-      continue;
+      if (block != null) visible.add(block);
+      _visiblePrefixCounts.add(visible.length);
     }
-    if (block.isImage && (block.imageUri?.trim().isNotEmpty ?? false)) {
-      add(
-        TimelineVisibleBlock.image(
-          block.imageUri!,
-          imageKey: block.imageKey,
-          aspectRatio:
-              block.aspectRatio ?? timelineImageAspects[block.imageKey],
-        ),
-      );
-      continue;
-    }
+    _projection = projection;
+    _showThinkingCards = showThinkingCards;
+    _showToolCards = showToolCards;
+    return _visible = List.unmodifiable(visible);
+  }
+}
+
+TimelineVisibleBlock? _visibleAssistantBlock(
+  TimelineProjectedBlock block, {
+  required bool showThinkingCards,
+  required bool showToolCards,
+  required bool Function(TimelineToolRef tool) isPendingApproval,
+}) {
+  // With tool cards visible, approval changes cannot affect filtering.
+  final cached = showToolCards ? _visibleBlockMemo[block] : null;
+  if (cached != null && cached.$1 == showThinkingCards) return cached.$2;
+  final TimelineVisibleBlock? visible;
+  if (block.isText && (block.text?.trim().isNotEmpty ?? false)) {
+    visible = TimelineVisibleBlock.text(
+      block.text!,
+      uiSource: block.uiSource,
+      sourceMap: block.sourceMap,
+    );
+  } else if (block.isImage && (block.imageUri?.trim().isNotEmpty ?? false)) {
+    visible = TimelineVisibleBlock.image(
+      block.imageUri!,
+      imageKey: block.imageKey,
+      aspectRatio: block.aspectRatio ?? timelineImageAspects[block.imageKey],
+    );
+  } else {
     final thinking = _filteredThinkingSteps(
       block,
       showThinkingCards: showThinkingCards,
       showToolCards: showToolCards,
       isPendingApproval: isPendingApproval,
     );
-    if (thinking.isNotEmpty) {
-      add(TimelineVisibleBlock.thinking(thinking));
-    } else {
-      add(null);
-    }
+    visible = thinking.isEmpty ? null : TimelineVisibleBlock.thinking(thinking);
   }
+  if (showToolCards) _visibleBlockMemo[block] = (showThinkingCards, visible);
   return visible;
 }
 

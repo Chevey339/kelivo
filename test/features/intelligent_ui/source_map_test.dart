@@ -7,6 +7,7 @@ import 'package:markstream/markstream_core.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:Kelivo/features/chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_source_map.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_generation_state.dart';
@@ -19,6 +20,178 @@ const _web =
     '```kelivo-web\n{"version":1,"title":"<think>literal</think>","summary":"😀"}\n<b>Local</b>\n```';
 void main() {
   const parser = MarkdownParser();
+  for (final language in ['kelivo-ui', 'kelivo-web']) {
+    test('cached negatives detect $language across edited empty parts', () {
+      for (var cut = 1; cut < language.length; cut++) {
+        final builder = MessagePartSnapshotBuilder();
+        final parts = <MessagePart>[
+          TextPart('```${language.substring(0, cut)}'),
+          const TextPart('!'),
+          TextPart('${language.substring(cut)}\n$_body\n```'),
+        ];
+        final previous = builder.update(parts);
+        expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+        parts[1] = const TextPart('');
+        final current = builder.update(parts, changed: {1});
+        expect(current.sourceIdentity, same(previous.sourceIdentity));
+        final source = UiMessageSource.of(current);
+        expect(source.hasCandidate, isTrue, reason: 'cut=$cut');
+        expect(source.runs.single.fences.single.node.info, language);
+        expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+      }
+    });
+
+    test('cached negatives traverse short/empty $language prefix parts', () {
+      final builder = MessagePartSnapshotBuilder();
+      final parts = <MessagePart>[
+        const TextPart('```'),
+        for (final character
+            in language.substring(0, language.length - 1).split('')) ...[
+          TextPart(character),
+          const TextPart(''),
+        ],
+        const TextPart('?'),
+        const TextPart('\n$_body\n```'),
+      ];
+      final previous = builder.update(parts);
+      expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+      final edited = parts.length - 2;
+      parts[edited] = TextPart(language.substring(language.length - 1));
+      expect(
+        UiMessageSource.of(
+          builder.update(parts, changed: {edited}),
+        ).hasCandidate,
+        isTrue,
+      );
+    });
+
+    test(
+      'cached negatives observe $language edits before the tail and removal',
+      () {
+        final builder = MessagePartSnapshotBuilder();
+        final parts = <MessagePart>[
+          const TextPart('```kelivx-'),
+          TextPart('${language.substring(7)}\n$_body\n```'),
+          const ToolCallPart('{}'),
+          const TextPart('unrelated tail'),
+        ];
+        final previous = builder.update(parts);
+        expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+        for (final prefix in ['```kelivo-', '```kelivx-', '```kelivo-']) {
+          parts[0] = TextPart(prefix);
+          expect(
+            UiMessageSource.of(
+              builder.update(parts, changed: {0}),
+            ).hasCandidate,
+            prefix == '```kelivo-',
+          );
+        }
+      },
+    );
+  }
+
+  test(
+    'cached negatives keep non-text boundaries and recheck structural changes',
+    () {
+      for (final removeBoundary in [false, true]) {
+        final builder = MessagePartSnapshotBuilder();
+        final parts = <MessagePart>[
+          const TextPart('```kelivo-'),
+          const ToolCallPart('{}'),
+          const TextPart('invalid'),
+        ];
+        final previous = builder.update(parts);
+        expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+        parts[2] = const TextPart('ui\n$_body\n```');
+        final stillSeparate = builder.update(parts, changed: {2});
+        expect(UiMessageSource.of(stillSeparate).hasCandidate, isFalse);
+        if (removeBoundary) {
+          parts.removeAt(1);
+        } else {
+          parts[1] = const TextPart('');
+        }
+        final connected = builder.update(parts, changed: {1, 2});
+        expect(
+          connected.structureRevision,
+          isNot(stillSeparate.structureRevision),
+        );
+        expect(UiMessageSource.of(connected).hasCandidate, isTrue);
+      }
+    },
+  );
+
+  test(
+    'negative candidate cache falls back after journal expiry or many edits',
+    () {
+      final builder = MessagePartSnapshotBuilder();
+      final previous = builder.update(const [TextPart('ordinary')]);
+      expect(UiMessageSource.of(previous).hasCandidate, isFalse);
+      for (var i = 0; i < 64; i++) {
+        builder.update([TextPart('ordinary $i')], changed: {0});
+      }
+      final current = builder.update(const [TextPart(_fence)], changed: {0});
+      expect(current.changesSince(previous), isNull);
+      expect(UiMessageSource.of(current).hasCandidate, isTrue);
+
+      final manyBuilder = MessagePartSnapshotBuilder();
+      final manyBefore = manyBuilder.update(
+        List.generate(20, (i) => TextPart('old $i')),
+      );
+      expect(UiMessageSource.of(manyBefore).hasCandidate, isFalse);
+      final manyAfter = manyBuilder.update(
+        List.generate(20, (i) => TextPart(i == 19 ? _web : 'new $i')),
+        changed: {for (var i = 0; i < 20; i++) i},
+      );
+      expect(UiMessageSource.of(manyAfter).hasCandidate, isTrue);
+    },
+  );
+
+  test('negative candidate cache never crosses snapshot source identities', () {
+    final first = MessagePartSnapshotBuilder().update(const [
+      TextPart('plain'),
+    ]);
+    expect(UiMessageSource.of(first).hasCandidate, isFalse);
+    final other = MessagePartSnapshotBuilder().update(const [TextPart(_fence)]);
+    expect(other.sourceIdentity, isNot(same(first.sourceIdentity)));
+    expect(other.changesSince(first), isNull);
+    expect(UiMessageSource.of(other).hasCandidate, isTrue);
+    expect(UiMessageSource.of(first).hasCandidate, isFalse);
+  });
+
+  for (final language in ['kelivo-ui', 'kelivo-web']) {
+    test('$language candidate spans short and empty adjacent text parts', () {
+      final source = UiMessageSource.of([
+        const TextPart('```'),
+        for (final character in language.split('')) ...[
+          const TextPart(''),
+          TextPart(character),
+        ],
+        const TextPart(''),
+        const TextPart('\n$_body\n```'),
+      ]);
+      expect(source.hasCandidate, isTrue);
+      expect(source.runs.single.fences.single.node.info, language);
+    });
+
+    test('$language candidate never crosses a non-text part', () {
+      for (final boundary in const <MessagePart>[
+        FilePart(uri: '/file', name: 'file'),
+        ImagePart(uri: '/image'),
+        ReasoningPart('reasoning'),
+        ToolCallPart('{}'),
+        AssistantRoundEndPart(),
+      ]) {
+        final source = UiMessageSource.of([
+          const TextPart('```kelivo-'),
+          const TextPart(''),
+          boundary,
+          const TextPart(''),
+          TextPart('${language.substring(7)}\n$_body\n```'),
+        ]);
+        expect(source.hasCandidate, isFalse, reason: boundary.kind);
+      }
+    });
+  }
   test('web markers across every split preserve original authority', () {
     for (var cut = 0; cut <= _web.length; cut++) {
       final source = UiMessageSource.of([

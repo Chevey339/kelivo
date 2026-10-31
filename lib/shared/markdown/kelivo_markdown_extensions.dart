@@ -137,6 +137,7 @@ Widget _diagram(
 }
 
 final _expansionState = CodeExpansionState();
+final markdownDetailsExpansionState = DetailsExpansionState();
 CodeBlockOptions markdownCodeOptions(SettingsProvider settings) =>
     CodeBlockOptions(
       autoCollapse: settings.autoCollapseCodeBlock,

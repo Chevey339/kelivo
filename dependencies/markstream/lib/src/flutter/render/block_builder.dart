@@ -39,6 +39,8 @@ class MarkstreamRenderer {
   late InlineSpanBuilder _inline;
   MarkstreamRenderer? _blockContentRenderer;
   late CodeBlockOptions codeOptions;
+  DetailsExpansionState? detailsExpansionState;
+  late Object detailsStateKey;
   late MarkstreamLabels labels;
   bool exporting = false;
   bool trackSelection = false;
@@ -53,6 +55,8 @@ class MarkstreamRenderer {
     ImageBuilder? imageBuilder,
     LinkHandler? linkHandler,
     required CodeBlockOptions codeOptions,
+    DetailsExpansionState? detailsExpansionState,
+    required Object detailsStateKey,
     required MarkstreamLabels labels,
     required bool exporting,
     required bool trackSelection,
@@ -66,6 +70,8 @@ class MarkstreamRenderer {
     this.imageBuilder = imageBuilder;
     this.linkHandler = linkHandler;
     this.codeOptions = codeOptions;
+    this.detailsExpansionState = detailsExpansionState;
+    this.detailsStateKey = detailsStateKey;
     this.labels = labels;
     this.exporting = exporting;
     this.trackSelection = trackSelection;
@@ -103,6 +109,8 @@ class MarkstreamRenderer {
     imageBuilder: imageBuilder,
     linkHandler: linkHandler,
     codeOptions: codeOptions,
+    detailsExpansionState: detailsExpansionState,
+    detailsStateKey: detailsStateKey,
     labels: labels,
     exporting: exporting,
     trackSelection: trackSelection,
@@ -301,6 +309,8 @@ class MarkstreamRenderer {
       final summary = node.children.whereType<DetailsSummaryNode>().firstOrNull;
       return MarkstreamDetailsBlock(
         node: node,
+        expansionState: detailsExpansionState,
+        stateKey: detailsStateKey,
         open: node.open,
         source: node.span.slice(document.source),
         theme: theme,

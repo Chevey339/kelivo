@@ -189,3 +189,38 @@ class CodeExpansionState {
     return '${language.trim().toLowerCase()}|$prefix';
   }
 }
+
+/// App-owned folding choices, scoped to a stable document and source offset.
+/// Only fingerprints are retained; long details bodies are not kept alive.
+class DetailsExpansionState {
+  DetailsExpansionState({this.capacity = 80}) : assert(capacity > 0);
+
+  final int capacity;
+  final _values = <(Object, int), ({int length, int hash, bool expanded})>{};
+
+  bool? read(Object documentKey, int offset, String source) {
+    final key = (documentKey, offset);
+    final value = _values[key];
+    if (value == null) return null;
+    if (source.length < value.length ||
+        source.substring(0, value.length).hashCode != value.hash) {
+      _values.remove(key);
+      return null;
+    }
+    remember(documentKey, offset, source, value.expanded);
+    return value.expanded;
+  }
+
+  void remember(Object documentKey, int offset, String source, bool expanded) {
+    final key = (documentKey, offset);
+    _values.remove(key);
+    _values[key] = (
+      length: source.length,
+      hash: source.hashCode,
+      expanded: expanded,
+    );
+    while (_values.length > capacity) {
+      _values.remove(_values.keys.first);
+    }
+  }
+}

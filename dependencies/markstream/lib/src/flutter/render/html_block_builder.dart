@@ -43,6 +43,8 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
             .firstOrNull;
         child = MarkstreamDetailsBlock(
           node: node,
+          expansionState: detailsExpansionState,
+          stateKey: detailsStateKey,
           source: node.span.slice(document.source),
           open: node.attributes.containsKey('open'),
           theme: theme,

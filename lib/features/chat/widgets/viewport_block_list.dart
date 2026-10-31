@@ -43,20 +43,31 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   ScrollPosition? _position;
   double? _width;
   double? _textScale;
+  ({Object key, double offset})? _pendingAnchor;
+  WeakReference<_ViewportBlockListState>? _descendantAnchor;
   int _first = 0, _last = 0;
   bool _scheduled = false;
+
+  bool get _anchoredByDescendant {
+    final descendant = _descendantAnchor?.target;
+    return descendant != null &&
+        descendant.mounted &&
+        descendant._pendingAnchor != null;
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final position = Scrollable.maybeOf(context)?.position;
     if (!identical(position, _position)) {
-      _position?.removeListener(_scheduleRefresh);
+      _position?.removeListener(_onScroll);
       _position = position;
-      _position?.addListener(_scheduleRefresh);
+      _pendingAnchor = null;
+      _position?.addListener(_onScroll);
     }
     final scale = MediaQuery.textScalerOf(context).scale(1);
     if (_textScale != scale) {
+      _preserveReadingAnchor(widget);
       _textScale = scale;
       _width = null;
     }
@@ -67,6 +78,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   void didUpdateWidget(ViewportBlockList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.structureToken != widget.structureToken) {
+      _preserveReadingAnchor(oldWidget);
       // A changed shape may insert/reorder blocks. Transfer only measured
       // extents with the same stable identity; payloads are never retained.
       final previous = {
@@ -93,8 +105,75 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
 
   @override
   void dispose() {
-    _position?.removeListener(_scheduleRefresh);
+    _pendingAnchor = null;
+    _position?.removeListener(_onScroll);
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_position?.isScrollingNotifier.value ?? false) {
+      _pendingAnchor = null;
+    }
+    _scheduleRefresh();
+  }
+
+  ({double origin, double start, double height})? _viewportGeometry() {
+    final position = _position;
+    final box = _boxKey.currentContext?.findRenderObject();
+    if (position == null ||
+        !position.hasPixels ||
+        box is! RenderBox ||
+        !box.hasSize) {
+      return null;
+    }
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (viewport == null) return null;
+    final origin = viewport.getOffsetToReveal(box, 0).offset;
+    return (
+      origin: origin,
+      start: position.pixels - origin,
+      height: box.size.height,
+    );
+  }
+
+  void _preserveReadingAnchor(ViewportBlockList source) {
+    if (_pendingAnchor != null ||
+        _anchoredByDescendant ||
+        _extents.length == 0) {
+      return;
+    }
+    final geometry = _viewportGeometry();
+    // An offscreen nested list must leave positioning to its outer list.
+    if (geometry == null ||
+        geometry.start < 0 ||
+        geometry.start >= geometry.height) {
+      return;
+    }
+    final position = _position!;
+    // Bottom-following belongs to the outer scrollable, not a reading anchor.
+    if (position.hasContentDimensions &&
+        position.pixels >= position.maxScrollExtent - .5) {
+      return;
+    }
+    final index = _extents.indexAt(geometry.start);
+    if (index >= source.itemCount) return;
+    _pendingAnchor = (
+      key: source.itemKey(index),
+      offset: geometry.start - _extents.prefix(index),
+    );
+    // Both lists can invalidate in the same layout. Only the innermost
+    // reading anchor owns the intra-item offset while their sizes settle.
+    context.visitAncestorElements((element) {
+      if (element is StatefulElement) {
+        final ancestor = element.state;
+        if (ancestor is _ViewportBlockListState &&
+            identical(ancestor._position, _position)) {
+          ancestor._pendingAnchor = null;
+          ancestor._descendantAnchor = WeakReference(this);
+        }
+      }
+      return true;
+    });
   }
 
   void _scheduleRefresh() {
@@ -104,18 +183,22 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       _scheduled = false;
       if (!mounted || _extents.length == 0) return;
       final position = _position;
-      final box = _boxKey.currentContext?.findRenderObject();
-      if (position == null ||
-          !position.hasPixels ||
-          box is! RenderBox ||
-          !box.hasSize) {
-        return;
+      final geometry = _viewportGeometry();
+      if (position == null || geometry == null) return;
+      var start = geometry.start;
+      int? pendingIndex;
+      final pending = _pendingAnchor;
+      if (pending != null) {
+        for (var i = 0; i < widget.itemCount; i++) {
+          if (widget.itemKey(i) == pending.key) {
+            pendingIndex = i;
+            break;
+          }
+        }
+        if (pendingIndex == null) _pendingAnchor = null;
       }
-      final viewport = RenderAbstractViewport.maybeOf(box);
-      if (viewport == null) return;
-      final origin = viewport.getOffsetToReveal(box, 0).offset;
-      var start = position.pixels - origin;
-      final readingInside = start > 0 && start < _extents.total;
+      final readingInside =
+          !_anchoredByDescendant && start >= 0 && start < geometry.height;
       final anchor = _extents.indexAt(math.max(0, start));
       final anchorBefore = _extents.prefix(anchor);
       var sizeChanged = false;
@@ -127,8 +210,16 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       }
       _measurements.clear();
       // Changes above the currently read block should not move its text.
-      final correction = _extents.prefix(anchor) - anchorBefore;
-      if (correction.abs() >= .5 && readingInside) {
+      final correction = pendingIndex != null
+          ? geometry.origin +
+                _extents.prefix(pendingIndex) +
+                pending!.offset -
+                position.pixels
+          : readingInside
+          ? _extents.prefix(anchor) - anchorBefore
+          : 0.0;
+      final positionChanged = correction.abs() >= .5;
+      if (positionChanged) {
         position.correctBy(correction);
         start += correction;
       }
@@ -140,12 +231,16 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
                   ) +
                   1)
               .clamp(first, widget.itemCount);
-      if (first != _first || last != _last || sizeChanged) {
+      final rangeChanged = first != _first || last != _last;
+      if (!positionChanged && !rangeChanged && !sizeChanged) {
+        _pendingAnchor = null;
+      }
+      if (rangeChanged || sizeChanged || positionChanged) {
         setState(() {
           _first = first;
           _last = last;
         });
-        if (sizeChanged) _scheduleRefresh();
+        if (sizeChanged || positionChanged) _scheduleRefresh();
       }
     });
   }
@@ -155,6 +250,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
     if (widget.itemCount <= widget.threshold ||
         _position == null ||
         ExportCaptureScope.of(context)) {
+      _pendingAnchor = null;
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,6 +268,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (_width != constraints.maxWidth) {
+          _preserveReadingAnchor(widget);
           _width = constraints.maxWidth;
           _extents.clear();
           _measurements.clear();

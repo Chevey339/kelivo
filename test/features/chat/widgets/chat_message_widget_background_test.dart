@@ -114,6 +114,165 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
+    'identical details in separate text blocks retain independent folding',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setCollapseThinkingSteps(false);
+      await settings.setAssistantBubbleSplitParagraphs(false);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      addTearDown(settings.dispose);
+      const details =
+          '<details>\n<summary>Details</summary>\n\nShared details body\n\n</details>';
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            controller: controller,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                id: 'recycled-details',
+                role: 'assistant',
+                conversationId: 'chat',
+                parts: [
+                  for (var i = 0; i < 80; i++) ...[
+                    TextPart(i < 2 ? details : 'Explanation $i'),
+                    ToolCallPart(
+                      jsonEncode({
+                        'id': 'tool-$i',
+                        'name': 'mcp_read_file',
+                        'content': 'done',
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+              showModelIcon: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final surfaces = find.byKey(const ValueKey('markstream-details-surface'));
+      expect(surfaces, findsNWidgets(2));
+      await tester.tap(surfaces.first);
+      await tester.pumpAndSettle();
+      expect(
+        renderedParagraphsWith('Shared details body', exact: true),
+        hasLength(1),
+      );
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(surfaces, findsNothing);
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(surfaces, findsNWidgets(2));
+      expect(
+        renderedParagraphsWith('Shared details body', exact: true),
+        hasLength(1),
+      );
+      expect(
+        find.descendant(
+          of: surfaces.first,
+          matching: find.byKey(const ValueKey('markstream-details-body')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: surfaces.last,
+          matching: find.byKey(const ValueKey('markstream-details-body')),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'local reasoning expansion survives eviction without crossing blocks',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setCollapseThinkingSteps(false);
+      await settings.setEnableReasoningMarkdown(false);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            controller: controller,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                id: 'recycled-reasoning',
+                role: 'assistant',
+                conversationId: 'chat',
+                parts: [
+                  for (var i = 0; i < 80; i++) ...[
+                    ReasoningPart('Reasoning body $i'),
+                    TextPart('Explanation $i'),
+                  ],
+                ],
+              ),
+              showModelIcon: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final first = find.byWidgetPredicate(
+        (widget) =>
+            widget is StatefulWidget &&
+            widget.key == const ValueKey('reasoning-0'),
+        description: 'the first cached reasoning step',
+      );
+      expect(
+        first,
+        findsOneWidget,
+        reason: 'The first reasoning row must be mounted before expansion.',
+      );
+      expect(find.text('Reasoning body 0'), findsNothing);
+      await tester.tap(first);
+      await tester.pumpAndSettle();
+      expect(find.text('Reasoning body 0'), findsOneWidget);
+      expect(find.text('Reasoning body 1'), findsNothing);
+
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        findsNothing,
+        reason: 'Jumping to the tail must evict the first reasoning row.',
+      );
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        findsOneWidget,
+        reason: 'Returning to the top must remount the first reasoning row.',
+      );
+      expect(
+        find.text('Reasoning body 0'),
+        findsOneWidget,
+        reason: 'The remounted row must restore its explicit expansion.',
+      );
+      expect(
+        find.text('Reasoning body 1'),
+        findsNothing,
+        reason: 'The next thinking block must keep its own collapsed state.',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'pending free-text answer survives transcript subtree recycling',
     (tester) async {
       final settings = await _createSettings(

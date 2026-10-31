@@ -1,4 +1,5 @@
 import 'package:Kelivo/features/chat/widgets/viewport_block_list.dart';
+import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +87,203 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'width and text scale changes retain the measured reading item and offset',
+    (tester) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      final items = List.generate(100, (i) => i);
+
+      await tester.pumpWidget(
+        _anchorHost(controller: controller, items: items),
+      );
+      await tester.pumpAndSettle();
+      await _visitOffset(tester, controller, 5025);
+      final readingItem = find.byKey(const ValueKey('item-50'));
+      expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+      await tester.pumpWidget(
+        _anchorHost(controller: controller, items: items, width: 400),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+      await tester.pumpWidget(
+        _anchorHost(
+          controller: controller,
+          items: items,
+          width: 400,
+          textScale: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+      expect(find.byType(Text).evaluate().length, lessThan(60));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('structural changes retain the stable reading key', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final items = List.generate(100, (i) => i);
+    await tester.pumpWidget(_anchorHost(controller: controller, items: items));
+    await tester.pumpAndSettle();
+    await _visitOffset(tester, controller, 5025);
+    final readingItem = find.byKey(const ValueKey('item-50'));
+
+    final inserted = [100, 101, 102, 103, 104, ...items];
+    await tester.pumpWidget(
+      _anchorHost(controller: controller, items: inserted),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+    final reordered = [...items.skip(10), ...items.take(10)];
+    await tester.pumpWidget(
+      _anchorHost(controller: controller, items: reordered),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('resize yields to the outer controller following the bottom', (
+    tester,
+  ) async {
+    final controller = ChatAutoFollowScrollController()
+      ..shouldAutoFollow = () => true;
+    addTearDown(controller.dispose);
+    final items = List.generate(100, (i) => i);
+    await tester.pumpWidget(_anchorHost(controller: controller, items: items));
+    await tester.pumpAndSettle();
+    expect(controller.offset, closeTo(controller.position.maxScrollExtent, .5));
+
+    await tester.pumpWidget(
+      _anchorHost(controller: controller, items: items, width: 400),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.offset, closeTo(controller.position.maxScrollExtent, .5));
+    expect(find.byKey(const ValueKey('item-99')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final readingNestedList in [true, false]) {
+    testWidgets(
+      readingNestedList
+          ? 'nested reading anchor owns simultaneous extent invalidation'
+          : 'offscreen nested list leaves the reading anchor to the outer list',
+      (tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+        Widget host(double width) => MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: width,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: ViewportBlockList(
+                    itemCount: 100,
+                    structureToken: 100,
+                    itemKey: (i) => i,
+                    keepAlive: (i) => i == 10,
+                    estimateExtent: (i, width) => i == 10 ? 4000 : 40,
+                    itemBuilder: (context, i) => i == 10
+                        ? ViewportBlockList(
+                            itemCount: 100,
+                            structureToken: 100,
+                            itemKey: (i) => i,
+                            estimateExtent: (i, width) => 40,
+                            itemBuilder: (context, i) => SizedBox(
+                              key: ValueKey('nested-$i'),
+                              height: 100,
+                              child: Text('nested-$i'),
+                            ),
+                          )
+                        : SizedBox(
+                            key: ValueKey('outer-$i'),
+                            height: 100,
+                            child: Text('outer-$i'),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpWidget(host(600));
+        await tester.pumpAndSettle();
+        // Visit the preceding content so its extents are measured, not guessed.
+        await _visitOffset(
+          tester,
+          controller,
+          readingNestedList ? 6025 : 14925,
+        );
+        final readingItem = find.byKey(
+          ValueKey(readingNestedList ? 'nested-50' : 'outer-50'),
+        );
+        expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+        await tester.pumpWidget(host(400));
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+        expect(find.byType(Scrollable), findsOneWidget);
+        expect(find.byType(Text).evaluate().length, lessThan(100));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+}
+
+Widget _anchorHost({
+  required ScrollController controller,
+  required List<int> items,
+  double width = 600,
+  double textScale = 1,
+}) => MaterialApp(
+  home: Scaffold(
+    body: MediaQuery(
+      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: width,
+          child: SingleChildScrollView(
+            controller: controller,
+            child: ViewportBlockList(
+              itemCount: items.length,
+              structureToken: items,
+              itemKey: (i) => items[i],
+              estimateExtent: (i, width) => 40,
+              itemBuilder: (context, i) => SizedBox(
+                key: ValueKey('item-${items[i]}'),
+                height: 100 * MediaQuery.textScalerOf(context).scale(1),
+                child: Text('item-${items[i]}'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
+Future<void> _visitOffset(
+  WidgetTester tester,
+  ScrollController controller,
+  double target,
+) async {
+  for (var offset = 0.0; offset < target; offset += 500) {
+    controller.jumpTo(offset);
+    await tester.pumpAndSettle();
+  }
+  controller.jumpTo(target);
+  await tester.pumpAndSettle();
 }
 
 class _Probe extends StatefulWidget {

@@ -23,6 +23,7 @@ Object describe(TimelineProjection projection) => [
             step.reasoning?.text,
             step.reasoning?.expanded,
             step.tool?.id,
+            step.tool?.toolName,
             step.tool?.content,
             step.tool?.fallbackOrdinal,
           ],
@@ -30,6 +31,109 @@ Object describe(TimelineProjection projection) => [
 ];
 
 void main() {
+  test('suffix rewinds retain the no-ID overlay position', () {
+    final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+    final projector = IncrementalTimelineProjection();
+    final parts = <MessagePart>[
+      const ToolCallPart('{"name":"shell"}'),
+      const TextPart('before'),
+      const ToolCallPart('{"name":"write_file"}'),
+    ];
+    const live = [
+      TimelineToolRef(
+        providerId: '',
+        fallbackOrdinal: 0,
+        toolName: 'shell',
+        arguments: {},
+        content: 'first result',
+      ),
+      TimelineToolRef(
+        providerId: '',
+        fallbackOrdinal: 1,
+        toolName: 'write_file',
+        arguments: {},
+        content: 'second result',
+      ),
+    ];
+    final original = projector.project(
+      parts: builder.update(parts),
+      liveTools: live,
+      reasoning: const [],
+    );
+    final projectedCount = projector.projectedPartCount;
+    parts[1] = const TextPart('after');
+    final snapshot = builder.update(parts, changed: {1});
+    final actual = projector.project(
+      parts: snapshot,
+      liveTools: live,
+      reasoning: const [],
+    );
+    final expected = projectAssistantTimeline(
+      parts: snapshot,
+      liveTools: live,
+      reasoningSegments: const [],
+      visualContent: 'after',
+      partsArrivalOrdered: true,
+      renderFromParts: true,
+      parseInlineThinking: false,
+    );
+    expect(describe(actual), describe(expected));
+    expect(actual.blocks.first, same(original.blocks.first));
+    expect(actual.blocks.last.steps.single.tool!.content, 'second result');
+    expect(projector.projectedPartCount - projectedCount, 2);
+  });
+
+  test('built-in search never consumes or replaces a tool overlay', () {
+    final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+    final parts = builder.update(const [
+      ToolCallPart('{"name":"builtin_search"}'),
+      ToolCallPart('{"name":"shell"}'),
+      ToolCallPart('{"id":"named","name":"read_file","content":"saved"}'),
+    ]);
+    const live = [
+      TimelineToolRef(
+        providerId: '',
+        fallbackOrdinal: 0,
+        toolName: 'builtin_search',
+        arguments: {},
+        content: 'citations',
+      ),
+      TimelineToolRef(
+        providerId: '',
+        fallbackOrdinal: 1,
+        toolName: 'shell',
+        arguments: {},
+        content: 'shell result',
+      ),
+      TimelineToolRef(
+        providerId: 'named',
+        fallbackOrdinal: 2,
+        toolName: 'builtin_search',
+        arguments: {},
+        content: 'other citations',
+      ),
+    ];
+    final actual = IncrementalTimelineProjection().project(
+      parts: parts,
+      liveTools: live,
+      reasoning: const [],
+    );
+    final expected = projectAssistantTimeline(
+      parts: parts,
+      liveTools: live,
+      reasoningSegments: const [],
+      visualContent: '',
+      partsArrivalOrdered: true,
+      renderFromParts: true,
+      parseInlineThinking: false,
+    );
+    expect(describe(actual), describe(expected));
+    expect(actual.blocks.single.steps.map((step) => step.tool!.toolName), [
+      'shell',
+      'read_file',
+    ]);
+  });
+
   test(
     'text after 5000 completed calls reprojects one part and reuses the group',
     () {

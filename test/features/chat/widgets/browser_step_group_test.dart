@@ -68,6 +68,7 @@ void main() {
     double scale = 1,
     bool reduceMotion = false,
     bool? streaming,
+    ScrollController? scrollController,
   }) async {
     tester.view.physicalSize = Size(narrow ? 320 : 800, 1500);
     tester.view.devicePixelRatio = 1;
@@ -96,6 +97,7 @@ void main() {
           ),
           home: Scaffold(
             body: SingleChildScrollView(
+              controller: scrollController,
               child: ChatMessageWidget(
                 message: ChatMessage(
                   id: 'message',
@@ -406,6 +408,120 @@ void main() {
       expect(steps(), findsNWidgets(5));
     },
   );
+
+  testWidgets(
+    'expanded browser history recycles rows and retains preceding context',
+    (tester) async {
+      const count = 2000;
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await pump(
+        tester,
+        [
+          for (var i = 0; i < count; i++)
+            i == 0 || i == count ~/ 2
+                ? _tool(
+                    '$i',
+                    action: 'snapshot',
+                    page: {
+                      'elements': [
+                        {
+                          'ref': 'e12',
+                          'name': i == 0 ? 'First target' : 'Later target',
+                        },
+                      ],
+                    },
+                  )
+                : _tool('$i', action: 'click', args: {'ref': 'e12'}),
+        ],
+        scrollController: controller,
+        reduceMotion: true,
+      );
+      await toggle(tester);
+      expect(steps(), findsNWidgets(5));
+      expect(find.text('「Later target」'), findsNWidgets(5));
+      await tester.tap(find.text('${count - 5} earlier steps'));
+      await tester.pumpAndSettle();
+      expect(step('0'), findsOneWidget);
+      expect(steps().evaluate().length, lessThan(200));
+      expect(find.text('「First target」'), findsWidgets);
+      expect(step('${count - 1}'), findsNothing);
+
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(step('0'), findsNothing);
+      expect(step('${count - 1}'), findsOneWidget);
+      expect(steps().evaluate().length, lessThan(200));
+      expect(
+        find.descendant(
+          of: step('${count - 1}'),
+          matching: find.text('「Later target」'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: step('${count - 1}'),
+          matching: find.byType(BrowserFavicon),
+        ),
+        findsNothing,
+      );
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(step('0'), findsOneWidget);
+      expect(step('${count - 1}'), findsNothing);
+      expect(find.text('「First target」'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('same-count browser reorder preserves the currently read step', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final tools = [for (var i = 0; i < 200; i++) _tool('$i')];
+    await pump(tester, tools, scrollController: controller, reduceMotion: true);
+    await toggle(tester);
+    await tester.tap(find.text('195 earlier steps'));
+    await tester.pumpAndSettle();
+    controller.jumpTo(controller.position.maxScrollExtent / 2);
+    await tester.pumpAndSettle();
+    final reading = step('100');
+    expect(
+      reading,
+      findsOneWidget,
+      reason: 'The middle browser step must be mounted before reordering.',
+    );
+    final before = tester.getTopLeft(reading).dy;
+    await pump(
+      tester,
+      [
+        tools.first,
+        ...tools.sublist(150, 160),
+        ...tools.sublist(1, 150),
+        ...tools.sublist(160),
+      ],
+      scrollController: controller,
+      reduceMotion: true,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      reading,
+      findsOneWidget,
+      reason: 'Reordering must retain the currently read browser step.',
+    );
+    expect(
+      tester.getTopLeft(reading).dy,
+      closeTo(before, 1),
+      reason: 'Moving later steps before the reader must preserve its anchor.',
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   for (final desktop in [false, true]) {
     testWidgets(

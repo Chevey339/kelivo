@@ -36,7 +36,11 @@ class IncrementalTimelineProjection {
       }
     }
     if (!identical(liveTools, _liveTools)) {
-      final next = {for (final tool in liveTools) tool.providerId.trim(): tool};
+      final next = {
+        for (final tool in liveTools)
+          if (tool.toolName != kBuiltinSearchToolName)
+            tool.providerId.trim(): tool,
+      };
       // No-id overlays are positional, so use a full rewind for that rare case.
       if (next.containsKey('') || _liveById.containsKey('')) start = 0;
       for (final id in {..._liveById.keys, ...next.keys}) {
@@ -50,7 +54,11 @@ class IncrementalTimelineProjection {
         ..addAll(next);
       _liveTools = liveTools;
       _emptyTools = liveTools
-          .where((tool) => tool.providerId.trim().isEmpty)
+          .where(
+            (tool) =>
+                tool.toolName != kBuiltinSearchToolName &&
+                tool.providerId.trim().isEmpty,
+          )
           .toList();
     }
     final reasonCount = reasoning.length > _reasoning.length
@@ -115,7 +123,7 @@ class IncrementalTimelineProjection {
       _pending = [];
     }
 
-    var emptyToolIndex = 0;
+    var emptyToolIndex = cursor.emptyTools;
 
     for (var index = start; index < parts.length; index++) {
       projectedPartCount++;
@@ -210,6 +218,7 @@ class IncrementalTimelineProjection {
           blocks: _blocks.length,
           pending: _pending.length,
           tools: toolCount,
+          emptyTools: emptyToolIndex,
           reasoning: reasoningCount,
           images: imageCount,
           textOffset: textOffset,
@@ -221,6 +230,8 @@ class IncrementalTimelineProjection {
     return _projection = TimelineProjection(
       fromParts: true,
       partsArrivalOrdered: true,
+      previous: _projection == null ? null : WeakReference(_projection!),
+      unchangedBlockPrefix: cursor.blocks,
       blocks: List.unmodifiable([
         ..._blocks,
         if (_pending.isNotEmpty)
@@ -245,10 +256,18 @@ class _Cursor {
     this.blocks = 0,
     this.pending = 0,
     this.tools = 0,
+    this.emptyTools = 0,
     this.reasoning = 0,
     this.images = 0,
     this.textOffset = 0,
     this.steps = 0,
   });
-  final int blocks, pending, tools, reasoning, images, textOffset, steps;
+  final int blocks,
+      pending,
+      tools,
+      emptyTools,
+      reasoning,
+      images,
+      textOffset,
+      steps;
 }

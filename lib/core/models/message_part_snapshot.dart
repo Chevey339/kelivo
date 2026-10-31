@@ -20,6 +20,10 @@ class MessagePartSnapshot extends UnmodifiableListView<MessagePart> {
   final int toolsRevision;
   bool get arrivalOrdered => _owner.arrivalOrdered;
 
+  /// Opaque identity shared by this source's snapshots. This token exposes no
+  /// mutable builder API and must only be used to scope derived caches.
+  Object get sourceIdentity => _owner._sourceIdentity;
+
   /// Null means an unrelated source or an expired journal: rebuild once.
   Set<int>? changesSince(MessagePartSnapshot previous) {
     if (!identical(_owner, previous._owner)) return null;
@@ -40,6 +44,7 @@ class MessagePartSnapshot extends UnmodifiableListView<MessagePart> {
 class MessagePartSnapshotBuilder {
   MessagePartSnapshotBuilder({this.arrivalOrdered = false});
   final bool arrivalOrdered;
+  final _sourceIdentity = Object();
   static const _journalLimit = 64;
   final _journal = <int, Set<int>>{};
   // A weak reference avoids an old snapshot keeping the newest payload alive.

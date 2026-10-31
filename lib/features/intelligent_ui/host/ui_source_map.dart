@@ -1,6 +1,7 @@
 import 'package:Kelivo/utils/protected_text.dart';
 import 'package:Kelivo/utils/source_text_map.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:markstream/markstream_core.dart';
 
 /// Original coordinates precede thinking extraction, visual regexes and bubbles.
@@ -8,6 +9,11 @@ import 'package:markstream/markstream_core.dart';
 final class UiMessageSource {
   UiMessageSource._(this.runs, this._parts);
   static final _memo = Expando<UiMessageSource>();
+  static final _negativeSnapshots =
+      Expando<WeakReference<MessagePartSnapshot>>();
+  static const _maxCandidateChanges = 16;
+  // The longest marker, kelivo-web, has ten UTF-16 units.
+  static const _markerOverlap = 9;
   static final empty = UiMessageSource._(const [], const {});
   final List<UiTextRun> runs;
   final Map<int, (UiTextRun, UiRunPart)> _parts;
@@ -16,6 +22,82 @@ final class UiMessageSource {
       _memo[parts] ??= _hasCandidate(parts) ? _parse(parts) : empty;
 
   static bool _hasCandidate(List<MessagePart> parts) {
+    if (parts is! MessagePartSnapshot) return _scanForCandidate(parts);
+    final previous = _negativeSnapshots[parts.sourceIdentity]?.target;
+    final changed =
+        previous != null &&
+            previous.structureRevision == parts.structureRevision &&
+            previous.length == parts.length
+        ? parts.changesSince(previous)
+        : null;
+    // Only reuse an authoritative negative result for bounded text-only edits.
+    // The weak reference never makes an old source snapshot stay alive.
+    final bool found;
+    if (previous != null &&
+        changed != null &&
+        changed.length <= _maxCandidateChanges &&
+        changed.every(
+          (index) =>
+              index >= 0 &&
+              index < parts.length &&
+              previous[index] is TextPart &&
+              parts[index] is TextPart,
+        )) {
+      found = changed.any((index) => _candidateAround(parts, index));
+    } else {
+      found = _scanForCandidate(parts);
+    }
+    _negativeSnapshots[parts.sourceIdentity] = found
+        ? null
+        : WeakReference(parts);
+    return found;
+  }
+
+  static bool _containsMarker(String text) =>
+      text.contains('kelivo-ui') || text.contains('kelivo-web');
+
+  static bool _candidateAround(List<MessagePart> parts, int index) {
+    final text = (parts[index] as TextPart).text;
+    if (_containsMarker(text)) return true;
+    final left = _adjacentText(parts, index, before: true);
+    final right = _adjacentText(parts, index, before: false);
+    if (left.isEmpty && right.isEmpty) return false;
+    if (text.length < _markerOverlap) {
+      return _containsMarker('$left$text$right');
+    }
+    return (left.isNotEmpty &&
+            _containsMarker('$left${text.substring(0, _markerOverlap)}')) ||
+        (right.isNotEmpty &&
+            _containsMarker(
+              '${text.substring(text.length - _markerOverlap)}$right',
+            ));
+  }
+
+  static String _adjacentText(
+    List<MessagePart> parts,
+    int index, {
+    required bool before,
+  }) {
+    var result = '';
+    final step = before ? -1 : 1;
+    for (
+      var i = index + step;
+      i >= 0 && i < parts.length && result.length < _markerOverlap;
+      i += step
+    ) {
+      final part = parts[i];
+      if (part is! TextPart) break;
+      final text = part.text;
+      if (text.isEmpty) continue;
+      final count = (_markerOverlap - result.length).clamp(0, text.length);
+      result = before
+          ? '${text.substring(text.length - count)}$result'
+          : '$result${text.substring(0, count)}';
+    }
+    return result;
+  }
+
+  static bool _scanForCandidate(List<MessagePart> parts) {
     var tail = '';
     for (final part in parts) {
       if (part is! TextPart) {
@@ -23,16 +105,21 @@ final class UiMessageSource {
         continue;
       }
       final text = part.text;
-      if (text.contains('kelivo-ui') ||
-          text.contains('kelivo-web') ||
-          const ['kelivo-ui', 'kelivo-web'].any(
-            (tag) => (tail + text.substring(0, text.length.clamp(0, 9)))
-                .contains(tag),
-          )) {
+      if (text.isEmpty) continue;
+      if (_containsMarker(text)) {
         return true;
       }
-      final end = text.length >= 9 ? text : tail + text;
-      tail = end.substring((end.length - 9).clamp(0, end.length));
+      // A non-text part clears the tail. The common tool/text alternation has
+      // no cross-part marker to check and needs no temporary boundary string.
+      if (tail.isNotEmpty) {
+        final boundary =
+            tail + text.substring(0, text.length.clamp(0, _markerOverlap));
+        if (_containsMarker(boundary)) {
+          return true;
+        }
+      }
+      final end = text.length >= _markerOverlap ? text : tail + text;
+      tail = end.substring((end.length - _markerOverlap).clamp(0, end.length));
     }
     return false;
   }
