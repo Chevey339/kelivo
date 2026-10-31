@@ -292,6 +292,8 @@ class ProviderOAuthService extends ChangeNotifier {
         statusCode: error.statusCode,
         code: error.code,
         message: error.message,
+        stage: error.stage,
+        transportFailure: error.transportFailure,
       );
     } finally {
       client.close();

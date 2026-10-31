@@ -10,6 +10,7 @@ import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
+import 'oauth_failure.dart';
 import 'oauth_pkce.dart';
 import 'claude_oauth_request.dart';
 
@@ -76,8 +77,9 @@ class OAuthWire {
         if (decoded is Map) data = decoded.cast<String, dynamic>();
       } catch (_) {
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          throw const ProviderOAuthException(
+          throw ProviderOAuthException(
             ProviderOAuthFailure.invalidResponse,
+            statusCode: response.statusCode,
           );
         }
       }
@@ -86,12 +88,8 @@ class OAuthWire {
         data,
         headers: response.headers,
       );
-    } on ProviderOAuthException {
-      rethrow;
-    } on TimeoutException {
-      throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
-    } catch (_) {
-      throw const ProviderOAuthException(ProviderOAuthFailure.network);
+    } catch (error) {
+      throw oauthFailure(error);
     }
   }
 }
@@ -213,7 +211,7 @@ abstract class ProviderOAuthAdapter {
   Future<ProviderOAuthCredentials> refresh(
     OAuthWire wire,
     ProviderOAuthCredentials stored,
-  ) async {
+  ) => oauthAtStage(ProviderOAuthStage.refreshToken, () async {
     final response = await wire.request(
       await tokenEndpoint(wire),
       form: {
@@ -246,7 +244,7 @@ abstract class ProviderOAuthAdapter {
       );
     }
     return credentials(response.data, stored: stored);
-  }
+  });
 
   Map<String, String> tokenHeaders(String? deviceId) => const {};
 
@@ -318,7 +316,7 @@ abstract class ProviderOAuthAdapter {
     OAuthPromptHandler onPrompt,
     String deviceUrl, {
     String? deviceId,
-  }) async {
+  }) => oauthAtStage(ProviderOAuthStage.requestDeviceCode, () async {
     final tokenUrl = await tokenEndpoint(wire);
     cancellation.check();
     final init = await wire.request(
@@ -356,39 +354,41 @@ abstract class ProviderOAuthAdapter {
       seconds: (oauthNumber(init.data['interval']) ?? 5).clamp(1, 60).toInt(),
     );
     await onPrompt(OAuthLoginPrompt(url: Uri.parse(url), userCode: userCode));
-    while (DateTime.now().isBefore(deadline)) {
-      await cancellation.wait(interval);
-      if (!DateTime.now().isBefore(deadline)) break;
-      final response = await wire.request(
-        tokenUrl,
-        form: {
-          'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
-          'client_id': provider.clientId,
-          'device_code': device,
-        },
-        headers: tokenHeaders(deviceId),
-      );
-      cancellation.check();
-      if (response.ok && response.data['access_token'] != null) {
-        return credentials(response.data, deviceId: deviceId);
+    return oauthAtStage(ProviderOAuthStage.waitDeviceAuthorization, () async {
+      while (DateTime.now().isBefore(deadline)) {
+        await cancellation.wait(interval);
+        if (!DateTime.now().isBefore(deadline)) break;
+        final response = await wire.request(
+          tokenUrl,
+          form: {
+            'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+            'client_id': provider.clientId,
+            'device_code': device,
+          },
+          headers: tokenHeaders(deviceId),
+        );
+        cancellation.check();
+        if (response.ok && response.data['access_token'] != null) {
+          return credentials(response.data, deviceId: deviceId);
+        }
+        final error = response.data['error'];
+        if (error == 'authorization_pending') continue;
+        if (error == 'slow_down') {
+          interval += const Duration(seconds: 5);
+          continue;
+        }
+        throw ProviderOAuthException(
+          error == 'access_denied'
+              ? ProviderOAuthFailure.denied
+              : error == 'expired_token'
+              ? ProviderOAuthFailure.timeout
+              : ProviderOAuthFailure.invalidResponse,
+          statusCode: response.status,
+        );
       }
-      final error = response.data['error'];
-      if (error == 'authorization_pending') continue;
-      if (error == 'slow_down') {
-        interval += const Duration(seconds: 5);
-        continue;
-      }
-      throw ProviderOAuthException(
-        error == 'access_denied'
-            ? ProviderOAuthFailure.denied
-            : error == 'expired_token'
-            ? ProviderOAuthFailure.timeout
-            : ProviderOAuthFailure.invalidResponse,
-        statusCode: response.status,
-      );
-    }
-    throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
-  }
+      throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
+    });
+  });
 
   Future<Map<String, dynamic>> get(
     OAuthWire wire,
@@ -457,64 +457,69 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
             (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
       );
     }
-    final init = await wire.request(
-      'https://auth.openai.com/api/accounts/deviceauth/usercode',
-      json: {'client_id': provider.clientId},
-      timeout: tokenRequestTimeout,
-    );
-    if (!init.ok) throw _requestFailure(init, null);
-    final id = oauthString(init.data['device_auth_id']);
-    final code = oauthString(init.data['user_code']);
-    if (!init.ok || id == null || code == null) {
-      throw ProviderOAuthException(
-        ProviderOAuthFailure.invalidResponse,
-        statusCode: init.status,
-      );
-    }
-    cancellation.check();
-    await onPrompt(
-      OAuthLoginPrompt(
-        url: Uri.parse('https://auth.openai.com/codex/device'),
-        userCode: code,
-      ),
-    );
-    final interval = Duration(
-      seconds:
-          (oauthNumber(init.data['interval']) ?? 5).clamp(1, 60).toInt() + 3,
-    );
-    // Match OMP: a quick first poll, then the advertised interval plus margin.
-    for (var poll = 0; poll < 120; poll++) {
-      await cancellation.wait(
-        poll == 0 && interval > const Duration(seconds: 5)
-            ? const Duration(seconds: 5)
-            : interval,
-      );
-      final response = await wire.request(
-        'https://auth.openai.com/api/accounts/deviceauth/token',
-        json: {'device_auth_id': id, 'user_code': code},
+    return oauthAtStage(ProviderOAuthStage.requestDeviceCode, () async {
+      final init = await wire.request(
+        'https://auth.openai.com/api/accounts/deviceauth/usercode',
+        json: {'client_id': provider.clientId},
         timeout: tokenRequestTimeout,
       );
-      cancellation.check();
-      if (response.status == 403 || response.status == 404) continue;
-      if (!response.ok) {
-        throw _requestFailure(response, null, secrets: [id, code]);
-      }
-      final authCode = oauthString(response.data['authorization_code']);
-      final verifier = oauthString(response.data['code_verifier']);
-      if (!response.ok || authCode == null || verifier == null) {
+      if (!init.ok) throw _requestFailure(init, null);
+      final id = oauthString(init.data['device_auth_id']);
+      final code = oauthString(init.data['user_code']);
+      if (!init.ok || id == null || code == null) {
         throw ProviderOAuthException(
           ProviderOAuthFailure.invalidResponse,
-          statusCode: response.status,
+          statusCode: init.status,
         );
       }
-      return _exchange(
-        wire,
-        authCode,
-        verifier,
-        'https://auth.openai.com/deviceauth/callback',
+      cancellation.check();
+      await onPrompt(
+        OAuthLoginPrompt(
+          url: Uri.parse('https://auth.openai.com/codex/device'),
+          userCode: code,
+        ),
       );
-    }
-    throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
+      return oauthAtStage(ProviderOAuthStage.waitDeviceAuthorization, () async {
+        final interval = Duration(
+          seconds:
+              (oauthNumber(init.data['interval']) ?? 5).clamp(1, 60).toInt() +
+              3,
+        );
+        // Match OMP: a quick first poll, then the advertised interval plus margin.
+        for (var poll = 0; poll < 120; poll++) {
+          await cancellation.wait(
+            poll == 0 && interval > const Duration(seconds: 5)
+                ? const Duration(seconds: 5)
+                : interval,
+          );
+          final response = await wire.request(
+            'https://auth.openai.com/api/accounts/deviceauth/token',
+            json: {'device_auth_id': id, 'user_code': code},
+            timeout: tokenRequestTimeout,
+          );
+          cancellation.check();
+          if (response.status == 403 || response.status == 404) continue;
+          if (!response.ok) {
+            throw _requestFailure(response, null, secrets: [id, code]);
+          }
+          final authCode = oauthString(response.data['authorization_code']);
+          final verifier = oauthString(response.data['code_verifier']);
+          if (!response.ok || authCode == null || verifier == null) {
+            throw ProviderOAuthException(
+              ProviderOAuthFailure.invalidResponse,
+              statusCode: response.status,
+            );
+          }
+          return _exchange(
+            wire,
+            authCode,
+            verifier,
+            'https://auth.openai.com/deviceauth/callback',
+          );
+        }
+        throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
+      });
+    });
   }
 
   Future<ProviderOAuthCredentials> _browserLogin(
@@ -522,69 +527,71 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt,
     OAuthUrlLauncher launcher,
-  ) async {
+  ) => oauthAtStage(ProviderOAuthStage.prepareBrowser, () async {
     final redirect = Uri.parse('http://localhost:1455/auth/callback');
     final callback = await openOAuthCallback(
       Uri.parse('https://auth.openai.com'),
       loopbackRedirect: redirect,
     );
     unawaited(cancellation.whenCancelled.then((_) => callback.close()));
-    try {
-      final verifier = oauthRandomString(32);
-      final state = oauthRandomString(24);
-      final url = Uri.https('auth.openai.com', '/oauth/authorize', {
-        'response_type': 'code',
-        'client_id': provider.clientId,
-        'redirect_uri': redirect.toString(),
-        'scope': provider.scope,
-        'code_challenge': oauthPkceChallenge(verifier),
-        'code_challenge_method': 'S256',
-        'state': state,
-        'id_token_add_organizations': 'true',
-        'codex_cli_simplified_flow': 'true',
-        'originator': 'kelivo',
-      });
-      cancellation.check();
-      await onPrompt(OAuthLoginPrompt(url: url, browserAuthorization: true));
-      cancellation.check();
-      final received = await Future.any<Uri>([
-        callback.authorize(url, const Duration(minutes: 10), launcher),
-        cancellation.whenCancelled.then(
-          (_) => throw const ProviderOAuthException(
-            ProviderOAuthFailure.cancelled,
+    return oauthAtStage(ProviderOAuthStage.browserAuthorization, () async {
+      try {
+        final verifier = oauthRandomString(32);
+        final state = oauthRandomString(24);
+        final url = Uri.https('auth.openai.com', '/oauth/authorize', {
+          'response_type': 'code',
+          'client_id': provider.clientId,
+          'redirect_uri': redirect.toString(),
+          'scope': provider.scope,
+          'code_challenge': oauthPkceChallenge(verifier),
+          'code_challenge_method': 'S256',
+          'state': state,
+          'id_token_add_organizations': 'true',
+          'codex_cli_simplified_flow': 'true',
+          'originator': 'kelivo',
+        });
+        cancellation.check();
+        await onPrompt(OAuthLoginPrompt(url: url, browserAuthorization: true));
+        cancellation.check();
+        final received = await Future.any<Uri>([
+          callback.authorize(url, const Duration(minutes: 10), launcher),
+          cancellation.whenCancelled.then(
+            (_) => throw const ProviderOAuthException(
+              ProviderOAuthFailure.cancelled,
+            ),
           ),
-        ),
-      ]);
-      cancellation.check();
-      if (received.queryParameters['state'] != state) {
-        throw const ProviderOAuthException(
-          ProviderOAuthFailure.invalidResponse,
+        ]);
+        cancellation.check();
+        if (received.queryParameters['state'] != state) {
+          throw const ProviderOAuthException(
+            ProviderOAuthFailure.invalidResponse,
+          );
+        }
+        final code = oauthString(received.queryParameters['code']);
+        if (code == null) {
+          throw const ProviderOAuthException(ProviderOAuthFailure.denied);
+        }
+        return await _exchange(wire, code, verifier, redirect.toString());
+      } on OAuthCallbackException catch (error) {
+        throw ProviderOAuthException(
+          error.cancelled
+              ? ProviderOAuthFailure.cancelled
+              : ProviderOAuthFailure.invalidResponse,
         );
+      } on TimeoutException {
+        throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
+      } finally {
+        await callback.close();
       }
-      final code = oauthString(received.queryParameters['code']);
-      if (code == null) {
-        throw const ProviderOAuthException(ProviderOAuthFailure.denied);
-      }
-      return await _exchange(wire, code, verifier, redirect.toString());
-    } on OAuthCallbackException catch (error) {
-      throw ProviderOAuthException(
-        error.cancelled
-            ? ProviderOAuthFailure.cancelled
-            : ProviderOAuthFailure.invalidResponse,
-      );
-    } on TimeoutException {
-      throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
-    } finally {
-      await callback.close();
-    }
-  }
+    });
+  });
 
   Future<ProviderOAuthCredentials> _exchange(
     OAuthWire wire,
     String code,
     String verifier,
     String redirect,
-  ) async {
+  ) => oauthAtStage(ProviderOAuthStage.exchangeToken, () async {
     final result = await wire.request(
       provider.tokenEndpoint,
       form: {
@@ -600,7 +607,7 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
       throw _requestFailure(result, null, secrets: [code, verifier]);
     }
     return credentials(result.data);
-  }
+  });
 
   @override
   Future<List<Map<String, dynamic>>> models(

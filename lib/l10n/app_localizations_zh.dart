@@ -12072,6 +12072,53 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oauthNetworkError => '连接失败，请检查网络后重试。';
 
   @override
+  String get oauthDnsError => 'DNS 解析失败，请检查网络或代理的 DNS 设置。';
+
+  @override
+  String get oauthTlsError => 'TLS 安全连接失败，请检查网络或代理的证书配置。';
+
+  @override
+  String get oauthProxyError => '代理连接失败，请检查代理地址和认证设置。';
+
+  @override
+  String get oauthConnectionError => '连接失败或中断，请检查网络或代理设置。';
+
+  @override
+  String get oauthConnectionTimeout => '连接服务器超时，请检查网络或代理设置。';
+
+  @override
+  String get oauthSendTimeout => '发送请求超时，请检查网络后重试。';
+
+  @override
+  String get oauthReceiveTimeout => '等待服务器响应超时，请重试。';
+
+  @override
+  String get oauthRequestTimeout => '请求超时，请检查网络或代理设置后重试。';
+
+  @override
+  String oauthFailureStage(String stage) {
+    return '失败阶段：$stage';
+  }
+
+  @override
+  String get oauthStageRequestDeviceCode => '申请设备码';
+
+  @override
+  String get oauthStageWaitDeviceAuthorization => '等待设备授权';
+
+  @override
+  String get oauthStagePrepareBrowser => '准备浏览器登录';
+
+  @override
+  String get oauthStageBrowserAuthorization => '浏览器授权与回调';
+
+  @override
+  String get oauthStageExchangeToken => '交换登录令牌';
+
+  @override
+  String get oauthStageRefreshToken => '刷新登录令牌';
+
+  @override
   String get oauthInvalidResponse => '授权未完成，请重试。';
 
   @override
@@ -26852,6 +26899,53 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthDnsError => 'DNS 解析失败，请检查网络或代理的 DNS 设置。';
+
+  @override
+  String get oauthTlsError => 'TLS 安全连接失败，请检查网络或代理的证书配置。';
+
+  @override
+  String get oauthProxyError => '代理连接失败，请检查代理地址和认证设置。';
+
+  @override
+  String get oauthConnectionError => '连接失败或中断，请检查网络或代理设置。';
+
+  @override
+  String get oauthConnectionTimeout => '连接服务器超时，请检查网络或代理设置。';
+
+  @override
+  String get oauthSendTimeout => '发送请求超时，请检查网络后重试。';
+
+  @override
+  String get oauthReceiveTimeout => '等待服务器响应超时，请重试。';
+
+  @override
+  String get oauthRequestTimeout => '请求超时，请检查网络或代理设置后重试。';
+
+  @override
+  String oauthFailureStage(String stage) {
+    return '失败阶段：$stage';
+  }
+
+  @override
+  String get oauthStageRequestDeviceCode => '申请设备码';
+
+  @override
+  String get oauthStageWaitDeviceAuthorization => '等待设备授权';
+
+  @override
+  String get oauthStagePrepareBrowser => '准备浏览器登录';
+
+  @override
+  String get oauthStageBrowserAuthorization => '浏览器授权与回调';
+
+  @override
+  String get oauthStageExchangeToken => '交换登录令牌';
+
+  @override
+  String get oauthStageRefreshToken => '刷新登录令牌';
 
   @override
   String get oauthInvalidResponse => '授权未完成，请重试。';
@@ -41712,6 +41806,53 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oauthNetworkError => '連線失敗，請檢查網路後重試。';
+
+  @override
+  String get oauthDnsError => 'DNS 解析失敗，請檢查網路或代理的 DNS 設定。';
+
+  @override
+  String get oauthTlsError => 'TLS 安全連線失敗，請檢查網路或代理的憑證設定。';
+
+  @override
+  String get oauthProxyError => '代理連線失敗，請檢查代理位址和驗證設定。';
+
+  @override
+  String get oauthConnectionError => '連線失敗或中斷，請檢查網路或代理設定。';
+
+  @override
+  String get oauthConnectionTimeout => '連線至伺服器逾時，請檢查網路或代理設定。';
+
+  @override
+  String get oauthSendTimeout => '傳送請求逾時，請檢查網路後重試。';
+
+  @override
+  String get oauthReceiveTimeout => '等待伺服器回應逾時，請重試。';
+
+  @override
+  String get oauthRequestTimeout => '請求逾時，請檢查網路或代理設定後重試。';
+
+  @override
+  String oauthFailureStage(String stage) {
+    return '失敗階段：$stage';
+  }
+
+  @override
+  String get oauthStageRequestDeviceCode => '申請裝置碼';
+
+  @override
+  String get oauthStageWaitDeviceAuthorization => '等待裝置授權';
+
+  @override
+  String get oauthStagePrepareBrowser => '準備瀏覽器登入';
+
+  @override
+  String get oauthStageBrowserAuthorization => '瀏覽器授權與回呼';
+
+  @override
+  String get oauthStageExchangeToken => '交換登入權杖';
+
+  @override
+  String get oauthStageRefreshToken => '重新整理登入權杖';
 
   @override
   String get oauthInvalidResponse => '授權未完成，請重試。';

@@ -29,7 +29,7 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
     OAuthPromptHandler onPrompt, {
     bool deviceCode = true,
     OAuthUrlLauncher? launcher,
-  }) async {
+  }) => oauthAtStage(ProviderOAuthStage.prepareBrowser, () async {
     final authority = Uri.parse('https://claude.ai');
     final preferred = Uri.parse('http://localhost:54545/callback');
     final state = oauthRandomString(24);
@@ -47,116 +47,125 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
         expectedState: state,
       );
     }
-    final redirect = callback.redirectUri;
-    final verifier = oauthRandomString(32);
-    final received = Completer<String>();
-    final url = Uri.https('claude.ai', '/oauth/authorize', {
-      'client_id': provider.clientId,
-      'response_type': 'code',
-      'redirect_uri': redirect.toString(),
-      'scope': provider.scope,
-      'code_challenge': oauthPkceChallenge(verifier),
-      'code_challenge_method': 'S256',
-      'state': state,
-      'code': 'true',
-    });
-    bool submit(String input) {
-      if (cancellation.isCancelled || received.isCompleted) return false;
-      String? parsed;
-      try {
-        parsed = _claudeAuthorizationCode(input, state);
-      } on FormatException {
-        return false;
+    return oauthAtStage(ProviderOAuthStage.browserAuthorization, () async {
+      final redirect = callback.redirectUri;
+      final verifier = oauthRandomString(32);
+      final received = Completer<String>();
+      final url = Uri.https('claude.ai', '/oauth/authorize', {
+        'client_id': provider.clientId,
+        'response_type': 'code',
+        'redirect_uri': redirect.toString(),
+        'scope': provider.scope,
+        'code_challenge': oauthPkceChallenge(verifier),
+        'code_challenge_method': 'S256',
+        'state': state,
+        'code': 'true',
+      });
+      bool submit(String input) {
+        if (cancellation.isCancelled || received.isCompleted) return false;
+        String? parsed;
+        try {
+          parsed = _claudeAuthorizationCode(input, state);
+        } on FormatException {
+          return false;
+        }
+        if (parsed == null) return false;
+        received.complete(parsed);
+        return true;
       }
-      if (parsed == null) return false;
-      received.complete(parsed);
-      return true;
-    }
 
-    unawaited(cancellation.whenCancelled.then((_) => callback.close()));
-    try {
-      cancellation.check();
-      await onPrompt(
-        OAuthLoginPrompt(
-          url: url,
-          browserAuthorization: true,
-          submitAuthorizationCode: submit,
-        ),
-      );
-      cancellation.check();
-      if (!received.isCompleted) {
-        unawaited(() async {
-          try {
-            final result = await callback.authorize(
-              url,
-              const Duration(minutes: 5),
-              launcher ??
-                  (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
-            );
-            if (cancellation.isCancelled || received.isCompleted) return;
-            if (result.queryParameters['state'] != state) {
-              received.completeError(
-                const ProviderOAuthException(
-                  ProviderOAuthFailure.invalidResponse,
-                ),
-              );
-            } else if (result.queryParameters.containsKey('error')) {
-              received.completeError(
-                const ProviderOAuthException(ProviderOAuthFailure.denied),
-              );
-            } else if (!submit(result.toString())) {
-              received.completeError(
-                const ProviderOAuthException(
-                  ProviderOAuthFailure.invalidResponse,
-                ),
-              );
-            }
-          } on OAuthCallbackException {
-            // Closing the browser leaves OMP's manual code entry available.
-          } on TimeoutException {
-            // The shared deadline below also covers the manual-input path.
-          } catch (error, stack) {
-            if (!received.isCompleted) received.completeError(error, stack);
-          }
-        }());
-      }
-      final code = await Future.any<String>([
-        received.future,
-        cancellation.whenCancelled.then(
-          (_) => throw const ProviderOAuthException(
-            ProviderOAuthFailure.cancelled,
+      unawaited(cancellation.whenCancelled.then((_) => callback.close()));
+      try {
+        cancellation.check();
+        await onPrompt(
+          OAuthLoginPrompt(
+            url: url,
+            browserAuthorization: true,
+            submitAuthorizationCode: submit,
           ),
-        ),
-      ]).timeout(const Duration(minutes: 5));
-      cancellation.check();
-      final response = await wire.request(
-        provider.tokenEndpoint,
-        json: {
-          'grant_type': 'authorization_code',
-          'client_id': provider.clientId,
-          'code': code,
-          'state': state,
-          'redirect_uri': redirect.toString(),
-          'code_verifier': verifier,
-        },
-      );
-      if (!response.ok) {
-        throw _requestFailure(response, null, secrets: [code, verifier]);
+        );
+        cancellation.check();
+        if (!received.isCompleted) {
+          unawaited(() async {
+            try {
+              final result = await callback.authorize(
+                url,
+                const Duration(minutes: 5),
+                launcher ??
+                    (uri) =>
+                        launchUrl(uri, mode: LaunchMode.externalApplication),
+              );
+              if (cancellation.isCancelled || received.isCompleted) return;
+              if (result.queryParameters['state'] != state) {
+                received.completeError(
+                  const ProviderOAuthException(
+                    ProviderOAuthFailure.invalidResponse,
+                  ),
+                );
+              } else if (result.queryParameters.containsKey('error')) {
+                received.completeError(
+                  const ProviderOAuthException(ProviderOAuthFailure.denied),
+                );
+              } else if (!submit(result.toString())) {
+                received.completeError(
+                  const ProviderOAuthException(
+                    ProviderOAuthFailure.invalidResponse,
+                  ),
+                );
+              }
+            } on OAuthCallbackException {
+              // Closing the browser leaves OMP's manual code entry available.
+            } on TimeoutException {
+              // The shared deadline below also covers the manual-input path.
+            } catch (error, stack) {
+              if (!received.isCompleted) received.completeError(error, stack);
+            }
+          }());
+        }
+        final code = await Future.any<String>([
+          received.future,
+          cancellation.whenCancelled.then(
+            (_) => throw const ProviderOAuthException(
+              ProviderOAuthFailure.cancelled,
+            ),
+          ),
+        ]).timeout(const Duration(minutes: 5));
+        cancellation.check();
+        final value = await oauthAtStage(
+          ProviderOAuthStage.exchangeToken,
+          () async {
+            final response = await wire.request(
+              provider.tokenEndpoint,
+              json: {
+                'grant_type': 'authorization_code',
+                'client_id': provider.clientId,
+                'code': code,
+                'state': state,
+                'redirect_uri': redirect.toString(),
+                'code_verifier': verifier,
+              },
+            );
+            if (!response.ok) {
+              throw _requestFailure(response, null, secrets: [code, verifier]);
+            }
+            return credentials(response.data);
+          },
+        );
+        cancellation.check();
+        final identity = await _identity(
+          wire,
+          value,
+          includeOrganization: true,
+        );
+        cancellation.check();
+        return identity;
+      } on TimeoutException {
+        throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
+      } finally {
+        await callback.close();
       }
-      cancellation.check();
-      final identity = await _identity(
-        wire,
-        credentials(response.data),
-        includeOrganization: true,
-      );
-      cancellation.check();
-      return identity;
-    } on TimeoutException {
-      throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
-    } finally {
-      await callback.close();
-    }
-  }
+    });
+  });
 
   @override
   ProviderOAuthCredentials credentials(
@@ -239,7 +248,7 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
   Future<ProviderOAuthCredentials> refresh(
     OAuthWire wire,
     ProviderOAuthCredentials stored,
-  ) async {
+  ) => oauthAtStage(ProviderOAuthStage.refreshToken, () async {
     final response = await wire.request(
       provider.tokenEndpoint,
       json: {
@@ -269,7 +278,7 @@ class ClaudeOAuthAdapter extends ProviderOAuthAdapter {
       credentials(response.data, stored: stored),
       includeOrganization: false,
     );
-  }
+  });
 
   @override
   Future<List<Map<String, dynamic>>> models(

@@ -22581,6 +22581,96 @@ abstract class AppLocalizations {
   /// **'Could not connect. Check your network and try again.'**
   String get oauthNetworkError;
 
+  /// No description provided for @oauthDnsError.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS lookup failed. Check your network or proxy DNS settings.'**
+  String get oauthDnsError;
+
+  /// No description provided for @oauthTlsError.
+  ///
+  /// In en, this message translates to:
+  /// **'The TLS connection failed. Check the certificates used by your network or proxy.'**
+  String get oauthTlsError;
+
+  /// No description provided for @oauthProxyError.
+  ///
+  /// In en, this message translates to:
+  /// **'The proxy connection failed. Check your proxy address and authentication settings.'**
+  String get oauthProxyError;
+
+  /// No description provided for @oauthConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection failed or was interrupted. Check your network or proxy settings.'**
+  String get oauthConnectionError;
+
+  /// No description provided for @oauthConnectionTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to the server timed out. Check your network or proxy settings.'**
+  String get oauthConnectionTimeout;
+
+  /// No description provided for @oauthSendTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending the request timed out. Check your network and try again.'**
+  String get oauthSendTimeout;
+
+  /// No description provided for @oauthReceiveTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the server response timed out. Please try again.'**
+  String get oauthReceiveTimeout;
+
+  /// No description provided for @oauthRequestTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The request timed out. Check your network or proxy settings and try again.'**
+  String get oauthRequestTimeout;
+
+  /// No description provided for @oauthFailureStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed at: {stage}'**
+  String oauthFailureStage(String stage);
+
+  /// No description provided for @oauthStageRequestDeviceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Requesting a device code'**
+  String get oauthStageRequestDeviceCode;
+
+  /// No description provided for @oauthStageWaitDeviceAuthorization.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for device authorization'**
+  String get oauthStageWaitDeviceAuthorization;
+
+  /// No description provided for @oauthStagePrepareBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing browser sign-in'**
+  String get oauthStagePrepareBrowser;
+
+  /// No description provided for @oauthStageBrowserAuthorization.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser authorization and callback'**
+  String get oauthStageBrowserAuthorization;
+
+  /// No description provided for @oauthStageExchangeToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchanging the authorization code'**
+  String get oauthStageExchangeToken;
+
+  /// No description provided for @oauthStageRefreshToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing the login token'**
+  String get oauthStageRefreshToken;
+
   /// No description provided for @oauthInvalidResponse.
   ///
   /// In en, this message translates to:

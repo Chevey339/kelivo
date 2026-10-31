@@ -75,6 +75,14 @@ class NetworkProxyConfig {
 /// Bodies past this are file uploads; the log records their size only.
 const int _loggedBodyLimit = 4 * 1024 * 1024;
 
+/// Retains the transport type so callers can classify failures without parsing
+/// or displaying a string that may contain request credentials.
+class TransportClientException extends http.ClientException {
+  TransportClientException(this.cause, Uri uri) : super(cause.toString(), uri);
+
+  final Object cause;
+}
+
 class DioHttpClient extends http.BaseClient {
   DioHttpClient({
     this._proxy,
@@ -378,14 +386,14 @@ class DioHttpClient extends http.BaseClient {
           );
         }
       }
-      throw http.ClientException(e.toString(), uri);
+      throw TransportClientException(e, uri);
     } catch (e) {
       if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
         );
       }
-      throw http.ClientException(e.toString(), uri);
+      throw TransportClientException(e, uri);
     }
   }
 }

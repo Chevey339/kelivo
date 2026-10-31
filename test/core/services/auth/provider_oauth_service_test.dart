@@ -2,6 +2,7 @@ import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
@@ -55,6 +56,37 @@ void main() {
     await settings.loaded;
   });
   tearDown(() => settings.dispose());
+
+  test(
+    'refresh errors retain sanitized diagnostics through the service',
+    () async {
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient((_) async {
+          throw const HandshakeException('private-proxy-password');
+        }),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      await settings.setProviderConfig('account', config());
+      await expectLater(
+        service.resolve(config()),
+        throwsA(
+          isA<ProviderOAuthException>()
+              .having((e) => e.providerId, 'provider', 'account')
+              .having((e) => e.stage, 'stage', ProviderOAuthStage.refreshToken)
+              .having(
+                (e) => e.transportFailure,
+                'transport',
+                ProviderOAuthTransportFailure.tls,
+              )
+              .having((e) => e.message, 'raw exception', isNull),
+        ),
+      );
+      expect(
+        settings.providerConfigs['account']!.oauthCredentials!.requiresLogin,
+        false,
+      );
+    },
+  );
 
   test(
     'concurrent refresh is coalesced, preserves edits, and persists token rotation',

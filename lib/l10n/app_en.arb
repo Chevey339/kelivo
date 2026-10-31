@@ -5727,6 +5727,28 @@
     }
   },
   "oauthNetworkError": "Could not connect. Check your network and try again.",
+  "oauthDnsError": "DNS lookup failed. Check your network or proxy DNS settings.",
+  "oauthTlsError": "The TLS connection failed. Check the certificates used by your network or proxy.",
+  "oauthProxyError": "The proxy connection failed. Check your proxy address and authentication settings.",
+  "oauthConnectionError": "The connection failed or was interrupted. Check your network or proxy settings.",
+  "oauthConnectionTimeout": "Connecting to the server timed out. Check your network or proxy settings.",
+  "oauthSendTimeout": "Sending the request timed out. Check your network and try again.",
+  "oauthReceiveTimeout": "Waiting for the server response timed out. Please try again.",
+  "oauthRequestTimeout": "The request timed out. Check your network or proxy settings and try again.",
+  "oauthFailureStage": "Failed at: {stage}",
+  "@oauthFailureStage": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthStageRequestDeviceCode": "Requesting a device code",
+  "oauthStageWaitDeviceAuthorization": "Waiting for device authorization",
+  "oauthStagePrepareBrowser": "Preparing browser sign-in",
+  "oauthStageBrowserAuthorization": "Browser authorization and callback",
+  "oauthStageExchangeToken": "Exchanging the authorization code",
+  "oauthStageRefreshToken": "Refreshing the login token",
   "oauthInvalidResponse": "Authorization did not complete. Please try again.",
   "oauthTimeout": "Authorization timed out. Please try again.",
   "oauthDenied": "Authorization was not granted. Please try again.",
