@@ -33,6 +33,7 @@ class StreamChunkHandler {
   final Map<String, int> _imageIndex = <String, int>{};
   final Map<String, int> _toolIndex = <String, int>{};
   final Map<String, _ToolBuffer> _tools = <String, _ToolBuffer>{};
+  final Set<String> _dirtyTools = <String>{};
   final Map<String, StringBuffer> _serverInput = <String, StringBuffer>{};
   final Map<String, String> _imageMime = <String, String>{};
   final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
@@ -56,7 +57,24 @@ class StreamChunkHandler {
     for (final index in _textBuffers.keys) {
       _flushText(index);
     }
+    _flushTools();
     return _snapshot = List<MessagePart>.unmodifiable(_parts);
+  }
+
+  /// Read one call without materializing or decoding the rest of the turn.
+  Map<String, dynamic>? toolPayload(String id) {
+    _flushTool(id);
+    final index = _toolIndex[id];
+    if (index == null) return null;
+    final part = _parts[index];
+    if (part is! ToolCallPart) return null;
+    return jsonDecode(part.payloadJson) as Map<String, dynamic>;
+  }
+
+  void _flushTools() {
+    for (final id in _dirtyTools.toList(growable: false)) {
+      _flushTool(id);
+    }
   }
 
   void _flushText(int index) {
@@ -188,8 +206,10 @@ class StreamChunkHandler {
         );
       case ToolCallEnd(:final id):
         _upsertTool(id);
+        _flushTool(id);
       case ToolCallResult(:final id, :final output, :final metadata):
         _upsertTool(id, content: output ?? '', metadata: metadata);
+        _flushTool(id);
       case ServerToolStart(
         :final id,
         :final toolName,
@@ -322,6 +342,7 @@ class StreamChunkHandler {
         for (final id in _tools.keys.toList()) {
           _upsertTool(id);
         }
+        _flushTools();
         _textIndex.clear();
         _reasoningIndex.clear();
         _imageIndex.clear();
@@ -379,7 +400,10 @@ class StreamChunkHandler {
     final buffer = _tools.putIfAbsent(id, _ToolBuffer.new);
     if (name != null && name.isNotEmpty) buffer.name = name;
     if (nameDelta.isNotEmpty) buffer.name += nameDelta;
-    if (inputDelta.isNotEmpty) buffer.input.write(inputDelta);
+    if (inputDelta.isNotEmpty) {
+      buffer.input.add(inputDelta);
+      buffer.inputDirty = true;
+    }
     // A decoder that never saw the call reports no arguments; empty ones are
     // no news either, and would erase the input already streamed for it.
     if (argumentsObject != null &&
@@ -391,24 +415,37 @@ class StreamChunkHandler {
     if (metadata != null && metadata.isNotEmpty) {
       buffer.metadata = <String, dynamic>{...?buffer.metadata, ...metadata};
     }
+    _dirtyTools.add(id);
+    // Reserve arrival order now; encoding is deferred until a snapshot or an
+    // explicit protocol boundary. No reader can observe the placeholder.
+    if (!_toolIndex.containsKey(id)) {
+      _toolIndex[id] = _parts.length;
+      _parts.add(const ToolCallPart('{}'));
+    }
+  }
+
+  void _flushTool(String id) {
+    if (!_dirtyTools.remove(id)) return;
+    final buffer = _tools[id]!;
+    if (buffer.inputDirty) {
+      buffer.decodedInput = _tryDecode(buffer.input.value);
+      buffer.inputDirty = false;
+    }
 
     final payload = jsonEncode(<String, dynamic>{
       'id': id,
       'name': buffer.name,
-      'arguments': buffer.arguments ?? _tryDecode(buffer.input.toString()),
+      'arguments': buffer.arguments ?? buffer.decodedInput,
       'content': buffer.content,
       'server': buffer.server,
       if (buffer.metadata != null && buffer.metadata!.isNotEmpty)
         'metadata': buffer.metadata,
     });
 
-    final index = _toolIndex[id];
-    final part = ToolCallPart(payload);
-    if (index != null && _parts[index] is ToolCallPart) {
-      _parts[index] = part;
-    } else {
-      _parts.add(part);
-      _toolIndex[id] = _parts.length - 1;
+    final index = _toolIndex[id]!;
+    final previous = _parts[index] as ToolCallPart;
+    if (previous.payloadJson != payload) {
+      _parts[index] = ToolCallPart(payload);
     }
   }
 
@@ -422,6 +459,7 @@ class StreamChunkHandler {
   }
 
   String? _lastSearchToolId() {
+    _flushTools();
     for (final part in _parts.reversed) {
       if (part is! ToolCallPart) continue;
       try {
@@ -484,7 +522,9 @@ class StreamChunkHandler {
 
 class _ToolBuffer {
   String name = '';
-  final StringBuffer input = StringBuffer();
+  final StreamTextBuffer input = StreamTextBuffer();
+  bool inputDirty = false;
+  Object decodedInput = const <String, dynamic>{};
   Object? arguments;
   Object? content;
   bool server = false;

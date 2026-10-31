@@ -10,6 +10,49 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('long tool arguments encode only at read and protocol boundaries', () {
+    final metadata = _CountingMetadata();
+    final handler = StreamChunkHandler();
+    handler.handle(
+      ToolCallStart(
+        id: 'patch',
+        toolName: 'apply_patch',
+        metadata: {'provider': metadata},
+      ),
+    );
+    handler.handle(const ToolCallDelta(id: 'patch', inputDelta: '{"patch":"'));
+    for (var i = 0; i < 10000; i++) {
+      handler.handle(const ToolCallDelta(id: 'patch', inputDelta: 'line\\n'));
+    }
+    expect(metadata.encodes, 0);
+    final preview = handler.parts.single as ToolCallPart;
+    expect(metadata.encodes, 1);
+    expect(identical(handler.parts.single, preview), isTrue);
+    handler.handle(const ToolCallDelta(id: 'patch', inputDelta: '"}'));
+    handler.handle(const ToolCallEnd('patch'));
+    expect(metadata.encodes, 2);
+    expect(handler.toolPayload('patch')!['arguments'], {
+      'patch': 'line\n' * 10000,
+    });
+    expect(metadata.encodes, 2);
+    final completed = handler.parts.single;
+    handler.handle(const TextDelta(id: 'body', text: 'done'));
+    expect(identical(handler.parts.first, completed), isTrue);
+    expect(metadata.encodes, 2);
+    // Providers can finish replay metadata after the arguments have ended.
+    metadata.signature = 'final';
+    handler.handle(const Finish());
+    expect(metadata.encodes, 3);
+    final payload = jsonDecode(
+      (handler.parts.first as ToolCallPart).payloadJson,
+    );
+    expect(payload['metadata']['provider']['signature'], 'final');
+    expect(
+      jsonDecode(preview.payloadJson)['arguments'],
+      startsWith('{"patch":'),
+    );
+  });
+
   test(
     'response boundaries close text ids and retain only that round metadata',
     () {
@@ -782,4 +825,13 @@ void main() {
     final now = DateTime(2026, 8, 31, 12);
     expect(pending.deadlineAt(now), now.add(const Duration(seconds: 5)));
   });
+}
+
+class _CountingMetadata {
+  int encodes = 0;
+  String signature = 'pending';
+  Map<String, dynamic> toJson() {
+    encodes++;
+    return {'signature': signature};
+  }
 }

@@ -1138,18 +1138,7 @@ class StreamController {
   Map<String, dynamic>? _toolPayloadFromHandler(
     StreamingState state,
     String id,
-  ) {
-    for (final part in state.partsHandler.parts.reversed) {
-      if (part is! ToolCallPart) continue;
-      try {
-        final decoded = jsonDecode(part.payloadJson);
-        if (decoded is Map && (decoded['id'] ?? '').toString() == id) {
-          return decoded.cast<String, dynamic>();
-        }
-      } catch (_) {}
-    }
-    return null;
-  }
+  ) => state.partsHandler.toolPayload(id);
 
   String _toolResultName(
     StreamingState state,
