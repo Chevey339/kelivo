@@ -775,6 +775,10 @@ class WorkspaceToolsService {
 
     await Directory(ctx.paths.tmpHostRoot).create(recursive: true);
     final runtimeRunId = const Uuid().v4();
+    final before = await FileSnapshot.snapshot([
+      Directory(ctx.paths.workspaceHostRoot),
+      ctx.sessionDir,
+    ], checkCancelled: cancellation?.throwIfCancelled);
     final run = registry.start(
       toolCallId,
       tool,
@@ -782,23 +786,17 @@ class WorkspaceToolsService {
       conversationId: conversationId ?? ctx.conversationId,
       runtimeRunId: runtimeRunId,
     );
-    final before = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
 
     CommandExited? exited;
     Object? executionError;
-    var executing = false;
+    void Function()? unregisterCancellation;
     try {
       cancellation?.throwIfCancelled();
       await access.permission.authorize(needed: needsApproval, arguments: args);
-      executing = true;
-      unawaited(
-        cancellation?.cancelled.then((_) async {
-          if (executing) await runtime.cancel(runtimeRunId);
-        }),
-      );
+      cancellation?.throwIfCancelled();
+      unregisterCancellation = cancellation?.onCancel(() {
+        unawaited(runtime.cancel(runtimeRunId));
+      });
       await for (final event in runtime.run(
         CommandRequest(
           runId: runtimeRunId,
@@ -826,7 +824,7 @@ class WorkspaceToolsService {
     } catch (e) {
       executionError = e;
     } finally {
-      executing = false;
+      unregisterCancellation?.call();
       // A failed or cancelled command may still have installed/updated files.
       // Refresh observers without turning a refresh failure into a tool error.
       try {
@@ -845,115 +843,129 @@ class WorkspaceToolsService {
         : exited.exitCode == 0
         ? ToolRunStatus.succeeded
         : ToolRunStatus.failed;
-    run.complete(status: runStatus, exitCode: exited?.exitCode);
-    final stdout = run.stdoutSoFar;
-    final stderr = run.stderrSoFar;
+    run.complete(
+      status: runStatus,
+      exitCode: exited?.exitCode,
+      retainUntilHandoff: true,
+    );
+    try {
+      final stdout = run.stdoutSoFar;
+      final stderr = run.stderrSoFar;
 
-    final after = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
-    final changedHost = FileSnapshot.changedSince(before, after);
-    final files = <WorkspaceToolFile>[];
-    for (final hostPath in changedHost.take(_changedFilesCap)) {
-      final modelPath = ctx.paths.toModelPath(hostPath);
-      try {
-        final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
-        if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
-        files.add(
-          _fileFor(
-            ctx,
-            resolved,
-            role: before.containsKey(hostPath)
-                ? WorkspaceFileRole.modified
-                : WorkspaceFileRole.created,
+      final after = await FileSnapshot.snapshot([
+        Directory(ctx.paths.workspaceHostRoot),
+        ctx.sessionDir,
+      ]);
+      final changedHost = FileSnapshot.changedSince(before, after);
+      final files = <WorkspaceToolFile>[];
+      for (final hostPath in changedHost.take(_changedFilesCap)) {
+        final modelPath = ctx.paths.toModelPath(hostPath);
+        try {
+          final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
+          if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
+          files.add(
+            _fileFor(
+              ctx,
+              resolved,
+              role: before.containsKey(hostPath)
+                  ? WorkspaceFileRole.modified
+                  : WorkspaceFileRole.created,
+            ),
+          );
+        } on PathResolutionException {
+          files.add(
+            WorkspaceToolFile(
+              path: modelPath,
+              role: WorkspaceFileRole.modified,
+            ),
+          );
+        } on FileSystemException {
+          // A file removed again before collection is not a remaining output.
+        }
+      }
+      final filesTruncated =
+          changedHost.length > _changedFilesCap ||
+          before.length >= FileSnapshot.defaultMaxEntries ||
+          after.length >= FileSnapshot.defaultMaxEntries;
+
+      if (executionError != null || exited == null) {
+        return _errorResult(
+          tool: tool,
+          error: 'shell_failed',
+          message:
+              executionError?.toString() ??
+              'Command ended without an exit event',
+          meta: WorkspaceToolMetadata(
+            tool: tool,
+            status: 'error',
+            code: 'shell_failed',
+            command: command,
+            stdoutPreview: stdout,
+            stderrPreview: stderr,
+            files: files,
+            filesTruncated: filesTruncated,
           ),
         );
-      } on PathResolutionException {
-        files.add(
-          WorkspaceToolFile(path: modelPath, role: WorkspaceFileRole.modified),
-        );
-      } on FileSystemException {
-        // A file removed again before collection is not a remaining output.
       }
-    }
-    final filesTruncated =
-        changedHost.length > _changedFilesCap ||
-        before.length >= FileSnapshot.defaultMaxEntries ||
-        after.length >= FileSnapshot.defaultMaxEntries;
 
-    if (executionError != null || exited == null) {
-      return _errorResult(
-        tool: tool,
-        error: 'shell_failed',
-        message:
-            executionError?.toString() ?? 'Command ended without an exit event',
-        meta: WorkspaceToolMetadata(
-          tool: tool,
-          status: 'error',
-          code: 'shell_failed',
-          command: command,
-          stdoutPreview: stdout,
-          stderrPreview: stderr,
-          files: files,
-          filesTruncated: filesTruncated,
-        ),
+      final offload = await ToolOutputOffloader.maybeOffload(
+        toolCallId: toolCallId,
+        stdout: stdout,
+        stderr: stderr,
+        outputsDir: ctx.outputsDir,
       );
-    }
+      final payload = _shellPayload(offload.modelText);
+      payload['exit_code'] = exited.exitCode;
+      payload['duration_ms'] = exited.duration.inMilliseconds;
+      payload['timed_out'] = exited.timedOut;
+      payload['cancelled'] = exited.cancelled;
+      payload['interrupted'] = exited.interrupted;
+      if (run.stdoutTruncated || run.stderrTruncated) {
+        payload['truncated'] = true;
+      }
+      if (files.isNotEmpty) {
+        payload['changed_files'] = [for (final file in files) file.path];
+      }
+      if (filesTruncated) payload['changed_files_truncated'] = true;
+      if (offload.offloadHostPath != null) {
+        final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
+        payload['output_file'] = outputFile;
+        payload['truncated'] = true;
+        final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
+        files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
+      }
 
-    final offload = await ToolOutputOffloader.maybeOffload(
-      toolCallId: toolCallId,
-      stdout: stdout,
-      stderr: stderr,
-      outputsDir: ctx.outputsDir,
-    );
-    final payload = _shellPayload(offload.modelText);
-    payload['exit_code'] = exited.exitCode;
-    payload['duration_ms'] = exited.duration.inMilliseconds;
-    payload['timed_out'] = exited.timedOut;
-    payload['cancelled'] = exited.cancelled;
-    payload['interrupted'] = exited.interrupted;
-    if (run.stdoutTruncated || run.stderrTruncated) {
-      payload['truncated'] = true;
+      final metaStatus = exited.timedOut
+          ? 'timeout'
+          : exited.cancelled
+          ? 'cancelled'
+          : 'ok';
+      final meta = WorkspaceToolMetadata(
+        tool: tool,
+        status: metaStatus,
+        command: command,
+        exitCode: exited.exitCode,
+        durationMs: exited.duration.inMilliseconds,
+        timedOut: exited.timedOut,
+        cancelled: exited.cancelled,
+        interrupted: exited.interrupted,
+        stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
+        stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
+        files: files,
+        filesTruncated: filesTruncated,
+        truncated: payload['truncated'] == true,
+      );
+      await _markToolsUsed(
+        ctx,
+        conversationId: conversationId,
+        status: metaStatus,
+      );
+      return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+    } finally {
+      // Model output and metadata now own immutable strings (or the offloaded
+      // file). Only now may the registry evict this completed execution.
+      run.finishHandoff();
     }
-    if (files.isNotEmpty) {
-      payload['changed_files'] = [for (final file in files) file.path];
-    }
-    if (filesTruncated) payload['changed_files_truncated'] = true;
-    if (offload.offloadHostPath != null) {
-      final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
-      payload['output_file'] = outputFile;
-      payload['truncated'] = true;
-      final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
-      files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
-    }
-
-    final metaStatus = exited.timedOut
-        ? 'timeout'
-        : exited.cancelled
-        ? 'cancelled'
-        : 'ok';
-    final meta = WorkspaceToolMetadata(
-      tool: tool,
-      status: metaStatus,
-      command: command,
-      exitCode: exited.exitCode,
-      durationMs: exited.duration.inMilliseconds,
-      timedOut: exited.timedOut,
-      cancelled: exited.cancelled,
-      interrupted: exited.interrupted,
-      stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
-      stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
-      files: files,
-      filesTruncated: filesTruncated,
-      truncated: payload['truncated'] == true,
-    );
-    await _markToolsUsed(
-      ctx,
-      conversationId: conversationId,
-      status: metaStatus,
-    );
-    return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
   }
 
   Future<String> _snapshotImage(ToolImage image) async {
