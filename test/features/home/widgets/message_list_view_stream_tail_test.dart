@@ -1,6 +1,8 @@
 import "../../../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
@@ -26,6 +28,62 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  testWidgets(
+    'long tool reply stays lazy inside the production message viewport',
+    (tester) async {
+      final key = GlobalKey<_ProbeHarnessState>();
+      await tester.pumpWidget(_ProbeHarness(key: key));
+      final state = key.currentState!;
+      final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+      final parts = <MessagePart>[
+        for (var i = 0; i < 1000; i++)
+          ToolCallPart(
+            '{"id":"long-$i","name":"mcp_read_file","content":"done"}',
+          ),
+        const TextPart('tail'),
+      ];
+      Future<void> frames() async {
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 30));
+        }
+      }
+
+      state.pushParts(builder.update(parts));
+      await frames();
+      state.scrollController.jumpTo(
+        state.scrollController.position.maxScrollExtent,
+      );
+      await frames();
+      expect(find.byKey(const ValueKey('tool-id:long-999')), findsOneWidget);
+      final mounted = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key as ValueKey<String>).value.startsWith(
+                  'tool-id:long-',
+                ),
+          )
+          .evaluate()
+          .length;
+      expect(mounted, lessThan(150));
+      state.scrollController.jumpTo(
+        state.scrollController.position.maxScrollExtent / 2,
+      );
+      state.scrollCtrl.handleUserScrollIntent();
+      await frames();
+      final before = state.scrollController.offset;
+      parts[1000] = const TextPart('tail with more text');
+      state.pushParts(builder.update(parts, changed: {1000}));
+      await frames();
+      expect(
+        state.scrollController.offset,
+        moreOrLessEquals(before, epsilon: 1),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   for (final input in ['touch', 'wheel', 'keyboard']) {
     testWidgets(
@@ -254,6 +312,21 @@ class _ProbeHarnessState extends State<_ProbeHarness> {
         for (final message in messages)
           if (message.id == _streamingId)
             message.copyWith(content: targetContent)
+          else
+            message,
+      ];
+    });
+    scrollCtrl.autoScrollToBottomIfNeeded();
+  }
+
+  void pushParts(List<MessagePart> parts) {
+    final text = parts.whereType<TextPart>().map((part) => part.text).join();
+    streamingNotifier.updateContent(_streamingId, text, 10, parts: parts);
+    setState(() {
+      messages = [
+        for (final message in messages)
+          if (message.id == _streamingId)
+            message.copyWith(parts: parts)
           else
             message,
       ];

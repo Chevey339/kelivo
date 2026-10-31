@@ -1198,8 +1198,20 @@ List<TimelineVisibleBlock> visibleAssistantTimeline(
 }) {
   final visible = <TimelineVisibleBlock>[];
   for (final block in projection.blocks) {
+    // With tool cards visible, approval changes cannot affect filtering.
+    // Reuse completed blocks across ordinary text-only snapshots.
+    final cached = showToolCards ? _visibleBlockMemo[block] : null;
+    if (cached != null && cached.$1 == showThinkingCards) {
+      if (cached.$2 != null) visible.add(cached.$2!);
+      continue;
+    }
+    void add(TimelineVisibleBlock? value) {
+      if (showToolCards) _visibleBlockMemo[block] = (showThinkingCards, value);
+      if (value != null) visible.add(value);
+    }
+
     if (block.isText && (block.text?.trim().isNotEmpty ?? false)) {
-      visible.add(
+      add(
         TimelineVisibleBlock.text(
           block.text!,
           uiSource: block.uiSource,
@@ -1209,7 +1221,7 @@ List<TimelineVisibleBlock> visibleAssistantTimeline(
       continue;
     }
     if (block.isImage && (block.imageUri?.trim().isNotEmpty ?? false)) {
-      visible.add(
+      add(
         TimelineVisibleBlock.image(
           block.imageUri!,
           imageKey: block.imageKey,
@@ -1226,11 +1238,15 @@ List<TimelineVisibleBlock> visibleAssistantTimeline(
       isPendingApproval: isPendingApproval,
     );
     if (thinking.isNotEmpty) {
-      visible.add(TimelineVisibleBlock.thinking(thinking));
+      add(TimelineVisibleBlock.thinking(thinking));
+    } else {
+      add(null);
     }
   }
   return visible;
 }
+
+final _visibleBlockMemo = Expando<(bool, TimelineVisibleBlock?)>();
 
 int visibleTimelineStepCount(List<VisibleTimelineBlock> blocks) {
   var count = 0;

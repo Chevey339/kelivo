@@ -317,6 +317,7 @@ class MessageListView extends StatefulWidget {
 }
 
 class _MessageListViewState extends State<MessageListView> {
+  final _timelineStorage = <String, PageStorageBucket>{};
   static const _footerExtent = 48.0;
   static final _idleStreamingContent = AlwaysStoppedAnimation(
     StreamingContentData(content: '', totalTokens: 0),
@@ -402,6 +403,8 @@ class _MessageListViewState extends State<MessageListView> {
       _awaitingAttachFlush = _toolExtentQueue.pendingIds.isNotEmpty;
       _scheduleAttachAwareFlush();
     }
+    final liveIds = widget.messages.map((message) => message.id).toSet();
+    _timelineStorage.removeWhere((id, _) => !liveIds.contains(id));
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
     for (final message in widget.messages) {
@@ -1121,12 +1124,14 @@ class _MessageListViewState extends State<MessageListView> {
   /// identity is the change signal — the same rule as the live tool map.
   int _partsEstimateSignature(List<MessagePart> parts) {
     if (parts.isEmpty) return 0;
-    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
+    return identityHashCode(parts);
   }
 
   int _toolEstimateSignature(List<ToolUIPart>? parts) {
     if (parts == null || parts.isEmpty) return 0;
-    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
+    return parts is ToolPartSnapshot
+        ? identityHashCode(parts)
+        : Object.hashAll(parts.map(identityHashCode));
   }
 
   /// Identity of the reasoning inputs an estimate was computed from.
@@ -2435,6 +2440,10 @@ class _MessageListViewState extends State<MessageListView> {
   }) {
     final currentIdx = availableVersions.indexOf(selectedVersion);
     return ChatMessageWidget(
+      timelineStorage: _timelineStorage.putIfAbsent(
+        message.id,
+        PageStorageBucket.new,
+      ),
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,

@@ -11,6 +11,7 @@ import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/foundation.dart'
@@ -80,6 +81,9 @@ import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
+import 'incremental_timeline_projection.dart';
+import 'viewport_block_list.dart';
+import '../../../core/models/message_part_snapshot.dart';
 import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
@@ -1245,6 +1249,7 @@ class _ToolDetailBody extends StatelessWidget {
 }
 
 class ChatMessageWidget extends StatefulWidget {
+  final PageStorageBucket? timelineStorage;
   final ChatMessage message;
   final Widget? modelIcon;
   final bool showModelIcon;
@@ -1311,6 +1316,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool collapseLongUserText;
 
   const ChatMessageWidget({
+    this.timelineStorage,
     super.key,
     required this.message,
     this.modelIcon,
@@ -1396,6 +1402,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   List<Map<String, dynamic>>? _searchItemsCache;
   Map<String, String> _citationIndexLookup = const {};
   String? Function(String) _citationIndexResolver = (_) => null;
+  final _localTimelineStorage = PageStorageBucket();
+  final _thinkingWidgets = Expando<(Object, Widget)>();
+  List<ReasoningSegment>? _currentReasoningSegments;
+  Future<void> _submitRecoveredAnswer(
+    ToolUIPart part,
+    AskUserResult result,
+  ) async {
+    await widget.onRecoveredAskUserAnswer?.call(part, result);
+  }
+
+  IncrementalTimelineProjection? _incrementalTimeline;
+  List<ToolUIPart>? _timelineToolSource;
+  List<TimelineToolRef> _timelineTools = const [];
+  final _timelineToolRefs = Expando<TimelineToolRef>();
 
   @override
   void initState() {
@@ -3018,11 +3038,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     SourceTextMap? sourceMap,
   }) {
     final assistant = _assistantForMessage();
-    return projectAssistantTimeline(
-      parts: widget.message.parts,
-      liveTools: [
+    if (widget.toolParts is! ToolPartSnapshot ||
+        !identical(widget.toolParts, _timelineToolSource)) {
+      _timelineToolSource = widget.toolParts;
+      _timelineTools = [
         for (var i = 0; i < (widget.toolParts?.length ?? 0); i++)
-          TimelineToolRef(
+          _timelineToolRefs[widget.toolParts![i]] ??= TimelineToolRef(
             providerId: widget.toolParts![i].id,
             fallbackOrdinal: i,
             toolName: widget.toolParts![i].toolName,
@@ -3030,20 +3051,39 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             content: widget.toolParts![i].content,
             metadata: widget.toolParts![i].metadata,
             loading: widget.toolParts![i].loading,
-            memoToken: identityHashCode(widget.toolParts![i]),
+            memoToken: widget.toolParts![i].cacheToken,
           ),
-      ],
-      reasoningSegments: [
-        for (final segment in reasoningSegments ?? const <ReasoningSegment>[])
-          TimelineReasoningRef(
-            text: segment.text,
-            expanded: segment.expanded,
-            loading: segment.loading,
-            startAt: segment.startAt,
-            finishedAt: segment.finishedAt,
-            toolStartIndex: segment.toolStartIndex,
-          ),
-      ],
+      ];
+    }
+    final reasoning = <TimelineReasoningRef>[
+      for (final segment in reasoningSegments ?? const <ReasoningSegment>[])
+        TimelineReasoningRef(
+          text: segment.text,
+          expanded: segment.expanded,
+          loading: segment.loading,
+          startAt: segment.startAt,
+          finishedAt: segment.finishedAt,
+          toolStartIndex: segment.toolStartIndex,
+        ),
+    ];
+    final parts = widget.message.parts;
+    if (widget.message.isStreaming &&
+        parts is MessagePartSnapshot &&
+        parts.arrivalOrdered &&
+        (assistant?.regexRules.isEmpty ?? true) &&
+        !_legacyInlineThinkingFor(widget).hasThinking &&
+        !UiMessageSource.of(parts).hasCandidate) {
+      return (_incrementalTimeline ??= IncrementalTimelineProjection()).project(
+        parts: parts,
+        liveTools: _timelineTools,
+        reasoning: reasoning,
+      );
+    }
+    _incrementalTimeline = null;
+    return projectAssistantTimeline(
+      parts: parts,
+      liveTools: _timelineTools,
+      reasoningSegments: reasoning,
       visualContent: visualContent,
       visualSourceMap: sourceMap,
       contentSplitOffsets: widget.contentSplitOffsets,
@@ -3092,10 +3132,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               loading: step.reasoning!.loading,
               startAt: step.reasoning!.startAt,
               finishedAt: step.reasoning!.finishedAt,
-              onToggle: _projectedReasoningToggle(
-                step.reasoningOverlayIndex,
-                reasoningSegments,
-              ),
+              onToggle: step.reasoningOverlayIndex == null
+                  ? null
+                  : () => _projectedReasoningToggle(
+                      step.reasoningOverlayIndex,
+                      _currentReasoningSegments,
+                    )?.call(),
               toolStartIndex: step.reasoning!.toolStartIndex,
             ),
             reasoningCountAfter: step.reasoningCountAfter,
@@ -3229,6 +3271,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final effectiveReasoningSegments = _effectiveReasoningSegments(
       extractedThinking,
     );
+    _currentReasoningSegments = effectiveReasoningSegments;
     final timelineProjection = _projectAssistantTimeline(
       visualContent,
       reasoningSegments: effectiveReasoningSegments,
@@ -3393,70 +3436,119 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ];
               }
 
-              final widgets = <Widget>[];
-              void addVisible(Widget child) {
-                if (widgets.isNotEmpty) {
-                  widgets.add(const SizedBox(height: 8));
-                }
-                widgets.add(child);
-              }
-
               final imageGroup = <String>[
                 for (final block in visibleBlocks)
                   if (block.isImage)
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
-
-              for (
-                var blockIndex = 0;
-                blockIndex < visibleBlocks.length;
-                blockIndex++
-              ) {
-                final block = visibleBlocks[blockIndex];
-                if (block.isImage) {
-                  addVisible(
-                    _buildAssistantImageBlock(
-                      context,
-                      block.imageUri!,
-                      imageKey:
-                          block.imageKey ??
-                          timelineImageBlockKey(sourceOrdinal: 0),
-                      group: imageGroup,
-                    ),
-                  );
-                  continue;
-                }
-                if (block.isText) {
-                  for (final bubble in _buildAssistantTextBubbles(
-                    context,
-                    block.text!,
-                    enableAssistantMarkdown,
-                    citationIndexResolver,
-                    blockKey: 'text$blockIndex',
-                    uiSource: block.uiSource,
-                    sourceMap: block.sourceMap,
-                  )) {
-                    addVisible(bubble);
-                  }
-                  continue;
-                }
-                if (!block.isThinking) continue;
-                addVisible(
-                  _ChainOfThoughtCard(
-                    steps: _timelineStepsFromProjected(
-                      block.thinkingSteps,
-                      effectiveReasoningSegments,
-                    ),
-                    conversationId: widget.message.conversationId,
-                    showThinkingCards: showThinkingCards,
-                    showToolCards: showToolCards,
-                    streaming:
-                        widget.message.isStreaming &&
-                        blockIndex == visibleBlocks.length - 1,
-                    onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
-                  ),
+              Object blockKey(int index) {
+                final block = visibleBlocks[index];
+                return (
+                  widget.message.id,
+                  index,
+                  block.isText
+                      ? 'text'
+                      : block.isImage
+                      ? block.imageKey
+                      : block.thinkingSteps.first.sourceOrdinal,
                 );
               }
+
+              final widgets = <Widget>[
+                ViewportBlockList(
+                  itemCount: visibleBlocks.length,
+                  spacing: 8,
+                  structureToken: (
+                    widget.message.id,
+                    visibleBlocks.length,
+                    showThinkingCards,
+                    showToolCards,
+                  ),
+                  itemKey: blockKey,
+                  keepAlive: (index) => visibleBlocks[index].thinkingSteps.any(
+                    (step) =>
+                        step.tool?.toolName == LocalToolNames.askUser &&
+                        (step.tool!.loading ||
+                            (step.tool!.content?.isEmpty ?? true)),
+                  ),
+                  estimateExtent: (index, width) {
+                    final block = visibleBlocks[index];
+                    if (block.isImage) {
+                      return estimateTimelineImageHeight(
+                        maxWidth: width,
+                        aspectRatio: block.aspectRatio,
+                      );
+                    }
+                    if (block.isText) {
+                      return 32.0 +
+                          24 *
+                              (block.text!.length / math.max(20, width / 8))
+                                  .ceil();
+                    }
+                    return 8 + 36.0 * block.thinkingSteps.length;
+                  },
+                  itemBuilder: (context, index) {
+                    final block = visibleBlocks[index];
+                    if (block.isImage) {
+                      return _buildAssistantImageBlock(
+                        context,
+                        block.imageUri!,
+                        imageKey:
+                            block.imageKey ??
+                            timelineImageBlockKey(sourceOrdinal: index),
+                        group: imageGroup,
+                      );
+                    }
+                    if (block.isText) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: _interleaveAssistantBubbles(
+                          _buildAssistantTextBubbles(
+                            context,
+                            block.text!,
+                            enableAssistantMarkdown,
+                            citationIndexResolver,
+                            blockKey: 'text$index',
+                            uiSource: block.uiSource,
+                            sourceMap: block.sourceMap,
+                          ),
+                        ),
+                      );
+                    }
+                    final streaming =
+                        widget.message.isStreaming &&
+                        index == visibleBlocks.length - 1;
+                    final signature = (
+                      streaming,
+                      showThinkingCards,
+                      showToolCards,
+                      blockKey(index),
+                      widget.onRecoveredAskUserAnswer != null,
+                    );
+                    final cached = _thinkingWidgets[block];
+                    if (cached != null && cached.$1 == signature) {
+                      return cached.$2;
+                    }
+                    final card = _ChainOfThoughtCard(
+                      key: ValueKey(blockKey(index)),
+                      steps: _timelineStepsFromProjected(
+                        block.thinkingSteps,
+                        effectiveReasoningSegments,
+                      ),
+                      conversationId: widget.message.conversationId,
+                      showThinkingCards: showThinkingCards,
+                      showToolCards: showToolCards,
+                      streaming: streaming,
+                      onRecoveredAnswer: widget.onRecoveredAskUserAnswer == null
+                          ? null
+                          : _submitRecoveredAnswer,
+                    );
+                    _thinkingWidgets[block] = (signature, card);
+                    return card;
+                  },
+                ),
+              ];
 
               // A round that only called tools leaves no visible text, but a
               // pending retry still has to say so somewhere.
@@ -4165,7 +4257,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ? _buildUserMessage()
         : widget.message.role == 'tool'
         ? _buildToolMessage()
-        : _buildAssistantMessage();
+        : PageStorage(
+            bucket: widget.timelineStorage ?? _localTimelineStorage,
+            child: _buildAssistantMessage(),
+          );
     return ChatSurfaceTheme(palette: palette, child: child);
   }
 }
@@ -4575,10 +4670,20 @@ WorkspaceToolPart _workspacePartFromUi(ToolUIPart part) {
 
 List<WorkspaceToolPart> _producedWorkspaceParts(List<ToolUIPart>? parts) {
   if (parts == null || parts.isEmpty) return const <WorkspaceToolPart>[];
-  return _producedPartsMemo[parts] ??= List.unmodifiable([
+  final cached = parts is ToolPartSnapshot ? _producedPartsMemo[parts] : null;
+  if (cached != null) return cached;
+  final result = List<WorkspaceToolPart>.unmodifiable([
     for (final part in parts)
       if (isWorkspaceToolName(part.toolName)) _workspacePartFromUi(part),
   ]);
+  if (parts is ToolPartSnapshot) _producedPartsMemo[parts] = result;
+  return result;
+}
+
+/// Only an immutable tool-list snapshot can serve as an O(1) cache key.
+class ToolPartSnapshot extends UnmodifiableListView<ToolUIPart> {
+  ToolPartSnapshot(Iterable<ToolUIPart> parts)
+    : super(List<ToolUIPart>.of(parts, growable: false));
 }
 
 // Data for a reasoning segment (for mixed display)
@@ -4861,6 +4966,7 @@ class _CachedTimelineStepState extends State<_CachedTimelineStep> {
 
 class _ChainOfThoughtCard extends StatefulWidget {
   const _ChainOfThoughtCard({
+    super.key,
     required this.steps,
     required this.conversationId,
     required this.showThinkingCards,
@@ -4881,7 +4987,17 @@ class _ChainOfThoughtCard extends StatefulWidget {
   State<_ChainOfThoughtCard> createState() => _ChainOfThoughtCardState();
 }
 
-class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
+class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
+    with _StoredTimelineState<_ChainOfThoughtCard> {
+  @override
+  Object get storageId => ('chain', widget.key);
+  @override
+  Object saveViewState() => _showAllSteps;
+  @override
+  void restoreViewState(Object value) {
+    _showAllSteps = value as bool;
+  }
+
   bool _showAllSteps = false;
 
   Object _reasoningStepSignature({
@@ -5071,8 +5187,30 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                       ),
                     ),
                   ),
-                for (var i = 0; i < visibleSteps.length; i++)
-                  () {
+                ViewportBlockList(
+                  itemCount: visibleSteps.length,
+                  structureToken: (visibleSteps.length, hiddenCount),
+                  itemKey: (i) {
+                    final step = visibleSteps[i];
+                    if (step.browserTools case final tools?) {
+                      return 'browser-group-${tools.first.id}-${step.sourceOrdinal}';
+                    }
+                    if (step.isReasoning) {
+                      return 'reasoning-${step.sourceOrdinal}';
+                    }
+                    return timelineToolStepKey(
+                      id: step.tool!.id,
+                      sourceOrdinal: step.sourceOrdinal,
+                      toolName: step.tool!.toolName,
+                    );
+                  },
+                  estimateExtent: (i, width) => 36,
+                  keepAlive: (i) =>
+                      visibleSteps[i].tool?.toolName ==
+                          LocalToolNames.askUser &&
+                      (visibleSteps[i].tool!.loading ||
+                          (visibleSteps[i].tool!.content?.isEmpty ?? true)),
+                  itemBuilder: (context, i) {
                     final step = visibleSteps[i];
                     final sourceIndex = hiddenCount + i;
                     final isFirst = i == 0;
@@ -5174,7 +5312,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                         );
                       },
                     );
-                  }(),
+                  },
+                ),
               ],
             ),
           ),
@@ -5703,7 +5842,21 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
 }
 
 class _ChainOfThoughtBrowserGroupState
-    extends State<_ChainOfThoughtBrowserGroup> {
+    extends State<_ChainOfThoughtBrowserGroup>
+    with _StoredTimelineState<_ChainOfThoughtBrowserGroup> {
+  @override
+  Object get storageId => ('browser', widget.tools.first.id);
+  @override
+  Object saveViewState() => (_expanded, _userToggled, _showAll);
+  @override
+  void restoreViewState(Object value) {
+    final stored = value as (bool?, bool, bool);
+    _expanded = stored.$1;
+    _userToggled = stored.$2;
+    _showAll = stored.$3;
+    _keepSteps = _isExpanded;
+  }
+
   List<BrowserToolAction> _actions = const [];
   List<Object> _inputs = const [];
   List<List<String>> _images = const [];
@@ -6191,7 +6344,17 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
       _ChainOfThoughtToolStepState();
 }
 
-class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
+class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
+    with _StoredTimelineState<_ChainOfThoughtToolStep> {
+  @override
+  Object get storageId => ('ask-expanded', widget.part.id);
+  @override
+  Object saveViewState() => (_askUserExpanded,);
+  @override
+  void restoreViewState(Object value) {
+    _askUserExpanded = (value as (bool?,)).$1;
+  }
+
   bool get _isAskUser => widget.part.toolName == LocalToolNames.askUser;
   bool? _askUserExpanded;
 
@@ -7101,24 +7264,80 @@ class _AskUserInlineBody extends StatefulWidget {
   State<_AskUserInlineBody> createState() => _AskUserInlineBodyState();
 }
 
-class _AskUserInlineBodyState extends State<_AskUserInlineBody> {
-  final Map<String, String> _singleAnswers = <String, String>{};
-  final Map<String, Set<String>> _multiAnswers = <String, Set<String>>{};
+class _AskUserInlineBodyState extends State<_AskUserInlineBody>
+    with _StoredTimelineState<_AskUserInlineBody> {
+  @override
+  Object get storageId => ('ask-draft', widget.part.id);
+  @override
+  Object saveViewState() => (
+    Map<String, String>.of(_singleAnswers),
+    {
+      for (final entry in _multiAnswers.entries)
+        entry.key: Set<String>.of(entry.value),
+    },
+    {for (final entry in _textControllers.entries) entry.key: entry.value.text},
+    Set<String>.of(_skippedQuestions),
+  );
+  @override
+  void restoreViewState(Object value) {
+    if (_hasLiveDraft) return;
+    final stored =
+        value
+            as (
+              Map<String, String>,
+              Map<String, Set<String>>,
+              Map<String, String>,
+              Set<String>,
+            );
+    _singleAnswers.addAll(stored.$1);
+    _multiAnswers.addAll(stored.$2);
+    for (final entry in stored.$3.entries) {
+      _controllerFor(entry.key).text = entry.value;
+    }
+    _skippedQuestions.addAll(stored.$4);
+  }
+
+  AskUserDraft _draft = AskUserDraft();
+  bool _hasLiveDraft = false;
+  Map<String, String> get _singleAnswers => _draft.singleAnswers;
+  Map<String, Set<String>> get _multiAnswers => _draft.multiAnswers;
   final Map<String, TextEditingController> _textControllers =
       <String, TextEditingController>{};
-  final Set<String> _skippedQuestions = <String>{};
+  Set<String> get _skippedQuestions => _draft.skippedQuestions;
   bool _submittingRecovered = false;
 
   @override
+  void didChangeDependencies() {
+    final request = context
+        .read<AskUserInteractionService>()
+        .pendingRequests[widget.part.id];
+    _hasLiveDraft = request != null;
+    if (request != null && !identical(_draft, request.draft)) {
+      for (final controller in _textControllers.values) {
+        controller.dispose();
+      }
+      _textControllers.clear();
+      _draft = request.draft;
+    }
+    super.didChangeDependencies();
+  }
+
+  @override
   void dispose() {
+    storeViewState();
     for (final controller in _textControllers.values) {
       controller.dispose();
     }
+    _textControllers.clear();
     super.dispose();
   }
 
   TextEditingController _controllerFor(String id) {
-    return _textControllers.putIfAbsent(id, TextEditingController.new);
+    return _textControllers.putIfAbsent(id, () {
+      final controller = TextEditingController(text: _draft.freeText[id]);
+      controller.addListener(() => _draft.freeText[id] = controller.text);
+      return controller;
+    });
   }
 
   bool _hasAnswer(AskUserQuestion question) {
@@ -8173,5 +8392,50 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
         ),
       ),
     );
+  }
+}
+
+/// Only small interaction state survives viewport recycling. Parsing results,
+/// timers, animation controllers and render trees remain owned by the view.
+mixin _StoredTimelineState<T extends StatefulWidget> on State<T> {
+  Object get storageId;
+  Object saveViewState();
+  void restoreViewState(Object value);
+  PageStorageBucket? _storage;
+  bool _restored = false;
+  bool _stored = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _storage = PageStorage.maybeOf(context);
+    if (!_restored) {
+      _restored = true;
+      final value = _storage?.readState(context, identifier: storageId);
+      if (value != null) restoreViewState(value);
+    }
+  }
+
+  void storeViewState() {
+    if (_stored) return;
+    _stored = true;
+    _storage?.writeState(context, saveViewState(), identifier: storageId);
+  }
+
+  @override
+  void deactivate() {
+    storeViewState();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _stored = false;
+  }
+
+  @override
+  void dispose() {
+    storeViewState();
+    super.dispose();
   }
 }

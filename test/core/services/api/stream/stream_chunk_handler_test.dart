@@ -10,6 +10,42 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'completed calls release working buffers and retain late results and metadata',
+    () {
+      final handler = StreamChunkHandler();
+      final blocks = <Map<String, dynamic>>[
+        {'signature': 'pending'},
+      ];
+      for (var i = 0; i < 1000; i++) {
+        handler.handle(
+          ToolCallStart(
+            id: '$i',
+            toolName: 'write_file',
+            metadata: i == 0 ? {'blocks': blocks} : null,
+          ),
+        );
+        handler.handle(
+          ToolCallDelta(id: '$i', inputDelta: '{"text":"long file contents"}'),
+        );
+        handler.handle(ToolCallEnd('$i'));
+        handler.handle(ToolCallResult(id: '$i', output: 'done'));
+      }
+      expect(handler.pendingToolBufferCount, 0);
+      handler.handle(const ToolCallResult(id: '0', output: 'corrected result'));
+      expect(handler.pendingToolBufferCount, 0);
+      blocks.single['signature'] = 'final';
+      handler.handle(const Finish());
+      final payload = jsonDecode(
+        (handler.parts.first as ToolCallPart).payloadJson,
+      );
+      expect(payload['arguments'], {'text': 'long file contents'});
+      expect(payload['content'], 'corrected result');
+      expect(payload['metadata']['blocks'][0]['signature'], 'final');
+      expect(handler.parts, hasLength(1000));
+    },
+  );
+
   test('long tool arguments encode only at read and protocol boundaries', () {
     final metadata = _CountingMetadata();
     final handler = StreamChunkHandler();

@@ -206,6 +206,31 @@ void main() {
       },
     );
 
+    test(
+      'late provider round metadata is compared with committed JSON',
+      () async {
+        final details = <dynamic>[
+          {'signature': 'pending'},
+        ];
+        final snapshot = ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          conversationId: 'conversation',
+          isStreaming: true,
+          parts: [
+            const TextPart('body'),
+            AssistantRoundEndPart(reasoningDetails: details),
+          ],
+        );
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        (details.single as Map)['signature'] = 'final';
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        final loaded = await repository.getMessage('streaming');
+        final round = loaded!.parts.whereType<AssistantRoundEndPart>().single;
+        expect((round.reasoningDetails!.single as Map)['signature'], 'final');
+      },
+    );
+
     test('一次事务写入完整消息快照和 tool events 且不改变顺序', () async {
       final snapshot = ChatMessage(
         id: 'streaming',

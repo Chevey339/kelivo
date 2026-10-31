@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../utils/utf16_safe_cut.dart';
 import 'message_part.dart';
+import 'message_part_snapshot.dart';
 import 'token_usage.dart';
 import 'quote_ref.dart';
 import '../database/generation_run.dart';
@@ -185,9 +186,11 @@ class ChatMessage extends HiveObject {
     this.cacheWriteTokens,
     this.finishUsage,
   }) : quotes = List.unmodifiable(quotes),
-       _parts = List<MessagePart>.unmodifiable(
-         parts ?? <MessagePart>[TextPart(content ?? '')],
-       ),
+       _parts = parts is MessagePartSnapshot
+           ? parts
+           : MessagePartSnapshotBuilder().update(
+               parts ?? <MessagePart>[TextPart(content ?? '')],
+             ),
        id = id ?? const Uuid().v4(),
        timestamp = timestamp ?? DateTime.now(),
        groupId = groupId ?? id,

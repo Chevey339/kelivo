@@ -113,6 +113,77 @@ class _RecordingTtsProvider extends TtsProvider {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'pending free-text answer survives transcript subtree recycling',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      final service = AskUserInteractionService();
+      var storage = PageStorageBucket();
+      const arguments = <String, dynamic>{
+        'questions': [
+          {'id': 'draft', 'question': 'Describe the change', 'type': 'single'},
+        ],
+      };
+      final answer = service.requestAnswer(
+        toolCallId: 'ask-recycle',
+        arguments: arguments,
+      );
+      var show = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          askUserService: service,
+          locale: const Locale('en'),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              if (!show) return const SizedBox.shrink();
+              return ChatMessageWidget(
+                timelineStorage: storage,
+                message: ChatMessage(
+                  id: 'draft-message',
+                  role: 'assistant',
+                  conversationId: 'draft-chat',
+                ),
+                showModelIcon: false,
+                toolParts: const [
+                  ToolUIPart(
+                    id: 'ask-recycle',
+                    toolName: AskUserToolNames.askUser,
+                    arguments: arguments,
+                    loading: true,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Keep this unsent answer');
+      rebuild(() => show = false);
+      await tester.pump();
+      // The whole message window can be evicted while its tool keeps waiting.
+      storage = PageStorageBucket();
+      rebuild(() => show = true);
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Keep this unsent answer',
+      );
+      expect(service.isPending('ask-recycle'), isTrue);
+      service.cancelAll();
+      await answer;
+      await tester.pumpWidget(const SizedBox.shrink());
+      service.dispose();
+      settings.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   group('ChatMessageWidget card background style', () {
     testWidgets('search citations render source capsule with favicon stack', (
       tester,

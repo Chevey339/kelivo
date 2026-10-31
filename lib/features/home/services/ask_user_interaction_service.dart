@@ -112,6 +112,15 @@ class AskUserResult {
   }
 }
 
+/// Unsubmitted answers belong to the pending request, not a mounted card.
+/// They survive viewport/window eviction and leave the service on answer/cancel.
+class AskUserDraft {
+  final singleAnswers = <String, String>{};
+  final multiAnswers = <String, Set<String>>{};
+  final freeText = <String, String>{};
+  final skippedQuestions = <String>{};
+}
+
 class AskUserRequest {
   AskUserRequest({
     required this.toolCallId,
@@ -124,6 +133,7 @@ class AskUserRequest {
   final List<AskUserQuestion> questions;
   final String? conversationId;
   final Completer<AskUserResult> _completer;
+  final draft = AskUserDraft();
 }
 
 class AskUserInteractionService extends ChangeNotifier {
