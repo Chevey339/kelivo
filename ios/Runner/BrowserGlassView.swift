@@ -2,19 +2,72 @@ import Flutter
 import UIKit
 import WebKit
 
-/// Applies browser-owned viewport insets without changing the WKWebView frame
-/// or the plugin's scroll-view content-inset policy.
+/// Applies browser-owned layout and scroll insets without changing the WKWebView
+/// frame or the plugin's automatic content-inset adjustment policy.
 final class BrowserViewportInsetsBridge {
   private weak var window: UIWindow?
   private final class Lease {
     weak var view: WKWebView?
     var owner: String
     let originalInsets: UIEdgeInsets
+    let originalScrollBottom: CGFloat
+    private var bottom: CGFloat = 0
+    private var scrollInsetObservation: NSKeyValueObservation?
+    private var offsetBeforeInsetChange: CGPoint?
+    private var synchronizingScrollInset = false
 
     init(view: WKWebView, owner: String, originalInsets: UIEdgeInsets) {
       self.view = view
       self.owner = owner
       self.originalInsets = originalInsets
+      originalScrollBottom = view.scrollView.contentInset.bottom
+      // The plugin resets contentInset whenever Flutter updates the view frame.
+      // Keep the browser's scroll allowance through keyboard/rotation/reattachment.
+      scrollInsetObservation = view.scrollView.observe(\.contentInset, options: [.prior]) { [weak self] scrollView, change in
+        guard let self, !self.synchronizingScrollInset else { return }
+        if change.isPrior {
+          self.offsetBeforeInsetChange = scrollView.contentOffset
+        } else {
+          let offset = self.offsetBeforeInsetChange
+          self.offsetBeforeInsetChange = nil
+          self.synchronizeScrollInset(restoring: offset)
+        }
+      }
+    }
+
+    @available(iOS 26.0, *)
+    func apply(top: CGFloat, bottom: CGFloat) {
+      self.bottom = bottom
+      view?.obscuredContentInsets = UIEdgeInsets(
+        top: top, left: originalInsets.left, bottom: bottom, right: originalInsets.right)
+      synchronizeScrollInset()
+    }
+
+    private func synchronizeScrollInset(restoring offset: CGPoint? = nil) {
+      guard let scrollView = view?.scrollView else { return }
+      let target = originalScrollBottom + bottom
+      guard scrollView.contentInset.bottom != target else { return }
+      // Obscured insets position fixed/sticky elements; scroll insets also let
+      // ordinary document footers scroll fully above the floating controls.
+      synchronizingScrollInset = true
+      defer { synchronizingScrollInset = false }
+      var insets = scrollView.contentInset
+      insets.bottom = target
+      scrollView.contentInset = insets
+      // UIKit can shift the offset while the plugin briefly removes the inset.
+      // Restore the position from before that write, not its already shifted value.
+      if let offset { scrollView.contentOffset = offset }
+    }
+
+    func restore() {
+      scrollInsetObservation?.invalidate()
+      scrollInsetObservation = nil
+      if #available(iOS 26.0, *), let view {
+        view.obscuredContentInsets = originalInsets
+        var insets = view.scrollView.contentInset
+        insets.bottom = originalScrollBottom
+        view.scrollView.contentInset = insets
+      }
     }
   }
   private var leases: [ObjectIdentifier: Lease] = [:]
@@ -66,8 +119,8 @@ final class BrowserViewportInsetsBridge {
     }
   }
 
-  /// A thumbnail contains webpage pixels only. On iOS 18 the WK frame already
-  /// begins below the status bar; iOS 26 extends it and owns the obscured inset.
+  /// A thumbnail contains webpage pixels only. Before iOS 26 the WK frame avoids
+  /// the browser controls; iOS 26 extends it and owns the obscured insets.
   private func snapshotRect(viewId: String?) -> [String: Double]? {
     guard let window, let identify, let viewId, !viewId.isEmpty else { return nil }
     var targets: [WKWebView] = []
@@ -82,12 +135,14 @@ final class BrowserViewportInsetsBridge {
           !view.bounds.isEmpty else { return nil }
     let bounds = view.bounds
     var top: CGFloat = 0
+    var bottom: CGFloat = 0
     if #available(iOS 26.0, *) {
       top = min(max(0, view.obscuredContentInsets.top), bounds.height)
+      bottom = min(max(0, view.obscuredContentInsets.bottom), bounds.height - top)
     }
-    guard top < bounds.height else { return nil }
+    guard top + bottom < bounds.height else { return nil }
     return ["x": Double(bounds.minX), "y": Double(bounds.minY + top),
-            "width": Double(bounds.width), "height": Double(bounds.height - top),
+            "width": Double(bounds.width), "height": Double(bounds.height - top - bottom),
             "scale": Double(view.window?.screen.scale ?? window.screen.scale)]
   }
 
@@ -97,7 +152,8 @@ final class BrowserViewportInsetsBridge {
           let owner = values["owner"] as? String, !owner.isEmpty,
           let marker = values["marker"] as? String,
           marker.hasPrefix("/* kelivo-browser-tab:"), marker.hasSuffix(" */"),
-          let top = values["top"] as? Double, top.isFinite, top >= 0 else { return false }
+          let top = values["top"] as? Double, top.isFinite, top >= 0,
+          let bottom = values["bottom"] as? Double, bottom.isFinite, bottom >= 0 else { return false }
     var candidates: [WKWebView] = []
     func visit(_ view: UIView) {
       // The plugin attaches a headless host to the window at alpha 0.01.
@@ -124,13 +180,9 @@ final class BrowserViewportInsetsBridge {
         view: target, owner: owner, originalInsets: target.obscuredContentInsets)
     }
     // Retained tabs share this presentation's chrome. Keep their insets stable
-    // while hidden, including when the same header changes height.
+    // while hidden, including when the header or keyboard changes height.
     for lease in leases.values where lease.owner == owner {
-      guard let view = lease.view else { continue }
-      let original = lease.originalInsets
-      view.obscuredContentInsets = UIEdgeInsets(
-        top: CGFloat(top), left: original.left,
-        bottom: original.bottom, right: original.right)
+      lease.apply(top: CGFloat(top), bottom: CGFloat(bottom))
     }
     return true
   }
@@ -141,9 +193,7 @@ final class BrowserViewportInsetsBridge {
     }
     for identity in released {
       guard let lease = leases.removeValue(forKey: identity) else { continue }
-      if #available(iOS 26.0, *), let view = lease.view {
-        view.obscuredContentInsets = lease.originalInsets
-      }
+      lease.restore()
     }
   }
 

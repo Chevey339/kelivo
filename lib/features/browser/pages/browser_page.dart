@@ -772,6 +772,14 @@ class BrowserPageViewState extends State<BrowserPage>
     final retainKeyboardBackdrop =
         _addressFocus.hasFocus ||
         (_addressKeyboardSession && keyboardInset > 0);
+    final bottomContentInset =
+        !_desktop && !_blank && defaultTargetPlatform == TargetPlatform.iOS
+        ? BrowserMobileLayout.contentBottomInsetFor(
+            bottomSafeInset: viewPadding.bottom,
+            keyboardInset: keyboardInset,
+            viewportResizesForKeyboard: !retainKeyboardBackdrop,
+          )
+        : 0.0;
     return CallbackShortcuts(
       bindings: widget.sidePanel != null
           ? {
@@ -991,6 +999,7 @@ class BrowserPageViewState extends State<BrowserPage>
                             tabId: _blank ? null : _service.activeTabId,
                             viewIdentity: tab?.runtimeVersion,
                             top: MediaQuery.viewPaddingOf(context).top,
+                            bottom: bottomContentInset,
                             builder: (context, underlap) =>
                                 ValueListenableBuilder<bool>(
                                   valueListenable:
@@ -999,6 +1008,8 @@ class BrowserPageViewState extends State<BrowserPage>
                                       BrowserMobileLayout(
                                         key: _mobileLayoutKey,
                                         underlapStatusBar: _blank || underlap,
+                                        bottomContentInset: bottomContentInset,
+                                        underlapToolbar: underlap,
                                         fadeBehindToolbar:
                                             !_blank &&
                                             underlap &&

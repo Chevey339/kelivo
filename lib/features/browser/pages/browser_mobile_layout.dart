@@ -6,8 +6,8 @@ import 'package:flutter/physics.dart';
 
 import '../widgets/browser_progressive_edge.dart';
 
-/// The page continues behind the floating controls. Only the chrome animates;
-/// its collapse never resizes or replaces the native WebView.
+/// The toolbar's reserved area stays stable while its controls collapse. Native
+/// viewport insets can provide that reservation without resizing the WebView.
 class BrowserMobileLayout extends StatelessWidget {
   const BrowserMobileLayout({
     super.key,
@@ -21,6 +21,8 @@ class BrowserMobileLayout extends StatelessWidget {
     this.keyboardInset = 0,
     this.viewportResizesForKeyboard = true,
     this.underlapStatusBar = false,
+    this.bottomContentInset = 0,
+    this.underlapToolbar = false,
     this.fadeBehindToolbar = false,
   });
   final Widget content;
@@ -39,6 +41,8 @@ class BrowserMobileLayout extends StatelessWidget {
   final double keyboardInset;
   final bool viewportResizesForKeyboard;
   final bool underlapStatusBar;
+  final double bottomContentInset;
+  final bool underlapToolbar;
   final bool fadeBehindToolbar;
   static const double expandedChromeHeight = 54;
 
@@ -51,6 +55,20 @@ class BrowserMobileLayout extends StatelessWidget {
   static double get toolbarBottomGap =>
       defaultTargetPlatform == TargetPlatform.android ? 16 : 10;
 
+  /// Reserve expanded controls even when collapsed so scrolling does not
+  /// repeatedly relayout the document. A form keyboard replaces the safe area;
+  /// URL editing keeps the original webpage geometry behind the keyboard.
+  static double contentBottomInsetFor({
+    required double bottomSafeInset,
+    required double keyboardInset,
+    required bool viewportResizesForKeyboard,
+  }) =>
+      expandedChromeHeight +
+      toolbarBottomGap +
+      (viewportResizesForKeyboard
+          ? math.max(0.0, bottomSafeInset - keyboardInset)
+          : bottomSafeInset);
+
   @override
   Widget build(BuildContext context) {
     final padding = viewPadding;
@@ -60,10 +78,13 @@ class BrowserMobileLayout extends StatelessWidget {
     final dockInset =
         math.max(padding.bottom, keyboardInset) -
         (viewportResizesForKeyboard ? keyboardInset : 0);
+    final viewportBottom = underlapToolbar ? 0.0 : bottomContentInset;
     return LayoutBuilder(
       builder: (context, constraints) {
         onViewportHeight?.call(
-          constraints.maxHeight - (underlapStatusBar ? 0 : padding.top),
+          constraints.maxHeight -
+              (underlapStatusBar ? 0 : padding.top) -
+              viewportBottom,
         );
         return Stack(
           fit: StackFit.expand,
@@ -71,6 +92,7 @@ class BrowserMobileLayout extends StatelessWidget {
             Positioned.fill(
               key: const ValueKey('browserMobileViewportSlot'),
               top: underlapStatusBar ? 0 : padding.top,
+              bottom: viewportBottom,
               child: content,
             ),
             if (transitionOverlay != null)
@@ -96,7 +118,9 @@ class BrowserMobileLayout extends StatelessWidget {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: padding.bottom + expandedChromeHeight + 20,
+                height: bottomContentInset > 0
+                    ? bottomContentInset
+                    : padding.bottom + expandedChromeHeight + 20,
                 child: BrowserProgressiveEdge(
                   top: false,
                   filterBackdrop: false,

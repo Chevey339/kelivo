@@ -1218,6 +1218,81 @@ void main() {
     },
   );
 
+  for (final nativeInsets in [false, true]) {
+    browserTestWidgets(
+      'iOS webpage footer stays above expanded and collapsed controls (native insets: $nativeInsets)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+        addTearDown(tester.view.resetViewPadding);
+        const channel = MethodChannel('app.browser_window');
+        final insets = <Map<dynamic, dynamic>>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async {
+            if (call.method == 'supportsBrowserViewportInsets') {
+              return nativeInsets;
+            }
+            if (call.method == 'setBrowserViewportInsets') {
+              insets.add(call.arguments as Map<dynamic, dynamic>);
+              return true;
+            }
+            if (call.method == 'getBrowserReduceTransparency') return false;
+            return null;
+          },
+        );
+        addTearDown(() {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          );
+        });
+        await service.initialize();
+        final tab = await service.createTab(url: 'https://example.com');
+        await mount(tester);
+        final engine = engines[tab.id]!;
+        final viewport = find.byKey(const ValueKey('fakeNativeView'));
+        final original = tester.getRect(viewport);
+        final state = tester.state(find.byType(_EngineView));
+
+        for (final offset in [0.0, 160.0, 4000.0, 3980.0]) {
+          engine.onChanged(_scroll(offset));
+          await tester.pumpAndSettle();
+          final bounds = tester.getRect(viewport);
+          final bottomInset = nativeInsets
+              ? (insets.last['bottom'] as num).toDouble()
+              : 0.0;
+          final contentBottom = bounds.bottom - bottomInset;
+          expect(contentBottom, 746);
+          expect(
+            contentBottom,
+            lessThanOrEqualTo(
+              tester.getRect(find.byType(BrowserAddressBar)).top,
+            ),
+          );
+          expect(
+            tester
+                .getRect(find.byKey(const ValueKey('browserMobileBottomEdge')))
+                .top,
+            contentBottom,
+          );
+          final taps = engine.humanPointerDowns;
+          await tester.tapAt(Offset(bounds.center.dx, contentBottom - 2));
+          expect(engine.humanPointerDowns, taps + 1);
+          expect(bounds, original);
+          expect(tester.state(find.byType(_EngineView)), same(state));
+        }
+        expect(engine.viewMounts, 1);
+        expect(engine.viewDisposals, 0);
+        if (nativeInsets) {
+          expect(insets, hasLength(1));
+          expect(insets.single['top'], 59);
+          expect(insets.single['bottom'], 98);
+        }
+      },
+    );
+  }
+
   browserTestWidgets(
     'address keyboard preserves viewport through dismiss and yields to webpage input',
     (tester) async {
@@ -1261,7 +1336,7 @@ void main() {
       await tester.tapAt(tester.getCenter(viewport));
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
-      expect(tester.getRect(viewport).height, before.height - 300);
+      expect(tester.getRect(viewport).height, before.height - (300 - 34));
       expect(tester.state(find.byType(_EngineView)), same(state));
       expect(engines[tab.id]!.viewMounts, 1);
       expect(tester.takeException(), isNull);
@@ -1313,7 +1388,7 @@ void main() {
       // still receives normal viewport avoidance without an extra page tap.
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pump();
-      expect(tester.getRect(viewport).height, before.height - 300);
+      expect(tester.getRect(viewport).height, before.height - (300 - 34));
       expect(tester.takeException(), isNull);
     },
   );
@@ -1399,7 +1474,10 @@ void main() {
           tester.getRect(find.byType(BrowserAddressBar)).bottom,
           closeTo(lowerBoundary - 10, .001),
         );
-        expect(tester.getRect(viewport).height, before.height - inset);
+        expect(
+          tester.getRect(viewport).height,
+          before.height - (inset > 34 ? inset - 34 : 0),
+        );
         expect(tester.state(find.byType(_EngineView)), same(state));
         if (inset > 0) {
           engine.onChanged(_scroll(400 + inset));

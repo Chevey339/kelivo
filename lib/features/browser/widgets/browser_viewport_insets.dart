@@ -6,19 +6,21 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/services/browser/browser_engine.dart';
 
-/// Keeps page content below the header until the actual WKWebView confirms its
-/// native obscured inset. Fixed/sticky website headers then remain WebKit-owned.
+/// Keeps page content clear of browser controls until the actual WKWebView
+/// confirms its native insets. Fixed/sticky website elements remain WebKit-owned.
 class BrowserViewportInsets extends StatefulWidget {
   const BrowserViewportInsets({
     super.key,
     required this.tabId,
     required this.top,
+    this.bottom = 0,
     required this.builder,
     this.viewIdentity,
   });
 
   final String? tabId;
   final double top;
+  final double bottom;
 
   /// Changes when the same tab replaces a terminated/evicted native runtime.
   final Object? viewIdentity;
@@ -129,6 +131,7 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tabId != widget.tabId ||
         oldWidget.top != widget.top ||
+        oldWidget.bottom != widget.bottom ||
         oldWidget.viewIdentity != widget.viewIdentity) {
       _generation++;
       _retry?.cancel();
@@ -139,7 +142,7 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
       _applied = false;
       // Retained renderers keep their obscured inset even while another tab
       // (including the start page) is active. The owner releases them together
-      // when its host is disposed; native updates apply a new top to all leases.
+      // when its host is disposed; native updates apply insets to all leases.
     }
     if (_supported && !_applied) _synchronize();
   }
@@ -169,6 +172,7 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
             'owner': _owner,
             'marker': browserTabUserScriptMarker(tabId),
             'top': widget.top,
+            'bottom': widget.bottom,
           }) ??
           false;
       if (!mounted || generation != _generation) return;
