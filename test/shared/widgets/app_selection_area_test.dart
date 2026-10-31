@@ -233,6 +233,8 @@ void main() {
         expect(find.text('Copy Markdown'), findsOneWidget);
         expect(find.text('Copy rich text'), findsOneWidget);
         expect(tester.takeException(), isNull);
+        await tester.ensureVisible(find.text('Copy rich text'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Copy rich text'));
         await tester.pumpAndSettle();
         expect(writer.items, hasLength(1));

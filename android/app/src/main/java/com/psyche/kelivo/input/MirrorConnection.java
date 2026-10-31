@@ -426,21 +426,20 @@ public final class MirrorConnection extends BaseInputConnection {
     return super.getSurroundingText(Math.min(before, QUERY_LIMIT), Math.min(after, QUERY_LIMIT), flags);
   }
   @Override public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
-    // A bounded snapshot cannot promise continuous extraction: an expanded
-    // selection can later exceed that bound. Explicitly decline monitoring
-    // instead of accepting a token whose contents would silently go stale.
-    if (navigationPending || (flags & GET_EXTRACTED_TEXT_MONITOR) != 0) return null;
-    int left = Math.min(base(), extent()), right = Math.max(base(), extent());
-    if (right - left > QUERY_LIMIT) return null;
-    int start = Math.max(0, left - QUERY_LIMIT / 2);
-    int end = Math.min(text.length(), Math.max(right, start + QUERY_LIMIT));
+    // Never expose a partial document as a complete extraction: iFlytek derives
+    // select-all from its length. Large documents use the standard context-menu
+    // action instead, without sending an unbounded snapshot over Binder. Keep
+    // complete small/empty snapshots for IME operations such as paste after cut.
+    // Monitoring remains unsupported because a later edit can exceed the bound.
+    if (navigationPending || text.length() > QUERY_LIMIT
+        || (flags & GET_EXTRACTED_TEXT_MONITOR) != 0) return null;
     ExtractedText result = new ExtractedText();
-    result.text = text.subSequence(start, end).toString();
-    result.startOffset = start;
+    result.text = text.toString();
+    result.startOffset = 0;
     result.partialStartOffset = -1;
     result.partialEndOffset = -1;
-    result.selectionStart = base() - start;
-    result.selectionEnd = extent() - start;
+    result.selectionStart = base();
+    result.selectionEnd = extent();
     return result;
   }
 

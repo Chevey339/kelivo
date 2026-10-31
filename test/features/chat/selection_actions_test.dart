@@ -7,6 +7,7 @@ import 'package:Kelivo/features/chat/widgets/selection_quick_toolbar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/shared/widgets/app_text_selection_toolbar.dart';
+import 'package:Kelivo/shared/widgets/android_text_selection_toolbar.dart';
 import 'package:Kelivo/shared/widgets/ios_text_selection_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -394,6 +395,7 @@ void main() {
           ['copy', 'Quote', 'Translate', 'AI Translate'],
         );
       } else {
+        expect(find.byType(AndroidTextSelectionToolbar), findsOneWidget);
         expect(find.text('Translate'), findsOneWidget);
         expect(find.text('Copy as Markdown'), findsNothing);
         await tester.tap(

@@ -19,6 +19,7 @@ import '../../features/chat/widgets/selection_result_panel.dart';
 import 'package:super_clipboard/super_clipboard.dart' show ClipboardWriter;
 import '../markdown/rich_clipboard.dart';
 import 'app_text_selection_toolbar.dart';
+import 'android_text_selection_toolbar.dart';
 import 'snackbar.dart';
 import 'selection_scroll_container.dart';
 
@@ -559,46 +560,36 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
         ],
       );
     }
-    return TextSelectionToolbar(
-      anchorAbove: anchors.primaryAnchor,
-      anchorBelow: anchors.secondaryAnchor ?? anchors.primaryAnchor,
-      children: [
-        for (final item in [
-          copy,
-          quote,
-          translate,
-          for (final item in items)
-            if (item.type != ContextMenuButtonType.copy &&
-                item.type != ContextMenuButtonType.selectAll)
-              item,
-          selectAll,
-        ])
-          TextSelectionToolbarTextButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: item.onPressed,
-            child: Text(
-              AdaptiveTextSelectionToolbar.getButtonLabel(context, item),
-            ),
-          ),
-        IosIconButton(
-          tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
-          icon: LucideIcons.ellipsisVertical,
-          size: 18,
-          minSize: 44,
-          onTap: () async {
-            region.hideToolbar();
-            final item = await showOptionSheet<ContextMenuButtonItem>(
-              this.context,
-              title: MaterialLocalizations.of(this.context).copyButtonLabel,
-              items: [
-                for (final item in [markdown, rich])
-                  OptionSheetItem(value: item, label: item.label!),
-              ],
-            );
-            if (mounted) item?.onPressed?.call();
-          },
-        ),
+    return AndroidTextSelectionToolbar(
+      anchors: anchors,
+      buttonItems: [
+        copy,
+        quote,
+        translate,
+        for (final item in items)
+          if (item.type != ContextMenuButtonType.copy &&
+              item.type != ContextMenuButtonType.selectAll)
+            item,
+        selectAll,
       ],
+      trailing: IosIconButton(
+        tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+        icon: LucideIcons.ellipsisVertical,
+        size: 18,
+        minSize: 44,
+        onTap: () async {
+          region.hideToolbar();
+          final item = await showOptionSheet<ContextMenuButtonItem>(
+            this.context,
+            title: MaterialLocalizations.of(this.context).copyButtonLabel,
+            items: [
+              for (final item in [markdown, rich])
+                OptionSheetItem(value: item, label: item.label!),
+            ],
+          );
+          if (mounted) item?.onPressed?.call();
+        },
+      ),
     );
   }
 

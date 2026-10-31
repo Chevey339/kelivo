@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/settings_provider.dart';
+import 'android_text_selection_toolbar.dart';
 import 'ios_text_selection_toolbar.dart';
 
 /// Platform selection menus whose desktop labels use the application font.
@@ -39,6 +40,12 @@ class AppTextSelectionToolbar extends StatelessWidget {
         buttonItems: buttonItems,
         selectionContext: selectionContext,
         onDismiss: onDismiss,
+      );
+    }
+    if (platform == TargetPlatform.android) {
+      return AndroidTextSelectionToolbar(
+        anchors: anchors,
+        buttonItems: buttonItems,
       );
     }
     if (platform != TargetPlatform.macOS &&

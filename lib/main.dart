@@ -20,6 +20,7 @@ import 'desktop/desktop_window_controller.dart';
 import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
+import 'shared/text_input/android_ime_selection.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -171,6 +172,7 @@ Future<void> main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       WindowsPasteFix.instance.install();
+      AndroidImeSelection.instance.install();
       // Register notification tap handling for every Android launch. This is
       // independent of the current background-chat mode: an older completion
       // notification can still launch the app after the mode has changed.
