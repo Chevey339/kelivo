@@ -44,6 +44,8 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
   final _owner = 'browser-insets-${_nextOwner++}';
   Timer? _retry;
   int _generation = 0;
+  int _latestRequest = 0;
+  bool _applyScheduled = false;
   int _attempts = 0;
   bool _supported = false;
   bool _applied = false;
@@ -131,7 +133,6 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tabId != widget.tabId ||
         oldWidget.top != widget.top ||
-        oldWidget.bottom != widget.bottom ||
         oldWidget.viewIdentity != widget.viewIdentity) {
       _generation++;
       _retry?.cancel();
@@ -144,7 +145,9 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
       // (including the start page) is active. The owner releases them together
       // when its host is disposed; native updates apply insets to all leases.
     }
-    if (_supported && !_applied) _synchronize();
+    if (_supported && (!_applied || oldWidget.bottom != widget.bottom)) {
+      _synchronize();
+    }
   }
 
   void _synchronize() {
@@ -153,9 +156,11 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     }
     _retry?.cancel();
     _attempts = 0;
-    final generation = ++_generation;
+    if (_applyScheduled) return;
+    _applyScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && generation == _generation) unawaited(_apply(generation));
+      _applyScheduled = false;
+      if (mounted) unawaited(_apply(_generation));
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -166,6 +171,7 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     }
     final tabId = widget.tabId;
     if (tabId == null) return;
+    final request = ++_latestRequest;
     try {
       final applied =
           await _channel.invokeMethod<bool>('setBrowserViewportInsets', {
@@ -183,6 +189,9 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
             _retainedUnderlap = false;
           });
         }
+      } else if (request != _latestRequest) {
+        // A later animation frame has already sent the current geometry.
+        return;
       } else if (++_attempts < 20) {
         // Platform view creation is asynchronous. Retry only while attaching;
         // steady-state frames never traverse the native view hierarchy.

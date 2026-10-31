@@ -6,8 +6,8 @@ import 'package:flutter/physics.dart';
 
 import '../widgets/browser_progressive_edge.dart';
 
-/// The toolbar's reserved area stays stable while its controls collapse. Native
-/// viewport insets can provide that reservation without resizing the WebView.
+/// The toolbar and its reserved area share the same collapse animation. Native
+/// viewport insets provide that reservation without resizing the WebView.
 class BrowserMobileLayout extends StatelessWidget {
   const BrowserMobileLayout({
     super.key,
@@ -55,15 +55,20 @@ class BrowserMobileLayout extends StatelessWidget {
   static double get toolbarBottomGap =>
       defaultTargetPlatform == TargetPlatform.android ? 16 : 10;
 
-  /// Reserve expanded controls even when collapsed so scrolling does not
-  /// repeatedly relayout the document. A form keyboard replaces the safe area;
-  /// URL editing keeps the original webpage geometry behind the keyboard.
+  static double controlHeightFor(double collapseProgress) =>
+      48 - 14 * collapseProgress;
+
+  /// Follow the controls' height and downward travel, retaining six points of
+  /// clearance above them. A form keyboard replaces the home-indicator inset.
   static double contentBottomInsetFor({
     required double bottomSafeInset,
     required double keyboardInset,
     required bool viewportResizesForKeyboard,
+    required double collapseProgress,
   }) =>
-      expandedChromeHeight +
+      controlHeightFor(collapseProgress) +
+      6 -
+      collapseDropFor(bottomSafeInset) * collapseProgress +
       toolbarBottomGap +
       (viewportResizesForKeyboard
           ? math.max(0.0, bottomSafeInset - keyboardInset)

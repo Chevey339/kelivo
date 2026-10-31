@@ -1,5 +1,6 @@
 // Compile with ios/Runner/BrowserGlassView.swift and the simulator Flutter
 // framework, then run the executable with `xcrun simctl spawn <device> <path>`.
+// Pass browser_viewport_anchor.dart, then 2000px or 200dvh; optionally add overflow.
 // Real WKWebViews exercise the bridge without launching Kelivo or taking images.
 import Flutter
 import UIKit
@@ -82,10 +83,20 @@ private struct BrowserViewportInsetsIOSTest {
     return output
   }
 
+  static func installAnchor(_ configuration: WKWebViewConfiguration) {
+    let source = try! String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8)
+    let script = source.components(separatedBy: "r'''")
+    precondition(script.count == 2)
+    let javascript = script[1].components(separatedBy: "'''")[0]
+    configuration.userContentController.addUserScript(WKUserScript(
+      source: javascript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+  }
+
   static func makeView(marker: String) -> WKWebView {
     let config = WKWebViewConfiguration()
     config.userContentController.addUserScript(WKUserScript(
       source: marker, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    installAnchor(config)
     return InsetsTestWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 844), configuration: config)
   }
 
@@ -126,15 +137,21 @@ private struct BrowserViewportInsetsIOSTest {
     let navigation = InsetsTestNavigation()
     first.navigationDelegate = navigation
     first.scrollView.contentInsetAdjustmentBehavior = .never
-    first.loadHTMLString("""
+    let documentHeight = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "2000px"
+    let overflow = CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "overflow"
+    let html = """
+      \(overflow ? "<!doctype html>" : "")
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <body style="margin:0">
-        <div style="height:2000px"></div>
+      <body style="margin:0;\(overflow ? "height:100vh" : "")">
+        \(overflow ? "<div style='position:absolute;top:0;left:0;width:100%'>" : "")
+        <div style="height:\(documentHeight)"></div>
         <button id="footer" style="display:block;height:44px">Footer</button>
+        \(overflow ? "</div>" : "")
         <button id="fixed" style="position:fixed;bottom:0;right:0;height:44px">Fixed</button>
       </body>
-      """, baseURL: nil)
-    waitUntil { navigation.loaded }
+      """
+    first.loadHTMLString(html, baseURL: nil)
+    waitUntil { navigation.loaded && first.scrollView.contentSize.height > first.bounds.height }
     _ = evaluate(first, "window.scrollTo(0, document.documentElement.scrollHeight - innerHeight)")
     RunLoop.main.run(until: Date().addingTimeInterval(0.3))
     let metrics = evaluate(first, """
@@ -154,6 +171,23 @@ private struct BrowserViewportInsetsIOSTest {
       })
       """) as? Bool == true, "Both footer buttons must remain hit-testable")
 
+    // Both directions of the chrome animation must keep a reached footer
+    // visible, including the compact 64-point reservation on this device.
+    for bottom in [94.0, 86.0, 74.0, 64.0, 74.0, 86.0, 94.0, 98.0] {
+      precondition(apply(firstMarker, bottom: bottom))
+      first.frame = first.frame
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      let geometry = evaluate(first, """
+        ({height:innerHeight,
+          footer:document.getElementById('footer').getBoundingClientRect().bottom,
+          fixed:document.getElementById('fixed').getBoundingClientRect().bottom})
+        """) as! [String: Double]
+      let expected = 844 - 59 - bottom
+      precondition(geometry["height"] == expected, "Viewport must follow toolbar height")
+      precondition(geometry["footer"] == expected, "Reached footer must follow inset \(bottom): \(geometry)")
+      precondition(geometry["fixed"] == expected, "Fixed footer must follow inset \(bottom)")
+    }
+
     // Restoring the inset alone is insufficient: UIKit can move contentOffset
     // during each reset, pushing an already reached footer below the controls.
     let bottomOffset = first.scrollView.contentOffset
@@ -166,6 +200,50 @@ private struct BrowserViewportInsetsIOSTest {
     RunLoop.main.run(until: Date().addingTimeInterval(0.3))
     precondition(evaluate(first, "document.getElementById('footer').getBoundingClientRect().bottom") as? Double == 687,
                  "The footer must stay visible after native frame updates")
+
+    // A finger can already be rubber-banding beyond the old end when the dock
+    // expands. That still needs a bottom anchor, with its overscroll retained.
+    precondition(apply(firstMarker, bottom: 64))
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    first.scrollView.contentOffset.y += 10
+    for bottom in [70.0, 80.0, 90.0, 98.0] {
+      precondition(apply(firstMarker, bottom: bottom))
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      let footer = evaluate(first, "document.getElementById('footer').getBoundingClientRect().bottom") as! Double
+      precondition(footer <= 844 - 59 - bottom,
+                   "Rubber-band recovery must keep the footer above expanding chrome")
+    }
+
+    _ = evaluate(first, "window.scrollTo(0, 500)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    let readingOffset = first.scrollView.contentOffset
+    for bottom in [64.0, 98.0] {
+      precondition(apply(firstMarker, bottom: bottom))
+      first.frame = first.frame
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      precondition(first.scrollView.contentOffset == readingOffset,
+                   "Chrome changes must not move a page that is not at its end")
+    }
+
+    _ = evaluate(first, "window.scrollTo(0, document.documentElement.scrollHeight - innerHeight)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    let beforeAppend = first.scrollView.contentOffset
+    let previousContentHeight = first.scrollView.contentSize.height
+    _ = evaluate(first, """
+      const extra = document.createElement('div');
+      extra.style.height = '240px';
+      \(overflow ? "extra.style.position = 'absolute'; extra.style.width = '100%'; extra.style.top = document.documentElement.scrollHeight + 'px';" : "")
+      void document.body.appendChild(extra);
+      """)
+    waitUntil { first.scrollView.contentSize.height >= previousContentHeight + 239 }
+    precondition(first.scrollView.contentOffset == beforeAppend,
+                 "Appending content must not stick the browser to the new end")
+    for bottom in [64.0, 98.0] {
+      precondition(apply(firstMarker, bottom: bottom))
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      precondition(first.scrollView.contentOffset == beforeAppend,
+                   "A later chrome resize must not resurrect an old bottom anchor")
+    }
 
     // Keyboard changes update inactive retained views as well as the active tab.
     precondition(apply(secondMarker, bottom: 64))
@@ -200,6 +278,40 @@ private struct BrowserViewportInsetsIOSTest {
     bridge.dispose()
     precondition(first.obscuredContentInsets == original)
     precondition(first.scrollView.contentInset.bottom == 6)
-    print("iOS viewport insets: normal/fixed footers, plugin frame resets, keyboard updates, tab transfer, crop and restoration passed")
+
+    // Exercise the pre-iOS-26 path without native obscured insets: Flutter
+    // changes the frame height while the same WKWebView stays mounted.
+    let legacyConfig = WKWebViewConfiguration()
+    installAnchor(legacyConfig)
+    let legacy = InsetsTestWebView(frame: CGRect(x: 0, y: 59, width: 390, height: 687), configuration: legacyConfig)
+    legacy.scrollView.contentInsetAdjustmentBehavior = .never
+    window.addSubview(legacy)
+    let legacyNavigation = InsetsTestNavigation()
+    legacy.navigationDelegate = legacyNavigation
+    legacy.loadHTMLString(html, baseURL: nil)
+    waitUntil { legacyNavigation.loaded && legacy.scrollView.contentSize.height > legacy.bounds.height }
+    _ = evaluate(legacy, "window.scrollTo(0, document.documentElement.scrollHeight - innerHeight)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    for height in [695.0, 710.0, 721.0, 710.0, 695.0, 687.0] {
+      legacy.frame.size.height = height
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      let geometry = evaluate(legacy, """
+        ({height:innerHeight,
+          footer:document.getElementById('footer').getBoundingClientRect().bottom,
+          fixed:document.getElementById('fixed').getBoundingClientRect().bottom})
+        """) as! [String: Double]
+      precondition(geometry["height"] == height)
+      precondition(geometry["footer"] == height, "Physical viewport must retain its footer: \(geometry)")
+      precondition(geometry["fixed"] == height)
+    }
+    _ = evaluate(legacy, "window.scrollTo(0, 500)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    for height in [721.0, 687.0] {
+      legacy.frame.size.height = height
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      precondition(legacy.scrollView.contentOffset.y == 500,
+                   "Physical viewport changes must preserve mid-document reading position")
+    }
+    print("iOS viewport insets: dynamic native/physical viewports, normal/fixed footers, plugin frame resets, keyboard updates, tab transfer, crop and restoration passed")
   }
 }

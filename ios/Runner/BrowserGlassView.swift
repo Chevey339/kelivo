@@ -37,10 +37,23 @@ final class BrowserViewportInsetsBridge {
 
     @available(iOS 26.0, *)
     func apply(top: CGFloat, bottom: CGFloat) {
+      guard let view else { return }
+      let scrollView = view.scrollView
+      let oldBottom = max(-scrollView.adjustedContentInset.top,
+                          scrollView.contentSize.height - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
+      let overscroll = scrollView.contentOffset.y - oldBottom
+      let pinnedToBottom = overscroll >= -1
       self.bottom = bottom
-      view?.obscuredContentInsets = UIEdgeInsets(
+      view.obscuredContentInsets = UIEdgeInsets(
         top: top, left: originalInsets.left, bottom: bottom, right: originalInsets.right)
       synchronizeScrollInset()
+      // Expanding the toolbar must carry an already reached footer upward.
+      // UIKit clamps a shrinking inset, but does not pin an expanding one.
+      if pinnedToBottom {
+        let nextBottom = max(-scrollView.adjustedContentInset.top,
+                             scrollView.contentSize.height - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
+        scrollView.contentOffset.y = nextBottom + max(0, overscroll)
+      }
     }
 
     private func synchronizeScrollInset(restoring offset: CGPoint? = nil) {

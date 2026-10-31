@@ -456,6 +456,45 @@ void main() {
     },
   );
 
+  viewportTest('animation does not invalidate a pending native attachment', (
+    tester,
+  ) async {
+    final replies = <Completer<bool>>[];
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call);
+      if (call.method == 'supportsBrowserViewportInsets') return true;
+      if (call.method == 'setBrowserViewportInsets') {
+        final reply = Completer<bool>();
+        replies.add(reply);
+        return reply.future;
+      }
+      return null;
+    });
+    await tester.pumpWidget(scene('a', bottom: 98));
+    await tester.pump();
+    await tester.pumpWidget(scene('a', bottom: 90));
+    await tester.pump();
+    await tester.pumpWidget(scene('a', bottom: 80));
+    await tester.pump();
+    replies.first.complete(true);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('underlap'), findsOneWidget);
+    replies.last.complete(true);
+    replies[1].complete(false);
+    await tester.pumpAndSettle();
+    expect(find.text('underlap'), findsOneWidget);
+    final count = calls.length;
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      calls.length,
+      count,
+      reason: 'an obsolete frame must not start retries',
+    );
+  });
+
   viewportTest('replacement hosts release only their own native lease', (
     tester,
   ) async {

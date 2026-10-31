@@ -1255,15 +1255,16 @@ void main() {
         final original = tester.getRect(viewport);
         final state = tester.state(find.byType(_EngineView));
 
-        for (final offset in [0.0, 160.0, 4000.0, 3980.0]) {
-          engine.onChanged(_scroll(offset));
-          await tester.pumpAndSettle();
+        Future<void> checkFooter() async {
           final bounds = tester.getRect(viewport);
           final bottomInset = nativeInsets
               ? (insets.last['bottom'] as num).toDouble()
               : 0.0;
           final contentBottom = bounds.bottom - bottomInset;
-          expect(contentBottom, 746);
+          final progress = tester
+              .widget<BrowserAddressBar>(find.byType(BrowserAddressBar))
+              .collapseProgress;
+          expect(contentBottom, closeTo(746 + 34 * progress, .001));
           expect(
             contentBottom,
             lessThanOrEqualTo(
@@ -1277,17 +1278,32 @@ void main() {
             contentBottom,
           );
           final taps = engine.humanPointerDowns;
-          await tester.tapAt(Offset(bounds.center.dx, contentBottom - 2));
-          expect(engine.humanPointerDowns, taps + 1);
-          expect(bounds, original);
+          for (final x in [20.0, bounds.center.dx, bounds.right - 20]) {
+            await tester.tapAt(Offset(x, contentBottom - 2));
+          }
+          expect(engine.humanPointerDowns, taps + 3);
+          if (nativeInsets) expect(bounds, original);
           expect(tester.state(find.byType(_EngineView)), same(state));
+        }
+
+        await checkFooter();
+        for (final offset in [160.0, 4000.0, 3980.0]) {
+          engine.onChanged(_scroll(offset));
+          await tester.pump();
+          for (var frame = 0; frame < 12; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            await checkFooter();
+          }
+          await tester.pumpAndSettle();
+          await checkFooter();
         }
         expect(engine.viewMounts, 1);
         expect(engine.viewDisposals, 0);
         if (nativeInsets) {
-          expect(insets, hasLength(1));
-          expect(insets.single['top'], 59);
-          expect(insets.single['bottom'], 98);
+          expect(insets.first['top'], 59);
+          expect(insets.first['bottom'], 98);
+          expect(insets.any((value) => value['bottom'] == 64), isTrue);
+          expect(insets.last['bottom'], 98);
         }
       },
     );
@@ -3256,6 +3272,31 @@ void main() {
       await tester.pumpAndSettle();
       expect(target(), 1);
       expect(engine.viewMounts, 1);
+    },
+  );
+
+  browserTestWidgets(
+    'inset animation metrics do not reverse an active collapse gesture',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      double target() => tester
+          .widget<BrowserChromeTransition>(find.byType(BrowserChromeTransition))
+          .progress;
+      engine.onChanged(_scroll(3000, gestureDelta: 30));
+      await tester.pumpAndSettle();
+      expect(target(), 1);
+      // Changing the native bottom inset also updates content size and offset.
+      // That KVO event has no new finger movement, even before touch release.
+      engine.onChanged(_scroll(3156, gestureDelta: 0));
+      await tester.pumpAndSettle();
+      expect(target(), 1);
+      engine.onChanged(_scroll(3156, gestureDelta: 12));
+      await tester.pumpAndSettle();
+      expect(target(), 0, reason: 'real edge input still expands navigation');
     },
   );
 

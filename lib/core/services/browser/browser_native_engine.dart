@@ -18,6 +18,7 @@ import 'browser_download_cookies.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
 import 'browser_scroll_observer.dart';
+import 'browser_viewport_anchor.dart';
 import 'browser_workspace_resources.dart';
 import 'browser_windows_environment.dart';
 
@@ -167,6 +168,13 @@ class NativeBrowserEngine implements BrowserEngine {
       injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       forMainFrameOnly: true,
     ),
+    if (Platform.isIOS)
+      UserScript(
+        groupName: 'kelivo-browser-viewport-anchor',
+        source: browserViewportAnchorScript,
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        forMainFrameOnly: true,
+      ),
     if (!Platform.isIOS)
       UserScript(
         groupName: 'kelivo-browser-scroll',
