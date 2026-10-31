@@ -299,7 +299,6 @@ class MessageGenerationService {
           assistant,
           conversationId: currentConversation?.id,
           workspaceContext: workspaceContext,
-          attachments: workspaceAttachments,
         );
       }
     } catch (e) {
@@ -494,8 +493,7 @@ class MessageGenerationService {
               resolvedWorkspace.workspace.isToolEnabled(name as String);
         });
     final localAttachments = <String, AttachmentInfo>{
-      if (hasWorkspaceFileTools)
-        for (final file in workspaceAttachments) file.sourceUri: file,
+      for (final file in workspaceAttachments) file.sourceUri: file,
     };
     final indicatorMessageId =
         processingMessageId != null &&
@@ -507,6 +505,7 @@ class MessageGenerationService {
               sandboxDataFiles: sandboxDataFiles,
               nativePdfInput: nativePdfInput,
               workspaceAttachments: localAttachments,
+              useWorkspaceForDocuments: hasWorkspaceFileTools,
             )
         ? processingMessageId
         : null;
@@ -525,6 +524,7 @@ class MessageGenerationService {
             sandboxDataFiles: sandboxDataFiles,
             nativePdfInput: nativePdfInput,
             workspaceAttachments: localAttachments,
+            useWorkspaceForDocuments: hasWorkspaceFileTools,
           );
     } on AttachmentRequiresWorkspace catch (e) {
       if (!contextProvider.mounted) rethrow;

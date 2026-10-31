@@ -916,6 +916,7 @@ class MessageBuilderService {
     bool sandboxDataFiles = false,
     bool nativePdfInput = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
+    bool useWorkspaceForDocuments = true,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -949,7 +950,10 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
-        if (workspaceAttachments.containsKey(document.path)) continue;
+        if (useWorkspaceForDocuments &&
+            workspaceAttachments.containsKey(document.path)) {
+          continue;
+        }
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: document.fileName, mime: mime)) {
           continue;
@@ -976,6 +980,11 @@ class MessageBuilderService {
   /// carrying one is not frozen: the frozen prompt is provider-neutral, and a
   /// later regeneration on a provider without a sandbox needs the text back.
   ///
+  /// Workspace attachment paths are added to their owning messages after
+  /// prompt freezing and memory refresh, using the current workspace mapping.
+  /// [useWorkspaceForDocuments] requires read_file or shell; paths remain
+  /// visible even when the available tools cannot read document contents.
+  ///
   /// Returns the image paths from the last user message (for API call).
   /// [previewOnly] reads frozen prompts and resolves memory without writing
   /// prompts or triggering document extraction / OCR for unfrozen attachments.
@@ -989,6 +998,7 @@ class MessageBuilderService {
     bool nativePdfInput = false,
     bool previewOnly = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
+    bool useWorkspaceForDocuments = true,
   }) async {
     late final quoteMarker = lookupAppLocalizations(
       basicLocaleListResolution(
@@ -1176,6 +1186,7 @@ class MessageBuilderService {
     // the context log would otherwise have that text treated as an internal
     // block and stripped off their message.
     final snapshotRevisionIds = <String>{};
+    final workspaceAttachmentPrompts = <int, String>{};
 
     for (int i = 0; i < apiMessages.length; i++) {
       if (!isPersistedUserMessage(apiMessages[i])) continue;
@@ -1191,11 +1202,33 @@ class MessageBuilderService {
           ? parseInputFromMessage(chatMessageForParts)
           : parseInputFromApiMap(apiMessages[i]);
       final hasNativePdf = nativePdfRevisionIds.contains(revisionId);
-      final hasWorkspaceDocuments = parsedUser.documents.any(
-        (d) =>
-            workspaceAttachments.containsKey(d.path) &&
-            !(nativePdfInput && isPdfMime(_effectiveAttachmentMime(d))),
-      );
+      final workspaceFiles = StringBuffer();
+      final attachmentPaths = <String>{
+        for (final document in parsedUser.documents) document.path,
+        ...parsedUser.imagePaths,
+      };
+      for (final path in attachmentPaths) {
+        final local = workspaceAttachments[path];
+        if (local == null) continue;
+        workspaceFiles
+          ..writeln('Attached file: ${local.name}')
+          ..writeln('Path: ${local.modelPath} (${local.size} bytes)');
+        if (useWorkspaceForDocuments) {
+          workspaceFiles.writeln(
+            'Use workspace file tools to inspect it as needed.',
+          );
+        }
+      }
+      if (workspaceFiles.isNotEmpty) {
+        workspaceAttachmentPrompts[i] = workspaceFiles.toString().trimRight();
+      }
+      final hasWorkspaceDocuments =
+          useWorkspaceForDocuments &&
+          parsedUser.documents.any(
+            (d) =>
+                workspaceAttachments.containsKey(d.path) &&
+                !(nativePdfInput && isPdfMime(_effectiveAttachmentMime(d))),
+          );
       // A local workspace already owns these documents. Do not additionally
       // upload them to a provider's code-execution sandbox.
       if (hasWorkspaceDocuments) {
@@ -1355,14 +1388,9 @@ class MessageBuilderService {
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (nativePdfInput && isPdfMime(effectiveMime)) continue;
-        final local = workspaceAttachments[d.path];
-        if (local != null) {
+        if (useWorkspaceForDocuments &&
+            workspaceAttachments.containsKey(d.path)) {
           leftToSandbox = true;
-          filePrompts.writeln('Attached file: ${d.fileName}');
-          filePrompts.writeln('Path: ${local.modelPath} (${local.size} bytes)');
-          filePrompts.writeln(
-            'Use workspace file tools to inspect it as needed.',
-          );
           continue;
         }
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
@@ -1469,6 +1497,17 @@ class MessageBuilderService {
       snapshotRevisionIds: snapshotRevisionIds
         ..addAll(injectionPass.snapshotCarriers),
     );
+
+    // Keep execution paths out of frozen prompts so rebinding a workspace can
+    // resolve them again. Only the owning message receives each descriptor;
+    // later uploads do not change the system prompt or earlier message text.
+    for (final entry in workspaceAttachmentPrompts.entries) {
+      final message = apiMessages[entry.key];
+      final body = message['content'] as String;
+      message['content'] = body.isEmpty
+          ? entry.value
+          : '$body\n\n${entry.value}';
+    }
 
     return lastUserImagePaths ?? <String>[];
   }
@@ -2119,7 +2158,6 @@ class MessageBuilderService {
     Assistant? assistant, {
     String? conversationId,
     WorkspaceToolContext? workspaceContext,
-    List<AttachmentInfo> attachments = const [],
   }) async {
     try {
       final environmentProvider = contextProvider.read<EnvironmentProvider?>();
@@ -2136,7 +2174,6 @@ class MessageBuilderService {
       final environment = await environmentProvider?.loadExecutionConfig();
       final fragment = WorkspaceToolsService.buildPromptFragment(
         ctx,
-        attachments: attachments,
         environmentVariableNames: environment?.variables.keys ?? const [],
       );
       if (fragment.trim().isEmpty) return;

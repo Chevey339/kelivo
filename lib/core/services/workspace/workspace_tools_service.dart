@@ -29,7 +29,6 @@ import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
 import 'workspace_runtime.dart';
-import 'workspace_session_sync.dart';
 import 'workspace_tool_context.dart';
 import 'workspace_tool_metadata.dart';
 
@@ -377,7 +376,6 @@ class WorkspaceToolsService {
 
   static String buildPromptFragment(
     WorkspaceToolContext ctx, {
-    List<AttachmentInfo> attachments = const [],
     Iterable<String> environmentVariableNames = const [],
   }) {
     if (ctx.skillsOnly) return '';
@@ -395,10 +393,6 @@ class WorkspaceToolsService {
     final outputsHint = paths.sandboxed
         ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
         : '${paths.sessionHostDir}/outputs/<id>.txt';
-    final attachDir = paths.sandboxed
-        ? '${WorkspacePaths.guestChat}/attachments/'
-        : '${paths.sessionHostDir}/attachments/';
-
     final buf = StringBuffer()
       ..writeln('<workspace>')
       ..writeln('Path zones:')
@@ -460,13 +454,6 @@ class WorkspaceToolsService {
       )
       ..writeln()
       ..writeln(_engineLine(ctx));
-    if (attachments.isNotEmpty) {
-      buf.writeln();
-      buf.writeln('Attachments under $attachDir');
-      for (final item in attachments) {
-        buf.writeln('- ${item.name} (${item.size} bytes)');
-      }
-    }
     buf.write('</workspace>');
     return buf.toString();
   }
