@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Kelivo/core/services/storage/storage_space.dart';
 import 'package:archive/archive_io.dart';
 import 'package:Kelivo/core/database/startup_recovery_service.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
@@ -232,13 +233,7 @@ void main() {
       addTearDown(() => DeviceStorageProbe.debugOverride = null);
       await expectLater(
         PrivateDataStorage.prepare(source: source, target: target),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'code',
-            'private_storage_insufficient_space',
-          ),
-        ),
+        throwsA(isA<InsufficientStorageSpace>()),
       );
       expect(await target.exists(), isFalse);
       expect(

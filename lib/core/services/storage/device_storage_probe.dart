@@ -46,7 +46,7 @@ final class DeviceStorageProbe {
     try {
       final value = await _channel.invokeMethod<Object?>('freeBytes');
       if (value is! int) return null;
-      if (value <= _minimumPlausibleBytes) return null;
+      if (value < _minimumPlausibleBytes) return null;
       if (value >= _maximumPlausibleBytes) return null;
       return value;
     } catch (_) {

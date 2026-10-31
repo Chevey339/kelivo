@@ -3325,7 +3325,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetButton.
   ///
   /// In en, this message translates to:
-  /// **'Reset data'**
+  /// **'Start with an empty chat list'**
   String get startupRecoveryResetButton;
 
   /// No description provided for @startupRecoveryBusy.
@@ -3361,19 +3361,19 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetDialogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reset all data?'**
+  /// **'Start with an empty chat list?'**
   String get startupRecoveryResetDialogTitle;
 
   /// No description provided for @startupRecoveryResetDialogContent.
   ///
   /// In en, this message translates to:
-  /// **'Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.'**
+  /// **'This will not recover your previous chats. Kelivo will keep the current database and existing copies, and start a new empty chat list. To get your chats back, cancel and choose a local copy.'**
   String get startupRecoveryResetDialogContent;
 
   /// No description provided for @startupRecoveryResetDialogConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Reset and restart'**
+  /// **'Keep copies and start fresh'**
   String get startupRecoveryResetDialogConfirm;
 
   /// No description provided for @startupRecoveryResetDialogCancel.
@@ -3505,7 +3505,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoverySectionDataBody.
   ///
   /// In en, this message translates to:
-  /// **'Nothing has been deleted. Save a copy somewhere safe before trying anything below.'**
+  /// **'You can also export the remaining data and keep it somewhere safe before continuing.'**
   String get startupRecoverySectionDataBody;
 
   /// No description provided for @startupRecoveryExportSavedTo.
@@ -3559,7 +3559,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryDangerZone.
   ///
   /// In en, this message translates to:
-  /// **'Danger zone'**
+  /// **'Other options'**
   String get startupRecoveryDangerZone;
 
   /// No description provided for @startupRecoveryDangerBody.
@@ -3571,7 +3571,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetAcknowledge.
   ///
   /// In en, this message translates to:
-  /// **'I want to start with a new empty database.'**
+  /// **'I choose to continue with an empty chat list without recovering my chats now.'**
   String get startupRecoveryResetAcknowledge;
 
   /// No description provided for @startupDatabaseUpdateRequiredTitle.
@@ -21654,7 +21654,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoverySnapshotTitle.
   ///
   /// In en, this message translates to:
-  /// **'Restore from a database snapshot'**
+  /// **'Recover from a local copy'**
   String get startupRecoverySnapshotTitle;
 
   /// No description provided for @startupRecoverySnapshotBody.
@@ -21672,7 +21672,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoverySnapshotButton.
   ///
   /// In en, this message translates to:
-  /// **'Choose a snapshot'**
+  /// **'Choose a copy to recover'**
   String get startupRecoverySnapshotButton;
 
   /// No description provided for @startupRecoverySnapshotConfirm.
@@ -23571,7 +23571,7 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryMissingDataBody.
   ///
   /// In en, this message translates to:
-  /// **'The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.'**
+  /// **'Kelivo could not find the current chat database. It has paused loading and has not created an empty database. We’ll look for previous copies below; existing files will be kept.'**
   String get recoveryMissingDataBody;
 
   /// No description provided for @recoveryEmptyDataTitle.
@@ -23583,19 +23583,19 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryEmptyDataBody.
   ///
   /// In en, this message translates to:
-  /// **'The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.'**
+  /// **'The current chat list is empty, and previous copies were found. Choose a copy below to recover your chats. Existing files will be kept.'**
   String get recoveryEmptyDataBody;
 
   /// No description provided for @recoveryKeepCurrent.
   ///
   /// In en, this message translates to:
-  /// **'Keep current data and continue'**
+  /// **'Continue with an empty chat list'**
   String get recoveryKeepCurrent;
 
   /// No description provided for @recoveryKeepCurrentConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Continue with the current empty database? Previous copies will remain available for recovery later.'**
+  /// **'This continues without recovering your previous chats. The current chat list will stay empty; old copies will be kept. If you want your chats back, cancel and choose a local copy.'**
   String get recoveryKeepCurrentConfirm;
 
   /// No description provided for @recoverySearchingCopies.
@@ -23637,7 +23637,7 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryStorageFailureBody.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.'**
+  /// **'The data update could not finish. The original data has been kept. Try reopening Kelivo, or choose a local copy below to recover.'**
   String get recoveryStorageFailureBody;
 
   /// No description provided for @recoveryProtectingTitle.
@@ -23679,7 +23679,7 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryStorageInsufficientSpaceBody.
   ///
   /// In en, this message translates to:
-  /// **'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.'**
+  /// **'There is not enough storage to safely prepare your data. Free space in system settings, then reopen Kelivo or recheck the copies below. Keep Kelivo installed and leave its data and local copies in place.'**
   String get recoveryStorageInsufficientSpaceBody;
 
   /// No description provided for @migrationFreshStartTitle.
@@ -27569,6 +27569,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// No description provided for @recoveryGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let’s recover your chats'**
+  String get recoveryGuideTitle;
+
+  /// No description provided for @recoveryGuideBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo paused loading your data. We’ll look for local copies so you can choose what to recover. Existing files will be kept.'**
+  String get recoveryGuideBody;
+
+  /// No description provided for @recoverySpaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Some free space is needed'**
+  String get recoverySpaceTitle;
+
+  /// No description provided for @recoveryChecksNeedSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Local copies were found, but there is not enough space to check them. This does not mean they are damaged. Free some space, then check again.'**
+  String get recoveryChecksNeedSpace;
+
+  /// No description provided for @recoveryChecksUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Some local copies could not be checked yet. Their files are still available. Check again, or export your data for help.'**
+  String get recoveryChecksUnavailable;
+
+  /// No description provided for @recoveryRecheckCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Check local copies again'**
+  String get recoveryRecheckCopies;
+
+  /// No description provided for @recoveryCopyPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy preview'**
+  String get recoveryCopyPreview;
+
+  /// No description provided for @recoveryRestoreRetryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The restore could not be completed. The selected copy has been kept. Check local copies again or reopen Kelivo to continue.'**
+  String get recoveryRestoreRetryBody;
+
+  /// No description provided for @recoverySpaceAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Last check: {available} available; at least {required} of free space is needed to prepare your data safely.'**
+  String recoverySpaceAmount(String required, String available);
+
+  /// No description provided for @recoveryCopiesNeedUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.'**
+  String get recoveryCopiesNeedUpdate;
 }
 
 class _AppLocalizationsDelegate

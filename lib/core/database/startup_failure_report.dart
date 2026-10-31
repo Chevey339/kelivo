@@ -10,6 +10,7 @@ import '../services/backup/restore_diagnostic_exception.dart';
 import '../services/backup/restore_cutover_executor.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
+import '../services/storage/storage_space.dart';
 
 /// Which startup gate failed closed.
 ///
@@ -332,6 +333,17 @@ final class StartupFailureReport {
   final StartupFailureEnvironment? environment;
   final Map<String, String> restoreDetails;
 
+  ({int required, int available})? get storageSpace {
+    for (final cause in causes) {
+      final required = int.tryParse(cause.details['required bytes'] ?? '');
+      final available = int.tryParse(cause.details['available bytes'] ?? '');
+      if (required != null && available != null) {
+        return (required: required, available: available);
+      }
+    }
+    return null;
+  }
+
   /// A blocked old-directory move can resume the same prepared transaction.
   /// Do not offer this shortcut for installation/rollback or unrelated I/O.
   String? get blockedRestoreDirectory {
@@ -395,6 +407,17 @@ final class StartupFailureReport {
   }
 
   static StartupFailureCause _describeCause(Object error, StackTrace? stack) {
+    if (error is InsufficientStorageSpace) {
+      return StartupFailureCause(
+        type: 'InsufficientStorageSpace',
+        message: 'storage_insufficient_space',
+        details: {
+          'required bytes': '${error.requiredBytes}',
+          'available bytes': '${error.availableBytes}',
+        },
+        stackTrace: stack,
+      );
+    }
     if (error is DriftRemoteException) {
       return StartupFailureCause(
         type: 'DriftRemoteException',
@@ -535,6 +558,9 @@ final class StartupFailureReport {
 /// anything else that differs per device. Anything that fails that test
 /// degrades to the type name, and the full text lives in the report instead.
 String restoreFailureDiagnosticCode(Object error) {
+  if (InsufficientStorageSpace.causedBy(error)) {
+    return 'storage_insufficient_space';
+  }
   if (error is DriftRemoteException) {
     // Drift's worker isolate is a transport, not a diagnosis; report what
     // actually failed and keep the marker that it happened off-isolate.

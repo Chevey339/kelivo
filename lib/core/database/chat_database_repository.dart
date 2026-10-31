@@ -46,6 +46,7 @@ import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
 import 'schema_migrations.dart';
+import '../services/storage/storage_space.dart';
 import 'gen_ui_derived_schema.dart';
 import '../services/api/stream/stream_chunk_handler.dart';
 import '../services/api/providers/claude/claude_thinking_recovery.dart';
@@ -429,7 +430,8 @@ class ChatDatabaseRepository {
     final int schemaVersion;
     try {
       schemaVersion = SchemaMigrations.readSchemaVersion(file);
-    } on sqlite.SqliteException {
+    } on sqlite.SqliteException catch (error) {
+      if (InsufficientStorageSpace.causedBy(error)) rethrow;
       throw StateError('database_corrupt');
     }
 
@@ -442,7 +444,8 @@ class ChatDatabaseRepository {
         // Deliberately validated only at the current schema; see
         // _validateRawStructure.
         _validateRawStructure(database);
-      } on sqlite.SqliteException {
+      } on sqlite.SqliteException catch (error) {
+        if (InsufficientStorageSpace.causedBy(error)) rethrow;
         throw StateError('database_corrupt');
       } finally {
         database.close();
@@ -458,6 +461,12 @@ class ChatDatabaseRepository {
       throw StateError('database_schema_version');
     }
 
+    // Recheck on every attempt, including installations already copied by an
+    // earlier build. Never start the checkpoint/backup with a known shortfall.
+    await InsufficientStorageSpace.require(
+      64 * 1024 * 1024 + await SchemaMigrations.additionalUpgradeBytes(file),
+    );
+
     final resolvedDurability = durability ?? RestorePlatformDurability();
     final parent = file.absolute.parent;
     final backup = File(
@@ -472,7 +481,8 @@ class ChatDatabaseRepository {
       } finally {
         database.close();
       }
-    } on sqlite.SqliteException {
+    } on sqlite.SqliteException catch (error) {
+      if (InsufficientStorageSpace.causedBy(error)) rethrow;
       throw StateError('database_corrupt');
     }
 
@@ -493,7 +503,7 @@ class ChatDatabaseRepository {
       } finally {
         database.close();
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
       // The copy is deliberately LEFT BEHIND. Between deleting the database
       // family and finishing the copy back there is no usable database on
       // disk, so the copy is the only surviving good state and must outlive
@@ -504,6 +514,9 @@ class ChatDatabaseRepository {
         target: file,
         durability: resolvedDurability,
       );
+      if (InsufficientStorageSpace.causedBy(error)) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
       throw StateError('database_migration_failed:$schemaVersion');
     }
 

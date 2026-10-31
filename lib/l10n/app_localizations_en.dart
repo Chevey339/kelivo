@@ -1756,7 +1756,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startupRecoveryExportButton => 'Export a copy of my data';
 
   @override
-  String get startupRecoveryResetButton => 'Reset data';
+  String get startupRecoveryResetButton => 'Start with an empty chat list';
 
   @override
   String get startupRecoveryBusy => 'Working…';
@@ -1777,14 +1777,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reset failed. Fully close Kelivo, then open it again.';
 
   @override
-  String get startupRecoveryResetDialogTitle => 'Reset all data?';
+  String get startupRecoveryResetDialogTitle =>
+      'Start with an empty chat list?';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      'Start with a new empty database? The current database, its journals and existing copies will be retained for recovery.';
+      'This will not recover your previous chats. Kelivo will keep the current database and existing copies, and start a new empty chat list. To get your chats back, cancel and choose a local copy.';
 
   @override
-  String get startupRecoveryResetDialogConfirm => 'Reset and restart';
+  String get startupRecoveryResetDialogConfirm => 'Keep copies and start fresh';
 
   @override
   String get startupRecoveryResetDialogCancel => 'Cancel';
@@ -1857,7 +1858,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoverySectionDataBody =>
-      'Nothing has been deleted. Save a copy somewhere safe before trying anything below.';
+      'You can also export the remaining data and keep it somewhere safe before continuing.';
 
   @override
   String startupRecoveryExportSavedTo(String path) {
@@ -1892,7 +1893,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The integrity check could not run.';
 
   @override
-  String get startupRecoveryDangerZone => 'Danger zone';
+  String get startupRecoveryDangerZone => 'Other options';
 
   @override
   String get startupRecoveryDangerBody =>
@@ -1900,7 +1901,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryResetAcknowledge =>
-      'I want to start with a new empty database.';
+      'I choose to continue with an empty chat list without recovering my chats now.';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => 'Update Kelivo to continue';
@@ -12095,7 +12096,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpImportConfirm => 'Import';
 
   @override
-  String get startupRecoverySnapshotTitle => 'Restore from a database snapshot';
+  String get startupRecoverySnapshotTitle => 'Recover from a local copy';
 
   @override
   String get startupRecoverySnapshotBody =>
@@ -12106,7 +12107,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'No database snapshots were found on this device. Export your data before trying other recovery actions.';
 
   @override
-  String get startupRecoverySnapshotButton => 'Choose a snapshot';
+  String get startupRecoverySnapshotButton => 'Choose a copy to recover';
 
   @override
   String startupRecoverySnapshotConfirm(String when) {
@@ -13208,21 +13209,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recoveryMissingDataBody =>
-      'The current database is missing, but this device still contains previous data. Kelivo has paused startup and has not created an empty database. Your remaining files and copies are being preserved.';
+      'Kelivo could not find the current chat database. It has paused loading and has not created an empty database. We’ll look for previous copies below; existing files will be kept.';
 
   @override
   String get recoveryEmptyDataTitle => 'Current chat history is empty';
 
   @override
   String get recoveryEmptyDataBody =>
-      'The current database has no conversations, but previous copies were found. Kelivo has paused startup so you can recover a copy or explicitly keep the current data. Nothing will be overwritten automatically.';
+      'The current chat list is empty, and previous copies were found. Choose a copy below to recover your chats. Existing files will be kept.';
 
   @override
-  String get recoveryKeepCurrent => 'Keep current data and continue';
+  String get recoveryKeepCurrent => 'Continue with an empty chat list';
 
   @override
   String get recoveryKeepCurrentConfirm =>
-      'Continue with the current empty database? Previous copies will remain available for recovery later.';
+      'This continues without recovering your previous chats. The current chat list will stay empty; old copies will be kept. If you want your chats back, cancel and choose a local copy.';
 
   @override
   String get recoverySearchingCopies =>
@@ -13251,7 +13252,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recoveryStorageFailureBody =>
-      'Kelivo could not activate its protected data storage. Startup has stopped and the original data has been kept. Export a copy of your data or retry; no empty database will be created.';
+      'The data update could not finish. The original data has been kept. Try reopening Kelivo, or choose a local copy below to recover.';
 
   @override
   String get recoveryProtectingTitle => 'Protecting the chat database';
@@ -13277,7 +13278,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recoveryStorageInsufficientSpaceBody =>
-      'There is not enough free space to keep the original database and create its verified internal copy. Existing data and snapshots are unchanged. Free some space, then retry.';
+      'There is not enough storage to safely prepare your data. Free space in system settings, then reopen Kelivo or recheck the copies below. Keep Kelivo installed and leave its data and local copies in place.';
 
   @override
   String get migrationFreshStartTitle => 'Fresh start is ready';
@@ -15604,4 +15605,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get recoveryGuideTitle => 'Let’s recover your chats';
+
+  @override
+  String get recoveryGuideBody =>
+      'Kelivo paused loading your data. We’ll look for local copies so you can choose what to recover. Existing files will be kept.';
+
+  @override
+  String get recoverySpaceTitle => 'Some free space is needed';
+
+  @override
+  String get recoveryChecksNeedSpace =>
+      'Local copies were found, but there is not enough space to check them. This does not mean they are damaged. Free some space, then check again.';
+
+  @override
+  String get recoveryChecksUnavailable =>
+      'Some local copies could not be checked yet. Their files are still available. Check again, or export your data for help.';
+
+  @override
+  String get recoveryRecheckCopies => 'Check local copies again';
+
+  @override
+  String get recoveryCopyPreview => 'Copy preview';
+
+  @override
+  String get recoveryRestoreRetryBody =>
+      'The restore could not be completed. The selected copy has been kept. Check local copies again or reopen Kelivo to continue.';
+
+  @override
+  String recoverySpaceAmount(String required, String available) {
+    return 'Last check: $available available; at least $required of free space is needed to prepare your data safely.';
+  }
+
+  @override
+  String get recoveryCopiesNeedUpdate =>
+      'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.';
 }

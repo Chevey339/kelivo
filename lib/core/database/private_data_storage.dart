@@ -14,7 +14,8 @@ import 'package:uuid/uuid.dart';
 
 import '../services/backup/restore_business_lease.dart';
 import '../services/backup/restore_durability.dart';
-import '../services/storage/device_storage_probe.dart';
+import '../services/storage/storage_space.dart';
+import 'schema_migrations.dart';
 
 /// Activates private iOS database storage. Public files stay in Documents.
 /// The source database family is retained, not deleted.
@@ -150,10 +151,13 @@ abstract final class PrivateDataStorage {
           requiredBytes += value['bytes'] as int;
         }
       }
-      final freeBytes = await DeviceStorageProbe.freeBytes();
-      if (freeBytes != null && freeBytes < requiredBytes) {
-        throw StateError('private_storage_insufficient_space');
-      }
+      // Startup still has to upgrade the copied database. Budget its retained
+      // backup and journal before activating the new directory, not just the
+      // first copy. The source remains untouched on an insufficient-space exit.
+      requiredBytes += await SchemaMigrations.additionalUpgradeBytes(
+        File(p.join(source.path, 'kelivo.db')),
+      );
+      await InsufficientStorageSpace.require(requiredBytes);
       await staged.create(recursive: true);
       await io.restrictDirectory(staged);
       await _write(File(p.join(staged.path, sourceManifestName)), {

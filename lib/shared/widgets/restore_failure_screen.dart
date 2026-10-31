@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import '../../core/database/private_data_storage.dart';
 import 'package:crypto/crypto.dart';
@@ -15,6 +16,7 @@ import '../../core/database/startup_recovery_service.dart';
 import '../../core/services/backup/local_copy_catalog.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/restore_business_lease.dart';
+import '../../core/services/storage/storage_space.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -87,6 +89,37 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   List<LocalCopy> _localCopies = const <LocalCopy>[];
   final Map<String, ChatDatabaseSnapshotInfo> _verifiedCopies = {};
   final Set<String> _invalidCopies = {};
+  final Set<String> _unavailableCopies = {};
+  final Set<String> _newerCopies = {};
+  final Map<String, String> _copyErrors = {};
+  bool _validationNeedsSpace = false;
+
+  bool get _needsSpace =>
+      _validationNeedsSpace ||
+      _report.diagnosticCode == 'storage_insufficient_space' ||
+      _report.diagnosticCode == 'private_storage_insufficient_space';
+
+  String get _diagnosticText => [
+    _report.toText(),
+    if (_copyErrors.isNotEmpty) 'Local copy checks:',
+    for (final entry in _copyErrors.entries) '${entry.key}: ${entry.value}',
+  ].join('\n');
+
+  List<LocalCopy> get _orderedVerifiedCopies {
+    final copies = _localCopies.where(
+      (copy) => _verifiedCopies.containsKey(copy.id),
+    );
+    bool hasChats(LocalCopy copy) {
+      final info = _verifiedCopies[copy.id]!;
+      return info.conversationCount > 0 || info.messageCount > 0;
+    }
+
+    return [
+      ...copies.where(hasChats),
+      ...copies.where((copy) => !hasChats(copy)),
+    ];
+  }
+
   bool _validatingCopies = true;
   bool _copySearchFailed = false;
 
@@ -113,13 +146,24 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   @override
   void initState() {
     super.initState();
-    unawaitedCollect();
+    unawaited(_collectDiagnostics());
   }
 
   /// Fills the report in with everything that needs I/O, then persists it.
   /// Deliberately fire-and-forget: the screen is already useful without it.
-  void unawaitedCollect() {
-    () async {
+  Future<void> _collectDiagnostics() async {
+    setState(() {
+      _collectingDiagnostics = true;
+      _validatingCopies = true;
+      _copySearchFailed = false;
+      _validationNeedsSpace = false;
+      _verifiedCopies.clear();
+      _invalidCopies.clear();
+      _unavailableCopies.clear();
+      _newerCopies.clear();
+      _copyErrors.clear();
+    });
+    try {
       final loaded = await (widget.appVersionLoader ?? _loadAppVersion)();
       final version = loaded.version;
       final build = loaded.build;
@@ -192,8 +236,29 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
             final info = await DataSync.inspectRecoverySnapshot(archive);
             if (digest != null) verifiedArchives.add(digest);
             if (mounted) setState(() => _verifiedCopies[copy.id] = info);
-          } catch (_) {
-            if (mounted) setState(() => _invalidCopies.add(copy.id));
+          } catch (error) {
+            if (mounted) {
+              setState(() {
+                _copyErrors[copy.file.path] = error.toString();
+                if (InsufficientStorageSpace.causedBy(error)) {
+                  _validationNeedsSpace = true;
+                  _unavailableCopies.add(copy.id);
+                } else if (const {
+                  'manifest_database_schema_too_new',
+                  'database_schema_too_new',
+                }.contains(
+                  restoreFailureDiagnosticCode(error).split(':').last,
+                )) {
+                  _newerCopies.add(copy.id);
+                } else if (error is FormatException) {
+                  _invalidCopies.add(copy.id);
+                } else {
+                  // I/O, lock, timeout and newer-schema errors are not proof of
+                  // corruption. Keep the candidate available for another check.
+                  _unavailableCopies.add(copy.id);
+                }
+              });
+            }
           } finally {
             if (prepared != null) {
               await DataSync.cleanupTemporaryBackupFile(prepared);
@@ -201,8 +266,25 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           }
         }
       }
-      if (mounted) setState(() => _validatingCopies = false);
-    }();
+      if (mounted && directory != null && _copyErrors.isNotEmpty) {
+        _savedReport = await StartupDiagnosticsService.writeFailureReport(
+          appDataDirectory: _isStorageActivationFailure
+              ? PrivateDataStorage.diagnosticsDirectory(directory)
+              : directory,
+          text: _diagnosticText,
+        );
+      }
+    } catch (error) {
+      _copySearchFailed = true;
+      _validationNeedsSpace = InsufficientStorageSpace.causedBy(error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _collectingDiagnostics = false;
+          _validatingCopies = false;
+        });
+      }
+    }
   }
 
   /// Bounded on purpose: this screen runs before the app is known to be
@@ -238,7 +320,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   }
 
   Future<void> _copyReport() async {
-    await Clipboard.setData(ClipboardData(text: _report.toText()));
+    await Clipboard.setData(ClipboardData(text: _diagnosticText));
     if (!mounted) return;
     setState(() => _copied = true);
   }
@@ -258,7 +340,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       final file = File(
         '${Directory.systemTemp.path}/kelivo-startup-failure-$stamp.txt',
       );
-      await file.writeAsString(_report.toText(), flush: true);
+      await file.writeAsString(_diagnosticText, flush: true);
       if (_isDesktop) {
         final destination = await FilePicker.platform.getDirectoryPath();
         if (destination == null || destination.trim().isEmpty) {
@@ -396,20 +478,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final directory = widget.appDataDirectory;
     if (directory == null || _busy || _snapshotPrepared) return;
     final l10n = AppLocalizations.of(context)!;
-    final snapshots = _localCopies
-        .where((copy) => _verifiedCopies.containsKey(copy.id))
-        .toList();
-    // A reset may have produced newer, valid but empty copies. Put retained
-    // conversations first, while keeping empty copies available for settings.
-    bool hasChats(LocalCopy copy) {
-      final info = _verifiedCopies[copy.id]!;
-      return info.conversationCount > 0 || info.messageCount > 0;
-    }
-
-    final ordered = [
-      ...snapshots.where(hasChats),
-      ...snapshots.where((copy) => !hasChats(copy)),
-    ];
+    final ordered = _orderedVerifiedCopies;
     final selected = await showDialog<LocalCopy>(
       context: context,
       builder: (context) => AlertDialog(
@@ -497,7 +566,11 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       setState(() {
         _recoveryBusy = false;
         _restoringSnapshot = false;
-        _snapshotError = l10n.startupRecoverySnapshotFailed('$error');
+        _snapshotError = InsufficientStorageSpace.causedBy(error)
+            ? l10n.recoveryStorageInsufficientSpaceBody
+            : l10n.recoveryRestoreRetryBody;
+        _validationNeedsSpace = InsufficientStorageSpace.causedBy(error);
+        _copyErrors[selected.file.path] = error.toString();
       });
       return;
     } finally {
@@ -518,20 +591,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.recoveryKeepCurrent),
-        content: Text(l10n.recoveryKeepCurrentConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.startupRecoveryResetDialogCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.recoveryKeepCurrent),
-          ),
-        ],
-      ),
+      builder: (context) =>
+          _ResetConfirmationDialog(l10n: l10n, keepCurrent: true),
     );
     if (confirmed != true || !mounted) return;
     setState(() => _recoveryBusy = true);
@@ -625,33 +686,44 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
               children: [
                 _Header(
-                  title: _blockedDirectory != null
+                  title: _needsSpace
+                      ? l10n.recoverySpaceTitle
+                      : _blockedDirectory != null
                       ? l10n.backupRestoreDirectoryBlockedTitle
                       : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableTitle
-                      : _isStorageActivationFailure
-                      ? l10n.recoveryStorageFailureTitle
-                      : _isMissingDatabase
-                      ? l10n.recoveryMissingDataTitle
-                      : _isEmptyDatabase
-                      ? l10n.recoveryEmptyDataTitle
-                      : l10n.backupRestoreFailureTitle,
-                  body: _blockedDirectory != null
+                      : l10n.recoveryGuideTitle,
+                  body: _needsSpace
+                      ? l10n.recoveryStorageInsufficientSpaceBody
+                      : _blockedDirectory != null
                       ? l10n.backupRestoreDirectoryBlockedContent
                       : _isLeaseUnavailable
                       ? l10n.backupRestoreBusinessLeaseUnavailableContent
                       : _isStorageActivationFailure
-                      ? (_report.diagnosticCode ==
-                                'private_storage_insufficient_space'
-                            ? l10n.recoveryStorageInsufficientSpaceBody
-                            : l10n.recoveryStorageFailureBody)
+                      ? l10n.recoveryStorageFailureBody
                       : _isMissingDatabase
                       ? l10n.recoveryMissingDataBody
                       : _isEmptyDatabase
                       ? l10n.recoveryEmptyDataBody
-                      : l10n.backupRestoreFailureContent,
+                      : l10n.recoveryGuideBody,
                 ),
-                if (_blockedDirectory != null) ...[
+                if (_needsSpace && _report.storageSpace != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.recoverySpaceAmount(
+                      formatBytes(_report.storageSpace!.required),
+                      formatBytes(_report.storageSpace!.available),
+                    ),
+                  ),
+                ],
+                if (!showRecoveryActions &&
+                    (_collectingDiagnostics || _validatingCopies)) ...[
+                  const SizedBox(height: 16),
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text(l10n.recoverySearchingCopies),
+                ],
+                if (_blockedDirectory != null && _detailsExpanded) ...[
                   const SizedBox(height: 12),
                   SelectableText(_blockedDirectory!),
                 ],
@@ -664,8 +736,14 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                         ? l10n.recoverySearchingCopies
                         : _verifiedCopies.isNotEmpty
                         ? l10n.recoveryFoundCopies(_verifiedCopies.length)
+                        : _validationNeedsSpace
+                        ? l10n.recoveryChecksNeedSpace
+                        : _unavailableCopies.isNotEmpty
+                        ? l10n.recoveryChecksUnavailable
                         : _copySearchFailed
                         ? l10n.recoverySearchFailed
+                        : _newerCopies.isNotEmpty
+                        ? l10n.recoveryCopiesNeedUpdate
                         : _invalidCopies.isNotEmpty
                         ? l10n.recoveryNoValidCopies
                         : l10n.startupRecoverySnapshotEmpty,
@@ -675,7 +753,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                           value: _localCopies.isEmpty
                               ? 0
                               : (_verifiedCopies.length +
-                                        _invalidCopies.length) /
+                                        _invalidCopies.length +
+                                        _unavailableCopies.length +
+                                        _newerCopies.length) /
                                     _localCopies.length,
                         ),
                       for (final copy in _localCopies.where(
@@ -684,7 +764,18 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                         Text(
                           l10n.recoveryInvalidCopy(_basename(copy.file.path)),
                         ),
-                      if (_verifiedCopies.isNotEmpty)
+                      if (_verifiedCopies.isNotEmpty) ...[
+                        Text(l10n.recoveryCopyPreview),
+                        Text(_localCopyDate(_orderedVerifiedCopies.first)),
+                        Text(
+                          l10n.localSnapshotCopyContents(
+                            _verifiedCopies[_orderedVerifiedCopies.first.id]!
+                                .conversationCount,
+                            _verifiedCopies[_orderedVerifiedCopies.first.id]!
+                                .messageCount,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         _ActionTile(
                           icon: Lucide.RotateCcw,
                           label: _restoringSnapshot
@@ -695,6 +786,28 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                               : _restoreSnapshot,
                           emphasized: true,
                         ),
+                      ],
+                      if (!_validatingCopies && !_snapshotPrepared) ...[
+                        if (_newerCopies.isNotEmpty &&
+                            (_verifiedCopies.isNotEmpty ||
+                                _validationNeedsSpace ||
+                                _unavailableCopies.isNotEmpty ||
+                                _copySearchFailed))
+                          Text(l10n.recoveryCopiesNeedUpdate),
+                        if (_unavailableCopies.isNotEmpty &&
+                            _verifiedCopies.isNotEmpty)
+                          Text(
+                            _validationNeedsSpace
+                                ? l10n.recoveryChecksNeedSpace
+                                : l10n.recoveryChecksUnavailable,
+                          ),
+                        const SizedBox(height: 10),
+                        _ActionTile(
+                          icon: Lucide.RefreshCw,
+                          label: l10n.recoveryRecheckCopies,
+                          onPressed: _busy ? null : _collectDiagnostics,
+                        ),
+                      ],
                       if (_restoringSnapshot) ...[
                         const SizedBox(height: 12),
                         const LinearProgressIndicator(),
@@ -711,6 +824,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                 ],
                 _DiagnosticsCard(
                   report: _report,
+                  details: _diagnosticText,
                   collecting: _collectingDiagnostics,
                   savedReport: _savedReport,
                   expanded: _detailsExpanded,
@@ -757,19 +871,10 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                         icon: Lucide.Download,
                         label: l10n.startupRecoveryExportButton,
                         onPressed: _busy ? null : _exportData,
-                        emphasized: true,
                       ),
                     ],
                   ),
-                  if (_isEmptyDatabase) ...[
-                    const SizedBox(height: 16),
-                    _ActionTile(
-                      icon: Lucide.Play,
-                      label: l10n.recoveryKeepCurrent,
-                      onPressed: _busy ? null : _keepCurrentData,
-                    ),
-                  ],
-                  if (!_isStorageActivationFailure) ...[
+                  if (!_isStorageActivationFailure && _detailsExpanded) ...[
                     const SizedBox(height: 16),
                     _Section(
                       icon: Lucide.Wrench,
@@ -802,7 +907,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                   const SizedBox(height: 16),
                   _DangerZone(
                     expanded: _dangerExpanded,
-                    busy: _busy || _snapshotPrepared,
+                    busy: _busy || _snapshotPrepared || _needsSpace,
+                    onKeepCurrent: _isEmptyDatabase ? _keepCurrentData : null,
                     localCopies: _localCopies,
                     onToggle: () =>
                         setState(() => _dangerExpanded = !_dangerExpanded),
@@ -868,7 +974,7 @@ class _Header extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(
-            Lucide.TriangleAlert,
+            Lucide.History,
             size: 26,
             color: colors.onPrimaryContainer,
           ),
@@ -895,6 +1001,7 @@ class _Header extends StatelessWidget {
 class _DiagnosticsCard extends StatelessWidget {
   const _DiagnosticsCard({
     required this.report,
+    required this.details,
     required this.collecting,
     required this.savedReport,
     required this.expanded,
@@ -906,6 +1013,7 @@ class _DiagnosticsCard extends StatelessWidget {
   });
 
   final StartupFailureReport report;
+  final String details;
   final bool collecting;
   final File? savedReport;
   final bool expanded;
@@ -920,6 +1028,16 @@ class _DiagnosticsCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    if (!expanded) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: onToggleExpanded,
+          icon: const Icon(Lucide.ChevronRight, size: 16),
+          label: Text(l10n.startupRecoveryShowDetails),
+        ),
+      );
+    }
     final environment = report.environment;
     final monospace = textTheme.bodySmall?.copyWith(
       fontFamily: 'monospace',
@@ -1026,7 +1144,7 @@ class _DiagnosticsCard extends StatelessWidget {
               child: Scrollbar(
                 child: SingleChildScrollView(
                   primary: false,
-                  child: SelectableText(report.toText(), style: monospace),
+                  child: SelectableText(details, style: monospace),
                 ),
               ),
             ),
@@ -1266,6 +1384,7 @@ class _DangerZone extends StatelessWidget {
     required this.localCopies,
     required this.onToggle,
     required this.onReset,
+    this.onKeepCurrent,
   });
 
   final bool expanded;
@@ -1275,6 +1394,7 @@ class _DangerZone extends StatelessWidget {
   final List<LocalCopy> localCopies;
   final VoidCallback onToggle;
   final Future<void> Function() onReset;
+  final Future<void> Function()? onKeepCurrent;
 
   @override
   Widget build(BuildContext context) {
@@ -1302,9 +1422,11 @@ class _DangerZone extends StatelessWidget {
           const SizedBox(height: 4),
           Container(
             decoration: BoxDecoration(
-              color: colors.errorContainer.withValues(alpha: 0.28),
+              color: colors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.error.withValues(alpha: 0.35)),
+              border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.6),
+              ),
             ),
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -1331,6 +1453,14 @@ class _DangerZone extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (onKeepCurrent != null) ...[
+                  const SizedBox(height: 14),
+                  _ActionTile(
+                    icon: Lucide.Play,
+                    label: l10n.recoveryKeepCurrent,
+                    onPressed: busy ? null : onKeepCurrent,
+                  ),
+                ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -1343,7 +1473,7 @@ class _DangerZone extends StatelessWidget {
                         color: colors.error.withValues(alpha: 0.5),
                       ),
                     ),
-                    icon: const Icon(Lucide.Trash2, size: 18),
+                    icon: const Icon(Lucide.Plus, size: 18),
                     label: Text(l10n.startupRecoveryResetButton),
                   ),
                 ),
@@ -1365,9 +1495,13 @@ String _localCopyDate(LocalCopy copy) {
 }
 
 class _ResetConfirmationDialog extends StatefulWidget {
-  const _ResetConfirmationDialog({required this.l10n});
+  const _ResetConfirmationDialog({
+    required this.l10n,
+    this.keepCurrent = false,
+  });
 
   final AppLocalizations l10n;
+  final bool keepCurrent;
 
   @override
   State<_ResetConfirmationDialog> createState() =>
@@ -1382,12 +1516,20 @@ class _ResetConfirmationDialogState extends State<_ResetConfirmationDialog> {
     final l10n = widget.l10n;
     final colors = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: Text(l10n.startupRecoveryResetDialogTitle),
+      title: Text(
+        widget.keepCurrent
+            ? l10n.recoveryKeepCurrent
+            : l10n.startupRecoveryResetDialogTitle,
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.startupRecoveryResetDialogContent),
+          Text(
+            widget.keepCurrent
+                ? l10n.recoveryKeepCurrentConfirm
+                : l10n.startupRecoveryResetDialogContent,
+          ),
           const SizedBox(height: 8),
           CheckboxListTile(
             value: _acknowledged,
@@ -1410,7 +1552,9 @@ class _ResetConfirmationDialogState extends State<_ResetConfirmationDialog> {
               ? () => Navigator.of(context).pop(true)
               : null,
           child: Text(
-            l10n.startupRecoveryResetDialogConfirm,
+            widget.keepCurrent
+                ? l10n.recoveryKeepCurrent
+                : l10n.startupRecoveryResetDialogConfirm,
             style: TextStyle(
               color: _acknowledged ? colors.error : colors.onSurfaceVariant,
             ),
