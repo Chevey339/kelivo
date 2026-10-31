@@ -826,17 +826,7 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
       'https://cli-chat-proxy.grok.com/v1/billing',
       credentials,
     );
-    final monthly = parseGrokUsage(monthlyData);
-    if (monthly.windows.isNotEmpty) return monthly;
-    // Unified billing does not imply a monthly subscription. A confirmed zero
-    // monthly quota can coexist with an active legacy weekly reset cycle.
-    if (oauthNumber(
-          oauthMap(oauthMap(monthlyData['config'])['monthlyLimit'])['val'],
-        ) ==
-        0) {
-      return parseGrokUsage(data, allowInferredWeekly: true);
-    }
-    return monthly;
+    return parseGrokUsage(data, monthlyData: monthlyData);
   }
 }
 
@@ -947,42 +937,130 @@ ProviderUsageSnapshot parseChatGptUsage(Map<String, dynamic> data) {
   final resetCredits = oauthNumber(
     oauthMap(data['rate_limit_reset_credits'])['available_count'],
   );
+  final spendControl = oauthMap(data['spend_control']);
+  final spend = oauthMap(spendControl['individual_limit']);
+  final used = oauthNumber(spend['used']);
+  final limit = oauthNumber(spend['limit']);
+  final remaining = oauthNumber(spend['remaining']);
+  final percent = used != null && limit != null && limit > 0
+      ? used / limit * 100
+      : oauthNumber(spend['used_percent']) ??
+            (remaining != null && remaining <= 0 ? 100.0 : null);
+  final hasSpendCap =
+      used != null || limit != null || remaining != null || percent != null;
+  final reached = spendControl['reached'] is bool
+      ? spendControl['reached'] as bool
+      : null;
+  if (hasSpendCap) {
+    final resetAfter = oauthNumber(spend['reset_after_seconds']);
+    windows.add(
+      ProviderUsageWindow(
+        id: 'spend-cap',
+        unit: 'credits',
+        used: used,
+        limit: limit,
+        remaining: remaining,
+        usedPercent: percent?.clamp(0, 100),
+        resetsAt:
+            _reset(spend['reset_at']) ??
+            (resetAfter == null
+                ? null
+                : now.add(Duration(seconds: resetAfter.toInt()))),
+      ),
+    );
+  }
+  var allowed = limits['allowed'] is bool ? limits['allowed'] as bool : null;
+  var limitReached = limits['limit_reached'] is bool
+      ? limits['limit_reached'] as bool
+      : null;
+  if (data['rate_limit'] is! Map && hasSpendCap) {
+    // Credit-billed seats have no plan windows. Do not infer an explicit
+    // backend verdict from a rounded percentage when that verdict is absent.
+    allowed = reached == null ? null : !reached;
+    limitReached = reached;
+  }
+  final credits = oauthMap(data['credits']);
+  if (limitReached == true &&
+      (credits['unlimited'] == true || credits['has_credits'] == true) &&
+      credits['overage_limit_reached'] != true &&
+      reached != true &&
+      !(reached == null && hasSpendCap && percent != null && percent >= 100)) {
+    // Paid credits can cover exhausted plan windows, but not separate meters.
+    allowed = true;
+    limitReached = false;
+  }
   return ProviderUsageSnapshot(
     windows: windows,
     fetchedAt: now,
     plan: oauthString(data['plan_type']),
-    allowed: limits['allowed'] is bool ? limits['allowed'] as bool : null,
-    limitReached: limits['limit_reached'] is bool
-        ? limits['limit_reached'] as bool
-        : null,
+    allowed: allowed,
+    limitReached: limitReached,
     resetCredits: resetCredits?.clamp(0, double.maxFinite).toInt(),
   );
 }
 
 ProviderUsageSnapshot parseGrokUsage(
   Map<String, dynamic> data, {
-  bool allowInferredWeekly = false,
+  Map<String, dynamic>? monthlyData,
 }) {
   data = oauthMap(data['config']);
+  final monthly = monthlyData == null ? data : oauthMap(monthlyData['config']);
   final windows = <ProviderUsageWindow>[];
   final period = oauthMap(data['currentPeriod']);
   final start = _reset(period['start']);
   final end = _reset(period['end']);
-  final percent =
-      oauthNumber(data['creditUsagePercent']) ??
-      ((data['isUnifiedBillingUser'] != true || allowInferredWeekly) &&
-              start != null &&
-              end != null &&
-              end.isAfter(start) &&
-              end.isAfter(DateTime.now()) &&
-              '${period['type']}'.toUpperCase().contains('WEEK')
-          ? 0.0
-          : null);
-  if (period.isNotEmpty && percent != null) {
+  final validWeekly =
+      start != null &&
+      end != null &&
+      end.isAfter(start) &&
+      '${period['type']}'.toUpperCase().contains('WEEK');
+  final inferred = data['creditUsagePercent'] == null;
+  final rawPercent = oauthNumber(data['creditUsagePercent']);
+  double? weeklyPercent;
+  if (validWeekly) {
+    if (inferred) {
+      if (end.isAfter(DateTime.now())) weeklyPercent = 0;
+    } else if (rawPercent != null && rawPercent >= 0 && rawPercent <= 100) {
+      weeklyPercent = rawPercent;
+    }
+  }
+  final monthlyLimit = oauthNumber(oauthMap(monthly['monthlyLimit'])['val']);
+  final monthlyUsed = oauthNumber(oauthMap(monthly['used'])['val']);
+  final hasMonthly =
+      monthlyLimit != null &&
+      monthlyLimit > 0 &&
+      monthlyUsed != null &&
+      monthlyUsed >= 0;
+  final unified = data['isUnifiedBillingUser'] == true;
+  final advisory =
+      unified &&
+      inferred &&
+      weeklyPercent != null &&
+      hasMonthly &&
+      monthlyUsed >= monthlyLimit;
+  final showWeekly =
+      weeklyPercent != null &&
+      (!inferred || !unified || (!hasMonthly && monthlyLimit == 0));
+  void addOnDemand(Map<String, dynamic> config) {
+    if (windows.any((window) => window.id == 'on-demand')) return;
+    final cap = oauthNumber(oauthMap(config['onDemandCap'])['val']);
+    final used = oauthNumber(oauthMap(config['onDemandUsed'])['val']);
+    if (cap == null || cap <= 0 || used == null || used < 0) return;
+    windows.add(
+      ProviderUsageWindow(
+        id: 'on-demand',
+        used: used,
+        limit: cap,
+        usedPercent: (used / cap * 100).clamp(0, 100),
+      ),
+    );
+  }
+
+  if (showWeekly) {
     windows.add(
       ProviderUsageWindow(
         id: 'weekly',
-        usedPercent: percent,
+        usedPercent: weeklyPercent,
         duration: const Duration(days: 7),
         resetsAt: _reset(period['end']),
       ),
@@ -990,7 +1068,7 @@ ProviderUsageSnapshot parseGrokUsage(
     for (final row
         in (data['productUsage'] as List? ?? const []).whereType<Map>()) {
       final p = oauthNumber(row['usagePercent']);
-      if (p != null) {
+      if (p != null && p >= 0 && p <= 100) {
         windows.add(
           ProviderUsageWindow(
             id: '${row['product']}',
@@ -1001,25 +1079,37 @@ ProviderUsageSnapshot parseGrokUsage(
         );
       }
     }
-  } else {
-    final limit = oauthNumber(oauthMap(data['monthlyLimit'])['val']);
-    final used = oauthNumber(oauthMap(data['used'])['val']);
-    if (limit != null && limit > 0 && used != null) {
-      windows.add(
-        ProviderUsageWindow(
-          id: 'monthly',
-          used: used,
-          limit: limit,
-          usedPercent: limit > 0 ? used / limit * 100 : null,
-          resetsAt: _reset(data['billingPeriodEnd']),
-        ),
-      );
-    }
+    addOnDemand(data);
   }
+  if (hasMonthly) {
+    windows.add(
+      ProviderUsageWindow(
+        id: 'monthly',
+        used: monthlyUsed,
+        limit: monthlyLimit,
+        usedPercent: (monthlyUsed / monthlyLimit * 100).clamp(0, 100),
+        resetsAt: _reset(monthly['billingPeriodEnd']),
+        advisory: advisory,
+      ),
+    );
+    addOnDemand(monthly);
+  }
+  final mainWindows = windows.where(
+    (window) => window.id == 'weekly' || window.id == 'monthly',
+  );
+  final onDemandHeadroom = windows.any(
+    (window) => window.id == 'on-demand' && window.used! < window.limit!,
+  );
+  final bool? exhausted = advisory || mainWindows.isEmpty
+      ? null
+      : !onDemandHeadroom &&
+            mainWindows.any((window) => window.usedPercent! >= 100);
   return ProviderUsageSnapshot(
     windows: windows,
     fetchedAt: DateTime.now(),
     plan: oauthString(data['planName']) ?? oauthString(data['plan']),
+    allowed: exhausted == null ? null : !exhausted,
+    limitReached: exhausted,
   );
 }
 
@@ -1030,6 +1120,7 @@ ProviderUsageSnapshot parseKimiUsage(Map<String, dynamic> data) {
     String id, {
     Duration? duration,
     String? label,
+    DateTime? resetsAt,
   }) {
     if (row.isEmpty) return;
     final limit = oauthNumber(row['limit']);
@@ -1048,7 +1139,9 @@ ProviderUsageSnapshot parseKimiUsage(Map<String, dynamic> data) {
             ? used / limit * 100
             : null,
         duration: duration,
-        resetsAt: _reset(row['resetTime'] ?? row['reset_at']),
+        resetsAt:
+            resetsAt ??
+            _reset(row['resetTime'] ?? row['reset_at'] ?? row['reset_time']),
       ),
     );
   }
@@ -1076,6 +1169,32 @@ ProviderUsageSnapshot parseKimiUsage(Map<String, dynamic> data) {
           ? null
           : Duration(seconds: (count * multiplier).toInt()),
       label: oauthString(row['name']),
+      resetsAt: _reset(
+        window['resetTime'] ?? window['reset_at'] ?? window['reset_time'],
+      ),
+    );
+  }
+  for (final entry in oauthMap(data['usages']).entries) {
+    // The detailed five-hour window above is authoritative.
+    if (entry.key == 'limit_5h') continue;
+    final row = oauthMap(entry.value);
+    final ratio = oauthNumber(row['used_ratio']);
+    if (ratio == null) continue;
+    windows.add(
+      ProviderUsageWindow(
+        id: entry.key,
+        label:
+            const {'limit_month_total', 'limit_month_code'}.contains(entry.key)
+            ? null
+            : entry.key,
+        unit: 'percent',
+        used: ratio.clamp(0, 1) * 100,
+        limit: 100,
+        usedPercent: ratio.clamp(0, 1) * 100,
+        resetsAt: _reset(
+          row['reset_time'] ?? row['resetTime'] ?? row['reset_at'],
+        ),
+      ),
     );
   }
   return ProviderUsageSnapshot(windows: windows, fetchedAt: DateTime.now());

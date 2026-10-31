@@ -12172,6 +12172,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oauthExtraUsage => '额外用量';
 
   @override
+  String get oauthMonthlyTotal => '本月总额度';
+
+  @override
+  String get oauthMonthlyCode => '本月代码额度';
+
+  @override
+  String get oauthSpendCap => '积分消费上限';
+
+  @override
+  String get oauthOnDemand => '按需额度';
+
+  @override
+  String get oauthQuotaAdvisory => '仅供参考：本周额度仍有效，暂无法确认该月额度是否限制使用。';
+
+  @override
+  String oauthCreditsValue(String value) {
+    return '$value 积分';
+  }
+
+  @override
+  String oauthRemainingValue(String value) {
+    return '剩余 $value';
+  }
+
+  @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 
   @override
@@ -26999,6 +27024,31 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthMonthlyTotal => '本月总额度';
+
+  @override
+  String get oauthMonthlyCode => '本月代码额度';
+
+  @override
+  String get oauthSpendCap => '积分消费上限';
+
+  @override
+  String get oauthOnDemand => '按需额度';
+
+  @override
+  String get oauthQuotaAdvisory => '仅供参考：本周额度仍有效，暂无法确认该月额度是否限制使用。';
+
+  @override
+  String oauthCreditsValue(String value) {
+    return '$value 积分';
+  }
+
+  @override
+  String oauthRemainingValue(String value) {
+    return '剩余 $value';
+  }
 
   @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
@@ -41906,6 +41956,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oauthExtraUsage => '額外用量';
+
+  @override
+  String get oauthMonthlyTotal => '本月總額度';
+
+  @override
+  String get oauthMonthlyCode => '本月程式碼額度';
+
+  @override
+  String get oauthSpendCap => '積分消費上限';
+
+  @override
+  String get oauthOnDemand => '按需額度';
+
+  @override
+  String get oauthQuotaAdvisory => '僅供參考：本週額度仍有效，暫時無法確認該月額度是否限制使用。';
+
+  @override
+  String oauthCreditsValue(String value) {
+    return '$value 積分';
+  }
+
+  @override
+  String oauthRemainingValue(String value) {
+    return '剩餘 $value';
+  }
 
   @override
   String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';

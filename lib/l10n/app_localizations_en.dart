@@ -12740,6 +12740,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oauthExtraUsage => 'Extra usage';
 
   @override
+  String get oauthMonthlyTotal => 'Monthly total';
+
+  @override
+  String get oauthMonthlyCode => 'Monthly code';
+
+  @override
+  String get oauthSpendCap => 'Credit spend cap';
+
+  @override
+  String get oauthOnDemand => 'On-demand quota';
+
+  @override
+  String get oauthQuotaAdvisory =>
+      'For reference only: active weekly credits make this monthly limit uncertain.';
+
+  @override
+  String oauthCreditsValue(String value) {
+    return '$value credits';
+  }
+
+  @override
+  String oauthRemainingValue(String value) {
+    return 'Remaining $value';
+  }
+
+  @override
   String get oauthPromptCachingHelp =>
       'Reuse context across messages and choose how long the cache is retained.';
 

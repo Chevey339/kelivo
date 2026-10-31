@@ -279,7 +279,10 @@ void main() {
                 'supports_image_in': true,
                 'protocol': 'anthropic',
                 'supports_thinking_type': 'only',
-                'think_efforts': {'support': true},
+                'think_efforts': {
+                  'support': true,
+                  'valid_efforts': ['low', 'medium', 'high'],
+                },
               },
             ],
           });
@@ -314,6 +317,8 @@ void main() {
         'dialect': 'anthropicAdaptiveEffort',
         'levels': ['low', 'medium', 'high'],
         'canDisable': false,
+        'defaultLevel': 'auto',
+        'budgets': <String, int>{},
       });
       expect(
         saved.modelOverrides['kimi-k2.5']['abilities'],
@@ -596,6 +601,7 @@ void main() {
           modelOverrides: {
             'kimi-display-id': {
               'apiModelId': 'kimi-k2.5',
+              'oauthProtocol': 'anthropic',
               'abilities': ['tool', 'reasoning'],
               'reasoning': {
                 'dialect': scenario.mode == 'adaptive'
@@ -608,7 +614,9 @@ void main() {
           },
         );
         await settings.setProviderConfig(original.id, original);
-        final resolved = await service.resolve(original);
+        final resolved = (await service.resolve(
+          original,
+        )).forModelProtocol('kimi-display-id');
         final requests = <http.Request>[];
         final client = service.authenticatedClient(
           MockClient((request) async {
@@ -786,12 +794,14 @@ void main() {
         'levels': ['low', 'high', 'max'],
         'canDisable': false,
         'defaultLevel': 'max',
+        'budgets': <String, int>{},
       });
       expect(synced.modelOverrides['optional-model']['reasoning'], {
         'dialect': 'kimiThinking',
         'levels': ['low', 'high', 'max'],
         'canDisable': true,
         'defaultLevel': 'max',
+        'budgets': <String, int>{},
       });
       for (final scenario in [
         (
@@ -1108,17 +1118,146 @@ void main() {
     },
   );
 
+  for (final protocol in [null, 'anthropic']) {
+    test(
+      'Kimi sync removes retired effort controls on $protocol transport',
+      () async {
+        const model = 'kimi-for-coding-highspeed';
+        final service = ProviderOAuthService(
+          clientFactory: (_) => MockClient(
+            (_) async => jsonResponse({
+              'data': [
+                {
+                  'id': model,
+                  'protocol': protocol,
+                  'supports_thinking_type': 'only',
+                  'supports_reasoning': false,
+                },
+              ],
+            }),
+          ),
+        )..bind(settings);
+        final original = config(expired: false).copyWith(
+          models: [model, 'retired-model'],
+          modelOverrides: {
+            model: {
+              'temperature': 0.2,
+              'reasoning': {
+                'dialect': 'anthropicBudget',
+                'levels': ['low', 'high'],
+                'defaultLevel': 'high',
+                'budgets': {'low': 1024, 'high': 64000},
+              },
+            },
+          },
+        );
+        await settings.setProviderConfig(original.id, original);
+        await service.syncModels(original.id);
+        final synced = settings.providerConfigs[original.id]!;
+        expect(synced.models, [model]);
+        expect(synced.modelOverrides[model]['temperature'], 0.2);
+        final spec = ModelSpecResolver.instance.spec(synced, model);
+        expect(spec.reasoning.levels, isEmpty);
+        expect(spec.reasoning.budgets, isEmpty);
+        expect(spec.reasoning.defaultLevel, ReasoningLevel.auto);
+        expect(spec.reasoning.canDisable, isFalse);
+        late Map body;
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            body = jsonDecode(request.body) as Map;
+            expect(
+              request.url.path,
+              protocol == 'anthropic'
+                  ? '/coding/v1/messages'
+                  : '/coding/v1/chat/completions',
+            );
+            return protocol == 'anthropic'
+                ? jsonResponse({
+                    'content': [
+                      {'type': 'text', 'text': 'OK'},
+                    ],
+                    'stop_reason': 'end_turn',
+                  })
+                : jsonResponse({
+                    'choices': [
+                      {
+                        'message': {'role': 'assistant', 'content': 'OK'},
+                        'finish_reason': 'stop',
+                      },
+                    ],
+                  });
+          }),
+          synced,
+        );
+        final effective = synced.forModelProtocol(model);
+        for (final budget in [0, 64000]) {
+          final send = protocol == 'anthropic'
+              ? sendClaudeStream
+              : sendOpenAIStream;
+          await send(
+            client,
+            effective,
+            model,
+            [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            stream: false,
+            reasoning: legacyBudget(budget),
+          ).toList();
+          if (protocol == 'anthropic') {
+            expect(body['thinking']['type'], 'enabled');
+            expect(
+              body['thinking']['budget_tokens'],
+              greaterThanOrEqualTo(1024),
+            );
+            expect(
+              body['thinking']['budget_tokens'],
+              lessThan(body['max_tokens'] as int),
+            );
+          } else {
+            expect(body['thinking'], {'type': 'enabled'});
+          }
+          expect(body['reasoning_effort'], isNull);
+          expect(body['output_config'], isNull);
+        }
+        client.close();
+        service.dispose();
+      },
+    );
+  }
+
+  test('Kimi accepts only advertised efforts and defaults', () {
+    for (final protocol in [null, 'anthropic']) {
+      final override = oauthDiscoveredReasoning(OAuthProvider.kimi, {
+        'protocol': protocol,
+        'supports_thinking_type': 'only',
+        'think_efforts': {
+          'support': true,
+          'valid_efforts': ['low', 'max', 'unknown'],
+          'default_effort': 'high',
+        },
+      })!;
+      expect(override.levels, [ReasoningLevel.low, ReasoningLevel.max]);
+      expect(override.defaultLevel, ReasoningLevel.auto);
+    }
+  });
+
   test('OAuth catalog rows map onto ReasoningSpecOverride', () {
     expect(
       oauthDiscoveredReasoning(OAuthProvider.kimi, {
         'protocol': 'anthropic',
         'supports_thinking_type': 'only',
-        'think_efforts': {'support': true},
+        'think_efforts': {
+          'support': true,
+          'valid_efforts': ['low', 'medium', 'high'],
+        },
       }),
       ReasoningSpecOverride.fromJson({
         'dialect': 'anthropicAdaptiveEffort',
         'levels': ['low', 'medium', 'high'],
         'canDisable': false,
+        'defaultLevel': 'auto',
+        'budgets': <String, int>{},
       }),
     );
     expect(
@@ -1128,8 +1267,10 @@ void main() {
       }),
       ReasoningSpecOverride.fromJson({
         'dialect': 'anthropicBudget',
-        'levels': ['low', 'medium', 'high'],
+        'levels': <String>[],
         'canDisable': true,
+        'defaultLevel': 'auto',
+        'budgets': <String, int>{},
       }),
     );
     expect(
@@ -1147,6 +1288,7 @@ void main() {
         'levels': ['low', 'high', 'max'],
         'canDisable': false,
         'defaultLevel': 'max',
+        'budgets': <String, int>{},
       }),
     );
     expect(
@@ -1200,7 +1342,10 @@ void main() {
       reasoning: oauthDiscoveredReasoning(OAuthProvider.kimi, {
         'protocol': 'anthropic',
         'supports_thinking_type': 'only',
-        'think_efforts': {'support': true},
+        'think_efforts': {
+          'support': true,
+          'valid_efforts': ['low', 'medium', 'high'],
+        },
       }),
       extra: const {'oauthProtocol': 'anthropic'},
     );

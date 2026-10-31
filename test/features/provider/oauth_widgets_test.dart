@@ -1405,6 +1405,102 @@ void main() {
     },
   );
 
+  testWidgets(
+    'OAuth quotas display credit amounts, monthly labels and advisory state',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          SingleChildScrollView(
+            child: OAuthAccountCard(
+              avatar: const SizedBox(),
+              name: 'Account',
+              showDetails: true,
+              usage: ProviderUsageSnapshot(
+                fetchedAt: DateTime(2026, 10, 30),
+                windows: const [
+                  ProviderUsageWindow(
+                    id: 'spend-cap',
+                    unit: 'credits',
+                    used: 3.25,
+                    limit: 100,
+                    usedPercent: 3.25,
+                  ),
+                  ProviderUsageWindow(id: 'limit_month_total', usedPercent: 8),
+                  ProviderUsageWindow(id: 'limit_month_code', usedPercent: 0),
+                  ProviderUsageWindow(id: 'on-demand', usedPercent: 40),
+                  ProviderUsageWindow(
+                    id: 'monthly',
+                    usedPercent: 100,
+                    advisory: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Credit spend cap'), findsOneWidget);
+      expect(find.text('Used 3.25 / 100.00 credits'), findsOneWidget);
+      expect(find.text('Monthly total'), findsOneWidget);
+      expect(find.text('Monthly code'), findsOneWidget);
+      expect(find.text('On-demand quota'), findsOneWidget);
+      expect(find.textContaining('For reference only:'), findsOneWidget);
+      expect(find.text('This account has no available quota.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'OAuth credit-only remaining amount never fabricates used credits',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          OAuthAccountCard(
+            avatar: const SizedBox(),
+            name: 'Account',
+            usage: ProviderUsageSnapshot(
+              fetchedAt: DateTime(2026, 10, 30),
+              windows: const [
+                ProviderUsageWindow(
+                  id: 'spend-cap',
+                  unit: 'credits',
+                  remaining: 12.5,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Remaining 12.50 credits'), findsOneWidget);
+      expect(find.textContaining('Used '), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(
+        app(
+          OAuthAccountCard(
+            avatar: const SizedBox(),
+            name: 'Account',
+            usage: ProviderUsageSnapshot(
+              fetchedAt: DateTime(2026, 10, 30),
+              windows: const [
+                ProviderUsageWindow(
+                  id: 'spend-cap',
+                  unit: 'credits',
+                  limit: 100,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Used — / 100.00 credits'), findsOneWidget);
+      expect(find.text('Used 0%'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('expired chat recovery becomes a confirmation after login', (
     tester,
   ) async {

@@ -39,6 +39,37 @@ void main() {
   );
 
   test(
+    'Codex omits unconstrained residency without falling through to compute',
+    () {
+      for (final claims in [
+        {'chatgpt_data_residency': 'no_constraint'},
+        {'chatgpt_compute_residency': ' NO_CONSTRAINT '},
+        {
+          'chatgpt_data_residency': 'no_constraint',
+          'chatgpt_compute_residency': 'us',
+        },
+      ]) {
+        final headers = <String, String>{};
+        applyCodexRequest({}, headers, token(claims));
+        expect(headers, isNot(contains('x-openai-internal-codex-residency')));
+        headers['x-openai-internal-codex-residency'] = 'eu';
+        applyCodexRequest({}, headers, token(claims));
+        expect(headers['x-openai-internal-codex-residency'], 'eu');
+      }
+      final headers = <String, String>{};
+      applyCodexRequest(
+        {},
+        headers,
+        token({
+          'chatgpt_data_residency': ' ',
+          'chatgpt_compute_residency': 'us',
+        }),
+      );
+      expect(headers['x-openai-internal-codex-residency'], 'us');
+    },
+  );
+
+  test(
     'interrupted tools and orphan outputs remain usable as Codex history',
     () {
       final matchedCall = <String, dynamic>{

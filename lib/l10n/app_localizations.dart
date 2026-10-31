@@ -22773,6 +22773,48 @@ abstract class AppLocalizations {
   /// **'Extra usage'**
   String get oauthExtraUsage;
 
+  /// No description provided for @oauthMonthlyTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly total'**
+  String get oauthMonthlyTotal;
+
+  /// No description provided for @oauthMonthlyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly code'**
+  String get oauthMonthlyCode;
+
+  /// No description provided for @oauthSpendCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit spend cap'**
+  String get oauthSpendCap;
+
+  /// No description provided for @oauthOnDemand.
+  ///
+  /// In en, this message translates to:
+  /// **'On-demand quota'**
+  String get oauthOnDemand;
+
+  /// No description provided for @oauthQuotaAdvisory.
+  ///
+  /// In en, this message translates to:
+  /// **'For reference only: active weekly credits make this monthly limit uncertain.'**
+  String get oauthQuotaAdvisory;
+
+  /// No description provided for @oauthCreditsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} credits'**
+  String oauthCreditsValue(String value);
+
+  /// No description provided for @oauthRemainingValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining {value}'**
+  String oauthRemainingValue(String value);
+
   /// No description provided for @oauthPromptCachingHelp.
   ///
   /// In en, this message translates to:

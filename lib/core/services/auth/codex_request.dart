@@ -18,6 +18,9 @@ void applyCodexRequest(
     ]) {
       final region = auth[name];
       if (region is! String || region.trim().isEmpty) continue;
+      // The first present claim wins, including an unconstrained workspace.
+      // Declaring this sentinel as a region makes Codex return HTTP 404.
+      if (region.trim().toLowerCase() == 'no_constraint') break;
       headers.putIfAbsent(
         'x-openai-internal-codex-residency',
         () => region.trim(),

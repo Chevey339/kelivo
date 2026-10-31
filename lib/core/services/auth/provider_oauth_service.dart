@@ -507,8 +507,6 @@ const _deletedOAuthThinkingKeys = {
   'oauthThinkingDefaultEffort',
 };
 
-const _kimiDefaultLevels = ['low', 'medium', 'high'];
-
 String kimiOAuthProtocol(Map<String, dynamic> row) {
   return row['protocol'] == null && row.containsKey('protocol')
       ? 'openai'
@@ -517,11 +515,15 @@ String kimiOAuthProtocol(Map<String, dynamic> row) {
 
 /// True/false when the catalog row states reasoning support; null if omitted.
 bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
+  switch (row['supports_thinking_type']) {
+    case 'only':
+    case 'both':
+      return true;
+    case 'no':
+      return false;
+  }
   if (row.containsKey('supports_reasoning')) {
     return row['supports_reasoning'] == true;
-  }
-  if (row.containsKey('supports_thinking_type')) {
-    return const {'only', 'both'}.contains(row['supports_thinking_type']);
   }
   final efforts = oauthMap(row['think_efforts']);
   if (efforts.containsKey('support')) {
@@ -545,23 +547,21 @@ ReasoningSpecOverride? oauthDiscoveredReasoning(
   final required = row['supports_thinking_type'] == 'only';
   switch (provider) {
     case OAuthProvider.kimi:
-      if (kimiOAuthProtocol(row) == 'anthropic') {
-        final adaptive = oauthMap(row['think_efforts'])['support'] == true;
-        return ReasoningSpecOverride.fromJson({
-          'dialect': adaptive
-              ? ReasoningDialect.anthropicAdaptiveEffort.name
-              : ReasoningDialect.anthropicBudget.name,
-          'levels': _kimiDefaultLevels,
-          'canDisable': !required,
-        });
-      }
-      final levels = _oauthLevelNames(row);
+      final levels = oauthMap(row['think_efforts'])['support'] == true
+          ? _oauthLevelNames(row)
+          : <String>[];
+      final defaultLevel = _oauthDefaultLevel(row);
       return ReasoningSpecOverride.fromJson({
-        'dialect': ReasoningDialect.kimiThinking.name,
-        'levels': levels.isEmpty ? _kimiDefaultLevels : levels,
+        'dialect': kimiOAuthProtocol(row) == 'anthropic'
+            ? (levels.isNotEmpty
+                  ? ReasoningDialect.anthropicAdaptiveEffort.name
+                  : ReasoningDialect.anthropicBudget.name)
+            : ReasoningDialect.kimiThinking.name,
+        'levels': levels,
         'canDisable': !required,
-        if (_oauthDefaultLevel(row) case final defaultLevel?)
-          'defaultLevel': defaultLevel,
+        'defaultLevel': levels.contains(defaultLevel) ? defaultLevel : 'auto',
+        // A fresh roster must retire controls saved by an older discovery.
+        'budgets': <String, int>{},
       });
     case OAuthProvider.chatgpt:
     case OAuthProvider.grok:

@@ -1,5 +1,6 @@
 import '../utils/provider_url.dart';
 import '../services/auth/provider_oauth_service.dart';
+import '../services/auth/claude_oauth_request.dart';
 export '../models/model_spec.dart';
 
 import 'dart:convert';
@@ -405,6 +406,12 @@ class ProviderManager {
         };
         final extra = _customBody(cfg, modelId);
         CustomRequestMerger.applyBody(body, extra);
+        if (cfg.oauthProvider == OAuthProvider.claude) {
+          applyClaudeOAuthOutputLimits(
+            body,
+            maxOutput: ModelSpecResolver.instance.spec(cfg, modelId).maxOutput,
+          );
+        }
         final headers = <String, String>{
           'x-api-key': _effectiveApiKey(cfg),
           'anthropic-version': ClaudeProvider.anthropicVersion,

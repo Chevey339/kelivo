@@ -5773,6 +5773,19 @@
   "oauthInvalidAuthorizationCode": "Enter the code or callback URL from this login attempt.",
   "oauthSubmitAuthorizationCode": "Complete login",
   "oauthExtraUsage": "Extra usage",
+  "oauthMonthlyTotal": "Monthly total",
+  "oauthMonthlyCode": "Monthly code",
+  "oauthSpendCap": "Credit spend cap",
+  "oauthOnDemand": "On-demand quota",
+  "oauthQuotaAdvisory": "For reference only: active weekly credits make this monthly limit uncertain.",
+  "oauthCreditsValue": "{value} credits",
+  "@oauthCreditsValue": {
+    "placeholders": {"value": {"type": "String"}}
+  },
+  "oauthRemainingValue": "Remaining {value}",
+  "@oauthRemainingValue": {
+    "placeholders": {"value": {"type": "String"}}
+  },
   "oauthPromptCachingHelp": "Reuse context across messages and choose how long the cache is retained.",
   "scheduledTasksPreparation": "Execution and notifications",
   "scheduledTasksAllowPreparation": "Allow advance preparation",

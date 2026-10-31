@@ -386,6 +386,9 @@ Stream<StreamChunk> sendClaudeStream(
           assistantBody: extraBody,
         );
         CustomRequestMerger.applyBody(body, extraClaude);
+        if (config.oauthProvider == OAuthProvider.claude) {
+          applyClaudeOAuthOutputLimits(body, maxOutput: spec.maxOutput);
+        }
         applyAnthropicMessagesProtocolConstraints(body);
         if (retriedContainer) body.remove('container');
         thinkingRecovery.filterRequest(body);

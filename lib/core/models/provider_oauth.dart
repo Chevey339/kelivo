@@ -161,18 +161,22 @@ class ProviderUsageWindow {
     this.usedPercent,
     this.used,
     this.limit,
+    this.remaining,
     this.resetsAt,
     this.duration,
     this.unit,
+    this.advisory = false,
   });
   final String id;
   final String? label;
   final double? usedPercent;
   final double? used;
   final double? limit;
+  final double? remaining;
   final DateTime? resetsAt;
   final Duration? duration;
   final String? unit;
+  final bool advisory;
 }
 
 class ProviderUsageSnapshot {
