@@ -40,6 +40,7 @@ import '../shared/widgets/ios_checkbox.dart';
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
+import '../features/assistant/widgets/assistant_copy_dialog.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';

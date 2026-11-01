@@ -2764,6 +2764,126 @@ abstract class AppLocalizations {
   /// **'Copy'**
   String get assistantSettingsCopySuffix;
 
+  /// No description provided for @assistantCopyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy assistant'**
+  String get assistantCopyTitle;
+
+  /// No description provided for @assistantCopyDefaultHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The default selection keeps the existing copy behavior. Choose additional data below, or copy everything.'**
+  String get assistantCopyDefaultHint;
+
+  /// No description provided for @assistantCopyConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant configuration'**
+  String get assistantCopyConfiguration;
+
+  /// No description provided for @assistantCopyConfigurationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Always included: name, avatar, prompts, model, parameters, and preset messages.'**
+  String get assistantCopyConfigurationHint;
+
+  /// No description provided for @assistantCopyMemories.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant memories'**
+  String get assistantCopyMemories;
+
+  /// No description provided for @assistantCopyMemoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes current and legacy memories, preserving archived status. Global memories remain shared.'**
+  String get assistantCopyMemoriesHint;
+
+  /// No description provided for @assistantCopyChooseMemories.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose memories'**
+  String get assistantCopyChooseMemories;
+
+  /// No description provided for @assistantCopyPhrasesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy this assistant’s phrases. Global phrases remain shared.'**
+  String get assistantCopyPhrasesHint;
+
+  /// No description provided for @assistantCopyBindingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bindings use the same existing resources. Resource definitions and workspace files are not duplicated. Unselected world books and injections follow global defaults.'**
+  String get assistantCopyBindingsHint;
+
+  /// No description provided for @assistantCopyWorldBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'World book bindings'**
+  String get assistantCopyWorldBooks;
+
+  /// No description provided for @assistantCopySkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill selection'**
+  String get assistantCopySkills;
+
+  /// No description provided for @assistantCopyTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool and search settings'**
+  String get assistantCopyTools;
+
+  /// No description provided for @assistantCopyWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Default workspace binding'**
+  String get assistantCopyWorkspace;
+
+  /// No description provided for @assistantCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy everything'**
+  String get assistantCopyAll;
+
+  /// No description provided for @assistantCopyInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying…'**
+  String get assistantCopyInProgress;
+
+  /// No description provided for @assistantCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the assistant. Your original data is unchanged. Please try again.'**
+  String get assistantCopyFailed;
+
+  /// No description provided for @assistantCopyMemoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load memories. Please try again.'**
+  String get assistantCopyMemoryLoadFailed;
+
+  /// No description provided for @assistantCopyRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get assistantCopyRetry;
+
+  /// No description provided for @assistantCopyNoMemories.
+  ///
+  /// In en, this message translates to:
+  /// **'This assistant has no personal memories to copy.'**
+  String get assistantCopyNoMemories;
+
+  /// No description provided for @assistantCopySelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all memories'**
+  String get assistantCopySelectAll;
+
   /// No description provided for @assistantSettingsDeleteButton.
   ///
   /// In en, this message translates to:

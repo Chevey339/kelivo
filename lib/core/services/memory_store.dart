@@ -6,6 +6,11 @@ class MemoryStore extends JsonBlobStore<AssistantMemory> {
 
   static const String _memoriesKey = 'assistant_memories_v1';
 
+  // Assistant duplication writes this table together with other assistant data.
+  @override
+  Future<R> runExclusive<R>(Future<R> Function() operation) =>
+      preferences.runExclusiveMutation(operation);
+
   @override
   String get storageKey => _memoriesKey;
 

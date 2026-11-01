@@ -40,6 +40,11 @@ class MemoryCreateManyResult {
 class MemoryRepository extends JsonBlobStore<MemoryEntry> {
   MemoryRepository(super.preferences);
 
+  // Share the copy transaction's lock, including across repository instances.
+  @override
+  Future<R> runExclusive<R>(Future<R> Function() operation) =>
+      preferences.runExclusiveMutation(operation);
+
   static final String _memoriesKey = BusinessEntityKind.memoryEntry.sourceKey;
   static final String _profileKey =
       BusinessEntityKind.userProfileField.sourceKey;

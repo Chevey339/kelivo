@@ -1400,6 +1400,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantSettingsCopySuffix => '副本';
 
   @override
+  String get assistantCopyTitle => '复制助手';
+
+  @override
+  String get assistantCopyDefaultHint => '默认勾选保持现有复制行为。可选择其他数据，或直接全量复制。';
+
+  @override
+  String get assistantCopyConfiguration => '助手配置';
+
+  @override
+  String get assistantCopyConfigurationHint => '始终复制名称、头像、提示词、模型、参数及预设消息等配置。';
+
+  @override
+  String get assistantCopyMemories => '助手专属记忆';
+
+  @override
+  String get assistantCopyMemoriesHint => '包含新旧两套专属记忆，保留归档状态；全局记忆继续共享。';
+
+  @override
+  String get assistantCopyChooseMemories => '选择记忆条目';
+
+  @override
+  String get assistantCopyPhrasesHint => '复制此助手专属的快捷短语；全局短语继续共享。';
+
+  @override
+  String get assistantCopyBindingsHint =>
+      '以下选项沿用已有资源，不另建资源副本或复制工作区文件。未勾选的世界书和指令注入沿用全局默认。';
+
+  @override
+  String get assistantCopyWorldBooks => '世界书绑定';
+
+  @override
+  String get assistantCopySkills => '技能选择';
+
+  @override
+  String get assistantCopyTools => '工具与搜索设置';
+
+  @override
+  String get assistantCopyWorkspace => '默认工作区绑定';
+
+  @override
+  String get assistantCopyAll => '全量复制';
+
+  @override
+  String get assistantCopyInProgress => '正在复制…';
+
+  @override
+  String get assistantCopyFailed => '复制失败，原数据未改变，请重试。';
+
+  @override
+  String get assistantCopyMemoryLoadFailed => '无法加载记忆，请重试。';
+
+  @override
+  String get assistantCopyRetry => '重试';
+
+  @override
+  String get assistantCopyNoMemories => '此助手没有可复制的专属记忆。';
+
+  @override
+  String get assistantCopySelectAll => '全选记忆';
+
+  @override
   String get assistantSettingsDeleteButton => '删除';
 
   @override
@@ -16328,6 +16389,67 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantSettingsCopySuffix => '副本';
 
   @override
+  String get assistantCopyTitle => '复制助手';
+
+  @override
+  String get assistantCopyDefaultHint => '默认勾选保持现有复制行为。可选择其他数据，或直接全量复制。';
+
+  @override
+  String get assistantCopyConfiguration => '助手配置';
+
+  @override
+  String get assistantCopyConfigurationHint => '始终复制名称、头像、提示词、模型、参数及预设消息等配置。';
+
+  @override
+  String get assistantCopyMemories => '助手专属记忆';
+
+  @override
+  String get assistantCopyMemoriesHint => '包含新旧两套专属记忆，保留归档状态；全局记忆继续共享。';
+
+  @override
+  String get assistantCopyChooseMemories => '选择记忆条目';
+
+  @override
+  String get assistantCopyPhrasesHint => '复制此助手专属的快捷短语；全局短语继续共享。';
+
+  @override
+  String get assistantCopyBindingsHint =>
+      '以下选项沿用已有资源，不另建资源副本或复制工作区文件。未勾选的世界书和指令注入沿用全局默认。';
+
+  @override
+  String get assistantCopyWorldBooks => '世界书绑定';
+
+  @override
+  String get assistantCopySkills => '技能选择';
+
+  @override
+  String get assistantCopyTools => '工具与搜索设置';
+
+  @override
+  String get assistantCopyWorkspace => '默认工作区绑定';
+
+  @override
+  String get assistantCopyAll => '全量复制';
+
+  @override
+  String get assistantCopyInProgress => '正在复制…';
+
+  @override
+  String get assistantCopyFailed => '复制失败，原数据未改变，请重试。';
+
+  @override
+  String get assistantCopyMemoryLoadFailed => '无法加载记忆，请重试。';
+
+  @override
+  String get assistantCopyRetry => '重试';
+
+  @override
+  String get assistantCopyNoMemories => '此助手没有可复制的专属记忆。';
+
+  @override
+  String get assistantCopySelectAll => '全选记忆';
+
+  @override
   String get assistantSettingsDeleteButton => '删除';
 
   @override
@@ -31180,6 +31302,67 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantSettingsCopySuffix => '副本';
+
+  @override
+  String get assistantCopyTitle => '複製助手';
+
+  @override
+  String get assistantCopyDefaultHint => '預設勾選維持現有複製行為。可選擇其他資料，或直接完整複製。';
+
+  @override
+  String get assistantCopyConfiguration => '助手設定';
+
+  @override
+  String get assistantCopyConfigurationHint => '一律複製名稱、頭像、提示詞、模型、參數及預設訊息等設定。';
+
+  @override
+  String get assistantCopyMemories => '助手專屬記憶';
+
+  @override
+  String get assistantCopyMemoriesHint => '包含新舊兩套專屬記憶，保留封存狀態；全域記憶繼續共用。';
+
+  @override
+  String get assistantCopyChooseMemories => '選擇記憶項目';
+
+  @override
+  String get assistantCopyPhrasesHint => '複製此助手專屬的快捷短語；全域短語繼續共用。';
+
+  @override
+  String get assistantCopyBindingsHint =>
+      '以下選項沿用現有資源，不另建資源副本或複製工作區檔案。未勾選的世界書和指令注入沿用全域預設。';
+
+  @override
+  String get assistantCopyWorldBooks => '世界書綁定';
+
+  @override
+  String get assistantCopySkills => '技能選擇';
+
+  @override
+  String get assistantCopyTools => '工具與搜尋設定';
+
+  @override
+  String get assistantCopyWorkspace => '預設工作區綁定';
+
+  @override
+  String get assistantCopyAll => '完整複製';
+
+  @override
+  String get assistantCopyInProgress => '正在複製…';
+
+  @override
+  String get assistantCopyFailed => '複製失敗，原始資料未變更，請重試。';
+
+  @override
+  String get assistantCopyMemoryLoadFailed => '無法載入記憶，請重試。';
+
+  @override
+  String get assistantCopyRetry => '重試';
+
+  @override
+  String get assistantCopyNoMemories => '此助手沒有可複製的專屬記憶。';
+
+  @override
+  String get assistantCopySelectAll => '全選記憶';
 
   @override
   String get assistantSettingsDeleteButton => '刪除';

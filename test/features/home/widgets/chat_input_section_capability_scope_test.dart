@@ -58,10 +58,7 @@ void main() {
       );
       await preferences.setString('current_assistant_id_v1', 'assistant-1');
       provider = AssistantProvider(preferences: preferences);
-      for (var i = 0; i < 100; i++) {
-        if (provider.currentAssistant != null) break;
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await provider.loaded;
     });
     return provider;
   }

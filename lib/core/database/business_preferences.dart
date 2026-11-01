@@ -27,6 +27,7 @@ final class BusinessPreferences {
   _syntheticIdentities = {};
   Future<void>? _loadFuture;
   Future<void> _writeTail = Future<void>.value();
+  Future<void>? _mutationTail;
   bool _isLoaded = false;
   bool _writesBlockedForRestore = false;
 
@@ -76,7 +77,28 @@ final class BusinessPreferences {
 
   /// Awaits every write accepted so far. Desktop exit hooks flush through this
   /// so the serialized queue reaches SQLite before the process exits.
-  Future<void> flushPendingWrites() => _writeTail;
+  Future<void> flushPendingWrites() async {
+    await _mutationTail;
+    await _writeTail;
+  }
+
+  /// Shared by assistant-related stores and assistant duplication. Lock the
+  /// whole read-modify-write operation, not just its final SQLite write.
+  Future<T> runExclusiveMutation<T>(Future<T> Function() operation) async {
+    final result = (_mutationTail ?? Future<void>.value()).then(
+      (_) => operation(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    _mutationTail = tail;
+    try {
+      return await result;
+    } finally {
+      if (identical(_mutationTail, tail)) _mutationTail = null;
+    }
+  }
 
   Object? get(String key) => _copyForRead(_values[key]);
 
@@ -127,34 +149,54 @@ final class BusinessPreferences {
     });
   }
 
-  Future<bool> _setValue(String key, Object value) async {
+  Future<bool> _setValue(String key, Object value) => setMany({key: value});
+
+  /// Publishes the cache only after every write has committed successfully.
+  Future<bool> setMany(Map<String, Object> values) async {
+    final updates = values.map(
+      (key, value) => MapEntry(key, _copyForStorage(value)),
+    );
     await load();
     return _serialize(() async {
-      final kind = _entityKindForKey(key);
-      if (kind != null) {
-        final next = Map<String, Object>.from(_values)..[key] = value;
-        var routed = BusinessSettingsRouter.normalizeAndRoute(next);
-        if (kind != BusinessEntityKind.provider && key == kind.sourceKey) {
-          final rows = _restoreSyntheticIdentities(
-            kind,
-            value,
-            routed.entities[kind]!,
-          );
-          routed = BusinessSnapshot(
-            entities: <BusinessEntityKind, List<BusinessEntityValue>>{
-              ...routed.entities,
-              kind: rows,
-            },
-            preferences: routed.preferences,
-          );
+      final kinds = <BusinessEntityKind>{};
+      final preferenceUpdates = <String, Object>{};
+      for (final entry in updates.entries) {
+        final kind = _entityKindForKey(entry.key);
+        if (kind == null) {
+          _validatePreferenceKey(entry.key);
+          preferenceUpdates[entry.key] = entry.value;
+        } else {
+          kinds.add(kind);
         }
-        await _repository.synchronizeEntities(kind, routed.entities[kind]!);
-        _applyRuntimeEntity(kind, routed);
-      } else {
-        _validatePreferenceKey(key);
-        await _repository.setPreference(key, value);
-        _values[key] = _copyForStorage(value);
       }
+      final next = {..._values, ...updates};
+      final normalized = kinds.isEmpty
+          ? null
+          : BusinessSettingsRouter.normalizeAndRoute(next);
+      final entities = <BusinessEntityKind, List<BusinessEntityValue>>{
+        for (final kind in kinds)
+          kind: kind == BusinessEntityKind.provider
+              ? normalized!.entities[kind]!
+              : _restoreSyntheticIdentities(
+                  kind,
+                  next[kind.sourceKey]!,
+                  normalized!.entities[kind]!,
+                ),
+      };
+      await _repository.writeBatch(
+        entities: entities,
+        preferences: preferenceUpdates,
+      );
+      if (normalized != null) {
+        final routed = BusinessSnapshot(
+          entities: {...normalized.entities, ...entities},
+          preferences: normalized.preferences,
+        );
+        for (final kind in kinds) {
+          _applyRuntimeEntity(kind, routed);
+        }
+      }
+      _values.addAll(preferenceUpdates);
       return true;
     });
   }

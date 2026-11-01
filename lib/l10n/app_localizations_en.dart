@@ -1457,6 +1457,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantSettingsCopySuffix => 'Copy';
 
   @override
+  String get assistantCopyTitle => 'Copy assistant';
+
+  @override
+  String get assistantCopyDefaultHint =>
+      'The default selection keeps the existing copy behavior. Choose additional data below, or copy everything.';
+
+  @override
+  String get assistantCopyConfiguration => 'Assistant configuration';
+
+  @override
+  String get assistantCopyConfigurationHint =>
+      'Always included: name, avatar, prompts, model, parameters, and preset messages.';
+
+  @override
+  String get assistantCopyMemories => 'Assistant memories';
+
+  @override
+  String get assistantCopyMemoriesHint =>
+      'Includes current and legacy memories, preserving archived status. Global memories remain shared.';
+
+  @override
+  String get assistantCopyChooseMemories => 'Choose memories';
+
+  @override
+  String get assistantCopyPhrasesHint =>
+      'Copy this assistant’s phrases. Global phrases remain shared.';
+
+  @override
+  String get assistantCopyBindingsHint =>
+      'Bindings use the same existing resources. Resource definitions and workspace files are not duplicated. Unselected world books and injections follow global defaults.';
+
+  @override
+  String get assistantCopyWorldBooks => 'World book bindings';
+
+  @override
+  String get assistantCopySkills => 'Skill selection';
+
+  @override
+  String get assistantCopyTools => 'Tool and search settings';
+
+  @override
+  String get assistantCopyWorkspace => 'Default workspace binding';
+
+  @override
+  String get assistantCopyAll => 'Copy everything';
+
+  @override
+  String get assistantCopyInProgress => 'Copying…';
+
+  @override
+  String get assistantCopyFailed =>
+      'Could not copy the assistant. Your original data is unchanged. Please try again.';
+
+  @override
+  String get assistantCopyMemoryLoadFailed =>
+      'Could not load memories. Please try again.';
+
+  @override
+  String get assistantCopyRetry => 'Retry';
+
+  @override
+  String get assistantCopyNoMemories =>
+      'This assistant has no personal memories to copy.';
+
+  @override
+  String get assistantCopySelectAll => 'Select all memories';
+
+  @override
   String get assistantSettingsDeleteButton => 'Delete';
 
   @override

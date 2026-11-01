@@ -79,17 +79,7 @@ class WorldBookStore {
     all.removeWhere((e) => e.id == id);
     await save(all);
 
-    final activeMap = await _loadActiveIdsMap();
-    var activeChanged = false;
-    final nextActiveMap = <String, List<String>>{};
-    for (final entry in activeMap.entries) {
-      final filtered = entry.value
-          .where((e) => e != id)
-          .toList(growable: false);
-      if (filtered.length != entry.value.length) activeChanged = true;
-      nextActiveMap[entry.key] = filtered;
-    }
-    if (activeChanged) await _persistActiveIdsMap(nextActiveMap);
+    await removeBookFromBindings(id);
 
     final collapsed = await _loadCollapsedBooksMap();
     if (collapsed.remove(id) != null) {
@@ -125,19 +115,29 @@ class WorldBookStore {
     return _cloneActiveIdsMap(await _loadActiveIdsMap());
   }
 
-  Future<void> setActiveIds(List<String> ids, {String? assistantId}) async {
-    final map = await _loadActiveIdsMap();
-    map[assistantKey(assistantId)] = _cleanIds(ids);
-    await _persistActiveIdsMap(map);
-  }
+  Future<void> setActiveIds(List<String> ids, {String? assistantId}) =>
+      _preferences.runExclusiveMutation(() async {
+        final map = await _loadActiveIdsMap();
+        map[assistantKey(assistantId)] = _cleanIds(ids);
+        await _persistActiveIdsMap(map);
+      });
 
-  Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
-    final next = <String, List<String>>{};
-    map.forEach((key, value) {
-      next[key] = _cleanIds(value).toList(growable: false);
-    });
-    await _persistActiveIdsMap(next);
-  }
+  /// Read inside the copy transaction's queue so removing one book cannot
+  /// overwrite bindings added by an assistant copy while a write was pending.
+  Future<void> removeBookFromBindings(String bookId) =>
+      _preferences.runExclusiveMutation(() async {
+        final map = await _loadActiveIdsMap();
+        final next = <String, List<String>>{};
+        var changed = false;
+        for (final entry in map.entries) {
+          final filtered = entry.value
+              .where((id) => id != bookId)
+              .toList(growable: false);
+          if (filtered.length != entry.value.length) changed = true;
+          next[entry.key] = filtered;
+        }
+        if (changed) await _persistActiveIdsMap(next);
+      });
 
   Future<Map<String, bool>> getCollapsedBooksMap() async {
     return _cloneCollapsedBooksMap(await _loadCollapsedBooksMap());

@@ -9,6 +9,10 @@ import 'learning_mode_store.dart';
 class InstructionInjectionStore extends JsonBlobStore<InstructionInjection> {
   InstructionInjectionStore(super._preferences);
 
+  @override
+  Future<R> runExclusive<R>(Future<R> Function() operation) =>
+      preferences.runExclusiveMutation(operation);
+
   static const String _itemsKey = 'instruction_injections_v1';
   static const String _activeIdsByAssistantKey =
       'instruction_injections_active_ids_by_assistant_v1';
@@ -189,11 +193,12 @@ class InstructionInjectionStore extends JsonBlobStore<InstructionInjection> {
     return _cloneActiveIdsMap(await _loadActiveIdsMap());
   }
 
-  Future<void> setActiveIds(List<String> ids, {String? assistantId}) async {
-    final map = await _loadActiveIdsMap();
-    map[assistantKey(assistantId)] = _cleanIds(ids);
-    await _persistActiveIdsMap(map);
-  }
+  Future<void> setActiveIds(List<String> ids, {String? assistantId}) =>
+      runExclusive(() async {
+        final map = await _loadActiveIdsMap();
+        map[assistantKey(assistantId)] = _cleanIds(ids);
+        await _persistActiveIdsMap(map);
+      });
 
   Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
     final next = <String, List<String>>{};

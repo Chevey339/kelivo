@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/assistant_copy_options.dart';
 import 'package:Kelivo/core/models/world_book.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 
 import '../../support/business_test_harness.dart';
@@ -64,6 +68,81 @@ void main() {
     await next.initialize();
     addTearDown(next.dispose);
     return next;
+  }
+
+  for (final delete in [true, false]) {
+    test(
+      '${delete ? 'deleting' : 'disabling'} a book during assistant copy preserves other bindings',
+      () async {
+        await harness.preferences.setString(
+          'assistants_v1',
+          Assistant.encodeList([
+            const Assistant(id: 'assistant', name: 'Assistant'),
+          ]),
+        );
+        final assistants = AssistantProvider(preferences: harness.preferences);
+        addTearDown(assistants.dispose);
+        await assistants.loaded;
+        await provider.addBook(const WorldBook(id: 'keep', name: 'Keep'));
+        await provider.setActiveBookIds([
+          'source',
+          'keep',
+        ], assistantId: 'assistant');
+        await provider.setActiveBookIds(['keep'], assistantId: 'other');
+        await provider.setActiveBookIds([]);
+
+        // Hold a real SQLite write so the old unguarded removal would capture
+        // the map before the copy commits, then overwrite its newly added key.
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        final heldWrite = harness.database.transaction(() async {
+          entered.complete();
+          await release.future;
+        });
+        await entered.future;
+        late Future<void> change;
+        late Future<String?> copying;
+        if (delete) {
+          change = provider.deleteBook('source');
+          await pumpEventQueue();
+          copying = assistants.duplicateAssistant(
+            'assistant',
+            options: const AssistantCopyOptions(worldBooks: true),
+          );
+        } else {
+          copying = assistants.duplicateAssistant(
+            'assistant',
+            options: const AssistantCopyOptions(worldBooks: true),
+          );
+          await pumpEventQueue();
+          change = provider.updateBook(
+            'source',
+            (book) => book.copyWith(enabled: false),
+          );
+        }
+        await pumpEventQueue();
+        release.complete();
+        await heldWrite;
+        final copyId = await copying;
+        await change;
+        expect(copyId, isNotNull);
+
+        // Match the copy flow's provider refresh, and check a cold read too.
+        await provider.loadAll();
+        final saved = await reload();
+        for (final books in [provider, saved]) {
+          expect(books.activeBookIdsFor('assistant'), ['keep']);
+          expect(books.activeBookIdsFor(copyId), ['keep']);
+          expect(books.activeBookIdsFor('other'), ['keep']);
+          expect(books.activeBookIdsFor(null), isEmpty);
+          if (delete) {
+            expect(books.getById('source'), isNull);
+          } else {
+            expect(books.getById('source')!.enabled, isFalse);
+          }
+        }
+      },
+    );
   }
 
   for (final sameBook in [false, true]) {
