@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/business_test_harness.dart';
+import '../../support/android_selection_menu_mock.dart';
 import '../../support/markdown_render_helpers.dart';
 
 class _Chat extends ChatService {
@@ -215,6 +216,8 @@ void main() {
   testWidgets(
     'copy sheet selection after a semantic card maps back to Markdown source',
     (tester) async {
+      final nativeMenu = AndroidSelectionMenuMock();
+      addTearDown(nativeMenu.dispose);
       const source =
           '**Before**\n\n```kelivo-ui\nui 1 catalog "kelivo.native/1"\nroot = Text(text="card")\n```\n\nAfter';
       final message = ChatMessage(
@@ -258,7 +261,7 @@ void main() {
           .single;
       await tester.longPressAt(paragraph.localToGlobal(box.toRect().center));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Quote'));
+      await nativeMenu.press('Quote');
       await tester.pumpAndSettle();
       expect(received.single.text, 'After');
       expect(

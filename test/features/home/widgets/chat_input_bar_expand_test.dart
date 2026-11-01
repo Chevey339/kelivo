@@ -1,4 +1,5 @@
 import '../../../support/business_test_harness.dart';
+import '../../../support/android_selection_menu_mock.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -18,13 +19,16 @@ void main() {
   const barKey = Key('bar');
   const bodyHeight = 600.0;
   const nativeMenuChannel = MethodChannel('app.ios_selection_menu');
+  late AndroidSelectionMenuMock androidMenu;
 
   setUp(() {
+    androidMenu = AndroidSelectionMenuMock();
     // These assertions exercise the existing Flutter toolbar on older iOS.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(nativeMenuChannel, (_) async => false);
   });
   tearDown(() {
+    androidMenu.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(nativeMenuChannel, null);
   });
@@ -176,12 +180,28 @@ void main() {
           tester.getTopLeft(find.byType(CodeEditor)) + const Offset(20, 12),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Copy'), findsOneWidget);
+        final android =
+            Theme.of(tester.element(find.byType(CodeEditor))).platform ==
+            TargetPlatform.android;
+        if (android) {
+          expect(androidMenu.labels, contains('Copy'));
+        } else {
+          expect(find.text('Copy'), findsOneWidget);
+        }
+        final nativeHides = androidMenu.calls
+            .where((call) => call.method == 'hide')
+            .length;
 
         await tester.tap(find.byTooltip(tooltip));
         await tester.pumpAndSettle();
         expect(editor.focusNode!.hasFocus, isTrue);
         expect(find.text('Copy'), findsNothing);
+        if (android) {
+          expect(
+            androidMenu.calls.where((call) => call.method == 'hide').length,
+            greaterThan(nativeHides),
+          );
+        }
         expect(controller.text, source);
       }
     },

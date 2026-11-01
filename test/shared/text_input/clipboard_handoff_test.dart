@@ -6,12 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:re_editor/re_editor.dart';
 
 import 'mirror_harness.dart';
+import '../../support/android_selection_menu_mock.dart';
 
 void main() {
   for (final returnToLines in [false, true]) {
     testWidgets(
       'old clipboard reply cannot overwrite later edits, return=$returnToLines',
       (tester) async {
+        final nativeMenu = AndroidSelectionMenuMock();
+        addTearDown(nativeMenu.dispose);
         final h = MirrorHarness(tester);
         final source = 'alpha beta gamma\n' * 200;
         await h.mount(source, 100);
@@ -36,8 +39,8 @@ void main() {
         final origin = tester.getTopLeft(find.byType(CodeEditor));
         await tester.longPressAt(origin + const Offset(30, 12));
         await tester.pump();
-        expect(find.text('Paste'), findsOneWidget);
-        await tester.tap(find.text('Paste'));
+        expect(nativeMenu.labels, contains('Paste'));
+        await nativeMenu.press('Paste');
         await tester.pump();
         expect(clipboardRequested, isTrue);
         final paragraphText = source.replaceRange(200, 200, 'A\r\nB');
