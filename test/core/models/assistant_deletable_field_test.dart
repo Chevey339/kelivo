@@ -20,10 +20,8 @@ Future<AssistantProvider> _createProviderWithLoadedAssistants(
     },
   );
   final provider = AssistantProvider(preferences: harness.preferences);
-  for (var i = 0; i < 25; i++) {
-    if (provider.assistants.length == assistants.length) return provider;
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
+  addTearDown(provider.dispose);
+  await provider.loaded;
   return provider;
 }
 

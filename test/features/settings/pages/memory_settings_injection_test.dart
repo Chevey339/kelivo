@@ -86,7 +86,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
           expect(tester.widget<MemorySelectChip>(instruction).selected, isTrue);
-          await tester.runAsync(storage.preferences.flushPendingWrites);
+          await storage.preferences.flushPendingWrites();
           expect(
             storage.preferences.getStringList('memory_full_injection_types_v1'),
             ['instruction'],
@@ -102,7 +102,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(MemorySelectChip), findsNothing);
           expect(tester.takeException(), isNull);
-          await tester.runAsync(storage.preferences.flushPendingWrites);
+          await storage.preferences.flushPendingWrites();
         } finally {
           debugDefaultTargetPlatformOverride = null;
         }
