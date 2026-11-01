@@ -21,6 +21,109 @@ const _web =
 void main() {
   const parser = MarkdownParser();
   for (final language in ['kelivo-ui', 'kelivo-web']) {
+    test(
+      '$language preserves a closed tail only when its body is unchanged',
+      () {
+        for (final marker in ['```', '~~~']) {
+          final before = 'before\n\n$marker$language\n$_body\n$marker';
+          final document = parser.parse(before, streaming: true);
+          final node = document.children.whereType<CodeBlockNode>().single;
+          expect(node.closed, isTrue);
+          for (final suffix in [' ', '\t', ' \t\r\n', '$marker \n\n$_web']) {
+            final text = '$before$suffix';
+            final source = UiMessageSource.of([TextPart(text)])
+                .sliceForPart(0, 0, text.length)!
+                .withFirstMessageOrdinal(1, webOrdinal: 2);
+            expect(source.resolve(document, node), isNull);
+            final resolved = source.resolve(
+              document,
+              node,
+              allowStreamingTail: true,
+            );
+            expect(resolved, same(source.fences.first.fence));
+            expect(resolved!.node.closed, isTrue);
+            expect(resolved.node.code, node.code);
+            expect(
+              source.messageOrdinalOf(resolved),
+              language == 'kelivo-ui' ? 1 : 2,
+            );
+          }
+          for (final text in [
+            '${before}not a closer',
+            '${before}not a closer\nnew body\n$marker',
+            '${before.replaceFirst('你好', '您好')} ',
+          ]) {
+            final source = UiMessageSource.of([
+              TextPart(text),
+            ]).sliceForPart(0, 0, text.length)!;
+            expect(
+              source.resolve(document, node, allowStreamingTail: true),
+              isNull,
+              reason: text,
+            );
+          }
+        }
+      },
+    );
+
+    test(
+      '$language resolves a coalesced open tail only for verified appends',
+      () {
+        final before = 'before\n\n```$language\n$_body';
+        final document = parser.parse(before, streaming: true);
+        final node = document.children.whereType<CodeBlockNode>().single;
+        for (final suffix in [' continued', '\n```', '\n```\n\n$_web']) {
+          final text = '$before$suffix';
+          final source = UiMessageSource.of([TextPart(text)])
+              .sliceForPart(0, 0, text.length)!
+              .withFirstMessageOrdinal(1, webOrdinal: 2);
+          expect(source.resolve(document, node), isNull);
+          final resolved = source.resolve(
+            document,
+            node,
+            allowStreamingTail: true,
+          );
+          expect(resolved, same(source.fences.first.fence));
+          expect(resolved!.source, startsWith(node.span.slice(before)));
+          expect(
+            source.messageOrdinalOf(resolved),
+            language == 'kelivo-ui' ? 1 : 2,
+          );
+        }
+
+        for (final text in [
+          '${before.replaceFirst('before', 'edited')} continued',
+          '${before.replaceFirst('你好', '您好')} continued',
+          before.substring(0, before.length - 1),
+          '$before continued'.split('\n').map((line) => '> $line').join('\n'),
+        ]) {
+          final source = UiMessageSource.of([
+            TextPart(text),
+          ]).sliceForPart(0, 0, text.length)!;
+          expect(
+            source.resolve(document, node, allowStreamingTail: true),
+            isNull,
+            reason: text,
+          );
+        }
+
+        final closed = '$before\n```';
+        final closedDocument = parser.parse(closed, streaming: true);
+        final reopened = '${closed}not a closing fence';
+        final source = UiMessageSource.of([
+          TextPart(reopened),
+        ]).sliceForPart(0, 0, reopened.length)!;
+        expect(
+          source.resolve(
+            closedDocument,
+            closedDocument.children.whereType<CodeBlockNode>().single,
+            allowStreamingTail: true,
+          ),
+          isNull,
+        );
+      },
+    );
+
     test('cached negatives detect $language across edited empty parts', () {
       for (var cut = 1; cut < language.length; cut++) {
         final builder = MessagePartSnapshotBuilder();

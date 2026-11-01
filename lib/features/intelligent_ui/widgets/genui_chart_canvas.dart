@@ -84,12 +84,17 @@ class _GenUiChartCanvasState extends State<GenUiChartCanvas> {
     final scale = MediaQuery.textScalerOf(context);
     final labelStyle = theme.label.copyWith(color: theme.secondaryInk);
     final axis = data.yAxis;
+    final interval = axis.tickInterval ?? (axis.maximum - axis.minimum) / 4;
+    // Measure the zero-aligned ticks painted by fl_chart, excluding the bounds.
+    // Sampling padded bounds can turn near-zero residue into a long exponent
+    // label that is never displayed but needlessly widens the gutter.
+    final firstTick = axis.minimum + (-axis.minimum % interval);
     var left = 32.0;
-    for (var i = 0; i <= 4; i++) {
+    for (var i = firstTick == axis.minimum ? 1 : 0; ; i++) {
+      final value = firstTick + i * interval;
+      if (value >= axis.maximum - interval / 100000) break;
       final width = _textWidths.measure(
-        genUiChartTick(
-          axis.tickValue(axis.minimum + (axis.maximum - axis.minimum) * i / 4),
-        ),
+        genUiChartTick(axis.tickValue(value)),
         labelStyle,
         scale,
         TextDirection.ltr,

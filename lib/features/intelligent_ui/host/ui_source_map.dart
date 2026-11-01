@@ -551,18 +551,37 @@ final class UiTextSlice {
                   .length,
   );
 
-  UiSourceFence? resolve(DocumentNode document, CodeBlockNode node) {
+  UiSourceFence? resolve(
+    DocumentNode document,
+    CodeBlockNode node, {
+    bool allowStreamingTail = false,
+  }) {
     if (!document.children.contains(node)) {
       return null;
     }
     for (final item in fences) {
-      if (item.fence.topLevel &&
-          node.span.start == item.span.start &&
-          node.span.end == item.span.end &&
+      if (!item.fence.topLevel ||
+          node.span.start != item.span.start ||
+          item.span.slice(text) != item.fence.source) {
+        continue;
+      }
+      if (node.span.end == item.span.end &&
           // A completed prefix can retain its prior document while later text
           // streams. Both source intervals must still equal the original fence.
-          node.span.slice(document.source) == item.fence.source &&
-          node.span.slice(text) == item.fence.source) {
+          node.span.slice(document.source) == item.fence.source) {
+        return item.fence;
+      }
+      // Markstream coalesces long streams, so its tail can lag the host.
+      // Keep the card only for a verified append to the same original fence;
+      // a closed tail may grow its closing marker or trailing whitespace only
+      // if it stays closed and its parsed body is unchanged.
+      if (allowStreamingTail &&
+          node.span.end == document.source.length &&
+          node.span.end < item.span.end &&
+          node.info.trim() == item.fence.node.info.trim() &&
+          text.startsWith(document.source) &&
+          (!node.closed ||
+              (item.fence.node.closed && node.code == item.fence.node.code))) {
         return item.fence;
       }
     }

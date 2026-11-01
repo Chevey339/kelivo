@@ -93,6 +93,45 @@ Offset _scatterPoint(WidgetTester tester, int point) {
 }
 
 void main() {
+  for (final scale in [1.0, 1.5]) {
+    testWidgets('Y-axis gutter fits displayed ticks at text scale $scale', (
+      tester,
+    ) async {
+      final c = _controller(
+        'root = Chart(kind="line",data=[{"x":1,"y":180},{"x":10,"y":690}],x="x",y=["y"])',
+      );
+      await tester.pumpWidget(_app(c, scale: scale));
+      await tester.pumpAndSettle();
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      final labels = find.descendant(
+        of: find.byType(LineChart),
+        matching: find.byWidgetPredicate(
+          (w) => w is SideTitleWidget && w.meta.axisSide == AxisSide.left,
+        ),
+      );
+      final texts = tester.widgetList<Text>(
+        find.descendant(of: labels, matching: find.byType(Text)),
+      );
+      expect(texts.map((text) => text.data), ['0', '200', '400', '600', '800']);
+      var widest = 0.0;
+      for (final text in texts) {
+        final painter = TextPainter(
+          text: TextSpan(text: text.data, style: text.style),
+          textScaler: TextScaler.linear(scale),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (painter.width > widest) widest = painter.width;
+        painter.dispose();
+      }
+      final gutter = chart.data.titlesData.leftTitles.sideTitles.reservedSize;
+      expect(gutter, greaterThanOrEqualTo(widest + 8));
+      expect(gutter, lessThanOrEqualTo(widest.ceilToDouble() + 16));
+      await tester.tapAt(_linePoint(tester, 1, 0));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('690'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('overlapping source rows do not repeat every decorative marker', (
     tester,
   ) async {

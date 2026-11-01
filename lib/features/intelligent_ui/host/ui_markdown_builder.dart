@@ -40,7 +40,11 @@ Widget buildGenUiBlock(
 }) {
   final host = UiHostScope.trustedOf(context);
   final registry = UiRuntimeScope.maybeOf(context);
-  final fence = host?.binding.source.resolve(rendering.document, node);
+  final fence = host?.binding.source.resolve(
+    rendering.document,
+    node,
+    allowStreamingTail: rendering.streaming,
+  );
   final ordinal = fence == null
       ? null
       : host!.binding.source.messageOrdinalOf(fence);

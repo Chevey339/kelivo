@@ -235,6 +235,98 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  for (final language in ['kelivo-web', 'kelivo-ui']) {
+    testWidgets(
+      'long streaming $language retains its card between Markdown updates',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        var source = language == 'kelivo-web'
+            ? '```kelivo-web\n{"version":1,"title":"Timer","summary":"Local timer"}\n<!doctype html>\n<!-- ${'padding ' * 1100}'
+            : '```kelivo-ui\nui 1 catalog "kelivo.native/1"\nroot = Text(text="${'padding ' * 1100}';
+        final card = find.byType(
+          language == 'kelivo-web' ? GenUiWebCard : GenUiSurface,
+        );
+        Future<void> show({bool complete = false}) async {
+          await tester.pumpWidget(
+            _MessageListHarness(
+              messages: [
+                message(
+                  source,
+                  streaming: !complete,
+                  state: complete
+                      ? GenerationRunState.completed
+                      : GenerationRunState.streaming,
+                ),
+              ],
+            ),
+          );
+        }
+
+        final nativeViews = UiWebController.createdNativeViews;
+        await show();
+        await tester.pump();
+        expect(card, findsOneWidget);
+        final element = tester.element(card);
+        for (var i = 0; i < 4; i++) {
+          source += 'chunk $i ';
+          await show();
+          // The renderer coalesces long streams for 50 ms. Check the frame
+          // before its timer and the frame after it, without settling first.
+          expect(card, findsOneWidget, reason: 'pending chunk $i');
+          expect(find.byType(ms.MarkstreamCodeBlock), findsNothing);
+          expect(tester.element(card), same(element));
+          await tester.pump(const Duration(milliseconds: 60));
+          expect(card, findsOneWidget, reason: 'parsed chunk $i');
+          expect(tester.element(card), same(element));
+        }
+        source += language == 'kelivo-web'
+            ? '-->\n<body>Ready</body>\n```'
+            : '")\n```';
+        await show();
+        expect(card, findsOneWidget);
+        expect(tester.element(card), same(element));
+        await tester.pump(const Duration(milliseconds: 60));
+        // A closing line may arrive in several chunks even after the parser
+        // first marks the fence closed. Its marker/whitespace is still growing.
+        for (final suffix in ['`', ' ', '\t']) {
+          source += suffix;
+          await show();
+          expect(
+            card,
+            findsOneWidget,
+            reason: 'pending closing suffix $suffix',
+          );
+          expect(find.byType(ms.MarkstreamCodeBlock), findsNothing);
+          expect(tester.element(card), same(element));
+          await tester.pump(const Duration(milliseconds: 60));
+          expect(tester.element(card), same(element));
+        }
+        source += ' \n\nAfter preview';
+        await show();
+        expect(card, findsOneWidget);
+        expect(tester.element(card), same(element));
+        await show(complete: true);
+        await tester.pumpAndSettle();
+        expect(tester.element(card), same(element));
+        if (language == 'kelivo-web') {
+          final document = tester.widget<GenUiWebCard>(card).document;
+          expect(document.phase, UiWebPhase.ready);
+          expect(document.html, endsWith('<body>Ready</body>\n'));
+        } else {
+          expect(
+            tester.widget<GenUiSurface>(card).controller.phase,
+            SurfacePhase.complete,
+          );
+        }
+        expect(UiWebController.createdNativeViews, nativeViews);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
+  }
   desktopTest(
     'repository replacement rebinds a cached native block with the same child',
     (tester) async {
