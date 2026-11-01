@@ -92,11 +92,53 @@ Future<void> _tap(
     }
     await tester.ensureVisible(finder);
   }
+  await tester.pump();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
 
 void main() {
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    testWidgets('inline memory navigation keeps the copy scope unchanged', (
+      tester,
+    ) async {
+      AssistantCopyOptions? chosen;
+      await _open(
+        tester,
+        width: platform == TargetPlatform.iOS ? 320 : 1200,
+        onCopy: (options) async {
+          chosen = options;
+          return 'copy';
+        },
+      );
+      await _tap(tester, 'choose-memories');
+      await _tap(tester, 'memory-back');
+      expect(
+        tester
+            .widget<IosCheckbox>(
+              find.byKey(const ValueKey('assistant-copy-memories')),
+            )
+            .value,
+        isFalse,
+      );
+      await _tap(tester, 'memories');
+      await _tap(tester, 'choose-memories');
+      await _tap(tester, 'memory-back');
+      expect(
+        tester
+            .widget<IosCheckbox>(
+              find.byKey(const ValueKey('assistant-copy-memories')),
+            )
+            .value,
+        isTrue,
+      );
+      await _tap(tester, 'confirm');
+      expect(chosen!.memories, isTrue);
+      expect(chosen!.memoryIds, isNull);
+      expect(chosen!.legacyMemoryIds, isNull);
+    }, variant: TargetPlatformVariant({platform}));
+  }
+
   for (final action in ['confirm', 'close', 'all']) {
     testWidgets('$action does not load the memory picker dataset', (
       tester,
@@ -324,6 +366,8 @@ void main() {
       await _tap(tester, 'confirm');
       await _tap(tester, 'all');
       await _tap(tester, 'close');
+      await _tap(tester, 'choose-memories');
+      expect(find.text('Copy assistant'), findsOneWidget);
       expect(calls, 1);
       expect(find.text('Copying…'), findsOneWidget);
       expect(await tester.binding.handlePopRoute(), isTrue);

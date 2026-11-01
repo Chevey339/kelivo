@@ -2773,7 +2773,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantCopyDefaultHint.
   ///
   /// In en, this message translates to:
-  /// **'The default selection keeps the existing copy behavior. Choose additional data below, or copy everything.'**
+  /// **'Choose what to copy, or copy everything.'**
   String get assistantCopyDefaultHint;
 
   /// No description provided for @assistantCopyConfiguration.
@@ -2806,6 +2806,12 @@ abstract class AppLocalizations {
   /// **'Choose memories'**
   String get assistantCopyChooseMemories;
 
+  /// No description provided for @assistantCopyChooseEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose entries'**
+  String get assistantCopyChooseEntries;
+
   /// No description provided for @assistantCopyPhrasesHint.
   ///
   /// In en, this message translates to:
@@ -2815,7 +2821,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantCopyBindingsHint.
   ///
   /// In en, this message translates to:
-  /// **'Bindings use the same existing resources. Resource definitions and workspace files are not duplicated. Unselected world books and injections follow global defaults.'**
+  /// **'These options reuse existing resources; workspace files are not copied. Unselected world books and injections use global defaults.'**
   String get assistantCopyBindingsHint;
 
   /// No description provided for @assistantCopyWorldBooks.

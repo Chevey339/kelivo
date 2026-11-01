@@ -1461,7 +1461,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantCopyDefaultHint =>
-      'The default selection keeps the existing copy behavior. Choose additional data below, or copy everything.';
+      'Choose what to copy, or copy everything.';
 
   @override
   String get assistantCopyConfiguration => 'Assistant configuration';
@@ -1481,12 +1481,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantCopyChooseMemories => 'Choose memories';
 
   @override
+  String get assistantCopyChooseEntries => 'Choose entries';
+
+  @override
   String get assistantCopyPhrasesHint =>
       'Copy this assistant’s phrases. Global phrases remain shared.';
 
   @override
   String get assistantCopyBindingsHint =>
-      'Bindings use the same existing resources. Resource definitions and workspace files are not duplicated. Unselected world books and injections follow global defaults.';
+      'These options reuse existing resources; workspace files are not copied. Unselected world books and injections use global defaults.';
 
   @override
   String get assistantCopyWorldBooks => 'World book bindings';

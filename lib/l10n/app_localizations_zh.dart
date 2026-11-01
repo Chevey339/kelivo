@@ -1403,7 +1403,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantCopyTitle => '复制助手';
 
   @override
-  String get assistantCopyDefaultHint => '默认勾选保持现有复制行为。可选择其他数据，或直接全量复制。';
+  String get assistantCopyDefaultHint => '选择复制范围，或直接全量复制。';
 
   @override
   String get assistantCopyConfiguration => '助手配置';
@@ -1421,11 +1421,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantCopyChooseMemories => '选择记忆条目';
 
   @override
+  String get assistantCopyChooseEntries => '选择条目';
+
+  @override
   String get assistantCopyPhrasesHint => '复制此助手专属的快捷短语；全局短语继续共享。';
 
   @override
   String get assistantCopyBindingsHint =>
-      '以下选项沿用已有资源，不另建资源副本或复制工作区文件。未勾选的世界书和指令注入沿用全局默认。';
+      '以下仅复制绑定，不另建资源或复制工作区文件。世界书、指令注入未勾选时沿用全局默认。';
 
   @override
   String get assistantCopyWorldBooks => '世界书绑定';
@@ -16392,7 +16395,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantCopyTitle => '复制助手';
 
   @override
-  String get assistantCopyDefaultHint => '默认勾选保持现有复制行为。可选择其他数据，或直接全量复制。';
+  String get assistantCopyDefaultHint => '选择复制范围，或直接全量复制。';
 
   @override
   String get assistantCopyConfiguration => '助手配置';
@@ -16410,11 +16413,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantCopyChooseMemories => '选择记忆条目';
 
   @override
+  String get assistantCopyChooseEntries => '选择条目';
+
+  @override
   String get assistantCopyPhrasesHint => '复制此助手专属的快捷短语；全局短语继续共享。';
 
   @override
   String get assistantCopyBindingsHint =>
-      '以下选项沿用已有资源，不另建资源副本或复制工作区文件。未勾选的世界书和指令注入沿用全局默认。';
+      '以下仅复制绑定，不另建资源或复制工作区文件。世界书、指令注入未勾选时沿用全局默认。';
 
   @override
   String get assistantCopyWorldBooks => '世界书绑定';
@@ -31307,7 +31313,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantCopyTitle => '複製助手';
 
   @override
-  String get assistantCopyDefaultHint => '預設勾選維持現有複製行為。可選擇其他資料，或直接完整複製。';
+  String get assistantCopyDefaultHint => '選擇複製範圍，或直接完整複製。';
 
   @override
   String get assistantCopyConfiguration => '助手設定';
@@ -31325,11 +31331,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantCopyChooseMemories => '選擇記憶項目';
 
   @override
+  String get assistantCopyChooseEntries => '選擇項目';
+
+  @override
   String get assistantCopyPhrasesHint => '複製此助手專屬的快捷短語；全域短語繼續共用。';
 
   @override
   String get assistantCopyBindingsHint =>
-      '以下選項沿用現有資源，不另建資源副本或複製工作區檔案。未勾選的世界書和指令注入沿用全域預設。';
+      '以下僅複製綁定，不另建資源或複製工作區檔案。世界書、指令注入未勾選時沿用全域預設。';
 
   @override
   String get assistantCopyWorldBooks => '世界書綁定';

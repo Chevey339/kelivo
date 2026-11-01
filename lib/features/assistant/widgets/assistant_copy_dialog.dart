@@ -339,7 +339,6 @@ class _AssistantCopyPanelState extends State<_AssistantCopyPanel> {
   }
 
   Widget _ranges(AppLocalizations l10n) {
-    final total = (_data?.entries.length ?? 0) + (_data?.legacy.length ?? 0);
     Widget option(
       String id,
       String title,
@@ -373,25 +372,19 @@ class _AssistantCopyPanelState extends State<_AssistantCopyPanel> {
               subtitle: l10n.assistantCopyConfigurationHint,
               value: true,
             ),
-            option('memories', l10n.assistantCopyMemories, _memories, (v) {
-              _memories = v;
-              _memoryIds = null;
-              _legacyIds = null;
-            }, subtitle: l10n.assistantCopyMemoriesHint),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(44, 0, 12, 8),
-              child: IosTileButton(
-                key: const ValueKey('assistant-copy-choose-memories'),
-                label: _data == null
-                    ? l10n.assistantCopyChooseMemories
-                    : '${l10n.assistantCopyChooseMemories} ($_selectedCount/$total)',
-                icon: Lucide.ListChecks,
-                enabled: !_busy,
-                onTap: () {
-                  setState(() => _selectingMemories = true);
-                  _loadMemories();
-                },
-              ),
+            _CopyOptionRow(
+              id: 'memories',
+              title: l10n.assistantCopyMemories,
+              subtitle: l10n.assistantCopyMemoriesHint,
+              value: _memories,
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() {
+                      _memories = value;
+                      _memoryIds = null;
+                      _legacyIds = null;
+                    }),
+              titleTrailing: _memorySelectionAction(l10n),
             ),
             option(
               'phrases',
@@ -448,6 +441,65 @@ class _AssistantCopyPanelState extends State<_AssistantCopyPanel> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _memorySelectionAction(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    final total = (_data?.entries.length ?? 0) + (_data?.legacy.length ?? 0);
+    final count = total > 0 ? '$_selectedCount/$total' : null;
+    final VoidCallback? onTap = _busy
+        ? null
+        : () {
+            setState(() => _selectingMemories = true);
+            _loadMemories();
+          };
+    return Semantics(
+      button: true,
+      enabled: !_busy,
+      label: l10n.assistantCopyChooseMemories,
+      value: count,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: IosCardPress(
+        key: const ValueKey('assistant-copy-choose-memories'),
+        onTap: onTap,
+        focusable: true,
+        haptics: false,
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                l10n.assistantCopyChooseEntries,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: AppFontWeights.medium,
+                  color: _busy
+                      ? cs.onSurfaceVariant.withValues(alpha: 0.45)
+                      : cs.primary,
+                ),
+              ),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                count,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+            const SizedBox(width: 3),
+            Icon(
+              Lucide.ChevronRight,
+              size: 14,
+              color: cs.onSurfaceVariant.withValues(alpha: _busy ? 0.35 : 0.7),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -638,12 +690,14 @@ class _CopyOptionRow extends StatelessWidget {
     required this.id,
     required this.title,
     this.subtitle,
+    this.titleTrailing,
     required this.value,
     this.onChanged,
   });
   final String id;
   final String title;
   final String? subtitle;
+  final Widget? titleTrailing;
   final bool value;
   final ValueChanged<bool>? onChanged;
 
@@ -666,8 +720,24 @@ class _CopyOptionRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 14)),
-              if (subtitle != null)
+              if (titleTrailing == null)
+                Text(title, style: const TextStyle(fontSize: 14))
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 2,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 14)),
+                      titleTrailing!,
+                    ],
+                  ),
+                ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 3),
                 Text(
                   subtitle!,
                   style: TextStyle(
@@ -675,6 +745,7 @@ class _CopyOptionRow extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
+              ],
             ],
           ),
         ),
