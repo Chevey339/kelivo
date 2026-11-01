@@ -13101,6 +13101,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserUnsupported => '此平台暂不支持内置浏览器。';
 
   @override
+  String get browserStorageUnsupported =>
+      '此工作区应用需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，请更新浏览器内核后重试。';
+
+  @override
   String get browserLoadFailed => '无法加载此页面';
 
   @override
@@ -28048,6 +28052,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserUnsupported => '此平台暂不支持内置浏览器。';
+
+  @override
+  String get browserStorageUnsupported =>
+      '此工作区应用需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，请更新浏览器内核后重试。';
 
   @override
   String get browserLoadFailed => '无法加载此页面';
@@ -43045,6 +43053,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserUnsupported => '此平台暫不支援內建瀏覽器。';
+
+  @override
+  String get browserStorageUnsupported =>
+      '此工作區應用程式需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，請更新瀏覽器核心後再試。';
 
   @override
   String get browserLoadFailed => '無法載入此頁面';

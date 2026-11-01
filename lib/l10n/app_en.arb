@@ -6180,6 +6180,7 @@
   "browserCopyLink": "Copy link",
   "browserLinkCopied": "Link copied",
   "browserUnsupported": "The embedded browser is not available on this platform.",
+  "browserStorageUnsupported": "This workspace app requires Android System WebView or Microsoft Edge WebView2 Runtime version 152 or later. Update the browser engine and try again.",
   "browserLoadFailed": "This page could not be loaded",
   "browserRetry": "Try again",
   "browserFavorites": "Favorites",

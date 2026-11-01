@@ -4917,6 +4917,7 @@
   "browserCopyLink": "复制链接",
   "browserLinkCopied": "已复制链接",
   "browserUnsupported": "此平台暂不支持内置浏览器。",
+  "browserStorageUnsupported": "此工作区应用需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，请更新浏览器内核后重试。",
   "browserLoadFailed": "无法加载此页面",
   "browserRetry": "重试",
   "browserFavorites": "个人收藏",

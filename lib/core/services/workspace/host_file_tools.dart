@@ -9,6 +9,7 @@ import 'edit_matchers.dart';
 import 'unified_diff.dart';
 import 'workspace_paths.dart';
 import 'workspace_file_access.dart';
+import 'workspace_file_coordinator.dart';
 import '../tool_image.dart';
 import '../../models/external_mount.dart';
 
@@ -255,19 +256,26 @@ class HostFileTools {
     String? cwd,
   }) async {
     final resolved = await _resolve(path, cwd, write: true);
-    if (paths.isReadOnlyPath(resolved.hostPath)) {
-      throw const HostFileException('External mount is read-only');
-    }
-    final file = File(resolved.hostPath);
-    final created = !await file.exists();
-    checkCancelled?.call();
-    await file.parent.create(recursive: true);
-    checkCancelled?.call();
-    await file.writeAsString(content);
-    return WriteFileResult(
-      bytes: utf8.encode(content).length,
-      created: created,
-    );
+    return WorkspaceFileCoordinator.run(resolved.hostPath, () async {
+      final current = await _resolve(path, cwd, write: true);
+      if (current.hostPath != resolved.hostPath) {
+        throw const HostFileException('File target changed');
+      }
+      if (paths.isReadOnlyPath(resolved.hostPath)) {
+        throw const HostFileException('External mount is read-only');
+      }
+      final file = File(resolved.hostPath);
+      final created = !await file.exists();
+      checkCancelled?.call();
+      await file.parent.create(recursive: true);
+      checkCancelled?.call();
+      await file.writeAsString(content);
+      WorkspaceFileCoordinator.changed(resolved.hostPath);
+      return WriteFileResult(
+        bytes: utf8.encode(content).length,
+        created: created,
+      );
+    });
   }
 
   Future<EditFileResult> editFile(
@@ -278,37 +286,44 @@ class HostFileTools {
     String? cwd,
   }) async {
     final resolved = await _resolve(path, cwd, write: true);
-    if (paths.isReadOnlyPath(resolved.hostPath)) {
-      throw const HostFileException('External mount is read-only');
-    }
-    final file = File(resolved.hostPath);
-    if (!await file.exists()) {
-      throw HostFileException('file not found: ${resolved.modelPath}');
-    }
-    final original = await file.readAsString();
-    final outcome = applyEdit(
-      original: original,
-      oldText: oldText,
-      newText: newText,
-      replaceAll: replaceAll,
-    );
-    if (outcome is EditFailed) {
-      throw HostFileException(outcome.message);
-    }
-    final applied = outcome as EditApplied;
-    checkCancelled?.call();
-    await file.writeAsString(applied.updated);
-    return EditFileResult(
-      changed: original != applied.updated,
-      diff: UnifiedDiff.compute(
-        original,
-        applied.updated,
-        path: resolved.modelPath,
-      ),
-      replacements: applied.replacements,
-      strategy: applied.strategy.id,
-      updated: applied.updated,
-    );
+    return WorkspaceFileCoordinator.run(resolved.hostPath, () async {
+      final current = await _resolve(path, cwd, write: true);
+      if (current.hostPath != resolved.hostPath) {
+        throw const HostFileException('File target changed');
+      }
+      if (paths.isReadOnlyPath(resolved.hostPath)) {
+        throw const HostFileException('External mount is read-only');
+      }
+      final file = File(resolved.hostPath);
+      if (!await file.exists()) {
+        throw HostFileException('file not found: ${resolved.modelPath}');
+      }
+      final original = await file.readAsString();
+      final outcome = applyEdit(
+        original: original,
+        oldText: oldText,
+        newText: newText,
+        replaceAll: replaceAll,
+      );
+      if (outcome is EditFailed) {
+        throw HostFileException(outcome.message);
+      }
+      final applied = outcome as EditApplied;
+      checkCancelled?.call();
+      await file.writeAsString(applied.updated);
+      WorkspaceFileCoordinator.changed(resolved.hostPath);
+      return EditFileResult(
+        changed: original != applied.updated,
+        diff: UnifiedDiff.compute(
+          original,
+          applied.updated,
+          path: resolved.modelPath,
+        ),
+        replacements: applied.replacements,
+        strategy: applied.strategy.id,
+        updated: applied.updated,
+      );
+    });
   }
 
   Future<ListDirResult> listDir(

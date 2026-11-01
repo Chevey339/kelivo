@@ -76,6 +76,51 @@ void main() {
   );
 
   test(
+    'bridge refusal leaves an existing normal tab network policy intact',
+    () async {
+      final root = await Directory.systemTemp.createTemp('bridge-refusal-');
+      await File('${root.path}/notes.app.html').writeAsString('offline app');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (_) async => root;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      platform.messageListenerError = StateError(
+        'browser_storage_bridge_unsupported',
+      );
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'chat',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      await expectLater(
+        service.navigate('kelivo://workspace/notes.app.html', tabId: tab.id),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'code',
+            'browser_storage_bridge_unsupported',
+          ),
+        ),
+      );
+      expect(
+        view.document.appliedSettings.any((s) => s.blockNetworkLoads == true),
+        false,
+      );
+      await service.navigate('https://example.org', tabId: tab.id);
+      expect(view.document.url.toString(), 'https://example.org');
+      expect(
+        await view.policy('https://example.org'),
+        NavigationActionPolicy.ALLOW,
+      );
+    },
+  );
+
+  test(
     'workspace resources use scoped URLs and reject other tab origins',
     () async {
       final root = await Directory.systemTemp.createTemp('native-workspace-');
@@ -2003,6 +2048,16 @@ class _MemoryStore extends BrowserStore {
 }
 
 class _BrowserPlatform extends InAppWebViewPlatform {
+  Object? messageListenerError;
+
+  @override
+  PlatformWebMessageListener createPlatformWebMessageListener(
+    PlatformWebMessageListenerCreationParams params,
+  ) {
+    if (messageListenerError != null) throw messageListenerError!;
+    return super.createPlatformWebMessageListener(params);
+  }
+
   Object? runError;
   Object? disposeError;
   bool useWindowsFindFactory = false;

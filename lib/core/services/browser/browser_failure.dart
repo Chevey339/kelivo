@@ -58,6 +58,12 @@ class BrowserFailure implements Exception {
       r'(browser_[a-z_]+|stale_ref|element_[a-z_]+|input_[a-z_]+|option_[a-z_]+|ambiguous_[a-z_]+|snapshot_budget_too_small|coordinates_outside_viewport)',
     ).firstMatch(raw)?.group(0);
     return switch (code) {
+      'browser_storage_bridge_unsupported' => const BrowserFailure(
+        'browser_storage_bridge_unsupported',
+        'This WebView cannot safely run a persistent workspace app.',
+        'Update Android System WebView or Microsoft Edge WebView2 Runtime to 152 or later before opening .app.html pages.',
+        recoverable: false,
+      ),
       'browser_agent_disabled' => const BrowserFailure(
         'browser_agent_disabled',
         'Browser control is disabled.',

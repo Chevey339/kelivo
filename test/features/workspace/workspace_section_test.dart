@@ -40,6 +40,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/file_browser_test_helpers.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -723,8 +724,9 @@ void main() {
 
     final browser = find.byType(FileBrowser);
     expect(browser, findsOneWidget);
-    await tester.runAsync(
-      tester.state<FileBrowserState>(browser).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(browser).refreshEntries(),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
@@ -735,8 +737,9 @@ void main() {
     await tester.tap(srcItem);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    await tester.runAsync(
-      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries(),
     );
     await tester.pump();
 

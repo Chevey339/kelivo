@@ -114,6 +114,9 @@ import 'features/home/controllers/chat_actions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/models/workspace_binding.dart';
 import 'core/services/browser/browser_workspace_resources.dart';
+import 'core/services/workspace/workspace_file_access.dart';
+import 'core/services/workspace/workspace_paths.dart';
+import 'core/services/conversation_tool_permissions.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -126,6 +129,52 @@ void _wireWorkspaceServices(BuildContext ctx) {
     final chat = ctx.read<ChatService>();
     final workspaces = ctx.read<WorkspaceProvider>();
     final assistants = ctx.read<AssistantProvider>();
+    Future<Directory>? storageSkills;
+    BrowserWorkspaceResources.instance.bindingForSession = (sessionId) {
+      final conversation = chat.getConversation(sessionId);
+      return conversation == null
+          ? null
+          : '${WorkspaceBinding.fromExtras(conversation.extras).workspaceId}\n${conversation.assistantId}';
+    };
+    BrowserWorkspaceResources
+        .instance
+        .authorizeData = (sessionId, relativePath, write) async {
+      if (!ctx.mounted) throw StateError('browser_workspace_not_bound');
+      final mounts = ctx.read<ExternalMountsProvider>();
+      final state = ConversationToolPermissions.forChat(chat).read(sessionId);
+      final workspace = state?.workspaceId == null
+          ? null
+          : workspaces.byId(state!.workspaceId!);
+      if (workspace == null) throw StateError('browser_workspace_not_bound');
+      final tool = write ? 'write_file' : 'read_file';
+      final root = await workspaces.hostRootFor(workspace);
+      final skills = await (storageSkills ??=
+          AppDirectories.getSkillsDirectory());
+      await mounts.loaded;
+      // Uses the existing path-zone rules without starting a shell/VM or
+      // repeatedly resolving directory bookmarks for each auto-save.
+      final paths = WorkspacePaths.sandboxed(
+        workspaceHostRoot: root,
+        sessionHostDir: root,
+        skillsHostDir: skills.path,
+        externalMounts: mounts.activeMounts,
+      );
+      await WorkspaceFileAccess(
+        paths: paths,
+        arguments: const {},
+        permission: ToolCallPermission(
+          toolName: tool,
+          toolCallId: '',
+          conversationId: sessionId,
+          workspaceId: workspace.id,
+          assistantId: state!.assistantId,
+          readState: () =>
+              ConversationToolPermissions.forChat(chat).read(sessionId),
+          isEnabled: () =>
+              workspaces.byId(workspace.id)?.isToolEnabled(tool) == true,
+        ),
+      ).resolve(relativePath, paths.modelRoot, write: write);
+    };
     BrowserWorkspaceResources.instance.rootForSession = (sessionId) async {
       await workspaces.loaded;
       final conversation = chat.getConversation(sessionId);

@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' show Theme;
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../features/browser/models/browser_models.dart';
 import '../../../features/browser/models/browser_agent_activity.dart';
 import '../api/tool_call_cancellation.dart';
@@ -2366,6 +2367,14 @@ class _BrowserViewHostState extends State<_BrowserViewHost> {
       builder: (context, snapshot) {
         final error = snapshot.error ?? _attachmentError;
         if (error != null) {
+          if (error is StateError &&
+              error.message == 'browser_storage_bridge_unsupported') {
+            return Center(
+              child: Text(
+                AppLocalizations.of(context)!.browserStorageUnsupported,
+              ),
+            );
+          }
           return Center(child: Text(error.toString()));
         }
         final engine = snapshot.data;

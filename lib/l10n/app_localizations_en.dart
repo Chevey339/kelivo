@@ -13738,6 +13738,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The embedded browser is not available on this platform.';
 
   @override
+  String get browserStorageUnsupported =>
+      'This workspace app requires Android System WebView or Microsoft Edge WebView2 Runtime version 152 or later. Update the browser engine and try again.';
+
+  @override
   String get browserLoadFailed => 'This page could not be loaded';
 
   @override

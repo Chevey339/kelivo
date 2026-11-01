@@ -953,17 +953,26 @@ namespace flutter_inappwebview_plugin
 
             if (settings->useShouldInterceptRequest) {
               auto callback = std::make_unique<WebViewChannelDelegate::ShouldInterceptRequestCallback>();
-              auto defaultBehaviour = [this, deferral, args](const std::optional<std::shared_ptr<WebResourceResponse>> response)
+              auto defaultBehaviour = [deferral, resourceArgs, environment](const std::optional<std::shared_ptr<WebResourceResponse>> response)
                 {
+                  // An enabled interceptor must not permit network traffic if
+                  // its Dart handler fails or disappears during view handoff.
+                  wil::com_ptr<ICoreWebView2WebResourceResponse> denied;
+                  if (environment && SUCCEEDED(environment->CreateWebResourceResponse(
+                    nullptr, 403, L"Forbidden", L"Cache-Control: no-store\r\nContent-Type: text/plain", &denied))) {
+                    resourceArgs->put_Response(denied.get());
+                  }
                   failedLog(deferral->Complete());
                 };
-              callback->nonNullSuccess = [this, deferral, args](const std::shared_ptr<WebResourceResponse> response)
+              callback->nonNullSuccess = [deferral, resourceArgs, environment](const std::shared_ptr<WebResourceResponse> response)
                 {
-                  args->put_Response(response->toWebView2Response(webViewEnv));
+                  wil::com_ptr<ICoreWebView2WebResourceResponse> nativeResponse;
+                  nativeResponse.attach(response->toWebView2Response(environment));
+                  if (nativeResponse) resourceArgs->put_Response(nativeResponse.get());
                   failedLog(deferral->Complete());
                   return false;
                 };
-              callback->nullSuccess = [this, deferral, args, isCustomScheme, onLoadResourceWithCustomSchemeCallback]()
+              callback->nullSuccess = [deferral, isCustomScheme, onLoadResourceWithCustomSchemeCallback]()
                 {
                   if (isCustomScheme) {
                     onLoadResourceWithCustomSchemeCallback();
@@ -974,7 +983,7 @@ namespace flutter_inappwebview_plugin
                   return false;
                 };
               callback->defaultBehaviour = defaultBehaviour;
-              callback->error = [this, defaultBehaviour](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
+              callback->error = [defaultBehaviour](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
                 {
                   debugLog(error_code + ", " + error_message);
                   defaultBehaviour(std::nullopt);

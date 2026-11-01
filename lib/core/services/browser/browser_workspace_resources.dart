@@ -7,12 +7,16 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import '../workspace/file_link_resolver.dart';
 import '../workspace/workspace_paths.dart';
-import 'browser_screenshot_file.dart';
+import '../workspace/atomic_file.dart';
+import 'browser_workspace_app.dart';
 
 /// App wiring resolves the tab owner's binding, never the foreground chat.
 class BrowserWorkspaceResources {
   static final instance = BrowserWorkspaceResources();
   Future<Directory?> Function(String sessionId)? rootForSession;
+  String? Function(String sessionId)? bindingForSession;
+  Future<void> Function(String sessionId, String relativePath, bool write)?
+  authorizeData;
 
   static bool isWorkspaceUrl(String value) {
     if (KelivoLink.tryParse(value)?.kind != KelivoLinkKind.workspaceFile) {
@@ -26,6 +30,10 @@ class BrowserWorkspaceResources {
         !uri.hasPort &&
         _segments(uri) != null;
   }
+
+  static bool isInternalHost(String host) => RegExp(
+    r'^(?:ws-[0-9a-f]{32}\.kelivo|app-[0-9a-f]{32})\.invalid$',
+  ).hasMatch(host);
 
   static List<String>? _segments(Uri uri) {
     final segments = uri.pathSegments;
@@ -65,26 +73,67 @@ class BrowserWorkspaceResources {
     return uri;
   }
 
-  Future<BrowserWorkspaceScope> scope(String? sessionId) async {
+  Future<BrowserWorkspaceScope> scope(
+    String? sessionId, {
+    String? pageUrl,
+  }) async {
     if (sessionId == null || rootForSession == null) {
       throw StateError('browser_workspace_not_bound');
     }
+    final binding = bindingForSession?.call(sessionId);
     final directory = await rootForSession!(sessionId);
     if (directory == null) throw StateError('browser_workspace_not_bound');
     final root = await directory.resolveSymbolicLinks();
-    final host =
-        'ws-${sha256.convert(utf8.encode('$sessionId\n$root')).toString().substring(0, 32)}.kelivo.invalid';
-    return BrowserWorkspaceScope._(this, sessionId, root, host);
+    final entry = pageUrl == null
+        ? null
+        : Uri.parse(pageUrl).pathSegments.join('/');
+    final app = entry != null && BrowserWorkspaceApp.isEntry(entry)
+        ? BrowserWorkspaceApp(entry)
+        : null;
+    final identity =
+        '$sessionId\n$root${app == null ? '' : '\n${app.entry}'}${binding == null ? '' : '\n$binding'}';
+    final digest = sha256
+        .convert(utf8.encode(identity))
+        .toString()
+        .substring(0, 32);
+    // Applications must not share a registrable domain with one another or
+    // normal workspace pages: Domain cookies would bypass origin isolation.
+    final host = app == null
+        ? 'ws-$digest.kelivo.invalid'
+        : 'app-$digest.invalid';
+    if (bindingForSession?.call(sessionId) != binding) {
+      throw StateError('browser_workspace_binding_changed');
+    }
+    return BrowserWorkspaceScope._(this, sessionId, root, host, app, binding);
   }
 }
 
 class BrowserWorkspaceScope {
-  BrowserWorkspaceScope._(this.resources, this.sessionId, this.root, this.host);
+  BrowserWorkspaceScope._(
+    this.resources,
+    this.sessionId,
+    this.root,
+    this.host,
+    this.app,
+    this.binding,
+  );
   final BrowserWorkspaceResources resources;
   final String sessionId, root, host;
+  final BrowserWorkspaceApp? app;
+  final String? binding;
   bool _closed = false;
   Future<void> _reads = Future<void>.value();
   static const maxResourceBytes = 16 * 1024 * 1024;
+
+  Future<void> checkCurrent() async {
+    final current = await resources.rootForSession?.call(sessionId);
+    if (_closed ||
+        current == null ||
+        await current.resolveSymbolicLinks() != root ||
+        resources.bindingForSession?.call(sessionId) != binding) {
+      throw StateError('browser_workspace_binding_changed');
+    }
+  }
 
   Uri internalUrl(String publicUrl, {required bool android}) {
     if (!BrowserWorkspaceResources.isWorkspaceUrl(publicUrl)) {
@@ -114,19 +163,23 @@ class BrowserWorkspaceScope {
             BrowserWorkspaceResources.isWorkspaceUrl(uri.toString()))) {
       throw StateError('browser_workspace_access_denied');
     }
-    final current = await resources.rootForSession?.call(sessionId);
-    if (current == null || await current.resolveSymbolicLinks() != root) {
-      throw StateError('browser_workspace_binding_changed');
-    }
+    await checkCurrent();
     final segments = BrowserWorkspaceResources._segments(uri);
     if (segments == null) throw StateError('browser_workspace_access_denied');
+    if (BrowserWorkspaceApp.isDataPath(segments.join('/')) ||
+        (app != null && !app!.acceptsResource(uri))) {
+      throw StateError('browser_workspace_access_denied');
+    }
     final path = p.joinAll([
       root,
       ...segments,
       if (segments.isEmpty || uri.path.endsWith('/')) 'index.html',
     ]);
     final resolved = await File(path).resolveSymbolicLinks();
-    if (!p.isWithin(root, resolved) || _closed) {
+    if (!p.isWithin(root, resolved) ||
+        _closed ||
+        BrowserWorkspaceApp.isDataPath(p.relative(resolved, from: root)) ||
+        (app != null && !p.equals(path, resolved))) {
       throw StateError('browser_workspace_access_denied');
     }
     return File(resolved);
@@ -179,7 +232,7 @@ class BrowserWorkspaceScope {
       if (await checkedPath() != resolved) {
         throw StateError('browser_workspace_binding_changed');
       }
-      await publishBrowserScreenshot(temp.path, resolved);
+      await publishNewFileAtomically(temp.path, resolved);
       return uri.toString();
     } finally {
       await staging.delete(recursive: true);

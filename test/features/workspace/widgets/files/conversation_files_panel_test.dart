@@ -26,6 +26,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/file_browser_test_helpers.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -115,8 +116,9 @@ Future<void> _awaitPanel(WidgetTester tester) async {
   final browsers = find.byType(FileBrowser);
   final count = browsers.evaluate().length;
   for (var i = 0; i < count; i++) {
-    await tester.runAsync(
-      tester.state<FileBrowserState>(browsers.at(i)).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(browsers.at(i)).refreshEntries(),
     );
   }
   await tester.pump();

@@ -4917,6 +4917,7 @@
   "browserCopyLink": "複製連結",
   "browserLinkCopied": "已複製連結",
   "browserUnsupported": "此平台暫不支援內建瀏覽器。",
+  "browserStorageUnsupported": "此工作區應用程式需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，請更新瀏覽器核心後再試。",
   "browserLoadFailed": "無法載入此頁面",
   "browserRetry": "重試",
   "browserFavorites": "個人收藏",

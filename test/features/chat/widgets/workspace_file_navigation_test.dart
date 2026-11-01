@@ -27,6 +27,7 @@ import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/file_browser_test_helpers.dart';
 import '../../../support/markdown_render_helpers.dart';
 
 class _Chat extends ChatService {
@@ -94,8 +95,11 @@ void main() {
       );
     }
     if (find.byType(FileBrowser).evaluate().isNotEmpty) {
-      await tester.runAsync(
-        tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+      await waitForFileBrowserOperation(
+        tester,
+        tester
+            .state<FileBrowserState>(find.byType(FileBrowser))
+            .refreshEntries(),
       );
       await tester.pump();
     }

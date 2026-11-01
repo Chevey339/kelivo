@@ -24486,6 +24486,12 @@ abstract class AppLocalizations {
   /// **'The embedded browser is not available on this platform.'**
   String get browserUnsupported;
 
+  /// No description provided for @browserStorageUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This workspace app requires Android System WebView or Microsoft Edge WebView2 Runtime version 152 or later. Update the browser engine and try again.'**
+  String get browserStorageUnsupported;
+
   /// No description provided for @browserLoadFailed.
   ///
   /// In en, this message translates to:
