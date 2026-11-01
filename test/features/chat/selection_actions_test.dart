@@ -1,4 +1,3 @@
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'dart:ui' as ui;
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
@@ -19,8 +18,13 @@ import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 import '../../support/markdown_render_helpers.dart';
+import '../../support/android_selection_menu_mock.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late AndroidSelectionMenuMock androidMenu;
+  setUp(() => androidMenu = AndroidSelectionMenuMock());
+  tearDown(() => androidMenu.dispose());
   for (final source in [
     'Earlier target\n\n```dart\ntarget();\n```',
     'Earlier target\n\n| Column | Other |\n| --- | --- |\n| target | value |',
@@ -368,7 +372,17 @@ void main() {
         nativeMenu,
         (_) async => false,
       );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.processText,
+        (call) async => call.method == 'ProcessText.queryTextActions'
+            ? {for (var i = 0; i < 24; i++) 'external-$i': 'External $i'}
+            : null,
+      );
       addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.processText,
+          null,
+        );
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           translation,
           null,
@@ -396,27 +410,28 @@ void main() {
         );
       } else {
         expect(find.byType(AndroidTextSelectionToolbar), findsOneWidget);
-        expect(find.text('Translate'), findsOneWidget);
-        expect(find.text('Copy as Markdown'), findsNothing);
-        await tester.tap(
-          find.byWidgetPredicate(
-            (w) =>
-                w is IosIconButton &&
-                w.tooltip ==
-                    MaterialLocalizations.of(
-                      tester.element(find.byType(SelectionArea)),
-                    ).moreButtonTooltip,
-          ),
+        expect(androidMenu.labels.take(5), [
+          'Copy',
+          'Quote',
+          'Translate',
+          'Copy as Markdown',
+          'Copy rich text',
+        ]);
+        expect(androidMenu.labels, containsAll(['External 0', 'External 23']));
+        expect(
+          androidMenu.items.take(5).every((item) => item['overflow'] == false),
+          isTrue,
         );
-        await tester.pumpAndSettle();
-        expect(find.text('Copy as Markdown'), findsOneWidget);
-        expect(find.text('Copy rich text'), findsOneWidget);
-        await tester.tapAt(const Offset(600, 20));
-        await tester.pumpAndSettle();
-        await tester.longPress(find.text('alpha beta gamma'));
-        await tester.pumpAndSettle();
+        expect(
+          androidMenu.items.skip(5).every((item) => item['overflow'] == true),
+          isTrue,
+        );
       }
-      await tester.tap(find.text('Quote'));
+      if (platform == TargetPlatform.android) {
+        await androidMenu.press('Quote');
+      } else {
+        await tester.tap(find.text('Quote'));
+      }
       await tester.pumpAndSettle();
       expect(received, hasLength(1));
       expect(received.single.text, isNotEmpty);

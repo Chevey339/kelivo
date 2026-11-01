@@ -4,6 +4,7 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import '../../support/markdown_render_helpers.dart';
+import '../../support/android_selection_menu_mock.dart';
 import 'package:markstream/markstream.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,6 +88,9 @@ class _ClipboardProvider implements PlatformDataProvider {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late AndroidSelectionMenuMock androidMenu;
+  setUp(() => androidMenu = AndroidSelectionMenuMock());
+  tearDown(() => androidMenu.dispose());
   const channel = MethodChannel('app.ios_translation');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -226,16 +230,20 @@ void main() {
           await tester.longPressAt(markdownGlyphCenter(tester, 'Selected'));
         }
         await tester.pumpAndSettle();
-        if (find.byTooltip('More').evaluate().isNotEmpty) {
-          await tester.tap(find.byTooltip('More'));
+        if (platform == TargetPlatform.android) {
+          expect(
+            androidMenu.labels,
+            containsAll(['Copy Markdown', 'Copy rich text']),
+          );
+          await androidMenu.press('Copy rich text');
+        } else {
+          expect(find.text('Copy Markdown'), findsOneWidget);
+          expect(find.text('Copy rich text'), findsOneWidget);
+          await tester.ensureVisible(find.text('Copy rich text'));
           await tester.pumpAndSettle();
+          await tester.tap(find.text('Copy rich text'));
         }
-        expect(find.text('Copy Markdown'), findsOneWidget);
-        expect(find.text('Copy rich text'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        await tester.ensureVisible(find.text('Copy rich text'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Copy rich text'));
         await tester.pumpAndSettle();
         expect(writer.items, hasLength(1));
         expect(

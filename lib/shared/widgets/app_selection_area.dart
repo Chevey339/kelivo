@@ -1,5 +1,3 @@
-import 'ios_tactile.dart';
-import 'option_sheet.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -7,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:uuid/uuid.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/quote_ref.dart';
 import '../../features/chat/models/selection_snapshot.dart';
@@ -560,36 +557,35 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
         ],
       );
     }
+    final overflowItems = [
+      for (final item in items)
+        if (item.type != ContextMenuButtonType.copy &&
+            item.type != ContextMenuButtonType.selectAll)
+          item,
+      selectAll,
+    ];
+    final buttonItems = [
+      copy,
+      quote,
+      translate,
+      markdown,
+      rich,
+      ...overflowItems,
+    ];
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return AppTextSelectionToolbar(
+        anchors: anchors,
+        buttonItems: buttonItems,
+        selectionContext: region.context,
+        onDismiss: () => region.hideToolbar(false),
+      );
+    }
     return AndroidTextSelectionToolbar(
       anchors: anchors,
-      buttonItems: [
-        copy,
-        quote,
-        translate,
-        for (final item in items)
-          if (item.type != ContextMenuButtonType.copy &&
-              item.type != ContextMenuButtonType.selectAll)
-            item,
-        selectAll,
-      ],
-      trailing: IosIconButton(
-        tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
-        icon: LucideIcons.ellipsisVertical,
-        size: 18,
-        minSize: 44,
-        onTap: () async {
-          region.hideToolbar();
-          final item = await showOptionSheet<ContextMenuButtonItem>(
-            this.context,
-            title: MaterialLocalizations.of(this.context).copyButtonLabel,
-            items: [
-              for (final item in [markdown, rich])
-                OptionSheetItem(value: item, label: item.label!),
-            ],
-          );
-          if (mounted) item?.onPressed?.call();
-        },
-      ),
+      buttonItems: buttonItems,
+      overflowItems: overflowItems.toSet(),
+      selectionContext: region.context,
+      onDismiss: () => region.hideToolbar(false),
     );
   }
 
