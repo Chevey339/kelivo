@@ -1,3 +1,4 @@
+import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -160,6 +161,7 @@ Future<List<Map<String, dynamic>>> _googleFunctionResponsePartsFromToolMessage(
     metadata: (message['metadata'] as Map?)?.cast<String, dynamic>(),
     canImageInput: canImageInput,
     id: rawFunctionCall is Map ? rawFunctionCall['id']?.toString() : null,
+    toolCallId: message['tool_call_id']?.toString(),
   );
 }
 
@@ -187,11 +189,13 @@ Future<List<Map<String, dynamic>>> _googleFunctionResponseParts(
   Map<String, dynamic>? metadata,
   required bool canImageInput,
   String? id,
+  String? toolCallId,
 }) async {
   final result = await ToolResultContent.read(
     name,
     content,
     metadata: metadata,
+    toolCallId: toolCallId ?? id,
     canImageInput: canImageInput,
   );
   Map<String, dynamic> response;
@@ -439,6 +443,7 @@ Stream<StreamChunk> sendGoogleStream(
         final parsed = await parseTextAndImages(
           raw,
           literalText: internalLiteralText(msg),
+          imageReferences: internalImageReferences(msg),
           // Gemini API 目前无法直接拉取远程 http(s) 图片
           allowRemoteImages: false,
           allowLocalImages: true,
@@ -655,7 +660,7 @@ Stream<StreamChunk> sendGoogleStream(
         req.headers.addAll(headers);
         final body = Map<String, dynamic>.from(baseBody);
         body['contents'] = _googleApiContents(currentContents);
-        req.body = jsonEncode(body);
+        req.body = await RequestImageContext.encodeBody(body);
         final resp = await client.send(req);
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           final errorBody = await resp.stream.bytesToString();
@@ -780,6 +785,7 @@ Stream<StreamChunk> sendGoogleStream(
               item.call.name,
               item.content,
               metadata: item.metadata,
+              toolCallId: item.call.id,
               canImageInput: effective.input.contains(Modality.image),
             ),
         ];
@@ -904,6 +910,7 @@ Stream<StreamChunk> sendGoogleStream(
       final parsed = await parseTextAndImages(
         raw,
         literalText: internalLiteralText(msg),
+        imageReferences: internalImageReferences(msg),
         // Gemini API 目前无法直接拉取远程 http(s) 图片
         allowRemoteImages: false,
         allowLocalImages: true,
@@ -1138,7 +1145,7 @@ Stream<StreamChunk> sendGoogleStream(
       final extra = customBody(config, modelId, assistantBody: extraBody);
       CustomRequestMerger.applyBody(body, extra);
       body['contents'] = _googleApiContents(convo);
-      request.body = jsonEncode(body);
+      request.body = await RequestImageContext.encodeBody(body);
 
       final resp = await client.send(request);
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -1339,6 +1346,7 @@ Stream<StreamChunk> sendGoogleStream(
             metadata: call.result?.metadata,
             canImageInput: effective.input.contains(Modality.image),
             id: call.apiId,
+            toolCallId: call.id,
           ),
         );
       }

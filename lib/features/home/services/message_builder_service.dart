@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../intelligent_ui/host/ui_user_context_parts.dart';
 import '../../intelligent_ui/models/ui_context_attachment.dart';
@@ -361,6 +362,17 @@ class MessageBuilderService {
 
     final out = <Map<String, dynamic>>[];
 
+    void identify(Map<String, dynamic> message, String id) {
+      message[imageContextOwnerKey] = id;
+      if (message['role'] == 'tool') {
+        message['metadata'] = <String, dynamic>{
+          ...?(message['metadata'] as Map?)?.cast<String, dynamic>(),
+          imageContextOwnerKey: id,
+          '_kelivo_image_call': message['tool_call_id'],
+        };
+      }
+    }
+
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
       if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
@@ -379,6 +391,7 @@ class MessageBuilderService {
         );
         if (history != null) {
           for (final message in history) {
+            identify(message, m.id);
             ContextSegmentTags.replaceWithSingle(
               message,
               source: message['role'] == 'tool'
@@ -416,6 +429,7 @@ class MessageBuilderService {
       if (includeToolMessages && m.role == 'assistant' && preserveToolTurns) {
         final history = buildAssistantToolHistory(m.parts);
         for (final message in history.messages) {
+          identify(message, m.id);
           ContextSegmentTags.replaceWithSingle(
             message,
             source: message['role'] == 'tool'
@@ -532,6 +546,9 @@ class MessageBuilderService {
                 );
               }
               out.add(assistantToolMessage);
+              for (final toolMessage in toolMessages) {
+                identify(toolMessage, m.id);
+              }
               out.addAll(toolMessages);
             }
           }
@@ -600,6 +617,7 @@ class MessageBuilderService {
         source: ContextSource.chatHistory,
         length: content.length,
       );
+      identify(message, m.id);
       out.add(message);
     }
 

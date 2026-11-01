@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -1534,6 +1535,7 @@ class GenerationContext {
     required this.apiMessages,
     this.contextUsageConfiguration,
     this.contextUsageRevision,
+    this.imageContext,
     required this.userImagePaths,
     required this.allowImagesApiRouting,
     required this.providerKey,
@@ -1560,6 +1562,7 @@ class GenerationContext {
   final List<Map<String, dynamic>> apiMessages;
   final Object? contextUsageConfiguration;
   final int? contextUsageRevision;
+  final RequestImageContext? imageContext;
   final List<String> userImagePaths;
   final bool allowImagesApiRouting;
   final String providerKey;

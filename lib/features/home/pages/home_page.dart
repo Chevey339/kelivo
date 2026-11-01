@@ -1678,8 +1678,12 @@ class _HomePageState extends State<HomePage>
   Future<void> _openContextUsagePopover() async {
     final conversationId = _controller.currentConversation?.id;
     if (conversationId == null || conversationId.isEmpty) return;
+    final imageTarget = _mediaController.capture();
     await showContextUsagePopover(
       context,
+      onAttachImage: (path) {
+        if (imageTarget.isValid) imageTarget.addImages([path]);
+      },
       anchorKey: _inputBarKey,
       conversationId: conversationId,
       draftText: formatQuotedMessage(
@@ -1848,6 +1852,7 @@ class _HomePageState extends State<HomePage>
   }
 
   void _showContextManagementSheet() async {
+    final imageTarget = _mediaController.capture();
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1859,6 +1864,9 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
+            onAttachImage: (path) {
+              if (imageTarget.isValid) imageTarget.addImages([path]);
+            },
             conversationId: _controller.currentConversation?.id,
             draftText: formatQuotedMessage(
               _inputController.text,

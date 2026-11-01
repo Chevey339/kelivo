@@ -337,6 +337,7 @@ class ClaudeHistory {
               (m['name'] ?? '').toString(),
               (m['content'] ?? '').toString(),
               metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              toolCallId: m['tool_call_id']?.toString(),
               canImageInput: canImageInput,
             )).claudeContent,
           });
@@ -664,6 +665,7 @@ class ClaudeHistory {
     final parsed = await parseTextAndImages(
       raw,
       literalText: internalLiteralText(m),
+      imageReferences: internalImageReferences(m),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: true,
@@ -704,12 +706,6 @@ class ClaudeHistory {
     }
     return (text: text, images: images);
   }
-}
-
-String normalizeClaudeImageMime(String mime) {
-  final normalized = mime.trim().toLowerCase();
-  if (normalized == 'image/jpg') return 'image/jpeg';
-  return normalized;
 }
 
 bool isClaudeSupportedImageMime(String mime) {

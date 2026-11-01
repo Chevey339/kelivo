@@ -1,3 +1,4 @@
+import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
@@ -83,6 +84,10 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
 
   // Keep structured media refs across tool-followup rebuilds so later
   // Chat Completions builders can still emit image_url / multimodal parts.
+  final imageReferences = internalImageReferences(m);
+  if (imageReferences.isNotEmpty) {
+    out[multimodalInternalImageReferencesKey] = imageReferences;
+  }
   final mediaPaths = m[multimodalInternalMediaPathsKey];
   if (mediaPaths != null) {
     if (mediaPaths is List) {
@@ -346,6 +351,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       m[multimodalInternalMediaPathsKey],
     );
     final outMsg = Map<String, dynamic>.from(m);
+    outMsg.remove(imageContextOwnerKey);
+    outMsg.remove(multimodalInternalImageReferencesKey);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg.remove(multimodalInternalLiteralTextKey);
     outMsg.remove(multimodalInternalDocumentPathsKey);
@@ -633,6 +640,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         (m['name'] ?? '').toString(),
         raw,
         metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+        toolCallId: m['tool_call_id']?.toString(),
         canImageInput: canImageInput,
       );
       outMsg['content'] = result.text;
@@ -682,6 +690,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     final parsed = await parseTextAndImages(
       raw,
       literalText: internalLiteralText(m),
+      imageReferences: internalImageReferences(m),
       allowRemoteImages: canImageInput && allowRemoteImages,
       allowLocalImages: canImageInput,
       allowDataImages: canImageInput,
@@ -961,7 +970,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           assistantHeaders: extraHeaders,
         ),
       );
-      req2.body = jsonEncode(body2);
+      req2.body = await RequestImageContext.encodeBody(body2);
       final http.StreamedResponse resp2;
       try {
         resp2 = await client.send(req2);
@@ -1123,7 +1132,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         skipImageParsing: skipImageParsing,
       );
       reqBody.remove('stream');
-      req.body = jsonEncode(reqBody);
+      req.body = await RequestImageContext.encodeBody(reqBody);
       final resp2 = await client.send(req);
       if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
         final errorBody = await resp2.stream.bytesToString();

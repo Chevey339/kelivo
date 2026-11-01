@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -357,6 +358,20 @@ class ContextUsageService extends ChangeNotifier {
 
   ContextUsageSnapshot? snapshot(String conversationId) =>
       _snapshots[conversationId];
+
+  Future<RequestImageContext?> imageContextPreview(
+    String conversationId,
+  ) async {
+    final resolved = _resolvedIdentity(conversationId);
+    final assemble = _assemble;
+    if (resolved == null || assemble == null) return null;
+    return (await assemble(
+      conversationId: conversationId,
+      providerKey: resolved.providerKey,
+      modelId: resolved.modelId,
+      assistantId: resolved.assistantId,
+    )).imageContext;
+  }
 
   void bindAssembler(ContextAssemblyPreviewFn assemble) {
     _assemble = assemble;

@@ -1,3 +1,4 @@
+import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -221,6 +222,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
               (m['name'] ?? '').toString(),
               raw,
               metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              toolCallId: m['tool_call_id']?.toString(),
               canImageInput: canImageInput,
             )).claudeContent,
           },
@@ -345,6 +347,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       final parsed = await parseTextAndImages(
         raw,
         literalText: internalLiteralText(m),
+        imageReferences: internalImageReferences(m),
         allowRemoteImages: true,
         allowLocalImages: true,
         keepRemoteMarkdownText: true,
@@ -510,7 +513,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 
       final httpRequest = http.Request('POST', url);
       httpRequest.headers.addAll(headers);
-      httpRequest.body = jsonEncode(body);
+      httpRequest.body = await RequestImageContext.encodeBody(body);
 
       final response = await client.send(httpRequest);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -673,6 +676,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
             tool.name,
             res?.content ?? '',
             metadata: res?.metadata,
+            toolCallId: tool.id,
             canImageInput: canImageInput,
           )).claudeContent,
         });
@@ -702,6 +706,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
                     item.call.name,
                     item.content,
                     metadata: item.metadata,
+                    toolCallId: item.call.id,
                     canImageInput: canImageInput,
                   )).claudeContent,
                 },

@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -91,6 +94,72 @@ void main() {
     final service = ChatService(assetContentHash: assetContentHash);
     services.add(service);
     return service;
+  }
+
+  for (final temporary in [false, true]) {
+    test('image recall scope and pins: temporary=$temporary', () async {
+      final chat = createService();
+      await chat.init();
+      final conversation = await chat.createDraftConversation(
+        temporary: temporary,
+      );
+      final message = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [
+          const TextPart('keep original ordinal'),
+          ImagePart(uri: 'data:image/png;base64,YWJj'),
+        ],
+      );
+      final before = await chat.imageContextHistory(conversation.id);
+      final image = RequestImageContext.collect(before).single;
+      expect(image.key, ContextImageIdentity(message.id, 'part:1').key);
+      final revision = chat.contextRevision(conversation.id);
+      await chat.setImageContextSettings(
+        conversation.id,
+        ImageContextSettings(pinned: {image.key}),
+      );
+      expect(chat.contextRevision(conversation.id), revision + 1);
+      expect((await chat.imageContextSettings(conversation.id)).pinned, {
+        image.key,
+      });
+      expect(
+        (await chat.chatRepositoryOrNull!.readImageContextSettings(
+          conversation.id,
+        )).pinned,
+        temporary ? isEmpty : {image.key},
+      );
+      await chat.clearConversationContext(conversation.id);
+      expect(await chat.imageContextHistory(conversation.id), isEmpty);
+      expect(
+        await chat.imageContextHistory(
+          conversation.id,
+          throughMessageId: message.id,
+        ),
+        isEmpty,
+      );
+      final next = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'after clear',
+      );
+      expect(
+        (await chat.imageContextHistory(conversation.id)).map((m) => m.id),
+        [next.id],
+      );
+      final request = RequestImageContext(
+        settings: await chat.imageContextSettings(conversation.id),
+        images: RequestImageContext.collect(
+          await chat.imageContextHistory(conversation.id),
+        ),
+      );
+      expect(request.readImage(image.handle).metadata, isNull);
+      await chat.deleteConversation(conversation.id);
+      expect(
+        (await chat.imageContextSettings(conversation.id)).pinned,
+        isEmpty,
+      );
+    });
   }
 
   for (final temporary in [false, true]) {

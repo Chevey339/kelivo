@@ -1,4 +1,6 @@
+import 'package:Kelivo/core/models/image_context.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -6,6 +8,8 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 void main() {
   late Directory dir;
@@ -62,6 +66,149 @@ void main() {
         'chat',
         limit: 100,
       )).map((m) => m.content).toList();
+
+  test(
+    'Markdown catalog preserves original order and eviction outside the window',
+    () async {
+      const large = 'data:image/png;base64,AAAAAAAA';
+      const small = 'data:image/png;base64,AAAA';
+      final original = ChatMessage(
+        id: 'markdown',
+        conversationId: 'chat',
+        role: 'user',
+        parts: [
+          const TextPart('```md\n'),
+          const TextPart('![literal]($small)\n```\n![actual]($large)'),
+        ],
+      );
+      final tools = ChatMessage(
+        id: 'observations',
+        conversationId: 'chat',
+        role: 'assistant',
+        parts: [
+          for (var i = 0; i < 3; i++)
+            ToolCallPart(
+              jsonEncode({
+                'id': 'tool_$i',
+                'name': 'screenshot',
+                'metadata': {
+                  kMcpResultMetadataKey: mcpResultMetadata([small]),
+                },
+              }),
+            ),
+        ],
+      );
+      for (final message in [original, tools]) {
+        await repo.appendLinearMessageToConversation(
+          conversation: conversation,
+          message: message,
+        );
+      }
+      final history = await repo.readImageContextHistory('chat');
+      expect(
+        history.firstWhere((m) => m.id == original.id).content,
+        original.content,
+      );
+      final images = await RequestImageContext.collectHistory(
+        history,
+        parseMarkdownImages: true,
+        allowRemoteImages: false,
+      );
+      expect(images.map((im) => im.uri), [large, small, small, small]);
+      expect(images.map((im) => im.partOrdinal), [1, 0, 1, 2]);
+      final request = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: images,
+        latestUserId: original.id,
+        userTurns: RequestImageContext.userTurnsFor(history),
+        maxImageBytes: 16,
+      );
+      final omitted = await request.historyOmissions();
+      expect(omitted, {images[1].key});
+      final window = await repo.getEffectiveContextMessages('chat', limit: 1);
+      expect(window.map((m) => m.id), [tools.id]);
+      final restored = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: await RequestImageContext.collectHistory(
+          await repo.readImageContextHistory(
+            'chat',
+            throughMessageId: window.last.id,
+          ),
+          parseMarkdownImages: true,
+          allowRemoteImages: false,
+        ),
+        latestUserId: original.id,
+        userTurns: RequestImageContext.userTurnsFor(history),
+        maxImageBytes: 16,
+      );
+      expect(await restored.historyOmissions(), omitted);
+    },
+  );
+
+  test(
+    'image pins survive fork and backup, remap message ids, and delete with their conversation',
+    () async {
+      final settings = ImageContextSettings(
+        automatic: false,
+        pinned: {
+          const ContextImageIdentity('u1', 'part:1').key,
+          const ContextImageIdentity('u3', 'part:0').key,
+        },
+      );
+      await repo.saveImageContextSettings('chat', settings);
+      final fork = (await repo.forkConversationWithVersions(
+        sourceId: 'chat',
+        targetRevisionId: 'a1',
+        title: 'fork',
+      ))!;
+      final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
+      final forkSettings = await repo.readImageContextSettings(fork.id);
+      expect(forkSettings.automatic, isFalse);
+      expect(forkSettings.pinned, {
+        ContextImageIdentity(forkMessages.first.id, 'part:1').key,
+      });
+      final snapshot = File('${dir.path}/images.sqlite');
+      await ChatDatabaseRepository.createConsistentSnapshot(
+        sourceFile: File('${dir.path}/chat.sqlite'),
+        destinationFile: snapshot,
+      );
+      final target = ChatDatabaseRepository.open(
+        file: File('${dir.path}/target.sqlite'),
+      );
+      await target.ensureReady();
+      try {
+        await target.putConversation(
+          Conversation(id: 'chat', title: 'collision'),
+        );
+        final report = await target.mergeBackupSnapshot(snapshot);
+        final importedId = report.remappedConversationIds['chat']!;
+        final importedMessages = (await target.readContextSnapshot(
+          importedId,
+        )).messages;
+        expect((await target.readImageContextSettings(importedId)).pinned, {
+          ContextImageIdentity(importedMessages.first.id, 'part:1').key,
+          ContextImageIdentity(importedMessages[4].id, 'part:0').key,
+        });
+        expect(
+          (await target.mergeBackupSnapshot(snapshot)).importedConversations,
+          0,
+        );
+        await target.deleteConversation(importedId);
+        expect(
+          (await target.readImageContextSettings(importedId)).pinned,
+          isEmpty,
+        );
+        expect(
+          (await target.readImageContextSettings(importedId)).automatic,
+          isTrue,
+        );
+      } finally {
+        await target.close();
+      }
+      await repo.deleteConversation(fork.id);
+      expect((await repo.readImageContextSettings(fork.id)).pinned, isEmpty);
+    },
+  );
 
   test(
     'in-place summary preserves originals, title, tail and raw message window',

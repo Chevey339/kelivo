@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:Kelivo/core/models/memory_entry.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
@@ -439,6 +441,53 @@ void main() {
         providerKey: 'Test',
         modelId: 'opaque',
       );
+
+  testWidgets('image context respects models that disable remote image URLs', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      final config = settings.getProviderConfig('Test');
+      await settings.setProviderConfig(
+        'Test',
+        config.copyWith(
+          modelOverrides: {
+            'opaque': {
+              'input': ['text', 'image'],
+              'remoteImageUrls': false,
+            },
+          },
+        ),
+      );
+      const url = 'https://example.test/remote.png';
+      final message = ChatMessage(
+        id: 'remote-user',
+        conversationId: 'one',
+        role: 'user',
+        parts: [
+          const TextPart('Inspect ![remote]($url)'),
+          ImagePart(uri: url, mime: 'image/png'),
+        ],
+      );
+      await repository.putMessage(message);
+      chat.storedMessages.add(message);
+      final result = await prepare(generation());
+      expect(result.imageContext!.allowsRemoteUserImages, isFalse);
+      expect(result.lastUserImagePaths, contains(url));
+      final user = result.apiMessages.lastWhere((m) => m['role'] == 'user');
+      expect(internalImageReferences(user), isEmpty);
+      expect(
+        parseInternalMediaRefs(
+          user[multimodalInternalMediaPathsKey],
+        ).single.uri,
+        url,
+      );
+      expect(
+        (await result.imageContext!.preview()).where((im) => im.included),
+        isEmpty,
+      );
+    });
+  });
 
   Future<void> record(ContextUsageService usage, PreparedGeneration request) =>
       usage.recordUsage(

@@ -104,6 +104,147 @@ void main() {
     );
 
     test(
+      'cancelled URL owner does not cancel live generations sharing its read',
+      () async {
+        final bytes = img.encodePng(img.Image(width: 4, height: 3));
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final connected = Completer<void>();
+        final disconnected = Completer<void>();
+        var fetches = 0;
+        server.listen((request) async {
+          fetches++;
+          if (fetches == 1) {
+            final socket = await request.response.detachSocket(
+              writeHeaders: false,
+            );
+            addTearDown(socket.destroy);
+            socket.write(
+              'HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 1000\r\n\r\na',
+            );
+            await socket.flush();
+            void closed() {
+              if (!disconnected.isCompleted) disconnected.complete();
+            }
+
+            socket.listen(
+              (_) {},
+              onDone: closed,
+              onError: (Object _) => closed(),
+            );
+            connected.complete();
+          } else {
+            request.response.add(bytes);
+            await request.response.close();
+          }
+        });
+        final stopOwner = Completer<void>();
+        final owner = ToolCallCancellation(
+          isCancelled: () => stopOwner.isCompleted,
+          cancelled: stopOwner.future,
+        );
+        final active = ToolCallCancellation(
+          isCancelled: () => false,
+          cancelled: Completer<void>().future,
+        );
+        final uri = 'http://127.0.0.1:${server.port}/shared.png';
+        final first = owner.run(
+          () => McpImageSnapshot.readDataUrl(uri, cacheKey: 'occurrence'),
+        );
+        final cancelled = expectLater(first, throwsStateError);
+        await connected.future.timeout(const Duration(seconds: 3));
+        final second = active.run(
+          () => McpImageSnapshot.readDataUrl(uri, cacheKey: 'occurrence'),
+        );
+        final third = active.run(
+          () => McpImageSnapshot.readDataUrl(uri, cacheKey: 'occurrence'),
+        );
+        final readers = Future.wait([second, third]);
+        stopOwner.complete();
+        final results = await readers.timeout(const Duration(seconds: 3));
+        await cancelled;
+        await disconnected.future.timeout(const Duration(seconds: 3));
+        expect(results, [
+          'data:image/png;base64,${base64Encode(bytes)}',
+          'data:image/png;base64,${base64Encode(bytes)}',
+        ]);
+        expect(
+          fetches,
+          2,
+          reason: 'survivors share one retry after the cancelled owner',
+        );
+        expect(
+          await McpImageSnapshot.readDataUrl(uri, cacheKey: 'occurrence'),
+          results.first,
+        );
+        expect(
+          fetches,
+          2,
+          reason: 'the first successful snapshot stays cached',
+        );
+      },
+    );
+
+    for (final sameGeneration in [true, false]) {
+      test(
+        'URL waiters preserve their cancellation (sameGeneration=$sameGeneration)',
+        () async {
+          final bytes = img.encodePng(img.Image(width: 2, height: 3));
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          final connected = Completer<void>();
+          final release = Completer<void>();
+          var fetches = 0;
+          server.listen((request) async {
+            fetches++;
+            if (!connected.isCompleted) connected.complete();
+            await release.future;
+            request.response.add(bytes);
+            try {
+              await request.response.close();
+            } on IOException {
+              /* The owner may have cancelled. */
+            }
+          });
+          final ownerStop = Completer<void>();
+          final waiterStop = sameGeneration ? ownerStop : Completer<void>();
+          final owner = ToolCallCancellation(
+            isCancelled: () => ownerStop.isCompleted,
+            cancelled: ownerStop.future,
+          );
+          final waiter = ToolCallCancellation(
+            isCancelled: () => waiterStop.isCompleted,
+            cancelled: waiterStop.future,
+          );
+          final uri = 'http://127.0.0.1:${server.port}/waiter.png';
+          final first = owner.run(
+            () => McpImageSnapshot.readDataUrl(uri, cacheKey: 'same'),
+          );
+          final firstResult = sameGeneration
+              ? expectLater(first, throwsStateError)
+              : expectLater(first, completion(isNotNull));
+          await connected.future.timeout(const Duration(seconds: 3));
+          final joined = waiter.run(
+            () => McpImageSnapshot.readDataUrl(uri, cacheKey: 'same'),
+          );
+          final joinedResult = expectLater(joined, throwsStateError);
+          waiterStop.complete();
+          try {
+            await joinedResult.timeout(const Duration(seconds: 3));
+            expect(
+              fetches,
+              1,
+              reason: 'cancelled waiters never start another download',
+            );
+          } finally {
+            release.complete();
+            await firstResult.timeout(const Duration(seconds: 3));
+          }
+        },
+      );
+    }
+
+    test(
       'save still accepts URL-safe and whitespace-separated base64',
       () async {
         final bytes = img.encodePng(img.Image(width: 3, height: 2));

@@ -1,3 +1,6 @@
+import '../../../core/services/api/providers/zhipu_layout_parsing.dart';
+import '../../../core/models/context_operation.dart';
+import '../../../core/services/api/request_image_context.dart';
 import '../../intelligent_ui/host/ui_context_submission.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
@@ -100,6 +103,7 @@ class PreparedGeneration {
   final List<String> lastUserImagePaths;
   final Object? contextUsageConfiguration;
   final int? contextUsageRevision;
+  final RequestImageContext? imageContext;
 
   PreparedGeneration({
     required this.apiMessages,
@@ -109,6 +113,7 @@ class PreparedGeneration {
     required this.lastUserImagePaths,
     this.contextUsageConfiguration,
     this.contextUsageRevision,
+    this.imageContext,
   });
 }
 
@@ -388,7 +393,27 @@ class MessageGenerationService {
           .spec(packed.cfg, modelId)
           .supportsPdfInput,
     );
+    final imageContext =
+        ChatApiService.supportsOpenAIImagesApiRouting(packed.cfg, modelId)
+        ? null
+        : await _imageContext(
+            conversationId,
+            messages,
+            packed,
+            settings,
+            modelId,
+          );
+    if (imageContext != null) {
+      await imageContext.prepareMessages(
+        packed.apiMessages,
+        const [],
+        parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
+        allowRemoteImages: imageContext.allowsRemoteUserImages,
+      );
+    }
+    final imagePreview = await imageContext?.preview();
     return ContextAssemblyPreview.fromApiMessages(
+      imageContext: imageContext,
       apiMessages: packed.apiMessages,
       mcpToolNames: {
         for (final tool in packed.toolDefs)
@@ -397,10 +422,77 @@ class MessageGenerationService {
               name,
       },
       tools: packed.toolDefs,
-      images: imageRefsFromApiMessages(
-        packed.apiMessages,
-        sourceMessages: messages,
+      images: imagePreview == null
+          ? imageRefsFromApiMessages(
+              packed.apiMessages,
+              sourceMessages: messages,
+            )
+          : [
+              for (final image in imagePreview)
+                if (image.included) const ContextImageRef(),
+            ],
+    );
+  }
+
+  Future<RequestImageContext> _imageContext(
+    String conversationId,
+    List<ChatMessage> messages,
+    UnprocessedRequestContext packed,
+    SettingsProvider settings,
+    String modelId,
+  ) async {
+    final cfg = packed.cfg;
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    final original = await chatService.imageContextHistory(
+      conversationId,
+      throughMessageId: messages
+          .where((m) => !ContextOperation.isSummary(m))
+          .lastOrNull
+          ?.id,
+    );
+    final history =
+        chatService.chatRepositoryOrNull == null &&
+            !chatService.isTemporaryConversation(conversationId)
+        ? messages
+        : original;
+    final spec = ModelSpecResolver.instance.spec(cfg, modelId);
+    final remoteImages =
+        (kind == ProviderKind.openai && spec.remoteImageUrls) ||
+        (kind == ProviderKind.google &&
+            cfg.vertexAI == true &&
+            modelId.toLowerCase().startsWith('claude-'));
+    return RequestImageContext(
+      settings: await chatService.imageContextSettings(conversationId),
+      images: await RequestImageContext.collectHistory(
+        history,
+        parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
+        allowRemoteImages: remoteImages,
       ),
+      userTurns: RequestImageContext.userTurnsFor(history),
+      inlineRemoteUsers: kind == ProviderKind.google,
+      allowsRemoteUserImages: remoteImages,
+      omitUserImages: settings.ocrActive,
+      latestUserId: history
+          .where((m) => m.role == 'user' && !ContextOperation.isSummary(m))
+          .lastOrNull
+          ?.id,
+      maxImageBytes: kind == ProviderKind.google
+          ? 14 * 1024 * 1024
+          : 20 * 1024 * 1024,
+      maxBodyBytes: kind == ProviderKind.google ? 20000000 : 28 * 1024 * 1024,
+      canImageInput: spec.supportsImageInput,
+      canRecall: packed.toolDefs.any(
+        (t) => (t['function'] as Map?)?['name'] == 'read_chat_image',
+      ),
+      viewImageUris:
+          packed.toolDefs.any(
+            (t) => (t['function'] as Map?)?['name'] == 'view_image',
+          )
+          ? {for (final file in packed.workspaceAttachments) file.sourceUri}
+          : {},
     );
   }
 
@@ -509,7 +601,7 @@ class MessageGenerationService {
             )
         ? processingMessageId
         : null;
-    final List<String> lastUserImagePaths;
+    List<String> lastUserImagePaths;
     if (indicatorMessageId != null) {
       onFileProcessingStarted?.call(indicatorMessageId);
     }
@@ -574,7 +666,26 @@ class MessageGenerationService {
         }
       }
     }
-    await messageBuilderService.inlineLocalImages(apiMessages);
+    RequestImageContext? imageContext;
+    if (currentConversation != null &&
+        !ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
+        !shouldUseZhipuLayoutParsing(cfg, modelId)) {
+      imageContext = await _imageContext(
+        currentConversation.id,
+        messages,
+        packed,
+        settings,
+        modelId,
+      );
+      lastUserImagePaths = await imageContext.prepareMessages(
+        apiMessages,
+        lastUserImagePaths,
+        parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
+        allowRemoteImages: imageContext.allowsRemoteUserImages,
+      );
+    } else {
+      await messageBuilderService.inlineLocalImages(apiMessages);
+    }
     if (ContextLogger.enabled) {
       final providerName = cfg.name.trim();
       ContextLogger.logPrepared(
@@ -607,6 +718,7 @@ class MessageGenerationService {
       lastUserImagePaths: lastUserImagePaths,
       contextUsageConfiguration: requestConfiguration,
       contextUsageRevision: requestRevision,
+      imageContext: imageContext,
     );
   }
 
@@ -900,10 +1012,17 @@ class MessageGenerationService {
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
+      imageContext: prepared.imageContext
+        ?..targetMessageId = assistantMessage.id,
       apiMessages: prepared.apiMessages,
       contextUsageConfiguration: prepared.contextUsageConfiguration,
       contextUsageRevision: prepared.contextUsageRevision,
-      userImagePaths: userImagePaths,
+      userImagePaths:
+          prepared.imageContext?.preparePaths(
+            userImagePaths,
+            allowRemoteImages: prepared.imageContext!.allowsRemoteUserImages,
+          ) ??
+          userImagePaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,

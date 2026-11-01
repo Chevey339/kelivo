@@ -465,6 +465,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
         },
         resetVersions: true,
       );
+      await _copyImageContext(sourceId, id, ids);
       final task =
           await (_db.select(_db.extensionEntityRows)..where(
                 (r) =>

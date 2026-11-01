@@ -60,6 +60,16 @@ extension ChatContextOperations on ChatService {
                   (tool['content'] ?? '').toString(),
                 );
                 buffer.write('\n[Tool: ${tool['name'] ?? 'unknown'}]\n');
+                final imageUris = mcpResultImageUris(
+                  readMcpResultMetadata(
+                    (tool['metadata'] as Map?)?.cast<String, dynamic>(),
+                  ),
+                );
+                for (var i = 0; i < imageUris.length; i++) {
+                  buffer.write(
+                    '\n[Image ${ContextImageIdentity(message.id, "tool:${tool['id'] ?? 'part:${message.parts.indexOf(part)}'}", i).handle}; read_chat_image can restore it]\n',
+                  );
+                }
                 if (tool['arguments'] != null) {
                   buffer.write(
                     truncateHeadTailUtf16Safe(
@@ -86,7 +96,7 @@ extension ChatContextOperations on ChatService {
               );
             } else if (part is ImagePart) {
               buffer.write(
-                '\n[Image attachment; image content not summarized]',
+                '\n[Image ${ContextImageIdentity(message.id, 'part:${message.parts.indexOf(part)}').handle}; image content not summarized]',
               );
             }
           }

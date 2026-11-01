@@ -1,3 +1,5 @@
+import '../models/image_context.dart';
+import '../utils/chat_image_result.dart';
 import '../models/quote_ref.dart';
 import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
@@ -59,6 +61,7 @@ import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_previous_plan.dart';
 
 part 'chat_context_repository.dart';
+part 'chat_image_context_repository.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -1827,7 +1830,8 @@ class ChatDatabaseRepository {
                 SELECT 1 FROM message_part_rows p
                 WHERE p.revision_id = m.id
                   AND (p.kind IN ('image', 'file')
-                    OR (p.kind = 'tool_call' AND p.payload LIKE '%"previewImage"%'))
+                    OR (p.kind = 'tool_call' AND (p.payload LIKE '%"previewImage"%'
+                      OR p.payload LIKE '%"chatImage"%')))
               ) OR
               EXISTS (
                 SELECT 1 FROM message_asset_rows a WHERE a.revision_id = m.id
@@ -2037,6 +2041,9 @@ class ChatDatabaseRepository {
               'truncate': conversation.truncateIndex,
               'summary': conversation.summary,
               'contextOperations': operations.map((op) => op.toJson()).toList(),
+              'imageContext': (await readImageContextSettings(
+                conversationId,
+              )).toJson(),
               'extras': conversation.extras,
               'model': [
                 conversation.chatModelProvider,
@@ -4686,6 +4693,7 @@ class ChatDatabaseRepository {
         messageIdMap: messageIdMap,
         groupIdMap: groupIdMap,
       );
+      await _copyImageContext(sourceId, targetId, messageIdMap);
       await _copyContextOperations(
         sourceId: sourceId,
         targetId: targetId,
@@ -4803,7 +4811,8 @@ class ChatDatabaseRepository {
       'UNION '
       'SELECT revision_id FROM message_part_rows '
       "WHERE conversation_id = ? AND (kind IN ('image', 'file') "
-      "OR (kind = 'tool_call' AND payload LIKE '%\"previewImage\"%'));",
+      "OR (kind = 'tool_call' AND (payload LIKE '%\"previewImage\"%' "
+      "OR payload LIKE '%\"chatImage\"%')));",
       [targetConversationId, targetConversationId],
     );
   }
@@ -4953,6 +4962,7 @@ class ChatDatabaseRepository {
         groupIdMap: groupIdMap,
         resetVersions: !preserveVersions,
       );
+      await _copyImageContext(sourceId, targetId, messageIdMap);
       await _copyContextOperations(
         sourceId: sourceId,
         targetId: targetId,
@@ -5410,7 +5420,9 @@ class ChatDatabaseRepository {
     }
     if (_messageHasAttachmentParts(message) ||
         parts.whereType<ToolCallPart>().any(
-          (part) => part.browserPreviewImage != null,
+          (part) =>
+              part.browserPreviewImage != null ||
+              chatImageAssetsFromPart(part).isNotEmpty,
         )) {
       await markMessageAssetReferencesDirty(message.id);
     }
@@ -6350,6 +6362,10 @@ class ChatDatabaseRepository {
               ),
               mcpRows.map((row) => row.data).toList(),
               messages,
+              await _imageContextFingerprint(schema, id, {
+                for (var i = 0; i < messageRows.length; i++)
+                  messageRows[i].read<String>('id'): '$i',
+              }),
               await _contextFingerprintData(
                 schema,
                 id,
@@ -6599,6 +6615,23 @@ class ChatDatabaseRepository {
       targetConversationId: targetId,
     );
     await _sealGenUiSearch(messageIdMap.values);
+    final sourceImages = await _db
+        .customSelect(
+          'SELECT payload FROM merge_source.extension_entity_rows WHERE kind=? AND id=?',
+          variables: [
+            Variable<String>(ImageContextSettings.entityKind),
+            Variable<String>(sourceId),
+          ],
+        )
+        .getSingleOrNull();
+    if (sourceImages != null) {
+      await _copyImageContext(
+        sourceId,
+        targetId,
+        messageIdMap,
+        payload: sourceImages.read<String>('payload'),
+      );
+    }
     final sourceContext = await _db
         .customSelect(
           'SELECT payload FROM merge_source.extension_entity_rows WHERE kind=? AND id=?',
@@ -6624,7 +6657,8 @@ class ChatDatabaseRepository {
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT DISTINCT revision_id FROM main.message_part_rows '
       "WHERE conversation_id = ? AND (kind IN ('image', 'file') "
-      "OR (kind = 'tool_call' AND payload LIKE '%\"previewImage\"%'));",
+      "OR (kind = 'tool_call' AND (payload LIKE '%\"previewImage\"%' "
+      "OR payload LIKE '%\"chatImage\"%')));",
       [targetId],
     );
   }
@@ -6973,6 +7007,7 @@ class ChatDatabaseRepository {
                   row.kind.isIn([
                     ContextOperation.entityKind,
                     'contextCompressionTask',
+                    ImageContextSettings.entityKind,
                   ]) &
                   row.ownerId.equals(id),
             ))
@@ -7227,7 +7262,7 @@ class ChatDatabaseRepository {
   Future<void> _clearChatRows() async {
     genUiStates.invalidateAfterCommit(all: true);
     await _db.customStatement(
-      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile','conversationContext','contextCompressionTask')",
+      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile','conversationContext','contextCompressionTask','conversationImageContext')",
     );
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();
@@ -7963,7 +7998,9 @@ class ChatDatabaseRepository {
       (part) =>
           part is ImagePart ||
           part is FilePart ||
-          (part is ToolCallPart && part.browserPreviewImage != null) ||
+          (part is ToolCallPart &&
+              (part.browserPreviewImage != null ||
+                  chatImageAssetsFromPart(part).isNotEmpty)) ||
           (part is MalformedPart && part.isAttachmentKind),
     );
   }

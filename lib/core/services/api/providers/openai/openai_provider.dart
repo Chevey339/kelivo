@@ -1,3 +1,4 @@
+import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
@@ -227,6 +228,7 @@ Stream<StreamChunk> sendOpenAIStream(
               (m['name'] ?? '').toString(),
               content,
               metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              toolCallId: m['tool_call_id']?.toString(),
               canImageInput: canImageInput,
             )).responsesOutput,
           });
@@ -317,6 +319,7 @@ Stream<StreamChunk> sendOpenAIStream(
         final parsed = await parseTextAndImages(
           raw,
           literalText: internalLiteralText(m),
+          imageReferences: internalImageReferences(m),
           allowRemoteImages: allowRemoteImages,
           allowLocalImages: canImageInput,
           allowDataImages: canImageInput,
@@ -608,7 +611,7 @@ Stream<StreamChunk> sendOpenAIStream(
       configuredTools: configuredBuiltInTools,
     );
   }
-  request.body = jsonEncode(body);
+  request.body = await RequestImageContext.encodeBody(body);
 
   final response = await client.send(request);
   if (response.statusCode < 200 || response.statusCode >= 300) {

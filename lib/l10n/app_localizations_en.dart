@@ -15796,4 +15796,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoveryCopiesNeedUpdate =>
       'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.';
+
+  @override
+  String get imageContextTitle => 'Image context';
+
+  @override
+  String get imageContextAutomatic => 'Manage history images automatically';
+
+  @override
+  String get imageContextDescription =>
+      'Keep user attachments longer; retire old tool screenshots in batches. Pins keep images in their original messages and may change the cached prefix. Add again places a new attachment in the composer. The preview uses saved files; pending OCR, remote files and provider limits are checked when sending.';
+
+  @override
+  String get imageContextIncluded => 'Included';
+
+  @override
+  String get imageContextOmitted => 'Omitted';
+
+  @override
+  String get imageContextPin => 'Pin image';
+
+  @override
+  String get imageContextUnpin => 'Unpin image';
+
+  @override
+  String get imageContextAttachAgain => 'Add to composer again';
+
+  @override
+  String get imageContextEmpty => 'No images in the current context';
+
+  @override
+  String get imageContextUnavailable =>
+      'This image is unavailable in the current context.';
 }

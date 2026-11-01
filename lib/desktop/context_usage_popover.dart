@@ -1,3 +1,4 @@
+import '../features/chat/widgets/image_context_panel.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ Future<void> showContextUsagePopover(
   required GlobalKey anchorKey,
   required String conversationId,
   required String draftText,
+  ValueChanged<String>? onAttachImage,
 }) async {
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return;
@@ -38,19 +40,33 @@ Future<void> showContextUsagePopover(
   unawaited(usage.refresh(conversationId, draftText: draftText));
 
   var requestSetWindow = false;
+  var requestImages = false;
   await showDesktopGlassPopover(
     context,
     anchorRect: anchorRect,
     width: (size.width - 16).clamp(260.0, 720.0),
     builder: (ctx, handle) => _ContextUsagePopoverContent(
       conversationId: conversationId,
+      onImages: () async {
+        requestImages = true;
+        await handle.close();
+      },
       onRequestSetWindow: () async {
         requestSetWindow = true;
         await handle.close();
       },
     ),
   );
-  if (!context.mounted || !requestSetWindow) return;
+  if (!context.mounted) return;
+  if (requestImages) {
+    await showImageContextPanel(
+      context,
+      conversationId,
+      onAttach: onAttachImage,
+    );
+    return;
+  }
+  if (!requestSetWindow) return;
 
   final snap = usage.snapshot(conversationId) ?? usage.current;
   if (snap == null || snap.providerKey.isEmpty || snap.modelId.isEmpty) {
@@ -70,9 +86,11 @@ class _ContextUsagePopoverContent extends StatelessWidget {
   const _ContextUsagePopoverContent({
     required this.conversationId,
     required this.onRequestSetWindow,
+    required this.onImages,
   });
 
   final String conversationId;
+  final Future<void> Function() onImages;
   final Future<void> Function() onRequestSetWindow;
 
   @override
@@ -104,6 +122,11 @@ class _ContextUsagePopoverContent extends StatelessWidget {
                 size: 16,
                 onTap: () => usage.refresh(conversationId, force: true),
               ),
+            ),
+            _ActionRow(
+              icon: Lucide.Image,
+              label: l10n.imageContextTitle,
+              onTap: () => unawaited(onImages()),
             ),
             if (showSetWindow) ...[
               const SizedBox(height: 8),

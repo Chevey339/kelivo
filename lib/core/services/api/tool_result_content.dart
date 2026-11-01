@@ -1,3 +1,4 @@
+import 'request_image_context.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../mcp/mcp_image_snapshot.dart';
 
@@ -16,7 +17,9 @@ class ToolResultContent {
     String content, {
     Map<String, dynamic>? metadata,
     bool canImageInput = true,
+    String? toolCallId,
   }) async {
+    final imageContext = RequestImageContext.current;
     final workspace = metadata?['workspace'];
     if (workspace != null &&
         (name != 'view_image' ||
@@ -27,11 +30,38 @@ class ToolResultContent {
     }
     final imageUris = mcpResultImageUris(readMcpResultMetadata(metadata));
     if (imageUris.isEmpty) return ToolResultContent(content);
+    if (name == 'read_chat_image' &&
+        (imageContext == null ||
+            !RequestImageContext.isReadImageResult(name, metadata) ||
+            !imageUris.every(imageContext.ownsUri))) {
+      return const ToolResultContent(
+        'Image is unavailable in the current conversation context.',
+      );
+    }
     var text = content;
     for (final uri in imageUris) {
       text = text.replaceAll('![](${encodeMarkdownImageDestination(uri)})', '');
     }
     text = text.trim();
+    if (imageContext != null) {
+      final refs = imageContext.toolReferences(
+        name,
+        imageUris,
+        metadata,
+        toolCallId,
+      );
+      return canImageInput
+          ? ToolResultContent(text, refs)
+          : ToolResultContent(
+              [
+                if (text.isNotEmpty) text,
+                for (final ref in refs)
+                  imageContext.omittedText(
+                    RequestImageContext.referenceHandle(ref)!,
+                  ),
+              ].join('\n'),
+            );
+    }
     if (!canImageInput) {
       return ToolResultContent(
         '$text\n(Image omitted: this model does not support image input.)',

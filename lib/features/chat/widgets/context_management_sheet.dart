@@ -18,6 +18,7 @@ class ContextManagementSheet extends StatelessWidget {
     this.messageCountLabel,
     this.conversationId,
     this.draftText = '',
+    this.onAttachImage,
   });
 
   final VoidCallback? onCompress;
@@ -27,6 +28,7 @@ class ContextManagementSheet extends StatelessWidget {
   final String? messageCountLabel;
   final String? conversationId;
   final String draftText;
+  final ValueChanged<String>? onAttachImage;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +72,7 @@ class ContextManagementSheet extends StatelessWidget {
                 children: [
                   ContextUsageHeader(
                     conversationId: conversationId,
+                    onAttachImage: onAttachImage,
                     draftText: draftText,
                   ),
                   const SizedBox(height: 16),

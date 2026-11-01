@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/model_spec.dart';
@@ -28,8 +29,10 @@ class ContextAssemblyPreview {
     this.workspaceText = '',
     this.searchText = '',
     this.mcpTools = const [],
+    this.imageContext,
   });
 
+  final RequestImageContext? imageContext;
   final String systemText;
   final String injectionsText;
   final String historyText;
@@ -49,11 +52,12 @@ class ContextAssemblyPreview {
     required List<Map<String, dynamic>> tools,
     required Set<String> mcpToolNames,
     required List<ContextImageRef> images,
+    RequestImageContext? imageContext,
   }) {
     final text = <ContextSource, StringBuffer>{};
     for (final message in apiMessages) {
       for (final segment in segmentsFromTaggedMessage(
-        message,
+        imageContext?.previewMessage(message) ?? message,
         estimateTokenCounts: false,
         elideDataUris: false,
       )) {
@@ -89,6 +93,7 @@ class ContextAssemblyPreview {
       tools: tools.where((tool) => !isMcp(tool)).toList(),
       mcpTools: tools.where(isMcp).toList(),
       images: images,
+      imageContext: imageContext,
     );
   }
 }

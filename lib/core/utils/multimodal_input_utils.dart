@@ -6,6 +6,17 @@ import '../../utils/sandbox_path_resolver.dart';
 
 const String multimodalInternalMediaPathsKey = '_kelivo_media_paths';
 const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
+const String multimodalInternalImageReferencesKey = '_kelivo_image_references';
+Map<String, String> internalImageReferences(Map<String, dynamic> message) {
+  final value = message[multimodalInternalImageReferencesKey];
+  return value is Map
+      ? {
+          for (final entry in value.entries)
+            if (entry.key is String && entry.value is String)
+              entry.key as String: entry.value as String,
+        }
+      : const {};
+}
 
 /// A separately persisted plain-text part that must bypass Markdown media
 /// extraction. Set from structured message parts, never inferred from markers

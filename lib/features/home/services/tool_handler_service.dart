@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -269,6 +270,37 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
+    if (supportsTools &&
+        conversationId != null &&
+        ModelSpecResolver.instance
+            .spec(settings.getProviderConfig(providerKey), modelId)
+            .supportsImageInput) {
+      toolDefs.add({
+        'type': 'function',
+        'function': {
+          'name': 'read_chat_image',
+          'description':
+              'Read an image from this conversation using its image_id. Omit image_id to list available images, then use next_offset to list more. Reading adds a fresh observation without rewriting earlier history.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'image_id': {
+                'type': 'string',
+                'description':
+                    'The img_ identifier from an image placeholder or listing.',
+              },
+              'offset': {
+                'type': 'integer',
+                'minimum': 0,
+                'description': 'Offset for listing images; default 0.',
+              },
+            },
+
+            'additionalProperties': false,
+          },
+        },
+      });
+    }
 
     // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
@@ -532,6 +564,25 @@ class ToolHandlerService {
       final permission = permissionFor(name, toolCallId);
       Future<Object?> execute() async {
         try {
+          if (name == 'read_chat_image') {
+            final imageContext = RequestImageContext.current;
+            if (imageContext == null ||
+                conversationId == null ||
+                permissionChat == null) {
+              return const ClientToolResult(
+                'Image is unavailable in the current conversation context.',
+              );
+            }
+            final allowed = await permissionChat.imageContextHistory(
+              conversationId,
+              throughMessageId: imageContext.targetMessageId,
+            );
+            return imageContext.readImage(
+              (args['image_id'] ?? '').toString(),
+              allowedMessages: allowed.map((m) => m.id).toSet(),
+              offset: args['offset'] is int ? args['offset'] as int : 0,
+            );
+          }
           if (name == BrowserToolsService.toolName) {
             final current = assistant == null
                 ? null

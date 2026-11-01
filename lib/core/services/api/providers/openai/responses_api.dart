@@ -1,3 +1,4 @@
+import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
@@ -252,6 +253,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
               item.call.name,
               item.content,
               metadata: item.metadata,
+              toolCallId: item.call.id,
               canImageInput: spec.input.contains(Modality.image),
             )).responsesOutput,
           },
@@ -305,7 +307,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           assistantHeaders: extraHeaders,
         ),
       );
-      req2.body = jsonEncode(body2);
+      req2.body = await RequestImageContext.encodeBody(body2);
       final http.StreamedResponse resp2;
       try {
         resp2 = await client.send(req2);

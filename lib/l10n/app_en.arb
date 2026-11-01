@@ -7409,5 +7409,15 @@
   "recoveryRestoreRetryBody": "The restore could not be completed. The selected copy has been kept. Check local copies again or reopen Kelivo to continue.",
   "recoverySpaceAmount": "Last check: {available} available; at least {required} of free space is needed to prepare your data safely.",
   "@recoverySpaceAmount": {"placeholders": {"required": {"type": "String"}, "available": {"type": "String"}}},
-  "recoveryCopiesNeedUpdate": "Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept."
+  "recoveryCopiesNeedUpdate": "Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.",
+  "imageContextTitle": "Image context",
+  "imageContextAutomatic": "Manage history images automatically",
+  "imageContextDescription": "Keep user attachments longer; retire old tool screenshots in batches. Pins keep images in their original messages and may change the cached prefix. Add again places a new attachment in the composer. The preview uses saved files; pending OCR, remote files and provider limits are checked when sending.",
+  "imageContextIncluded": "Included",
+  "imageContextOmitted": "Omitted",
+  "imageContextPin": "Pin image",
+  "imageContextUnpin": "Unpin image",
+  "imageContextAttachAgain": "Add to composer again",
+  "imageContextEmpty": "No images in the current context",
+  "imageContextUnavailable": "This image is unavailable in the current context."
 }

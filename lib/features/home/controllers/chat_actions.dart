@@ -2240,6 +2240,7 @@ class ChatActions {
 
       state.requestStartedAt = DateTime.now();
       final stream = ChatApiService.sendMessageStream(
+        imageContext: ctx.imageContext,
         config: ctx.config,
         modelId: ctx.modelId,
         messages: ctx.apiMessages,

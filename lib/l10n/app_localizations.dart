@@ -27887,6 +27887,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.'**
   String get recoveryCopiesNeedUpdate;
+
+  /// No description provided for @imageContextTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image context'**
+  String get imageContextTitle;
+
+  /// No description provided for @imageContextAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage history images automatically'**
+  String get imageContextAutomatic;
+
+  /// No description provided for @imageContextDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep user attachments longer; retire old tool screenshots in batches. Pins keep images in their original messages and may change the cached prefix. Add again places a new attachment in the composer. The preview uses saved files; pending OCR, remote files and provider limits are checked when sending.'**
+  String get imageContextDescription;
+
+  /// No description provided for @imageContextIncluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Included'**
+  String get imageContextIncluded;
+
+  /// No description provided for @imageContextOmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Omitted'**
+  String get imageContextOmitted;
+
+  /// No description provided for @imageContextPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin image'**
+  String get imageContextPin;
+
+  /// No description provided for @imageContextUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin image'**
+  String get imageContextUnpin;
+
+  /// No description provided for @imageContextAttachAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to composer again'**
+  String get imageContextAttachAgain;
+
+  /// No description provided for @imageContextEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No images in the current context'**
+  String get imageContextEmpty;
+
+  /// No description provided for @imageContextUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This image is unavailable in the current context.'**
+  String get imageContextUnavailable;
 }
 
 class _AppLocalizationsDelegate

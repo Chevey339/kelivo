@@ -114,6 +114,12 @@ String mimeFromPath(String path) {
   return inferMediaMimeFromSource(path, fallbackMime: 'image/png');
 }
 
+String normalizeClaudeImageMime(String mime) {
+  final normalized = mime.trim().toLowerCase();
+  if (normalized == 'image/jpg') return 'image/jpeg';
+  return normalized;
+}
+
 String mimeFromDataUrl(String dataUrl) {
   try {
     final start = dataUrl.indexOf(':');
@@ -173,6 +179,8 @@ Future<ParsedTextAndImages> parseTextAndImages(
   bool keepDisallowedImageText = true,
   bool skipImageParsing = false,
   String? literalText,
+  Map<String, String> imageReferences = const {},
+  bool validateRemoteImages = true,
 }) async {
   if (raw.isEmpty) return const ParsedTextAndImages('', <ImageRef>[]);
   // Utility / text-only prompts (title, summary, compress) must keep
@@ -184,6 +192,17 @@ Future<ParsedTextAndImages> parseTextAndImages(
   // Custom attachment markers are intentionally not recognized here.
   // Attachments arrive via structured parts / media-path keys.
   final images = <ImageRef>[];
+  void addImage(String kind, String source, int offset) {
+    final reference = imageReferences[source];
+    images.add(
+      ImageRef(
+        reference == null ? kind : 'data',
+        reference ?? source,
+        offset: offset,
+      ),
+    );
+  }
+
   final buf = StringBuffer();
   final literalRanges = literalText == null || literalText.isEmpty
       ? <Match>[]
@@ -276,7 +295,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('data:')) {
           if (allowDataImages) {
-            images.add(ImageRef('data', url));
+            addImage('data', url, m1.start);
           } else if (keepDisallowedImageText) {
             buf.write(full);
           }
@@ -289,13 +308,13 @@ Future<ParsedTextAndImages> parseTextAndImages(
             i = m1.end;
             continue;
           }
-          final ok = await _isValidRemoteImageUrl(url);
+          final ok = !validateRemoteImages || await _isValidRemoteImageUrl(url);
           if (!ok) {
             buf.write(full);
             i = m1.end;
             continue;
           }
-          images.add(ImageRef('url', url));
+          addImage('url', url, m1.start);
           if (keepRemoteMarkdownText) {
             buf.write(full);
           }
@@ -325,7 +344,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
           i = m1.end;
           continue;
         }
-        images.add(ImageRef('path', url));
+        addImage('path', url, m1.start);
         i = m1.end;
         continue;
       }
@@ -599,7 +618,8 @@ class ImageRef {
   final String kind; // 'data' | 'path' | 'url'
   final String src;
   final String? mime;
-  const ImageRef(this.kind, this.src, {this.mime});
+  final int? offset;
+  const ImageRef(this.kind, this.src, {this.mime, this.offset});
 }
 
 class ParsedTextAndImages {
