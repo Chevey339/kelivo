@@ -16,12 +16,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _buildHarness({required Widget child}) {
+Widget _buildHarness({required Widget child, SettingsProvider? settings}) {
   SharedPreferences.setMockInitialValues(const {});
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        create: (_) =>
+            settings ?? SettingsProvider(createBusinessTestPreferences()),
       ),
       ChangeNotifierProvider(
         create: (_) =>
@@ -182,11 +183,20 @@ void main() {
     testWidgets('reasoning overflow retains the renderer at width $width', (
       tester,
     ) async {
+      // This test covers the scrolling overflow preview, which the collapsed
+      // reasoning preview setting (on by default) replaces while loading.
+      final settings = await tester.runAsync(() async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        await settings.setShowCollapsedReasoningPreview(false);
+        return settings;
+      });
       tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         _buildHarness(
+          settings: settings,
           child: SizedBox(
             width: 360,
             child: ChatMessageWidget(
