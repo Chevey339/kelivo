@@ -15,6 +15,7 @@ class AppTextSelectionToolbar extends StatelessWidget {
     required this.buttonItems,
     required this.selectionContext,
     required this.onDismiss,
+    this.keepOpenOnSelectAll = true,
     this.separatorsBefore = const {},
     this.shortcuts = const {},
   });
@@ -23,6 +24,9 @@ class AppTextSelectionToolbar extends StatelessWidget {
   final List<ContextMenuButtonItem> buttonItems;
   final BuildContext selectionContext;
   final VoidCallback onDismiss;
+
+  /// Whether Android retains the current menu and callbacks for Select All.
+  final bool keepOpenOnSelectAll;
   final Set<ContextMenuButtonItem> separatorsBefore;
   final Map<ContextMenuButtonItem, String> shortcuts;
 
@@ -48,6 +52,7 @@ class AppTextSelectionToolbar extends StatelessWidget {
         buttonItems: buttonItems,
         selectionContext: selectionContext,
         onDismiss: onDismiss,
+        keepOpenOnSelectAll: keepOpenOnSelectAll,
       );
     }
     if (platform != TargetPlatform.macOS &&

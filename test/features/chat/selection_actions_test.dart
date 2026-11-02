@@ -169,6 +169,51 @@ void main() {
   }
 
   testWidgets(
+    'Android message Select all retires stale actions and keeps Copy available',
+    (tester) async {
+      const source = 'alpha beta gamma';
+      String? clipboard;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      final received = <QuoteRef>[];
+      await mount(tester, received);
+      await tester.longPress(find.text(source));
+      await tester.pumpAndSettle();
+      expect(androidMenu.isShown, isTrue);
+      final previousMenu = androidMenu.menu;
+      final copyIndex = androidMenu.labels.indexOf('Copy');
+      final quoteIndex = androidMenu.labels.indexOf('Quote');
+      await androidMenu.press('Select all');
+      // These events may already be queued while SelectableRegion replaces its
+      // overlay. They must not execute callbacks holding the old partial snapshot.
+      await androidMenu.event('action', previousMenu, index: copyIndex);
+      await androidMenu.event('action', previousMenu, index: quoteIndex);
+      expect(clipboard, isNull);
+      expect(received, isEmpty);
+      await tester.pumpAndSettle();
+      expect(androidMenu.isShown, isTrue);
+      await androidMenu.event('action', previousMenu, index: copyIndex);
+      expect(clipboard, isNull);
+      expect(androidMenu.isShown, isTrue);
+      await androidMenu.press('Copy');
+      await tester.pumpAndSettle();
+      expect(clipboard, source);
+      expect(androidMenu.isShown, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
     'mouse selection settles before showing only Quote and Translate; scroll hides it',
     (tester) async {
       final received = <QuoteRef>[];

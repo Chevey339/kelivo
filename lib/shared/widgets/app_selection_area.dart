@@ -404,6 +404,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       anchors: anchors,
       selectionContext: region.context,
       onDismiss: () => region.hideToolbar(false),
+      keepOpenOnSelectAll: false,
       buttonItems: [
         for (final item in region.contextMenuButtonItems)
           if (item.type == ContextMenuButtonType.copy && _hasCopyBudget)
@@ -586,6 +587,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       overflowItems: overflowItems.toSet(),
       selectionContext: region.context,
       onDismiss: () => region.hideToolbar(false),
+      keepOpenOnSelectAll: false,
     );
   }
 

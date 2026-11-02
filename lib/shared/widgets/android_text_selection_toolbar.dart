@@ -16,6 +16,7 @@ class AndroidTextSelectionToolbar extends StatefulWidget {
     required this.selectionContext,
     required this.onDismiss,
     this.overflowItems = const {},
+    this.keepOpenOnSelectAll = true,
   });
 
   final TextSelectionToolbarAnchors anchors;
@@ -23,6 +24,12 @@ class AndroidTextSelectionToolbar extends StatefulWidget {
   final Set<ContextMenuButtonItem> overflowItems;
   final BuildContext selectionContext;
   final VoidCallback onDismiss;
+
+  /// False when Select All replaces callbacks captured from the old selection.
+  final bool keepOpenOnSelectAll;
+
+  bool _keepsMenuOpen(ContextMenuButtonItem item) =>
+      keepOpenOnSelectAll && item.type == ContextMenuButtonType.selectAll;
 
   static const _channel = MethodChannel('app.android_selection_menu');
   static _AndroidTextSelectionToolbarState? _active;
@@ -41,10 +48,12 @@ class AndroidTextSelectionToolbar extends StatefulWidget {
             index >= active.widget.buttonItems.length) {
           return;
         }
-        final action = active.widget.buttonItems[index].onPressed;
+        final item = active.widget.buttonItems[index];
+        final action = item.onPressed;
         if (action == null) return;
-        // Select All can synchronously create the next toolbar.
-        active._dismiss();
+        // EditableText updates its toolbar in place. SelectableRegion replaces
+        // it, so callbacks holding the previous selection must retire first.
+        if (!active.widget._keepsMenuOpen(item)) active._dismiss();
         action();
       case 'dismissed':
         active._dismiss();
@@ -66,7 +75,7 @@ class _AndroidTextSelectionToolbarState
   bool _observing = false;
   int _revision = 0;
   int _request = 0;
-  List<(String, bool, bool)>? _items;
+  List<(String, bool, bool, bool)>? _items;
   Rect? _rect;
   (Size, double, EdgeInsets, EdgeInsets)? _windowGeometry;
 
@@ -135,6 +144,7 @@ class _AndroidTextSelectionToolbarState
           AdaptiveTextSelectionToolbar.getButtonLabel(context, item),
           item.onPressed != null,
           widget.overflowItems.contains(item),
+          widget._keepsMenuOpen(item),
         ),
     ];
     final itemsChanged = !listEquals(items, _items);
@@ -159,7 +169,12 @@ class _AndroidTextSelectionToolbarState
               'rect': [rect.left, rect.top, rect.right, rect.bottom],
               'items': [
                 for (final item in items)
-                  {'title': item.$1, 'enabled': item.$2, 'overflow': item.$3},
+                  {
+                    'title': item.$1,
+                    'enabled': item.$2,
+                    'overflow': item.$3,
+                    'keepOpen': item.$4,
+                  },
               ],
             },
           ) ??

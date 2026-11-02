@@ -19,7 +19,12 @@ internal class AndroidSelectionMenu(
     messenger: BinaryMessenger,
     private val viewProvider: () -> View?,
 ) {
-    private data class Item(val title: String, val enabled: Boolean, val overflow: Boolean)
+    private data class Item(
+        val title: String,
+        val enabled: Boolean,
+        val overflow: Boolean,
+        val keepOpen: Boolean,
+    )
     private class Session(
         val id: Long,
         var revision: Int,
@@ -69,6 +74,7 @@ internal class AndroidSelectionMenu(
                 item["title"] as? String ?: return false,
                 item["enabled"] == true,
                 item["overflow"] == true,
+                item["keepOpen"] == true,
             )
         } ?: return false
         if (items.isEmpty()) return false
@@ -120,8 +126,9 @@ internal class AndroidSelectionMenu(
                 if (current !== session || item.groupId != session.revision ||
                     session.items.getOrNull(index)?.enabled != true) return false
                 val event = mapOf("session" to session.id, "revision" to session.revision, "index" to index)
-                // Retire this mode before Dart's action can open another one.
-                dismiss(notify = false)
+                // Keep this mode only for actions that update it in place.
+                // Otherwise retire it before Dart can open another toolbar.
+                if (!session.items[index].keepOpen) dismiss(notify = false)
                 channel.invokeMethod("action", event)
                 return true
             }

@@ -46,12 +46,13 @@ class AndroidSelectionMenuTest {
         activity.pause().stop().destroy()
     }
 
-    private fun show(session: Int = 1, revision: Int = 1, enabled: Boolean = true): Any? =
+    private fun show(session: Int = 1, revision: Int = 1, enabled: Boolean = true, selectAll: Boolean = false): Any? =
         messenger.call("show", mapOf(
             "session" to session, "revision" to revision,
             "rect" to listOf(300.0, 400.0, 600.0, 480.0),
             "items" to listOf(
-                mapOf("title" to "Copy", "enabled" to enabled, "overflow" to false),
+                mapOf("title" to if (selectAll) "Select all" else "Copy",
+                    "enabled" to enabled, "overflow" to false, "keepOpen" to selectAll),
                 mapOf("title" to "Quote", "enabled" to true, "overflow" to false),
                 mapOf("title" to "Translate", "enabled" to true, "overflow" to false),
                 mapOf("title" to "Markdown", "enabled" to true, "overflow" to false),
@@ -60,6 +61,40 @@ class AndroidSelectionMenuTest {
                 mapOf("title" to "External $it", "enabled" to true, "overflow" to true)
             },
         ))
+
+    @Test fun selectAllKeepsTheModeForUpdatedActionsAndFollowingCopy() {
+        assertEquals(true, show(selectAll = true))
+        val mode = view.modes.single()
+        val selectAll = mode.menu.getItem(0)
+        assertTrue(mode.callback.onActionItemClicked(mode, selectAll))
+        assertFalse(mode.finished)
+        assertEquals(listOf("action"), messenger.events.map { it.method })
+
+        assertEquals(true, show(revision = 2))
+        assertSame(mode, view.modes.single())
+        assertEquals("Copy", mode.menu.getItem(0).title)
+        assertFalse(mode.callback.onActionItemClicked(mode, selectAll))
+        assertTrue(mode.callback.onActionItemClicked(mode, mode.menu.getItem(0)))
+        assertTrue(mode.finished)
+        assertEquals(listOf(1, 2), messenger.events.map { it.argument<Int>("revision") })
+    }
+
+    @Test fun selectAllStillAllowsBackAndOwnerDismissal() {
+        show(selectAll = true)
+        val first = view.modes.single()
+        first.callback.onActionItemClicked(first, first.menu.getItem(0))
+        assertTrue(handler.handleBack())
+        assertTrue(first.finished)
+        assertEquals(listOf("action", "dismissed"), messenger.events.map { it.method })
+
+        show(session = 2, selectAll = true)
+        val second = view.modes.last()
+        second.callback.onActionItemClicked(second, second.menu.getItem(0))
+        messenger.call("hide", mapOf("session" to 2))
+        assertTrue(second.finished)
+        assertFalse(handler.handleBack())
+        assertEquals(listOf("action", "dismissed", "action"), messenger.events.map { it.method })
+    }
 
     @Test fun floatingMenuKeepsPrimaryOrderAndForcesExternalActionsIntoOverflow() {
         assertEquals(true, show())
