@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
+import 'package:Kelivo/core/services/api/providers/google_gemini.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -59,6 +60,7 @@ class _Builder extends MessageBuilderService {
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
     ({String providerId, String modelId})? claudeSource,
+    String? googleProviderId,
   }) {
     history = super.buildApiMessages(
       messages: messages,
@@ -68,6 +70,7 @@ class _Builder extends MessageBuilderService {
       preserveToolTurns: preserveToolTurns,
       responsesScope: responsesScope,
       claudeSource: claudeSource,
+      googleProviderId: googleProviderId,
     );
     // Exercise real protocol selection and history assembly, stopping before
     // unrelated prompt injection, workspace setup, and tool discovery.
@@ -233,7 +236,11 @@ void main() {
               {
                 'content': {
                   'role': 'model',
-                  'parts': replies[requests.length - 1],
+                  'parts':
+                      replies[(requests.length - 1).clamp(
+                        0,
+                        replies.length - 1,
+                      )],
                 },
                 'finishReason': 'STOP',
               },
@@ -275,6 +282,8 @@ void main() {
         final assistant = ChatMessage(
           role: 'assistant',
           conversationId: 'c',
+          providerId: config.id,
+          modelId: model,
           parts: [
             for (final part in StreamChunkHandler.collect(chunks).parts)
               MessagePart.fromRow(part.kind, part.encodePayload()),
@@ -343,6 +352,60 @@ void main() {
             [response('c')],
             replies[2],
           ],
+        );
+
+        final switchedConfig = config.copyWith(id: 'OtherGemini');
+        await expectLater(
+          MessageGenerationService(
+            chatService: chat,
+            messageBuilderService: builder,
+            generationController: _Generation(),
+            streamController: _Stream(),
+            contextProvider: context,
+          ).assembleUnprocessedRequestContext(
+            messages: [
+              ChatMessage(role: 'user', content: 'Check.', conversationId: 'c'),
+              assistant,
+              ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+            ],
+            versionSelections: {},
+            currentConversation: null,
+            settings: _Settings(switchedConfig),
+            assistant: null,
+            assistantId: null,
+            providerKey: switchedConfig.id,
+            modelId: model,
+          ),
+          throwsA(isA<_HistoryCaptured>()),
+        );
+        await ChatApiService.sendMessageStream(
+          config: switchedConfig,
+          modelId: model,
+          messages: builder.history,
+          stream: stream,
+        ).toList();
+        Map<String, dynamic> unsignedCall(String id, {bool first = true}) => {
+          'functionCall': call(id)['functionCall'],
+          if (first) 'thoughtSignature': geminiDummyThoughtSignature,
+        };
+        final switched = (requests.last['contents'] as List).cast<Map>();
+        expect(
+          [for (final turn in switched.sublist(1, 6)) turn['parts']],
+          [
+            [
+              {'text': 'Checking.'},
+              unsignedCall('a'),
+              unsignedCall('b', first: false),
+            ],
+            [response('a'), response('b')],
+            [unsignedCall('c')],
+            [response('c')],
+            replies[2],
+          ],
+        );
+        expect(
+          assistant.parts.whereType<ToolCallPart>().first.payloadJson,
+          contains('sig-a'),
         );
       },
     );

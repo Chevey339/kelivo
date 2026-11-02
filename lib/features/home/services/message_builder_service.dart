@@ -45,7 +45,7 @@ import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/services/api/providers/claude/claude_history.dart';
 import '../../../core/services/api/providers/claude/claude_thinking_recovery.dart';
-import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
+import '../../../core/services/api/providers/google_gemini.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -53,6 +53,35 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 import 'assistant_tool_history.dart';
 import '../../../core/services/api/providers/openai/responses_history.dart';
+
+void _removeGoogleToolSignatures(Map<String, dynamic> message) {
+  void removeFromMetadata(Map<String, dynamic> target) {
+    final metadata = target['metadata'];
+    if (metadata is! Map) return;
+    final google = metadata['google'];
+    if (google is! Map) return;
+    final part = google['part'];
+    if (part is! Map) return;
+    // Copy only the changed maps so replay never alters persisted tool data.
+    target['metadata'] = {
+      ...metadata,
+      'google': {
+        ...google,
+        'part': Map<String, dynamic>.from(part)
+          ..remove('thoughtSignature')
+          ..remove('thought_signature'),
+      },
+    };
+  }
+
+  removeFromMetadata(message);
+  final calls = message['tool_calls'];
+  if (calls is List) {
+    for (final call in calls.cast<Map<String, dynamic>>()) {
+      removeFromMetadata(call);
+    }
+  }
+}
 
 /// Result of §7.6 memory-prefix resolution.
 ///
@@ -349,6 +378,7 @@ class MessageBuilderService {
   /// [preserveToolTurns] replays each persisted tool round as its own turn.
   /// [responsesScope] selects native Responses replay for matching artifacts.
   /// [claudeSource] keeps ordinary Claude blocks on their original model.
+  /// [googleProviderId] limits Gemini signatures to their original provider.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -357,6 +387,7 @@ class MessageBuilderService {
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
     ({String providerId, String modelId})? claudeSource,
+    String? googleProviderId,
   }) {
     final source = collapseVersions(messages, versionSelections);
 
@@ -375,6 +406,11 @@ class MessageBuilderService {
 
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      final messageStart = out.length;
+      final omitGoogleSignatures =
+          m.role == 'assistant' &&
+          googleProviderId != null &&
+          m.providerId != googleProviderId;
       if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
         thinkingRecovery.readArtifact(
           _providerArtifact(m, claudeThinkingRecoveryArtifactKind),
@@ -555,6 +591,13 @@ class MessageBuilderService {
         }
       }
 
+      if (omitGoogleSignatures) {
+        content = extractGeminiThoughtMeta(content).cleanedText;
+        for (final message in out.skip(messageStart)) {
+          _removeGoogleToolSignatures(message);
+        }
+      }
+
       final mediaRefs = mediaRefsFromParts(m);
       // Pure-attachment turns have empty text content but still must be sent.
       // Document FileParts are omitted from mediaRefs (they travel via
@@ -593,7 +636,9 @@ class MessageBuilderService {
           m,
           geminiThoughtSignatureArtifactKind,
         );
-        if (signature != null && signature.isNotEmpty) {
+        if (!omitGoogleSignatures &&
+            signature != null &&
+            signature.isNotEmpty) {
           message[multimodalInternalGeminiThoughtSignatureKey] = signature;
         }
       }
