@@ -27909,7 +27909,7 @@ abstract class AppLocalizations {
   /// No description provided for @imageContextDescription.
   ///
   /// In en, this message translates to:
-  /// **'Keep user attachments longer; retire old tool screenshots in batches. Pins keep images in their original messages and may change the cached prefix. Add again places a new attachment in the composer. The preview uses saved files; pending OCR, remote files and provider limits are checked when sending.'**
+  /// **'Manage the images included in this turn. Originals stay in your chat.'**
   String get imageContextDescription;
 
   /// No description provided for @imageContextIncluded.
@@ -27921,7 +27921,7 @@ abstract class AppLocalizations {
   /// No description provided for @imageContextOmitted.
   ///
   /// In en, this message translates to:
-  /// **'Omitted'**
+  /// **'Not included'**
   String get imageContextOmitted;
 
   /// No description provided for @imageContextPin.
@@ -27945,7 +27945,7 @@ abstract class AppLocalizations {
   /// No description provided for @imageContextEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No images in the current context'**
+  /// **'No images yet'**
   String get imageContextEmpty;
 
   /// No description provided for @imageContextUnavailable.
@@ -27953,6 +27953,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This image is unavailable in the current context.'**
   String get imageContextUnavailable;
+
+  /// No description provided for @imageContextEntryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and manage images for this turn'**
+  String get imageContextEntryDescription;
+
+  /// No description provided for @imageContextAutomaticDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your attachments longer and set aside older tool images.'**
+  String get imageContextAutomaticDescription;
+
+  /// No description provided for @imageContextActionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to prioritize an image, or add it to the composer again.'**
+  String get imageContextActionsHint;
+
+  /// No description provided for @imageContextEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Images you send or tools read will appear here.'**
+  String get imageContextEmptyDescription;
+
+  /// No description provided for @imageContextUserImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Your images'**
+  String get imageContextUserImages;
+
+  /// No description provided for @imageContextToolImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool images'**
+  String get imageContextToolImages;
+
+  /// No description provided for @imageContextAssistantImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated images'**
+  String get imageContextAssistantImages;
+
+  /// No description provided for @imageContextImageNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Image {index}'**
+  String imageContextImageNumber(int index);
+
+  /// No description provided for @imageContextIncludedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{included} of {total} images included'**
+  String imageContextIncludedCount(int included, int total);
+
+  /// No description provided for @imageContextMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get imageContextMissing;
+
+  /// No description provided for @imageContextLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load images. Try again.'**
+  String get imageContextLoadFailed;
+
+  /// No description provided for @imageContextUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your changes. Try again.'**
+  String get imageContextUpdateFailed;
 }
 
 class _AppLocalizationsDelegate

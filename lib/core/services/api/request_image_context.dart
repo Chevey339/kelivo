@@ -1085,11 +1085,21 @@ class RequestImageContext {
     return result;
   }
 
-  Future<String?> attachmentPath(String handle) async {
+  /// A preview may inspect an existing local image, but must not fetch or save
+  /// pixels just because its row became visible. Keep the same MCP file gate
+  /// as explicit reattachment.
+  Future<String?> localAttachmentPath(String handle) async {
     final image = _byHandle[handle];
     if (image == null || _isUnavailable(image)) return null;
     final file = await _localAssetFile(image);
-    if (file != null && await file.exists()) return file.path;
+    return file != null && await file.exists() ? file.path : null;
+  }
+
+  Future<String?> attachmentPath(String handle) async {
+    final image = _byHandle[handle];
+    if (image == null || _isUnavailable(image)) return null;
+    final local = await localAttachmentPath(handle);
+    if (local != null) return local;
     final data = isRemoteHttpUrl(image.uri)
         ? await McpImageSnapshot.readDataUrl(
             image.uri,

@@ -1,5 +1,3 @@
-import 'image_context_panel.dart';
-import '../../../shared/widgets/ios_text_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,12 +16,10 @@ class ContextUsageHeader extends StatefulWidget {
     super.key,
     this.conversationId,
     this.draftText = '',
-    this.onAttachImage,
   });
 
   final String? conversationId;
   final String draftText;
-  final ValueChanged<String>? onAttachImage;
 
   @override
   State<ContextUsageHeader> createState() => _ContextUsageHeaderState();
@@ -86,16 +82,6 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ContextUsageBreakdown(snapshot: snapshot),
-        if (id != null)
-          IosTextButton(
-            label: AppLocalizations.of(context)!.imageContextTitle,
-            icon: Lucide.Image,
-            onPressed: () => showImageContextPanel(
-              context,
-              id,
-              onAttach: widget.onAttachImage,
-            ),
-          ),
         if (showSetWindow) ...[
           const SizedBox(height: 12),
           _SetWindowRow(onTap: () => _openSetWindow(snapshot)),

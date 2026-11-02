@@ -1,6 +1,7 @@
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
 import '../../intelligent_ui/host/ui_host_scope.dart';
 import '../../chat/widgets/context_dialog.dart';
+import '../../chat/widgets/image_context_panel.dart';
 import '../../../core/models/context_compression_task.dart';
 import '../../../core/models/context_operation.dart';
 import '../services/tool_approval_service.dart';
@@ -1853,6 +1854,7 @@ class _HomePageState extends State<HomePage>
 
   void _showContextManagementSheet() async {
     final imageTarget = _mediaController.capture();
+    final imageConversationId = _controller.currentConversation?.id;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1864,9 +1866,19 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
-            onAttachImage: (path) {
-              if (imageTarget.isValid) imageTarget.addImages([path]);
-            },
+            onImages: imageConversationId == null
+                ? null
+                : () async {
+                    await Navigator.of(ctx).maybePop();
+                    if (!mounted) return;
+                    await showImageContextPanel(
+                      context,
+                      imageConversationId,
+                      onAttach: (path) {
+                        if (imageTarget.isValid) imageTarget.addImages([path]);
+                      },
+                    );
+                  },
             conversationId: _controller.currentConversation?.id,
             draftText: formatQuotedMessage(
               _inputController.text,

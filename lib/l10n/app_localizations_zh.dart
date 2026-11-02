@@ -15006,14 +15006,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageContextAutomatic => '自动管理历史图片';
 
   @override
-  String get imageContextDescription =>
-      '用户附件保留更久，工具截图分批淘汰。固定图片保留在原消息中，可能改变缓存前缀；再次添加会放入输入框。预览依据已有文件，待处理 OCR、远程文件和服务商限制在发送时确认。';
+  String get imageContextDescription => '管理本轮使用的图片，原图仍保留在聊天中。';
 
   @override
-  String get imageContextIncluded => '将发送';
+  String get imageContextIncluded => '本轮发送';
 
   @override
-  String get imageContextOmitted => '已省略';
+  String get imageContextOmitted => '本轮不发送';
 
   @override
   String get imageContextPin => '固定图片';
@@ -15025,10 +15024,50 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageContextAttachAgain => '再次添加到输入框';
 
   @override
-  String get imageContextEmpty => '当前上下文没有图片';
+  String get imageContextEmpty => '还没有图片';
 
   @override
   String get imageContextUnavailable => '当前上下文无法读取这张图片。';
+
+  @override
+  String get imageContextEntryDescription => '查看和管理本轮使用的图片';
+
+  @override
+  String get imageContextAutomaticDescription => '优先保留你上传的图片，分批收起较早的工具图片。';
+
+  @override
+  String get imageContextActionsHint => '固定以优先保留，或再次添加到输入框。';
+
+  @override
+  String get imageContextEmptyDescription => '发送图片或让工具读取图片后，会显示在这里。';
+
+  @override
+  String get imageContextUserImages => '你上传的图片';
+
+  @override
+  String get imageContextToolImages => '工具图片';
+
+  @override
+  String get imageContextAssistantImages => '生成的图片';
+
+  @override
+  String imageContextImageNumber(int index) {
+    return '图片 $index';
+  }
+
+  @override
+  String imageContextIncludedCount(int included, int total) {
+    return '本轮发送 $included / $total 张';
+  }
+
+  @override
+  String get imageContextMissing => '图片不可用';
+
+  @override
+  String get imageContextLoadFailed => '暂时无法加载图片，请重试。';
+
+  @override
+  String get imageContextUpdateFailed => '未能保存修改，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
