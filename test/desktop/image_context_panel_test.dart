@@ -12,6 +12,7 @@ import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/features/chat/widgets/image_context_panel.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import '../support/business_test_harness.dart';
 
 class _TemporaryChat extends ChatService {
@@ -134,9 +135,7 @@ void main() {
     await tester.pumpAndSettle();
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
     expect(find.byTooltip('Unpin image'), findsOneWidget);
-    await tester.tap(
-      find.bySemanticsLabel('Manage history images automatically').first,
-    );
+    await tester.tap(find.byType(IosSwitch));
     await tester.pump();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 40)),
