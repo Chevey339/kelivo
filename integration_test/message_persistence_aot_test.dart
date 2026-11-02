@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/features/home/services/message_generation_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -113,5 +115,57 @@ void main() {
     expect(stored.parts, checkpoint.parts);
     expect(stored.timestamp.isAtSameMomentAs(timestamp), isTrue);
     expect(stored.isStreaming, isFalse);
+
+    final imageMessage = ChatMessage(
+      id: 'historical-images',
+      role: 'user',
+      conversationId: conversation.id,
+      timestamp: timestamp,
+      parts: const [
+        TextPart('image caption'),
+        ImagePart(uri: 'https://example.com/first.png', mime: 'image/png'),
+        ImagePart(uri: 'https://example.com/second.png', mime: 'image/png'),
+      ],
+    );
+    await repository.appendLinearMessageToConversation(
+      conversation: conversation,
+      message: imageMessage,
+    );
+
+    var editId = imageMessage.id;
+    var expectedVersion = 0;
+    for (final remainingImages in const [
+      ['https://example.com/second.png'],
+      <String>[],
+    ]) {
+      final editedParts =
+          await MessageGenerationService.buildPersistedUserMessageParts(
+            ChatInputData(text: 'image caption', imagePaths: remainingImages),
+            assistant: null,
+          );
+      final result = await repository.appendMessageVersion(
+        messageId: editId,
+        parts: editedParts,
+      );
+      expect(result, isNotNull);
+      editId = result!.message.id;
+      final edited = (await repository.getMessage(editId))!;
+      expect(edited.version, ++expectedVersion);
+      expect(edited.content, 'image caption');
+      expect(
+        edited.parts.whereType<ImagePart>().map((part) => part.uri),
+        remainingImages,
+      );
+      expect(
+        result.conversation.versionSelections[imageMessage.id],
+        expectedVersion,
+      );
+    }
+    expect(
+      (await repository.getMessage(imageMessage.id))!.parts,
+      imageMessage.parts,
+      reason:
+          'Removing images from an edit must preserve the original version.',
+    );
   });
 }

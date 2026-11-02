@@ -918,6 +918,63 @@ void main() {
     focusNode.dispose();
   });
 
+  testWidgets('removing restored history images only changes the draft', (
+    tester,
+  ) async {
+    late List<File> sources;
+    await tester.runAsync(() async {
+      sources = [
+        await writeUserImage('history_first.png'),
+        await writeUserImage('history_second.png'),
+      ];
+    });
+    final controller = TextEditingController(text: 'history caption');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    var submissions = 0;
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (_) async {
+          submissions++;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+    mediaController.restoreInput(
+      ChatInputData(
+        text: controller.text,
+        imagePaths: sources.map((file) => file.path).toList(),
+      ),
+    );
+    await tester.pump();
+
+    ChatInputData? changedDraft;
+    mediaController.onDraftChanged = () {
+      changedDraft = mediaController.snapshotInput(controller.text);
+    };
+    for (var remaining = 1; remaining >= 0; remaining--) {
+      await tester.tap(find.byKey(const ValueKey('chat-input-image-remove:0')));
+      await tester.pumpAndSettle();
+      expect(
+        changedDraft!.imagePaths,
+        sources.skip(2 - remaining).map((f) => f.path),
+      );
+      expect(controller.text, 'history caption');
+      expect(submissions, 0);
+      expect(tester.takeException(), isNull);
+      for (final source in sources) {
+        expect(await fileExists(tester, source), isTrue);
+      }
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    focusNode.dispose();
+  });
+
   testWidgets('restoreInput 清空草稿后保留用户源文件', (tester) async {
     late File source;
     await tester.runAsync(() async {
