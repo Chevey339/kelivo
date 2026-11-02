@@ -10747,6 +10747,12 @@ abstract class AppLocalizations {
   /// **'For Token Plan, choose Recorded audio, enter token-plan as the Workspace ID, and select the region for your key.'**
   String get asrServicesQwenTokenPlanHint;
 
+  /// No description provided for @asrServicesWorkspaceIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. token-plan'**
+  String get asrServicesWorkspaceIdHint;
+
   /// No description provided for @asrServicesEndpointOverrideLabel.
   ///
   /// In en, this message translates to:

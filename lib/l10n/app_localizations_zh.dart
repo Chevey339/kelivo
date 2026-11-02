@@ -5659,6 +5659,9 @@ class AppLocalizationsZh extends AppLocalizations {
       '使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。';
 
   @override
+  String get asrServicesWorkspaceIdHint => '例如：token-plan';
+
+  @override
   String get asrServicesEndpointOverrideLabel => '自定义端点（可选）';
 
   @override
@@ -20725,6 +20728,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。';
 
   @override
+  String get asrServicesWorkspaceIdHint => '例如：token-plan';
+
+  @override
   String get asrServicesEndpointOverrideLabel => '自定义端点（可选）';
 
   @override
@@ -35644,6 +35650,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get asrServicesQwenTokenPlanHint =>
       '使用 Token Plan 時，選擇錄音轉寫，業務空間 ID 填 token-plan，並選擇與金鑰對應的地域。';
+
+  @override
+  String get asrServicesWorkspaceIdHint => '例如：token-plan';
 
   @override
   String get asrServicesEndpointOverrideLabel => '自訂端點（選填）';

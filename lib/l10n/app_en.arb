@@ -2573,6 +2573,7 @@
   "asrServicesRecordedMode": "Recorded audio",
   "asrServicesQwenAudioSubtitle": "Real-time or recorded audio transcription",
   "asrServicesQwenTokenPlanHint": "For Token Plan, choose Recorded audio, enter token-plan as the Workspace ID, and select the region for your key.",
+  "asrServicesWorkspaceIdHint": "e.g. token-plan",
   "asrServicesEndpointOverrideLabel": "Custom endpoint (optional)",
   "asrServicesWorkspaceIdInvalid": "Enter a workspace ID, not a URL.",
   "asrServicesWebSocketEndpointInvalid": "Enter a complete ws:// or wss:// endpoint without credentials or a fragment.",

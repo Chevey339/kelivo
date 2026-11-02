@@ -5895,6 +5895,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'For Token Plan, choose Recorded audio, enter token-plan as the Workspace ID, and select the region for your key.';
 
   @override
+  String get asrServicesWorkspaceIdHint => 'e.g. token-plan';
+
+  @override
   String get asrServicesEndpointOverrideLabel => 'Custom endpoint (optional)';
 
   @override

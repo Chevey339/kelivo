@@ -2058,6 +2058,7 @@
   "asrServicesRecordedMode": "录音转写",
   "asrServicesQwenAudioSubtitle": "实时识别或录音转写",
   "asrServicesQwenTokenPlanHint": "使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。",
+  "asrServicesWorkspaceIdHint": "例如：token-plan",
   "asrServicesEndpointOverrideLabel": "自定义端点（可选）",
   "asrServicesWorkspaceIdInvalid": "请输入业务空间 ID，不要填写网址。",
   "asrServicesWebSocketEndpointInvalid": "请输入完整的 ws:// 或 wss:// 端点，不含用户名、密码或 URL 片段。",

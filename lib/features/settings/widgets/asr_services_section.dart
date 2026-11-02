@@ -1128,7 +1128,7 @@ class _AsrEditorState extends State<_AsrEditor> {
         _EditorField(
           label: l10n.ttsServicesFieldWorkspaceIdLabel,
           controller: _workspaceController,
-          hint: 'token-plan',
+          hint: l10n.asrServicesWorkspaceIdHint,
           desktop: widget.desktop,
           onChanged: (_) => setState(() {}),
           errorText:
@@ -2010,7 +2010,14 @@ class _EditorFieldState extends State<_EditorField> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hintStyle = TextStyle(
+      color: cs.onSurface.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.42 : 0.46,
+      ),
+      fontWeight: AppFontWeights.regular,
+    );
     if (widget.desktop) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -2033,6 +2040,7 @@ class _EditorFieldState extends State<_EditorField> {
               onChanged: widget.onChanged,
               decoration: InputDecoration(
                 hintText: widget.hint,
+                hintStyle: hintStyle,
                 errorText: widget.errorText,
                 isDense: true,
                 border: OutlineInputBorder(
@@ -2073,6 +2081,7 @@ class _EditorFieldState extends State<_EditorField> {
             ),
             decoration: InputDecoration(
               hintText: widget.hint,
+              hintStyle: hintStyle,
               errorText: widget.errorText,
               isDense: true,
               filled: true,
