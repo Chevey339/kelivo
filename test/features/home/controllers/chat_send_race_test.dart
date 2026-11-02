@@ -32,6 +32,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
+import 'package:Kelivo/core/services/api/providers/google_gemini.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_emit.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
@@ -1142,6 +1143,220 @@ void main() {
             },
           );
         }
+      }
+    }
+  }
+
+  for (final temporary in [false, true]) {
+    for (final stream in [false, true]) {
+      for (final change in ['none', 'provider', 'model']) {
+        testWidgets(
+          'Gemini recovery owns its signatures: temporary=$temporary, stream=$stream, change=$change',
+          (tester) async {
+            final controller = await pumpHarness(tester);
+            await tester.runAsync(() async {
+              const sourceProvider = 'GeminiSource';
+              const sourceModel = 'gemini-4-argon';
+              final targetProvider = change == 'provider'
+                  ? 'GeminiOther'
+                  : sourceProvider;
+              final targetModel = change == 'model'
+                  ? 'gemini-3.8-flash'
+                  : sourceModel;
+              for (final id in {sourceProvider, targetProvider}) {
+                await settings.setProviderConfig(
+                  id,
+                  ProviderConfig(
+                    id: id,
+                    enabled: true,
+                    name: id,
+                    apiKey: 'test',
+                    baseUrl:
+                        'http://${server.address.address}:${server.port}/v1beta',
+                    providerType: ProviderKind.google,
+                  ),
+                );
+              }
+              await settings.disableTitleGeneration();
+              await settings.disableSuggestionGeneration();
+              await settings.setPerChatModelEnabled(true);
+              await settings.setRegenerateDeleteTrailingMessages(true);
+              await assistantProvider.updateAssistant(
+                assistantProvider.currentAssistant!.copyWith(
+                  streamOutput: stream,
+                ),
+              );
+              final convo = temporary
+                  ? await service.createDraftConversation(
+                      title: 'Gemini recovery',
+                      temporary: true,
+                    )
+                  : await service.createConversation(title: 'Gemini recovery');
+              await service.addMessage(
+                conversationId: convo.id,
+                role: 'user',
+                content: 'Ask me',
+              );
+              const arguments = {
+                'questions': [
+                  {'id': 'q1', 'question': 'Continue?'},
+                ],
+              };
+              final reply = await service.addMessage(
+                conversationId: convo.id,
+                role: 'assistant',
+                providerId: sourceProvider,
+                modelId: sourceModel,
+                parts: [
+                  const TextPart('Before asking. '),
+                  ToolCallPart(
+                    jsonEncode({
+                      'id': 'gemini-ask',
+                      'name': AskUserToolNames.askUser,
+                      'arguments': arguments,
+                      'content': null,
+                      'metadata': {
+                        'google': {
+                          'part': {
+                            'functionCall': {
+                              'id': 'gemini-ask',
+                              'name': AskUserToolNames.askUser,
+                              'args': arguments,
+                            },
+                            'thoughtSignature': 'source-tool-signature',
+                          },
+                        },
+                      },
+                    }),
+                  ),
+                  const AssistantRoundEndPart(),
+                ],
+              );
+              final originalSignature = encodeGeminiThoughtSignature(
+                textKey: 'thoughtSignature',
+                textValue: 'source-text-signature',
+              );
+              await service.setGeminiThoughtSignature(
+                reply.id,
+                originalSignature,
+              );
+              final following = await service.addMessage(
+                conversationId: convo.id,
+                role: 'user',
+                content: 'Keep this later message',
+              );
+              final requests = <Map<String, dynamic>>[];
+              apiOverride = (request, body) async {
+                expect(body['contents'], isA<List>());
+                requests.add(body);
+                final response = jsonEncode({
+                  'candidates': [
+                    {
+                      'content': {
+                        'role': 'model',
+                        'parts': [
+                          {
+                            'text': 'Continued.',
+                            'thoughtSignature': 'target-signature',
+                          },
+                        ],
+                      },
+                      'finishReason': 'STOP',
+                    },
+                  ],
+                });
+                request.response.headers.contentType = stream
+                    ? ContentType('text', 'event-stream')
+                    : ContentType.json;
+                request.response.write(
+                  stream ? 'data: $response\n\n' : response,
+                );
+                await request.response.close();
+              };
+              await controller.chatController.setCurrentConversationAndLoad(
+                convo,
+              );
+              await controller.setConversationModel(
+                providerKey: targetProvider,
+                modelId: targetModel,
+              );
+              await controller.submitRecoveredAskUserAnswer(
+                reply,
+                const ToolUIPart(
+                  id: 'gemini-ask',
+                  toolName: AskUserToolNames.askUser,
+                  arguments: arguments,
+                  loading: true,
+                ),
+                const AskUserResult.answer({
+                  'q1': AskUserAnswerValue.single(
+                    value: 'approved',
+                    custom: true,
+                  ),
+                }),
+              );
+              await waitFor(
+                () =>
+                    !controller.chatController.isConversationLoading(convo.id),
+                'Gemini recovery finish',
+              );
+              expect(requests, hasLength(1));
+              expect(jsonEncode(requests.single), contains('approved'));
+              expect(
+                jsonEncode(requests.single),
+                isNot(contains(following.content)),
+              );
+              final saved = await service.loadMessages(convo.id);
+              final replies = saved
+                  .where((m) => m.role == 'assistant')
+                  .toList();
+              final changedSource = change != 'none';
+              expect(replies, hasLength(changedSource ? 2 : 1));
+              expect(saved.last.id, following.id);
+              final continued = replies.last;
+              expect(continued.providerId, targetProvider);
+              expect(continued.modelId, targetModel);
+              expect(
+                service.getGeminiThoughtSignature(continued.id),
+                contains('target-signature'),
+              );
+              if (changedSource) {
+                expect(continued.id, isNot(reply.id));
+                expect(replies.first.content, reply.content);
+                expect(replies.first.providerId, sourceProvider);
+                expect(replies.first.modelId, sourceModel);
+                expect(continued.content, 'Continued.');
+                expect(continued.parts.whereType<ToolCallPart>(), isEmpty);
+                expect(
+                  service.getGeminiThoughtSignature(reply.id),
+                  originalSignature,
+                );
+              }
+              await controller.setConversationModel(
+                providerKey: sourceProvider,
+                modelId: sourceModel,
+              );
+              await controller.sendMessage(ChatInputData(text: 'Next'));
+              await waitFor(
+                () =>
+                    !controller.chatController.isConversationLoading(convo.id),
+                'Gemini return to source finish',
+              );
+              expect(requests, hasLength(2));
+              expect(
+                jsonEncode(requests.last),
+                contains('source-tool-signature'),
+              );
+              expect(
+                jsonEncode(requests.last),
+                change == 'provider'
+                    ? isNot(contains('target-signature'))
+                    : contains('target-signature'),
+              );
+            });
+            expect(tester.takeException(), isNull);
+          },
+        );
       }
     }
   }

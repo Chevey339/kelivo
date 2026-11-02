@@ -1889,10 +1889,29 @@ class ChatActions {
         ),
       );
     }
-    final streamingMessage = completeMessages[contextIndex].copyWith(
+    final answeredMessage = completeMessages[contextIndex].copyWith(
       parts: resumedParts.parts,
-      isStreaming: true,
     );
+    if (answeredMessage.providerId != providerKey ||
+        answeredMessage.modelId != modelId) {
+      // Native signatures belong to the source of each reply. Keep the answered
+      // tool round on its original message and give the new source its own reply.
+      // Persist cached answers too, since temporary chats keep them separately.
+      await chatService.updateMessage(
+        answeredMessage.id,
+        parts: answeredMessage.parts,
+      );
+      return regenerateAtMessage(
+        message: answeredMessage,
+        conversation: conversation,
+        assistantAsNewReply: true,
+        preserveFollowingMessages: true,
+        allowImagesApiRouting: allowImagesApiRouting,
+        assistantOverride: assistant,
+        modelOverride: (providerKey: providerKey, modelId: modelId),
+      );
+    }
+    final streamingMessage = answeredMessage.copyWith(isStreaming: true);
     _activeAssistantMessages.put(streamingMessage);
     chatController.publishGenerationStarted(streamingMessage);
     await chatService.updateMessage(streamingMessage.id, isStreaming: true);
