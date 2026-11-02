@@ -11,6 +11,7 @@ struct GenerationActivityBundle: WidgetBundle {
 struct GenerationActivityWidget: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: KelivoGenerationActivityAttributes.self) { context in
+      // Use the system background; custom dynamic tints can stay light in Dark Mode.
       HStack(spacing: 12) {
         Image(systemName: symbol(context.state, stale: activityIsStale(context)))
           .font(.title2).foregroundStyle(activityIsStale(context) ? .orange : .blue)
@@ -29,7 +30,6 @@ struct GenerationActivityWidget: Widget {
       }
       .padding(16)
       .widgetURL(conversationURL(context.state.conversationId))
-      .activityBackgroundTint(Color(.secondarySystemBackground))
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
