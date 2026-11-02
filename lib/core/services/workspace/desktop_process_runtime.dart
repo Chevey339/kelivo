@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
+import '../../../utils/windows_explorer.dart';
 import 'workspace_runtime.dart';
 
 /// Native host-process [WorkspaceRuntime] for macOS, Linux, and Windows.
@@ -124,7 +125,7 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
       return;
     }
     if (Platform.isWindows) {
-      final args = isDir ? <String>[hostPath] : <String>['/select,$hostPath'];
+      final args = windowsExplorerArguments(hostPath, isDirectory: isDir);
       // Explorer can return a nonzero exit code after opening the location.
       // Only a failure to start the process should fail this action.
       await Process.start('explorer', args, mode: ProcessStartMode.detached);
