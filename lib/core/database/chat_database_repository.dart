@@ -5435,6 +5435,14 @@ class ChatDatabaseRepository {
     final now = DateTime.now().toUtc();
     final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
     final roundPayloads = <int, String>{};
+    // Resolve the nullable snapshot outside the loop: AOT can otherwise hoist
+    // the inlined DateTime comparison above its null check (#1342).
+    final baselineParts =
+        baseline != null &&
+            baseline.conversationId == message.conversationId &&
+            baseline.timestamp == message.timestamp
+        ? baseline.parts
+        : const <MessagePart>[];
     await _db.batch((batch) {
       for (var ordinal = 0; ordinal < parts.length; ordinal++) {
         final part = parts[ordinal];
@@ -5444,11 +5452,8 @@ class ChatDatabaseRepository {
             ? part.encodePayload()
             : null;
         if (roundPayload != null) roundPayloads[ordinal] = roundPayload;
-        if (baseline != null &&
-            baseline.conversationId == message.conversationId &&
-            baseline.timestamp == message.timestamp &&
-            ordinal < baseline.parts.length &&
-            baseline.parts[ordinal] == part &&
+        if (ordinal < baselineParts.length &&
+            baselineParts[ordinal] == part &&
             (roundPayload == null ||
                 baselineRounds?[ordinal] == roundPayload)) {
           continue;
