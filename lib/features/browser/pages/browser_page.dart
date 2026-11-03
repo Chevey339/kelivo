@@ -43,6 +43,7 @@ import '../browser_management_route.dart';
 import 'browser_desktop_layout.dart';
 import 'browser_mobile_layout.dart';
 import 'browser_management_page.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum _BrowserMenu {
   newTab,
@@ -1106,7 +1107,10 @@ class BrowserPageViewState extends State<BrowserPage>
             child: Text(
               l.browserTitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
           ),
           BrowserActionButton(
@@ -1176,7 +1180,7 @@ class BrowserPageViewState extends State<BrowserPage>
           style: DefaultTextStyle.of(context).style.merge(
             TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeights.medium,
               height: 1.15,
             ),
           ),
@@ -2598,7 +2602,7 @@ class BrowserStartPage extends StatelessWidget {
                 'Kelivo',
                 style: TextStyle(
                   fontSize: 38,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   letterSpacing: -1.4,
                   color: cs.onSurface,
                 ),
@@ -2608,7 +2612,7 @@ class BrowserStartPage extends StatelessWidget {
                 l.browserFavorites,
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: cs.onSurface,
                 ),
               ),

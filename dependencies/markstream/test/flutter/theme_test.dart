@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
+import 'package:markstream/src/flutter/render/html_style.dart';
 
 void main() {
   final light = ColorScheme.fromSeed(seedColor: Colors.blue);
@@ -65,9 +66,12 @@ void main() {
         ),
         codeFontFamily: 'AppMono',
         cjk: true,
-        medium: FontWeight.w400,
-        semibold: FontWeight.w500,
-        strong: FontWeight.w600,
+        fontWeightResolver: (weight) => switch (weight) {
+          FontWeight.w500 => FontWeight.w400,
+          FontWeight.w600 => FontWeight.w500,
+          FontWeight.w700 => FontWeight.w600,
+          _ => weight,
+        },
       );
       expect(theme.body.fontFamily, 'AppFont');
       expect(theme.body.height, 1.55);
@@ -76,10 +80,14 @@ void main() {
       expect(theme.headings.first.fontWeight, FontWeight.w600);
       expect(theme.strongWeight, FontWeight.w600);
       expect(theme.link.fontSize, isNull);
-      expect(
-        theme.headings.skip(1).map((style) => style.fontWeight),
-        everyElement(FontWeight.w500),
-      );
+      expect(theme.headings.map((style) => style.fontWeight), [
+        FontWeight.w600,
+        FontWeight.w500,
+        FontWeight.w500,
+        FontWeight.w400,
+        FontWeight.w400,
+        FontWeight.w400,
+      ]);
       expect(theme.chrome.label.fontWeight, FontWeight.w400);
       expect(theme.details.summary.fontWeight, FontWeight.w400);
       expect(theme.table.heading.fontFamily, 'AppFont');
@@ -102,6 +110,42 @@ void main() {
       );
       expect(minimal.body.fontSize, 15.5);
       expect(minimal.body.color, light.onSurface);
+    },
+  );
+  test(
+    'font weight resolver survives theme copies and resolves numeric HTML',
+    () {
+      final theme = MarkstreamTheme.fromColorScheme(
+        light,
+        bodyStyle: const TextStyle(color: Colors.purple),
+        fontWeightResolver: (weight) => switch (weight) {
+          FontWeight.w500 => FontWeight.w400,
+          FontWeight.w600 ||
+          FontWeight.w700 ||
+          FontWeight.w800 ||
+          FontWeight.w900 => FontWeight.w500,
+          _ => weight,
+        },
+      );
+      for (final copy in [theme, theme.copyWith(), theme.blockContentTheme]) {
+        for (final (source, expected) in [
+          ('300', FontWeight.w300),
+          ('normal', FontWeight.w400),
+          ('500', FontWeight.w400),
+          ('600', FontWeight.w500),
+          ('700', FontWeight.w500),
+          ('900', FontWeight.w500),
+          ('bold', FontWeight.w500),
+        ]) {
+          final node = HtmlElementNode(
+            span: const SourceSpan(0, 0),
+            tag: 'span',
+            attributes: {'style': 'font-weight: $source'},
+            children: const [],
+          );
+          expect(htmlTextStyle(node, copy.body, copy).fontWeight, expected);
+        }
+      }
     },
   );
   test(
@@ -178,6 +222,7 @@ void main() {
         first,
       );
       for (final changed in [
+        first.copyWith(fontWeightResolver: (_) => FontWeight.w400),
         first.copyWith(colors: first.colors.copyWith(border: Colors.red)),
         first.copyWith(chrome: first.chrome.copyWith(height: 40)),
         first.copyWith(inlineCode: first.inlineCode.copyWith(opticalCenter: 8)),

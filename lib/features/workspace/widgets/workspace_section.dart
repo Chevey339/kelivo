@@ -36,6 +36,7 @@ import 'package:provider/provider.dart';
 
 import 'desktop_workspace_button.dart';
 import 'workspace_default_notice.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class WorkspaceSection extends StatefulWidget {
   const WorkspaceSection({
@@ -464,9 +465,9 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                 key: WorkspaceSection.nameKey,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 import 'android_text_selection_toolbar.dart';
 import 'ios_text_selection_toolbar.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Platform selection menus whose desktop labels use the application font.
 class AppTextSelectionToolbar extends StatelessWidget {
@@ -73,7 +74,7 @@ class AppTextSelectionToolbar extends StatelessWidget {
       fontFamilyFallback: appStyle?.fontFamilyFallback,
       fontSize: 14,
       letterSpacing: -0.15,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeights.regular,
     );
     return AdaptiveTextSelectionToolbar(
       anchors: anchors,

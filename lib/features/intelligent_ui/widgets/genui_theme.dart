@@ -153,9 +153,7 @@ final class GenUiTheme {
           bodyStyle: body,
           codeFontFamily:
               inheritedMarkdown?.code.text.fontFamily ?? 'monospace',
-          medium: AppFontWeights.medium,
-          semibold: AppFontWeights.semibold,
-          strong: AppFontWeights.strong,
+          fontWeightResolver: AppFontWeights.normalize,
         );
     mono = markdown.code.text;
     final dark = brightness == Brightness.dark;

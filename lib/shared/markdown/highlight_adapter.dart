@@ -4,6 +4,7 @@ import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:highlight/highlight.dart' show Node, highlight;
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/cache/byte_lru_cache.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 // Cache syntax trees, not styled spans, so changing the theme does not reparse.
 final _nodes = ByteLruCache<String, List<Node>>(
@@ -54,6 +55,14 @@ class KelivoCodeHighlighter implements CodeHighlighter {
     final mutedStyles = brightness == Brightness.dark
         ? (wallpaper ? _wallpaperDarkMuted : _plainDarkMuted)
         : (wallpaper ? _wallpaperLightMuted : _plainLightMuted);
+    TextStyle? syntaxStyle(String? name) {
+      final raw = theme[name]?.merge(mutedStyles[name]) ?? mutedStyles[name];
+      final weight = raw?.fontWeight;
+      if (weight == null) return raw;
+      final normalized = AppFontWeights.normalize(weight);
+      return normalized == weight ? raw : raw!.copyWith(fontWeight: normalized);
+    }
+
     try {
       var nodes = _nodes.get(key);
       if (nodes == null) {
@@ -68,7 +77,7 @@ class KelivoCodeHighlighter implements CodeHighlighter {
             children: node.value == null && node.children != null
                 ? convert(node.children!)
                 : null,
-            style: mutedStyles[node.className] ?? theme[node.className],
+            style: syntaxStyle(node.className),
           ),
       ];
       final span = TextSpan(
@@ -84,12 +93,12 @@ class KelivoCodeHighlighter implements CodeHighlighter {
   }
 }
 
-// Canonical styles preserve each upstream class's weight/italics. Choosing a
-// backdrop only selects constants; syntax-tree caching and parsing are unchanged.
+// Color overrides inherit upstream emphasis, normalized for the app platform.
+// Changing the backdrop or platform reuses the cached syntax tree.
 const _plainLightMuted = <String, TextStyle>{
   'comment': TextStyle(color: Color(0xff57606a), fontStyle: FontStyle.italic),
   'quote': TextStyle(color: Color(0xff57606a), fontStyle: FontStyle.italic),
-  'meta': TextStyle(color: Color(0xff57606a), fontWeight: FontWeight.bold),
+  'meta': TextStyle(color: Color(0xff57606a)),
 };
 const _plainDarkMuted = <String, TextStyle>{
   'comment': TextStyle(color: Color(0xff9da5b0), fontStyle: FontStyle.italic),
@@ -99,7 +108,7 @@ const _plainDarkMuted = <String, TextStyle>{
 const _wallpaperLightMuted = <String, TextStyle>{
   'comment': TextStyle(color: Color(0xff4a525c), fontStyle: FontStyle.italic),
   'quote': TextStyle(color: Color(0xff4a525c), fontStyle: FontStyle.italic),
-  'meta': TextStyle(color: Color(0xff4a525c), fontWeight: FontWeight.bold),
+  'meta': TextStyle(color: Color(0xff4a525c)),
 };
 const _wallpaperDarkMuted = <String, TextStyle>{
   'comment': TextStyle(color: Color(0xffbdc5d0), fontStyle: FontStyle.italic),

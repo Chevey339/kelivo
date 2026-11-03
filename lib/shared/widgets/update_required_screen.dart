@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/url_launcher_ext.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Shown when the installed database was written by a newer app version;
 /// restarting cannot help, so the only immediate action is updating Kelivo.
@@ -64,7 +65,7 @@ class UpdateRequiredScreen extends StatelessWidget {
                       Text(
                         l10n.startupDatabaseUpdateRequiredTitle,
                         style: textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -84,7 +85,7 @@ class UpdateRequiredScreen extends StatelessWidget {
                       Text(
                         l10n.startupDatabaseUpdateRequiredDowngradeTitle,
                         style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -184,7 +185,7 @@ class _NumberedStep extends StatelessWidget {
           child: Text(
             '$number',
             style: textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: colors.onSecondaryContainer,
             ),
           ),

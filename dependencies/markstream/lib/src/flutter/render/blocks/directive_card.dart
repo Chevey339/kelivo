@@ -74,7 +74,7 @@ class MarkstreamDirectiveCard extends StatelessWidget {
                         title,
                         style: theme.body.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: theme.fontWeightResolver(FontWeight.w600),
                           color: accent,
                         ),
                       ),

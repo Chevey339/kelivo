@@ -19,6 +19,7 @@ import '../../core/services/backup/restore_business_lease.dart';
 import '../../core/services/storage/storage_space.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 export '../../core/database/startup_failure_report.dart'
     show
@@ -982,7 +983,9 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           title,
-          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+          style: textTheme.headlineSmall?.copyWith(
+            fontWeight: AppFontWeights.semibold,
+          ),
         ),
         const SizedBox(height: 10),
         Text(
@@ -1221,7 +1224,7 @@ class _FactRow extends StatelessWidget {
               value,
               style: textTheme.bodySmall?.copyWith(
                 color: highlight ? colors.primary : colors.onSurface,
-                fontWeight: highlight ? FontWeight.w600 : null,
+                fontWeight: highlight ? AppFontWeights.semibold : null,
                 fontFamily: monospace ? 'monospace' : null,
               ),
             ),
@@ -1267,7 +1270,7 @@ class _Section extends StatelessWidget {
                 child: Text(
                   title,
                   style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -1449,7 +1452,7 @@ class _DangerZone extends StatelessWidget {
                     style: textTheme.bodySmall?.copyWith(
                       color: colors.onSurface,
                       height: 1.45,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ],

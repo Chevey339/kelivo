@@ -68,9 +68,7 @@ MarkstreamTheme mapMarkdownTheme(
     codeFontFamily: (settings.codeFontFamily?.isNotEmpty ?? false)
         ? settings.codeFontFamily!
         : 'monospace',
-    medium: AppFontWeights.medium,
-    semibold: AppFontWeights.semibold,
-    strong: AppFontWeights.strong,
+    fontWeightResolver: AppFontWeights.normalize,
   );
   if (!settings.useLegacyInlineCodeStyle) return theme;
   final translucent =

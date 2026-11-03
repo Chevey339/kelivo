@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_semantic_colors.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum TrailingKind { clear, eye, reset, lock, none }
 
@@ -190,7 +191,7 @@ class _ProviderInputRowState extends State<ProviderInputRow>
               style: TextStyle(
                 fontSize: 13,
                 color: cs.onSurface.withValues(alpha: 0.8),
-                fontWeight: widget.desktop ? FontWeight.w600 : null,
+                fontWeight: widget.desktop ? AppFontWeights.semibold : null,
               ),
             ),
           ),

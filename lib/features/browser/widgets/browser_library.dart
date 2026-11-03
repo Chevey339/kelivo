@@ -12,6 +12,7 @@ import '../pages/browser_management_page.dart';
 import 'browser_controls.dart';
 import 'browser_favicon.dart';
 import 'browser_surface_controls.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 // All mutations come from the shared service, so pages opened by the agent and
 // user appear in the same history and bookmark lists.
@@ -334,9 +335,9 @@ class _BrowserLibraryState extends State<BrowserLibrary> {
                 padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
                 child: Text(
                   group,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -401,7 +402,7 @@ class _BrowserLibraryState extends State<BrowserLibrary> {
                             item.fileName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            style: TextStyle(fontWeight: AppFontWeights.medium),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -519,9 +520,9 @@ class _SavedPageRow extends StatelessWidget {
                         title.isEmpty ? browserDisplayUrl(url) : title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                         ),
                       ),
                       const SizedBox(height: 4),

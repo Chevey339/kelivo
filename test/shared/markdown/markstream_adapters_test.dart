@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -299,6 +300,51 @@ void main() {
     }
     expect(debugHighlightParseCount, 1);
   });
+  test('cached syntax resolves platform weights without changing source', () {
+    debugResetHighlightNodeCache();
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const source = '**strong** and *italic*';
+    for (final platform in [
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    ]) {
+      debugDefaultTargetPlatformOverride = platform;
+      for (final brightness in Brightness.values) {
+        for (final wallpaper in [false, true]) {
+          final span = KelivoCodeHighlighter(wallpaper: wallpaper).highlight(
+            source,
+            language: 'markdown',
+            style: TextStyle(fontWeight: AppFontWeights.semibold),
+            brightness: brightness,
+          );
+          final pending = [...?span.children];
+          final weights = <FontWeight>[];
+          var italic = false;
+          while (pending.isNotEmpty) {
+            final node = pending.removeLast();
+            if (node.style?.fontWeight case final weight?) weights.add(weight);
+            italic |= node.style?.fontStyle == FontStyle.italic;
+            if (node is TextSpan) pending.addAll(node.children ?? const []);
+          }
+          expect(span.toPlainText(), source);
+          expect(weights, isNotEmpty);
+          expect(
+            weights,
+            everyElement(
+              platform == TargetPlatform.android
+                  ? FontWeight.w500
+                  : FontWeight.w700,
+            ),
+          );
+          expect(italic, isTrue);
+          // The caller's style is already normalized; do not reduce it again.
+          expect(span.style!.fontWeight, AppFontWeights.semibold);
+        }
+      }
+    }
+    expect(debugHighlightParseCount, 1);
+  });
   test('math normalization repairs visuals and preserves color arguments', () {
     expect(normalizeMathTex(r'\# + #'), r'\# + \#');
     expect(
@@ -397,6 +443,7 @@ void main() {
       expect(style.fontFamilyFallback, ['CallerCjk']);
     }
     expect(view.theme!.strongWeight, AppFontWeights.strong);
+    expect(view.theme!.fontWeightResolver, AppFontWeights.normalize);
     expect(view.codeOptions.autoCollapse, isTrue);
     expect(view.codeOptions.mobileWrap, isTrue);
     await settings.setEnableMathRendering(false);

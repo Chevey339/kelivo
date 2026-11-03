@@ -10,6 +10,7 @@ import '../pages/browser_management_page.dart';
 import 'browser_glass.dart';
 import 'browser_library.dart';
 import 'browser_surface_controls.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 typedef _BrowserSettingsValues = ({
   BrowserSearchEngine searchEngine,
@@ -73,9 +74,9 @@ class BrowserSettingsPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Text(
                 l.browserSurfaceStyle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -497,7 +498,9 @@ class _SurfaceChoice extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                fontWeight: selected
+                    ? AppFontWeights.strong
+                    : AppFontWeights.regular,
               ),
             ),
             const SizedBox(height: 5),

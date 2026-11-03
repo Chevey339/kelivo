@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/section_card.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class DesktopScheduledTaskTile extends StatelessWidget {
   const DesktopScheduledTaskTile({
@@ -55,7 +56,7 @@ class DesktopScheduledTaskTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: AppFontWeights.medium,
                         color: cs.onSurface,
                       ),
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+FontWeight _identityFontWeight(FontWeight weight) => weight;
+
 // Value equality keeps cached prefix widgets valid when an app reconstructs
 // an equivalent theme during a streaming update.
 @immutable
@@ -545,6 +547,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.brightness,
     required this.body,
     required this.strongWeight,
+    this.fontWeightResolver = _identityFontWeight,
     required List<TextStyle> headings,
     required this.headingPadding,
     required this.blockSpacing,
@@ -572,6 +575,10 @@ final class MarkstreamTheme extends _ThemeTokens {
   final Brightness brightness;
   final TextStyle body;
   final FontWeight strongWeight;
+
+  /// Resolves raw font weights from theme defaults and inline HTML.
+  /// Already-resolved styles must not pass through this a second time.
+  final FontWeight Function(FontWeight) fontWeightResolver;
   final List<TextStyle> headings;
   final EdgeInsetsGeometry headingPadding;
   final double blockSpacing;
@@ -627,6 +634,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     Brightness? brightness,
     TextStyle? body,
     FontWeight? strongWeight,
+    FontWeight Function(FontWeight)? fontWeightResolver,
     List<TextStyle>? headings,
     EdgeInsetsGeometry? headingPadding,
     double? blockSpacing,
@@ -653,6 +661,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     brightness: brightness ?? this.brightness,
     body: body ?? this.body,
     strongWeight: strongWeight ?? this.strongWeight,
+    fontWeightResolver: fontWeightResolver ?? this.fontWeightResolver,
     headings: headings ?? this.headings,
     headingPadding: headingPadding ?? this.headingPadding,
     blockSpacing: blockSpacing ?? this.blockSpacing,
@@ -681,6 +690,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     brightness,
     body,
     strongWeight,
+    fontWeightResolver,
     ...headings,
     headingPadding,
     blockSpacing,
@@ -711,12 +721,13 @@ final class MarkstreamTheme extends _ThemeTokens {
     double maskStrength = 1,
     String codeFontFamily = 'monospace',
     bool desktop = false,
-    FontWeight medium = FontWeight.w500,
-    FontWeight semibold = FontWeight.w600,
-    FontWeight strong = FontWeight.w700,
+    FontWeight Function(FontWeight) fontWeightResolver = _identityFontWeight,
     bool cjk = false,
     MarkstreamFillAlphas fillAlphas = const MarkstreamFillAlphas(),
   }) {
+    final medium = fontWeightResolver(FontWeight.w500);
+    final semibold = fontWeightResolver(FontWeight.w600);
+    final strong = fontWeightResolver(FontWeight.w700);
     final dark = colors.brightness == Brightness.dark;
     // App adapters already resolve these defaults. Keep that immutable style
     // instead of allocating an identical copy for every theme construction.
@@ -854,15 +865,16 @@ final class MarkstreamTheme extends _ThemeTokens {
       brightness: colors.brightness,
       body: body,
       strongWeight: strong,
+      fontWeightResolver: fontWeightResolver,
       headings: [
         body.copyWith(fontSize: b * 1.45, fontWeight: strong, height: 1.3),
         body.copyWith(fontSize: b * 1.27, fontWeight: semibold, height: 1.35),
         body.copyWith(fontSize: b * 1.13, fontWeight: semibold, height: 1.4),
-        body.copyWith(fontSize: b, fontWeight: semibold, height: 1.45),
-        body.copyWith(fontSize: b * .94, fontWeight: semibold, height: 1.45),
+        body.copyWith(fontSize: b, fontWeight: medium, height: 1.45),
+        body.copyWith(fontSize: b * .94, fontWeight: medium, height: 1.45),
         body.copyWith(
           fontSize: b * .88,
-          fontWeight: semibold,
+          fontWeight: medium,
           height: 1.45,
           color: mutedBodyInk,
         ),
