@@ -277,7 +277,7 @@ void main() {
                   background,
                 );
                 expect(
-                  _contrast(code.theme.code.label.color!, header),
+                  _contrast(code.theme.code.chrome.label.color!, header),
                   greaterThanOrEqualTo(4.5),
                   reason: reason,
                 );

@@ -2323,6 +2323,8 @@
   "displaySettingsPageEnableMathTitle": "啟用數學公式渲染",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "舊版行內程式碼樣式",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "為行內程式碼使用較淺的底色、細邊框和更寬鬆的行距。",
+  "displaySettingsPageUseLegacyCodeBlockStyleTitle": "舊版程式碼區塊樣式",
+  "displaySettingsPageUseLegacyCodeBlockStyleSubtitle": "還原程式碼區塊原有的配色、圓角和間距。",
   "displaySettingsPageEnableUserMarkdownTitle": "使用者訊息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维鏈 Markdown 渲染",
   "displaySettingsPageEnableAssistantMarkdownTitle": "助手訊息 Markdown 渲染",

@@ -68,7 +68,9 @@ Widget markdownIconAction(
   size: chrome.actionIconSize,
   minSize: chrome.actionSize,
   borderRadius: chrome.actionRadius,
-  padding: const EdgeInsets.all(6.5),
+  padding: EdgeInsets.all(
+    ((chrome.actionSize - chrome.actionIconSize) / 2).clamp(0, double.infinity),
+  ),
   color: chrome.actionColor,
   onTap: () => unawaited(Future<void>.sync(invoke)),
 );
@@ -86,7 +88,7 @@ List<Widget> markdownCodeActions(
   return [
     markdownIconAction(
       context,
-      chrome: action.theme.chrome,
+      chrome: action.theme.code.chrome,
       icon: Lucide.Download,
       label: l10n.codeBlockSaveAsButton,
       invoke: () => _save(
@@ -99,7 +101,7 @@ List<Widget> markdownCodeActions(
     if (isHtmlLanguage(language))
       markdownIconAction(
         context,
-        chrome: action.theme.chrome,
+        chrome: action.theme.code.chrome,
         icon: Lucide.Eye,
         label: l10n.codeBlockPreviewButton,
         invoke: () => previewMarkdownHtml(context, action.code.code),

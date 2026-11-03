@@ -93,6 +93,7 @@ void main() {
       expect(theme.table.heading.fontFamily, 'AppFont');
       expect(theme.table.heading.fontWeight, FontWeight.w500);
       expect(theme.code.text.fontFamily, 'AppMono');
+      expect(theme.monospace, theme.code.text);
       expect(theme.code.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamily, 'AppMono');
@@ -212,16 +213,31 @@ void main() {
         first.copyWith(
           colors: first.colors.copyWith(),
           chrome: first.chrome.copyWith(),
+          monospace: first.monospace.copyWith(),
           inlineCode: first.inlineCode.copyWith(),
           keyboard: first.keyboard.copyWith(),
           quote: first.quote.copyWith(),
           task: first.task.copyWith(),
           table: first.table.copyWith(),
+          code: first.code.copyWith(chrome: first.code.chrome.copyWith()),
           details: first.details.copyWith(),
         ),
         first,
       );
       for (final changed in [
+        first.copyWith(
+          monospace: first.monospace.copyWith(fontFamily: 'OtherMono'),
+        ),
+        first.copyWith(
+          code: first.code.copyWith(
+            chrome: first.code.chrome.copyWith(height: 40),
+          ),
+        ),
+        first.copyWith(code: first.code.copyWith(bodyPadding: EdgeInsets.zero)),
+        first.copyWith(
+          code: first.code.copyWith(titlePadding: EdgeInsets.zero),
+        ),
+        first.copyWith(code: first.code.copyWith(actionSpacing: 16)),
         first.copyWith(fontWeightResolver: (_) => FontWeight.w400),
         first.copyWith(colors: first.colors.copyWith(border: Colors.red)),
         first.copyWith(chrome: first.chrome.copyWith(height: 40)),

@@ -2926,6 +2926,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use a lighter background, a thin border, and more line spacing for inline code.';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle =>
+      'Legacy code block style';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      'Restore the previous colors, rounded corners, and spacing for code blocks.';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle =>
       'Render user messages with Markdown';
 

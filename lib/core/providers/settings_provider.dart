@@ -298,6 +298,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_math_rendering_v1';
   static const String _displayUseLegacyInlineCodeStyleKey =
       'display_use_legacy_inline_code_style_v1';
+  static const String _displayUseLegacyCodeBlockStyleKey =
+      'display_use_legacy_code_block_style_v1';
   static const String _displayEnableUserMarkdownKey =
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
@@ -1147,6 +1149,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
     _useLegacyInlineCodeStyle =
         prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
+    _useLegacyCodeBlockStyle =
+        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? false;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -5218,6 +5222,16 @@ Requirements:
     await _preferences.setBool(_displayUseLegacyInlineCodeStyleKey, value);
   }
 
+  // Display: opt in to the previous fenced code block appearance.
+  bool _useLegacyCodeBlockStyle = false;
+  bool get useLegacyCodeBlockStyle => _useLegacyCodeBlockStyle;
+  Future<void> setUseLegacyCodeBlockStyle(bool value) async {
+    if (_useLegacyCodeBlockStyle == value) return;
+    _useLegacyCodeBlockStyle = value;
+    notifyListeners();
+    await _preferences.setBool(_displayUseLegacyCodeBlockStyleKey, value);
+  }
+
   // Display: render user messages with Markdown
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
@@ -5950,6 +5964,7 @@ Requirements:
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
     copy._useLegacyInlineCodeStyle = _useLegacyInlineCodeStyle;
+    copy._useLegacyCodeBlockStyle = _useLegacyCodeBlockStyle;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;

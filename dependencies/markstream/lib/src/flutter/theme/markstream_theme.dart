@@ -235,49 +235,53 @@ final class InlineCodeTheme extends _ThemeTokens {
 final class CodeBlockTheme extends _ThemeTokens {
   const CodeBlockTheme({
     required this.text,
-    required this.label,
+    required this.chrome,
     required this.margin,
-    required this.headerPadding,
+    required this.bodyPadding,
+    required this.titlePadding,
+    required this.actionSpacing,
     required this.radius,
     required this.borderColor,
     required this.backgroundColor,
-    required this.headerBackgroundColor,
     required this.collapseDuration,
     required this.fadeHeight,
     required this.virtualizedHeight,
   });
   final TextStyle text;
-  final TextStyle label;
+  final MarkstreamChromeTheme chrome;
   final EdgeInsetsGeometry margin;
-  final EdgeInsetsGeometry headerPadding;
+  final EdgeInsetsGeometry bodyPadding;
+  final EdgeInsetsGeometry titlePadding;
+  final double actionSpacing;
   final double radius;
   final Color borderColor;
   final Color backgroundColor;
-  final Color headerBackgroundColor;
   final Duration collapseDuration;
   final double fadeHeight;
   final double virtualizedHeight;
   CodeBlockTheme copyWith({
     TextStyle? text,
-    TextStyle? label,
+    MarkstreamChromeTheme? chrome,
     EdgeInsetsGeometry? margin,
-    EdgeInsetsGeometry? headerPadding,
+    EdgeInsetsGeometry? bodyPadding,
+    EdgeInsetsGeometry? titlePadding,
+    double? actionSpacing,
     double? radius,
     Color? borderColor,
     Color? backgroundColor,
-    Color? headerBackgroundColor,
     Duration? collapseDuration,
     double? fadeHeight,
     double? virtualizedHeight,
   }) => CodeBlockTheme(
     text: text ?? this.text,
-    label: label ?? this.label,
+    chrome: chrome ?? this.chrome,
     margin: margin ?? this.margin,
-    headerPadding: headerPadding ?? this.headerPadding,
+    bodyPadding: bodyPadding ?? this.bodyPadding,
+    titlePadding: titlePadding ?? this.titlePadding,
+    actionSpacing: actionSpacing ?? this.actionSpacing,
     radius: radius ?? this.radius,
     borderColor: borderColor ?? this.borderColor,
     backgroundColor: backgroundColor ?? this.backgroundColor,
-    headerBackgroundColor: headerBackgroundColor ?? this.headerBackgroundColor,
     collapseDuration: collapseDuration ?? this.collapseDuration,
     fadeHeight: fadeHeight ?? this.fadeHeight,
     virtualizedHeight: virtualizedHeight ?? this.virtualizedHeight,
@@ -285,13 +289,14 @@ final class CodeBlockTheme extends _ThemeTokens {
   @override
   List<Object?> get _values => [
     text,
-    label,
+    chrome,
     margin,
-    headerPadding,
+    bodyPadding,
+    titlePadding,
+    actionSpacing,
     radius,
     borderColor,
     backgroundColor,
-    headerBackgroundColor,
     collapseDuration,
     fadeHeight,
     virtualizedHeight,
@@ -546,6 +551,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.colors,
     required this.brightness,
     required this.body,
+    required this.monospace,
     required this.strongWeight,
     this.fontWeightResolver = _identityFontWeight,
     required List<TextStyle> headings,
@@ -574,6 +580,9 @@ final class MarkstreamTheme extends _ThemeTokens {
   final MarkstreamColors colors;
   final Brightness brightness;
   final TextStyle body;
+
+  /// Baseline monospace text, independent of fenced code block styling.
+  final TextStyle monospace;
   final FontWeight strongWeight;
 
   /// Resolves raw font weights from theme defaults and inline HTML.
@@ -633,6 +642,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     MarkstreamColors? colors,
     Brightness? brightness,
     TextStyle? body,
+    TextStyle? monospace,
     FontWeight? strongWeight,
     FontWeight Function(FontWeight)? fontWeightResolver,
     List<TextStyle>? headings,
@@ -660,6 +670,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     colors: colors ?? this.colors,
     brightness: brightness ?? this.brightness,
     body: body ?? this.body,
+    monospace: monospace ?? this.monospace,
     strongWeight: strongWeight ?? this.strongWeight,
     fontWeightResolver: fontWeightResolver ?? this.fontWeightResolver,
     headings: headings ?? this.headings,
@@ -689,6 +700,7 @@ final class MarkstreamTheme extends _ThemeTokens {
     colors,
     brightness,
     body,
+    monospace,
     strongWeight,
     fontWeightResolver,
     ...headings,
@@ -864,6 +876,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       chrome: chrome,
       brightness: colors.brightness,
       body: body,
+      monospace: mono,
       strongWeight: strong,
       fontWeightResolver: fontWeightResolver,
       headings: [
@@ -897,13 +910,14 @@ final class MarkstreamTheme extends _ThemeTokens {
       ),
       code: CodeBlockTheme(
         text: mono,
-        label: chrome.label,
+        chrome: chrome,
         margin: const EdgeInsets.symmetric(vertical: 4),
-        headerPadding: const EdgeInsets.symmetric(horizontal: 12),
+        bodyPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        titlePadding: const EdgeInsets.symmetric(horizontal: 6),
+        actionSpacing: 0,
         radius: radiusMd,
         borderColor: palette.border,
         backgroundColor: palette.fillBlock,
-        headerBackgroundColor: palette.fillHead,
         collapseDuration: const Duration(milliseconds: 220),
         fadeHeight: 24,
         virtualizedHeight: 420,

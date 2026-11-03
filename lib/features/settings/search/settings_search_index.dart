@@ -659,6 +659,12 @@ class SettingsSearchIndex {
       keywords: 'inline code legacy classic style 行内代码 行內程式碼 旧版 舊版 样式 樣式',
     );
     add(
+      'displaySettingsPageUseLegacyCodeBlockStyleTitle',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+      keywords: 'code block legacy classic style 代码块 程式碼區塊 旧版 舊版 样式 樣式',
+    );
+    add(
       'displaySettingsPageEnableUserMarkdownTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageEnableUserMarkdownTitle,

@@ -2328,6 +2328,8 @@
   "displaySettingsPageEnableMathTitle": "启用数学公式渲染",
   "displaySettingsPageUseLegacyInlineCodeStyleTitle": "旧版行内代码样式",
   "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "为行内代码使用较浅的底色、细边框和更宽松的行距。",
+  "displaySettingsPageUseLegacyCodeBlockStyleTitle": "旧版代码块样式",
+  "displaySettingsPageUseLegacyCodeBlockStyleSubtitle": "恢复代码块原有的配色、圆角和间距。",
   "displaySettingsPageEnableUserMarkdownTitle": "用户消息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维链 Markdown 渲染",
   "displaySettingsPageEnableAssistantMarkdownTitle": "助手消息 Markdown 渲染",

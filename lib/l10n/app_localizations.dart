@@ -5404,6 +5404,18 @@ abstract class AppLocalizations {
   /// **'Use a lighter background, a thin border, and more line spacing for inline code.'**
   String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle;
 
+  /// No description provided for @displaySettingsPageUseLegacyCodeBlockStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy code block style'**
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle;
+
+  /// No description provided for @displaySettingsPageUseLegacyCodeBlockStyleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the previous colors, rounded corners, and spacing for code blocks.'**
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle;
+
   /// No description provided for @displaySettingsPageEnableUserMarkdownTitle.
   ///
   /// In en, this message translates to:

@@ -2818,6 +2818,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '为行内代码使用较浅的底色、细边框和更宽松的行距。';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '旧版代码块样式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '恢复代码块原有的配色、圆角和间距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -17959,6 +17966,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '为行内代码使用较浅的底色、细边框和更宽松的行距。';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '旧版代码块样式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '恢复代码块原有的配色、圆角和间距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -32954,6 +32968,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle =>
       '為行內程式碼使用較淺的底色、細邊框和更寬鬆的行距。';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '舊版程式碼區塊樣式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '還原程式碼區塊原有的配色、圓角和間距。';
 
   @override
   String get displaySettingsPageEnableUserMarkdownTitle => '使用者訊息 Markdown 渲染';
