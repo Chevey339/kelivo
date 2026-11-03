@@ -98,6 +98,9 @@ class _ContextUsagePopoverContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final usage = context.watch<ContextUsageService>();
     final snapshot = usage.snapshot(conversationId) ?? usage.current;
+    final refreshLabel = snapshot?.state == ContextUsageState.failed
+        ? l10n.retry
+        : l10n.contextUsageRefresh;
     final showSetWindow =
         snapshot != null &&
         snapshot.contextWindow == null &&
@@ -116,8 +119,8 @@ class _ContextUsagePopoverContent extends StatelessWidget {
             ContextUsageBreakdown(
               snapshot: snapshot,
               headerTrailing: IosIconButton(
-                tooltip: l10n.contextUsageRefresh,
-                semanticLabel: l10n.contextUsageRefresh,
+                tooltip: refreshLabel,
+                semanticLabel: refreshLabel,
                 icon: Lucide.RefreshCw,
                 size: 16,
                 onTap: () => usage.refresh(conversationId, force: true),

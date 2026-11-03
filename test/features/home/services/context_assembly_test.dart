@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/logging/context_log_models.dart';
 import 'package:Kelivo/core/utils/token_estimator.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
@@ -21,6 +24,73 @@ Map<String, dynamic> tagged(
 };
 
 void main() {
+  for (final kind in ProviderKind.values) {
+    test(
+      'real isolate counts every bucket with cached image Futures: $kind',
+      () async {
+        final image = ChatContextImage(
+          identity: const ContextImageIdentity('message', 'user:0'),
+          uri: 'data:image/png;base64,YWJj',
+          source: ContextImageSource.user,
+          label: 'image',
+        );
+        final imageContext = RequestImageContext(
+          settings: const ImageContextSettings(),
+          images: [image],
+        );
+        imageContext.activeHandles.add(image.handle);
+        expect((await imageContext.preview()).single.included, isTrue);
+        const tools = [
+          {
+            'type': 'function',
+            'function': {'name': 'date'},
+          },
+        ];
+        const mcpTools = [
+          {
+            'type': 'function',
+            'function': {'name': 'external_search'},
+          },
+        ];
+        final job = ContextEstimateJob(
+          kind: kind,
+          preview: ContextAssemblyPreview(
+            systemText: 'system',
+            injectionsText: 'injection rules',
+            historyText: 'user question and assistant answer',
+            memoryText: 'memory facts',
+            worldBookText: 'world book lore',
+            skillsText: 'available skills',
+            workspaceText: 'workspace files',
+            searchText: 'search instructions',
+            tools: tools,
+            mcpTools: mcpTools,
+            images: const [ContextImageRef(width: 512, height: 512)],
+            imageContext: imageContext,
+          ),
+        );
+        final result = await Isolate.run(job.call);
+        expect(result.system, estimateTokens('system'));
+        expect(result.injections, estimateTokens('injection rules'));
+        expect(
+          result.history,
+          estimateTokens('user question and assistant answer'),
+        );
+        expect(result.memory, estimateTokens('memory facts'));
+        expect(result.worldBook, estimateTokens('world book lore'));
+        expect(result.skills, estimateTokens('available skills'));
+        expect(result.workspace, estimateTokens('workspace files'));
+        expect(result.search, estimateTokens('search instructions'));
+        expect(result.tools, estimateToolsTokens(tools));
+        expect(result.mcpTools, estimateToolsTokens(mcpTools));
+        expect(
+          result.attachments,
+          estimateImageTokens(kind, width: 512, height: 512),
+        );
+      },
+    );
+  }
+
   for (final hasTags in [false, true]) {
     test('usage keeps raw data URIs while logs elide them, tagged=$hasTags', () {
       final body =

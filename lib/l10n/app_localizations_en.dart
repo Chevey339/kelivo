@@ -3375,6 +3375,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageStateComputing => 'Computing…';
 
   @override
+  String get contextUsageStateFailed => 'Calculation failed';
+
+  @override
+  String get contextUsageStateFailedWithPrevious =>
+      'Update failed · previous result is stale';
+
+  @override
+  String get contextUsageUnavailable => 'Usage unavailable';
+
+  @override
   String get contextUsageStateNone => 'No data yet';
 
   @override

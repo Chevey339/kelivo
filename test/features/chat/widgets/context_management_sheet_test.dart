@@ -168,6 +168,7 @@ void main() {
       draft: 5,
     );
     usage.seeded = usage.seeded!.copyWith(
+      state: ContextUsageState.failed,
       buckets: detailed,
       usedTokens: detailed.total,
     );
@@ -178,5 +179,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Clear Context').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    expect(
+      find.text('Update failed · previous result is stale'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.byTooltip('Retry'));
+    await tester.tap(find.byTooltip('Retry'));
+    await tester.pump();
+    expect(usage.refreshCalls, 2);
+    expect(usage.lastForce, isTrue);
+    expect(usage.lastDraft, isNull);
+
+    usage.seeded = usage.seeded!.copyWith(state: ContextUsageState.estimated);
+    usage.notifyListeners();
+    await tester.pump();
+    expect(find.byTooltip('Retry'), findsNothing);
+    expect(find.text('Estimated'), findsOneWidget);
   });
 }

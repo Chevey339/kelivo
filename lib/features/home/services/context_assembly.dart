@@ -107,10 +107,38 @@ typedef ContextAssemblyPreviewFn =
     });
 
 class ContextEstimateJob {
-  const ContextEstimateJob({required this.preview, required this.kind});
+  ContextEstimateJob({
+    required ContextAssemblyPreview preview,
+    required this.kind,
+  }) : systemText = preview.systemText,
+       injectionsText = preview.injectionsText,
+       historyText = preview.historyText,
+       tools = preview.tools,
+       images = preview.images,
+       memoryText = preview.memoryText,
+       worldBookText = preview.worldBookText,
+       skillsText = preview.skillsText,
+       workspaceText = preview.workspaceText,
+       searchText = preview.searchText,
+       mcpTools = preview.mcpTools;
 
-  final ContextAssemblyPreview preview;
+  // Keep only counting data. The preview's imageContext owns Future caches
+  // that cannot be sent to an isolate, even after those Futures complete.
+  final String systemText;
+  final String injectionsText;
+  final String historyText;
+  final List<Map<String, dynamic>> tools;
+  final List<ContextImageRef> images;
+  final String memoryText;
+  final String worldBookText;
+  final String skillsText;
+  final String workspaceText;
+  final String searchText;
+  final List<Map<String, dynamic>> mcpTools;
   final ProviderKind kind;
+
+  // A method tear-off captures only this job, not the refresh method's scope.
+  ContextEstimateResult call() => estimateContextBuckets(this);
 }
 
 class ContextEstimateResult {
@@ -155,8 +183,7 @@ class ContextEstimateResult {
 
 ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
   var attachments = 0;
-  final preview = job.preview;
-  for (final image in preview.images) {
+  for (final image in job.images) {
     attachments += estimateImageTokens(
       job.kind,
       width: image.width,
@@ -164,16 +191,16 @@ ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
     );
   }
   return ContextEstimateResult(
-    system: estimateTokens(preview.systemText),
-    injections: estimateTokens(preview.injectionsText),
-    history: estimateTokens(preview.historyText),
-    tools: estimateToolsTokens(preview.tools),
-    memory: estimateTokens(preview.memoryText),
-    worldBook: estimateTokens(preview.worldBookText),
-    skills: estimateTokens(preview.skillsText),
-    workspace: estimateTokens(preview.workspaceText),
-    search: estimateTokens(preview.searchText),
-    mcpTools: estimateToolsTokens(preview.mcpTools),
+    system: estimateTokens(job.systemText),
+    injections: estimateTokens(job.injectionsText),
+    history: estimateTokens(job.historyText),
+    tools: estimateToolsTokens(job.tools),
+    memory: estimateTokens(job.memoryText),
+    worldBook: estimateTokens(job.worldBookText),
+    skills: estimateTokens(job.skillsText),
+    workspace: estimateTokens(job.workspaceText),
+    search: estimateTokens(job.searchText),
+    mcpTools: estimateToolsTokens(job.mcpTools),
     attachments: attachments,
   );
 }

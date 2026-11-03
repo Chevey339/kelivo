@@ -10,6 +10,7 @@ ContextUsageSnapshot usageSnap({
   int used = 110,
   int? window = 1000,
   bool calibrated = false,
+  bool hasUsage = true,
   ContextUsageBuckets buckets = const ContextUsageBuckets(
     system: 10,
     injections: 8,
@@ -29,7 +30,7 @@ ContextUsageSnapshot usageSnap({
     providerKey: 'TestProvider',
     modelId: 'window-model',
     assistantId: null,
-    computedAt: DateTime.utc(2026, 1, 1),
+    computedAt: hasUsage ? DateTime.utc(2026, 1, 1) : null,
     calibrated: calibrated,
   );
 }
@@ -47,6 +48,51 @@ void expectSegment(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final hasPrevious in [false, true]) {
+    testWidgets(
+      'failed usage labels previous data or hides placeholders: $hasPrevious',
+      (tester) async {
+        final snapshot = usageSnap(
+          state: ContextUsageState.failed,
+          hasUsage: hasPrevious,
+          used: hasPrevious ? 110 : 0,
+          buckets: hasPrevious
+              ? const ContextUsageBuckets(history: 110)
+              : const ContextUsageBuckets(),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: ContextUsageBreakdown(snapshot: snapshot)),
+          ),
+        );
+        expect(find.text('Stale, updating…'), findsNothing);
+        if (hasPrevious) {
+          expect(
+            find.text('Update failed · previous result is stale'),
+            findsOneWidget,
+          );
+          expect(find.text('110 / 1k (11%)'), findsOneWidget);
+        } else {
+          expect(find.text('Calculation failed'), findsOneWidget);
+          expect(find.text('Usage unavailable'), findsOneWidget);
+          expect(find.text('0 / 1k (0%)'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('context-usage-stacked-bar')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
+            findsNothing,
+          );
+          expect(buildContextUsageSegments(snapshot), isEmpty);
+        }
+      },
+    );
+  }
 
   for (final width in [320.0, 720.0]) {
     for (final brightness in Brightness.values) {

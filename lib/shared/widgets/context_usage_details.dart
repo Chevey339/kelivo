@@ -71,6 +71,10 @@ String contextUsageStateLabel(
     ContextUsageState.estimated => l10n.contextUsageStateEstimated,
     ContextUsageState.stale => l10n.contextUsageStateStale,
     ContextUsageState.computing => l10n.contextUsageStateComputing,
+    ContextUsageState.failed =>
+      snapshot!.hasUsage
+          ? l10n.contextUsageStateFailedWithPrevious
+          : l10n.contextUsageStateFailed,
     ContextUsageState.none || null => l10n.contextUsageStateNone,
   };
 }
@@ -79,6 +83,7 @@ String contextUsageSummaryText(
   AppLocalizations l10n,
   ContextUsageSnapshot? snapshot,
 ) {
+  if (snapshot?.hasUsage != true) return l10n.contextUsageUnavailable;
   final used = snapshot?.usedTokens ?? 0;
   final window = snapshot?.contextWindow;
   if (window == null || window <= 0) {
@@ -120,7 +125,7 @@ bool contextUsageHasWindow(ContextUsageSnapshot? snapshot) {
 List<ContextUsageSegment> buildContextUsageSegments(
   ContextUsageSnapshot snapshot,
 ) {
-  if (snapshot.state == ContextUsageState.none) {
+  if (!snapshot.hasUsage) {
     return const [];
   }
 
@@ -199,45 +204,50 @@ class ContextUsageSummaryHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              l10n.contextUsageTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        l10n.contextUsageTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    contextUsageSummaryText(l10n, snapshot),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface.withValues(alpha: 0.78),
+                    ),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                contextUsageStateLabel(l10n, snapshot),
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              contextUsageSummaryText(l10n, snapshot),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: AppFontWeights.medium,
-                color: cs.onSurface.withValues(alpha: 0.78),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              contextUsageStateLabel(l10n, snapshot),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                color: cs.onSurface.withValues(alpha: 0.45),
-              ),
-            ),
-          ],
         ),
         if (trailing != null) trailing!,
       ],

@@ -3247,6 +3247,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextUsageStateComputing => '计算中…';
 
   @override
+  String get contextUsageStateFailed => '计算失败';
+
+  @override
+  String get contextUsageStateFailedWithPrevious => '更新失败，上次结果已过时';
+
+  @override
+  String get contextUsageUnavailable => '用量不可用';
+
+  @override
   String get contextUsageStateNone => '暂无数据';
 
   @override
@@ -18316,6 +18325,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextUsageStateComputing => '计算中…';
 
   @override
+  String get contextUsageStateFailed => '计算失败';
+
+  @override
+  String get contextUsageStateFailedWithPrevious => '更新失败，上次结果已过时';
+
+  @override
+  String get contextUsageUnavailable => '用量不可用';
+
+  @override
   String get contextUsageStateNone => '暂无数据';
 
   @override
@@ -33239,6 +33257,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextUsageStateComputing => '計算中…';
+
+  @override
+  String get contextUsageStateFailed => '計算失敗';
+
+  @override
+  String get contextUsageStateFailedWithPrevious => '更新失敗，上次結果已過時';
+
+  @override
+  String get contextUsageUnavailable => '用量不可用';
 
   @override
   String get contextUsageStateNone => '暫無資料';

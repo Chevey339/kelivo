@@ -6214,6 +6214,24 @@ abstract class AppLocalizations {
   /// **'Computing…'**
   String get contextUsageStateComputing;
 
+  /// No description provided for @contextUsageStateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation failed'**
+  String get contextUsageStateFailed;
+
+  /// No description provided for @contextUsageStateFailedWithPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed · previous result is stale'**
+  String get contextUsageStateFailedWithPrevious;
+
+  /// No description provided for @contextUsageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage unavailable'**
+  String get contextUsageUnavailable;
+
   /// No description provided for @contextUsageStateNone.
   ///
   /// In en, this message translates to:
