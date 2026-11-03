@@ -12,6 +12,7 @@ import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../../utils/ui_scale.dart';
 
 class TerminalTabStrip extends StatefulWidget {
   const TerminalTabStrip({
@@ -212,7 +213,10 @@ class _TabChip extends StatelessWidget {
     final exitCode = session.exitCode ?? 0;
     final failed = session.exited && exitCode != 0;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 96, maxWidth: 180),
+      constraints: BoxConstraints(
+        minWidth: scaledDim(context, 96),
+        maxWidth: scaledDim(context, 180),
+      ),
       child: Listener(
         key: TerminalTabStrip.tabKey(session.id),
         onPointerDown: (event) {
@@ -235,7 +239,7 @@ class _TabChip extends StatelessWidget {
             onActions(position);
           },
           child: SizedBox(
-            height: 32,
+            height: scaledDim(context, 32),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,

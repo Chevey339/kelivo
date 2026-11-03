@@ -19,6 +19,7 @@ import '../../core/services/backup/restore_business_lease.dart';
 import '../../core/services/storage/storage_space.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/ui_scale.dart';
 
 export '../../core/database/startup_failure_report.dart'
     show
@@ -484,7 +485,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       builder: (context) => AlertDialog(
         title: Text(l10n.startupRecoverySnapshotTitle),
         content: SizedBox(
-          width: 420,
+          width: scaledDim(context, 420),
           child: ListView.separated(
             shrinkWrap: true,
             itemCount: ordered.length,
@@ -681,7 +682,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 620)),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
               children: [
@@ -837,7 +838,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
-                  height: 48,
+                  height: scaledDim(context, 48),
                   child: FilledButton.icon(
                     onPressed: _busy ? null : _restart,
                     icon: _restarting
@@ -1135,7 +1136,7 @@ class _DiagnosticsCard extends StatelessWidget {
             const SizedBox(height: 4),
             Container(
               width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 280),
+              constraints: BoxConstraints(maxHeight: scaledDim(context, 280)),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
@@ -1208,7 +1209,7 @@ class _FactRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 104,
+            width: scaledDim(context, 104),
             child: Text(
               label,
               style: textTheme.bodySmall?.copyWith(
@@ -1307,7 +1308,7 @@ class _ActionTile extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return SizedBox(
       width: double.infinity,
-      height: 44,
+      height: scaledDim(context, 44),
       child: emphasized
           ? FilledButton.tonalIcon(
               onPressed: onPressed,
@@ -1464,7 +1465,7 @@ class _DangerZone extends StatelessWidget {
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
-                  height: 44,
+                  height: scaledDim(context, 44),
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : () => onReset(),
                     style: OutlinedButton.styleFrom(

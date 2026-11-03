@@ -10,12 +10,34 @@ import '../models/stats_models.dart';
 
 const double _heatCellSize = 11;
 const double _heatCellPadding = 1.5;
-const double _heatCellPitch = _heatCellSize + _heatCellPadding * 2;
 const double _heatWeekGap = 1;
 const double _heatMonthLabelHeight = 12;
 const double _heatMonthLabelGap = 4;
 const double _heatWeekdayLabelWidth = 18;
 const double _heatLegendMinWidth = 170;
+
+/// The heatmap grid is drawn from hard-coded sizes, while its labels scale with
+/// the ambient text scaler (the UI font slider). Derive every geometric value
+/// from that scaler so the labels never outgrow the cells around them.
+class _HeatGeometry {
+  const _HeatGeometry(this._scaler);
+
+  final TextScaler _scaler;
+
+  static _HeatGeometry of(BuildContext context) =>
+      _HeatGeometry(MediaQuery.textScalerOf(context));
+
+  double scale(double value) => _scaler.scale(value);
+
+  double get cellSize => scale(_heatCellSize);
+  double get cellPadding => scale(_heatCellPadding);
+  double get pitch => cellSize + cellPadding * 2;
+  double get weekGap => scale(_heatWeekGap);
+  double get monthLabelHeight => scale(_heatMonthLabelHeight);
+  double get monthLabelGap => scale(_heatMonthLabelGap);
+  double get weekdayLabelWidth => scale(_heatWeekdayLabelWidth);
+  double get legendMinWidth => scale(_heatLegendMinWidth);
+}
 
 class StatsHeatmap extends StatefulWidget {
   const StatsHeatmap({super.key, required this.days});
@@ -59,7 +81,8 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
     final q3 = _quantile(activeCounts, 0.75);
 
     final weeks = _calendarWeeks(widget.days);
-    final contentWidth = _heatmapContentWidth(weeks);
+    final geometry = _HeatGeometry.of(context);
+    final contentWidth = _heatmapContentWidth(weeks, geometry);
     final localeName = Localizations.localeOf(context).toLanguageTag();
 
     return Column(
@@ -99,11 +122,11 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
                                     localeName: localeName,
                                   ),
                                   if (i < weeks.length - 1)
-                                    const SizedBox(width: _heatWeekGap),
+                                    SizedBox(width: geometry.weekGap),
                                 ],
                               ],
                             ),
-                            const SizedBox(height: _heatMonthLabelGap),
+                            SizedBox(height: geometry.monthLabelGap),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -123,7 +146,7 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
                                     ],
                                   ),
                                   if (i < weeks.length - 1)
-                                    const SizedBox(width: _heatWeekGap),
+                                    SizedBox(width: geometry.weekGap),
                                 ],
                               ],
                             ),
@@ -141,7 +164,7 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
         Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const SizedBox(width: _heatWeekdayLabelWidth),
+            SizedBox(width: geometry.weekdayLabelWidth),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -149,7 +172,7 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
                     alignment: Alignment.centerLeft,
                     child: SizedBox(
                       width: math.min(
-                        math.max(contentWidth, _heatLegendMinWidth),
+                        math.max(contentWidth, geometry.legendMinWidth),
                         constraints.maxWidth,
                       ),
                       child: Align(
@@ -191,10 +214,13 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
     return TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.56));
   }
 
-  double _heatmapContentWidth(List<List<StatsHeatmapDay>> weeks) {
+  double _heatmapContentWidth(
+    List<List<StatsHeatmapDay>> weeks,
+    _HeatGeometry geometry,
+  ) {
     if (weeks.isEmpty) return 0;
-    return weeks.length * _heatCellPitch +
-        math.max(0, weeks.length - 1) * _heatWeekGap;
+    return weeks.length * geometry.pitch +
+        math.max(0, weeks.length - 1) * geometry.weekGap;
   }
 
   int _quantile(List<int> sorted, double p) {
@@ -271,12 +297,13 @@ class _WeekdayLabels extends StatelessWidget {
       fontWeight: AppFontWeights.semibold,
       color: cs.onSurface.withValues(alpha: 0.46),
     );
+    final geometry = _HeatGeometry.of(context);
     return SizedBox(
-      width: _heatWeekdayLabelWidth,
+      width: geometry.weekdayLabelWidth,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: _heatMonthLabelHeight + _heatMonthLabelGap),
+          SizedBox(height: geometry.monthLabelHeight + geometry.monthLabelGap),
           for (final weekday in const [
             DateTime.sunday,
             DateTime.monday,
@@ -287,7 +314,7 @@ class _WeekdayLabels extends StatelessWidget {
             DateTime.saturday,
           ])
             SizedBox(
-              height: _heatCellPitch,
+              height: geometry.pitch,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child:
@@ -334,9 +361,10 @@ class _MonthLabel extends StatelessWidget {
       fontWeight: AppFontWeights.semibold,
       color: cs.onSurface.withValues(alpha: 0.46),
     );
+    final geometry = _HeatGeometry.of(context);
     return SizedBox(
-      width: 14,
-      height: 12,
+      width: geometry.pitch,
+      height: geometry.monthLabelHeight,
       child: firstOfMonth == null
           ? const SizedBox.shrink()
           : OverflowBox(
@@ -370,7 +398,7 @@ class _HeatCellSlot extends StatelessWidget {
       key: ValueKey(
         'stats-heatmap-day-${day.date.year}-${day.date.month}-${day.date.day}',
       ),
-      padding: const EdgeInsets.all(_heatCellPadding),
+      padding: EdgeInsets.all(_HeatGeometry.of(context).cellPadding),
       child: _HeatCell(level: level),
     );
   }
@@ -391,7 +419,7 @@ class _HeatmapLegend extends StatelessWidget {
         Text(l10n.statsPageHeatmapLess, style: style),
         const SizedBox(width: 6),
         for (var level = 0; level <= 4; level++) ...[
-          _HeatCell(level: level, size: 10),
+          _HeatCell(level: level, sizeBase: 10),
           const SizedBox(width: 3),
         ],
         const SizedBox(width: 3),
@@ -402,14 +430,15 @@ class _HeatmapLegend extends StatelessWidget {
 }
 
 class _HeatCell extends StatelessWidget {
-  const _HeatCell({required this.level, this.size = 11});
+  const _HeatCell({required this.level, this.sizeBase = _heatCellSize});
 
   final int level;
-  final double size;
+  final double sizeBase;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final size = _HeatGeometry.of(context).scale(sizeBase);
     final alpha = switch (level) {
       0 => 0.10,
       1 => 0.25,

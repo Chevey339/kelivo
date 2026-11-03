@@ -11,6 +11,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'desktop_workspace_button.dart';
+import '../../../utils/ui_scale.dart';
 
 class DesktopWorkspacesView extends StatefulWidget {
   const DesktopWorkspacesView({
@@ -248,7 +249,7 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                   children: [
                     if (wide) ...[
                       SizedBox(
-                        width: 244,
+                        width: scaledDim(context, 244),
                         child: ColoredBox(
                           color: Colors.transparent,
                           child: Column(

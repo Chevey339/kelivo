@@ -14,6 +14,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../utils/ui_scale.dart';
 
 class WorkspaceFilesMobileLayout extends StatelessWidget {
   const WorkspaceFilesMobileLayout({
@@ -110,7 +111,7 @@ class _WorkspaceFilesScaffoldState extends State<WorkspaceFilesScaffold> {
           ? Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
                 child: _content(body),
               ),
             )

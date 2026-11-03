@@ -1958,6 +1958,8 @@
   "desktopDisplaySettingsTopicPositionRight": "右侧",
   "displaySettingsPageNewChatOnLaunchSubtitle": "应用启动时自动创建新对话",
   "displaySettingsPageChatFontSizeTitle": "聊天字体大小",
+  "displaySettingsPageUiFontSizeTitle": "界面字体大小",
+  "displaySettingsPageInputFontSizeTitle": "输入框字体大小",
   "displaySettingsPageAutoScrollEnableTitle": "自动跟随底部",
   "displaySettingsPageAutoScrollDisabledLabel": "已关闭",
   "displaySettingsPageChatFontSampleText": "这是一个示例的聊天文本",

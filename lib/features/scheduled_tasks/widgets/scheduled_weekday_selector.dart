@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../utils/ui_scale.dart';
 
 class ScheduledWeekdaySelector extends StatelessWidget {
   const ScheduledWeekdaySelector({
@@ -38,7 +39,7 @@ class ScheduledWeekdaySelector extends StatelessWidget {
                   onChanged(selected);
                 },
                 child: SizedBox(
-                  height: 44,
+                  height: scaledDim(context, 44),
                   child: Center(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,

@@ -17,6 +17,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<void> showSelectCopySheet(
   BuildContext context, {
@@ -97,7 +98,7 @@ class _SelectCopySheet extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 32,
+              height: scaledDim(context, 32),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
