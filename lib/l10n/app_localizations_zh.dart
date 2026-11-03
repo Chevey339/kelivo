@@ -15080,6 +15080,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageContextUpdateFailed => '未能保存修改，请重试。';
+
+  @override
+  String get contextOperationsTitle => '上下文操作记录';
+
+  @override
+  String get contextOperationsDescription => '管理压缩任务、摘要和上下文分界';
+
+  @override
+  String get contextOperationsEmpty => '暂无上下文操作记录。';
+
+  @override
+  String contextOperationsStored(int count) {
+    return '已保存历史：$count 条消息';
+  }
+
+  @override
+  String contextOperationsEffective(int summaries, int messages) {
+    return '下次请求的历史部分：$summaries 条摘要 + $messages 条原始消息';
+  }
+
+  @override
+  String get contextOperationsScope =>
+      '已应用当前历史消息数量限制。系统提示、记忆、工具和未发送输入会额外加入上下文。点击记录可查看摘要、原始范围或撤销操作。';
+
+  @override
+  String get contextOperationsLoadFailed => '无法加载上下文概览，请重试。';
+
+  @override
+  String get compressNewConversation => '压缩并新建会话';
+
+  @override
+  String get compressNewConversationDescription =>
+      '新会话包含摘要和保留的消息，原会话保持不变。关闭后将在当前会话原位压缩。';
+
+  @override
+  String get contextViewBoundary => '跳转到分界位置';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -30014,6 +30050,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get recoveryCopiesNeedUpdate =>
       '部分副本来自更新版本的 Kelivo，请升级 App 后再恢复。这些副本仍然保留。';
+
+  @override
+  String get contextOperationsTitle => '上下文操作记录';
+
+  @override
+  String get contextOperationsDescription => '管理压缩任务、摘要和上下文分界';
+
+  @override
+  String get contextOperationsEmpty => '暂无上下文操作记录。';
+
+  @override
+  String contextOperationsStored(int count) {
+    return '已保存历史：$count 条消息';
+  }
+
+  @override
+  String contextOperationsEffective(int summaries, int messages) {
+    return '下次请求的历史部分：$summaries 条摘要 + $messages 条原始消息';
+  }
+
+  @override
+  String get contextOperationsScope =>
+      '已应用当前历史消息数量限制。系统提示、记忆、工具和未发送输入会额外加入上下文。点击记录可查看摘要、原始范围或撤销操作。';
+
+  @override
+  String get contextOperationsLoadFailed => '无法加载上下文概览，请重试。';
+
+  @override
+  String get compressNewConversation => '压缩并新建会话';
+
+  @override
+  String get compressNewConversationDescription =>
+      '新会话包含摘要和保留的消息，原会话保持不变。关闭后将在当前会话原位压缩。';
+
+  @override
+  String get contextViewBoundary => '跳转到分界位置';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -45029,4 +45101,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get recoveryCopiesNeedUpdate =>
       '部分副本來自更新版本的 Kelivo，請升級 App 後再還原。這些副本仍然保留。';
+
+  @override
+  String get contextOperationsTitle => '上下文操作記錄';
+
+  @override
+  String get contextOperationsDescription => '管理壓縮任務、摘要和上下文分界';
+
+  @override
+  String get contextOperationsEmpty => '尚無上下文操作記錄。';
+
+  @override
+  String contextOperationsStored(int count) {
+    return '已儲存歷史：$count 則訊息';
+  }
+
+  @override
+  String contextOperationsEffective(int summaries, int messages) {
+    return '下次請求的歷史部分：$summaries 則摘要 + $messages 則原始訊息';
+  }
+
+  @override
+  String get contextOperationsScope =>
+      '已套用目前歷史訊息數量限制。系統提示、記憶、工具和未傳送輸入會額外加入上下文。點擊記錄可查看摘要、原始範圍或復原操作。';
+
+  @override
+  String get contextOperationsLoadFailed => '無法載入上下文概覽，請重試。';
+
+  @override
+  String get compressNewConversation => '壓縮並建立新對話';
+
+  @override
+  String get compressNewConversationDescription =>
+      '新對話包含摘要和保留的訊息，原對話保持不變。關閉後將在目前對話原位壓縮。';
+
+  @override
+  String get contextViewBoundary => '跳至分界位置';
 }

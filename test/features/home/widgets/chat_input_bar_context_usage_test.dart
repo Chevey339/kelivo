@@ -84,6 +84,7 @@ void main() {
     String? conversationId = 'c1',
     Locale locale = const Locale('en'),
     ChatInputBarController? mediaController,
+    bool queued = false,
   }) {
     tester.view.physicalSize = surfaceSize;
     tester.view.devicePixelRatio = 1;
@@ -109,6 +110,7 @@ void main() {
                 focusNode: focusNode,
                 conversationId: conversationId,
                 onOpenContextUsage: onOpenContextUsage,
+                hasQueuedInput: queued,
               ),
             ),
           ),
@@ -222,7 +224,9 @@ void main() {
     expect(find.byType(ContextUsageRing), findsNothing);
   });
 
-  testWidgets('tapping the ring invokes onOpenContextUsage', (tester) async {
+  testWidgets('context usage stays accessible while the composer is queued', (
+    tester,
+  ) async {
     final providers = await createProviders();
     final controller = TextEditingController();
     final focusNode = FocusNode();
@@ -239,6 +243,7 @@ void main() {
       focusNode: focusNode,
       surfaceSize: const Size(1200, 800),
       onOpenContextUsage: () => opened++,
+      queued: true,
     );
     await tester.pump();
 

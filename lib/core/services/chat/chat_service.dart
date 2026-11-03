@@ -30,6 +30,7 @@ import '../backup/backup_task_progress.dart';
 import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../../models/context_operation.dart';
+import '../../models/compress_context_options.dart';
 import 'context_compression_service.dart';
 import '../memory/memory_block_builder.dart';
 import '../logging/log_payload_elider.dart';
@@ -166,6 +167,7 @@ class ChatService extends ChangeNotifier {
   }
 
   final Map<String, Conversation> _conversationsCache = {};
+  final Set<String> _unpublishedForks = {};
   final Map<String, List<ContextOperation>> _contextOperations = {};
   final Map<String, int> _contextStartIndices = {};
   final Map<String, int> _contextStateVersions = {};
@@ -1166,7 +1168,9 @@ class ChatService extends ChangeNotifier {
         _sortedConversationsCacheRevision == _conversationListRevision) {
       return List<Conversation>.of(cached);
     }
-    final conversations = _conversationsCache.values.toList();
+    final conversations = _conversationsCache.values
+        .where((conversation) => !_unpublishedForks.contains(conversation.id))
+        .toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     _sortedConversationsCache = conversations;
     _sortedConversationsCacheRevision = _conversationListRevision;
@@ -1187,10 +1191,8 @@ class ChatService extends ChangeNotifier {
   }
 
   Conversation? getCompleteConversation(String id) {
-    if (!_initialized) return null;
-    final draft = _draftConversations[id];
-    if (draft != null) return draft;
-    return _conversationsCache[id];
+    if (_unpublishedForks.contains(id)) return null;
+    return getConversation(id);
   }
 
   Conversation? _conversationForMessages(String conversationId) {
@@ -1348,14 +1350,18 @@ class ChatService extends ChangeNotifier {
     String? assistantId,
   }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
-    return _repo.searchConversationMatches(
+    final matches = await _repo.searchConversationMatches(
       tokens: tokens,
       limit: limit,
       includeAllRevisions: includeAllRevisions,
       conversationId: conversationId,
       excludeConversationId: excludeConversationId,
       assistantId: assistantId,
+      excludedConversationIds: Set<String>.of(_unpublishedForks),
     );
+    return matches
+        .where((match) => !_unpublishedForks.contains(match.conversationId))
+        .toList();
   }
 
   Future<ChatStatsAggregate> loadStatsAggregate({
@@ -4088,6 +4094,7 @@ class ChatService extends ChangeNotifier {
     required List<String>? sourceMcpServerIds,
     required String? activationOwner,
     bool activate = true,
+    Future<void> Function(Conversation)? beforePublish,
   }) async {
     // Cache-only metadata belongs to temporary sources too. Capture it before
     // the first await, since explicit navigation can discard that owner.
@@ -4104,12 +4111,14 @@ class ChatService extends ChangeNotifier {
         },
     };
     final uiCopies = await _captureGenUiCopies(sourceMessages);
-    final persisted = await createConversation(
+    final persisted = Conversation(
       title: title,
       assistantId: assistantId,
-      activate: false,
+      extras: _extrasForNewConversation(assistantId),
     );
+    _unpublishedForks.add(persisted.id);
     try {
+      await _saveConversation(persisted);
       await _copyConversationSettingsFrom(persisted.id, sourceExtras);
       if (sourceMcpServerIds != null) {
         await setConversationMcpServers(persisted.id, sourceMcpServerIds);
@@ -4124,14 +4133,19 @@ class ChatService extends ChangeNotifier {
         cachedTools: cachedTools,
         cachedArtifacts: cachedArtifacts,
       );
+      await beforePublish?.call(getConversation(persisted.id)!);
     } catch (_) {
       // This target belongs solely to the failed copy. Remove its committed
       // partial rows and caches; keep the current owner and temporary assets.
       await _deletePersistedConversation(persisted.id);
       notifyListeners();
       rethrow;
+    } finally {
+      _unpublishedForks.remove(persisted.id);
     }
     if (activate) _activateForkIfCurrent(persisted.id, activationOwner);
+    _enforceMessageCacheLimits();
+    _bumpConversationListRevision();
     notifyListeners();
     return getConversation(persisted.id) ?? persisted;
   }
@@ -4784,6 +4798,7 @@ class ChatService extends ChangeNotifier {
   }
 
   void setCurrentConversation(String? id) {
+    if (_unpublishedForks.contains(id)) return;
     if (id != _currentConversationId) {
       _discardTemporaryConversation(_currentConversationId);
     }

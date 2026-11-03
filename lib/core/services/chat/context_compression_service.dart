@@ -187,7 +187,19 @@ class ContextCompressionService extends ChangeNotifier {
     task.error = reason;
     task.request = null;
     ChatApiService.cancelRequest(task.id);
-    await _publish(task);
+    try {
+      await _publish(task);
+    } catch (error) {
+      // Cancellation already stopped the request. Do not revive it when the
+      // status write fails; retain an actionable, inactive task for dismissal.
+      if (identical(_tasks[id], task) &&
+          task.phase == CompressionPhase.cancelled) {
+        task.phase = CompressionPhase.interrupted;
+        task.error = error.toString();
+        if (!_disposed) notifyListeners();
+      }
+      rethrow;
+    }
   }
 
   void _check(ContextCompressionTask task) {
@@ -383,7 +395,11 @@ class ContextCompressionService extends ChangeNotifier {
             : <ChatMessage>[];
         await _apply(task, retained: retained);
       } catch (error) {
-        if (task.phase != CompressionPhase.cancelled && !_disposed) {
+        if (!_disposed &&
+            identical(_tasks[id], task) &&
+            task.phase != CompressionPhase.cancelled &&
+            task.phase != CompressionPhase.interrupted &&
+            task.phase != CompressionPhase.completed) {
           task.phase = CompressionPhase.review;
           task.error = error.toString();
           await _publish(task);
@@ -453,8 +469,18 @@ class ContextCompressionService extends ChangeNotifier {
   Future<void> dismiss(String id) async {
     final task = _tasks[id];
     if (task == null || task.active) return;
+    final previousPhase = task.phase;
     task.phase = CompressionPhase.cancelled;
-    await _publish(task);
+    try {
+      await _publish(task);
+    } catch (_) {
+      if (identical(_tasks[id], task) &&
+          task.phase == CompressionPhase.cancelled) {
+        task.phase = previousPhase;
+        if (!_disposed) notifyListeners();
+      }
+      rethrow;
+    }
     if (identical(_tasks[id], task)) _tasks.remove(id);
     if (!_disposed) notifyListeners();
   }

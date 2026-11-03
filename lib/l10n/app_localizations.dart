@@ -28049,6 +28049,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save your changes. Try again.'**
   String get imageContextUpdateFailed;
+
+  /// No description provided for @contextOperationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context operations'**
+  String get contextOperationsTitle;
+
+  /// No description provided for @contextOperationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage compression tasks, summaries and context boundaries'**
+  String get contextOperationsDescription;
+
+  /// No description provided for @contextOperationsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No context operations yet.'**
+  String get contextOperationsEmpty;
+
+  /// No description provided for @contextOperationsStored.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved history: {count} messages'**
+  String contextOperationsStored(int count);
+
+  /// No description provided for @contextOperationsEffective.
+  ///
+  /// In en, this message translates to:
+  /// **'History for the next request: {summaries} summaries + {messages} original messages'**
+  String contextOperationsEffective(int summaries, int messages);
+
+  /// No description provided for @contextOperationsScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the current history limit. System prompts, memory, tools and unsent input add to this context. Open a record to view its summary, original range or undo it.'**
+  String get contextOperationsScope;
+
+  /// No description provided for @contextOperationsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the context overview. Please retry.'**
+  String get contextOperationsLoadFailed;
+
+  /// No description provided for @compressNewConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress into a new chat'**
+  String get compressNewConversation;
+
+  /// No description provided for @compressNewConversationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new chat with the summary and retained messages. Keep the original chat unchanged. Turn off to compress in place.'**
+  String get compressNewConversationDescription;
+
+  /// No description provided for @contextViewBoundary.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to boundary'**
+  String get contextViewBoundary;
 }
 
 class _AppLocalizationsDelegate

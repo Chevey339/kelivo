@@ -110,6 +110,7 @@ void main() {
   Future<void> pumpOpenButton(
     WidgetTester tester, {
     required _RecordingUsage usage,
+    Future<void> Function()? onOperations,
   }) {
     final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);
@@ -141,6 +142,7 @@ void main() {
                           anchorKey: anchorKey,
                           conversationId: 'c1',
                           draftText: 'hello',
+                          onOperations: onOperations,
                         );
                       },
                       child: const Text('open'),
@@ -215,6 +217,28 @@ void main() {
       usage.lastDraft,
       isNull,
     ); // Refresh must use the live composer state.
+  });
+
+  testWidgets('operations entry closes the popover before opening management', (
+    tester,
+  ) async {
+    final usage = await _createUsage();
+    usage.seeded = usageSnap();
+    var opened = false;
+    await pumpOpenButton(
+      tester,
+      usage: usage,
+      onOperations: () async {
+        opened = true;
+      },
+    );
+    await tester.tap(find.byKey(const ValueKey('open-context-usage-popover')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Context operations'));
+    await tester.tap(find.text('Context operations'));
+    await tester.pumpAndSettle();
+    expect(opened, isTrue);
+    expect(find.byKey(contextUsagePopoverKey), findsNothing);
   });
 
   for (final hasPrevious in [false, true]) {

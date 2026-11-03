@@ -127,6 +127,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _compressModelKey = 'compress_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _compressLimitModeKey = 'compress_limit_mode_v1';
+  static const String _compressNewConversationKey = 'compress_new_conversation';
   static const String _compressKeepUserMessagesKey =
       'compress_keep_user_messages_v1';
   static const String _compressMaxCharsKey = 'compress_max_chars_v1';
@@ -857,6 +858,8 @@ class SettingsProvider extends ChangeNotifier {
       orElse: () => CompressContextLimitMode.keepRecent,
     );
     _compressKeepUserMessages = prefs.getInt(_compressKeepUserMessagesKey);
+    _compressNewConversation =
+        prefs.getBool(_compressNewConversationKey) ?? false;
     _compressMaxChars =
         prefs.getInt(_compressMaxCharsKey) ??
         CompressContextOptions.defaultMaxChars;
@@ -3942,6 +3945,15 @@ Requirements:
       CompressContextLimitMode.keepRecent;
   CompressContextLimitMode get compressLimitMode => _compressLimitMode;
 
+  bool _compressNewConversation = false;
+  bool get compressNewConversation => _compressNewConversation;
+
+  Future<void> setCompressNewConversation(bool value) async {
+    _compressNewConversation = value;
+    notifyListeners();
+    await _preferences.setBool(_compressNewConversationKey, value);
+  }
+
   int? _compressKeepUserMessages;
   int? get compressKeepUserMessages => _compressKeepUserMessages;
 
@@ -5813,6 +5825,7 @@ Requirements:
     copy._compressModelId = _compressModelId;
     copy._compressPrompt = _compressPrompt;
     copy._compressLimitMode = _compressLimitMode;
+    copy._compressNewConversation = _compressNewConversation;
     copy._compressKeepUserMessages = _compressKeepUserMessages;
     copy._compressMaxChars = _compressMaxChars;
     copy._translateModelProvider = _translateModelProvider;

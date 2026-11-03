@@ -27,6 +27,7 @@ class ContextOperationContent extends StatefulWidget {
     this.onSave,
     this.onUndo,
     this.onViewOriginal,
+    this.onViewBoundary,
     this.onRecompress,
     this.onContinueNewChat,
     this.rangeLabel = '',
@@ -42,6 +43,7 @@ class ContextOperationContent extends StatefulWidget {
   final Future<bool> Function(String summary)? onSave;
   final Future<bool> Function()? onUndo;
   final VoidCallback? onViewOriginal;
+  final VoidCallback? onViewBoundary;
   final VoidCallback? onRecompress;
   final VoidCallback? onContinueNewChat;
   final String rangeLabel;
@@ -164,6 +166,12 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
             label: l10n.contextDetailViewOriginals,
             onTap: widget.onViewOriginal!,
           ),
+        if (widget.onViewBoundary != null)
+          ActionSheetItem(
+            icon: LucideIcons.locate,
+            label: l10n.contextViewBoundary,
+            onTap: widget.onViewBoundary!,
+          ),
         if (widget.onContinueNewChat != null)
           ActionSheetItem(
             icon: LucideIcons.gitBranch,
@@ -187,6 +195,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         : widget.statusLabel;
     final hasMore =
         widget.onViewOriginal != null ||
+        widget.onViewBoundary != null ||
         widget.onRecompress != null ||
         widget.onContinueNewChat != null;
     final empty = _editor.text.trim().isEmpty;

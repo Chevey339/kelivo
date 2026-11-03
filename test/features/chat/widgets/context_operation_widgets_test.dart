@@ -275,7 +275,6 @@ void main() {
     expect(find.text('Retry'), findsNothing);
     for (final state in [
       CompressionPhase.cancelled,
-      CompressionPhase.review,
       CompressionPhase.completed,
     ]) {
       task.phase = state;
@@ -285,7 +284,12 @@ void main() {
     task.phase = CompressionPhase.failed;
     task.error = 'context_changed';
     await pump();
-    expect(find.byType(Divider), findsNothing);
+    expect(find.text('Compression failed'), findsOneWidget);
+    task.phase = CompressionPhase.review;
+    await pump();
+    expect(find.text('Review the summary before applying'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byIcon(LucideIcons.pause), findsOneWidget);
   });
 
   check(
@@ -312,7 +316,11 @@ void main() {
       await tester.pumpAndSettle();
       final start = find.widgetWithText(ContextDialogActionButton, 'Compress');
       expect(tester.widget<ContextDialogActionButton>(start).onTap, isNull);
-      expect(find.byType(IosSwitch), findsNothing);
+      expect(find.byType(IosSwitch), findsOneWidget);
+      expect(
+        tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
+        isFalse,
+      );
       await tester.ensureVisible(find.text('Advanced'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Advanced'));
@@ -330,6 +338,84 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  check('new-chat compression option is returned and remembered', (
+    tester,
+  ) async {
+    await prepare(tester, TargetPlatform.android);
+    CompressContextOptions? selected;
+    final messages = [
+      for (var i = 0; i < 8; i++)
+        ChatMessage(
+          id: 'u$i',
+          conversationId: 'chat',
+          role: 'user',
+          content: 'history $i',
+        ),
+    ];
+    await tester.pumpWidget(
+      app(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () async {
+              selected = await showDialog<CompressContextOptions>(
+                context: context,
+                builder: (_) => CompressContextOptionsDialog(
+                  messages: messages,
+                  operations: const [],
+                ),
+              );
+            },
+            child: const Text('open options'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(IosSwitch).first);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(ContextDialogActionButton, 'Compress'),
+    );
+    for (var i = 0; i < 200 && selected == null; i++) {
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    await tester.pumpAndSettle();
+    expect(selected!.newConversation, isTrue);
+    expect(settings.compressNewConversation, isTrue);
+    await tester.tap(find.text('open options'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  check('boundary action invokes navigation from summary details', (
+    tester,
+  ) async {
+    await prepare(tester, TargetPlatform.android);
+    var jumps = 0;
+    await tester.pumpWidget(
+      app(
+        ContextOperationContent(
+          operation: op,
+          onClose: () {},
+          onViewBoundary: () => jumps++,
+        ),
+      ),
+    );
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jump to boundary'));
+    await tester.pumpAndSettle();
+    expect(jumps, 1);
+  });
 
   for (final brightness in Brightness.values) {
     for (final size in [const Size(320, 440), const Size(1000, 720)]) {

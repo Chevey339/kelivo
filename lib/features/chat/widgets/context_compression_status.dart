@@ -9,11 +9,10 @@ bool compressionShowsDivider(ContextCompressionTask task) =>
       CompressionPhase.preparing ||
       CompressionPhase.summarizing ||
       CompressionPhase.merging ||
+      CompressionPhase.review ||
       CompressionPhase.applying ||
+      CompressionPhase.failed ||
       CompressionPhase.interrupted => true,
-      CompressionPhase.failed =>
-        !(task.error?.contains('context_changed') ?? false) &&
-            !(task.error?.contains('no_messages') ?? false),
       _ => false,
     };
 
@@ -22,6 +21,9 @@ String compressionDividerLabel(
   ContextCompressionTask task, {
   bool waitingForApproval = false,
 }) => switch (task.phase) {
+  CompressionPhase.review => l10n.contextTaskReview,
+  CompressionPhase.preparing => l10n.contextTaskPreparing,
+  CompressionPhase.applying => l10n.contextTaskApplying,
   CompressionPhase.waiting =>
     waitingForApproval
         ? l10n.compressTaskWaitingApproval
@@ -37,6 +39,7 @@ String compressionStatusLabel(
   ContextCompressionTask task,
 ) => switch (task.phase) {
   CompressionPhase.review => l10n.contextTaskReview,
+  CompressionPhase.interrupted => l10n.contextTaskInterrupted,
   CompressionPhase.cancelled => l10n.contextTaskCancelled,
   CompressionPhase.completed => l10n.contextTaskCompleted,
   _ => compressionDividerLabel(l10n, task),
@@ -62,6 +65,9 @@ ContextTaskIndicator? contextTaskIndicator(
 }) {
   if (task != null && task.active && task.phase != CompressionPhase.review) {
     return ContextTaskIndicator.running;
+  }
+  if (task?.phase == CompressionPhase.review) {
+    return ContextTaskIndicator.paused;
   }
   if (task != null && compressionShowsDivider(task)) {
     return ContextTaskIndicator.failed;

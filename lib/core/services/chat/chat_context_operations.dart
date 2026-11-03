@@ -250,6 +250,35 @@ extension ChatContextOperations on ChatService {
     _notifyContextChanged(id);
   }
 
+  Future<ContextMessageCounts> loadContextMessageCounts(
+    String id, {
+    required int limit,
+  }) async {
+    if (!_initialized || getConversation(id) == null) {
+      throw StateError('conversation_not_found');
+    }
+    await loadContextOperations(id);
+    if (!_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      return _repo.getContextMessageCounts(id, limit: limit);
+    }
+    final snapshot = await loadContextSnapshot(id);
+    if (limit <= 0) {
+      return (stored: snapshot.messages.length, messages: 0, summaries: 0);
+    }
+    final effective = ContextHistory.resolve(
+      snapshot.messages,
+      snapshot.operations,
+      limit: limit,
+    );
+    final summaries = effective.where(ContextOperation.isSummary).length;
+    return (
+      stored: snapshot.messages.length,
+      messages: effective.length - summaries,
+      summaries: summaries,
+    );
+  }
+
   Future<void> changeContextOperation(
     String id,
     String operationId, {
@@ -331,24 +360,48 @@ extension ChatContextOperations on ChatService {
         throw StateError('context_changed');
       }
       final source = getConversation(id)!;
-      final created = await forkConversationFromMessages(
+      final sourceMessages = [
+        ChatMessage(
+          role: 'user',
+          content: operation.summary,
+          conversationId: id,
+          modelId: operation.model,
+        ),
+        ...retained,
+      ];
+      return _forkSelectedMessages(
         title: source.title,
         assistantId: source.assistantId,
         activate: false,
-        sourceMessages: [
-          ChatMessage(
-            role: 'user',
-            content: operation.summary,
-            conversationId: id,
-          ),
-          ...retained,
-        ],
+        sourceMessages: sourceMessages,
+        sourceExtras: Map<String, dynamic>.from(source.extras),
+        sourceMcpServerIds: ConversationMcpSettings.isOverridden(source)
+            ? List<String>.of(source.mcpServerIds)
+            : null,
+        activationOwner: _currentConversationId,
+        beforePublish: (created) async {
+          final target = await loadContextSnapshot(created.id);
+          await restoreContextOperations(created.id, [
+            for (var i = 0; i < sourceMessages.length; i++)
+              if (i == 0 || ContextOperation.isSummary(sourceMessages[i]))
+                ContextOperation.forCopiedSummary(
+                  target.messages[i],
+                  keepUserMessages: countUserMessages(
+                    sourceMessages.skip(i + 1).toList(),
+                  ),
+                ),
+          ], expectedFingerprint: target.fingerprint);
+          await setConversationModel(
+            created.id,
+            providerKey: source.chatModelProvider,
+            modelId: source.chatModelId,
+          );
+          if ((await loadContextSnapshot(id)).fingerprint !=
+              expectedFingerprint) {
+            throw StateError('context_changed');
+          }
+        },
       );
-      if ((await loadContextSnapshot(id)).fingerprint != expectedFingerprint) {
-        await deleteConversation(created.id);
-        throw StateError('context_changed');
-      }
-      return created;
     }
     final created = await _repo.createCompressedConversation(
       id,

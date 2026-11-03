@@ -7453,5 +7453,32 @@
         "type": "int"
       }
     }
-  }
+  },
+  "contextOperationsTitle": "Context operations",
+  "contextOperationsDescription": "Manage compression tasks, summaries and context boundaries",
+  "contextOperationsEmpty": "No context operations yet.",
+  "contextOperationsStored": "Saved history: {count} messages",
+  "contextOperationsEffective": "History for the next request: {summaries} summaries + {messages} original messages",
+  "contextOperationsScope": "Uses the current history limit. System prompts, memory, tools and unsent input add to this context. Open a record to view its summary, original range or undo it.",
+  "contextOperationsLoadFailed": "Could not load the context overview. Please retry.",
+  "compressNewConversation": "Compress into a new chat",
+  "compressNewConversationDescription": "Create a new chat with the summary and retained messages. Keep the original chat unchanged. Turn off to compress in place.",
+  "@contextOperationsStored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextOperationsEffective": {
+    "placeholders": {
+      "summaries": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "contextViewBoundary": "Jump to boundary"
 }

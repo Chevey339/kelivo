@@ -382,6 +382,47 @@ void main() {
   });
 
   test(
+    'context overview follows compression, history limits and undo',
+    () async {
+      expect(await repo.getContextMessageCounts('chat', limit: 100), (
+        stored: 6,
+        messages: 6,
+        summaries: 0,
+      ));
+      await compact('S1', ['u1', 'a1']);
+      expect(await repo.getContextMessageCounts('chat', limit: 100), (
+        stored: 6,
+        messages: 4,
+        summaries: 1,
+      ));
+      expect(await repo.getContextMessageCounts('chat', limit: 2), (
+        stored: 6,
+        messages: 2,
+        summaries: 1,
+      ));
+      await compact('S2', ['u1', 'a1', 'u2', 'a2'], depends: ['S1']);
+      expect(await repo.getContextMessageCounts('chat', limit: 100), (
+        stored: 6,
+        messages: 2,
+        summaries: 1,
+      ));
+      await repo.changeContextOperation(
+        'chat',
+        'S1',
+        includeDependents: true,
+        expectedState: ContextHistory.operationsFingerprint(
+          await repo.readContextOperations('chat'),
+        ),
+      );
+      expect(await repo.getContextMessageCounts('chat', limit: 100), (
+        stored: 6,
+        messages: 6,
+        summaries: 0,
+      ));
+    },
+  );
+
+  test(
     'old clear boundary converts once atomically without changing title',
     () async {
       final old = (await repo.getConversation(
@@ -700,6 +741,19 @@ void main() {
         ['new summary', 'Original u2', 'Original a2', 'Summary S2'],
       );
       expect((await repo.readContextOperations('chat')).length, 2);
+      expect(
+        (await repo.getEffectiveContextMessages(
+          created.id,
+          limit: 1,
+        )).map((m) => m.content),
+        ['new summary', 'Original a2', 'Summary S2'],
+      );
+      final copiedNodes = await repo.readContextOperations(created.id);
+      expect(copiedNodes, hasLength(2));
+      expect(
+        copiedNodes.every((node) => node.sourceGroups.length == 1),
+        isTrue,
+      );
     },
   );
   test(

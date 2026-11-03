@@ -19,6 +19,7 @@ class ContextManagementSheet extends StatelessWidget {
     this.conversationId,
     this.draftText = '',
     this.onImages,
+    this.onOperations,
   });
 
   final VoidCallback? onCompress;
@@ -29,6 +30,7 @@ class ContextManagementSheet extends StatelessWidget {
   final String? conversationId;
   final String draftText;
   final VoidCallback? onImages;
+  final VoidCallback? onOperations;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +77,16 @@ class ContextManagementSheet extends StatelessWidget {
                     draftText: draftText,
                   ),
                   const SizedBox(height: 16),
+                  if (onOperations != null) ...[
+                    _OptionRow(
+                      icon: Lucide.History,
+                      label: l10n.contextOperationsTitle,
+                      description: l10n.contextOperationsDescription,
+                      onTap: onOperations,
+                      showChevron: true,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (onImages != null) ...[
                     _OptionRow(
                       icon: Lucide.Image,

@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import 'chat_message.dart';
+import '../utils/token_estimator.dart';
 
 enum ContextOperationKind { clear, compress }
 
 enum ContextHistorySource { effective, previous, original }
+
+typedef ContextMessageCounts = ({int stored, int messages, int summaries});
 
 /// A history transformation, stored independently from actual chat messages.
 /// Group ids locate ranges; revision ids and content fingerprints detect edits.
@@ -33,6 +36,28 @@ class ContextOperation {
     this.convertedFromLegacyClear = false,
     this.inputParts = 0,
   });
+
+  /// A copied summary has a visible source row in its new conversation. Keep
+  /// its summary identity so raw-message window limits cannot evict it.
+  factory ContextOperation.forCopiedSummary(
+    ChatMessage message, {
+    required int keepUserMessages,
+  }) => ContextOperation(
+    id: message.id,
+    kind: ContextOperationKind.compress,
+    anchorGroupId: ContextHistory.group(message),
+    appliedAfterGroupId: ContextHistory.group(message),
+    sourceGroups: [ContextHistory.group(message)],
+    dependencies: const [],
+    createdAt: message.timestamp,
+    summary: message.content,
+    originalSummary: message.content,
+    keepUserMessages: keepUserMessages,
+    model: message.modelId ?? '',
+    inputTokens: estimateTokens(message.content),
+    includedAttachmentsAndTools: false,
+    inputParts: 1,
+  );
 
   static const entityKind = 'conversationContext';
   static const summaryPrefix = 'context-summary:';

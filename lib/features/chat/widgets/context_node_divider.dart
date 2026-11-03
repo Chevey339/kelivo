@@ -111,6 +111,7 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
     final failed =
         task?.phase == CompressionPhase.failed ||
         task?.phase == CompressionPhase.interrupted;
+    final review = task?.phase == CompressionPhase.review;
     return LayoutBuilder(
       builder: (context, constraints) {
         return Opacity(
@@ -163,7 +164,7 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (task != null && !failed)
+                                      if (task != null && !failed && !review)
                                         SizedBox(
                                           width: 12,
                                           height: 12,
@@ -181,6 +182,8 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
                                           child: Icon(
                                             failed
                                                 ? LucideIcons.circleAlert
+                                                : review
+                                                ? LucideIcons.pause
                                                 : operation?.isCompression ==
                                                       true
                                                 ? LucideIcons.package2

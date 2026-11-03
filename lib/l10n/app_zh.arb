@@ -5796,5 +5796,32 @@
   "imageContextIncludedCount": "本轮发送 {included} / {total} 张",
   "imageContextMissing": "图片不可用",
   "imageContextLoadFailed": "暂时无法加载图片，请重试。",
-  "imageContextUpdateFailed": "未能保存修改，请重试。"
+  "imageContextUpdateFailed": "未能保存修改，请重试。",
+  "contextOperationsTitle": "上下文操作记录",
+  "contextOperationsDescription": "管理压缩任务、摘要和上下文分界",
+  "contextOperationsEmpty": "暂无上下文操作记录。",
+  "contextOperationsStored": "已保存历史：{count} 条消息",
+  "contextOperationsEffective": "下次请求的历史部分：{summaries} 条摘要 + {messages} 条原始消息",
+  "contextOperationsScope": "已应用当前历史消息数量限制。系统提示、记忆、工具和未发送输入会额外加入上下文。点击记录可查看摘要、原始范围或撤销操作。",
+  "contextOperationsLoadFailed": "无法加载上下文概览，请重试。",
+  "compressNewConversation": "压缩并新建会话",
+  "compressNewConversationDescription": "新会话包含摘要和保留的消息，原会话保持不变。关闭后将在当前会话原位压缩。",
+  "@contextOperationsStored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextOperationsEffective": {
+    "placeholders": {
+      "summaries": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "contextViewBoundary": "跳转到分界位置"
 }

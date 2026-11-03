@@ -95,26 +95,32 @@ void main() {
     addTearDown(worldBooks.dispose);
     addTearDown(usage.dispose);
 
+    var operationsOpened = 0;
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<ContextUsageService>.value(value: usage),
         ],
-        child: const MaterialApp(
-          locale: Locale('en'),
+        child: MaterialApp(
+          locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: ContextManagementSheet(
               conversationId: 'c1',
               draftText: 'draft',
+              onOperations: () => operationsOpened++,
             ),
           ),
         ),
       ),
     );
     await tester.pump();
+
+    await tester.ensureVisible(find.text('Context operations'));
+    await tester.tap(find.text('Context operations'));
+    expect(operationsOpened, 1);
 
     expect(find.byType(ContextUsageHeader), findsOneWidget);
     expect(find.byType(ContextUsageRing), findsNothing);

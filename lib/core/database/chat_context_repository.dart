@@ -100,6 +100,29 @@ extension ChatContextRepository on ChatDatabaseRepository {
     ];
   });
 
+  /// Counts the same projection used for sending without loading message bodies.
+  Future<ContextMessageCounts> getContextMessageCounts(
+    String id, {
+    required int limit,
+  }) => _db.transaction(() async {
+    final operations = await readContextOperations(id);
+    final metadata = await _contextMetadata(id);
+    if (limit <= 0) {
+      return (stored: metadata.length, messages: 0, summaries: 0);
+    }
+    final effective = ContextHistory.resolve(
+      metadata,
+      operations,
+      limit: limit,
+    );
+    final summaries = effective.where(ContextOperation.isSummary).length;
+    return (
+      stored: metadata.length,
+      messages: effective.length - summaries,
+      summaries: summaries,
+    );
+  });
+
   Future<int> contextBoundaryIndex(
     String id,
     List<ContextOperation> operations,
@@ -416,7 +439,14 @@ extension ChatContextRepository on ChatDatabaseRepository {
         role: 'user',
         content: operation.summary,
         conversationId: id,
+        modelId: operation.model,
       );
+      final targetOperations = [
+        ContextOperation.forCopiedSummary(
+          summary,
+          keepUserMessages: countUserMessages(retained),
+        ),
+      ];
       await _appendLinearMessageToConversation(
         conversation: target,
         message: summary,
@@ -453,6 +483,14 @@ extension ChatContextRepository on ChatDatabaseRepository {
               .into(_db.messageRows)
               .insert(_messageCompanion(background, i + 1));
           await _replaceMessageParts(background);
+          targetOperations.add(
+            ContextOperation.forCopiedSummary(
+              background,
+              keepUserMessages: countUserMessages(
+                retained.skip(i + 1).toList(),
+              ),
+            ),
+          );
         }
       }
       final ids = {for (final row in ordered) row.id: const Uuid().v4()};
@@ -466,6 +504,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
         resetVersions: true,
       );
       await _copyImageContext(sourceId, id, ids);
+      await _writeContextOperations(id, targetOperations);
       final task =
           await (_db.select(_db.extensionEntityRows)..where(
                 (r) =>

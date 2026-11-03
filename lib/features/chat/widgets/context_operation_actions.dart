@@ -20,6 +20,7 @@ import 'context_compression_status.dart';
 import 'context_dialog.dart';
 import 'context_impact_dialog.dart';
 import 'context_operation_widgets.dart';
+import 'context_operations_panel.dart';
 import '../pages/context_summary_editor_page.dart';
 
 Future<CompressionBudget?> _estimate(
@@ -275,6 +276,9 @@ Future<void> showContextOperationDetails(
   final source = snapshot.messages
       .where((m) => operation.sourceGroups.contains(ContextHistory.group(m)))
       .toList();
+  final anchor = snapshot.messages
+      .where((m) => ContextHistory.group(m) == operation.anchorGroupId)
+      .firstOrNull;
   final affected = ContextHistory.affectedOperations(
     snapshot.operations,
     operationIds: {operation.id},
@@ -357,6 +361,12 @@ Future<void> showContextOperationDetails(
               Navigator.of(detailContext).pop();
               onViewOriginal(source.first.id);
             },
+      onViewBoundary: anchor == null || onViewOriginal == null
+          ? null
+          : () {
+              Navigator.of(detailContext).pop();
+              onViewOriginal(anchor.id);
+            },
       onRecompress: onRecompress == null
           ? null
           : () {
@@ -414,6 +424,17 @@ Future<void> showContextCompressionMenu(
           DateTime.now().difference(task.startedAt).inSeconds.clamp(0, 864000),
         );
   final items = <ActionSheetItem>[
+    if (task.phase == CompressionPhase.review)
+      ActionSheetItem(
+        icon: LucideIcons.filePenLine,
+        label: l10n.contextTaskReview,
+        onTap: () => showCompressionReview(
+          context,
+          chat: chat,
+          task: task,
+          onRecompress: onAdjust,
+        ),
+      ),
     if (failed) ...[
       ActionSheetItem(
         icon: LucideIcons.sparkles,
@@ -458,6 +479,44 @@ Future<void> showContextCompressionMenu(
     await showMobileActionSheet(context, title: details, items: items);
   }
 }
+
+Future<void> showContextOperations(
+  BuildContext context, {
+  required ChatService chat,
+  required String conversationId,
+  required int messageLimit,
+  required ValueChanged<ContextOperation> onOpenOperation,
+  required ValueChanged<ContextCompressionTask> onRetry,
+  required ValueChanged<ContextCompressionTask> onAdjust,
+  required ValueChanged<String> onOpenConversation,
+}) => _showContextContent(
+  context,
+  title: AppLocalizations.of(context)!.contextOperationsTitle,
+  builder: (panelContext) {
+    void leave(VoidCallback action) {
+      Navigator.of(panelContext).pop();
+      action();
+    }
+
+    return ContextOperationsPanel(
+      chat: chat,
+      conversationId: conversationId,
+      messageLimit: messageLimit,
+      onOpenOperation: (operation) => leave(() => onOpenOperation(operation)),
+      onRetry: (task) => leave(() => onRetry(task)),
+      onAdjust: (task) => leave(() => onAdjust(task)),
+      onReview: (task) => leave(
+        () => showCompressionReview(
+          context,
+          chat: chat,
+          task: task,
+          onRecompress: () => onAdjust(task),
+        ),
+      ),
+      onOpenConversation: (id) => leave(() => onOpenConversation(id)),
+    );
+  },
+);
 
 Future<void> showCompressionReview(
   BuildContext context, {

@@ -49,6 +49,7 @@ class _CompressContextOptionsDialogState
   ContextHistorySource _source = ContextHistorySource.effective;
   bool _includeManual = true;
   bool _includeAttachments = true;
+  late bool _newConversation;
   bool _advanced = false;
   bool _adjusting = false;
   late final TextEditingController _maxChars;
@@ -73,6 +74,7 @@ class _CompressContextOptionsDialogState
     includeEditedSummaries: includeManual ?? _includeManual,
     includeAttachmentsAndTools: _includeAttachments,
     regenerateExisting: regenerate,
+    newConversation: _newConversation,
   );
   CompressionSelection get _selection =>
       selectCompressionHistory(widget.messages, widget.operations, _options());
@@ -91,6 +93,8 @@ class _CompressContextOptionsDialogState
     super.initState();
     final settings = context.read<SettingsProvider>();
     final initial = widget.initialOptions;
+    _newConversation =
+        initial?.newConversation ?? settings.compressNewConversation;
     _mode = initial?.mode ?? settings.compressLimitMode;
     _source = initial?.historySource ?? ContextHistorySource.effective;
     _includeManual = initial?.includeEditedSummaries ?? true;
@@ -186,6 +190,7 @@ class _CompressContextOptionsDialogState
     final options = _options(regenerate: regenerate);
     try {
       await settings.setCompressLimitMode(_mode);
+      await settings.setCompressNewConversation(_newConversation);
       if ((options.keepUserMessages ?? 0) > 0) {
         await settings.setCompressKeepUserMessages(options.keepUserMessages);
       }
@@ -300,6 +305,12 @@ class _CompressContextOptionsDialogState
                   ),
                   const SizedBox(height: 14),
                   const _CompressModelPickerRow(),
+                  _switch(
+                    l10n.compressNewConversation,
+                    l10n.compressNewConversationDescription,
+                    _newConversation,
+                    (value) => _update(() => _newConversation = value),
+                  ),
                   const SizedBox(height: 12),
                   _CompressModeSegmented(
                     mode: _mode,

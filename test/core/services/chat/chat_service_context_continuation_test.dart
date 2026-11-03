@@ -34,6 +34,25 @@ class _Paths extends PathProviderPlatform {
   Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
+class _PausingCopyChatService extends ChatService {
+  Completer<void>? copyGate;
+  Completer<String>? copyTarget;
+
+  @override
+  Future<void> addMessageDirectly(
+    String conversationId,
+    ChatMessage message,
+  ) async {
+    final gate = copyGate;
+    if (gate != null) {
+      copyGate = null;
+      copyTarget!.complete(conversationId);
+      await gate.future;
+    }
+    await super.addMessageDirectly(conversationId, message);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
@@ -48,7 +67,7 @@ void main() {
       docsDir: directory.path,
       supportDir: directory.path,
     );
-    chat = ChatService();
+    chat = _PausingCopyChatService();
     await chat.init();
   });
 
@@ -64,9 +83,14 @@ void main() {
     bool keepTail = true,
   }) async {
     final source = temporary
-        ? await chat.createDraftConversation(temporary: true)
+        ? await chat.createDraftConversation(title: 'Original', temporary: true)
         : await chat.createConversation(title: 'Original');
     sourceId = source.id;
+    await chat.setConversationModel(
+      sourceId,
+      providerKey: 'pinned-provider',
+      modelId: 'pinned-model',
+    );
     messages = [];
     for (var i = 0; i < 3; i++) {
       for (final role in ['user', 'assistant']) {
@@ -131,7 +155,17 @@ void main() {
         expect(copied.map((m) => m.version).toSet(), {0});
         expect(copied.every((m) => (m.groupId ?? m.id) == m.id), isTrue);
         expect(chat.getVersionSelections(created.id), isEmpty);
-        expect(await chat.loadContextOperations(created.id), isEmpty);
+        final nodes = await chat.loadContextOperations(created.id);
+        expect(nodes.single.sourceGroups, [copied.first.id]);
+        expect(created.chatModelProvider, 'pinned-provider');
+        expect(created.chatModelId, 'pinned-model');
+        expect(
+          (await chat.loadSelectedContextMessages(
+            created.id,
+            limit: 1,
+          )).map((m) => m.content),
+          ['Edited summary', if (keepTail) 'assistant 2'],
+        );
         expect(chat.getToolEvents(copied.first.id), isEmpty);
         if (keepTail) {
           expect(chat.getToolEvents(copied.last.id), [
@@ -158,7 +192,22 @@ void main() {
           )).map((m) => m.content),
           expected,
         );
-        expect(await chat.loadContextOperations(created.id), isEmpty);
+        expect(
+          (await chat.loadContextOperations(created.id)).single.sourceGroups,
+          [copied.first.id],
+        );
+        expect(
+          chat.getConversation(created.id)!.chatModelProvider,
+          'pinned-provider',
+        );
+        expect(chat.getConversation(created.id)!.chatModelId, 'pinned-model');
+        expect(
+          (await chat.loadSelectedContextMessages(
+            created.id,
+            limit: 1,
+          )).first.content,
+          'Edited summary',
+        );
         if (!temporary) {
           expect(
             (await chat.loadContextSnapshot(sourceId)).fingerprint,
@@ -214,6 +263,96 @@ void main() {
       );
     });
   }
+
+  test(
+    'temporary compression publishes only a complete, usable target',
+    () async {
+      final operation = await compress(temporary: true);
+      final before = chat.getAllConversations().map((c) => c.id).toSet();
+      String? adopted;
+      final publishedCounts = <int>[];
+      void adoptNewConversation() {
+        if (adopted != null) return;
+        final target = chat
+            .getAllConversations()
+            .where((c) => !before.contains(c.id))
+            .firstOrNull;
+        if (target == null) return;
+        publishedCounts.add(chat.getMessageCount(target.id));
+        expect(chat.contextOperationsFor(target.id), hasLength(1));
+        expect(target.chatModelProvider, 'pinned-provider');
+        expect(target.chatModelId, 'pinned-model');
+        adopted = target.id;
+        chat.setCurrentConversation(target.id);
+      }
+
+      chat.addListener(adoptNewConversation);
+      try {
+        final created = await chat.continueFromContextSummary(
+          sourceId,
+          operation.id,
+        );
+        expect(adopted, created.id);
+        expect(publishedCounts, [3]);
+        expect(chat.currentConversationId, created.id);
+        expect(chat.getConversation(sourceId), isNull);
+        expect(
+          await chat.chatRepositoryOrNull!.getConversation(created.id),
+          isNotNull,
+        );
+        expect(
+          (await chat.loadSelectedContextMessages(
+            created.id,
+            limit: 1,
+          )).map((m) => m.content),
+          ['Edited summary', 'assistant 2'],
+        );
+      } finally {
+        chat.removeListener(adoptNewConversation);
+      }
+    },
+  );
+
+  test('unpublished temporary copies cannot be searched or selected', () async {
+    final visible = await chat.createConversation(
+      title: 'Original visible chat',
+    );
+    final operation = await compress(temporary: true);
+    final copying = chat as _PausingCopyChatService;
+    final gate = Completer<void>();
+    copying.copyGate = gate;
+    copying.copyTarget = Completer<String>();
+    final future = chat.continueFromContextSummary(sourceId, operation.id);
+    final targetId = await copying.copyTarget!.future;
+    try {
+      expect(chat.getAllConversations().any((c) => c.id == targetId), isFalse);
+      expect(chat.getCompleteConversation(targetId), isNull);
+      chat.setCurrentConversation(targetId);
+      expect(chat.currentConversationId, sourceId);
+      final results = await chat.searchConversationMatches(
+        tokens: ['original'],
+        limit: 1,
+      );
+      expect(results, isNotEmpty);
+      expect(
+        results.every((match) => match.conversationId == visible.id),
+        isTrue,
+      );
+    } finally {
+      gate.complete();
+    }
+    final created = await future;
+    expect(created.id, targetId);
+    expect(chat.getCompleteConversation(targetId), isNotNull);
+    expect(
+      (await chat.searchConversationMatches(
+        tokens: ['original'],
+      )).any((match) => match.conversationId == targetId),
+      isTrue,
+    );
+    chat.setCurrentConversation(targetId);
+    expect(chat.currentConversationId, targetId);
+  });
 
   testWidgets('summary details continue action opens the compact new chat', (
     tester,

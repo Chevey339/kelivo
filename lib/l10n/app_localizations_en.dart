@@ -15890,4 +15890,42 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get imageContextUpdateFailed =>
       'Could not save your changes. Try again.';
+
+  @override
+  String get contextOperationsTitle => 'Context operations';
+
+  @override
+  String get contextOperationsDescription =>
+      'Manage compression tasks, summaries and context boundaries';
+
+  @override
+  String get contextOperationsEmpty => 'No context operations yet.';
+
+  @override
+  String contextOperationsStored(int count) {
+    return 'Saved history: $count messages';
+  }
+
+  @override
+  String contextOperationsEffective(int summaries, int messages) {
+    return 'History for the next request: $summaries summaries + $messages original messages';
+  }
+
+  @override
+  String get contextOperationsScope =>
+      'Uses the current history limit. System prompts, memory, tools and unsent input add to this context. Open a record to view its summary, original range or undo it.';
+
+  @override
+  String get contextOperationsLoadFailed =>
+      'Could not load the context overview. Please retry.';
+
+  @override
+  String get compressNewConversation => 'Compress into a new chat';
+
+  @override
+  String get compressNewConversationDescription =>
+      'Create a new chat with the summary and retained messages. Keep the original chat unchanged. Turn off to compress in place.';
+
+  @override
+  String get contextViewBoundary => 'Jump to boundary';
 }

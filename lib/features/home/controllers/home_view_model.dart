@@ -1120,10 +1120,10 @@ class HomeViewModel extends ChangeNotifier {
 
     if (currentConversation?.id == id) return;
 
-    _chatService.setCurrentConversation(id);
-    _syncContextUsageConversation(id);
-    final convo = _chatService.getConversation(id);
+    final convo = _chatService.getCompleteConversation(id);
     if (convo != null) {
+      _chatService.setCurrentConversation(id);
+      _syncContextUsageConversation(id);
       // Assistant preference persistence runs concurrently with the window
       // load; setCurrentAssistant notifies before its disk write completes.
       final assistantSwitch = _assistantSwitchFor(
@@ -1156,7 +1156,7 @@ class HomeViewModel extends ChangeNotifier {
 
     if (currentConversation?.id == id) return null;
 
-    final convo = _chatService.getConversation(id);
+    final convo = _chatService.getCompleteConversation(id);
     if (convo == null) return null;
 
     // The assistant switch is deferred to commitConversationSwitch: it

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
@@ -29,13 +30,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory dir;
   late ChatDatabaseRepository repo;
+  late AppDatabase database;
   late ChatService chat;
   late String id;
   late ContextCompressionService compression;
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('compression_jobs_');
     PathProviderPlatform.instance = _Paths(dir.path);
-    repo = ChatDatabaseRepository.open(file: File('${dir.path}/chat.sqlite'));
+    final databaseFile = File('${dir.path}/chat.sqlite');
+    database = AppDatabase.open(file: databaseFile);
+    repo = ChatDatabaseRepository(database, databaseFile: databaseFile);
     await repo.ensureReady();
     chat = ChatService(existingRepository: repo);
     await chat.init();
@@ -82,6 +86,13 @@ void main() {
       'compression did not reach expected state: ${compression.taskFor(id)?.phase}',
     );
   }
+
+  Future<void> rejectCancellationWrites() => database.customStatement('''
+    CREATE TRIGGER reject_cancel BEFORE UPDATE ON extension_entity_rows
+    WHEN NEW.kind = 'contextCompressionTask'
+      AND json_extract(NEW.payload, '\$.phase') = 'cancelled'
+    BEGIN SELECT RAISE(FAIL, 'cancel write failed'); END
+  ''');
 
   test(
     'waiting includes final reply; applying keeps six complete user exchanges',
@@ -130,6 +141,74 @@ void main() {
     expect(compression.taskFor(id)!.phase, CompressionPhase.cancelled);
     expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
   });
+
+  test('failed cancellation writes keep an inactive, retryable task', () async {
+    final response = Completer<String>();
+    await compression.start(id, request((_, _) => response.future));
+    await until(
+      () => compression.taskFor(id)!.phase == CompressionPhase.summarizing,
+    );
+    await rejectCancellationWrites();
+    final failedWrite = throwsA(
+      predicate(
+        (Object error) => error.toString().contains('cancel write failed'),
+      ),
+    );
+    await expectLater(compression.cancel(id), failedWrite);
+    expect(compression.taskFor(id)!.phase, CompressionPhase.interrupted);
+    expect(compression.blocksSending(id), isFalse);
+    response.complete('late summary');
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
+    await expectLater(compression.dismiss(id), failedWrite);
+    expect(compression.taskFor(id)!.phase, CompressionPhase.interrupted);
+    await database.customStatement('DROP TRIGGER reject_cancel');
+    await compression.dismiss(id);
+    expect(compression.taskFor(id), isNull);
+    await chat.close();
+    await chat.init();
+    expect(compression.taskFor(id), isNull);
+  });
+
+  test(
+    'late review estimate cannot revive a cancellation whose write failed',
+    () async {
+      compression.estimateCandidate = (_, _) async =>
+          (usedTokens: 9000, contextWindow: 1000);
+      await compression.start(id, request((_, _) async => 'summary'));
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.review,
+      );
+      await rejectCancellationWrites();
+      final budget = Completer<CompressionBudget>();
+      var entered = false;
+      compression.estimateCandidate = (_, _) {
+        entered = true;
+        return budget.future;
+      };
+      final applied = expectLater(
+        compression.applyReviewed(id, 'edited summary'),
+        throwsStateError,
+      );
+      await until(() => entered);
+      await expectLater(
+        compression.cancel(id),
+        throwsA(
+          predicate(
+            (Object error) => error.toString().contains('cancel write failed'),
+          ),
+        ),
+      );
+      budget.complete((usedTokens: 100, contextWindow: 1000));
+      await applied;
+      expect(compression.taskFor(id)!.phase, CompressionPhase.interrupted);
+      expect(compression.blocksSending(id), isFalse);
+      expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
+      await database.customStatement('DROP TRIGGER reject_cancel');
+      await compression.dismiss(id);
+      expect(compression.taskFor(id), isNull);
+    },
+  );
 
   test('source edits during generation reject the stale result', () async {
     final hold = Completer<String>();
@@ -217,6 +296,7 @@ void main() {
     'new-chat compression keeps source selection and original nodes unchanged',
     () async {
       final other = await chat.createConversation(title: 'Other');
+      final source = await chat.loadContextSnapshot(id);
       await compression.start(
         id,
         request(
@@ -234,7 +314,20 @@ void main() {
       expect(chat.currentConversationId, other.id);
       final result = compression.taskFor(id)!.resultConversationId!;
       expect((await chat.loadMessages(result)).length, 3);
+      expect(
+        (await chat.loadSelectedContextMessages(
+          result,
+          limit: 1,
+        )).map((m) => m.content),
+        ['summary', (await chat.loadMessages(result)).last.content],
+      );
       expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
+      final retained = (await chat.loadMessages(result)).last;
+      await chat.updateMessage(retained.id, content: 'edited in the new chat');
+      expect(
+        (await chat.loadContextSnapshot(id)).fingerprint,
+        source.fingerprint,
+      );
     },
   );
 
