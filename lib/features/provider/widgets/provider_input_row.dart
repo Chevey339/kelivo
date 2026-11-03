@@ -12,6 +12,7 @@ class ProviderInputRow extends StatefulWidget {
     required this.controller,
     this.hint,
     this.obscure = false,
+    this.enableSuggestions = true,
     this.enabled = true,
     this.helper,
     this.helperRich,
@@ -30,6 +31,9 @@ class ProviderInputRow extends StatefulWidget {
   final TextEditingController controller;
   final String? hint;
   final bool obscure;
+  // Android treats disabled suggestions as visible-password input, even when
+  // obscure is false. Only sensitive fields should opt out of suggestions.
+  final bool enableSuggestions;
   final bool enabled;
   final String? helper;
   final Widget? helperRich;
@@ -200,7 +204,7 @@ class _ProviderInputRowState extends State<ProviderInputRow>
           obscureText: widget.obscure,
           keyboardType: widget.keyboardType,
           autocorrect: false,
-          enableSuggestions: false,
+          enableSuggestions: widget.enableSuggestions,
           onChanged: widget.onChanged,
           onSubmitted: widget.onSubmitted,
           style: TextStyle(

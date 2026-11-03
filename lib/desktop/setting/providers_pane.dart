@@ -1621,6 +1621,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     controller: _apiKeyCtrl,
                     desktop: true,
                     obscure: !_showApiKey,
+                    enableSuggestions: false,
                     mono: _showApiKey,
                     hint: l10n.providerDetailPageApiKeyExample,
                     trailing: TrailingKind.eye,

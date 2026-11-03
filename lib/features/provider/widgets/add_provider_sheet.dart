@@ -175,12 +175,15 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     required TextEditingController controller,
     String? hint,
     bool obscure = false,
+    bool enableSuggestions = true,
     bool enabled = true,
   }) => ProviderInputRow(
+    key: ValueKey(controller),
     label: label,
     controller: controller,
     hint: hint,
     obscure: obscure,
+    enableSuggestions: enableSuggestions,
     enabled: enabled,
     onChanged: (_) => setState(() {}),
   );
@@ -232,6 +235,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         _inputRow(
           label: 'API Key',
           controller: _openaiKey,
+          enableSuggestions: false,
           hint: l10n.providerDetailPageApiKeyExample,
         ),
         const SizedBox(height: 10),
@@ -277,6 +281,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           _inputRow(
             label: 'API Key',
             controller: _googleKey,
+            enableSuggestions: false,
             hint: l10n.providerDetailPageApiKeyExample,
           ),
           const SizedBox(height: 10),
@@ -336,6 +341,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         _inputRow(
           label: 'API Key',
           controller: _claudeKey,
+          enableSuggestions: false,
           hint: l10n.providerDetailPageApiKeyExample,
         ),
         const SizedBox(height: 10),
