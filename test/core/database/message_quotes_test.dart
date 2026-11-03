@@ -33,11 +33,22 @@ void main() {
         model: 'model',
         createdAt: source.timestamp,
       );
+      final reasoningQuote = QuoteRef(
+        id: 'reasoning',
+        messageId: source.id,
+        start: 0,
+        end: 0,
+        text: 'selected thought',
+        model: 'model',
+        createdAt: source.timestamp,
+        hasSourceRange: false,
+      );
+      final quotes = [quote, reasoningQuote];
       final reply = ChatMessage(
         id: 'reply',
         role: 'user',
-        content: 'Why \uFFFC?',
-        quotes: [quote],
+        content: 'Why \uFFFC and \uFFFC?',
+        quotes: quotes,
         conversationId: 'chat',
       );
       await repository.putMigrationBatch(
@@ -60,19 +71,21 @@ void main() {
         reply.id,
         translation: 'full translation',
       );
-      expect((await repository.getMessage(reply.id))!.quotes, [quote]);
+      expect((await repository.getMessage(reply.id))!.quotes, quotes);
       final edited = await repository.appendMessageVersion(
         messageId: reply.id,
-        content: '\uFFFC Explain',
-        quotes: [quote],
+        content: '\uFFFC \uFFFC Explain',
+        quotes: quotes,
       );
-      expect(edited!.message.quotes, [quote]);
+      expect(edited!.message.quotes, quotes);
       final copy = await repository.duplicateConversation('chat');
       final copied = await repository.getMessagesByIds(copy!.messageIds);
       final copiedSource = copied.singleWhere((m) => m.role == 'assistant');
       for (final message in copied.where((m) => m.role == 'user')) {
-        expect(message.quotes.single.messageId, copiedSource.id);
-        expect(message.quotes.single.text, quote.text);
+        expect(
+          message.quotes,
+          quotes.map((quote) => quote.withMessageId(copiedSource.id)).toList(),
+        );
       }
       await repository.close();
       repository = ChatDatabaseRepository.open(
@@ -80,8 +93,8 @@ void main() {
       );
       await repository.ensureReady();
       final loaded = (await repository.getMessage(edited.message.id))!;
-      expect(loaded.content, '\uFFFC Explain');
-      expect(loaded.quotes, [quote]);
+      expect(loaded.content, '\uFFFC \uFFFC Explain');
+      expect(loaded.quotes, quotes);
       final without = await repository.appendMessageVersion(
         messageId: loaded.id,
         content: 'No quote',

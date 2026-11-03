@@ -13,6 +13,102 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  for (final draft in [true, false]) {
+    testWidgets(
+      'reasoning chip previews without source lookup or jump (draft: $draft)',
+      (tester) async {
+        var removed = false;
+        final actions = QuoteInteractionController(
+          onQuote: (_) async {},
+          onJump: (_) async => throw StateError('Unexpected source jump'),
+          sourceExists: (_) async =>
+              throw StateError('Unexpected source lookup'),
+        );
+        addTearDown(actions.dispose);
+        final quote = QuoteRef(
+          id: 'thinking',
+          messageId: 'source',
+          start: 0,
+          end: 0,
+          text: 'Only the selected reasoning text',
+          model: 'Model',
+          createdAt: DateTime(2026),
+          hasSourceRange: false,
+        );
+        actions.setDraftQuotes([quote]);
+        actions.reveal(quote);
+        expect(actions.highlightsFor('source'), isEmpty);
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: QuoteInteractionScope(
+                controller: actions,
+                child: Center(
+                  child: QuoteChip(
+                    quote: quote,
+                    onRemove: draft ? () => removed = true : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(QuoteChip));
+        await tester.pumpAndSettle();
+        expect(find.text(quote.text), findsOneWidget);
+        expect(find.text('Jump to source'), findsNothing);
+        expect(find.text('Source no longer exists'), findsNothing);
+        actions.refreshSources();
+        await tester.pumpAndSettle();
+        if (selectionUsesDesktop) {
+          // Touch input has no MouseRegion exit to dismiss the preview.
+          await tester.tap(find.text(quote.text));
+          await tester.pumpAndSettle();
+          expect(find.text(quote.text), findsOneWidget);
+          await tester.tapAt(const Offset(20, 20));
+          await tester.pumpAndSettle();
+          expect(find.text(quote.text), findsNothing);
+          await tester.tap(find.byType(QuoteChip));
+          await tester.pumpAndSettle();
+          expect(find.text(quote.text), findsOneWidget);
+          await tester.tap(find.byType(QuoteChip));
+          await tester.pumpAndSettle();
+          expect(find.text(quote.text), findsNothing);
+          await tester.tap(find.byType(QuoteChip));
+          await tester.pumpAndSettle();
+        }
+        if (draft) {
+          if (selectionUsesDesktop) {
+            final mouse = await tester.createGesture(
+              kind: ui.PointerDeviceKind.mouse,
+            );
+            await mouse.addPointer(location: Offset.zero);
+            await mouse.moveTo(tester.getCenter(find.byType(QuoteChip)));
+            await tester.pump(const Duration(milliseconds: 150));
+            await tester.tap(find.byIcon(LucideIcons.x));
+            await mouse.removePointer();
+          } else {
+            await tester.tap(find.text('Remove quote'));
+          }
+          await tester.pumpAndSettle();
+          expect(removed, isTrue);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      }),
+    );
+  }
   testWidgets(
     'desktop hover delays preview, permits pointer transfer and removes the whole quote',
     (tester) async {

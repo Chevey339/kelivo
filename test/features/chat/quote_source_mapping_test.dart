@@ -11,6 +11,8 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/controllers/quote_editing_controller.dart';
+import 'package:Kelivo/features/chat/widgets/quote_chip.dart';
 import 'package:Kelivo/features/chat/widgets/quote_interaction_scope.dart';
 import 'package:Kelivo/features/chat/widgets/select_copy_sheet.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
@@ -20,6 +22,8 @@ import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,6 +79,204 @@ Widget _app(Widget child) => MultiProvider(
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final markdown in [false, true]) {
+    for (final mode in ['parts', 'inline', 'preview']) {
+      testWidgets(
+        'reasoning selection inserts only selected text as a chip ($mode, markdown: $markdown)',
+        (tester) async {
+          final menu = AndroidSelectionMenuMock();
+          final input = QuoteEditingController(nativeInputEnabled: false);
+          final settings = SettingsProvider(createBusinessTestPreferences());
+          await settings.loaded;
+          await settings.setEnableReasoningMarkdown(markdown);
+          addTearDown(menu.dispose);
+          addTearDown(input.dispose);
+          addTearDown(settings.dispose);
+          late QuoteInteractionController actions;
+          actions = QuoteInteractionController(
+            onQuote: (quote) async {
+              input.insertQuote(quote);
+              actions.setDraftQuotes(input.quotes);
+            },
+            onJump: (_) async => throw StateError('Unexpected source jump'),
+            sourceExists: (_) async =>
+                throw StateError('Unexpected source lookup'),
+          );
+          addTearDown(actions.dispose);
+          final thinking = markdown
+              ? 'Before **chosen** after'
+              : 'Before chosen after';
+          final message = ChatMessage(
+            id: 'thinking-message',
+            role: 'assistant',
+            conversationId: 'c',
+            modelId: 'model',
+            parts: mode == 'inline'
+                ? [TextPart('<think>$thinking</think>chosen answer')]
+                : [ReasoningPart(thinking), const TextPart('chosen answer')],
+          );
+          await tester.pumpWidget(
+            _app(
+              ChangeNotifierProvider.value(
+                value: settings,
+                child: QuoteInteractionScope(
+                  controller: actions,
+                  child: Column(
+                    children: [
+                      TextField(controller: input),
+                      ChatMessageWidget(
+                        message: message,
+                        showModelIcon: false,
+                        reasoningSegments: [
+                          ReasoningSegment(
+                            text: thinking,
+                            expanded: mode != 'preview',
+                            loading: mode == 'preview',
+                          ),
+                        ],
+                        reasoningSegmentsFromInlineThinking: mode == 'inline',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          // A loading reasoning card animates continuously.
+          Future<void> pumpSelectionFrames() async {
+            for (var i = 0; i < 4; i++) {
+              await tester.pump(const Duration(milliseconds: 100));
+            }
+          }
+
+          await pumpSelectionFrames();
+          final paragraph = renderParagraphs(find.byType(AppSelectionArea))
+              .singleWhere(
+                (p) => p.text.toPlainText().contains('Before chosen after'),
+              );
+          final start = paragraph.text.toPlainText().indexOf('chosen');
+          Offset point(int offset, {bool trailing = false}) {
+            final box = paragraph
+                .getBoxesForSelection(
+                  TextSelection(baseOffset: offset, extentOffset: offset + 1),
+                )
+                .single;
+            return paragraph.localToGlobal(
+              Offset(
+                trailing ? box.right - 1 : box.left + 1,
+                box.toRect().center.dy,
+              ),
+            );
+          }
+
+          if (defaultTargetPlatform == TargetPlatform.android) {
+            await tester.longPressAt(point(start));
+            await pumpSelectionFrames();
+            await menu.press('Quote');
+          } else {
+            final gesture = await tester.startGesture(
+              point(start),
+              kind: ui.PointerDeviceKind.mouse,
+            );
+            await gesture.moveTo(point(start + 5, trailing: true));
+            await gesture.up();
+            await gesture.removePointer();
+            await pumpSelectionFrames();
+            expect(find.text('Quote'), findsOneWidget);
+            if (mode == 'inline') {
+              await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+              await tester.sendKeyEvent(LogicalKeyboardKey.keyL);
+              await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+            } else {
+              await tester.tap(find.text('Quote'));
+            }
+          }
+          await pumpSelectionFrames();
+          expect(input.text, quotePlaceholder);
+          expect(input.quotes.single.text, 'chosen');
+          expect(input.quotes.single.messageId, message.id);
+          expect(input.quotes.single.model, message.modelId);
+          expect(input.quotes.single.hasSourceRange, isFalse);
+          expect(actions.highlightsFor(message.id), isEmpty);
+          expect(find.byType(QuoteChip), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+        variant: const TargetPlatformVariant({
+          TargetPlatform.android,
+          TargetPlatform.linux,
+        }),
+      );
+    }
+  }
+  for (final inlineThinking in [false, true]) {
+    testWidgets(
+      'quoting the entire body excludes thinking (inline: $inlineThinking)',
+      (tester) async {
+        final received = <QuoteRef>[];
+        final actions = QuoteInteractionController(
+          onQuote: (quote) async => received.add(quote),
+          onJump: (_) async => true,
+          sourceExists: (_) async => true,
+        );
+        addTearDown(actions.dispose);
+        final message = ChatMessage(
+          id: 'm',
+          role: 'assistant',
+          conversationId: 'c',
+          parts: inlineThinking
+              ? const [TextPart('<think>Private thinking</think>Answer only')]
+              : const [
+                  ReasoningPart('Private thinking'),
+                  TextPart('Answer only'),
+                ],
+        );
+        await tester.pumpWidget(
+          _app(
+            QuoteInteractionScope(
+              controller: actions,
+              child: ChatMessageWidget(
+                message: message,
+                showModelIcon: false,
+                reasoningSegments: const [
+                  ReasoningSegment(
+                    text: 'Private thinking',
+                    expanded: true,
+                    loading: false,
+                  ),
+                ],
+                reasoningSegmentsFromInlineThinking: inlineThinking,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final body = find.byWidgetPredicate(
+          (widget) =>
+              widget is AppSelectionArea && widget.sourceText == 'Answer only',
+        );
+        expect(body, findsOneWidget);
+        tester
+            .state<SelectableRegionState>(
+              find.descendant(
+                of: body,
+                matching: find.byType(SelectableRegion),
+              ),
+            )
+            .selectAll(SelectionChangedCause.keyboard);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Quote'));
+        await tester.pumpAndSettle();
+        expect(received.single.text, 'Answer only');
+        expect(
+          message.content.substring(received.single.start, received.single.end),
+          'Answer only',
+        );
+        await tester.pumpWidget(const SizedBox());
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+  }
   testWidgets(
     'mixed prose/code references expand their own snapshots before quoting',
     (tester) async {

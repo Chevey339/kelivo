@@ -232,6 +232,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<bool> _jumpToQuote(QuoteRef quote) async {
+    if (!quote.hasSourceRange) return false;
     final source = (await context.read<ChatService>().loadMessagesByIds([
       quote.messageId,
     ])).firstOrNull;
