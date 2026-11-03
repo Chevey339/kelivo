@@ -4,6 +4,139 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 void main() {
+  const mobilePlatforms = TargetPlatformVariant({
+    TargetPlatform.iOS,
+    TargetPlatform.android,
+  });
+  const inputKey = Key('safe-area-input');
+
+  void configureView(WidgetTester tester, {double width = 400}) {
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = Size(width * 3, 800 * 3);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 102);
+    tester.view.padding = const FakeViewPadding(bottom: 102);
+    addTearDown(tester.view.reset);
+  }
+
+  Widget scrollableLayout(
+    ScrollController controller, {
+    bool backgroundImageActive = false,
+    VoidCallback? onInputTap,
+  }) {
+    return MaterialApp(
+      home: Scaffold(
+        resizeToAvoidBottomInset: true,
+        body: ChatInputOverlayLayout(
+          topInset: 100,
+          backgroundImageActive: backgroundImageActive,
+          topBackground: const ColoredBox(color: Colors.green),
+          content: SuperListView.builder(
+            controller: controller,
+            padding: const EdgeInsets.only(top: 108, bottom: 144),
+            itemCount: 40,
+            itemBuilder: (_, index) =>
+                SizedBox(height: 80, child: Text('Message $index')),
+          ),
+          bottomOverlay: SafeArea(
+            top: false,
+            left: false,
+            right: false,
+            child: GestureDetector(
+              key: inputKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: onInputTap,
+              child: const SizedBox(width: 200, height: 50),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  for (final width in [400.0, 1024.0]) {
+    for (final backgroundImageActive in [false, true]) {
+      testWidgets('底部安全区阻止列表拖动，输入栏和正常滚动不受影响 '
+          '(width=$width, background=$backgroundImageActive)', (tester) async {
+        configureView(tester, width: width);
+        final controller = ScrollController(initialScrollOffset: 200);
+        addTearDown(controller.dispose);
+        var inputTaps = 0;
+        await tester.pumpWidget(
+          scrollableLayout(
+            controller,
+            backgroundImageActive: backgroundImageActive,
+            onInputTap: () => inputTaps++,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.getBottomLeft(find.byType(SuperListView)).dy, 800);
+        expect(tester.getBottomLeft(find.byKey(inputKey)).dy, 766);
+        // Cover the entire safe area, including beside a narrow composer.
+        for (final x in [2.0, width / 2, width - 2]) {
+          await tester.dragFrom(Offset(x, 795), const Offset(0, -120));
+          await tester.pumpAndSettle();
+          expect(controller.offset, 200);
+        }
+
+        await tester.tap(find.byKey(inputKey));
+        await tester.pump();
+        expect(inputTaps, 1);
+        await tester.dragFrom(Offset(width / 2, 300), const Offset(0, -120));
+        await tester.pumpAndSettle();
+        expect(controller.offset, greaterThan(200));
+      }, variant: mobilePlatforms);
+    }
+  }
+
+  testWidgets('键盘弹出后底部可交互，收起后恢复安全区拦截', (tester) async {
+    configureView(tester);
+    final controller = ScrollController(initialScrollOffset: 200);
+    addTearDown(controller.dispose);
+    var inputTaps = 0;
+    await tester.pumpWidget(
+      scrollableLayout(controller, onInputTap: () => inputTaps++),
+    );
+    await tester.pumpAndSettle();
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+    tester.view.padding = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(tester.getBottomLeft(find.byType(SuperListView)).dy, 500);
+    expect(tester.getBottomLeft(find.byKey(inputKey)).dy, 500);
+    await tester.dragFrom(const Offset(2, 495), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(200));
+    // A stale 34px guard would also block the bottom of the composer.
+    await tester.tapAt(const Offset(200, 495));
+    await tester.pump();
+    expect(inputTaps, 1);
+
+    tester.view.viewInsets = FakeViewPadding.zero;
+    tester.view.padding = const FakeViewPadding(bottom: 102);
+    await tester.pumpAndSettle();
+    expect(tester.getBottomLeft(find.byType(SuperListView)).dy, 800);
+    expect(tester.getBottomLeft(find.byKey(inputKey)).dy, 766);
+    final before = controller.offset;
+    await tester.dragFrom(const Offset(200, 795), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(controller.offset, before);
+  }, variant: mobilePlatforms);
+
+  testWidgets('无底部安全区时不拦截底部触摸', (tester) async {
+    configureView(tester);
+    tester.view.viewPadding = FakeViewPadding.zero;
+    tester.view.padding = FakeViewPadding.zero;
+    final controller = ScrollController(initialScrollOffset: 200);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(scrollableLayout(controller));
+    await tester.pumpAndSettle();
+
+    await tester.dragFrom(const Offset(2, 795), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(200));
+  }, variant: mobilePlatforms);
+
   testWidgets('消息画布铺到系统状态栏后方，底部覆盖层贴住底部', (tester) async {
     const rootKey = Key('root');
     const contentKey = Key('content');

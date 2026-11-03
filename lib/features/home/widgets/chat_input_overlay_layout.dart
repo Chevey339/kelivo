@@ -25,6 +25,9 @@ class ChatInputOverlayLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Match the composer's SafeArea, including its zero padding above the IME.
+    final bottomSafeInset = MediaQuery.paddingOf(context).bottom;
+
     return Stack(
       children: [
         Positioned.fill(
@@ -97,6 +100,16 @@ class ChatInputOverlayLayout extends StatelessWidget {
           top: topInset + _bottomOverlayTopGap,
           child: Align(alignment: Alignment.bottomCenter, child: bottomOverlay),
         ),
+        // SafeArea padding is not hit-testable. Keep gestures starting there
+        // from reaching the full-height message list behind the composer.
+        if (bottomSafeInset > 0)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: bottomSafeInset,
+            child: const AbsorbPointer(child: SizedBox.expand()),
+          ),
       ],
     );
   }
