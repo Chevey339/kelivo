@@ -18,7 +18,8 @@ class StreamChunkHandler {
     this.onRetry,
   }) {
     for (final part in seed) {
-      if (_isBlankPart(part)) continue;
+      // Empty reasoning retains its position in persisted timing overlays.
+      if (_isBlankPart(part) && part is! ReasoningPart) continue;
       _seedPart(part);
     }
   }

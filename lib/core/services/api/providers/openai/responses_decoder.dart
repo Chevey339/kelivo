@@ -94,6 +94,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Set<String> _openServerToolIds = <String>{};
   final Set<String> _endedServerToolIds = <String>{};
   final Set<String> _seenCitationUrls = <String>{};
+  final Set<String> _openReasoningIds = <String>{};
+  final Set<String> _endedReasoningIds = <String>{};
   bool _emittedCitationEvents = false;
   bool _closed = false;
 
@@ -228,14 +230,18 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: _reasoningSeriesId(obj), text: delta));
+        final id = _reasoningSeriesId(obj);
+        chunks.addAll(_startReasoning(id));
+        chunks.add(ReasoningDelta(id: id, text: delta));
       }
       return;
     }
     if (type == 'response.output_item.added') {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
-      if (item is Map && (item['type'] ?? '') == 'function_call') {
+      if (item is Map && item['type'] == 'reasoning') {
+        chunks.addAll(_startReasoning(_reasoningSeriesId(obj)));
+      } else if (item is Map && (item['type'] ?? '') == 'function_call') {
         final callId = (item['call_id'] ?? '').toString();
         final name = (item['name'] ?? '').toString();
         final args = (item['arguments'] ?? '').toString();
@@ -302,7 +308,9 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
       if (item is Map) _outputItems[idx] = item.cast<String, dynamic>();
-      if (item is Map && (item['type'] ?? '') == 'function_call') {
+      if (item is Map && item['type'] == 'reasoning') {
+        chunks.addAll(_endReasoning(_reasoningSeriesId(obj)));
+      } else if (item is Map && (item['type'] ?? '') == 'function_call') {
         final args = (item['arguments'] ?? '').toString();
         final entry = toolCallsByIndex.putIfAbsent(
           idx,
@@ -679,10 +687,26 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     ];
   }
 
+  List<StreamChunk> _startReasoning(String id) {
+    if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
+      return const [];
+    }
+    return [ReasoningStart(id: id)];
+  }
+
+  List<StreamChunk> _endReasoning(String id) {
+    if (!_openReasoningIds.remove(id)) return const [];
+    _endedReasoningIds.add(id);
+    return [ReasoningEnd(id: id)];
+  }
+
   List<StreamChunk> _closeOpenSeries({
     ServerToolStatus serverStatus = ServerToolStatus.completed,
   }) {
     final chunks = <StreamChunk>[];
+    for (final id in _openReasoningIds.toList()) {
+      chunks.addAll(_endReasoning(id));
+    }
     for (final id in _openToolIds.toList()) {
       chunks.addAll(_endTool(id));
     }

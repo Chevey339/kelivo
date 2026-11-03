@@ -923,7 +923,11 @@ class _MessageListViewState extends State<MessageListView> {
             finishedAt: segment.finishedAt,
             toolStartIndex: segment.toolStartIndex,
           )
-      else if (reasoning != null && reasoning.text.isNotEmpty)
+      else if (reasoning != null &&
+          (reasoning.text.isNotEmpty ||
+              (message.isStreaming &&
+                  reasoning.startAt != null &&
+                  reasoning.finishedAt == null)))
         TimelineReasoningRef(
           text: reasoning.text,
           expanded: reasoning.expanded,
@@ -2492,8 +2496,9 @@ class _MessageListViewState extends State<MessageListView> {
           : false,
       reasoningLoading: (message.role == 'assistant')
           ? (message.isStreaming &&
-                r?.finishedAt == null &&
-                (r?.text.isNotEmpty == true))
+                r != null &&
+                r.startAt != null &&
+                r.finishedAt == null)
           : false,
       reasoningStartAt: (message.role == 'assistant') ? r?.startAt : null,
       reasoningFinishedAt: (message.role == 'assistant') ? r?.finishedAt : null,

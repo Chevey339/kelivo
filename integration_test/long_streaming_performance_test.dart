@@ -140,7 +140,11 @@ void main() {
               if (timeline) {
                 controller.markStreamingStarted(message.id);
                 if (reasoning) {
-                  await controller.handleReasoningChunk(source.value, state);
+                  await controller.handleReasoningChunk(
+                    source.value,
+                    state,
+                    id: 'profile-reasoning',
+                  );
                 } else {
                   controller.streamingContentNotifier.updateContent(
                     message.id,
@@ -277,7 +281,11 @@ void main() {
                 source.value += delta;
                 if (timeline) {
                   if (reasoning) {
-                    await controller.handleReasoningChunk(delta, state);
+                    await controller.handleReasoningChunk(
+                      delta,
+                      state,
+                      id: 'profile-reasoning',
+                    );
                   } else {
                     controller.streamingContentNotifier.updateContent(
                       message.id,

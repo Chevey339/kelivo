@@ -2,6 +2,7 @@ import '../../../support/markdown_render_helpers.dart';
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
@@ -63,6 +64,57 @@ void expectAbove(WidgetTester tester, Object upper, Object lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('empty reasoning card follows activity without text changes', (
+    tester,
+  ) async {
+    final parts = MessagePartSnapshotBuilder(
+      arrivalOrdered: true,
+    ).update(const [ReasoningPart('')]);
+    final startedAt = DateTime.now();
+    var loading = true;
+    late StateSetter update;
+    await tester.pumpWidget(
+      _buildHarness(
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return ChatMessageWidget(
+              message: ChatMessage(
+                id: 'empty-reasoning',
+                role: 'assistant',
+                conversationId: 'c',
+                isStreaming: true,
+                parts: parts,
+              ),
+              showModelIcon: false,
+              reasoningSegments: [
+                ReasoningSegment(
+                  text: '',
+                  expanded: false,
+                  loading: loading,
+                  startAt: startedAt,
+                  finishedAt: loading
+                      ? null
+                      : startedAt.add(const Duration(seconds: 1)),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    final context = tester.element(find.byType(ChatMessageWidget));
+    final label = AppLocalizations.of(context)!.chatMessageWidgetDeepThinking;
+    expect(find.text(label), findsOneWidget);
+    update(() => loading = false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text(label), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('token footer switches between finish and total usage', (
     tester,

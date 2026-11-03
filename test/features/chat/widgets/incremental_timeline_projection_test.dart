@@ -31,6 +31,97 @@ Object describe(TimelineProjection projection) => [
 ];
 
 void main() {
+  test('empty reasoning is visible only while active in both projectors', () {
+    final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+    final projector = IncrementalTimelineProjection();
+    final parts = builder.update(const [ReasoningPart('')]);
+    for (final loading in [true, false, true]) {
+      final reasoning = [TimelineReasoningRef(text: '', loading: loading)];
+      final incremental = projector.project(
+        parts: parts,
+        liveTools: const [],
+        reasoning: reasoning,
+      );
+      final full = projectAssistantTimeline(
+        parts: parts,
+        liveTools: const [],
+        reasoningSegments: reasoning,
+        visualContent: '',
+        partsArrivalOrdered: true,
+      );
+      for (final projection in [incremental, full]) {
+        expect(projection.blocks, hasLength(loading ? 1 : 0));
+        if (loading) {
+          expect(
+            projection.blocks.single.steps.single.reasoning!.loading,
+            isTrue,
+          );
+        }
+      }
+    }
+  });
+
+  test('hidden empty reasoning keeps subsequent overlays aligned', () {
+    final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+    final projector = IncrementalTimelineProjection();
+    final parts = builder.update(const [
+      ReasoningPart(''),
+      ToolCallPart('{"id":"t","name":"shell","content":"done"}'),
+      ReasoningPart('summary'),
+    ]);
+    final start = DateTime(2026, 11, 2);
+    for (final loading in [true, false]) {
+      final reasoning = [
+        const TimelineReasoningRef(text: '', expanded: false),
+        TimelineReasoningRef(text: 'summary', loading: loading, startAt: start),
+      ];
+      final incremental = projector.project(
+        parts: parts,
+        liveTools: const [],
+        reasoning: reasoning,
+      );
+      final full = projectAssistantTimeline(
+        parts: parts,
+        liveTools: const [],
+        reasoningSegments: reasoning,
+        visualContent: '',
+        partsArrivalOrdered: true,
+      );
+      for (final projection in [incremental, full]) {
+        final steps = projection.blocks.single.steps;
+        expect(steps, hasLength(2));
+        expect(steps.last.reasoningOverlayIndex, 1);
+        expect(steps.last.reasoning!.startAt, start);
+        expect(steps.last.reasoning!.loading, loading);
+      }
+    }
+  });
+
+  test('ending empty reasoning preserves the following tool identity', () {
+    final parts = MessagePartSnapshotBuilder(arrivalOrdered: true).update(
+      const [ReasoningPart(''), ToolCallPart('{"id":"t","name":"shell"}')],
+    );
+    final projector = IncrementalTimelineProjection();
+    for (final loading in [true, false]) {
+      final reasoning = [TimelineReasoningRef(text: '', loading: loading)];
+      final incremental = projector.project(
+        parts: parts,
+        liveTools: const [],
+        reasoning: reasoning,
+      );
+      final full = projectAssistantTimeline(
+        parts: parts,
+        liveTools: const [],
+        reasoningSegments: reasoning,
+        visualContent: '',
+        partsArrivalOrdered: true,
+      );
+      for (final projection in [incremental, full]) {
+        expect(projection.blocks.single.steps.last.sourceOrdinal, 1);
+      }
+    }
+  });
+
   test('suffix rewinds retain the no-ID overlay position', () {
     final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
     final projector = IncrementalTimelineProjection();

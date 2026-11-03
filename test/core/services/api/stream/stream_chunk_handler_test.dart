@@ -734,6 +734,19 @@ void main() {
     expect((handler.parts[3] as TextPart).text, 'after');
   });
 
+  test('resuming keeps empty reasoning positions for timing overlays', () {
+    final handler = StreamChunkHandler(
+      seed: const [ReasoningPart(''), TextPart('answer')],
+    );
+    handler.handle(const ReasoningStart(id: 'next'));
+    handler.handle(const ReasoningDelta(id: 'next', text: 'next summary'));
+    expect(handler.parts, const [
+      ReasoningPart(''),
+      TextPart('answer'),
+      ReasoningPart('next summary'),
+    ]);
+  });
+
   test(
     'handleResult after seed appends the new round instead of replacing',
     () {

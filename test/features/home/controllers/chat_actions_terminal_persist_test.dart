@@ -113,6 +113,112 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
 
+  for (final terminal in ['complete', 'error', 'cancel']) {
+    testWidgets('empty reasoning stops on $terminal without an end event', (
+      tester,
+    ) async {
+      final service = _ThrowingFinalizeChatService(failCompletion: false);
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final background = MobileBackgroundCoordinator(
+        platform: TargetPlatform.linux,
+      );
+      addTearDown(settings.dispose);
+      addTearDown(background.dispose);
+      late ChatActions actions;
+      await tester.pumpWidget(
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) {
+                actions = _actionsFor(
+                  context,
+                  service,
+                  settings,
+                  background,
+                ).actions;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+      addTearDown(actions.streamController.dispose);
+      final state = StreamingState(
+        GenerationContext(
+          assistantMessage: ChatMessage(
+            id: 'empty-reasoning',
+            role: 'assistant',
+            conversationId: 'conversation-1',
+            isStreaming: true,
+          ),
+          apiMessages: const [],
+          userImagePaths: const [],
+          allowImagesApiRouting: false,
+          providerKey: 'test',
+          modelId: 'test',
+          assistant: null,
+          settings: settings,
+          config: ProviderConfig(
+            id: 'test',
+            enabled: true,
+            name: 'test',
+            apiKey: '',
+            baseUrl: '',
+          ),
+          toolDefs: const [],
+          supportsReasoning: true,
+          enableReasoning: true,
+          streamOutput: true,
+          generateTitleOnFinish: false,
+        ),
+      )..requestStartedAt = DateTime.now();
+      actions.streamController.markStreamingStarted(state.messageId);
+      // Exercise multiple open items so terminal cleanup cannot leave an older
+      // item active just because the last one was closed.
+      for (final id in ['first', 'second']) {
+        await actions.debugHandleStreamChunk(ReasoningStart(id: id), state);
+      }
+      await tester.pump(const Duration(milliseconds: 50));
+      final segments = actions.streamController.getReasoningSegments(
+        state.messageId,
+      )!;
+      expect(segments, hasLength(2));
+      expect(segments.every((segment) => segment.finishedAt == null), isTrue);
+      expect(state.firstTokenMs, isNull);
+      switch (terminal) {
+        case 'complete':
+          await actions.debugFinishStreaming(state);
+        case 'error':
+          await actions.debugHandleStreamError(
+            StateError('stream failed'),
+            state,
+          );
+        case 'cancel':
+          actions.debugTrackActiveMessage(
+            state.ctx.assistantMessage.copyWith(
+              parts: state.partsHandler.parts,
+            ),
+          );
+          await actions.cancelStreamingById(state.conversationId);
+      }
+      expect(segments.every((segment) => segment.finishedAt != null), isTrue);
+      final saved = service.lastMessage!;
+      expect(saved.isStreaming, isFalse);
+      expect(saved.reasoningText, isEmpty);
+      expect(saved.reasoningFinishedAt, isNotNull);
+      expect(saved.firstTokenMs, isNull);
+      expect(
+        actions.streamController.streamingContentNotifier.hasNotifier(
+          state.messageId,
+        ),
+        isFalse,
+      );
+    });
+  }
+
   for (final fail in [false, true]) {
     testWidgets(
       'terminal persistence keeps usage and request timing (fail=$fail)',

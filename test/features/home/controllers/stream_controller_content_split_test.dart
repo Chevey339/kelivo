@@ -262,7 +262,7 @@ void main() {
     final state = buildStreamingState(settings);
     addTearDown(() => controller.cleanupTimers(state.messageId));
 
-    await controller.handleReasoningChunk('thinking', state);
+    await controller.handleReasoningChunk('thinking', state, id: 'r');
 
     expect(
       controller.reasoningSegments[state.messageId]!.single.expanded,

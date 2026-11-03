@@ -999,15 +999,17 @@ List<TimelineProjectedBlock> _projectFromParts({
           ),
         );
       case ReasoningPart(:final text):
-        if (text.isEmpty) continue;
         final overlayIndex = inlineThinking ? 0 : reasoningIndex;
         final provided = overlayIndex < reasoningSegments.length
             ? reasoningSegments[overlayIndex]
             : null;
         reasoningIndex++;
+        reasoningCount++;
+        final ordinal = sourceOrdinal++;
+        if (text.isEmpty && provided?.loading != true) continue;
         pending.add(
           TimelineProjectedStep.reasoning(
-            sourceOrdinal: sourceOrdinal++,
+            sourceOrdinal: ordinal,
             reasoning: TimelineReasoningRef(
               text: text,
               expanded:
@@ -1018,7 +1020,7 @@ List<TimelineProjectedBlock> _projectFromParts({
               finishedAt: provided?.finishedAt,
               toolStartIndex: provided?.toolStartIndex ?? toolCount,
             ),
-            reasoningCountAfter: ++reasoningCount,
+            reasoningCountAfter: reasoningCount,
             toolCountAfter: toolCount,
             reasoningOverlayIndex: provided == null ? null : overlayIndex,
           ),
@@ -1088,12 +1090,14 @@ List<TimelineProjectedStep> _interleaveReasoningAndTools({
       );
       toolIndex++;
     }
-    if (segment.text.isNotEmpty) {
+    reasoningCount++;
+    final ordinal = sourceOrdinal++;
+    if (segment.text.isNotEmpty || segment.loading) {
       steps.add(
         TimelineProjectedStep.reasoning(
-          sourceOrdinal: sourceOrdinal++,
+          sourceOrdinal: ordinal,
           reasoning: segment,
-          reasoningCountAfter: ++reasoningCount,
+          reasoningCountAfter: reasoningCount,
           toolCountAfter: toolCount,
           reasoningOverlayIndex: i,
         ),

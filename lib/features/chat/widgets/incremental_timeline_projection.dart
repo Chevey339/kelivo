@@ -145,15 +145,19 @@ class IncrementalTimelineProjection {
           }
           textOffset += text.length;
         case ReasoningPart(:final text):
-          if (text.isNotEmpty) {
-            final overlay = reasoningCount < reasoning.length
-                ? reasoning[reasoningCount]
-                : null;
-            _reasoningPositions.add(index);
+          final overlayIndex = reasoningCount++;
+          final overlay = overlayIndex < reasoning.length
+              ? reasoning[overlayIndex]
+              : null;
+          // Empty parts still own an overlay and must be invalidated when
+          // their activity changes without any text or part mutation.
+          _reasoningPositions.add(index);
+          final ordinal = sourceOrdinal++;
+          if (text.isNotEmpty || overlay?.loading == true) {
             reusablePending = null;
             _pending.add(
               TimelineProjectedStep.reasoning(
-                sourceOrdinal: sourceOrdinal++,
+                sourceOrdinal: ordinal,
                 reasoning: TimelineReasoningRef(
                   text: text,
                   expanded: overlay?.expanded ?? false,
@@ -162,8 +166,8 @@ class IncrementalTimelineProjection {
                   finishedAt: overlay?.finishedAt,
                   toolStartIndex: overlay?.toolStartIndex ?? toolCount,
                 ),
-                reasoningOverlayIndex: overlay == null ? null : reasoningCount,
-                reasoningCountAfter: ++reasoningCount,
+                reasoningOverlayIndex: overlay == null ? null : overlayIndex,
+                reasoningCountAfter: reasoningCount,
                 toolCountAfter: toolCount,
               ),
             );
