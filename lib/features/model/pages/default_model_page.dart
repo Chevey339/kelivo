@@ -1,3 +1,4 @@
+import '../../home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -7,9 +8,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import '../utils/ocr_model_capability.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -1000,9 +999,11 @@ class _ModelCard extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        _BrandAvatar(
-                          name: modelDisplay ?? (providerName ?? '?'),
+                        CurrentModelIcon(
+                          providerKey: effectiveProvider,
+                          modelId: effectiveModelId,
                           size: 24,
+                          iconScale: .62,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1029,64 +1030,6 @@ class _ModelCard extends StatelessWidget {
   }
 }
 
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 20});
-  final String name;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        final ColorFilter? tint =
-            (dark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        inner = SvgPicture.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          colorFilter: tint,
-        );
-      } else {
-        inner = Image.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          fit: BoxFit.contain,
-        );
-      }
-    } else {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
-    );
-  }
-}
-
-/// Toggles whether the chat model picker writes to the conversation or to the
-/// current assistant. Conversation pins survive being switched off, so the
-/// wording promises a scope change, not a reset.
 class _PerChatModelCard extends StatelessWidget {
   const _PerChatModelCard({required this.value, required this.onChanged});
 

@@ -8,7 +8,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'macos_window_drag_area.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
-import '../utils/brand_assets.dart';
+import '../features/home/widgets/model_icon.dart';
 import '../core/providers/settings_provider.dart';
 import '../theme/app_semantic_colors.dart';
 import '../core/providers/assistant_provider.dart';
@@ -255,10 +255,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       ),
     );
 
-    final brandAsset = (_modelId != null)
-        ? BrandAssets.assetForName(_modelId!)
-        : null;
-
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Column(
@@ -326,7 +322,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                         : 320,
                                   ),
                                   child: _ModelPickerButton(
-                                    asset: brandAsset,
+                                    providerKey: _modelProviderKey,
                                     modelId: _modelId,
                                     onTap: _pickModel,
                                     enabled: !_translating,
@@ -958,12 +954,12 @@ class _TranslateButtonState extends State<_TranslateButton> {
 
 class _ModelPickerButton extends StatelessWidget {
   const _ModelPickerButton({
-    required this.asset,
+    required this.providerKey,
     required this.modelId,
     required this.onTap,
     required this.enabled,
   });
-  final String? asset;
+  final String? providerKey;
   final String? modelId;
   final VoidCallback onTap;
   final bool enabled;
@@ -988,27 +984,16 @@ class _ModelPickerButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (asset != null)
-                () {
-                  if (asset!.toLowerCase().endsWith('.svg')) {
-                    return SvgPicture.asset(
-                      asset!,
-                      width: 18,
-                      height: 18,
-                      colorFilter:
-                          isDark && BrandAssets.assetNeedsDarkInvert(asset!)
-                          ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-                          : null,
-                    );
-                  }
-                  return Image.asset(asset!, width: 18, height: 18);
-                }()
-              else
-                Icon(
-                  lucide.Lucide.Bot,
+              if (providerKey != null && modelId != null)
+                CurrentModelIcon(
+                  providerKey: providerKey,
+                  modelId: modelId,
                   size: 18,
-                  color: cs.onSurface.withValues(alpha: 0.9),
-                ),
+                  iconScale: 1,
+                  withBackground: false,
+                )
+              else
+                Icon(lucide.Lucide.Bot, size: 18, color: cs.onSurface),
               if (modelId != null) ...[
                 const SizedBox(width: 8),
                 Flexible(

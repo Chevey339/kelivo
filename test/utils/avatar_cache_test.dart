@@ -105,6 +105,41 @@ void main() {
     },
   );
 
+  test(
+    'explicit failure retries share one download and then reuse the cache',
+    () async {
+      var requests = 0;
+      await http.runWithClient(
+        () async {
+          const url = 'https://avatar.test/recover.png';
+          expect(await AvatarCache.getPath(url), isNull);
+          expect(await AvatarCache.getPath(url), isNull);
+          expect(requests, 1);
+          final retries = List.generate(
+            4,
+            (_) => AvatarCache.getPath(url, retryFailed: true),
+          );
+          expect(
+            retries.every((retry) => identical(retry, retries.first)),
+            isTrue,
+          );
+          final paths = await Future.wait(retries);
+          expect(paths.toSet(), hasLength(1));
+          expect(paths.first, isNotNull);
+          expect(requests, 2);
+          expect(
+            await AvatarCache.getPath(url, retryFailed: true),
+            paths.first,
+          );
+          expect(requests, 2);
+        },
+        () => MockClient(
+          (_) async => http.Response('image', ++requests == 1 ? 503 : 200),
+        ),
+      );
+    },
+  );
+
   test('memoized paths do not repeat platform directory lookups', () async {
     final paths = PathProviderPlatform.instance as _Paths;
     await http.runWithClient(() async {

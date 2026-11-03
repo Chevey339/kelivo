@@ -9,6 +9,19 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get avatarInputInvalid =>
+      'Enter a valid icon name or an HTTP(S) image URL.';
+
+  @override
+  String get modelAvatarTitle => 'Model icon';
+
+  @override
+  String get avatarColor => 'Color';
+
+  @override
+  String get avatarMonochrome => 'Monochrome';
+
+  @override
   String get settingsSearchHint => 'Search settings';
 
   @override

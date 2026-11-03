@@ -402,6 +402,20 @@ class BrandAssets {
   };
 
   // Build the LobeHub static SVG CDN URL from an icon name (e.g. 'openai').
+  static List<String> lobehubIconUrls(String name, {bool monochrome = false}) {
+    var n = name.trim().toLowerCase();
+    if (!RegExp(r'^[a-z0-9][a-z0-9-]*$').hasMatch(n)) return const [];
+    if (monochrome) {
+      if (n.endsWith('-color')) n = n.substring(0, n.length - 6);
+      return [lobehubIconUrl(n)];
+    }
+    return [
+      if (!n.endsWith('-color') && !n.endsWith('-text'))
+        lobehubIconUrl('$n-color'),
+      lobehubIconUrl(n),
+    ];
+  }
+
   static String lobehubIconUrl(String name) {
     final n = name.trim().toLowerCase();
     return 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/$n.svg';

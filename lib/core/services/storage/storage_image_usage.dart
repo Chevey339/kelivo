@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../database/app_database.dart';
+import '../../models/avatar_config.dart';
 import '../../models/message_part.dart';
 import '../../models/mcp_presentation.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
@@ -129,6 +130,15 @@ _ImageReferences _readReferences(String path, {required bool includeMessages}) {
       final payload = jsonDecode(row['payload'] as String) as Map;
       if (payload['avatarType'] == 'file') {
         add(appearance, payload['avatarValue']);
+      }
+      final overrides = payload['modelOverrides'];
+      if (overrides is Map) {
+        for (final override in overrides.values) {
+          final avatar = AvatarConfig.fromJson(
+            override is Map ? override['avatar'] : null,
+          );
+          if (avatar?.type == AvatarType.file) add(appearance, avatar!.value);
+        }
       }
     }
     for (final row in database.select(

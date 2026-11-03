@@ -1,3 +1,4 @@
+import '../../features/home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -7,8 +8,6 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
-import '../../utils/brand_assets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -1063,9 +1062,11 @@ class _ModelCardState extends State<_ModelCard> {
                   ),
                   child: Row(
                     children: [
-                      _BrandCircle(
-                        name: modelDisplay ?? (providerName ?? '?'),
+                      CurrentModelIcon(
+                        providerKey: effectiveProvider,
+                        modelId: effectiveModelId,
                         size: 24,
+                        iconScale: .62,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -1370,56 +1371,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
           child: Icon(widget.icon, size: 18, color: cs.onSurface),
         ),
       ),
-    );
-  }
-}
-
-class _BrandCircle extends StatelessWidget {
-  const _BrandCircle({required this.name, this.size = 22});
-  final String name;
-  final double size;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset == null) {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.heavy,
-          fontSize: size * 0.45,
-        ),
-      );
-    } else if (asset.endsWith('.svg')) {
-      inner = SvgPicture.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-        colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null,
-      );
-    } else {
-      inner = Image.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
     );
   }
 }

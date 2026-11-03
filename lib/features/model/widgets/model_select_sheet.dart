@@ -9,13 +9,12 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../desktop/model_spec_edit_dialog.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../pages/model_spec_edit_page.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/brand_assets.dart';
+import '../../home/widgets/model_icon.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
@@ -77,11 +76,6 @@ class _ModelProcessingResult {
   });
 }
 
-// Lightweight brand asset resolver usable in isolates
-String? _assetForNameStatic(String n) {
-  return BrandAssets.assetForName(n);
-}
-
 List<String> _buildDisplayProvidersOrder(
   SettingsProvider settings,
   Iterable<String> providerKeys,
@@ -128,7 +122,6 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
             info: spec,
             pinned: data.pinnedModels.contains('$key::$mid'),
             selected: data.currentModelKey == '$key::$mid',
-            asset: _assetForNameStatic(spec.upstreamId),
           );
         }(),
     ];
@@ -1413,7 +1406,12 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             width: double.infinity,
             child: Row(
               children: [
-                _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
+                CurrentModelIcon(
+                  providerKey: m.providerKey,
+                  modelId: m.id,
+                  size: 28,
+                  iconScale: .62,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1668,7 +1666,6 @@ class _ModelItem {
   final ModelSpec info;
   final bool pinned;
   final bool selected;
-  final String? asset; // pre-resolved avatar asset for performance
   _ModelItem({
     required this.providerKey,
     required this.providerName,
@@ -1676,7 +1673,6 @@ class _ModelItem {
     required this.info,
     this.pinned = false,
     this.selected = false,
-    this.asset,
   });
   _ModelItem copyWith({bool? pinned, bool? selected}) => _ModelItem(
     providerKey: providerKey,
@@ -1685,7 +1681,6 @@ class _ModelItem {
     info: info,
     pinned: pinned ?? this.pinned,
     selected: selected ?? this.selected,
-    asset: asset,
   );
 }
 
@@ -1713,63 +1708,6 @@ class _ModelRow extends _ListRow {
 class _InheritRow extends _ListRow {
   final String label;
   _InheritRow(this.label);
-}
-
-// Reuse badges and avatars similar to provider detail
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 20, this.assetOverride});
-  final String name;
-  final double size;
-  final String? assetOverride;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = assetOverride ?? BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        final ColorFilter? tint =
-            (dark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        inner = SvgPicture.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          colorFilter: tint,
-        );
-      } else {
-        inner = Image.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          fit: BoxFit.contain,
-        );
-      }
-    } else {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
-    );
-  }
 }
 
 // ===== Desktop dialog implementation =====
@@ -2346,7 +2284,12 @@ class _DesktopModelSelectDialogBodyState
             Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
         child: Row(
           children: [
-            _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
+            CurrentModelIcon(
+              providerKey: m.providerKey,
+              modelId: m.id,
+              size: 18,
+              iconScale: .62,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Text.rich(

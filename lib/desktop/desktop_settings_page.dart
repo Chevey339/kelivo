@@ -1,3 +1,6 @@
+import '../features/home/widgets/model_icon.dart';
+import '../core/models/avatar_config.dart';
+import '../features/provider/widgets/avatar_input_dialog.dart';
 import '../core/utils/provider_url.dart';
 import '../features/provider/utils/provider_test_failure.dart';
 import '../features/provider/widgets/provider_test_details.dart';
@@ -55,8 +58,6 @@ import 'model_spec_edit_dialog.dart'
 // Use the unified model selector (desktop dialog on desktop platforms)
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
-import '../utils/brand_assets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
 import '../shared/widgets/model_tag_wrap.dart';
 import '../core/models/api_keys.dart';

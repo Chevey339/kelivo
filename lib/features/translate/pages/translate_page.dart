@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/brand_assets.dart';
+import '../../home/widgets/model_icon.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -257,10 +257,6 @@ class _TranslatePageState extends State<TranslatePage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = (_modelId != null)
-        ? BrandAssets.assetForName(_modelId!)
-        : null;
-
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -318,28 +314,15 @@ class _TranslatePageState extends State<TranslatePage> {
             padding: const EdgeInsets.only(right: 8),
             child: IosIconButton(
               padding: const EdgeInsets.all(8),
-              builder: (color) {
-                if (asset != null && asset.toLowerCase().endsWith('.svg')) {
-                  final isDark =
-                      Theme.of(context).brightness == Brightness.dark;
-                  return SvgPicture.asset(
-                    asset,
-                    width: 22,
-                    height: 22,
-                    colorFilter:
-                        isDark && BrandAssets.assetNeedsDarkInvert(asset)
-                        ? ColorFilter.mode(
-                            Theme.of(context).colorScheme.onSurface,
-                            BlendMode.srcIn,
-                          )
-                        : null,
-                  );
-                }
-                if (asset != null) {
-                  return Image.asset(asset, width: 22, height: 22);
-                }
-                return Icon(lucide.Lucide.Bot, size: 22, color: color);
-              },
+              builder: (color) => _providerKey == null || _modelId == null
+                  ? Icon(lucide.Lucide.Bot, size: 22, color: color)
+                  : CurrentModelIcon(
+                      providerKey: _providerKey,
+                      modelId: _modelId,
+                      size: 22,
+                      iconScale: 1,
+                      withBackground: false,
+                    ),
               onTap: _pickModel,
             ),
           ),

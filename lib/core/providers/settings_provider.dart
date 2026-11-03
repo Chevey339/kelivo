@@ -21,6 +21,7 @@ import '../services/logging/context_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
+import '../models/avatar_config.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/auto_retry_options.dart';
@@ -3243,13 +3244,21 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // Store a LobeHub icon name (not the full URL); URL is built at render time.
-  Future<void> setProviderAvatarLobehub(String key, String name) async {
+  Future<void> setProviderAvatarLobehub(
+    String key,
+    String name, {
+    bool monochrome = false,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final old = getProviderConfig(key);
     await setProviderConfig(
       key,
-      old.copyWith(avatarType: 'lobehub', avatarValue: trimmed),
+      old.copyWith(
+        avatarType: 'lobehub',
+        avatarValue: trimmed,
+        avatarMonochrome: monochrome,
+      ),
     );
   }
 
@@ -3274,7 +3283,11 @@ class SettingsProvider extends ChangeNotifier {
     }
     await setProviderConfig(
       key,
-      old.copyWith(avatarType: null, avatarValue: null),
+      old.copyWith(
+        avatarType: null,
+        avatarValue: null,
+        avatarMonochrome: false,
+      ),
     );
   }
 
@@ -6233,6 +6246,19 @@ class ProviderConfig {
   // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon | lobehub)
   final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon' | 'lobehub'
   final String? avatarValue;
+  final bool avatarMonochrome;
+
+  AvatarConfig? get avatar => AvatarConfig.fromJson({
+    'type': avatarType,
+    'value': avatarValue,
+    'monochrome': avatarMonochrome,
+  });
+
+  AvatarConfig? modelAvatar(String modelId) {
+    final override = modelOverrides[modelId];
+    return AvatarConfig.fromJson(override is Map ? override['avatar'] : null);
+  }
+
   // Multi-key mode
   final bool? multiKeyEnabled; // default false
   final List<ApiKeyConfig>? apiKeys; // when enabled
@@ -6323,6 +6349,7 @@ class ProviderConfig {
     this.proxyPassword,
     this.avatarType,
     this.avatarValue,
+    this.avatarMonochrome = false,
     this.multiKeyEnabled,
     this.apiKeys,
     this.keyManagement,
@@ -6382,6 +6409,7 @@ class ProviderConfig {
     String? proxyPassword,
     Object? avatarType = _sentinel,
     Object? avatarValue = _sentinel,
+    bool? avatarMonochrome,
     bool? multiKeyEnabled,
     List<ApiKeyConfig>? apiKeys,
     KeyManagementConfig? keyManagement,
@@ -6434,6 +6462,7 @@ class ProviderConfig {
     avatarValue: (identical(avatarValue, _sentinel))
         ? this.avatarValue
         : (avatarValue as String?),
+    avatarMonochrome: avatarMonochrome ?? this.avatarMonochrome,
     multiKeyEnabled: multiKeyEnabled ?? this.multiKeyEnabled,
     apiKeys: apiKeys ?? this.apiKeys,
     keyManagement: keyManagement ?? this.keyManagement,
@@ -6486,6 +6515,7 @@ class ProviderConfig {
     'proxyPassword': proxyPassword,
     'avatarType': avatarType,
     'avatarValue': avatarValue,
+    'avatarMonochrome': avatarMonochrome,
     'multiKeyEnabled': multiKeyEnabled,
     'apiKeys': apiKeys?.map((e) => e.toJson()).toList(),
     'keyManagement': keyManagement?.toJson(),
@@ -6562,6 +6592,7 @@ class ProviderConfig {
     proxyPassword: json['proxyPassword'] as String?,
     avatarType: json['avatarType'] as String?,
     avatarValue: json['avatarValue'] as String?,
+    avatarMonochrome: json['avatarMonochrome'] == true,
     multiKeyEnabled: json['multiKeyEnabled'] as bool?,
     apiKeys: (json['apiKeys'] as List?)
         ?.whereType<Map>()

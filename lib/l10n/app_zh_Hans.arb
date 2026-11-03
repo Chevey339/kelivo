@@ -1,4 +1,9 @@
 {
+  "avatarInputInvalid": "请输入有效的图标名称或 HTTP(S) 图片链接。",
+  "modelAvatarTitle": "模型图标",
+  "avatarColor": "彩色",
+  "avatarMonochrome": "单色",
+
   "settingsSearchHint": "搜索设置",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清空搜索",

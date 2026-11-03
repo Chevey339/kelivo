@@ -1,4 +1,9 @@
 {
+  "avatarInputInvalid": "Enter a valid icon name or an HTTP(S) image URL.",
+  "modelAvatarTitle": "Model icon",
+  "avatarColor": "Color",
+  "avatarMonochrome": "Monochrome",
+
   "settingsSearchHint": "Search settings",
   "settingsSearchCancel": "Cancel",
   "settingsSearchClear": "Clear search",

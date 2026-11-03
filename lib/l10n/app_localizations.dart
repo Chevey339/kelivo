@@ -100,6 +100,30 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @avatarInputInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid icon name or an HTTP(S) image URL.'**
+  String get avatarInputInvalid;
+
+  /// No description provided for @modelAvatarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model icon'**
+  String get modelAvatarTitle;
+
+  /// No description provided for @avatarColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get avatarColor;
+
+  /// No description provided for @avatarMonochrome.
+  ///
+  /// In en, this message translates to:
+  /// **'Monochrome'**
+  String get avatarMonochrome;
+
   /// No description provided for @settingsSearchHint.
   ///
   /// In en, this message translates to:

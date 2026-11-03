@@ -185,6 +185,49 @@ Future<void> _dismissModelSelector(WidgetTester tester) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    testWidgets(
+      'model picker uses custom icons for logical aliases on $platform',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          tester.view.physicalSize = platform == TargetPlatform.iOS
+              ? const Size(390, 844)
+              : const Size(1100, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final settings = await _settingsWithOnlyTestProviders(tester);
+          addTearDown(settings.dispose);
+          await settings.setProviderConfig(
+            'provider-0',
+            _providerConfig('provider-0', 'Provider', ['alias']).copyWith(
+              modelOverrides: {
+                'alias': {
+                  'apiModelId': 'gpt-4o',
+                  'name': 'Custom model',
+                  'avatar': {'type': 'emoji', 'value': '🌟'},
+                },
+              },
+            ),
+          );
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            limitProviderKey: 'provider-0',
+          );
+          expect(find.text('Custom model'), findsOneWidget);
+          expect(find.text('🌟'), findsOneWidget);
+          Navigator.of(tester.element(find.text('Custom model'))).pop();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
   for (final (platform, limited) in [
     for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS])
       for (final limited in [false, true]) (platform, limited),
