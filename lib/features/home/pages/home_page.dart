@@ -1858,6 +1858,8 @@ class _HomePageState extends State<HomePage>
   void _showContextManagementSheet() async {
     final imageTarget = _mediaController.capture();
     final imageConversationId = _controller.currentConversation?.id;
+    final messageCountLabel = await _controller.contextMessageCountLabel();
+    if (!mounted) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1898,7 +1900,7 @@ class _HomePageState extends State<HomePage>
               _inputController.quotes,
               quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
             ),
-            messageCountLabel: _controller.contextMessageCountLabel(),
+            messageCountLabel: messageCountLabel,
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;

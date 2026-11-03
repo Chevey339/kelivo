@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -301,17 +302,88 @@ void main() {
         chatService.getConversation(conversation.id)!,
       );
 
-      expect(controller.debugViewModel.getContextMessageCount(), (
-        actual: 2,
-        configured: 10,
-      ));
+      expect(
+        await controller.debugViewModel.contextMessageCountLabel(),
+        '2/10 messages',
+      );
 
       await controller.debugViewModel.clearContext();
 
-      expect(controller.debugViewModel.getContextMessageCount(), (
-        actual: 0,
-        configured: 10,
-      ));
+      expect(
+        await controller.debugViewModel.contextMessageCountLabel(),
+        '0/10 messages',
+      );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('context label follows compression, not the clear boundary', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      await assistantProvider.updateAssistant(
+        assistantProvider.currentAssistant!.copyWith(
+          limitContextMessages: true,
+          contextMessageSize: 10,
+        ),
+      );
+      final conversation = await chatService.createConversation(
+        title: 'Compressed Chat',
+        assistantId: assistantProvider.currentAssistantId,
+      );
+      final firstQuestion = await chatService.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'First question',
+      );
+      final firstAnswer = await chatService.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'First answer',
+      );
+      await chatService.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'Second question',
+      );
+      final secondAnswer = await chatService.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'Second answer',
+      );
+      await controller.chatController.setCurrentConversationAndLoad(
+        chatService.getConversation(conversation.id)!,
+      );
+
+      expect(
+        await controller.debugViewModel.contextMessageCountLabel(),
+        '4/10 messages',
+      );
+
+      final snapshot = await chatService.loadContextSnapshot(conversation.id);
+      await chatService.appendContextOperation(
+        conversation.id,
+        ContextOperation(
+          id: 'compress-1',
+          kind: ContextOperationKind.compress,
+          anchorGroupId: firstAnswer.groupId ?? firstAnswer.id,
+          appliedAfterGroupId: secondAnswer.groupId ?? secondAnswer.id,
+          sourceGroups: [
+            firstQuestion.groupId ?? firstQuestion.id,
+            firstAnswer.groupId ?? firstAnswer.id,
+          ],
+          dependencies: const [],
+          createdAt: DateTime.now(),
+          summary: 'First turn summary.',
+        ),
+        expectedFingerprint: snapshot.fingerprint,
+      );
+
+      expect(
+        await controller.debugViewModel.contextMessageCountLabel(),
+        '2/10 messages',
+      );
     });
     expect(tester.takeException(), isNull);
   });

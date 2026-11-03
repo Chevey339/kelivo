@@ -101,15 +101,15 @@ extension ChatContextRepository on ChatDatabaseRepository {
   });
 
   /// Counts the same projection used for sending without loading message bodies.
+  ///
+  /// A null [limit] counts every raw message the projection kept instead of
+  /// only the newest ones.
   Future<ContextMessageCounts> getContextMessageCounts(
     String id, {
-    required int limit,
+    int? limit,
   }) => _db.transaction(() async {
     final operations = await readContextOperations(id);
     final metadata = await _contextMetadata(id);
-    if (limit <= 0) {
-      return (stored: metadata.length, messages: 0, summaries: 0);
-    }
     final effective = ContextHistory.resolve(
       metadata,
       operations,

@@ -1559,32 +1559,28 @@ class HomeViewModel extends ChangeNotifier {
     return _chatController.groupMessagesByGroup();
   }
 
-  /// Messages currently in the conversation context.
+  /// Trailing label for the context sheet, e.g. "12/64 messages".
   ///
-  /// [actual] counts the messages after the context boundary, capped by the
-  /// assistant's limit when one is set. [configured] is that limit, or null
-  /// when context messages are unlimited.
-  ({int actual, int? configured}) getContextMessageCount() {
+  /// Counts the send projection instead of the clear boundary: compressing
+  /// folds messages away without moving that boundary, so a boundary count
+  /// would never drop after compressing.
+  Future<String> contextMessageCountLabel() async {
+    final l10n = AppLocalizations.of(_contextProvider)!;
     final assistant = _contextProvider
         .read<AssistantProvider>()
         .currentAssistant;
     final configured = (assistant?.limitContextMessages ?? false)
         ? (assistant?.contextMessageSize ?? 0)
-        : 0;
-    // Timeline totals and truncateIndex both use logical message slots.
-    final remaining = computeClearContextRemainingMessageCount(
-      totalMessages: _chatController.totalMessageCount,
-      truncateIndex: currentConversation == null
-          ? -1
-          : _chatService.getContextStartIndex(currentConversation!.id),
+        : null;
+    final conversation = currentConversation;
+    if (conversation == null) return l10n.contextMessageCount(0);
+    final counts = await _chatService.loadContextMessageCounts(
+      conversation.id,
+      limit: configured,
     );
-    if (configured > 0) {
-      return (
-        actual: remaining > configured ? configured : remaining,
-        configured: configured,
-      );
-    }
-    return (actual: remaining, configured: null);
+    return configured == null
+        ? l10n.contextMessageCount(counts.messages)
+        : l10n.contextMessageCountLimited(counts.messages, configured);
   }
 
   /// Test entry for [_maybeGenerateSummaryFor].
@@ -1598,18 +1594,6 @@ class HomeViewModel extends ChangeNotifier {
     String conversationId, {
     bool force = false,
   }) => _maybeGenerateTitleFor(conversationId, force: force);
-
-  @visibleForTesting
-  static int computeClearContextRemainingMessageCount({
-    required int totalMessages,
-    required int truncateIndex,
-  }) {
-    final safeTruncateIndex =
-        (truncateIndex < 0 || truncateIndex > totalMessages)
-        ? 0
-        : truncateIndex;
-    return totalMessages - safeTruncateIndex;
-  }
 
   // ============================================================================
   // Title Generation
