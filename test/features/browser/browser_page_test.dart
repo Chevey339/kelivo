@@ -32,6 +32,7 @@ import 'package:Kelivo/features/browser/widgets/browser_window_chrome.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 BrowserPageState _scroll(
   double offset, {
@@ -2869,7 +2870,7 @@ void main() {
         final labels = tester.widgetList<Text>(host).toList();
         expect(labels, hasLength(progress > 0 && progress < 1 ? 2 : 1));
         for (final text in labels) {
-          expect(text.style!.fontWeight, FontWeight.w500);
+          expect(text.style!.fontWeight, AppFontWeights.medium);
           expect(text.style!.fontSize, 16);
         }
       }

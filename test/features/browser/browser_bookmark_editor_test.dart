@@ -12,6 +12,7 @@ import 'package:Kelivo/features/browser/pages/browser_bookmark_editor.dart';
 import 'package:Kelivo/features/browser/pages/browser_management_page.dart';
 import 'package:Kelivo/features/browser/widgets/browser_surface_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 void main() {
   final original = BrowserBookmark(
@@ -137,7 +138,7 @@ void main() {
     expect(style.color, pageTheme.colorScheme.onSurface);
     expect(style.decoration, TextDecoration.none);
     expect(style.fontSize, 17);
-    expect(style.fontWeight, FontWeight.w600);
+    expect(style.fontWeight, AppFontWeights.semibold);
     expect(style.letterSpacing, 1.4);
     expect(tester.takeException(), isNull);
   });
