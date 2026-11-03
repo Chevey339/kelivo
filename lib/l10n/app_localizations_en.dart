@@ -4387,7 +4387,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceInfo => 'Get account balance';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path';
+  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path or URL';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP Method';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return 'These settings apply only to balance queries. Use $apiKeyPlaceholder in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => 'Request Body (Optional)';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      'Sent with POST only. Leave empty to send no body. Content-Type defaults to application/json; add a header to use another format.';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => 'Result JSON Path';

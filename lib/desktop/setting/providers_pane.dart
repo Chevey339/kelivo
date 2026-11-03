@@ -1037,6 +1037,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   final TextEditingController _apiPathCtrl = TextEditingController();
   final TextEditingController _balanceApiPathCtrl = TextEditingController();
   final TextEditingController _balanceResultPathCtrl = TextEditingController();
+  final TextEditingController _balanceBodyCtrl = TextEditingController();
   final TextEditingController _providerSettingsNameCtrl =
       TextEditingController();
   final TextEditingController _proxyHostCtrl = TextEditingController();
@@ -1072,6 +1073,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
     _syncCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
+    _syncCtrl(_balanceBodyCtrl, cfg.balanceBody);
     _syncCtrl(
       _balanceApiPathCtrl,
       cfg.balanceApiPath ??
@@ -1208,6 +1210,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     _apiPathCtrl.dispose();
     _balanceApiPathCtrl.dispose();
     _balanceResultPathCtrl.dispose();
+    _balanceBodyCtrl.dispose();
     _providerSettingsNameCtrl.dispose();
     _proxyHostCtrl.dispose();
     _proxyPortCtrl.dispose();
@@ -2511,6 +2514,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
       final updated = old.copyWith(
         balanceApiPath: _balanceApiPathCtrl.text.trim(),
         balanceResultPath: _balanceResultPathCtrl.text.trim(),
+        balanceBody: _balanceBodyCtrl.text,
       );
       await sp.setProviderConfig(widget.providerKey, updated);
       ProviderBalanceBadge.clearCacheFor(widget.providerKey);
@@ -2621,6 +2625,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                   widget.providerKey,
                   displayName: widget.displayName,
                 );
+                syncCtrl(_balanceBodyCtrl, cfgNow.balanceBody);
                 syncCtrl(
                   _balanceApiPathCtrl,
                   cfgNow.balanceApiPath ?? balanceDefaults.balanceApiPath ?? '',
@@ -3129,6 +3134,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: IosSwitch(
+                                      key: const ValueKey(
+                                        'provider-balance-enabled',
+                                      ),
                                       value: balanceEnabledNow,
                                       onChanged: (v) async {
                                         final old = spWatch.getProviderConfig(
@@ -3158,6 +3166,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                         row(
                                           l10n.providerDetailPageBalanceApiPathLabel,
                                           TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-api-path',
+                                            ),
                                             controller: _balanceApiPathCtrl,
                                             style: TextStyle(fontSize: 13),
                                             decoration: _proxyInputDecoration(
@@ -3190,10 +3201,65 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             },
                                           ),
                                         ),
+                                        const SizedBox(height: 12),
+                                        ProviderBalanceRequestEditor(
+                                          method: cfgNow.balanceMethod,
+                                          headers: cfgNow.balanceHeaders,
+                                          bodyController: _balanceBodyCtrl,
+                                          onMethodChanged: (value) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceMethod: value,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                          onHeadersChanged: (headers) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceHeaders: headers,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                          onBodyChanged: (_) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceBody:
+                                                    _balanceBodyCtrl.text,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                        ),
                                         const SizedBox(height: 4),
                                         row(
                                           l10n.providerDetailPageBalanceResultPathLabel,
                                           TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-result-path',
+                                            ),
                                             controller: _balanceResultPathCtrl,
                                             style: TextStyle(fontSize: 13),
                                             decoration: _proxyInputDecoration(
@@ -3264,6 +3330,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                       .withValues(alpha: 0.78),
                                                   onTap: () async {
                                                     _syncControllerText(
+                                                      _balanceBodyCtrl,
+                                                      balanceDefaults
+                                                          .balanceBody,
+                                                    );
+                                                    _syncControllerText(
                                                       _balanceApiPathCtrl,
                                                       balanceDefaults
                                                               .balanceApiPath ??
@@ -3284,6 +3355,15 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                     await spWatch.setProviderConfig(
                                                       widget.providerKey,
                                                       old.copyWith(
+                                                        balanceMethod:
+                                                            balanceDefaults
+                                                                .balanceMethod,
+                                                        balanceHeaders:
+                                                            balanceDefaults
+                                                                .balanceHeaders,
+                                                        balanceBody:
+                                                            balanceDefaults
+                                                                .balanceBody,
                                                         balanceEnabled:
                                                             balanceDefaults
                                                                 .balanceEnabled ??

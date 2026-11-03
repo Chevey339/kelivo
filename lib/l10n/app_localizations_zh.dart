@@ -4227,7 +4227,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径或完整网址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '这些设置仅用于余额查询。在请求头或请求体中使用 $apiKeyPlaceholder 可引用当前 API Key。默认使用 Bearer 认证；请求头值留空可移除该请求头。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '请求体（可选）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '仅随 POST 发送，留空则不发送请求体。Content-Type 默认为 application/json，可添加请求头指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -19341,7 +19356,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径或完整网址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '这些设置仅用于余额查询。在请求头或请求体中使用 $apiKeyPlaceholder 可引用当前 API Key。默认使用 Bearer 认证；请求头值留空可移除该请求头。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '请求体（可选）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '仅随 POST 发送，留空则不发送请求体。Content-Type 默认为 application/json，可添加请求头指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -34311,7 +34341,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '取得帳戶餘額';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑';
+  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑或完整網址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '這些設定僅用於餘額查詢。在請求標頭或請求主體中使用 $apiKeyPlaceholder 可引用目前的 API Key。預設使用 Bearer 驗證；標頭值留空可移除該標頭。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '請求主體（選填）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '僅隨 POST 傳送，留空則不傳送請求主體。Content-Type 預設為 application/json，可新增標頭指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '結果 JSON 路徑';

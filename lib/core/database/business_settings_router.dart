@@ -596,6 +596,8 @@ final class BusinessSettingsRouter {
             'avatarValue',
             'balanceApiPath',
             'balanceResultPath',
+            'balanceMethod',
+            'balanceBody',
             'claudePromptCachingTtl',
           },
           booleans: const {
@@ -610,6 +612,7 @@ final class BusinessSettingsRouter {
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
+          objectLists: const {'balanceHeaders'},
           maps: const {'modelOverrides', 'keyManagement', 'oauthCredentials'},
         );
         _validateProviderChildren(kind, payload);
@@ -845,6 +848,19 @@ final class BusinessSettingsRouter {
     BusinessEntityKind kind,
     Map<String, Object?> payload,
   ) {
+    final balanceMethod = payload['balanceMethod'];
+    if (balanceMethod != null &&
+        balanceMethod != 'GET' &&
+        balanceMethod != 'POST') {
+      throw const FormatException('Invalid balance HTTP method');
+    }
+    for (final header in (payload['balanceHeaders'] as List?) ?? const []) {
+      final row = header as Map;
+      if (row.keys.any((key) => key is! String) ||
+          row.values.any((value) => value is! String)) {
+        throw const FormatException('Invalid balance request headers');
+      }
+    }
     final oauthProvider = payload['oauthProvider'];
     if (oauthProvider != null &&
         !{'chatgpt', 'grok', 'kimi', 'claude'}.contains(oauthProvider)) {

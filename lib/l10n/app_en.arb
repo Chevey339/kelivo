@@ -1935,7 +1935,16 @@
   "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
   "providerDetailPageBalanceTitle": "Account Balance",
   "providerDetailPageBalanceInfo": "Get account balance",
-  "providerDetailPageBalanceApiPathLabel": "Balance API Path",
+  "providerDetailPageBalanceApiPathLabel": "Balance API Path or URL",
+  "providerDetailPageBalanceMethodLabel": "HTTP Method",
+  "providerDetailPageBalanceRequestHint": "These settings apply only to balance queries. Use {apiKeyPlaceholder} in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.",
+  "@providerDetailPageBalanceRequestHint": {
+    "placeholders": {
+      "apiKeyPlaceholder": { "type": "String" }
+    }
+  },
+  "providerDetailPageBalanceBodyLabel": "Request Body (Optional)",
+  "providerDetailPageBalanceBodyHint": "Sent with POST only. Leave empty to send no body. Content-Type defaults to application/json; add a header to use another format.",
   "providerDetailPageBalanceResultPathLabel": "Result JSON Path",
   "providerDetailPageBalanceQueryButton": "Check Balance",
   "providerDetailPageBalanceQuerying": "Checking...",

@@ -8044,8 +8044,32 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageBalanceApiPathLabel.
   ///
   /// In en, this message translates to:
-  /// **'Balance API Path'**
+  /// **'Balance API Path or URL'**
   String get providerDetailPageBalanceApiPathLabel;
+
+  /// No description provided for @providerDetailPageBalanceMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP Method'**
+  String get providerDetailPageBalanceMethodLabel;
+
+  /// No description provided for @providerDetailPageBalanceRequestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These settings apply only to balance queries. Use {apiKeyPlaceholder} in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.'**
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder);
+
+  /// No description provided for @providerDetailPageBalanceBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Body (Optional)'**
+  String get providerDetailPageBalanceBodyLabel;
+
+  /// No description provided for @providerDetailPageBalanceBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent with POST only. Leave empty to send no body. Content-Type defaults to application/json; add a header to use another format.'**
+  String get providerDetailPageBalanceBodyHint;
 
   /// No description provided for @providerDetailPageBalanceResultPathLabel.
   ///

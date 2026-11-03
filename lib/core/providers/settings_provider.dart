@@ -6243,6 +6243,9 @@ class ProviderConfig {
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;
+  final String balanceMethod;
+  final List<Map<String, String>> balanceHeaders;
+  final String balanceBody;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
@@ -6327,6 +6330,9 @@ class ProviderConfig {
     this.balanceEnabled,
     this.balanceApiPath,
     this.balanceResultPath,
+    this.balanceMethod = 'GET',
+    this.balanceHeaders = const [],
+    this.balanceBody = '',
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
@@ -6383,6 +6389,9 @@ class ProviderConfig {
     bool? balanceEnabled,
     String? balanceApiPath,
     String? balanceResultPath,
+    String? balanceMethod,
+    List<Map<String, String>>? balanceHeaders,
+    String? balanceBody,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
   }) => ProviderConfig(
@@ -6433,6 +6442,9 @@ class ProviderConfig {
     balanceEnabled: balanceEnabled ?? this.balanceEnabled,
     balanceApiPath: balanceApiPath ?? this.balanceApiPath,
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
+    balanceMethod: balanceMethod ?? this.balanceMethod,
+    balanceHeaders: balanceHeaders ?? this.balanceHeaders,
+    balanceBody: balanceBody ?? this.balanceBody,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
@@ -6481,6 +6493,9 @@ class ProviderConfig {
     'balanceEnabled': balanceEnabled,
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
+    'balanceMethod': balanceMethod,
+    'balanceHeaders': balanceHeaders,
+    'balanceBody': balanceBody,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
@@ -6559,6 +6574,13 @@ class ProviderConfig {
     balanceEnabled: json['balanceEnabled'] as bool?,
     balanceApiPath: json['balanceApiPath'] as String?,
     balanceResultPath: json['balanceResultPath'] as String?,
+    balanceMethod: json['balanceMethod'] as String? ?? 'GET',
+    balanceHeaders:
+        (json['balanceHeaders'] as List?)
+            ?.map((row) => Map<String, String>.from(row as Map))
+            .toList() ??
+        const [],
+    balanceBody: json['balanceBody'] as String? ?? '',
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(

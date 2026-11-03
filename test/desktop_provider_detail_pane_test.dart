@@ -350,7 +350,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     final customRequestEditor = tester.widget<ProviderCustomRequestEditor>(
-      find.byType(ProviderCustomRequestEditor),
+      find.byKey(const ValueKey('desktop-provider-custom-request-ProviderA')),
     );
     expect(
       customRequestEditor.key,
