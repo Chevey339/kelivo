@@ -1,3 +1,4 @@
+import '../../home/widgets/model_icon.dart';
 import '../../../desktop/widgets/desktop_adaptive_panes.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -10,7 +11,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
@@ -62,7 +62,6 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
-import '../../../utils/brand_assets.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
@@ -1140,76 +1139,6 @@ class _InputRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BrandAvatarLike extends StatelessWidget {
-  const _BrandAvatarLike({required this.name, this.size = 20});
-  final String name;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Map known names to brand assets used in default_model_page
-    final asset = BrandAssets.assetForName(name);
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final ColorFilter? tint =
-            (isDark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: SvgPicture.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            colorFilter: tint,
-          ),
-        );
-      } else {
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Image.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            fit: BoxFit.contain,
-          ),
-        );
-      }
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      ),
     );
   }
 }
@@ -2547,13 +2476,19 @@ class _DesktopAssistantBasicPaneState
                           ),
                           child: Row(
                             children: [
-                              _BrandAvatarLike(name: display, size: 24),
+                              CurrentModelIcon(
+                                providerKey:
+                                    a.chatModelProvider ??
+                                    settings.currentModelProvider,
+                                modelId:
+                                    a.chatModelId ?? settings.currentModelId,
+                                size: 24,
+                                iconScale: .62,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   display,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: AppFontWeights.semibold,

@@ -329,12 +329,14 @@ void main() {
     );
     await tester.enterText(iconField, 'openai');
     await tester.pump();
+    await tester.tap(find.text('Monochrome'));
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     final cfg = settings.getProviderConfig('ProviderA');
     expect(cfg.avatarType, 'lobehub');
     expect(cfg.avatarValue, 'openai');
+    expect(cfg.avatarMonochrome, isTrue);
   });
 
   testWidgets('desktop provider settings persist custom request rows', (
@@ -350,7 +352,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     final customRequestEditor = tester.widget<ProviderCustomRequestEditor>(
-      find.byType(ProviderCustomRequestEditor),
+      find.byKey(const ValueKey('desktop-provider-custom-request-ProviderA')),
     );
     expect(
       customRequestEditor.key,

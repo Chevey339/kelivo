@@ -39,6 +39,7 @@ class AppSelectionArea extends StatefulWidget {
     this.sourceOffset,
     this.sourceMap,
     this.onQuoteSelected,
+    this.quoteTextOnly = false,
   });
 
   final Widget child;
@@ -51,6 +52,9 @@ class AppSelectionArea extends StatefulWidget {
   final int? sourceOffset;
   final SourceTextMap? sourceMap;
   final VoidCallback? onQuoteSelected;
+
+  /// Capture a quote chip without linking its text to message body offsets.
+  final bool quoteTextOnly;
 
   @override
   State<AppSelectionArea> createState() => _AppSelectionAreaState();
@@ -126,6 +130,18 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
         ? _markdownSelection.selectedPlainText
         : _selectionKey.currentState?.selectedText ?? _selectedText;
     if (message == null || text.trim().isEmpty) return null;
+    if (widget.quoteTextOnly) {
+      return SelectionSnapshot(
+        messageId: message.id,
+        role: message.role,
+        start: 0,
+        end: 0,
+        text: text,
+        markdown: _markdownSelection.hasSelection
+            ? _markdownSelection.selectedMarkdown
+            : text,
+      );
+    }
     final source = widget.sourceText ?? message.content;
     final ranges =
         _markdownSelection.selections
@@ -258,6 +274,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
           text: snapshot.text,
           model: message.modelId,
           createdAt: message.timestamp,
+          hasSourceRange: !widget.quoteTextOnly,
         ),
       ),
     );

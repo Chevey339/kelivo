@@ -364,13 +364,18 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     ),
                     child: Row(
                       children: [
-                        _BrandAvatarLike(name: display, size: 24),
+                        CurrentModelIcon(
+                          providerKey:
+                              a.chatModelProvider ??
+                              settings.currentModelProvider,
+                          modelId: a.chatModelId ?? settings.currentModelId,
+                          size: 24,
+                          iconScale: .62,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             display,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: AppFontWeights.semibold,

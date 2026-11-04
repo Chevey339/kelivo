@@ -152,12 +152,10 @@ final class GenUiTheme {
           cs,
           bodyStyle: body,
           codeFontFamily:
-              inheritedMarkdown?.code.text.fontFamily ?? 'monospace',
-          medium: AppFontWeights.medium,
-          semibold: AppFontWeights.semibold,
-          strong: AppFontWeights.strong,
+              inheritedMarkdown?.monospace.fontFamily ?? 'monospace',
+          fontWeightResolver: AppFontWeights.normalize,
         );
-    mono = markdown.code.text;
+    mono = markdown.monospace;
     final dark = brightness == Brightness.dark;
     chartColors = List.unmodifiable([
       primary,
@@ -217,7 +215,7 @@ final class GenUiTheme {
   double get lg => AppSpacing.lg;
   double get cardRadius => MarkstreamTheme.radiusMd;
   double get controlRadius => 10;
-  Color get headerFill => markdown.code.headerBackgroundColor;
+  Color get headerFill => markdown.chrome.background;
   // The outer surface already supplies the Markdown backdrop. Painting it
   // again inside tables or donut holes would hide the wallpaper underneath.
   Color get contentBackground =>

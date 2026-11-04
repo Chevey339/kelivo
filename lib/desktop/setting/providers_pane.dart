@@ -1037,6 +1037,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   final TextEditingController _apiPathCtrl = TextEditingController();
   final TextEditingController _balanceApiPathCtrl = TextEditingController();
   final TextEditingController _balanceResultPathCtrl = TextEditingController();
+  final TextEditingController _balanceBodyCtrl = TextEditingController();
   final TextEditingController _providerSettingsNameCtrl =
       TextEditingController();
   final TextEditingController _proxyHostCtrl = TextEditingController();
@@ -1072,6 +1073,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
     _syncCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
+    _syncCtrl(_balanceBodyCtrl, cfg.balanceBody);
     _syncCtrl(
       _balanceApiPathCtrl,
       cfg.balanceApiPath ??
@@ -1208,6 +1210,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     _apiPathCtrl.dispose();
     _balanceApiPathCtrl.dispose();
     _balanceResultPathCtrl.dispose();
+    _balanceBodyCtrl.dispose();
     _providerSettingsNameCtrl.dispose();
     _proxyHostCtrl.dispose();
     _proxyPortCtrl.dispose();
@@ -1618,6 +1621,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                     controller: _apiKeyCtrl,
                     desktop: true,
                     obscure: !_showApiKey,
+                    enableSuggestions: false,
                     mono: _showApiKey,
                     hint: l10n.providerDetailPageApiKeyExample,
                     trailing: TrailingKind.eye,
@@ -2511,6 +2515,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
       final updated = old.copyWith(
         balanceApiPath: _balanceApiPathCtrl.text.trim(),
         balanceResultPath: _balanceResultPathCtrl.text.trim(),
+        balanceBody: _balanceBodyCtrl.text,
       );
       await sp.setProviderConfig(widget.providerKey, updated);
       ProviderBalanceBadge.clearCacheFor(widget.providerKey);
@@ -2621,6 +2626,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                   widget.providerKey,
                   displayName: widget.displayName,
                 );
+                syncCtrl(_balanceBodyCtrl, cfgNow.balanceBody);
                 syncCtrl(
                   _balanceApiPathCtrl,
                   cfgNow.balanceApiPath ?? balanceDefaults.balanceApiPath ?? '',
@@ -3129,6 +3135,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: IosSwitch(
+                                      key: const ValueKey(
+                                        'provider-balance-enabled',
+                                      ),
                                       value: balanceEnabledNow,
                                       onChanged: (v) async {
                                         final old = spWatch.getProviderConfig(
@@ -3158,6 +3167,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                         row(
                                           l10n.providerDetailPageBalanceApiPathLabel,
                                           TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-api-path',
+                                            ),
                                             controller: _balanceApiPathCtrl,
                                             style: TextStyle(fontSize: 13),
                                             decoration: _proxyInputDecoration(
@@ -3190,10 +3202,65 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             },
                                           ),
                                         ),
+                                        const SizedBox(height: 12),
+                                        ProviderBalanceRequestEditor(
+                                          method: cfgNow.balanceMethod,
+                                          headers: cfgNow.balanceHeaders,
+                                          bodyController: _balanceBodyCtrl,
+                                          onMethodChanged: (value) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceMethod: value,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                          onHeadersChanged: (headers) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceHeaders: headers,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                          onBodyChanged: (_) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceBody:
+                                                    _balanceBodyCtrl.text,
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                        ),
                                         const SizedBox(height: 4),
                                         row(
                                           l10n.providerDetailPageBalanceResultPathLabel,
                                           TextField(
+                                            key: const ValueKey(
+                                              'provider-balance-result-path',
+                                            ),
                                             controller: _balanceResultPathCtrl,
                                             style: TextStyle(fontSize: 13),
                                             decoration: _proxyInputDecoration(
@@ -3264,6 +3331,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                       .withValues(alpha: 0.78),
                                                   onTap: () async {
                                                     _syncControllerText(
+                                                      _balanceBodyCtrl,
+                                                      balanceDefaults
+                                                          .balanceBody,
+                                                    );
+                                                    _syncControllerText(
                                                       _balanceApiPathCtrl,
                                                       balanceDefaults
                                                               .balanceApiPath ??
@@ -3284,6 +3356,15 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                     await spWatch.setProviderConfig(
                                                       widget.providerKey,
                                                       old.copyWith(
+                                                        balanceMethod:
+                                                            balanceDefaults
+                                                                .balanceMethod,
+                                                        balanceHeaders:
+                                                            balanceDefaults
+                                                                .balanceHeaders,
+                                                        balanceBody:
+                                                            balanceDefaults
+                                                                .balanceBody,
                                                         balanceEnabled:
                                                             balanceDefaults
                                                                 .balanceEnabled ??
@@ -3874,113 +3955,20 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     BuildContext context,
     String providerKey,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController();
-    String value = '';
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.16),
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        bool valid(String s) => s.trim().isNotEmpty;
-        return StatefulBuilder(
-          builder: (ctx2, setLocal) {
-            return Dialog(
-              key: const ValueKey('desktop-provider-lobehub-icon-dialog'),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 24,
-              ),
-              backgroundColor: context.overlaySurface,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      height: 44,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                l10n.providerAvatarLobehubDialogTitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: AppFontWeights.emphasis,
-                                ),
-                              ),
-                            ),
-                            _IconBtn(
-                              icon: lucide.Lucide.X,
-                              onTap: () => Navigator.of(ctx).maybePop(false),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Divider(
-                      height: 1,
-                      thickness: 0.5,
-                      color: cs.outlineVariant.withValues(alpha: 0.12),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            key: const ValueKey(
-                              'desktop-provider-lobehub-icon-field',
-                            ),
-                            controller: controller,
-                            autofocus: true,
-                            style: const TextStyle(fontSize: 13),
-                            textInputAction: TextInputAction.done,
-                            decoration: _inputDecoration(ctx2).copyWith(
-                              hintText: l10n.providerAvatarLobehubDialogHint,
-                            ),
-                            onChanged: (v) => setLocal(() => value = v),
-                            onSubmitted: (_) {
-                              if (valid(value)) Navigator.of(ctx2).pop(true);
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: _DialogActionButton(
-                              icon: const Icon(lucide.Lucide.Check),
-                              label: l10n.sideDrawerSave,
-                              filled: true,
-                              onTap: valid(value)
-                                  ? () => Navigator.of(ctx2).pop(true)
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+    final avatar = await showAvatarInputDialog(
+      context,
+      type: AvatarType.lobehub,
+      desktop: true,
+      initial: settings.getProviderConfig(providerKey).avatar,
+      keyPrefix: 'desktop-provider-lobehub-icon',
     );
-    if (ok == true) {
-      final name = controller.text.trim();
-      if (name.isNotEmpty) {
-        await settings.setProviderAvatarLobehub(providerKey, name);
-      }
+    if (avatar != null) {
+      await settings.setProviderAvatarLobehub(
+        providerKey,
+        avatar.value,
+        monochrome: avatar.monochrome,
+      );
     }
   }
 
@@ -4858,7 +4846,12 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           child: Row(
                             children: [
                               if (selectedModelId != null)
-                                _BrandCircle(name: selectedModelId!, size: 22),
+                                CurrentModelIcon(
+                                  providerKey: widget.providerKey,
+                                  modelId: selectedModelId,
+                                  size: 22,
+                                  iconScale: .62,
+                                ),
                               if (selectedModelId != null)
                                 const SizedBox(width: 8),
                               Expanded(
@@ -6462,56 +6455,6 @@ class _DialogActionButtonState extends State<_DialogActionButton> {
   }
 }
 
-class _BrandCircle extends StatelessWidget {
-  const _BrandCircle({required this.name, this.size = 22});
-  final String name;
-  final double size;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset == null) {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.heavy,
-          fontSize: size * 0.45,
-        ),
-      );
-    } else if (asset.endsWith('.svg')) {
-      inner = SvgPicture.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-        colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null,
-      );
-    } else {
-      inner = Image.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
-    );
-  }
-}
-
 class _ProviderListRow extends StatefulWidget {
   const _ProviderListRow({
     required this.name,
@@ -7074,14 +7017,23 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
             ],
-            _BrandCircle(name: baseId, size: 22),
+            CurrentModelIcon(
+              providerKey: providerKey,
+              modelId: modelId,
+              size: 22,
+              iconScale: .62,
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                displayName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(displayName, style: TextStyle(fontSize: 13.5)),
+                  if (!isSelectionMode) ...[
+                    const SizedBox(height: 4),
+                    ModelCapsulesRow(model: info),
+                  ],
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -7133,8 +7085,6 @@ class _ModelRow extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ModelCapsulesRow(model: info, alignment: WrapAlignment.end),
-                  const SizedBox(width: 8),
                   _IconBtn(
                     key: ValueKey('desktop-provider-model-settings-$modelId'),
                     icon: lucide.Lucide.Settings2,

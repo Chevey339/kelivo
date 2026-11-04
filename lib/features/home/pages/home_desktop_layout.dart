@@ -23,7 +23,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../utils/brand_assets.dart';
+import '../widgets/model_icon.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
@@ -44,6 +44,8 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.title,
     required this.providerName,
     required this.modelDisplay,
+    this.modelProviderKey,
+    this.modelId,
     // Sidebar state
     required this.tabletSidebarOpen,
     this.compact = false,
@@ -76,6 +78,8 @@ class HomeDesktopScaffold extends StatelessWidget {
   final String title;
   final String? providerName;
   final String? modelDisplay;
+  final String? modelProviderKey;
+  final String? modelId;
 
   // Sidebar state
   final bool tabletSidebarOpen;
@@ -344,12 +348,6 @@ class HomeDesktopScaffold extends StatelessWidget {
     final currentAssistant = context
         .watch<AssistantProvider>()
         .currentAssistant;
-    final String? brandAsset =
-        (modelDisplay != null
-            ? BrandAssets.assetForName(modelDisplay!)
-            : null) ??
-        (providerName != null ? BrandAssets.assetForName(providerName!) : null);
-
     Widget? capsule;
     String? capsuleLabel;
 
@@ -367,30 +365,14 @@ class HomeDesktopScaffold extends StatelessWidget {
           opacity: anim,
           child: ScaleTransition(scale: anim, child: child),
         ),
-        child: (brandAsset != null)
-            ? (brandAsset.endsWith('.svg')
-                  ? SvgPicture.asset(
-                      brandAsset,
-                      width: 16,
-                      height: 16,
-                      key: ValueKey('brand:$brandAsset'),
-                      colorFilter:
-                          isDark && BrandAssets.assetNeedsDarkInvert(brandAsset)
-                          ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-                          : null,
-                    )
-                  : Image.asset(
-                      brandAsset,
-                      width: 16,
-                      height: 16,
-                      key: ValueKey('brand:$brandAsset'),
-                    ))
-            : Icon(
-                Lucide.Boxes,
-                size: 16,
-                color: cs.onSurface.withValues(alpha: 0.7),
-                key: const ValueKey('brand:default'),
-              ),
+        child: CurrentModelIcon(
+          key: ValueKey('$modelProviderKey::$modelId'),
+          providerKey: modelProviderKey,
+          modelId: modelId,
+          size: 16,
+          iconScale: 1,
+          withBackground: false,
+        ),
       );
 
       capsule = IosCardPress(

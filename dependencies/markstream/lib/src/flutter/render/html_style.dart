@@ -59,10 +59,14 @@ TextStyle htmlTextStyle(
         if (value == 'bold' || value == 'bolder') {
           style = style.copyWith(fontWeight: theme.strongWeight);
         } else if (value == 'normal') {
-          style = style.copyWith(fontWeight: FontWeight.normal);
+          style = style.copyWith(
+            fontWeight: theme.fontWeightResolver(FontWeight.normal),
+          );
         } else if (weight != null && weight >= 100 && weight <= 900) {
           style = style.copyWith(
-            fontWeight: FontWeight.values[(weight ~/ 100) - 1],
+            fontWeight: theme.fontWeightResolver(
+              FontWeight.values[(weight ~/ 100) - 1],
+            ),
           );
         }
       case 'font-style':

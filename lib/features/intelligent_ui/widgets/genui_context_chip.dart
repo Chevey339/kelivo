@@ -4,6 +4,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import '../models/ui_context_attachment.dart';
 import 'genui_theme.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// The attachment is frozen. Presentation never reads the source's live values.
 class GenUiContextChip extends StatefulWidget {
@@ -83,7 +84,7 @@ class _GenUiContextChipState extends State<GenUiContextChip> {
                   maxLines: widget.stale ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.badge.copyWith(
-                    fontWeight: FontWeight.normal,
+                    fontWeight: AppFontWeights.regular,
                     color: widget.stale ? ink : theme.captionInk,
                   ),
                 ),
@@ -189,7 +190,7 @@ class _GenUiContextChipState extends State<GenUiContextChip> {
                               l10n.genuiChipExactText,
                               style: theme.badge.copyWith(
                                 color: theme.captionInk,
-                                fontWeight: FontWeight.normal,
+                                fontWeight: AppFontWeights.regular,
                               ),
                             ),
                           ),

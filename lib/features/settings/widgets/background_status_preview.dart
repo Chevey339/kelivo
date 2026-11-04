@@ -5,6 +5,7 @@ import 'package:flutter/widget_previews.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/models/mobile_background_settings.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Native-free preview. Logical-pixel geometry mirrors BackgroundOverlay on
 /// Android, including shrinking artwork to fit very small user-defined cards.
@@ -101,7 +102,9 @@ class BackgroundStatusPreview extends StatelessWidget {
               style: TextStyle(
                 fontSize: fontSize * textScale,
                 height: 1.15,
-                fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: bold
+                    ? AppFontWeights.semibold
+                    : AppFontWeights.regular,
                 color: bold ? cs.onSurface : cs.onSurfaceVariant,
               ),
             ),

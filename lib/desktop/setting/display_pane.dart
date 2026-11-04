@@ -109,6 +109,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowLegacyInlineCodeStyle(),
                   _RowDivider(),
+                  _ToggleRowLegacyCodeBlockStyle(),
+                  _RowDivider(),
                   _ToggleRowUserMarkdown(),
                   _RowDivider(),
                   _ToggleRowReasoningMarkdown(),
@@ -2524,6 +2526,22 @@ class _ToggleRowLegacyInlineCodeStyle extends StatelessWidget {
       value: sp.useLegacyInlineCodeStyle,
       onChanged: (value) =>
           context.read<SettingsProvider>().setUseLegacyInlineCodeStyle(value),
+    );
+  }
+}
+
+class _ToggleRowLegacyCodeBlockStyle extends StatelessWidget {
+  const _ToggleRowLegacyCodeBlockStyle();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+      tip: l10n.displaySettingsPageUseLegacyCodeBlockStyleSubtitle,
+      value: sp.useLegacyCodeBlockStyle,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setUseLegacyCodeBlockStyle(value),
     );
   }
 }

@@ -13,6 +13,7 @@ class QuoteRef {
     required this.text,
     required this.model,
     required this.createdAt,
+    this.hasSourceRange = true,
   });
 
   final String id;
@@ -23,8 +24,16 @@ class QuoteRef {
   final String? model;
   final DateTime createdAt;
 
+  /// False for text snapshots (such as reasoning selections). In that case
+  /// [start] and [end] are unused; the message supplies attribution only.
+  final bool hasSourceRange;
+
   bool sameSource(QuoteRef other) =>
-      messageId == other.messageId && start == other.start && end == other.end;
+      messageId == other.messageId &&
+      hasSourceRange == other.hasSourceRange &&
+      (hasSourceRange
+          ? start == other.start && end == other.end
+          : text == other.text);
 
   QuoteRef withMessageId(String value) => QuoteRef(
     id: id,
@@ -34,6 +43,7 @@ class QuoteRef {
     text: text,
     model: model,
     createdAt: createdAt,
+    hasSourceRange: hasSourceRange,
   );
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +54,7 @@ class QuoteRef {
     'text': text,
     'model': model,
     'createdAt': createdAt.toIso8601String(),
+    'hasSourceRange': hasSourceRange,
   };
 
   factory QuoteRef.fromJson(Map<String, dynamic> json) => QuoteRef(
@@ -54,6 +65,7 @@ class QuoteRef {
     text: json['text'] as String,
     model: json['model'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
+    hasSourceRange: json['hasSourceRange'] as bool? ?? true,
   );
 
   static List<QuoteRef> decodeList(Object? raw) => raw is List
@@ -69,13 +81,24 @@ class QuoteRef {
   bool operator ==(Object other) =>
       other is QuoteRef &&
       id == other.id &&
-      sameSource(other) &&
+      messageId == other.messageId &&
+      start == other.start &&
+      end == other.end &&
+      hasSourceRange == other.hasSourceRange &&
       text == other.text &&
       model == other.model &&
       createdAt == other.createdAt;
   @override
-  int get hashCode =>
-      Object.hash(id, messageId, start, end, text, model, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    messageId,
+    start,
+    end,
+    text,
+    model,
+    createdAt,
+    hasSourceRange,
+  );
 }
 
 /// The stored body stays editable: one code unit per quote, in list order.

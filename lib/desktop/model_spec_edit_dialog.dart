@@ -237,7 +237,10 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
 
   Widget _sectionBody(_SpecSection section) {
     return switch (section) {
-      _SpecSection.basic => BasicSection(controller: _controller),
+      _SpecSection.basic => BasicSection(
+        controller: _controller,
+        desktop: true,
+      ),
       _SpecSection.modalities => ModalityAbilitySection(
         controller: _controller,
       ),

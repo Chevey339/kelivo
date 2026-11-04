@@ -65,11 +65,13 @@ class GenUiDiagnosticSource extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                color: code.headerBackgroundColor,
-                padding: code.headerPadding,
+                color: code.chrome.background,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    Expanded(child: Text('kelivo-ui', style: code.label)),
+                    Expanded(
+                      child: Text('kelivo-ui', style: code.chrome.label),
+                    ),
                     if (!exporting)
                       GenUiControlRegion(
                         child: IosIconButton(

@@ -9,6 +9,19 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get avatarInputInvalid =>
+      'Enter a valid icon name or an HTTP(S) image URL.';
+
+  @override
+  String get modelAvatarTitle => 'Model icon';
+
+  @override
+  String get avatarColor => 'Color';
+
+  @override
+  String get avatarMonochrome => 'Monochrome';
+
+  @override
   String get settingsSearchHint => 'Search settings';
 
   @override
@@ -2913,6 +2926,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use a lighter background, a thin border, and more line spacing for inline code.';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle =>
+      'Legacy code block style';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      'Restore the previous colors, rounded corners, and spacing for code blocks.';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle =>
       'Render user messages with Markdown';
 
@@ -4387,7 +4408,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceInfo => 'Get account balance';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path';
+  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path or URL';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP Method';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return 'These settings apply only to balance queries. Use $apiKeyPlaceholder in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => 'Request Body (Optional)';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      'Sent with POST only. Leave empty to send no body. Content-Type defaults to application/json; add a header to use another format.';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => 'Result JSON Path';

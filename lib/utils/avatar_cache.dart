@@ -83,12 +83,14 @@ class AvatarCache {
   }
 
   /// Ensures avatar at [url] is cached locally and returns the file path.
-  /// On failure, returns null.
-  static Future<String?> getPath(String url) {
+  /// On failure, returns null. Lifecycle owners can explicitly retry a prior
+  /// failure when opening a new view, without retrying on every rebuild.
+  static Future<String?> getPath(String url, {bool retryFailed = false}) {
     if (url.isEmpty) return Future.value();
-    // Legacy callers still resolve in build. A failed URL should not retry on
-    // every rebuild; clear/evict explicitly invalidates this result as before.
-    if (_memo.containsKey(url) && _memo[url] == null) return Future.value();
+    if (_memo.containsKey(url) && _memo[url] == null) {
+      if (!retryFailed) return Future.value();
+      _memo.remove(url);
+    }
     final pending = _pending[url];
     if (pending != null) return pending;
     late final Future<String?> request;

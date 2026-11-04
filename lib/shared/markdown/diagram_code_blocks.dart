@@ -171,11 +171,11 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: mermaidColors.fillBlock,
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
       ),
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
         border: Border.all(color: mermaidColors.border),
       ),
       child: Column(

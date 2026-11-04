@@ -78,10 +78,14 @@ class _QuoteChipState extends State<QuoteChip> {
   }
 
   Future<void> _checkSource() async {
+    final check = ++_sourceCheck;
+    if (!widget.quote.hasSourceRange) {
+      if (_missing) setState(() => _missing = false);
+      return;
+    }
     final actions = _actions;
     if (actions == null) return;
     final id = widget.quote.messageId;
-    final check = ++_sourceCheck;
     final exists = await actions.sourceExists(id);
     if (mounted &&
         check == _sourceCheck &&
@@ -94,7 +98,8 @@ class _QuoteChipState extends State<QuoteChip> {
   @override
   void didUpdateWidget(QuoteChip oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.quote.messageId != widget.quote.messageId) {
+    if (oldWidget.quote.messageId != widget.quote.messageId ||
+        oldWidget.quote.hasSourceRange != widget.quote.hasSourceRange) {
       unawaited(_checkSource());
     }
     if (oldWidget.flashRevision != widget.flashRevision &&
@@ -108,6 +113,7 @@ class _QuoteChipState extends State<QuoteChip> {
   }
 
   Future<void> _jump() async {
+    if (!widget.quote.hasSourceRange) return;
     _portal.hide();
     final found = await _actions?.onJump(widget.quote);
     if (mounted && found != null) setState(() => _missing = !found);
@@ -143,16 +149,17 @@ class _QuoteChipState extends State<QuoteChip> {
       onClose: () => Navigator.pop(context),
       actions: Row(
         children: [
-          Expanded(
-            child: IosTextButton(
-              label: l10n.quoteJumpToSource,
-              icon: LucideIcons.arrowUpRight,
-              onPressed: () {
-                Navigator.pop(context);
-                unawaited(_jump());
-              },
+          if (widget.quote.hasSourceRange)
+            Expanded(
+              child: IosTextButton(
+                label: l10n.quoteJumpToSource,
+                icon: LucideIcons.arrowUpRight,
+                onPressed: () {
+                  Navigator.pop(context);
+                  unawaited(_jump());
+                },
+              ),
             ),
-          ),
           if (widget.onRemove != null)
             Expanded(
               child: IosTextButton(
@@ -265,37 +272,39 @@ class _QuoteChipState extends State<QuoteChip> {
                   style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 ),
               ),
-              const SizedBox(width: 8),
-              Semantics(
-                button: true,
-                child: IosCardPress(
-                  focusable: true,
-                  haptics: false,
-                  mouseCursor: SystemMouseCursors.basic,
-                  baseColor: Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 5,
-                  ),
-                  onTap: () => unawaited(_jump()),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        l10n.quoteJumpToSource,
-                        style: TextStyle(fontSize: 12, color: cs.onSurface),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        LucideIcons.arrowUpRight,
-                        size: 13,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ],
+              if (widget.quote.hasSourceRange) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  child: IosCardPress(
+                    focusable: true,
+                    haptics: false,
+                    mouseCursor: SystemMouseCursors.basic,
+                    baseColor: Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 5,
+                    ),
+                    onTap: () => unawaited(_jump()),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.quoteJumpToSource,
+                          style: TextStyle(fontSize: 12, color: cs.onSurface),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          LucideIcons.arrowUpRight,
+                          size: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -304,8 +313,15 @@ class _QuoteChipState extends State<QuoteChip> {
   }
 
   Future<void> _tap() async {
-    if (widget.onRemove == null || selectionUsesDesktop) {
+    if (widget.quote.hasSourceRange &&
+        (widget.onRemove == null || selectionUsesDesktop)) {
       await _jump();
+      return;
+    }
+    if (selectionUsesDesktop) {
+      _hoverTimer?.cancel();
+      _closeTimer?.cancel();
+      _portal.toggle();
       return;
     }
     await _checkSource();
@@ -400,41 +416,53 @@ class _QuoteChipState extends State<QuoteChip> {
             targetAnchor: below ? Alignment.bottomLeft : Alignment.topLeft,
             followerAnchor: below ? Alignment.topLeft : Alignment.bottomLeft,
             offset: Offset(left - origin.dx, below ? 8 : -8),
-            child: MouseRegion(
-              onEnter: (_) => _closeTimer?.cancel(),
-              onExit: (_) => _exit(),
-              child:
-                  DesktopGlassPanel(
-                        borderRadius: BorderRadius.circular(10),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 280),
-                          child: _desktopPreview(context),
+            child: TapRegion(
+              groupId: this,
+              onTapOutside: (_) {
+                _hoverTimer?.cancel();
+                _closeTimer?.cancel();
+                _portal.hide();
+              },
+              child: MouseRegion(
+                onEnter: (_) => _closeTimer?.cancel(),
+                onExit: (_) => _exit(),
+                child:
+                    DesktopGlassPanel(
+                          borderRadius: BorderRadius.circular(10),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 280),
+                            child: _desktopPreview(context),
+                          ),
+                        )
+                        .animate()
+                        .fadeIn(duration: 120.ms)
+                        .scale(
+                          begin: const Offset(.96, .96),
+                          end: const Offset(1, 1),
+                          duration: 120.ms,
                         ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 120.ms)
-                      .scale(
-                        begin: const Offset(.96, .96),
-                        end: const Offset(1, 1),
-                        duration: 120.ms,
-                      ),
+              ),
             ),
           ),
         );
       },
       child: CompositedTransformTarget(
         link: _link,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.basic,
-          onEnter: selectionUsesDesktop ? (_) => _enter() : null,
-          onExit: selectionUsesDesktop ? (_) => _exit() : null,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _tap,
-            child: Semantics(
-              button: true,
-              label: widget.quote.text,
-              child: child,
+        child: TapRegion(
+          groupId: this,
+          enabled: selectionUsesDesktop,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.basic,
+            onEnter: selectionUsesDesktop ? (_) => _enter() : null,
+            onExit: selectionUsesDesktop ? (_) => _exit() : null,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _tap,
+              child: Semantics(
+                button: true,
+                label: widget.quote.text,
+                child: child,
+              ),
             ),
           ),
         ),

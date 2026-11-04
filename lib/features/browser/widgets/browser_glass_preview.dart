@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/browser_models.dart';
 import 'browser_glass.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Interaction/layout preview; optical fidelity is validated on native hosts,
 /// because the web previewer's renderer cannot run Impeller image filters.
@@ -65,20 +66,20 @@ class _BrowserGlassPreviewState extends State<BrowserGlassPreview> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         '开始探索',
                         style: TextStyle(
                           fontSize: 32,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.strong,
                           letterSpacing: -.8,
                         ),
                       ),
                       const SizedBox(height: 12),
                       const Text('搜索网页，或者让 Agent 帮你浏览。'),
                       const SizedBox(height: 46),
-                      const Text(
+                      Text(
                         '个人收藏',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(fontWeight: AppFontWeights.semibold),
                       ),
                       const SizedBox(height: 22),
                       Row(

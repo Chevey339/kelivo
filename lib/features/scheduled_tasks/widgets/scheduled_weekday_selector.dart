@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ScheduledWeekdaySelector extends StatelessWidget {
   const ScheduledWeekdaySelector({
@@ -47,8 +48,8 @@ class ScheduledWeekdaySelector extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: days.contains(day)
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                              ? AppFontWeights.semibold
+                              : AppFontWeights.regular,
                           color: days.contains(day)
                               ? colors.primary
                               : colors.onSurface.withValues(alpha: .6),

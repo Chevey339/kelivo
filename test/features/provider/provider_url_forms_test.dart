@@ -12,6 +12,7 @@ import 'package:Kelivo/features/provider/widgets/add_provider_sheet.dart';
 import 'package:Kelivo/features/provider/widgets/provider_base_url_field.dart';
 import 'package:Kelivo/features/provider/widgets/provider_input_row.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import '../../support/business_test_harness.dart';
 
@@ -135,6 +136,35 @@ Future<void> blur(WidgetTester tester) async {
 String value(WidgetTester tester) =>
     tester.widget<TextField>(baseField).controller!.text;
 
+Finder providerField(String label) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) => widget is ProviderInputRow && widget.label == label,
+  ),
+  matching: find.byType(TextField),
+);
+
+Future<void> expectInputConfiguration(
+  WidgetTester tester,
+  Finder field, {
+  required bool enableSuggestions,
+  bool obscureText = false,
+  TextInputType keyboardType = TextInputType.text,
+}) async {
+  await tester.ensureVisible(field);
+  await tester.showKeyboard(field);
+  await tester.pumpAndSettle();
+  // Check the platform-channel contract used by Android to select the IME.
+  expect(
+    tester.testTextInput.setClientArgs,
+    allOf(
+      containsPair('enableSuggestions', enableSuggestions),
+      containsPair('obscureText', obscureText),
+      containsPair('autocorrect', false),
+      containsPair('inputType', keyboardType.toJson()),
+    ),
+  );
+}
+
 void formTest(String description, WidgetTesterCallback callback) {
   testWidgets(description, (tester) async {
     try {
@@ -148,6 +178,111 @@ void formTest(String description, WidgetTesterCallback callback) {
 }
 
 void main() {
+  formTest('mobile ordinary provider fields use normal input', (tester) async {
+    await mount(tester, false);
+    await expectInputConfiguration(
+      tester,
+      providerField('Name'),
+      enableSuggestions: true,
+    );
+    await expectInputConfiguration(
+      tester,
+      baseField,
+      enableSuggestions: true,
+      keyboardType: TextInputType.url,
+    );
+    await expectInputConfiguration(
+      tester,
+      providerField('API Path'),
+      enableSuggestions: true,
+    );
+  });
+
+  for (final kind in ['OpenAI', 'Google', 'Claude']) {
+    formTest('mobile $kind add form separates normal and API key input', (
+      tester,
+    ) async {
+      await mount(tester, false, adding: true);
+      if (kind != 'OpenAI') {
+        await tester.tap(find.text(kind).first);
+        await tester.pumpAndSettle();
+      }
+      await expectInputConfiguration(
+        tester,
+        providerField('API Key'),
+        enableSuggestions: false,
+      );
+      await expectInputConfiguration(
+        tester,
+        providerField('Name'),
+        enableSuggestions: true,
+      );
+      await expectInputConfiguration(
+        tester,
+        baseField,
+        enableSuggestions: true,
+        keyboardType: TextInputType.url,
+      );
+      if (kind == 'OpenAI') {
+        await expectInputConfiguration(
+          tester,
+          providerField('API Path'),
+          enableSuggestions: true,
+        );
+      }
+    });
+  }
+
+  for (final adding in [false, true]) {
+    formTest(
+      'mobile Google Vertex toggle refreshes input configuration with adding=$adding',
+      (tester) async {
+        await mount(tester, false, adding: adding, kind: ProviderKind.google);
+        if (adding) {
+          await tester.tap(find.text('Google').first);
+        } else {
+          await tester.ensureVisible(find.byTooltip('Show'));
+          await tester.tap(find.byTooltip('Show'));
+        }
+        await tester.pumpAndSettle();
+        await expectInputConfiguration(
+          tester,
+          providerField('API Key'),
+          enableSuggestions: false,
+        );
+        final vertexSwitch = find.descendant(
+          of: find
+              .ancestor(of: find.text('Vertex AI'), matching: find.byType(Row))
+              .first,
+          matching: find.byType(IosSwitch),
+        );
+        Future<void> toggleVertex() async {
+          await Scrollable.ensureVisible(
+            tester.element(vertexSwitch),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          expect(vertexSwitch.hitTestable(), findsOneWidget);
+          await tester.tap(vertexSwitch);
+          await tester.pumpAndSettle();
+        }
+
+        await toggleVertex();
+        await expectInputConfiguration(
+          tester,
+          providerField('Location'),
+          enableSuggestions: true,
+        );
+        await toggleVertex();
+        await expectInputConfiguration(
+          tester,
+          providerField('API Key'),
+          enableSuggestions: false,
+        );
+      },
+    );
+  }
+
   for (final swipe in [false, true]) {
     formTest('mobile saves the URL before opening models with swipe=$swipe', (
       tester,
@@ -503,16 +638,36 @@ void main() {
         final keyRow = find.byWidgetPredicate(
           (w) => w is ProviderInputRow && w.trailing == TrailingKind.eye,
         );
+        final keyField = find.descendant(
+          of: keyRow,
+          matching: find.byType(TextField),
+        );
+        await expectInputConfiguration(
+          tester,
+          keyField,
+          enableSuggestions: false,
+          obscureText: true,
+        );
         await tester.ensureVisible(keyRow);
         await tester.tap(
           find.descendant(of: keyRow, matching: find.byType(IconButton)),
         );
         await tester.pumpAndSettle();
-        final key = tester.widget<TextField>(
-          find.descendant(of: keyRow, matching: find.byType(TextField)),
+        await expectInputConfiguration(
+          tester,
+          keyField,
+          enableSuggestions: false,
         );
+        final key = tester.widget<TextField>(keyField);
         expect(key.obscureText, isFalse);
         expect(key.style!.fontFamily, 'monospace');
+        if (!desktop) {
+          await expectInputConfiguration(
+            tester,
+            providerField('Name'),
+            enableSuggestions: true,
+          );
+        }
       },
     );
     formTest('$platform add form rejects empty URL and saves normalized URL', (

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:markstream/markstream.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Recognizes only explicit citation markers; ordinary [1] remains text.
 class CitationSyntax extends InlineSyntax {
@@ -161,7 +162,7 @@ class _CitationChips extends StatelessWidget {
                       _label(ref, scope),
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                         fontFeatures: const [FontFeature.tabularFigures()],
                         height: 1,
                         color: scheme.primary,

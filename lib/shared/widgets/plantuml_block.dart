@@ -99,11 +99,11 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: colors.fillBlock,
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
       ),
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
         border: Border.all(color: colors.border),
       ),
       child: Column(

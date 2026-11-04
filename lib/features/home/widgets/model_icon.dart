@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../shared/widgets/configurable_avatar.dart';
 import '../../../utils/brand_assets.dart';
-import '../../../theme/app_font_weights.dart';
 
 /// Widget that displays the current model's icon.
 ///
-/// Shows either:
-/// - A brand SVG/PNG icon if available for the model/provider
-/// - A circular placeholder with the first letter of the model name
+/// Prefers the model's custom avatar, then its recognized brand, then the
+/// provider's custom/brand avatar, and finally the model's initial.
 class CurrentModelIcon extends StatelessWidget {
   const CurrentModelIcon({
     super.key,
@@ -15,77 +16,40 @@ class CurrentModelIcon extends StatelessWidget {
     required this.modelId,
     this.size = 28,
     this.withBackground = true,
+    this.iconScale = .5,
     this.backgroundColor,
   });
 
   final String? providerKey;
   final String? modelId;
+  final double iconScale;
   final double size; // outer diameter
   final bool withBackground; // whether to draw circular background
   final Color? backgroundColor; // override background color if provided
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (providerKey == null || modelId == null) return const SizedBox.shrink();
-
-    String? asset = BrandAssets.assetForName(modelId!);
-    asset ??= BrandAssets.assetForName(providerKey!);
-
-    Widget inner;
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final ColorFilter? tint =
-            (Theme.of(context).brightness == Brightness.dark &&
-                BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        inner = SvgPicture.asset(
-          asset,
-          width: size * 0.5,
-          height: size * 0.5,
-          colorFilter: tint,
-        );
-      } else {
-        inner = Image.asset(
-          asset,
-          width: size * 0.5,
-          height: size * 0.5,
-          fit: BoxFit.contain,
-        );
-      }
-    } else {
-      inner = Text(
-        modelId!.isNotEmpty ? modelId!.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.43,
-        ),
-      );
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: withBackground
-            ? (backgroundColor ??
-                  (cs.primary.withValues(alpha: isDark ? 0.18 : 0.1)))
-            : Colors.transparent,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: size * 0.64,
-        height: size * 0.64,
-        child: Center(
-          child: inner is SvgPicture || inner is Image
-              ? inner
-              : FittedBox(child: inner),
-        ),
-      ),
+    final cfg = context.select<SettingsProvider?, ProviderConfig?>(
+      (settings) => settings?.providerConfigs[providerKey],
+    );
+    final upstreamId = cfg == null
+        ? modelId!
+        : ModelSpecResolver.instance.spec(cfg, modelId!).upstreamId;
+    final modelAsset = BrandAssets.assetForName(upstreamId);
+    return ConfigurableAvatar(
+      avatar:
+          cfg?.modelAvatar(modelId!) ??
+          (modelAsset == null ? cfg?.avatar : null),
+      name: modelId!,
+      fallbackAsset:
+          modelAsset ??
+          BrandAssets.assetForName(cfg?.name ?? '') ??
+          BrandAssets.assetForName(providerKey!),
+      size: size,
+      iconScale: iconScale,
+      withBackground: withBackground,
+      backgroundColor: backgroundColor,
     );
   }
 }

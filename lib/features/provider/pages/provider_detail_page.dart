@@ -5,14 +5,14 @@ import '../utils/provider_url_editor.dart';
 import '../widgets/provider_input_row.dart';
 import '../widgets/provider_base_url_field.dart';
 import '../widgets/provider_icon_picker.dart';
+import '../widgets/avatar_input_dialog.dart';
+import '../../../core/models/avatar_config.dart';
 import '../widgets/prompt_cache_ttl_control.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/selection_back_scope.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../../../utils/brand_assets.dart';
-import '../../../utils/avatar_cache.dart';
+import '../../home/widgets/model_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
@@ -489,109 +489,26 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   Future<void> _inputLobehubIcon() async {
-    final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        bool valid(String s) => s.trim().isNotEmpty;
-        String value = '';
-        return StatefulBuilder(
-          builder: (ctx2, setLocal) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              backgroundColor: context.overlaySurface,
-              title: Text(l10n.providerAvatarLobehubDialogTitle),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: l10n.providerAvatarLobehubDialogHint,
-                    filled: true,
-                    fillColor: ctx2.appColors.surfaceFill,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.transparent),
-                    ),
-                    enabledBorder: const OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide(color: Colors.transparent),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.primary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                  onChanged: (v) => setLocal(() => value = v),
-                  onSubmitted: (_) {
-                    if (valid(value)) Navigator.of(ctx2).pop(true);
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text(l10n.sideDrawerCancel),
-                ),
-                TextButton(
-                  onPressed: valid(value)
-                      ? () => Navigator.of(ctx).pop(true)
-                      : null,
-                  child: Text(
-                    l10n.sideDrawerSave,
-                    style: TextStyle(
-                      color: valid(value)
-                          ? cs.primary
-                          : cs.onSurface.withValues(alpha: 0.38),
-                      fontWeight: AppFontWeights.semibold,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final avatar = await showAvatarInputDialog(
+      context,
+      type: AvatarType.lobehub,
+      desktop: false,
+      initial: settings.getProviderConfig(widget.keyName).avatar,
+      keyPrefix: 'provider-lobehub-icon',
     );
-    if (ok == true) {
-      final name = controller.text.trim();
-      if (name.isNotEmpty) {
-        await settings.setProviderAvatarLobehub(widget.keyName, name);
-        if (mounted) setState(() {});
-      }
+    if (avatar != null && mounted) {
+      await settings.setProviderAvatarLobehub(
+        widget.keyName,
+        avatar.value,
+        monochrome: avatar.monochrome,
+      );
     }
-  }
-
-  // 后台预热 LobeHub 图标缓存（彩色优先，失败回退单色），不阻塞 UI。
-  // 顺序需与 ProviderAvatar._resolveLobehubPath 保持一致，避免缓存键不一致。
-  void _prewarmLobehubIcon(String n) {
-    if (n.isEmpty) return;
-    Future.microtask(() async {
-      if (!n.endsWith('-color') && !n.endsWith('-text')) {
-        final colored = await AvatarCache.getPath(
-          BrandAssets.lobehubIconUrl('$n-color'),
-        );
-        if (colored != null) return;
-      }
-      await AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
-    });
   }
 
   Future<void> _pickProviderIcon() async {
     final settings = context.read<SettingsProvider>();
     final current = settings.getProviderConfig(widget.keyName);
-    if (current.avatarType == 'lobehub' &&
-        (current.avatarValue ?? '').isNotEmpty) {
-      _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
-    }
     final asset = await showProviderIconPicker(
       context,
       selectedAsset: current.avatarType == 'icon' ? current.avatarValue : null,
@@ -1110,6 +1027,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               controller: _keyCtrl,
               hint: l10n.providerDetailPageApiKeyExample,
               obscure: !_showApiKey,
+              enableSuggestions: false,
               mono: _showApiKey,
               trailing: TrailingKind.eye,
               onTrailingTap: () => setState(() => _showApiKey = !_showApiKey),
@@ -1543,6 +1461,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required TextEditingController controller,
     String? hint,
     bool obscure = false,
+    bool enableSuggestions = true,
     bool enabled = true,
     String? helper,
     Widget? helperRich,
@@ -1558,6 +1477,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     controller: controller,
     hint: hint,
     obscure: obscure,
+    enableSuggestions: enableSuggestions,
     enabled: enabled,
     helper: helper,
     helperRich: helperRich,
@@ -3658,11 +3578,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                                         width:
                                                                             28,
                                                                         child: Center(
-                                                                          child: _BrandAvatar(
-                                                                            name:
+                                                                          child: CurrentModelIcon(
+                                                                            providerKey:
+                                                                                widget.keyName,
+                                                                            modelId:
                                                                                 m.id,
                                                                             size:
                                                                                 28,
+                                                                            iconScale:
+                                                                                .62,
                                                                           ),
                                                                         ),
                                                                       ),
@@ -3681,8 +3605,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                                                 fontSize: 14,
                                                                                 fontWeight: AppFontWeights.semibold,
                                                                               ),
-                                                                              maxLines: 1,
-                                                                              overflow: TextOverflow.ellipsis,
                                                                             ),
                                                                             const SizedBox(
                                                                               height: 4,
@@ -3870,7 +3792,12 @@ class _ModelCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                _BrandAvatar(name: resolved.upstreamId, size: 28),
+                CurrentModelIcon(
+                  providerKey: providerKey,
+                  modelId: modelId,
+                  size: 28,
+                  iconScale: .62,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -4066,7 +3993,12 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _BrandAvatar(name: _selectedModelId!, size: 24),
+              CurrentModelIcon(
+                providerKey: widget.providerKey,
+                modelId: _selectedModelId,
+                size: 24,
+                iconScale: .62,
+              ),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -4120,7 +4052,12 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _BrandAvatar(name: _selectedModelId!, size: 24),
+              CurrentModelIcon(
+                providerKey: widget.providerKey,
+                modelId: _selectedModelId,
+                size: 24,
+                iconScale: .62,
+              ),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -4168,7 +4105,12 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.max,
                   children: [
-                    _BrandAvatar(name: _selectedModelId!, size: 24),
+                    CurrentModelIcon(
+                      providerKey: widget.providerKey,
+                      modelId: _selectedModelId,
+                      size: 24,
+                      iconScale: .62,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -4285,51 +4227,6 @@ Future<String?> showModelPickerForTest(
 // Using flutter_slidable for reliable swipe actions with confirm + undo.
 
 // Legacy page-based implementations removed in favor of swipeable PageView tabs.
-
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 20});
-  final String name;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    final mono =
-        asset != null && isDark && BrandAssets.assetNeedsDarkInvert(asset);
-    return CircleAvatar(
-      radius: size / 2,
-      backgroundColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-      child: asset == null
-          ? Text(
-              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: TextStyle(
-                color: cs.primary,
-                fontSize: size * 0.5,
-                fontWeight: AppFontWeights.emphasis,
-              ),
-            )
-          : (asset.endsWith('.svg')
-                ? SvgPicture.asset(
-                    asset,
-                    width: size * 0.7,
-                    height: size * 0.7,
-                    colorFilter: mono
-                        ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-                        : null,
-                  )
-                : Image.asset(
-                    asset,
-                    width: size * 0.7,
-                    height: size * 0.7,
-                    fit: BoxFit.contain,
-                    color: mono ? cs.onSurface : null,
-                    colorBlendMode: mono ? BlendMode.srcIn : null,
-                  )),
-    );
-  }
-}
 
 // Top-level tactile row used by iOS-style lists here
 class _TactileRow extends StatefulWidget {

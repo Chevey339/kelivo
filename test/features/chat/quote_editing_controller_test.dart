@@ -20,6 +20,51 @@ QuoteRef quote(int index) => QuoteRef(
 
 void main() {
   test(
+    'reasoning snapshots deduplicate by selected text and survive serialization',
+    () {
+      final controller = QuoteEditingController(nativeInputEnabled: false);
+      addTearDown(controller.dispose);
+      QuoteRef snapshot(String id, String text) => QuoteRef(
+        id: id,
+        messageId: 'thinking',
+        start: 0,
+        end: 0,
+        text: text,
+        model: 'model',
+        createdAt: DateTime(2026),
+        hasSourceRange: false,
+      );
+      final first = snapshot('first', 'first thought');
+      final second = snapshot('second', 'second thought');
+      expect(controller.insertQuote(first), QuoteInsertion.inserted);
+      expect(controller.insertQuote(second), QuoteInsertion.inserted);
+      expect(
+        controller.insertQuote(snapshot('again', first.text)),
+        QuoteInsertion.duplicate,
+      );
+      expect(controller.quotes, [first, second]);
+      final draft = ComposerDraftInput(
+        text: controller.text,
+        quotes: controller.quotes,
+      );
+      final restored = ComposerDraftInput.fromJson(draft.toJson());
+      expect(restored.sameValue(draft), isTrue);
+      expect(restored.quotes.every((quote) => !quote.hasSourceRange), isTrue);
+      final bodyQuote = QuoteRef(
+        id: 'body',
+        messageId: first.messageId,
+        start: 0,
+        end: 0,
+        text: first.text,
+        model: first.model,
+        createdAt: first.createdAt,
+      );
+      expect(controller.insertQuote(bodyQuote), QuoteInsertion.inserted);
+      expect(first.withMessageId('copied').hasSourceRange, isFalse);
+    },
+  );
+
+  test(
     'references follow cursor insertion and adjacent backward/forward deletion',
     () {
       final controller = QuoteEditingController(

@@ -38,10 +38,10 @@ MarkstreamTheme mapMarkdownTheme(
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows;
   final backdrop = resolveMarkdownBackdrop(context, settings);
+  final customBackground = backdrop == MarkstreamBackdrop.plain
+      ? null
+      : MarkdownSurfaceScope.maybeOf(context)?.customBackground;
   if (backdrop != MarkstreamBackdrop.plain) {
-    final customBackground = MarkdownSurfaceScope.maybeOf(
-      context,
-    )?.customBackground;
     if (customBackground != null) {
       // Fixed syntax colors need a near-dark or near-light block surface, even
       // over arbitrary wallpaper. Retain the bubble's hue, not its midtones.
@@ -57,7 +57,7 @@ MarkstreamTheme mapMarkdownTheme(
       );
     }
   }
-  final theme = MarkstreamTheme.fromColorScheme(
+  var theme = MarkstreamTheme.fromColorScheme(
     scheme,
     backdrop: backdrop,
     maskStrength: backdrop == MarkstreamBackdrop.plain
@@ -68,10 +68,17 @@ MarkstreamTheme mapMarkdownTheme(
     codeFontFamily: (settings.codeFontFamily?.isNotEmpty ?? false)
         ? settings.codeFontFamily!
         : 'monospace',
-    medium: AppFontWeights.medium,
-    semibold: AppFontWeights.semibold,
-    strong: AppFontWeights.strong,
+    fontWeightResolver: AppFontWeights.normalize,
   );
+  if (settings.useLegacyCodeBlockStyle) {
+    theme = theme.copyWith(
+      code: _legacyCodeBlockTheme(
+        theme,
+        scheme,
+        customSurface: customBackground != null,
+      ),
+    );
+  }
   if (!settings.useLegacyInlineCodeStyle) return theme;
   final translucent =
       backdrop == MarkstreamBackdrop.wallpaper ||
@@ -91,6 +98,56 @@ MarkstreamTheme mapMarkdownTheme(
           ? Colors.white12
           : const Color(0x66F1F3F5),
       borderColor: theme.colors.border,
+    ),
+  );
+}
+
+CodeBlockTheme _legacyCodeBlockTheme(
+  MarkstreamTheme theme,
+  ColorScheme scheme, {
+  required bool customSurface,
+}) {
+  final dark = theme.brightness == Brightness.dark;
+  final outline = scheme.outlineVariant;
+  final border = outline == Colors.black || outline == Colors.white
+      ? Color.alphaBlend(
+          scheme.onSurfaceVariant.withValues(alpha: dark ? .32 : .24),
+          scheme.surface,
+        )
+      : outline;
+  // Custom chat colors still need the paired block surface/ink resolved above.
+  // Other surfaces retain the original theme-container colors and 80% fill.
+  return theme.code.copyWith(
+    text: theme.code.text.copyWith(fontSize: 13, height: 1.5),
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    bodyPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    titlePadding: EdgeInsets.zero,
+    actionSpacing: 16,
+    radius: 16,
+    backgroundColor: customSurface
+        ? theme.colors.fillBlock
+        : scheme.surfaceContainer.withValues(alpha: .8),
+    borderColor: customSurface ? theme.colors.border : border,
+    chrome: theme.code.chrome.copyWith(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      background:
+          (customSurface ? scheme.surface : scheme.surfaceContainerHighest)
+              .withValues(alpha: .8),
+      divider: Colors.transparent,
+      label: theme.code.chrome.label.copyWith(
+        fontSize: 12,
+        letterSpacing: theme.body.letterSpacing,
+        color: customSurface
+            ? theme.colors.ink2
+            : scheme.onSurfaceVariant.withValues(alpha: .72),
+      ),
+      actionSize: 24,
+      actionIconSize: 16,
+      actionRadius: 4,
+      actionColor: customSurface
+          ? theme.colors.ink3
+          : scheme.onSurfaceVariant.withValues(alpha: .5),
     ),
   );
 }

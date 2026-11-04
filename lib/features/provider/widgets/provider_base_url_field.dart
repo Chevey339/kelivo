@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../utils/provider_url_editor.dart';
 import 'provider_input_row.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ProviderBaseUrlField extends StatefulWidget {
   const ProviderBaseUrlField({
@@ -222,7 +223,7 @@ class ProviderRequestUrlPreview extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'monospace',
               color: cs.primary,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
         ],

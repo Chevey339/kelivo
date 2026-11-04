@@ -100,6 +100,30 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @avatarInputInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid icon name or an HTTP(S) image URL.'**
+  String get avatarInputInvalid;
+
+  /// No description provided for @modelAvatarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model icon'**
+  String get modelAvatarTitle;
+
+  /// No description provided for @avatarColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get avatarColor;
+
+  /// No description provided for @avatarMonochrome.
+  ///
+  /// In en, this message translates to:
+  /// **'Monochrome'**
+  String get avatarMonochrome;
+
   /// No description provided for @settingsSearchHint.
   ///
   /// In en, this message translates to:
@@ -5380,6 +5404,18 @@ abstract class AppLocalizations {
   /// **'Use a lighter background, a thin border, and more line spacing for inline code.'**
   String get displaySettingsPageUseLegacyInlineCodeStyleSubtitle;
 
+  /// No description provided for @displaySettingsPageUseLegacyCodeBlockStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy code block style'**
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle;
+
+  /// No description provided for @displaySettingsPageUseLegacyCodeBlockStyleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the previous colors, rounded corners, and spacing for code blocks.'**
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle;
+
   /// No description provided for @displaySettingsPageEnableUserMarkdownTitle.
   ///
   /// In en, this message translates to:
@@ -8044,8 +8080,32 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageBalanceApiPathLabel.
   ///
   /// In en, this message translates to:
-  /// **'Balance API Path'**
+  /// **'Balance API Path or URL'**
   String get providerDetailPageBalanceApiPathLabel;
+
+  /// No description provided for @providerDetailPageBalanceMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP Method'**
+  String get providerDetailPageBalanceMethodLabel;
+
+  /// No description provided for @providerDetailPageBalanceRequestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These settings apply only to balance queries. Use {apiKeyPlaceholder} in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.'**
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder);
+
+  /// No description provided for @providerDetailPageBalanceBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Body (Optional)'**
+  String get providerDetailPageBalanceBodyLabel;
+
+  /// No description provided for @providerDetailPageBalanceBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent with POST only. Leave empty to send no body. Content-Type defaults to application/json; add a header to use another format.'**
+  String get providerDetailPageBalanceBodyHint;
 
   /// No description provided for @providerDetailPageBalanceResultPathLabel.
   ///

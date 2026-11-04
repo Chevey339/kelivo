@@ -21,6 +21,7 @@ import '../services/logging/context_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
+import '../models/avatar_config.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/auto_retry_options.dart';
@@ -297,6 +298,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_math_rendering_v1';
   static const String _displayUseLegacyInlineCodeStyleKey =
       'display_use_legacy_inline_code_style_v1';
+  static const String _displayUseLegacyCodeBlockStyleKey =
+      'display_use_legacy_code_block_style_v1';
   static const String _displayEnableUserMarkdownKey =
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
@@ -1146,6 +1149,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
     _useLegacyInlineCodeStyle =
         prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
+    _useLegacyCodeBlockStyle =
+        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? false;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -3243,13 +3248,21 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // Store a LobeHub icon name (not the full URL); URL is built at render time.
-  Future<void> setProviderAvatarLobehub(String key, String name) async {
+  Future<void> setProviderAvatarLobehub(
+    String key,
+    String name, {
+    bool monochrome = false,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final old = getProviderConfig(key);
     await setProviderConfig(
       key,
-      old.copyWith(avatarType: 'lobehub', avatarValue: trimmed),
+      old.copyWith(
+        avatarType: 'lobehub',
+        avatarValue: trimmed,
+        avatarMonochrome: monochrome,
+      ),
     );
   }
 
@@ -3274,7 +3287,11 @@ class SettingsProvider extends ChangeNotifier {
     }
     await setProviderConfig(
       key,
-      old.copyWith(avatarType: null, avatarValue: null),
+      old.copyWith(
+        avatarType: null,
+        avatarValue: null,
+        avatarMonochrome: false,
+      ),
     );
   }
 
@@ -3641,6 +3658,7 @@ You need to summarize the conversation between user and assistant into a short t
   static const String defaultTranslatePrompt =
       '''You are a translation expert, skilled in translating various languages, and maintaining accuracy, faithfulness, and elegance in translation.
 Next, I will send you text. Please translate it into {target_lang}, and return the translation result directly, without adding any explanations or other content.
+Preserve the original Markdown formatting and LaTeX math expressions. Translate prose without changing code, formulas, or link destinations.
 
 Please translate the <source_text> section:
 <source_text>
@@ -5205,6 +5223,16 @@ Requirements:
     await _preferences.setBool(_displayUseLegacyInlineCodeStyleKey, value);
   }
 
+  // Display: opt in to the previous fenced code block appearance.
+  bool _useLegacyCodeBlockStyle = false;
+  bool get useLegacyCodeBlockStyle => _useLegacyCodeBlockStyle;
+  Future<void> setUseLegacyCodeBlockStyle(bool value) async {
+    if (_useLegacyCodeBlockStyle == value) return;
+    _useLegacyCodeBlockStyle = value;
+    notifyListeners();
+    await _preferences.setBool(_displayUseLegacyCodeBlockStyleKey, value);
+  }
+
   // Display: render user messages with Markdown
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
@@ -5937,6 +5965,7 @@ Requirements:
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
     copy._useLegacyInlineCodeStyle = _useLegacyInlineCodeStyle;
+    copy._useLegacyCodeBlockStyle = _useLegacyCodeBlockStyle;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;
@@ -6233,6 +6262,19 @@ class ProviderConfig {
   // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon | lobehub)
   final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon' | 'lobehub'
   final String? avatarValue;
+  final bool avatarMonochrome;
+
+  AvatarConfig? get avatar => AvatarConfig.fromJson({
+    'type': avatarType,
+    'value': avatarValue,
+    'monochrome': avatarMonochrome,
+  });
+
+  AvatarConfig? modelAvatar(String modelId) {
+    final override = modelOverrides[modelId];
+    return AvatarConfig.fromJson(override is Map ? override['avatar'] : null);
+  }
+
   // Multi-key mode
   final bool? multiKeyEnabled; // default false
   final List<ApiKeyConfig>? apiKeys; // when enabled
@@ -6243,6 +6285,9 @@ class ProviderConfig {
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;
+  final String balanceMethod;
+  final List<Map<String, String>> balanceHeaders;
+  final String balanceBody;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
@@ -6320,6 +6365,7 @@ class ProviderConfig {
     this.proxyPassword,
     this.avatarType,
     this.avatarValue,
+    this.avatarMonochrome = false,
     this.multiKeyEnabled,
     this.apiKeys,
     this.keyManagement,
@@ -6327,6 +6373,9 @@ class ProviderConfig {
     this.balanceEnabled,
     this.balanceApiPath,
     this.balanceResultPath,
+    this.balanceMethod = 'GET',
+    this.balanceHeaders = const [],
+    this.balanceBody = '',
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
@@ -6376,6 +6425,7 @@ class ProviderConfig {
     String? proxyPassword,
     Object? avatarType = _sentinel,
     Object? avatarValue = _sentinel,
+    bool? avatarMonochrome,
     bool? multiKeyEnabled,
     List<ApiKeyConfig>? apiKeys,
     KeyManagementConfig? keyManagement,
@@ -6383,6 +6433,9 @@ class ProviderConfig {
     bool? balanceEnabled,
     String? balanceApiPath,
     String? balanceResultPath,
+    String? balanceMethod,
+    List<Map<String, String>>? balanceHeaders,
+    String? balanceBody,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
   }) => ProviderConfig(
@@ -6425,6 +6478,7 @@ class ProviderConfig {
     avatarValue: (identical(avatarValue, _sentinel))
         ? this.avatarValue
         : (avatarValue as String?),
+    avatarMonochrome: avatarMonochrome ?? this.avatarMonochrome,
     multiKeyEnabled: multiKeyEnabled ?? this.multiKeyEnabled,
     apiKeys: apiKeys ?? this.apiKeys,
     keyManagement: keyManagement ?? this.keyManagement,
@@ -6433,6 +6487,9 @@ class ProviderConfig {
     balanceEnabled: balanceEnabled ?? this.balanceEnabled,
     balanceApiPath: balanceApiPath ?? this.balanceApiPath,
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
+    balanceMethod: balanceMethod ?? this.balanceMethod,
+    balanceHeaders: balanceHeaders ?? this.balanceHeaders,
+    balanceBody: balanceBody ?? this.balanceBody,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
@@ -6474,6 +6531,7 @@ class ProviderConfig {
     'proxyPassword': proxyPassword,
     'avatarType': avatarType,
     'avatarValue': avatarValue,
+    'avatarMonochrome': avatarMonochrome,
     'multiKeyEnabled': multiKeyEnabled,
     'apiKeys': apiKeys?.map((e) => e.toJson()).toList(),
     'keyManagement': keyManagement?.toJson(),
@@ -6481,6 +6539,9 @@ class ProviderConfig {
     'balanceEnabled': balanceEnabled,
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
+    'balanceMethod': balanceMethod,
+    'balanceHeaders': balanceHeaders,
+    'balanceBody': balanceBody,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
@@ -6547,6 +6608,7 @@ class ProviderConfig {
     proxyPassword: json['proxyPassword'] as String?,
     avatarType: json['avatarType'] as String?,
     avatarValue: json['avatarValue'] as String?,
+    avatarMonochrome: json['avatarMonochrome'] == true,
     multiKeyEnabled: json['multiKeyEnabled'] as bool?,
     apiKeys: (json['apiKeys'] as List?)
         ?.whereType<Map>()
@@ -6559,6 +6621,13 @@ class ProviderConfig {
     balanceEnabled: json['balanceEnabled'] as bool?,
     balanceApiPath: json['balanceApiPath'] as String?,
     balanceResultPath: json['balanceResultPath'] as String?,
+    balanceMethod: json['balanceMethod'] as String? ?? 'GET',
+    balanceHeaders:
+        (json['balanceHeaders'] as List?)
+            ?.map((row) => Map<String, String>.from(row as Map))
+            .toList() ??
+        const [],
+    balanceBody: json['balanceBody'] as String? ?? '',
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(

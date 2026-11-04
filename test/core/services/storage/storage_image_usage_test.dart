@@ -164,6 +164,68 @@ void main() {
   );
 
   test(
+    'model file avatars remain protected until their last model reference is removed',
+    () async {
+      final image = await fixture.file('avatars/model.png');
+      final before = await StorageUsageService.listUploadEntries(images: true);
+      expect(before.single.isInUse, isFalse);
+      Map<String, Object?> provider(String key, String path) => {
+        'name': key,
+        'models': [key],
+        'disabledModels': [key],
+        'modelOverrides': {
+          key: {
+            'apiModelId': 'same-model',
+            'avatar': {'type': 'file', 'value': path},
+          },
+        },
+      };
+      final providers = {
+        'A': provider('model', image.path),
+        'B': provider('alias', await image.resolveSymbolicLinks()),
+      };
+      await fixture.preferences.setString(
+        'provider_configs_v1',
+        jsonEncode(providers),
+      );
+      final entries = await StorageUsageService.listUploadEntries(images: true);
+      expect(entries.single.isInUse, isTrue);
+      expect(entries.single.imageKind, StorageImageKind.avatar);
+      expect(
+        await StorageUsageService.deleteUploadFiles([image.path], images: true),
+        0,
+      );
+      providers.remove('A');
+      await fixture.preferences.setString(
+        'provider_configs_v1',
+        jsonEncode(providers),
+      );
+      expect(
+        await StorageUsageService.deleteUploadFiles([image.path], images: true),
+        0,
+      );
+      expect(await image.exists(), isTrue);
+      await fixture.preferences.setString(
+        'provider_configs_v1',
+        jsonEncode({
+          'B': {
+            'name': 'B',
+            'models': ['alias'],
+            'modelOverrides': {
+              'alias': {'apiModelId': 'same-model'},
+            },
+          },
+        }),
+      );
+      expect(
+        await StorageUsageService.deleteUploadFiles([image.path], images: true),
+        1,
+      );
+      expect(await image.exists(), isFalse);
+    },
+  );
+
+  test(
     'classifies rendered Markdown images without treating code samples as uses',
     () async {
       final markdown = await MarkdownMediaSanitizer.replaceInlineBase64Images(

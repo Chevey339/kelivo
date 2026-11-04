@@ -8,13 +8,14 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'macos_window_drag_area.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
-import '../utils/brand_assets.dart';
+import '../features/home/widgets/model_icon.dart';
 import '../core/providers/settings_provider.dart';
 import '../theme/app_semantic_colors.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
@@ -29,7 +30,7 @@ class DesktopTranslatePage extends StatefulWidget {
 
 class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   final TextEditingController _source = TextEditingController();
-  final TextEditingController _output = TextEditingController();
+  final ValueNotifier<String> _output = ValueNotifier('');
 
   LanguageOption? _targetLang;
   String? _modelProviderKey;
@@ -169,7 +170,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     setState(() {
       _translating = true;
-      _output.text = '';
+      _output.value = '';
     });
 
     try {
@@ -189,13 +190,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _subscription = stream.listen(
         (chunk) {
           if (chunk is! TextDelta) return;
-          // live update; remove leading whitespace on first chunk to avoid top gap
-          final s = chunk.text;
-          if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
-          } else {
-            _output.text += s;
-          }
+          _output.value += chunk.text;
         },
         onDone: () {
           if (!mounted) return;
@@ -254,10 +249,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         ),
       ),
     );
-
-    final brandAsset = (_modelId != null)
-        ? BrandAssets.assetForName(_modelId!)
-        : null;
 
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -326,7 +317,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                         : 320,
                                   ),
                                   child: _ModelPickerButton(
-                                    asset: brandAsset,
+                                    providerKey: _modelProviderKey,
                                     modelId: _modelId,
                                     onTap: _pickModel,
                                     enabled: !_translating,
@@ -350,7 +341,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   label: l10n.translatePageClearAll,
                                   onTap: () {
                                     _source.clear();
-                                    _output.clear();
+                                    _output.value = '';
                                   },
                                 ),
                                 child: TextField(
@@ -379,7 +370,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   label: l10n.translatePageCopyResult,
                                   onTap: () async {
                                     await Clipboard.setData(
-                                      ClipboardData(text: _output.text),
+                                      ClipboardData(text: _output.value),
                                     );
                                     if (!context.mounted) return;
                                     showAppSnackBar(
@@ -390,19 +381,19 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     );
                                   },
                                 ),
-                                child: TextField(
-                                  controller: _output,
-                                  readOnly: true,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageOutputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                child: TranslationOutput(
+                                  text: _output,
+                                  streaming: _translating,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    44,
+                                    14,
+                                    14,
                                   ),
-                                  style: TextStyle(fontSize: 14.5, height: 1.4),
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    height: 1.4,
+                                  ),
                                 ),
                               ),
                             ),
@@ -958,12 +949,12 @@ class _TranslateButtonState extends State<_TranslateButton> {
 
 class _ModelPickerButton extends StatelessWidget {
   const _ModelPickerButton({
-    required this.asset,
+    required this.providerKey,
     required this.modelId,
     required this.onTap,
     required this.enabled,
   });
-  final String? asset;
+  final String? providerKey;
   final String? modelId;
   final VoidCallback onTap;
   final bool enabled;
@@ -988,27 +979,16 @@ class _ModelPickerButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (asset != null)
-                () {
-                  if (asset!.toLowerCase().endsWith('.svg')) {
-                    return SvgPicture.asset(
-                      asset!,
-                      width: 18,
-                      height: 18,
-                      colorFilter:
-                          isDark && BrandAssets.assetNeedsDarkInvert(asset!)
-                          ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-                          : null,
-                    );
-                  }
-                  return Image.asset(asset!, width: 18, height: 18);
-                }()
-              else
-                Icon(
-                  lucide.Lucide.Bot,
+              if (providerKey != null && modelId != null)
+                CurrentModelIcon(
+                  providerKey: providerKey,
+                  modelId: modelId,
                   size: 18,
-                  color: cs.onSurface.withValues(alpha: 0.9),
-                ),
+                  iconScale: 1,
+                  withBackground: false,
+                )
+              else
+                Icon(lucide.Lucide.Bot, size: 18, color: cs.onSurface),
               if (modelId != null) ...[
                 const SizedBox(width: 8),
                 Flexible(

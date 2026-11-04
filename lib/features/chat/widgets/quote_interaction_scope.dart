@@ -31,9 +31,10 @@ class QuoteInteractionController extends ChangeNotifier {
   Iterable<QuoteRef> highlightsFor(String messageId) => [
     ..._draft,
     if (_revealed != null) _revealed!,
-  ].where((q) => q.messageId == messageId);
+  ].where((q) => q.hasSourceRange && q.messageId == messageId);
 
   void reveal(QuoteRef quote) {
+    if (!quote.hasSourceRange) return;
     _timer?.cancel();
     _revealed = quote;
     notifyListeners();

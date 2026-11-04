@@ -9,6 +9,18 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get avatarInputInvalid => '请输入有效的图标名称或 HTTP(S) 图片链接。';
+
+  @override
+  String get modelAvatarTitle => '模型图标';
+
+  @override
+  String get avatarColor => '彩色';
+
+  @override
+  String get avatarMonochrome => '单色';
+
+  @override
   String get settingsSearchHint => '搜索设置';
 
   @override
@@ -2806,6 +2818,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '为行内代码使用较浅的底色、细边框和更宽松的行距。';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '旧版代码块样式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '恢复代码块原有的配色、圆角和间距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -4227,7 +4246,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径或完整网址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '这些设置仅用于余额查询。在请求头或请求体中使用 $apiKeyPlaceholder 可引用当前 API Key。默认使用 Bearer 认证；请求头值留空可移除该请求头。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '请求体（可选）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '仅随 POST 发送，留空则不发送请求体。Content-Type 默认为 application/json，可添加请求头指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -15123,6 +15157,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
 
   @override
+  String get avatarInputInvalid => '请输入有效的图标名称或 HTTP(S) 图片链接。';
+
+  @override
+  String get modelAvatarTitle => '模型图标';
+
+  @override
+  String get avatarColor => '彩色';
+
+  @override
+  String get avatarMonochrome => '单色';
+
+  @override
   String get settingsSearchHint => '搜索设置';
 
   @override
@@ -17920,6 +17966,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '为行内代码使用较浅的底色、细边框和更宽松的行距。';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '旧版代码块样式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '恢复代码块原有的配色、圆角和间距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
 
   @override
@@ -19341,7 +19394,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径或完整网址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '这些设置仅用于余额查询。在请求头或请求体中使用 $apiKeyPlaceholder 可引用当前 API Key。默认使用 Bearer 认证；请求头值留空可移除该请求头。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '请求体（可选）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '仅随 POST 发送，留空则不发送请求体。Content-Type 默认为 application/json，可添加请求头指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -30093,6 +30161,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
 
   @override
+  String get avatarInputInvalid => '請輸入有效的圖示名稱或 HTTP(S) 圖片連結。';
+
+  @override
+  String get modelAvatarTitle => '模型圖示';
+
+  @override
+  String get avatarColor => '彩色';
+
+  @override
+  String get avatarMonochrome => '單色';
+
+  @override
   String get settingsSearchHint => '搜尋設定';
 
   @override
@@ -32890,6 +32970,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '為行內程式碼使用較淺的底色、細邊框和更寬鬆的行距。';
 
   @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleTitle => '舊版程式碼區塊樣式';
+
+  @override
+  String get displaySettingsPageUseLegacyCodeBlockStyleSubtitle =>
+      '還原程式碼區塊原有的配色、圓角和間距。';
+
+  @override
   String get displaySettingsPageEnableUserMarkdownTitle => '使用者訊息 Markdown 渲染';
 
   @override
@@ -34311,7 +34398,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '取得帳戶餘額';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑';
+  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑或完整網址';
+
+  @override
+  String get providerDetailPageBalanceMethodLabel => 'HTTP 方法';
+
+  @override
+  String providerDetailPageBalanceRequestHint(String apiKeyPlaceholder) {
+    return '這些設定僅用於餘額查詢。在請求標頭或請求主體中使用 $apiKeyPlaceholder 可引用目前的 API Key。預設使用 Bearer 驗證；標頭值留空可移除該標頭。';
+  }
+
+  @override
+  String get providerDetailPageBalanceBodyLabel => '請求主體（選填）';
+
+  @override
+  String get providerDetailPageBalanceBodyHint =>
+      '僅隨 POST 傳送，留空則不傳送請求主體。Content-Type 預設為 application/json，可新增標頭指定其他格式。';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '結果 JSON 路徑';
