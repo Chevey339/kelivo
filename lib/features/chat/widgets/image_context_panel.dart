@@ -187,6 +187,51 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
     }
   }
 
+  Widget _settingCard({
+    required String label,
+    required String description,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: AppFontWeights.medium,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          IosSwitch(
+            value: value,
+            semanticLabel: label,
+            onChanged: _busy ? null : onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -215,52 +260,29 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                     ),
                     if (settings != null) ...[
                       const SizedBox(height: 18),
-                      SectionCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
+                      _settingCard(
+                        label: l10n.imageContextAutomatic,
+                        description: l10n.imageContextAutomaticDescription,
+                        value: settings.automatic,
+                        onChanged: (value) => _save(
+                          ImageContextSettings(
+                            automatic: value,
+                            allowRecall: settings.allowRecall,
+                            pinned: settings.pinned,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    l10n.imageContextAutomatic,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: AppFontWeights.medium,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    l10n.imageContextAutomaticDescription,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.5,
-                                      color: cs.onSurface.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            IosSwitch(
-                              value: settings.automatic,
-                              semanticLabel: l10n.imageContextAutomatic,
-                              onChanged: _busy
-                                  ? null
-                                  : (value) => _save(
-                                      ImageContextSettings(
-                                        automatic: value,
-                                        pinned: settings.pinned,
-                                      ),
-                                    ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(height: 10),
+                      _settingCard(
+                        label: l10n.imageContextAllowRecall,
+                        description: l10n.imageContextAllowRecallDescription,
+                        value: settings.allowRecall,
+                        onChanged: (value) => _save(
+                          ImageContextSettings(
+                            automatic: settings.automatic,
+                            allowRecall: value,
+                            pinned: settings.pinned,
+                          ),
                         ),
                       ),
                     ],

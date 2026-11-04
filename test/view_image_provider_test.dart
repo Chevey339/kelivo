@@ -385,6 +385,132 @@ void main() {
   );
 
   for (final api in _Api.values) {
+    for (final stream in [false, true]) {
+      test(
+        '${api.name} stream=$stream exposes recall only after an image arrives',
+        () async {
+          final file = File('${imageRoot.path}/images/mcp_img_recall.png');
+          await file.writeAsBytes(
+            img.encodePng(img.Image(width: 2, height: 2)),
+          );
+          final requests = <Map<String, dynamic>>[];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          var first = true;
+          server.listen((request) async {
+            final body =
+                jsonDecode(await utf8.decoder.bind(request).join())
+                    as Map<String, dynamic>;
+            requests.add(body);
+            final callTool = first;
+            first = false;
+            final isStream =
+                body['stream'] == true ||
+                request.uri.path.contains('streamGenerateContent');
+            request.response.headers.contentType = isStream
+                ? ContentType('text', 'event-stream')
+                : ContentType.json;
+            request.response.write(
+              isStream
+                  ? _sse(api, callTool)
+                  : jsonEncode(_response(api, callTool)),
+            );
+            await request.response.close();
+          });
+          final model = _model(api);
+          final config = ProviderConfig(
+            id: 'recall-test',
+            name: 'recall-test',
+            enabled: true,
+            apiKey: 'test-key',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            providerType: switch (api) {
+              _Api.chat || _Api.responses => ProviderKind.openai,
+              _Api.claude => ProviderKind.claude,
+              _ => ProviderKind.google,
+            },
+            useResponseApi: api == _Api.responses,
+            vertexAI: api == _Api.vertexClaude,
+            projectId: api == _Api.vertexClaude ? 'test' : null,
+            location: api == _Api.vertexClaude ? 'global' : null,
+            modelOverrides: {
+              model: {
+                'input': ['text', 'image'],
+                'abilities': ['tool'],
+              },
+            },
+          );
+          final candidates = [
+            ..._imageTools('view_image'),
+            ..._imageTools('read_chat_image'),
+          ];
+          final original = jsonEncode(candidates);
+          for (final allowRecall in [true, false]) {
+            requests.clear();
+            first = true;
+            final context = RequestImageContext(
+              settings: ImageContextSettings(allowRecall: allowRecall),
+              images: [],
+            );
+            final chunks = await ChatApiService.sendMessageStream(
+              config: config,
+              modelId: model,
+              stream: stream,
+              messages: const [
+                {'role': 'user', 'content': 'Inspect plot.png.'},
+              ],
+              tools: candidates,
+              imageContext: context,
+              onToolCall: (name, args, {toolCallId}) async => ClientToolResult(
+                'Image',
+                metadata: {
+                  ...const WorkspaceToolMetadata(
+                    tool: 'view_image',
+                    status: 'ok',
+                  ).toJson(),
+                  kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+                },
+              ),
+            ).toList();
+            expect(chunks.isGenerationDone, isTrue);
+            expect(requests, hasLength(2));
+            expect(
+              jsonEncode(requests.first['tools']),
+              isNot(contains('read_chat_image')),
+            );
+            expect(
+              jsonEncode(requests.last['tools']).contains('read_chat_image'),
+              allowRecall,
+            );
+            expect(_imagePayloads(requests.last), isNotEmpty);
+            expect(context.images, isNotEmpty);
+            expect(jsonEncode(candidates), original);
+          }
+          requests.clear();
+          first = false;
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: model,
+            stream: stream,
+            messages: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            tools: _imageTools('read_chat_image'),
+            imageContext: RequestImageContext(
+              settings: const ImageContextSettings(),
+              images: [],
+            ),
+          ).drain<void>();
+          expect(requests, hasLength(1));
+          expect(requests.single, isNot(contains('tools')));
+          expect(requests.single, isNot(contains('tool_choice')));
+          expect(requests.single, isNot(contains('toolConfig')));
+        },
+      );
+    }
+  }
+
+  for (final api in _Api.values) {
     test(
       '${api.name} preserves the original mixed Markdown request before eviction',
       () async {

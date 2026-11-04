@@ -67,7 +67,7 @@ extension ChatContextOperations on ChatService {
                 );
                 for (var i = 0; i < imageUris.length; i++) {
                   buffer.write(
-                    '\n[Image ${ContextImageIdentity(message.id, "tool:${tool['id'] ?? 'part:${message.parts.indexOf(part)}'}", i).handle}; read_chat_image can restore it]\n',
+                    '\n[Image ${ContextImageIdentity(message.id, "tool:${tool['id'] ?? 'part:${message.parts.indexOf(part)}'}", i).handle}; image content not summarized]\n',
                   );
                 }
                 if (tool['arguments'] != null) {

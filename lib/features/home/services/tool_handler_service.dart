@@ -270,6 +270,8 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
+    // Keep this candidate for images returned later in the tool loop.
+    // RequestImageContext gates its declaration on every outgoing request.
     if (supportsTools &&
         conversationId != null &&
         ModelSpecResolver.instance
@@ -566,14 +568,22 @@ class ToolHandlerService {
         try {
           if (name == 'read_chat_image') {
             final imageContext = RequestImageContext.current;
+            final chat = permissionChat;
             if (imageContext == null ||
                 conversationId == null ||
-                permissionChat == null) {
+                chat == null) {
               return const ClientToolResult(
                 'Image is unavailable in the current conversation context.',
               );
             }
-            final allowed = await permissionChat.imageContextHistory(
+            if (!(await chat.imageContextSettings(
+              conversationId,
+            )).allowRecall) {
+              return const ClientToolResult(
+                'Image recall is disabled for this conversation. Ask the user to attach the image again if needed.',
+              );
+            }
+            final allowed = await chat.imageContextHistory(
               conversationId,
               throughMessageId: imageContext.targetMessageId,
             );

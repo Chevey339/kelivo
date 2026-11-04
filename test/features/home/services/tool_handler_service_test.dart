@@ -1,6 +1,8 @@
 import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +24,77 @@ import '../../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'image recall checks the current switch during an existing request',
+    (tester) async {
+      final chat = _RecallChat();
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final mcpProvider = McpProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final toolSvc = McpToolService();
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(chat.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(mcpProvider.dispose);
+      addTearDown(toolSvc.dispose);
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await assistants.loaded;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+            ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+            ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+          ],
+          child: const SizedBox.shrink(),
+        ),
+      );
+      final handler = ToolHandlerService(
+        contextProvider: tester.element(find.byType(SizedBox)),
+      ).buildToolCallHandler(settings, null, conversationId: 'chat')!;
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [
+          ChatContextImage(
+            identity: const ContextImageIdentity('u', 'part:0'),
+            uri: 'data:image/png;base64,YWJj',
+            source: ContextImageSource.user,
+            label: 'image',
+          ),
+        ],
+      );
+      await tester.runAsync(
+        () => context.run(() async* {
+          final before = ClientToolResult.fromHandler(
+            await handler('read_chat_image', {}),
+          );
+          expect(before.content, contains('"images"'));
+          await chat.setImageContextSettings(
+            'chat',
+            const ImageContextSettings(allowRecall: false),
+          );
+          for (final args in [
+            <String, dynamic>{},
+            {'image_id': context.images.single.handle},
+          ]) {
+            final result = ClientToolResult.fromHandler(
+              await handler('read_chat_image', args),
+            );
+            expect(result.content, contains('disabled'));
+            expect(result.content, isNot(contains('read_chat_image')));
+            expect(result.metadata, isNull);
+          }
+          yield 0;
+        }).drain<void>(),
+      );
+    },
+  );
 
   group('ToolHandlerService tool schema sanitization', () {
     for (final kind in const [ProviderKind.openai, ProviderKind.claude]) {
@@ -616,4 +689,9 @@ class _PermissionChat extends ChatService {
   @override
   Conversation? getConversation(String id) =>
       id == conversation.id ? conversation : null;
+}
+
+class _RecallChat extends ChatService {
+  @override
+  bool isTemporaryConversation(String? id) => true;
 }

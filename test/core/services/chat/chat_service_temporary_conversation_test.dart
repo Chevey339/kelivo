@@ -103,6 +103,10 @@ void main() {
       final conversation = await chat.createDraftConversation(
         temporary: temporary,
       );
+      await chat.setImageContextSettings(
+        conversation.id,
+        const ImageContextSettings(allowRecall: false),
+      );
       final message = await chat.addMessage(
         conversationId: conversation.id,
         role: 'user',
@@ -114,22 +118,38 @@ void main() {
       final before = await chat.imageContextHistory(conversation.id);
       final image = RequestImageContext.collect(before).single;
       expect(image.key, ContextImageIdentity(message.id, 'part:1').key);
+      final settings = await chat.imageContextSettings(conversation.id);
+      expect(settings.allowRecall, isFalse);
       final revision = chat.contextRevision(conversation.id);
       await chat.setImageContextSettings(
         conversation.id,
-        ImageContextSettings(pinned: {image.key}),
+        settings.pin(image.key, true),
       );
       expect(chat.contextRevision(conversation.id), revision + 1);
       expect((await chat.imageContextSettings(conversation.id)).pinned, {
         image.key,
       });
       expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
+      expect(
         (await chat.chatRepositoryOrNull!.readImageContextSettings(
           conversation.id,
         )).pinned,
         temporary ? isEmpty : {image.key},
       );
+      expect(
+        (await chat.chatRepositoryOrNull!.readImageContextSettings(
+          conversation.id,
+        )).allowRecall,
+        temporary,
+      );
       await chat.clearConversationContext(conversation.id);
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
       expect(await chat.imageContextHistory(conversation.id), isEmpty);
       expect(
         await chat.imageContextHistory(
@@ -158,6 +178,10 @@ void main() {
       expect(
         (await chat.imageContextSettings(conversation.id)).pinned,
         isEmpty,
+      );
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isTrue,
       );
     });
   }

@@ -15851,6 +15851,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.';
 
   @override
+  String get imageContextAllowRecall => 'Allow the model to recall images';
+
+  @override
+  String get imageContextAllowRecallDescription =>
+      'Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.';
+
+  @override
   String get imageContextTitle => 'Image context';
 
   @override

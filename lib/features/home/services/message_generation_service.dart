@@ -395,7 +395,8 @@ class MessageGenerationService {
           .supportsPdfInput,
     );
     final imageContext =
-        ChatApiService.supportsOpenAIImagesApiRouting(packed.cfg, modelId)
+        ChatApiService.supportsOpenAIImagesApiRouting(packed.cfg, modelId) ||
+            shouldUseZhipuLayoutParsing(packed.cfg, modelId)
         ? null
         : await _imageContext(
             conversationId,
@@ -633,6 +634,27 @@ class MessageGenerationService {
       }
     }
 
+    RequestImageContext? imageContext;
+    if (currentConversation != null &&
+        !ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
+        !shouldUseZhipuLayoutParsing(cfg, modelId)) {
+      imageContext = await _imageContext(
+        currentConversation.id,
+        messages,
+        packed,
+        settings,
+        modelId,
+      );
+      lastUserImagePaths = await imageContext.prepareMessages(
+        apiMessages,
+        lastUserImagePaths,
+        parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
+        allowRemoteImages: imageContext.allowsRemoteUserImages,
+      );
+    } else {
+      await messageBuilderService.inlineLocalImages(apiMessages);
+    }
+
     if (currentConversation != null &&
         chatService.contextOperationsFor(currentConversation.id).isNotEmpty) {
       final window = ModelSpecResolver.instance
@@ -640,6 +662,7 @@ class MessageGenerationService {
           .contextWindow;
       if (window != null) {
         final preview = ContextAssemblyPreview.fromApiMessages(
+          imageContext: imageContext,
           apiMessages: apiMessages,
           tools: toolDefs,
           mcpToolNames: const {},
@@ -666,26 +689,6 @@ class MessageGenerationService {
           );
         }
       }
-    }
-    RequestImageContext? imageContext;
-    if (currentConversation != null &&
-        !ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
-        !shouldUseZhipuLayoutParsing(cfg, modelId)) {
-      imageContext = await _imageContext(
-        currentConversation.id,
-        messages,
-        packed,
-        settings,
-        modelId,
-      );
-      lastUserImagePaths = await imageContext.prepareMessages(
-        apiMessages,
-        lastUserImagePaths,
-        parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
-        allowRemoteImages: imageContext.allowsRemoteUserImages,
-      );
-    } else {
-      await messageBuilderService.inlineLocalImages(apiMessages);
     }
     if (ContextLogger.enabled) {
       final providerName = cfg.name.trim();

@@ -54,6 +54,10 @@ class ContextAssemblyPreview {
     required List<ContextImageRef> images,
     RequestImageContext? imageContext,
   }) {
+    tools = RequestImageContext.toolsForRequest(
+      tools,
+      imageContext: imageContext,
+    );
     final text = <ContextSource, StringBuffer>{};
     for (final message in apiMessages) {
       for (final segment in segmentsFromTaggedMessage(

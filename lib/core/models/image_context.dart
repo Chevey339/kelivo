@@ -27,15 +27,21 @@ class ContextImageIdentity {
 }
 
 class ImageContextSettings {
-  const ImageContextSettings({this.automatic = true, this.pinned = const {}});
+  const ImageContextSettings({
+    this.automatic = true,
+    this.allowRecall = true,
+    this.pinned = const {},
+  });
 
   static const entityKind = 'conversationImageContext';
   final bool automatic;
+  final bool allowRecall;
   final Set<String> pinned;
 
   factory ImageContextSettings.fromJson(Map<String, dynamic> json) =>
       ImageContextSettings(
         automatic: json['automatic'] != false,
+        allowRecall: json['allowRecall'] != false,
         pinned: Set.unmodifiable(
           (json['pinned'] as List? ?? const []).whereType<String>(),
         ),
@@ -43,12 +49,14 @@ class ImageContextSettings {
 
   Map<String, dynamic> toJson() => {
     'automatic': automatic,
+    'allowRecall': allowRecall,
     'pinned': pinned.toList()..sort(),
   };
 
   ImageContextSettings remap(Map<String, String> messages) =>
       ImageContextSettings(
         automatic: automatic,
+        allowRecall: allowRecall,
         pinned: {
           for (final key in pinned)
             if (ContextImageIdentity.remapKey(key, messages)
@@ -59,6 +67,7 @@ class ImageContextSettings {
 
   ImageContextSettings pin(String key, bool value) => ImageContextSettings(
     automatic: automatic,
+    allowRecall: allowRecall,
     pinned: {...pinned}
       ..removeWhere((item) => item == key)
       ..addAll(value ? [key] : const []),

@@ -23,21 +23,21 @@ class _TemporaryChat extends ChatService {
 class _Usage extends ContextUsageService {
   _Usage({
     required this.chat,
-    required this.image,
+    required this.images,
     required super.settings,
     required super.assistants,
     required super.instructions,
     required super.worldBooks,
   }) : super(chatService: chat);
   final ChatService chat;
-  final ChatContextImage image;
+  List<ChatContextImage> images;
   @override
   Future<RequestImageContext?> imageContextPreview(
     String conversationId,
   ) async => RequestImageContext(
     settings: await chat.imageContextSettings(conversationId),
-    images: [image],
-  )..activeHandles.add(image.handle);
+    images: images,
+  )..activeHandles.addAll(images.map((image) => image.handle));
   @override
   Future<void> refresh(
     String conversationId, {
@@ -77,7 +77,7 @@ void main() {
     );
     usage = _Usage(
       chat: chat,
-      image: image,
+      images: [image],
       settings: settings,
       assistants: assistants,
       instructions: instructions,
@@ -92,10 +92,22 @@ void main() {
       worlds.dispose();
     });
   });
-  testWidgets('image panel pins, changes mode and queues a new attachment', (
-    tester,
-  ) async {
-    String? attached;
+  Finder imageSwitch(String label) => find.byWidgetPredicate(
+    (widget) => widget is IosSwitch && widget.semanticLabel == label,
+  );
+
+  Future<void> settlePanel(WidgetTester tester) async {
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 40)),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openPanel(
+    WidgetTester tester, {
+    ValueChanged<String>? onAttach,
+  }) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -108,11 +120,8 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: TextButton(
-                onPressed: () => showImageContextPanel(
-                  context,
-                  'chat',
-                  onAttach: (path) => attached = path,
-                ),
+                onPressed: () =>
+                    showImageContextPanel(context, 'chat', onAttach: onAttach),
                 child: const Text('Open'),
               ),
             ),
@@ -121,33 +130,86 @@ void main() {
       ),
     );
     await tester.tap(find.text('Open'));
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 40)),
-    );
-    await tester.pumpAndSettle();
+    await settlePanel(tester);
+  }
+
+  testWidgets('image panel keeps recall independent of management and pins', (
+    tester,
+  ) async {
+    String? attached;
+    await openPanel(tester, onAttach: (path) => attached = path);
     expect(find.text('diagram'), findsOneWidget);
+    final recall = imageSwitch('Allow the model to recall images');
+    final automatic = imageSwitch('Manage history images automatically');
+    expect(tester.widget<IosSwitch>(recall).value, isTrue);
+    expect(tester.widget<IosSwitch>(automatic).value, isTrue);
+    await tester.tap(recall);
+    await settlePanel(tester);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect(tester.widget<IosSwitch>(automatic).value, isTrue);
+
+    await tester.scrollUntilVisible(
+      find.byTooltip('Pin image').hitTestable(),
+      150,
+      scrollable: find.descendant(
+        of: find.byType(ImageContextPanel),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Pin image'));
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 40)),
-    );
-    await tester.pumpAndSettle();
+    await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
     expect(find.byTooltip('Unpin image'), findsOneWidget);
-    await tester.tap(find.byType(IosSwitch));
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 40)),
-    );
+    await tester.ensureVisible(automatic);
     await tester.pumpAndSettle();
+    await tester.tap(automatic);
+    await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
-    await tester.tap(find.byTooltip('Add to composer again'));
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 40)),
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).pinned, {image.key});
+
+    await tester.scrollUntilVisible(
+      find.byTooltip('Add to composer again').hitTestable(),
+      150,
+      scrollable: find.descendant(
+        of: find.byType(ImageContextPanel),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Add to composer again'));
+    await settlePanel(tester);
     expect(attached, file.path);
+
+    await tester.tap(find.text('Open'));
+    await settlePanel(tester);
+    await tester.ensureVisible(recall);
+    await tester.pumpAndSettle();
+    await tester.tap(recall);
+    await settlePanel(tester);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
+    expect((await chat.imageContextSettings('chat')).automatic, isFalse);
+    expect((await chat.imageContextSettings('chat')).pinned, {image.key});
+  });
+
+  testWidgets('image panel allows recall control before the first image', (
+    tester,
+  ) async {
+    usage.images = [];
+    await openPanel(tester);
+    expect(find.text('No images yet'), findsOneWidget);
+    final recall = imageSwitch('Allow the model to recall images');
+    final automatic = imageSwitch('Manage history images automatically');
+    await tester.tap(recall);
+    await settlePanel(tester);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect(tester.widget<IosSwitch>(automatic).value, isTrue);
+    expect(find.text('No images yet'), findsOneWidget);
+    await tester.tap(automatic);
+    await settlePanel(tester);
+    expect((await chat.imageContextSettings('chat')).automatic, isFalse);
+    expect(tester.widget<IosSwitch>(recall).value, isFalse);
   });
 }

@@ -340,7 +340,6 @@ void main() {
       final request = RequestImageContext(
         settings: const ImageContextSettings(),
         images: items,
-        canImageInput: false,
       );
       request.activeHandles.addAll(items.map((im) => im.handle));
       expect(
@@ -366,7 +365,15 @@ void main() {
         request.readImage(items[0].handle, allowedMessages: {}).metadata,
         isNull,
       );
-      expect((await request.preview()).any((image) => image.included), isFalse);
+      final textOnly = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: items,
+        canImageInput: false,
+      )..activeHandles.addAll(items.map((im) => im.handle));
+      expect(
+        (await textOnly.preview()).any((image) => image.included),
+        isFalse,
+      );
     },
   );
 

@@ -27978,6 +27978,18 @@ abstract class AppLocalizations {
   /// **'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.'**
   String get recoveryCopiesNeedUpdate;
 
+  /// No description provided for @imageContextAllowRecall.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the model to recall images'**
+  String get imageContextAllowRecall;
+
+  /// No description provided for @imageContextAllowRecallDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.'**
+  String get imageContextAllowRecallDescription;
+
   /// No description provided for @imageContextTitle.
   ///
   /// In en, this message translates to:

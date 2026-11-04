@@ -7431,6 +7431,8 @@
   "recoverySpaceAmount": "Last check: {available} available; at least {required} of free space is needed to prepare your data safely.",
   "@recoverySpaceAmount": {"placeholders": {"required": {"type": "String"}, "available": {"type": "String"}}},
   "recoveryCopiesNeedUpdate": "Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.",
+  "imageContextAllowRecall": "Allow the model to recall images",
+  "imageContextAllowRecallDescription": "Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.",
   "imageContextTitle": "Image context",
   "imageContextAutomatic": "Manage history images automatically",
   "imageContextDescription": "Manage the images included in this turn. Originals stay in your chat.",

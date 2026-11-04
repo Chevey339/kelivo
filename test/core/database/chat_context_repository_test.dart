@@ -146,10 +146,11 @@ void main() {
   );
 
   test(
-    'image pins survive fork and backup, remap message ids, and delete with their conversation',
+    'image preferences survive fork and backup, remap pins, and delete with their conversation',
     () async {
       final settings = ImageContextSettings(
         automatic: false,
+        allowRecall: false,
         pinned: {
           const ContextImageIdentity('u1', 'part:1').key,
           const ContextImageIdentity('u3', 'part:0').key,
@@ -164,6 +165,7 @@ void main() {
       final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
       final forkSettings = await repo.readImageContextSettings(fork.id);
       expect(forkSettings.automatic, isFalse);
+      expect(forkSettings.allowRecall, isFalse);
       expect(forkSettings.pinned, {
         ContextImageIdentity(forkMessages.first.id, 'part:1').key,
       });
@@ -185,7 +187,12 @@ void main() {
         final importedMessages = (await target.readContextSnapshot(
           importedId,
         )).messages;
-        expect((await target.readImageContextSettings(importedId)).pinned, {
+        final importedSettings = await target.readImageContextSettings(
+          importedId,
+        );
+        expect(importedSettings.automatic, isFalse);
+        expect(importedSettings.allowRecall, isFalse);
+        expect(importedSettings.pinned, {
           ContextImageIdentity(importedMessages.first.id, 'part:1').key,
           ContextImageIdentity(importedMessages[4].id, 'part:0').key,
         });
@@ -200,6 +207,10 @@ void main() {
         );
         expect(
           (await target.readImageContextSettings(importedId)).automatic,
+          isTrue,
+        );
+        expect(
+          (await target.readImageContextSettings(importedId)).allowRecall,
           isTrue,
         );
       } finally {

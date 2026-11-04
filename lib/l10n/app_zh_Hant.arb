@@ -1,4 +1,6 @@
 {
+  "imageContextAllowRecall": "允許模型重新讀取歷史圖片",
+  "imageContextAllowRecallDescription": "允許模型按需讀取本對話中的圖片。關閉後不影響歷史圖片的自動管理。",
   "avatarInputInvalid": "請輸入有效的圖示名稱或 HTTP(S) 圖片連結。",
   "modelAvatarTitle": "模型圖示",
   "avatarColor": "彩色",

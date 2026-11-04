@@ -74,7 +74,7 @@ class RequestImageContext {
     this.maxImageBytes = 20 * 1024 * 1024,
     this.maxBodyBytes = 28 * 1024 * 1024,
     this.maxSingleImageBytes = 5 * 1024 * 1024,
-    this.canRecall = true,
+    bool canRecall = true,
     this.canImageInput = true,
     this.loader,
     this.inlineRemoteUsers = false,
@@ -82,7 +82,8 @@ class RequestImageContext {
     Map<String, String?> userTurns = const {},
     this.omitUserImages = false,
     this.viewImageUris = const {},
-  }) : images = List.of(images),
+  }) : canRecall = canRecall && canImageInput && settings.allowRecall,
+       images = List.of(images),
        _userTurns = Map.of(userTurns) {
     String? user;
     for (final image in images) {
@@ -102,6 +103,8 @@ class RequestImageContext {
   final int maxBodyBytes;
   final int maxSingleImageBytes;
   final bool canRecall;
+  bool get hasRecallableImages =>
+      canRecall && images.any((image) => !_isUnavailable(image));
   final bool canImageInput;
   final bool inlineRemoteUsers;
   final bool allowsRemoteUserImages;
@@ -498,7 +501,12 @@ class RequestImageContext {
     Set<String>? allowedMessages,
     int offset = 0,
   }) {
-    if (handle.isEmpty && canRecall) {
+    if (!canRecall) {
+      return const ClientToolResult(
+        'Image recall is disabled for this request. Ask the user to attach the image again if needed.',
+      );
+    }
+    if (handle.isEmpty) {
       final available = images
           .where(
             (image) =>
@@ -525,13 +533,13 @@ class RequestImageContext {
       );
     }
     final source = _byHandle[handle];
-    if (!canRecall ||
-        source == null ||
+    if (source == null ||
         _isUnavailable(source) ||
         (allowedMessages != null &&
             !allowedMessages.contains(source.identity.messageId))) {
-      return const ClientToolResult(
-        'Image is unavailable in the current conversation context. Call read_chat_image without image_id to list available images.',
+      return ClientToolResult(
+        'Image is unavailable in the current conversation context. '
+        '${hasRecallableImages ? 'Call read_chat_image without image_id to list available images.' : 'Ask the user to attach it again.'}',
       );
     }
     return ClientToolResult(
@@ -560,10 +568,18 @@ class RequestImageContext {
             SandboxPathResolver.dedupeKey(uri),
   );
 
-  String omittedText(String handle, {String? reason}) => reason == 'unavailable'
-      ? '[Image $handle unavailable. Ask the user to attach it again.]'
-      : '[Image $handle omitted. '
-            '${viewImageUris.contains(_byHandle[handle]?.uri) ? 'Use view_image on the attached Path when needed.' : 'Use read_chat_image with this image_id when needed.'}]';
+  String omittedText(String handle, {String? reason}) {
+    if (reason == 'unavailable') {
+      return '[Image $handle unavailable. Ask the user to attach it again.]';
+    }
+    final instruction =
+        canImageInput && viewImageUris.contains(_byHandle[handle]?.uri)
+        ? 'Use view_image on the attached Path when needed.'
+        : hasRecallableImages
+        ? 'Use read_chat_image with this image_id when needed.'
+        : 'Ask the user to attach it again if needed.';
+    return '[Image $handle omitted. $instruction]';
+  }
 
   Future<String?> _load(ChatContextImage image) =>
       _loads.putIfAbsent(image.key, () async {
@@ -1012,10 +1028,11 @@ class RequestImageContext {
       );
       projected['messages'] = messages;
     }
-    if (utf8.encode(jsonEncode(projected)).length > maxBodyBytes) {
+    final request = _projectTools(projected, this);
+    if (utf8.encode(jsonEncode(request)).length > maxBodyBytes) {
       throw const ImageContextBudgetException();
     }
-    return projected;
+    return request;
   }
 
   List<Map<String, dynamic>> withoutImageInput(
@@ -1054,8 +1071,95 @@ class RequestImageContext {
       })(),
   ];
 
+  /// Keep the candidates intact: a tool can return the first image after the
+  /// initial request. Preview and every HTTP round use this same projection.
+  static List<Map<String, dynamic>> toolsForRequest(
+    List<Map<String, dynamic>> tools, {
+    required RequestImageContext? imageContext,
+  }) {
+    if (imageContext?.hasRecallableImages == true) return tools;
+    return [
+      for (final tool in tools)
+        if (_withoutRecallTool(tool) case final filtered?) filtered,
+    ];
+  }
+
+  static bool _isRecallTool(Map tool) =>
+      tool['name'] == 'read_chat_image' ||
+      (tool['function'] is Map &&
+          tool['function']['name'] == 'read_chat_image');
+
+  static Map<String, dynamic>? _withoutRecallTool(Map<String, dynamic> tool) {
+    if (_isRecallTool(tool)) return null;
+    var result = tool;
+    for (final key in ['function_declarations', 'functionDeclarations']) {
+      final declarations = tool[key];
+      if (declarations is! List ||
+          !declarations.any((d) => d is Map && _isRecallTool(d))) {
+        continue;
+      }
+      final filtered = [
+        for (final declaration in declarations)
+          if (declaration is! Map || !_isRecallTool(declaration)) declaration,
+      ];
+      result = {...result}..remove(key);
+      if (filtered.isNotEmpty) result[key] = filtered;
+    }
+    return result.isEmpty ? null : result;
+  }
+
+  static Map<String, dynamic> _projectTools(
+    Map<String, dynamic> body,
+    RequestImageContext? imageContext,
+  ) {
+    final candidates = body['tools'];
+    if (candidates is! List) return body;
+    final tools = toolsForRequest(
+      candidates.cast<Map<String, dynamic>>(),
+      imageContext: imageContext,
+    );
+    if (tools.length == candidates.length &&
+        Iterable<int>.generate(
+          tools.length,
+        ).every((i) => identical(tools[i], candidates[i]))) {
+      return body;
+    }
+    final result = {...body};
+    if (tools.isEmpty) {
+      result.remove('tools');
+      result.remove('tool_choice');
+    } else {
+      result['tools'] = tools;
+      final choice = result['tool_choice'];
+      if (choice is Map && _isRecallTool(choice)) {
+        result.remove('tool_choice');
+      }
+    }
+    final hasFunctions = tools.any(
+      (tool) => [
+        'function_declarations',
+        'functionDeclarations',
+      ].any((key) => tool[key] is List && (tool[key] as List).isNotEmpty),
+    );
+    if (!hasFunctions && result['toolConfig'] is Map) {
+      final config = Map<String, dynamic>.from(result['toolConfig'] as Map)
+        ..remove('function_calling_config')
+        ..remove('functionCallingConfig')
+        ..remove('includeServerSideToolInvocations');
+      if (config.isEmpty) {
+        result.remove('toolConfig');
+      } else {
+        result['toolConfig'] = config;
+      }
+    }
+    return result;
+  }
+
   static Future<String> encodeBody(Map<String, dynamic> body) async {
-    return jsonEncode(await current?.project(body) ?? body);
+    final context = current;
+    return jsonEncode(
+      context == null ? _projectTools(body, null) : await context.project(body),
+    );
   }
 
   Map<String, dynamic> previewMessage(Map<String, dynamic> message) {

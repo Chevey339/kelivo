@@ -15046,6 +15046,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '部分副本来自更新版本的 Kelivo，请升级 App 后再恢复。这些副本仍然保留。';
 
   @override
+  String get imageContextAllowRecall => '允许模型回读历史图片';
+
+  @override
+  String get imageContextAllowRecallDescription =>
+      '允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。';
+
+  @override
   String get imageContextTitle => '图片上下文';
 
   @override
@@ -30118,6 +30125,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get recoveryCopiesNeedUpdate =>
       '部分副本来自更新版本的 Kelivo，请升级 App 后再恢复。这些副本仍然保留。';
+
+  @override
+  String get imageContextAllowRecall => '允许模型回读历史图片';
+
+  @override
+  String get imageContextAllowRecallDescription =>
+      '允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。';
 
   @override
   String get contextOperationsTitle => '上下文操作记录';
@@ -45203,6 +45217,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get recoveryCopiesNeedUpdate =>
       '部分副本來自更新版本的 Kelivo，請升級 App 後再還原。這些副本仍然保留。';
+
+  @override
+  String get imageContextAllowRecall => '允許模型重新讀取歷史圖片';
+
+  @override
+  String get imageContextAllowRecallDescription =>
+      '允許模型按需讀取本對話中的圖片。關閉後不影響歷史圖片的自動管理。';
 
   @override
   String get contextOperationsTitle => '上下文操作記錄';
