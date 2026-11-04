@@ -18,6 +18,7 @@ import '../../settings/widgets/language_select_sheet.dart'
 import '../../../core/services/haptics.dart';
 import '../../model/widgets/model_select_sheet.dart' show showModelSelector;
 import '../../../theme/app_font_weights.dart';
+import '../widgets/translation_output.dart';
 
 class TranslatePage extends StatefulWidget {
   const TranslatePage({super.key});
@@ -28,7 +29,7 @@ class TranslatePage extends StatefulWidget {
 
 class _TranslatePageState extends State<TranslatePage> {
   final TextEditingController _src = TextEditingController();
-  final TextEditingController _dst = TextEditingController();
+  final ValueNotifier<String> _dst = ValueNotifier('');
   LanguageOption? _lang;
   String? _providerKey;
   String? _modelId;
@@ -98,7 +99,7 @@ class _TranslatePageState extends State<TranslatePage> {
     final lang = await showLanguageSelector(context);
     if (!mounted || lang == null) return;
     if (lang.code == '__clear__') {
-      setState(() => _dst.clear());
+      _dst.value = '';
       return;
     }
     setState(() => _lang = lang);
@@ -130,7 +131,7 @@ class _TranslatePageState extends State<TranslatePage> {
 
     setState(() {
       _loading = true;
-      _dst.text = '';
+      _dst.value = '';
     });
 
     try {
@@ -149,14 +150,7 @@ class _TranslatePageState extends State<TranslatePage> {
       _sub = stream.listen(
         (chunk) {
           if (chunk is! TextDelta) return;
-          final s = chunk.text;
-          if (_dst.text.isEmpty) {
-            // Remove any leading whitespace/newlines from the first chunk to avoid top gap
-            final cleaned = s.replaceFirst(RegExp(r'^\s+'), '');
-            _dst.text = cleaned;
-          } else {
-            _dst.text += s;
-          }
+          _dst.value += chunk.text;
         },
         onError: (e) {
           if (!mounted) return;
@@ -235,7 +229,7 @@ class _TranslatePageState extends State<TranslatePage> {
   }
 
   Future<void> _copyResult() async {
-    await Clipboard.setData(ClipboardData(text: _dst.text));
+    await Clipboard.setData(ClipboardData(text: _dst.value));
     if (!mounted) return;
     showAppSnackBar(
       context,
@@ -248,7 +242,7 @@ class _TranslatePageState extends State<TranslatePage> {
     await _stop();
     setState(() {
       _src.clear();
-      _dst.clear();
+      _dst.value = '';
     });
   }
 
@@ -360,21 +354,11 @@ class _TranslatePageState extends State<TranslatePage> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                 child: _Card(
-                  child: TextField(
-                    controller: _dst,
-                    readOnly: true,
-                    keyboardType: TextInputType.multiline,
-                    maxLines: null,
-                    expands: true,
-                    decoration: InputDecoration(
-                      hintText: l10n.translatePageOutputHint,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    ),
-                    enableInteractiveSelection: false,
-                    contextMenuBuilder: (context, editableTextState) =>
-                        const SizedBox.shrink(),
-                    style: TextStyle(fontSize: 15, height: 1.4),
+                  child: TranslationOutput(
+                    text: _dst,
+                    streaming: _loading,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    style: const TextStyle(fontSize: 15, height: 1.4),
                   ),
                 ),
               ),

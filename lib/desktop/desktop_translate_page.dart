@@ -15,6 +15,7 @@ import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
@@ -29,7 +30,7 @@ class DesktopTranslatePage extends StatefulWidget {
 
 class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   final TextEditingController _source = TextEditingController();
-  final TextEditingController _output = TextEditingController();
+  final ValueNotifier<String> _output = ValueNotifier('');
 
   LanguageOption? _targetLang;
   String? _modelProviderKey;
@@ -169,7 +170,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     setState(() {
       _translating = true;
-      _output.text = '';
+      _output.value = '';
     });
 
     try {
@@ -189,13 +190,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _subscription = stream.listen(
         (chunk) {
           if (chunk is! TextDelta) return;
-          // live update; remove leading whitespace on first chunk to avoid top gap
-          final s = chunk.text;
-          if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
-          } else {
-            _output.text += s;
-          }
+          _output.value += chunk.text;
         },
         onDone: () {
           if (!mounted) return;
@@ -346,7 +341,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   label: l10n.translatePageClearAll,
                                   onTap: () {
                                     _source.clear();
-                                    _output.clear();
+                                    _output.value = '';
                                   },
                                 ),
                                 child: TextField(
@@ -375,7 +370,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   label: l10n.translatePageCopyResult,
                                   onTap: () async {
                                     await Clipboard.setData(
-                                      ClipboardData(text: _output.text),
+                                      ClipboardData(text: _output.value),
                                     );
                                     if (!context.mounted) return;
                                     showAppSnackBar(
@@ -386,19 +381,19 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     );
                                   },
                                 ),
-                                child: TextField(
-                                  controller: _output,
-                                  readOnly: true,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageOutputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                child: TranslationOutput(
+                                  text: _output,
+                                  streaming: _translating,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    44,
+                                    14,
+                                    14,
                                   ),
-                                  style: TextStyle(fontSize: 14.5, height: 1.4),
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    height: 1.4,
+                                  ),
                                 ),
                               ),
                             ),

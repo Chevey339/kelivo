@@ -3658,6 +3658,7 @@ You need to summarize the conversation between user and assistant into a short t
   static const String defaultTranslatePrompt =
       '''You are a translation expert, skilled in translating various languages, and maintaining accuracy, faithfulness, and elegance in translation.
 Next, I will send you text. Please translate it into {target_lang}, and return the translation result directly, without adding any explanations or other content.
+Preserve the original Markdown formatting and LaTeX math expressions. Translate prose without changing code, formulas, or link destinations.
 
 Please translate the <source_text> section:
 <source_text>
