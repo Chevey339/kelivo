@@ -7025,11 +7025,15 @@ class _ModelRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                displayName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(displayName, style: TextStyle(fontSize: 13.5)),
+                  if (!isSelectionMode) ...[
+                    const SizedBox(height: 4),
+                    ModelCapsulesRow(model: info),
+                  ],
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -7081,8 +7085,6 @@ class _ModelRow extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ModelCapsulesRow(model: info, alignment: WrapAlignment.end),
-                  const SizedBox(width: 8),
                   _IconBtn(
                     key: ValueKey('desktop-provider-model-settings-$modelId'),
                     icon: lucide.Lucide.Settings2,

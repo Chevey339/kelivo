@@ -3605,8 +3605,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                                                 fontSize: 14,
                                                                                 fontWeight: AppFontWeights.semibold,
                                                                               ),
-                                                                              maxLines: 1,
-                                                                              overflow: TextOverflow.ellipsis,
                                                                             ),
                                                                             const SizedBox(
                                                                               height: 4,

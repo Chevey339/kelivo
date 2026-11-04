@@ -2489,8 +2489,6 @@ class _DesktopAssistantBasicPaneState
                               Expanded(
                                 child: Text(
                                   display,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: AppFontWeights.semibold,

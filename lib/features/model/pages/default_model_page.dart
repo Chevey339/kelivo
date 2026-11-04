@@ -1009,8 +1009,6 @@ class _ModelCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             modelDisplay ?? (providerName ?? '-'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: AppFontWeights.semibold,

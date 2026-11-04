@@ -1,6 +1,7 @@
 import "../../../support/business_test_harness.dart";
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -495,6 +496,72 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 20)),
   );
+
+  for (final limited in [false, true]) {
+    testWidgets('mobile model selector fully reveals a wrapped last selection '
+        '(limited=$limited)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithLongSingleProvider(tester);
+        addTearDown(settings.dispose);
+        for (final key in settings.providerConfigs.keys.toList()) {
+          if (key != 'provider-long') {
+            await settings.removeProviderConfig(key);
+          }
+        }
+        const modelId = 'provider-long-model-19';
+        const name =
+            'openrouter/vendor-organization/long-context-multimodal-reasoning-'
+            'extended-thinking-instruct-preview-128k-2026-11-04-experimental-'
+            'with-tools-and-structured-output';
+        final config = settings.getProviderConfig('provider-long');
+        await settings.setProviderConfig(
+          'provider-long',
+          config.copyWith(
+            modelOverrides: const {
+              modelId: {'name': name},
+            },
+          ),
+        );
+        await _pumpModelSelector(
+          tester,
+          settings: settings,
+          limitProviderKey: limited ? 'provider-long' : null,
+        );
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final nameFinder = find.text(name);
+        expect(nameFinder, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: nameFinder, matching: find.byType(RichText)),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+        final tileRect = tester.getRect(
+          find.ancestor(of: nameFinder, matching: find.byType(IosCardPress)),
+        );
+        final visibleTop = limited
+            ? listRect.top
+            : tester
+                  .getRect(
+                    find.byKey(
+                      const ValueKey('model-selector-sticky-provider'),
+                    ),
+                  )
+                  .bottom;
+        expect(tileRect.top, greaterThanOrEqualTo(visibleTop));
+        expect(tileRect.bottom, lessThanOrEqualTo(listRect.bottom));
+        expect(tester.takeException(), isNull);
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    }, timeout: const Timeout(Duration(seconds: 20)));
+  }
 
   testWidgets(
     'mobile model selector keeps reachable current model near the top',

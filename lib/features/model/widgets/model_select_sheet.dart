@@ -563,30 +563,51 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final targetIndex = _currentSelectionTargetIndex();
 
     if (targetIndex != null) {
-      final alignment = _currentSelectionScrollAlignment(targetIndex);
       try {
-        await _itemScrollController.scrollTo(
-          index: targetIndex,
-          alignment: alignment,
-          duration: const Duration(milliseconds: 360),
-          curve: Curves.easeOutCubic,
-        );
+        await _scrollCurrentSelectionIntoView(targetIndex);
         _autoScrolled = true;
       } catch (_) {
         // If scroll fails for any reason, try again once.
         Future.delayed(const Duration(milliseconds: 80), () async {
           if (!mounted || _autoScrolled) return;
           try {
-            await _itemScrollController.scrollTo(
-              index: targetIndex,
-              alignment: alignment,
-              duration: const Duration(milliseconds: 360),
-              curve: Curves.easeOutCubic,
-            );
+            await _scrollCurrentSelectionIntoView(targetIndex);
             _autoScrolled = true;
           } catch (_) {}
         });
       }
+    }
+  }
+
+  Future<void> _scrollCurrentSelectionIntoView(int targetIndex) async {
+    await _itemScrollController.scrollTo(
+      index: targetIndex,
+      alignment: _currentSelectionScrollAlignment(targetIndex),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+    // Wrapped names can make the target taller than the initial estimate.
+    // Wait for the list to publish its measured bounds before correcting it.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted ||
+        !_itemScrollController.isAttached ||
+        _listViewportHeight <= 0 ||
+        _currentSelectionTargetIndex() != targetIndex) {
+      return;
+    }
+    for (final position in _itemPositionsListener.itemPositions.value) {
+      if (position.index != targetIndex) continue;
+      if (position.itemTrailingEdge <= 1) return;
+      final extent = position.itemTrailingEdge - position.itemLeadingEdge;
+      final alignment = (1 - extent - _listBottomPadding / _listViewportHeight)
+          .clamp(_currentSelectionTopAlignment, 1.0);
+      await _itemScrollController.scrollTo(
+        index: targetIndex,
+        alignment: alignment,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+      );
+      return;
     }
   }
 
@@ -618,9 +639,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (_listViewportHeight <= 0) {
       return 0;
     }
-    final topAlignment = widget.limitProviderKey == null
-        ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
-        : 0.0;
+    final topAlignment = _currentSelectionTopAlignment;
     if (_rows.length <= 1) return topAlignment;
 
     final remainingExtent = _estimatedRemainingExtentFrom(targetIndex);
@@ -630,6 +649,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final tailAlignment = 1.0 - (remainingExtent / _listViewportHeight);
     return tailAlignment.clamp(topAlignment, 0.72);
   }
+
+  double get _currentSelectionTopAlignment =>
+      widget.limitProviderKey == null && _listViewportHeight > 0
+      ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
+      : 0.0;
 
   double _estimatedRemainingExtentFrom(int targetIndex) {
     var extent = _listBottomPadding;
@@ -1420,8 +1444,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                       if (!showProviderLabel)
                         Text(
                           m.info.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: AppFontWeights.semibold,
@@ -1445,8 +1467,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                               ),
                             ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       const SizedBox(height: 4),
                       ModelTagWrap(model: m.info),
@@ -2292,67 +2312,63 @@ class _DesktopModelSelectDialogBodyState
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text.rich(
-                TextSpan(
-                  text: m.info.displayName,
-                  style: TextStyle(fontSize: 12.5),
-                  children: [
-                    if (showProviderLabel)
-                      TextSpan(
-                        text: ' | ${m.providerName}',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: cs.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      text: m.info.displayName,
+                      style: TextStyle(fontSize: 12.5),
+                      children: [
+                        if (showProviderLabel)
+                          TextSpan(
+                            text: ' | ${m.providerName}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ModelCapsulesRow(
+                    model: m.info,
+                    pillPadding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    bgOpacityDark: 0.18,
+                    bgOpacityLight: 0.14,
+                    borderOpacity: 0.22,
+                    itemSpacing: 4,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ModelCapsulesRow(
-                  model: m.info,
-                  alignment: WrapAlignment.end,
-                  pillPadding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
+            Builder(
+              builder: (context) {
+                final pinnedNow = context.select<SettingsProvider, bool>(
+                  (s) => s.isModelPinned(m.providerKey, m.id),
+                );
+                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
+                return IosIconButton(
+                  key: ValueKey(
+                    'desktop-model-favorite-${m.providerKey}::${m.id}',
                   ),
-                  bgOpacityDark: 0.18,
-                  bgOpacityLight: 0.14,
-                  borderOpacity: 0.22,
-                  itemSpacing: 4,
-                ),
-                const SizedBox(width: 4),
-                Builder(
-                  builder: (context) {
-                    final pinnedNow = context.select<SettingsProvider, bool>(
-                      (s) => s.isModelPinned(m.providerKey, m.id),
-                    );
-                    final icon = pinnedNow
-                        ? Icons.favorite
-                        : Icons.favorite_border;
-                    return IosIconButton(
-                      key: ValueKey(
-                        'desktop-model-favorite-${m.providerKey}::${m.id}',
-                      ),
-                      icon: icon,
-                      size: 16,
-                      color: cs.primary,
-                      tooltip: l10n.modelSelectSheetFavoriteTooltip,
-                      onTap: () => context
-                          .read<SettingsProvider>()
-                          .togglePinModel(m.providerKey, m.id),
-                      padding: const EdgeInsets.all(3),
-                      minSize: 26,
-                    );
-                  },
-                ),
-              ],
+                  icon: icon,
+                  size: 16,
+                  color: cs.primary,
+                  tooltip: l10n.modelSelectSheetFavoriteTooltip,
+                  onTap: () => context.read<SettingsProvider>().togglePinModel(
+                    m.providerKey,
+                    m.id,
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  minSize: 26,
+                );
+              },
             ),
           ],
         ),
