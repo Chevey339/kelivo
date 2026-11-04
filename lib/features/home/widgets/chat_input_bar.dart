@@ -51,6 +51,7 @@ import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/platform_utils.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:re_editor/re_editor.dart' show CodeEditorTapRegion;
 import '../../../desktop/desktop_context_menu.dart';
@@ -2499,9 +2500,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       return KeyEventResult.handled;
     }
 
-    // Enter handling on tablet/desktop: configurable shortcut
-    if (isEnter && isTabletOrDesktop) {
+    // Desktop send shortcuts must survive resizing below the tablet breakpoint.
+    if (isEnter && (PlatformUtils.isDesktopTarget || isTabletOrDesktop)) {
       if (!isDown) return KeyEventResult.handled; // ignore key up
+      if (_composerLocked || _ownsVoiceSession) return KeyEventResult.handled;
       // Respect IME composition (e.g., Chinese Pinyin). If composing, let IME handle Enter.
       final composing = _controller.value.composing;
       final composingActive = composing.isValid && !composing.isCollapsed;
