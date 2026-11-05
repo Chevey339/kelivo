@@ -2,8 +2,11 @@ import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
+
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -67,6 +70,33 @@ class _InterruptedWriter extends FakeWorkspaceRuntime {
   }
 }
 
+class _ConcurrentShellRuntime extends FakeWorkspaceRuntime {
+  final firstStarted = Completer<void>();
+  final secondStarted = Completer<void>();
+  final releaseFirst = Completer<void>();
+
+  @override
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    if (request.command == 'first') {
+      yield const CommandStarted(pid: 1);
+      File(p.join(request.cwd, 'from-first.txt')).writeAsStringSync('first');
+      firstStarted.complete();
+      await releaseFirst.future;
+    } else {
+      secondStarted.complete();
+      yield const CommandStarted(pid: 2);
+      File(p.join(request.cwd, 'from-second.txt')).writeAsStringSync('second');
+    }
+    yield const CommandExited(
+      exitCode: 0,
+      timedOut: false,
+      cancelled: false,
+      interrupted: false,
+      duration: Duration.zero,
+    );
+  }
+}
+
 void main() {
   final canRunReal = Platform.isMacOS || Platform.isLinux;
 
@@ -121,32 +151,34 @@ void main() {
     Set<String> disabledTools = const {},
     List<Mount> externalMounts = const [],
     Future<List<Mount>> Function()? loadExternalMounts,
+    Directory? sessionOverride,
+    String? conversationIdOverride,
   }) {
+    final session = sessionOverride ?? sessionDir;
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
             externalMounts: externalMounts,
             loadExternalMounts: loadExternalMounts,
             workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           )
         : WorkspacePaths.native(
             workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
-      workspace: workspace(
-        shellNeedsApproval: shellNeedsApproval,
-      ).copyWith(disabledTools: disabledTools),
+      workspace: workspace(shellNeedsApproval: shellNeedsApproval)
+          .copyWith(disabledTools: disabledTools),
       permissionMode: fullAccess
           ? ToolPermissionMode.fullAccess
           : ToolPermissionMode.requestApproval,
       binding: WorkspaceBinding(workspaceId: 'ws1', toolsUsed: toolsUsed),
       paths: paths,
-      sessionDir: sessionDir,
-      outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
-      conversationId: 'conv-1',
+      sessionDir: session,
+      outputsDir: Directory(p.join(session.path, 'outputs')),
+      conversationId: conversationIdOverride ?? 'conv-1',
       runtimeStatus:
           status ??
           RuntimeStatus(ready: true, engine: 'fake', sandboxed: sandboxed),
@@ -189,49 +221,44 @@ void main() {
     return WorkspaceToolMetadata.fromJson(client(raw).metadata!);
   }
 
-  test(
-    'environment injection uses raw values but shell and file results are private',
-    () async {
-      const secret = 'test-token-秘密-123';
-      var config = EnvironmentExecutionConfig(variables: {'TOKEN': secret});
-      final runtime = FakeWorkspaceRuntime(useRealProcess: true);
-      final tools = service(
-        runtime: runtime,
-        loadEnvironment: () async => config,
-      );
-      final context = ctx();
-      final raw = await tools.handle(context, 'shell', {
-        'command':
-            r'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; printf "%s" "$TOKEN" > secret.txt; exit 1',
-      }, toolCallId: 'env-shell');
-      expect(runtime.requests.single.env['TOKEN'], secret);
-      expect(runtime.requests.single.env['NO_COLOR'], '1');
-      expect(client(raw).content, isNot(contains(secret)));
-      expect(jsonOf(raw)['exit_code'], 1);
-      expect(metaOf(raw).stdoutPreview, secret);
-      expect(metaOf(raw).stderrPreview, secret);
-      final read = await tools.handle(context, 'read_file', {
-        'path': 'secret.txt',
-      }, toolCallId: 'env-read');
-      expect(client(read).content, contains('[REDACTED]'));
-      expect(client(read).content, isNot(contains(secret)));
-      expect(metaOf(read).stdoutPreview, contains(secret));
-      config = EnvironmentExecutionConfig(
-        variables: {'TOKEN': secret},
-        privacyMode: false,
-      );
-      final unmasked = await tools.handle(context, 'shell', {
-        'command': r'printf "%s" "$TOKEN"',
-      }, toolCallId: 'env-off');
-      expect(client(unmasked).content, contains(secret));
-      config = EnvironmentExecutionConfig();
-      await tools.handle(context, 'shell', {
-        'command': 'true',
-      }, toolCallId: 'env-removed');
-      expect(runtime.requests.last.env.containsKey('TOKEN'), isFalse);
-    },
-    skip: !canRunReal,
-  );
+  test('environment injection uses raw values but shell and file results are private', () async {
+    const secret = 'test-token-秘密-123';
+    var config = EnvironmentExecutionConfig(variables: {'TOKEN': secret});
+    final runtime = FakeWorkspaceRuntime(useRealProcess: true);
+    final tools = service(
+      runtime: runtime,
+      loadEnvironment: () async => config,
+    );
+    final context = ctx();
+    final raw = await tools.handle(context, 'shell', {
+      'command': r'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; printf "%s" "$TOKEN" > secret.txt; exit 1',
+    }, toolCallId: 'env-shell');
+    expect(runtime.requests.single.env['TOKEN'], secret);
+    expect(runtime.requests.single.env['NO_COLOR'], '1');
+    expect(client(raw).content, isNot(contains(secret)));
+    expect(jsonOf(raw)['exit_code'], 1);
+    expect(metaOf(raw).stdoutPreview, secret);
+    expect(metaOf(raw).stderrPreview, secret);
+    final read = await tools.handle(context, 'read_file', {
+      'path': 'secret.txt',
+    }, toolCallId: 'env-read');
+    expect(client(read).content, contains('[REDACTED]'));
+    expect(client(read).content, isNot(contains(secret)));
+    expect(metaOf(read).stdoutPreview, contains(secret));
+    config = EnvironmentExecutionConfig(
+      variables: {'TOKEN': secret},
+      privacyMode: false,
+    );
+    final unmasked = await tools.handle(context, 'shell', {
+      'command': r'printf "%s" "$TOKEN"',
+    }, toolCallId: 'env-off');
+    expect(client(unmasked).content, contains(secret));
+    config = EnvironmentExecutionConfig();
+    await tools.handle(context, 'shell', {
+      'command': 'true',
+    }, toolCallId: 'env-removed');
+    expect(runtime.requests.last.env.containsKey('TOKEN'), isFalse);
+  }, skip: !canRunReal);
 
   test(
     'execution and redaction share a snapshot when settings change mid-command',
@@ -514,9 +541,8 @@ void main() {
         final result = await tools.handle(context, 'shell', {
           'command': 'download',
         }, toolCallId: 'progress-log');
-        final stored = await File(
-          jsonOf(result)['output_file'] as String,
-        ).readAsString();
+        final stored = await File(jsonOf(result)['output_file'] as String)
+            .readAsString();
         expect(stored, contains('${'log line\n' * 5000}100%'));
         expect(stored, contains('error\n'));
         expect(stored, isNot(contains('\r')));
@@ -634,6 +660,93 @@ void main() {
       },
     );
 
+    test(
+      'serializes shared-workspace shells before taking snapshots',
+      () async {
+        final secondSession = await Directory(
+          p.join(tmp.path, 'second-session'),
+        ).create();
+        await Directory(p.join(secondSession.path, 'outputs')).create();
+        final runtime = _ConcurrentShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(
+          ctx(conversationIdOverride: 'first-conversation'),
+          'shell',
+          {'command': 'first'},
+          toolCallId: 'first-shell',
+        );
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+
+        final second = tools.handle(
+          ctx(
+            conversationIdOverride: 'second-conversation',
+            sessionOverride: secondSession,
+          ),
+          'shell',
+          {'command': 'second'},
+          toolCallId: 'second-shell',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+
+        runtime.releaseFirst.complete();
+        final firstMeta = metaOf(await first);
+        final secondMeta = metaOf(await second);
+        expect(firstMeta.files.map((file) => p.basename(file.path)).toList(), [
+          'from-first.txt',
+        ]);
+        expect(secondMeta.files.map((file) => p.basename(file.path)).toList(), [
+          'from-second.txt',
+        ]);
+      },
+    );
+
+    test(
+      'cancelling a shell queued behind another conversation releases it',
+      () async {
+        final secondSession = await Directory(
+          p.join(tmp.path, 'cancelled-session'),
+        ).create();
+        await Directory(p.join(secondSession.path, 'outputs')).create();
+        final runtime = _ConcurrentShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(
+          ctx(conversationIdOverride: 'first-conversation'),
+          'shell',
+          {'command': 'first'},
+          toolCallId: 'first-shell',
+        );
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+
+        final cancelled = Completer<void>();
+        var isCancelled = false;
+        final second =
+            ToolCallCancellation(
+              isCancelled: () => isCancelled,
+              cancelled: cancelled.future,
+            ).run(
+              () => tools.handle(
+                ctx(
+                  conversationIdOverride: 'cancelled-conversation',
+                  sessionOverride: secondSession,
+                ),
+                'shell',
+                {'command': 'second'},
+                toolCallId: 'cancelled-shell',
+              ),
+            );
+        isCancelled = true;
+        cancelled.complete();
+        final result = await second.timeout(const Duration(seconds: 3));
+        expect(jsonOf(result)['error'], 'tool_failed');
+        expect(jsonOf(result)['message'], contains('tool_call_cancelled'));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+
+        runtime.releaseFirst.complete();
+        await first;
+      },
+    );
+
     test('environment_not_ready when runtime is null', () async {
       final tools = service(registerRuntime: false);
       final result = await tools.handle(
@@ -732,9 +845,8 @@ void main() {
     });
 
     test('read_file binary returns hex preview', () async {
-      File(
-        p.join(workspaceDir.path, 'blob.bin'),
-      ).writeAsBytesSync(Uint8List.fromList([0x00, 0x01, 0xFF]));
+      File(p.join(workspaceDir.path, 'blob.bin'))
+          .writeAsBytesSync(Uint8List.fromList([0x00, 0x01, 0xFF]));
       final payload = jsonOf(
         await service().handle(ctx(), 'read_file', {
           'path': p.join(workspaceDir.path, 'blob.bin'),
@@ -745,9 +857,8 @@ void main() {
     });
 
     test('read_file image returns a structured image result', () async {
-      File(
-        p.join(workspaceDir.path, 'pic.png'),
-      ).writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
+      File(p.join(workspaceDir.path, 'pic.png'))
+          .writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
       final result = client(
         await service().handle(ctx(), 'read_file', {
           'path': p.join(workspaceDir.path, 'pic.png'),
@@ -803,9 +914,8 @@ void main() {
 
     test('list_dir / glob / grep listings', () async {
       Directory(p.join(workspaceDir.path, 'sub')).createSync();
-      File(
-        p.join(workspaceDir.path, 'sub', 'a.txt'),
-      ).writeAsStringSync('needle');
+      File(p.join(workspaceDir.path, 'sub', 'a.txt'))
+          .writeAsStringSync('needle');
       File(p.join(workspaceDir.path, 'b.md')).writeAsStringSync('hi');
       final tools = service();
       final native = ctx();
@@ -1162,8 +1272,7 @@ void main() {
       );
       final result = metaOf(
         await tools.handle(ctx(), 'shell', {
-          'command':
-              'printf new > existing.txt; printf new > result.csv; printf session > ../session/note.txt; printf outside > ../outside.txt; exit 1',
+          'command': 'printf new > existing.txt; printf new > result.csv; printf session > ../session/note.txt; printf outside > ../outside.txt; exit 1',
         }, toolCallId: 'failed-with-output'),
       );
       expect(result.exitCode, 1);
