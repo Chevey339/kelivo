@@ -2588,8 +2588,9 @@ $code
     (tester) async {
       addTearDown(MermaidImageCache.clear);
       addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      final render = Completer<MermaidBitmapRenderResult>();
       debugMermaidBitmapRenderOverride = (code, isDark, themeVars) {
-        return Completer<MermaidBitmapRenderResult>().future;
+        return render.future;
       };
 
       await tester.pumpWidget(
@@ -2614,6 +2615,8 @@ A-->B
       expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(find.byType(Image), findsNothing);
       expect(_paragraphsWith('graph TD', contains: true), isEmpty);
+      render.complete(MermaidBitmapRenderResult.failed());
+      await tester.pump();
     },
   );
 
