@@ -328,7 +328,13 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
             h = Math.ceil(rect.height);
           }
           const padding = 24;
-          const scale = (window.devicePixelRatio || 1) * 2;
+          // Keep each RGBA canvas below 16 MiB, including on high-DPI phones.
+          const scale = Math.min(
+            (window.devicePixelRatio || 1) * 2,
+            4096 / (w + padding * 2),
+            4096 / (h + padding * 2),
+            Math.sqrt(4194304 / ((w + padding * 2) * (h + padding * 2)))
+          );
           const canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
           canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
@@ -718,7 +724,13 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
             h = Math.ceil(rect.height);
           }
           const padding = 24;
-          const scale = (window.devicePixelRatio || 1) * 2;
+          // Keep each RGBA canvas below 16 MiB, including on high-DPI phones.
+          const scale = Math.min(
+            (window.devicePixelRatio || 1) * 2,
+            4096 / (w + padding * 2),
+            4096 / (h + padding * 2),
+            Math.sqrt(4194304 / ((w + padding * 2) * (h + padding * 2)))
+          );
           const canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
           canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
