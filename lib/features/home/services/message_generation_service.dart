@@ -163,6 +163,7 @@ class MessageGenerationService {
   /// Packs system prompt, injections, history, and tool definitions without
   /// OCR, document extraction, or inline-image encoding.
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
+    bool? fixedContextStart,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
@@ -320,7 +321,16 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
     );
 
-    messageBuilderService.applyContextLimit(apiMessages, assistant);
+    final hasFixedStart =
+        fixedContextStart ??
+        (currentConversation != null &&
+            ContextHistory.fixedStart(
+                  chatService.contextOperationsFor(currentConversation.id),
+                ) !=
+                null);
+    if (!hasFixedStart) {
+      messageBuilderService.applyContextLimit(apiMessages, assistant);
+    }
 
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,
@@ -348,6 +358,7 @@ class MessageGenerationService {
   }
 
   Future<ContextAssemblyPreview> previewContextAssembly({
+    bool? fixedContextStart,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -370,6 +381,7 @@ class MessageGenerationService {
               : 0x7fffffff,
         );
     final packed = await assembleUnprocessedRequestContext(
+      fixedContextStart: fixedContextStart,
       messages: messages,
       versionSelections: chatService.getVersionSelections(conversationId),
       currentConversation: conversation?.copyWith(truncateIndex: -1),

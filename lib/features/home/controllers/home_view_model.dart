@@ -1,3 +1,4 @@
+import '../../../core/models/context_operation.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -194,8 +195,9 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<CompressionBudget> _estimateCompressedContext(
     String id,
-    List<ChatMessage> history,
-  ) async {
+    List<ChatMessage> history, {
+    bool? fixedContextStart,
+  }) async {
     final settings = _contextProvider.read<SettingsProvider>();
     final conversation = _chatService.getConversation(id);
     if (conversation == null) throw StateError('conversation_not_found');
@@ -231,6 +233,7 @@ class HomeViewModel extends ChangeNotifier {
       modelId: model.modelId!,
       assistantId: conversation.assistantId,
       messagesOverride: messages,
+      fixedContextStart: fixedContextStart,
     );
     final estimate = estimateContextBuckets(
       ContextEstimateJob(
@@ -1568,7 +1571,13 @@ class HomeViewModel extends ChangeNotifier {
     final assistant = _contextProvider
         .read<AssistantProvider>()
         .currentAssistant;
-    final configured = (assistant?.limitContextMessages ?? false)
+    final fixedStart =
+        currentConversation != null &&
+        ContextHistory.fixedStart(
+              _chatService.contextOperationsFor(currentConversation!.id),
+            ) !=
+            null;
+    final configured = !fixedStart && (assistant?.limitContextMessages ?? false)
         ? (assistant?.contextMessageSize ?? 0)
         : 0;
     // Timeline totals and truncateIndex both use logical message slots.

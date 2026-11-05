@@ -28181,6 +28181,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Jump to boundary'**
   String get contextViewBoundary;
+
+  /// No description provided for @contextFixedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed context start'**
+  String get contextFixedStart;
+
+  /// No description provided for @contextSetFixedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start context here'**
+  String get contextSetFixedStart;
+
+  /// No description provided for @contextCancelFixedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel fixed context start'**
+  String get contextCancelFixedStart;
+
+  /// No description provided for @contextFixedStartDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Send history from this message onward, without the rolling message-count limit.'**
+  String get contextFixedStartDescription;
+
+  /// No description provided for @contextBeforeFixedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'This message is before the fixed context start. Move or cancel the start before regenerating it.'**
+  String get contextBeforeFixedStart;
+
+  /// No description provided for @contextRegenerateFixedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.'**
+  String get contextRegenerateFixedStart;
 }
 
 class _AppLocalizationsDelegate

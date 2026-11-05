@@ -21,6 +21,8 @@ Future<void> _openMoreSheet(
   WidgetTester tester, {
   required bool canDeleteAllVersions,
   bool canCreateBranch = true,
+  bool canSetContextStart = false,
+  bool isContextStart = false,
   ValueChanged<MessageMoreAction?>? onSelected,
 }) async {
   await tester.pumpWidget(
@@ -44,6 +46,8 @@ Future<void> _openMoreSheet(
                     _message(),
                     canDeleteAllVersions: canDeleteAllVersions,
                     canCreateBranch: canCreateBranch,
+                    canSetContextStart: canSetContextStart,
+                    isContextStart: isContextStart,
                   ).then((action) => onSelected?.call(action));
                 },
                 child: const Text('open'),
@@ -60,6 +64,43 @@ Future<void> _openMoreSheet(
 }
 
 void main() {
+  for (final pinned in [false, true]) {
+    testWidgets(
+      'context start menu action: pinned=$pinned',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 1400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        MessageMoreAction? selected;
+        await _openMoreSheet(
+          tester,
+          canDeleteAllVersions: false,
+          canSetContextStart: true,
+          isContextStart: pinned,
+          onSelected: (action) => selected = action,
+        );
+        final label = pinned
+            ? 'Cancel fixed context start'
+            : 'Start context here';
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        expect(
+          selected,
+          pinned
+              ? MessageMoreAction.cancelContextStart
+              : MessageMoreAction.setContextStart,
+        );
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      }),
+    );
+  }
+
   testWidgets(
     'one menu entry selects messages for every batch action',
     (tester) async {

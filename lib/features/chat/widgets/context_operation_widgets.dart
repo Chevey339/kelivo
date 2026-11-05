@@ -218,7 +218,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (!operation.isCompression) ...[
           const SizedBox(height: 8),
           Text(
-            l10n.contextClearDetails,
+            operation.isFixedStart
+                ? l10n.contextFixedStartDescription
+                : l10n.contextClearDetails,
             style: TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -227,7 +229,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           ),
         ],
         ContextDetailRow(
-          label: operation.isCompression
+          label: operation.isFixedStart
+              ? l10n.contextFixedStart
+              : operation.isCompression
               ? l10n.contextDetailReplaced
               : l10n.contextDetailExcluded,
           value: widget.rangeLabel.isEmpty
@@ -434,7 +438,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            operation.isCompression
+                            operation.isFixedStart
+                                ? LucideIcons.flag
+                                : operation.isCompression
                                 ? LucideIcons.package2
                                 : LucideIcons.eraser,
                             size: 20,
@@ -443,7 +449,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                           const SizedBox(width: 10),
                           Flexible(
                             child: Text(
-                              operation.isCompression
+                              operation.isFixedStart
+                                  ? l10n.contextFixedStart
+                                  : operation.isCompression
                                   ? l10n.contextDetailTitle
                                   : l10n.contextDetailClearTitle,
                               style: TextStyle(
@@ -508,7 +516,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: IosTextButton(
-                      label: operation.isCompression
+                      label: operation.isFixedStart
+                          ? l10n.contextCancelFixedStart
+                          : operation.isCompression
                           ? l10n.contextUndoCompressTooltip
                           : l10n.contextUndoClearTooltip,
                       icon: LucideIcons.undo2,

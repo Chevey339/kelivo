@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import "../../../support/business_test_harness.dart";
 import '../../../support/markdown_render_helpers.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -22,6 +24,70 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  testWidgets(
+    'cancel fixed start targets the operation shown when the menu opened',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        tester.view.physicalSize = const Size(1000, 1400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        ContextOperation pin(String id, String anchor) => ContextOperation(
+          id: id,
+          kind: ContextOperationKind.start,
+          anchorGroupId: anchor,
+          appliedAfterGroupId: anchor,
+          sourceGroups: [anchor],
+          dependencies: [],
+          createdAt: DateTime(2026),
+        );
+        final first = pin('pin-a', 'a');
+        final second = pin('pin-b', 'b');
+        final undone = <String>[];
+        final key = GlobalKey<_MessageListHarnessState>();
+        await tester.pumpWidget(
+          _MessageListHarness(
+            key: key,
+            messages: [
+              ChatMessage(
+                id: 'a',
+                role: 'user',
+                content: 'first question',
+                conversationId: 'c',
+              ),
+              ChatMessage(
+                id: 'b',
+                role: 'user',
+                content: 'second question',
+                conversationId: 'c',
+              ),
+            ],
+            onEditMessage: (_) {},
+            contextOperations: [first],
+            onUndoContextOperation: (op) => undone.add(op.id),
+          ),
+        );
+        final message = tester.widget<ChatMessageWidget>(
+          find.byType(ChatMessageWidget).first,
+        );
+        message.onMore!();
+        await tester.pumpAndSettle();
+        expect(find.text('Cancel fixed context start'), findsOneWidget);
+        key.currentState!.setOperations([
+          first.copyWith(revoked: true),
+          second,
+        ]);
+        await tester.pump();
+        await tester.tap(find.text('Cancel fixed context start'));
+        await tester.pumpAndSettle();
+        expect(undone, ['pin-a']);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('all user messages expose edit from long press menu', (
     tester,
@@ -79,11 +145,16 @@ void main() {
 
 class _MessageListHarness extends StatefulWidget {
   const _MessageListHarness({
+    super.key,
+    this.contextOperations = const [],
+    this.onUndoContextOperation,
     required this.messages,
     required this.onEditMessage,
   });
 
   final List<ChatMessage> messages;
+  final List<ContextOperation> contextOperations;
+  final ValueChanged<ContextOperation>? onUndoContextOperation;
   final ValueChanged<ChatMessage> onEditMessage;
 
   @override
@@ -91,6 +162,9 @@ class _MessageListHarness extends StatefulWidget {
 }
 
 class _MessageListHarnessState extends State<_MessageListHarness> {
+  late List<ContextOperation> operations = widget.contextOperations;
+  void setOperations(List<ContextOperation> value) =>
+      setState(() => operations = value);
   late final ScrollController scrollController;
   late final ListController listController;
   late final ValueNotifier<String?> processingFilesMessageId;
@@ -154,6 +228,9 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             dividerPadding: EdgeInsets.zero,
             processingFilesMessageId: processingFilesMessageId,
             onEditMessage: widget.onEditMessage,
+            contextOperations: operations,
+            onSetContextStart: (_) {},
+            onUndoContextOperation: widget.onUndoContextOperation,
           ),
         ),
       ),

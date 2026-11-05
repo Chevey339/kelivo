@@ -34,6 +34,174 @@ void main() {
   List<String> text(List<ChatMessage> messages) =>
       messages.map((m) => m.content).toList();
 
+  ContextOperation start(String anchor) => ContextOperation(
+    id: 'start-$anchor',
+    kind: ContextOperationKind.start,
+    anchorGroupId: anchor,
+    appliedAfterGroupId: anchor,
+    sourceGroups: [anchor],
+    dependencies: const [],
+    createdAt: DateTime(2026),
+  );
+
+  test(
+    'fixed start is inclusive, overrides the window and follows the selected group',
+    () {
+      final history = ['A', 'B', 'C', 'D'].map(message).toList();
+      final pin = start('B');
+      expect(text(ContextHistory.resolve(history, [pin], limit: 1)), [
+        'B',
+        'C',
+        'D',
+      ]);
+      expect(
+        text(
+          ContextHistory.resolve(history, [pin], throughGroupId: 'C', limit: 1),
+        ),
+        ['B', 'C'],
+      );
+      expect(
+        ContextHistory.resolve(history, [pin], throughGroupId: 'A'),
+        isEmpty,
+      );
+      final revised = [
+        history.first,
+        message('B-v2').copyWith(groupId: 'B'),
+        ...history.skip(2),
+      ];
+      expect(text(ContextHistory.resolve(revised, [pin], limit: 1)), [
+        'B-v2',
+        'C',
+        'D',
+      ]);
+      expect(
+        text(
+          ContextHistory.resolve(
+            history,
+            [pin],
+            omitOperations: {pin.id},
+            limit: 1,
+          ),
+        ),
+        ['D'],
+      );
+      expect(
+        ContextHistory.affectedOperations([pin], changedGroups: {'B'}),
+        isEmpty,
+      );
+      expect(ContextHistory.affectedOperations([pin], removedGroups: {'B'}), {
+        pin.id,
+      });
+      expect(ContextOperation.fromJson(pin.toJson()).isFixedStart, isTrue);
+    },
+  );
+
+  test(
+    'fixed start excludes earlier clear and summaries spanning its boundary',
+    () {
+      final history = ['A', 'B', 'C', 'D'].map(message).toList();
+      final pin = start('B');
+      expect(
+        text(ContextHistory.resolve(history, [clear('old-clear', 'C'), pin])),
+        ['B', 'C', 'D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(history, [
+            clear('clear', 'A'),
+            compact('old', ['A', 'B']),
+            pin,
+          ]),
+        ),
+        ['B', 'C', 'D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(history, [
+            pin,
+            compact('new', ['B', 'C']),
+          ], limit: 1),
+        ),
+        ['new', 'D'],
+      );
+      expect(
+        text(ContextHistory.resolve(history, [pin, clear('later', 'C')])),
+        ['D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(history, [
+            pin.copyWith(revoked: true),
+          ], limit: 2),
+        ),
+        ['C', 'D'],
+      );
+    },
+  );
+
+  test(
+    'summaries authored under a fixed start are revoked with that start',
+    () {
+      final history = ['A', 'B', 'C', 'D', 'E', 'F'].map(message).toList();
+      final original = compact('old', ['A', 'B', 'C', 'D']);
+      final pin = start('C');
+      var operations = ContextHistory.appendOperation([original], pin);
+      operations = ContextHistory.appendOperation(
+        operations,
+        compact('new', ['C', 'D']),
+      );
+      expect(operations.last.dependencies, contains(pin.id));
+      expect(
+        text(
+          ContextHistory.compressionInput(
+            history,
+            operations,
+            source: ContextHistorySource.original,
+            includeEditedSummaries: false,
+          ),
+        ),
+        ['C', 'D', 'E', 'F'],
+      );
+      final selection = selectCompressionHistory(
+        history,
+        operations,
+        const CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 2,
+          historySource: ContextHistorySource.original,
+        ),
+      );
+      expect(text(selection.input), ['C', 'D']);
+
+      expect(text(ContextHistory.resolve(history, operations)), [
+        'new',
+        'E',
+        'F',
+      ]);
+      final affected = ContextHistory.affectedOperations(
+        operations,
+        operationIds: {pin.id},
+      );
+      final undone = [
+        for (final op in operations)
+          affected.contains(op.id) ? op.copyWith(revoked: true) : op,
+      ];
+      expect(text(ContextHistory.resolve(history, undone)), ['old', 'E', 'F']);
+      final moved = ContextHistory.appendOperation(operations, start('E'));
+      expect(moved.singleWhere((op) => op.id == 'new').revoked, isTrue);
+      expect(text(ContextHistory.resolve(history, moved)), ['E', 'F']);
+      expect(
+        text(
+          ContextHistory.resolve(history, [
+            ...moved.take(moved.length - 1),
+            moved.last.copyWith(revoked: true),
+          ]),
+        ),
+        ['old', 'E', 'F'],
+      );
+    },
+  );
+
   test(
     'successive undo restores the earlier summary and all later messages',
     () {

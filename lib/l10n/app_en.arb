@@ -7498,5 +7498,11 @@
       }
     }
   },
-  "contextViewBoundary": "Jump to boundary"
+  "contextViewBoundary": "Jump to boundary",
+  "contextFixedStart": "Fixed context start",
+  "contextSetFixedStart": "Start context here",
+  "contextCancelFixedStart": "Cancel fixed context start",
+  "contextFixedStartDescription": "Send history from this message onward, without the rolling message-count limit.",
+  "contextBeforeFixedStart": "This message is before the fixed context start. Move or cancel the start before regenerating it.",
+  "contextRegenerateFixedStart": "This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating."
 }

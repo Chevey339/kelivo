@@ -36,6 +36,111 @@ void main() {
     await dir.delete(recursive: true);
   });
 
+  test(
+    'fixed start persists, moves atomically and counts the full pinned range',
+    () async {
+      Future<void> pin(String group) async {
+        final snapshot = await repo.readContextSnapshot('chat');
+        await repo.appendContextOperation(
+          'chat',
+          ContextOperation(
+            id: 'pin-$group',
+            kind: ContextOperationKind.start,
+            anchorGroupId: group,
+            appliedAfterGroupId: group,
+            sourceGroups: [group],
+            dependencies: const [],
+            createdAt: DateTime.now(),
+          ),
+          expectedFingerprint: snapshot.fingerprint,
+        );
+      }
+
+      await pin('u2');
+      expect(
+        await repo.contextBoundaryIndex(
+          'chat',
+          await repo.readContextOperations('chat'),
+        ),
+        2,
+      );
+      expect(
+        (await repo.getEffectiveContextMessages(
+          'chat',
+          limit: 1,
+        )).map((m) => m.id),
+        ['u2', 'a2', 'u3', 'a3'],
+      );
+      expect(
+        (await repo.getContextMessageCounts('chat', limit: 1)).messages,
+        4,
+      );
+      await repo.close();
+      repo = ChatDatabaseRepository.open(file: File('${dir.path}/chat.sqlite'));
+      await repo.ensureReady();
+      expect(
+        (await repo.getEffectiveContextMessages('chat', limit: 1)).first.id,
+        'u2',
+      );
+      await pin('u3');
+      final operations = await repo.readContextOperations('chat');
+      expect(
+        operations
+            .where((op) => op.isFixedStart && !op.revoked)
+            .single
+            .anchorGroupId,
+        'u3',
+      );
+      expect(
+        (await repo.getEffectiveContextMessages(
+          'chat',
+          limit: 1,
+        )).map((m) => m.id),
+        ['u3', 'a3'],
+      );
+      expect(await repo.getMessageCount('chat'), 6);
+      final copy = (await repo.duplicateConversation('chat'))!;
+      expect(
+        (await repo.getEffectiveContextMessages(
+          copy.id,
+          limit: 1,
+        )).map((m) => m.content),
+        ['Original u3', 'Original a3'],
+      );
+      final fork = (await repo.forkConversationWithVersions(
+        sourceId: 'chat',
+        targetRevisionId: 'a2',
+        title: 'Before pin',
+      ))!;
+      expect(
+        ContextHistory.fixedStart(await repo.readContextOperations(fork.id)),
+        isNull,
+      );
+      final revision = (await repo.appendMessageVersion(
+        messageId: 'u3',
+        content: 'revised u3',
+      ))!;
+      expect(
+        (await repo.getEffectiveContextMessages('chat', limit: 1)).first.id,
+        revision.message.id,
+      );
+      await repo.deleteMessage('u3');
+      expect(
+        ContextHistory.fixedStart(await repo.readContextOperations('chat')),
+        isNotNull,
+      );
+      await repo.deleteMessage(revision.message.id);
+      expect(
+        ContextHistory.fixedStart(await repo.readContextOperations('chat')),
+        isNull,
+      );
+      expect(
+        (await repo.getEffectiveContextMessages('chat', limit: 1)).single.id,
+        'a3',
+      );
+    },
+  );
+
   Future<ContextOperation> compact(
     String id,
     List<String> groups, {
@@ -454,6 +559,40 @@ void main() {
         'Original u3',
         'Original a3',
       ]);
+    },
+  );
+
+  test(
+    'undo fixed start also revokes compression that depends on its projection',
+    () async {
+      await compact('old', ['u1', 'a1', 'u2', 'a2']);
+      final snapshot = await repo.readContextSnapshot('chat');
+      await repo.appendContextOperation(
+        'chat',
+        ContextOperation(
+          id: 'pin',
+          kind: ContextOperationKind.start,
+          anchorGroupId: 'u2',
+          appliedAfterGroupId: 'u2',
+          sourceGroups: ['u2'],
+          dependencies: [],
+          createdAt: DateTime(2026),
+        ),
+        expectedFingerprint: snapshot.fingerprint,
+      );
+      await compact('new', ['u2', 'a2']);
+      final operations = await repo.readContextOperations('chat');
+      expect(operations.last.dependencies, ['pin']);
+      expect(await effective(), ['Summary new', 'Original u3', 'Original a3']);
+      await repo.changeContextOperation(
+        'chat',
+        'pin',
+        includeDependents: true,
+        expectedState: ContextHistory.operationsFingerprint(operations),
+      );
+      expect(await effective(), ['Summary old', 'Original u3', 'Original a3']);
+      expect((await repo.readContextOperations('chat')).last.revoked, isTrue);
+      expect(await repo.getMessageCount('chat'), 6);
     },
   );
 

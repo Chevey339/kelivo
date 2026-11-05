@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_context_submission.dart';
@@ -2398,6 +2399,257 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  for (final limit in [1, 10, 11]) {
+    for (final temporary in [false, true]) {
+      testWidgets(
+        'context window stays identical on regeneration: limit=$limit temporary=$temporary',
+        (tester) async {
+          final controller = await pumpHarness(tester);
+          await tester.runAsync(() async {
+            await assistantProvider.updateAssistant(
+              assistantProvider.currentAssistant!.copyWith(
+                limitContextMessages: true,
+                contextMessageSize: limit,
+              ),
+            );
+            final convo = temporary
+                ? await service.createDraftConversation(
+                    title: 'Window test',
+                    temporary: true,
+                  )
+                : await openConversation(controller);
+            if (temporary) {
+              await controller.chatController.setCurrentConversationAndLoad(
+                convo,
+              );
+            }
+            for (var i = 0; i < 9; i++) {
+              await service.addMessage(
+                conversationId: convo.id,
+                role: 'user',
+                content: 'question $i',
+              );
+              await service.addMessage(
+                conversationId: convo.id,
+                role: 'assistant',
+                content: 'answer $i',
+              );
+            }
+            await controller.sendMessage(ChatInputData(text: 'last question'));
+            await waitFor(
+              () =>
+                  streamRequests.length == 1 &&
+                  !controller.chatController.isConversationLoading(convo.id),
+              'send completion',
+            );
+            final first = streamRequests.single['messages'];
+            for (var version = 1; version <= 2; version++) {
+              final selected = await service.loadSelectedContextMessages(
+                convo.id,
+                limit: 100,
+              );
+              await controller.regenerateAtMessage(selected.last);
+              await waitFor(
+                () =>
+                    streamRequests.length == version + 1 &&
+                    !controller.chatController.isConversationLoading(convo.id),
+                'regeneration completion',
+              );
+              expect(streamRequests.last['messages'], first);
+            }
+            final all = await service.loadMessages(convo.id);
+            expect(all, hasLength(22));
+            expect(all.where((m) => m.content == 'answer 0'), hasLength(1));
+          });
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final temporary in [false, true]) {
+    testWidgets(
+      'regenerating assistant fixed start is rejected before creating a version: temporary=$temporary',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          final convo = temporary
+              ? await service.createDraftConversation(
+                  title: 'Assistant start',
+                  temporary: true,
+                )
+              : await openConversation(controller);
+          if (temporary) {
+            await controller.chatController.setCurrentConversationAndLoad(
+              convo,
+            );
+          }
+          await service.addMessage(
+            conversationId: convo.id,
+            role: 'user',
+            content: 'Question',
+          );
+          final reply = await service.addMessage(
+            conversationId: convo.id,
+            role: 'assistant',
+            content: 'Answer',
+          );
+          await service.setConversationContextStart(convo.id, reply.id);
+          final selections = Map<String, int>.from(
+            service.getVersionSelections(convo.id),
+          );
+          final errors = <String>[];
+          controller.debugViewModel.onError = errors.add;
+          expect(
+            await controller.debugViewModel.regenerateAtMessage(reply),
+            isFalse,
+          );
+          expect(errors.single, contains('its question is excluded'));
+          expect(streamRequests, isEmpty);
+          expect((await service.loadMessages(convo.id)).map((m) => m.content), [
+            'Question',
+            'Answer',
+          ]);
+          expect(service.getVersionSelections(convo.id), selections);
+          await controller.sendMessage(
+            ChatInputData(text: 'A follow-up question'),
+          );
+          await waitFor(
+            () =>
+                streamRequests.length == 1 &&
+                !controller.chatController.isConversationLoading(convo.id),
+            'follow-up after rejected regeneration',
+          );
+          final history = (streamRequests.single['messages'] as List)
+              .where((m) => m['role'] != 'system')
+              .toList();
+          expect(history.first['content'], 'Answer');
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final temporary in [false, true]) {
+    testWidgets(
+      'fixed context start survives sends, regeneration, moving and cancellation: temporary=$temporary',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await assistantProvider.updateAssistant(
+            assistantProvider.currentAssistant!.copyWith(
+              limitContextMessages: true,
+              contextMessageSize: 2,
+            ),
+          );
+          final convo = temporary
+              ? await service.createDraftConversation(
+                  title: 'Pinned temporary',
+                  temporary: true,
+                )
+              : await openConversation(controller);
+          if (temporary) {
+            await controller.chatController.setCurrentConversationAndLoad(
+              convo,
+            );
+          }
+          final users = <ChatMessage>[];
+          for (var i = 0; i < 6; i++) {
+            users.add(
+              await service.addMessage(
+                conversationId: convo.id,
+                role: 'user',
+                content: 'question $i',
+              ),
+            );
+            await service.addMessage(
+              conversationId: convo.id,
+              role: 'assistant',
+              content: 'answer $i',
+            );
+          }
+          users[0] = (await service.appendMessageVersion(
+            messageId: users.first.id,
+            content: 'edited old question',
+          ))!;
+          final errors = <String>[];
+          controller.debugViewModel.onError = errors.add;
+          await service.setConversationContextStart(convo.id, users[2].id);
+          expect(service.getContextStartIndex(convo.id), 4);
+          expect(
+            controller.debugViewModel.getContextMessageCount().configured,
+            isNull,
+          );
+          final beforeCount = (await service.loadMessages(convo.id)).length;
+          expect(
+            await controller.debugViewModel.regenerateAtMessage(users.first),
+            isFalse,
+          );
+          expect((await service.loadMessages(convo.id)).length, beforeCount);
+          expect(streamRequests, isEmpty);
+          expect(errors.single, contains('before the fixed context start'));
+
+          await controller.sendMessage(ChatInputData(text: 'last question'));
+          await waitFor(
+            () =>
+                streamRequests.length == 1 &&
+                !controller.chatController.isConversationLoading(convo.id),
+            'pinned send',
+          );
+          List<dynamic> history() => (streamRequests.last['messages'] as List)
+              .where((m) => m['role'] != 'system')
+              .toList();
+          expect(history(), hasLength(9));
+          expect(history().first['content'], 'question 2');
+          final first = streamRequests.last['messages'];
+          final selected = await service.loadSelectedContextMessages(
+            convo.id,
+            limit: 1,
+          );
+          await controller.regenerateAtMessage(selected.last);
+          await waitFor(
+            () =>
+                streamRequests.length == 2 &&
+                !controller.chatController.isConversationLoading(convo.id),
+            'pinned regeneration',
+          );
+          expect(streamRequests.last['messages'], first);
+          await service.setConversationContextStart(convo.id, users[4].id);
+          await controller.sendMessage(ChatInputData(text: 'another question'));
+          await waitFor(
+            () =>
+                streamRequests.length == 3 &&
+                !controller.chatController.isConversationLoading(convo.id),
+            'moved start',
+          );
+          expect(history().first['content'], 'question 4');
+          final snapshot = await service.loadContextSnapshot(convo.id);
+          final start = snapshot.operations.singleWhere(
+            (op) => op.isFixedStart && !op.revoked,
+          );
+          await service.changeContextOperation(
+            convo.id,
+            start.id,
+            includeDependents: true,
+            expectedState: ContextHistory.operationsFingerprint(
+              snapshot.operations,
+            ),
+          );
+          await controller.sendMessage(ChatInputData(text: 'rolling again'));
+          await waitFor(
+            () =>
+                streamRequests.length == 4 &&
+                !controller.chatController.isConversationLoading(convo.id),
+            'unpinned send',
+          );
+          expect(history(), hasLength(3));
+          expect(history().first['content'], 'another question');
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('double regenerate tap creates a single new version', (
     tester,

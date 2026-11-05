@@ -65,7 +65,11 @@ class ContextCompressionService extends ChangeNotifier {
   // sidebar indicators, never another pending-input store.
   bool Function(String conversationId)? isInputPaused;
   void refreshInputStatus() => notifyListeners();
-  Future<CompressionBudget> Function(String id, List<ChatMessage> history)?
+  Future<CompressionBudget> Function(
+    String id,
+    List<ChatMessage> history, {
+    bool? fixedContextStart,
+  })?
   estimateCandidate;
   bool _disposed = false;
   Iterable<ContextCompressionTask> get tasks => _tasks.values;

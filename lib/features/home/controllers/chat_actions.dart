@@ -1,3 +1,4 @@
+import '../../../core/models/context_operation.dart';
 import '../../../core/models/context_compression_task.dart';
 import '../../../core/services/auth/provider_oauth_service.dart';
 import 'dart:async';
@@ -1540,6 +1541,12 @@ class ChatActions {
   }) async {
     // Avoid using BuildContext across async gaps (this class holds a BuildContext).
     final settings = contextProvider.read<SettingsProvider>();
+    final beforeFixedStartMessage = AppLocalizations.of(
+      contextProvider,
+    )!.contextBeforeFixedStart;
+    final atFixedStartMessage = AppLocalizations.of(
+      contextProvider,
+    )!.contextRegenerateFixedStart;
     final truncateFuture =
         !preserveFollowingMessages && settings.regenerateDeleteTrailingMessages;
     final assistantProvider = contextProvider.read<AssistantProvider>();
@@ -1573,11 +1580,35 @@ class ChatActions {
         ? await chatController.messagesForCompleteHistoryContext(conversation)
         : await chatController.messagesForGenerationContext(
             conversation,
-            maxMessages: contextLimit,
+            // Match the send path's lookback before the final API trim. The
+            // target reply occupies a slot but is replaced by an empty draft.
+            maxMessages: contextLimit + 2,
             throughRevisionId: message.id,
             includeFollowingAssistant: true,
           );
     final idx = completeMessages.indexWhere((m) => m.id == message.id);
+    final fixedStart = ContextHistory.fixedStart(
+      await chatService.loadContextOperations(conversation.id),
+    );
+    if (fixedStart != null &&
+        (idx < 0 ||
+            (isTemporaryConversation &&
+                completeMessages.indexWhere(
+                      (m) =>
+                          ContextHistory.group(m) ==
+                          ContextHistory.group(message),
+                    ) <
+                    completeMessages.indexWhere(
+                      (m) =>
+                          ContextHistory.group(m) == fixedStart.anchorGroupId,
+                    )))) {
+      return ChatActionResult.error(beforeFixedStartMessage);
+    }
+    if (!assistantAsNewReply &&
+        message.role == 'assistant' &&
+        fixedStart?.anchorGroupId == ContextHistory.group(message)) {
+      return ChatActionResult.error(atFixedStartMessage);
+    }
     if (idx < 0) {
       return ChatActionResult.error('message_not_found');
     }
@@ -1681,8 +1712,8 @@ class ChatActions {
     final regenerationMessages = isTemporaryConversation
         ? await chatController.messagesForGenerationContext(
             conversation,
-            // The new empty reply occupies one slot in this post-begin read.
-            maxMessages: contextLimit + 1,
+            // Use the same pre-trim history window as a normal send.
+            maxMessages: contextLimit + 2,
             throughRevisionId: assistantMessage.id,
           )
         : ChatActions.buildRegenerationMessages(

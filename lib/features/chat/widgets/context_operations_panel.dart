@@ -320,13 +320,19 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                       .any(
                         (op) =>
                             !op.revoked &&
-                            !op.isCompression &&
-                            op.sourceGroups.contains(operation.anchorGroupId),
+                            (op.isFixedStart ||
+                                (op.isClear &&
+                                    op.sourceGroups.contains(
+                                      operation.anchorGroupId,
+                                    ))),
                       );
-                  final superseded = operations.any(
-                    (op) =>
-                        !op.revoked && op.dependencies.contains(operation.id),
-                  );
+                  final superseded =
+                      operation.isCompression &&
+                      operations.any(
+                        (op) =>
+                            !op.revoked &&
+                            op.dependencies.contains(operation.id),
+                      );
                   final status = operation.revoked
                       ? l10n.contextOperationUndone
                       : hidden
@@ -346,7 +352,9 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            operation.isCompression
+                            operation.isFixedStart
+                                ? l10n.contextFixedStart
+                                : operation.isCompression
                                 ? l10n.contextDividerCompressed
                                 : l10n.contextDetailClearTitle,
                             style: Theme.of(context).textTheme.titleSmall,

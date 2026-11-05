@@ -57,7 +57,7 @@ void main() {
       );
     }
     compression = chat.contextCompression;
-    compression.estimateCandidate = (_, _) async =>
+    compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
         (usedTokens: 100, contextWindow: 4000);
   });
   tearDown(() async {
@@ -173,7 +173,7 @@ void main() {
   test(
     'late review estimate cannot revive a cancellation whose write failed',
     () async {
-      compression.estimateCandidate = (_, _) async =>
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
           (usedTokens: 9000, contextWindow: 1000);
       await compression.start(id, request((_, _) async => 'summary'));
       await until(
@@ -182,7 +182,7 @@ void main() {
       await rejectCancellationWrites();
       final budget = Completer<CompressionBudget>();
       var entered = false;
-      compression.estimateCandidate = (_, _) {
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) {
         entered = true;
         return budget.future;
       };
@@ -236,7 +236,7 @@ void main() {
     () async {
       final budget = Completer<CompressionBudget>();
       var entered = false;
-      compression.estimateCandidate = (_, _) {
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) {
         entered = true;
         return budget.future;
       };
@@ -253,14 +253,14 @@ void main() {
   test(
     'oversized summary is editable review; double save applies only once',
     () async {
-      compression.estimateCandidate = (_, _) async =>
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
           (usedTokens: 9000, contextWindow: 1000);
       await compression.start(id, request((_, _) async => 'summary'));
       await until(
         () => compression.taskFor(id)!.phase == CompressionPhase.review,
       );
       expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
-      compression.estimateCandidate = (_, _) async =>
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
           (usedTokens: 500, contextWindow: 1000);
       await Future.wait([
         compression.applyReviewed(id, 'edited'),

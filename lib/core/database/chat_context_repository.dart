@@ -127,17 +127,17 @@ extension ChatContextRepository on ChatDatabaseRepository {
     String id,
     List<ContextOperation> operations,
   ) => _db.transaction(() async {
-    final clear = operations
-        .where((op) => !op.revoked && !op.isCompression)
+    final boundary = operations
+        .where((op) => !op.revoked && (op.isClear || op.isFixedStart))
         .lastOrNull;
-    if (clear == null) return -1;
+    if (boundary == null) return -1;
     await _timelineIndex.ensureConversation(id);
     final anchor = await _db
         .customSelect(
           'SELECT anchor_order FROM timeline_group_rows WHERE conversation_id=? AND group_id=?',
           variables: [
             Variable<String>(id),
-            Variable<String>(clear.anchorGroupId),
+            Variable<String>(boundary.anchorGroupId),
           ],
         )
         .getSingleOrNull();
@@ -149,11 +149,11 @@ extension ChatContextRepository on ChatDatabaseRepository {
           variables: [
             Variable<String>(id),
             Variable<int>(anchor.read<int>('anchor_order')),
-            Variable<String>(clear.anchorGroupId),
+            Variable<String>(boundary.anchorGroupId),
           ],
         )
         .getSingle();
-    return count.read<int>('n');
+    return count.read<int>('n') - (boundary.isFixedStart ? 1 : 0);
   });
 
   Future<void> saveCompressionTask(
@@ -349,7 +349,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
         expectedFingerprint) {
       throw StateError('context_changed');
     }
-    final next = [...operations, operation];
+    final next = ContextHistory.appendOperation(operations, operation);
     await _writeContextOperations(conversationId, next);
     // Commit the task outcome with the node so a crash cannot invite a second
     // compression after a successful application.

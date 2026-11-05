@@ -5790,5 +5790,11 @@
       }
     }
   },
-  "contextViewBoundary": "跳转到分界位置"
+  "contextViewBoundary": "跳转到分界位置",
+  "contextFixedStart": "固定上下文起点",
+  "contextSetFixedStart": "从此处开始上下文",
+  "contextCancelFixedStart": "取消固定上下文起点",
+  "contextFixedStartDescription": "从这条消息开始发送历史，不再按消息数量滚动截取。",
+  "contextBeforeFixedStart": "这条消息位于固定上下文起点之前，请先移动或取消起点再重新生成。",
+  "contextRegenerateFixedStart": "这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。"
 }

@@ -121,19 +121,19 @@ extension ChatContextOperations on ChatService {
     if (_temporaryConversationIds.contains(id) ||
         _draftConversations.containsKey(id)) {
       final operations = contextOperationsFor(id);
-      final clear = operations
-          .where((op) => !op.revoked && !op.isCompression)
+      final boundary = operations
+          .where((op) => !op.revoked && (op.isClear || op.isFixedStart))
           .lastOrNull;
       final messages = _collapseTitleVersions(
         _messagesCache[id] ?? [],
         getVersionSelections(id),
       );
-      _contextStartIndices[id] = clear == null
+      _contextStartIndices[id] = boundary == null
           ? -1
           : messages.indexWhere(
-                  (m) => ContextHistory.group(m) == clear.anchorGroupId,
+                  (m) => ContextHistory.group(m) == boundary.anchorGroupId,
                 ) +
-                1;
+                (boundary.isFixedStart ? 0 : 1);
       _contextStateVersions[id] = contextRevision(id);
       return operations;
     }
@@ -238,7 +238,10 @@ extension ChatContextOperations on ChatService {
       if (snapshot.fingerprint != expectedFingerprint) {
         throw StateError('context_changed');
       }
-      _contextOperations[id] = [...snapshot.operations, operation];
+      _contextOperations[id] = ContextHistory.appendOperation(
+        snapshot.operations,
+        operation,
+      );
     } else {
       _contextOperations[id] = await _repo.appendContextOperation(
         id,
@@ -479,6 +482,35 @@ extension ChatContextOperations on ChatService {
             anchorGroupId: tail,
             appliedAfterGroupId: tail,
             sourceGroups: snapshot.messages.map(ContextHistory.group).toList(),
+            dependencies: const [],
+            createdAt: DateTime.now(),
+          ),
+          expectedFingerprint: snapshot.fingerprint,
+        );
+      });
+
+  /// Pins the inclusive history boundary to a message group, independently of
+  /// compression and the assistant's rolling message-count limit.
+  Future<void> setConversationContextStart(String id, String messageId) =>
+      contextCompression.runContextChange(id, () async {
+        final snapshot = await loadContextSnapshot(id);
+        final message = snapshot.messages
+            .where((message) => message.id == messageId)
+            .firstOrNull;
+        if (message == null) throw StateError('message_not_found');
+        final group = ContextHistory.group(message);
+        if (ContextHistory.fixedStart(snapshot.operations)?.anchorGroupId ==
+            group) {
+          return;
+        }
+        await appendContextOperation(
+          id,
+          ContextOperation(
+            id: const Uuid().v4(),
+            kind: ContextOperationKind.start,
+            anchorGroupId: group,
+            appliedAfterGroupId: group,
+            sourceGroups: [group],
             dependencies: const [],
             createdAt: DateTime.now(),
           ),

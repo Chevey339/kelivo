@@ -1277,6 +1277,21 @@ class _HomePageState extends State<HomePage>
       },
       onRegenerateMessage: (message) =>
           _controller.regenerateAtMessage(message),
+      onSetContextStart: (message) async {
+        try {
+          await chat.setConversationContextStart(
+            message.conversationId,
+            message.id,
+          );
+        } catch (error) {
+          if (!context.mounted) return;
+          showAppSnackBar(
+            context,
+            message: error.toString(),
+            type: NotificationType.error,
+          );
+        }
+      },
       onResendMessage: (message) => _controller.regenerateAtMessage(message),
       onTranslateMessage: (message) => _controller.translateMessage(message),
       onEditMessage: (message) => _controller.editMessage(message),

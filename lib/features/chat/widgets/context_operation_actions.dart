@@ -33,6 +33,7 @@ Future<CompressionBudget?> _estimate(
     return await chat.contextCompression.estimateCandidate?.call(
       id,
       ContextHistory.resolve(snapshot.messages, operations),
+      fixedContextStart: ContextHistory.fixedStart(operations) != null,
     );
   } catch (_) {
     return null;
@@ -166,9 +167,9 @@ Future<bool> changeContextOperationWithConfirmation(
       targetId: operation.id,
       kind: summary != null
           ? ContextImpactKind.edit
-          : operation.isCompression
-          ? ContextImpactKind.undo
-          : ContextImpactKind.clear,
+          : operation.isClear
+          ? ContextImpactKind.clear
+          : ContextImpactKind.undo,
       before: budgets.first,
       after: budgets.last,
     )) {
@@ -305,15 +306,20 @@ Future<void> showContextOperationDetails(
       .any(
         (op) =>
             !op.revoked &&
-            !op.isCompression &&
-            op.sourceGroups.contains(operation.anchorGroupId),
+            (op.isFixedStart ||
+                (op.isClear &&
+                    op.sourceGroups.contains(operation.anchorGroupId))),
       );
-  final superseded = snapshot.operations.any(
-    (op) => !op.revoked && op.dependencies.contains(operation.id),
-  );
+  final superseded =
+      operation.isCompression &&
+      snapshot.operations.any(
+        (op) => !op.revoked && op.dependencies.contains(operation.id),
+      );
   await _showContextContent(
     context,
-    title: operation.isCompression
+    title: operation.isFixedStart
+        ? l10n.contextFixedStart
+        : operation.isCompression
         ? l10n.contextDetailTitle
         : l10n.contextDetailClearTitle,
     maxWidth: operation.isCompression ? 560 : 500,

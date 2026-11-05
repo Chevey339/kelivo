@@ -80,8 +80,9 @@ void main() {
         );
       }
     }
-    chat.contextCompression.estimateCandidate = (_, _) async =>
-        (usedTokens: 100, contextWindow: 4000);
+    chat.contextCompression.estimateCandidate =
+        (_, _, {bool? fixedContextStart}) async =>
+            (usedTokens: 100, contextWindow: 4000);
   });
   tearDown(() async {
     await chat.close();
@@ -365,8 +366,9 @@ void main() {
     'review remains visible and cancellable; interrupted status can be dismissed across restarts',
     (tester) async {
       await tester.runAsync(() async {
-        chat.contextCompression.estimateCandidate = (_, _) async =>
-            (usedTokens: 5000, contextWindow: 4000);
+        chat.contextCompression.estimateCandidate =
+            (_, _, {bool? fixedContextStart}) async =>
+                (usedTokens: 5000, contextWindow: 4000);
         await start((_, _) async => 'summary');
         await until(
           () =>

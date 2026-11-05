@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import '../../../icons/lucide_adapter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/chat_message.dart';
 // import '../pages/select_copy_page.dart';
 import 'select_copy_sheet.dart';
@@ -28,6 +29,8 @@ enum MessageMoreAction {
   deleteCurrentVersion,
   deleteAllVersions,
   selectMessages,
+  setContextStart,
+  cancelContextStart,
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
@@ -35,6 +38,8 @@ Future<MessageMoreAction?> showMessageMoreSheet(
   ChatMessage message, {
   required bool canDeleteAllVersions,
   required bool canCreateBranch,
+  bool canSetContextStart = false,
+  bool isContextStart = false,
 }) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -53,6 +58,8 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
         canCreateBranch: canCreateBranch,
+        canSetContextStart: canSetContextStart,
+        isContextStart: isContextStart,
       ),
     );
   }
@@ -126,6 +133,19 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           selected = MessageMoreAction.selectMessages;
         },
       ),
+      if (canSetContextStart)
+        DesktopContextMenuItem(
+          icon: LucideIcons.flag,
+          label: isContextStart
+              ? l10n.contextCancelFixedStart
+              : l10n.contextSetFixedStart,
+          subtitle: l10n.contextFixedStartDescription,
+          onTap: () {
+            selected = isContextStart
+                ? MessageMoreAction.cancelContextStart
+                : MessageMoreAction.setContextStart;
+          },
+        ),
       if (canCreateBranch)
         DesktopContextMenuItem(
           icon: Lucide.GitFork,
@@ -166,11 +186,15 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.parentContext,
     required this.canDeleteAllVersions,
     required this.canCreateBranch,
+    required this.canSetContextStart,
+    required this.isContextStart,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
   final bool canCreateBranch;
+  final bool canSetContextStart;
+  final bool isContextStart;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -358,6 +382,19 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         ).pop(MessageMoreAction.selectMessages);
                       },
                     ),
+                    if (widget.canSetContextStart)
+                      _actionItem(
+                        icon: LucideIcons.flag,
+                        label: widget.isContextStart
+                            ? l10n.contextCancelFixedStart
+                            : l10n.contextSetFixedStart,
+                        subtitle: l10n.contextFixedStartDescription,
+                        onTap: () => Navigator.of(context).pop(
+                          widget.isContextStart
+                              ? MessageMoreAction.cancelContextStart
+                              : MessageMoreAction.setContextStart,
+                        ),
+                      ),
                     if (widget.canCreateBranch)
                       _actionItem(
                         icon: Lucide.GitFork,

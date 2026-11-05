@@ -15971,4 +15971,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextViewBoundary => 'Jump to boundary';
+
+  @override
+  String get contextFixedStart => 'Fixed context start';
+
+  @override
+  String get contextSetFixedStart => 'Start context here';
+
+  @override
+  String get contextCancelFixedStart => 'Cancel fixed context start';
+
+  @override
+  String get contextFixedStartDescription =>
+      'Send history from this message onward, without the rolling message-count limit.';
+
+  @override
+  String get contextBeforeFixedStart =>
+      'This message is before the fixed context start. Move or cancel the start before regenerating it.';
+
+  @override
+  String get contextRegenerateFixedStart =>
+      'This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.';
 }

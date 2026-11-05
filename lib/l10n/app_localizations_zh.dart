@@ -15157,6 +15157,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contextViewBoundary => '跳转到分界位置';
+
+  @override
+  String get contextFixedStart => '固定上下文起点';
+
+  @override
+  String get contextSetFixedStart => '从此处开始上下文';
+
+  @override
+  String get contextCancelFixedStart => '取消固定上下文起点';
+
+  @override
+  String get contextFixedStartDescription => '从这条消息开始发送历史，不再按消息数量滚动截取。';
+
+  @override
+  String get contextBeforeFixedStart => '这条消息位于固定上下文起点之前，请先移动或取消起点再重新生成。';
+
+  @override
+  String get contextRegenerateFixedStart =>
+      '这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -30168,6 +30187,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get contextViewBoundary => '跳转到分界位置';
+
+  @override
+  String get contextFixedStart => '固定上下文起点';
+
+  @override
+  String get contextSetFixedStart => '从此处开始上下文';
+
+  @override
+  String get contextCancelFixedStart => '取消固定上下文起点';
+
+  @override
+  String get contextFixedStartDescription => '从这条消息开始发送历史，不再按消息数量滚动截取。';
+
+  @override
+  String get contextBeforeFixedStart => '这条消息位于固定上下文起点之前，请先移动或取消起点再重新生成。';
+
+  @override
+  String get contextRegenerateFixedStart =>
+      '这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -45260,4 +45298,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextViewBoundary => '跳至分界位置';
+
+  @override
+  String get contextFixedStart => '固定上下文起點';
+
+  @override
+  String get contextSetFixedStart => '從此處開始上下文';
+
+  @override
+  String get contextCancelFixedStart => '取消固定上下文起點';
+
+  @override
+  String get contextFixedStartDescription => '從這則訊息開始傳送歷史，不再按訊息數量滾動截取。';
+
+  @override
+  String get contextBeforeFixedStart => '這則訊息位於固定上下文起點之前，請先移動或取消起點再重新生成。';
+
+  @override
+  String get contextRegenerateFixedStart =>
+      '這則回覆是固定上下文起點，其之前的問題已被排除。請將起點移到更早的訊息，或取消起點後再重新生成。';
 }

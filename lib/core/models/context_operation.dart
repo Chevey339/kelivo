@@ -5,7 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'chat_message.dart';
 import '../utils/token_estimator.dart';
 
-enum ContextOperationKind { clear, compress }
+enum ContextOperationKind { clear, compress, start }
 
 enum ContextHistorySource { effective, previous, original }
 
@@ -86,33 +86,38 @@ class ContextOperation {
 
   bool get isEdited => summary != originalSummary;
   bool get isCompression => kind == ContextOperationKind.compress;
+  bool get isClear => kind == ContextOperationKind.clear;
+  bool get isFixedStart => kind == ContextOperationKind.start;
   String get summaryMessageId => '$summaryPrefix$id';
   static bool isSummary(ChatMessage message) =>
       message.id.startsWith(summaryPrefix);
 
-  ContextOperation copyWith({String? summary, bool? revoked}) =>
-      ContextOperation(
-        id: id,
-        kind: kind,
-        anchorGroupId: anchorGroupId,
-        appliedAfterGroupId: appliedAfterGroupId,
-        sourceGroups: sourceGroups,
-        dependencies: dependencies,
-        createdAt: createdAt,
-        summary: summary ?? this.summary,
-        originalSummary: originalSummary,
-        revoked: revoked ?? this.revoked,
-        keepUserMessages: keepUserMessages,
-        model: model,
-        inputTokens: inputTokens,
-        inputMode: inputMode,
-        inputMaxChars: inputMaxChars,
-        historySource: historySource,
-        includedEditedSummaries: includedEditedSummaries,
-        includedAttachmentsAndTools: includedAttachmentsAndTools,
-        convertedFromLegacyClear: convertedFromLegacyClear,
-        inputParts: inputParts,
-      );
+  ContextOperation copyWith({
+    String? summary,
+    bool? revoked,
+    List<String>? dependencies,
+  }) => ContextOperation(
+    id: id,
+    kind: kind,
+    anchorGroupId: anchorGroupId,
+    appliedAfterGroupId: appliedAfterGroupId,
+    sourceGroups: sourceGroups,
+    dependencies: dependencies ?? this.dependencies,
+    createdAt: createdAt,
+    summary: summary ?? this.summary,
+    originalSummary: originalSummary,
+    revoked: revoked ?? this.revoked,
+    keepUserMessages: keepUserMessages,
+    model: model,
+    inputTokens: inputTokens,
+    inputMode: inputMode,
+    inputMaxChars: inputMaxChars,
+    historySource: historySource,
+    includedEditedSummaries: includedEditedSummaries,
+    includedAttachmentsAndTools: includedAttachmentsAndTools,
+    convertedFromLegacyClear: convertedFromLegacyClear,
+    inputParts: inputParts,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -193,6 +198,40 @@ class ContextOperation {
 
 /// Pure projection shared by sending, compression previews and regeneration.
 class ContextHistory {
+  static ContextOperation? fixedStart(List<ContextOperation> operations) =>
+      operations.where((op) => op.isFixedStart && !op.revoked).lastOrNull;
+
+  /// Compression performed under a pin depends on that history projection.
+  /// Undoing or replacing the pin must also retire those summaries, otherwise
+  /// restored older summaries can overlap them.
+  static List<ContextOperation> appendOperation(
+    List<ContextOperation> operations,
+    ContextOperation operation,
+  ) {
+    final start = fixedStart(operations);
+    final revoked = operation.isFixedStart
+        ? affectedOperations(
+            operations,
+            operationIds: {
+              for (final op in operations)
+                if (op.isFixedStart && !op.revoked) op.id,
+            },
+          )
+        : const <String>{};
+    final appended = operation.isCompression && start != null
+        ? operation.copyWith(
+            dependencies: {...operation.dependencies, start.id}.toList(),
+          )
+        : operation;
+    return [
+      for (final previous in operations)
+        revoked.contains(previous.id)
+            ? previous.copyWith(revoked: true)
+            : previous,
+      appended,
+    ];
+  }
+
   static String operationsFingerprint(List<ContextOperation> operations) =>
       sha256
           .convert(
@@ -241,12 +280,29 @@ class ContextHistory {
     if (through == null) return [];
     final end = endGroupId == null ? through : positions[endGroupId];
     if (end == null) return [];
+    final startOperation = fixedStart(
+      operations.where((op) => !omitOperations.contains(op.id)).toList(),
+    );
+    final start = startOperation == null
+        ? 0
+        : positions[startOperation.anchorGroupId];
+    if (start == null) throw StateError('context_boundary_missing');
     var result = selected
-        .where((message) => positions[group(message)]! <= end)
+        .where(
+          (message) =>
+              positions[group(message)]! >= start &&
+              positions[group(message)]! <= end,
+        )
         .toList();
     final summaryPositions = <String, int>{};
-    for (final operation in operations) {
+    // Setting a start explicitly selects original history from that point.
+    // Earlier clears/compressions remain stored and return when the pin is undone.
+    final applicable = startOperation == null
+        ? operations
+        : operations.skipWhile((op) => op.id != startOperation.id);
+    for (final operation in applicable) {
       if (operation.revoked || omitOperations.contains(operation.id)) continue;
+      if (operation.isFixedStart) continue;
       final anchor = positions[operation.anchorGroupId];
       final appliedAfter = positions[operation.appliedAfterGroupId];
       // Missing references fail closed. They must be revoked in the same
@@ -254,8 +310,17 @@ class ContextHistory {
       if (anchor == null || appliedAfter == null) {
         throw StateError('context_boundary_missing');
       }
+      // A manual start excludes earlier history, including summaries that
+      // contain it. Keep the original messages inside the chosen range instead.
+      if (anchor < start ||
+          (operation.isCompression &&
+              operation.sourceGroups.any(
+                (group) => (positions[group] ?? -1) < start,
+              ))) {
+        continue;
+      }
       if (throughGroupId != null && appliedAfter >= through) continue;
-      if (!operation.isCompression) {
+      if (operation.isClear) {
         result.removeWhere(
           (message) =>
               (summaryPositions[message.id] ?? positions[group(message)]!) <=
@@ -291,7 +356,7 @@ class ContextHistory {
         ),
       );
     }
-    if (limit != null) {
+    if (limit != null && startOperation == null) {
       final raw = result.where((m) => !ContextOperation.isSummary(m)).toList();
       final retained = raw
           .skip((raw.length - limit).clamp(0, raw.length))
@@ -325,6 +390,12 @@ class ContextHistory {
       void include(String id) {
         final op = operations.firstWhere((op) => op.id == id);
         for (final dependency in op.dependencies) {
+          // Projection dependencies must stay active while summaries expand.
+          if (!operations
+              .firstWhere((op) => op.id == dependency)
+              .isCompression) {
+            continue;
+          }
           if (expanded.add(dependency)) include(dependency);
         }
       }

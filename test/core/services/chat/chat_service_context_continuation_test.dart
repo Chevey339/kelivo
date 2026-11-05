@@ -372,8 +372,9 @@ void main() {
       });
       addTearDown(settings.dispose);
       addTearDown(assistants.dispose);
-      chat.contextCompression.estimateCandidate = (_, _) async =>
-          (usedTokens: 100, contextWindow: 4000);
+      chat.contextCompression.estimateCandidate =
+          (_, _, {bool? fixedContextStart}) async =>
+              (usedTokens: 100, contextWindow: 4000);
       Future<void> pumpUntil(bool Function() complete) async {
         for (var i = 0; i < 500; i++) {
           await tester.pump();

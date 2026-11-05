@@ -1,3 +1,6 @@
+import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart'
+    show exportContextNodeText;
+import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -44,6 +47,35 @@ void main() {
     originalSummary: 'Actual request summary',
     keepUserMessages: 6,
   );
+  test(
+    'a summary depending on a pin does not mark the pin superseded in export',
+    () {
+      final pin = ContextOperation(
+        id: 'pin',
+        kind: ContextOperationKind.start,
+        anchorGroupId: 'u',
+        appliedAfterGroupId: 'u',
+        sourceGroups: ['u'],
+        dependencies: [],
+        createdAt: DateTime(2026),
+      );
+      final exported = exportContextNodeText(
+        pin,
+        AppLocalizationsEn(),
+        markdown: true,
+        operations: [
+          pin,
+          op.copyWith(dependencies: [pin.id]),
+        ],
+      );
+      expect(exported, contains(AppLocalizationsEn().contextOperationActive));
+      expect(
+        exported,
+        isNot(contains(AppLocalizationsEn().contextOperationSuperseded)),
+      );
+    },
+  );
+
   late SettingsProvider settings;
   late AssistantProvider assistants;
   Future<void> prepare(WidgetTester tester, TargetPlatform platform) async {
@@ -84,6 +116,37 @@ void main() {
       home: Scaffold(body: child),
     ),
   );
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
+    check(
+      'fixed start divider identifies the pin and opens details on $platform',
+      (tester) async {
+        await prepare(tester, platform);
+        var opened = 0;
+        await tester.pumpWidget(
+          app(
+            ContextOperationDivider(
+              operation: ContextOperation(
+                id: 'pin',
+                kind: ContextOperationKind.start,
+                anchorGroupId: 'u',
+                appliedAfterGroupId: 'u',
+                sourceGroups: ['u'],
+                dependencies: [],
+                createdAt: DateTime(2026),
+              ),
+              onOpen: () => opened++,
+            ),
+          ),
+        );
+        expect(find.text('Fixed context start'), findsOneWidget);
+        expect(find.text('Context cleared'), findsNothing);
+        await tester.tap(find.text('Fixed context start'));
+        await tester.pump();
+        expect(opened, 1);
+      },
+    );
+  }
 
   check(
     'desktop undo appears on hover and keyboard focus without opening details',

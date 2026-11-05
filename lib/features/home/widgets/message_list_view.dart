@@ -138,6 +138,7 @@ class MessageListView extends StatefulWidget {
     this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
+    this.onSetContextStart,
     this.onResendMessage,
     this.onTranslateMessage,
     this.onEditMessage,
@@ -239,6 +240,7 @@ class MessageListView extends StatefulWidget {
   // Callbacks
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
+  final ValueChanged<ChatMessage>? onSetContextStart;
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
@@ -2121,6 +2123,21 @@ class _MessageListViewState extends State<MessageListView> {
       key: ValueKey<String>('timeline-slot:${_slotId(message)}'),
       mainAxisSize: MainAxisSize.min,
       children: [
+        for (final operation in widget.contextOperations)
+          if (!operation.revoked &&
+              operation.isFixedStart &&
+              operation.anchorGroupId == (message.groupId ?? message.id))
+            Padding(
+              padding: widget.dividerPadding,
+              child: ContextOperationDivider(
+                key: ValueKey('context-node-${operation.id}'),
+                operation: operation,
+                onOpen: () => widget.onOpenContextOperation?.call(operation),
+                onUndo: widget.onUndoContextOperation == null
+                    ? null
+                    : () => widget.onUndoContextOperation!(operation),
+              ),
+            ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2224,6 +2241,7 @@ class _MessageListViewState extends State<MessageListView> {
         ),
         for (final operation in widget.contextOperations)
           if (!operation.revoked &&
+              !operation.isFixedStart &&
               operation.anchorGroupId == (message.groupId ?? message.id))
             Padding(
               padding: widget.dividerPadding,
@@ -2236,14 +2254,19 @@ class _MessageListViewState extends State<MessageListView> {
                     .any(
                       (op) =>
                           !op.revoked &&
-                          !op.isCompression &&
-                          op.sourceGroups.contains(operation.anchorGroupId),
+                          (op.isFixedStart ||
+                              (op.isClear &&
+                                  op.sourceGroups.contains(
+                                    operation.anchorGroupId,
+                                  ))),
                     ),
-                superseded: widget.contextOperations.any(
-                  (other) =>
-                      !other.revoked &&
-                      other.dependencies.contains(operation.id),
-                ),
+                superseded:
+                    operation.isCompression &&
+                    widget.contextOperations.any(
+                      (other) =>
+                          !other.revoked &&
+                          other.dependencies.contains(operation.id),
+                    ),
                 onOpen: () => widget.onOpenContextOperation?.call(operation),
                 onUndo: widget.onUndoContextOperation == null
                     ? null
@@ -2531,13 +2554,21 @@ class _MessageListViewState extends State<MessageListView> {
           ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
           : null,
       onMore: () async {
+        final start = ContextHistory.fixedStart(widget.contextOperations);
         final action = await showMessageMoreSheet(
           context,
           message,
           canDeleteAllVersions: total > 1,
           canCreateBranch: widget.onForkConversation != null,
+          canSetContextStart:
+              widget.onSetContextStart != null && !message.isStreaming,
+          isContextStart: start?.anchorGroupId == ContextHistory.group(message),
         );
-        if (action == MessageMoreAction.deleteCurrentVersion) {
+        if (action == MessageMoreAction.setContextStart) {
+          widget.onSetContextStart?.call(message);
+        } else if (action == MessageMoreAction.cancelContextStart) {
+          if (start != null) widget.onUndoContextOperation?.call(start);
+        } else if (action == MessageMoreAction.deleteCurrentVersion) {
           await widget.onDeleteMessage?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.deleteAllVersions) {
           await widget.onDeleteAllVersions?.call(message, widget.byGroup);

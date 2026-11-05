@@ -858,7 +858,9 @@ String exportContextNodeText(
   required bool markdown,
   required List<ContextOperation> operations,
 }) {
-  final title = op.isCompression
+  final title = op.isFixedStart
+      ? l10n.contextFixedStart
+      : op.isCompression
       ? l10n.contextCompressMarker
       : l10n.contextClearMarker;
   final hidden = operations
@@ -867,16 +869,17 @@ String exportContextNodeText(
       .any(
         (item) =>
             !item.revoked &&
-            !item.isCompression &&
-            item.sourceGroups.contains(op.anchorGroupId),
+            (item.isFixedStart ||
+                (item.isClear && item.sourceGroups.contains(op.anchorGroupId))),
       );
   final status = op.revoked
       ? l10n.contextOperationUndone
       : hidden
       ? l10n.contextOperationHidden
-      : operations.any(
-          (item) => !item.revoked && item.dependencies.contains(op.id),
-        )
+      : op.isCompression &&
+            operations.any(
+              (item) => !item.revoked && item.dependencies.contains(op.id),
+            )
       ? l10n.contextOperationSuperseded
       : l10n.contextOperationActive;
   return '${markdown ? '### ' : '['}$title · $status${markdown ? '' : ']'}\n'

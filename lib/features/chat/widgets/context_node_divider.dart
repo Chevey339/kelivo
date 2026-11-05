@@ -103,9 +103,15 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
             task,
             waitingForApproval: widget.waitingForApproval,
           )
-        : '${operation!.isCompression ? l10n.contextDividerCompressed : l10n.homePageClearContext}'
+        : '${operation!.isFixedStart
+                  ? l10n.contextFixedStart
+                  : operation.isCompression
+                  ? l10n.contextDividerCompressed
+                  : l10n.homePageClearContext}'
               '${operation.isCompression && operation.isEdited ? ' · ${l10n.contextDividerEdited}' : ''}';
-    final undoLabel = operation?.isCompression == true
+    final undoLabel = operation?.isFixedStart == true
+        ? l10n.contextCancelFixedStart
+        : operation?.isCompression == true
         ? l10n.contextUndoCompressTooltip
         : l10n.contextUndoClearTooltip;
     final failed =
@@ -184,6 +190,9 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
                                                 ? LucideIcons.circleAlert
                                                 : review
                                                 ? LucideIcons.pause
+                                                : operation?.isFixedStart ==
+                                                      true
+                                                ? LucideIcons.flag
                                                 : operation?.isCompression ==
                                                       true
                                                 ? LucideIcons.package2
