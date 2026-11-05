@@ -5820,5 +5820,16 @@
   "contextCancelFixedStart": "取消固定上下文起點",
   "contextFixedStartDescription": "從這則訊息開始傳送歷史，不再按訊息數量滾動截取。",
   "contextBeforeFixedStart": "這則訊息位於固定上下文起點之前，請先移動或取消起點再重新生成。",
-  "contextRegenerateFixedStart": "這則回覆是固定上下文起點，其之前的問題已被排除。請將起點移到更早的訊息，或取消起點後再重新生成。"
+  "contextRegenerateFixedStart": "這則回覆是固定上下文起點，其之前的問題已被排除。請將起點移到更早的訊息，或取消起點後再重新生成。",
+  "responseSpeedLabel": "回應速度",
+  "responseSpeedStandard": "標準",
+  "responseSpeedUsageHint": "加速模式會消耗更多額度或餘額。",
+  "responseSpeedLoading": "正在檢查可用檔位…",
+  "responseSpeedUnavailable": "目前模型沒有可請求的加速檔位。",
+  "responseSpeedSaveFailed": "回應速度儲存失敗，請重試。",
+  "responseSpeedRequestFailed": "{mode} 請求失敗。請檢查模型及帳號是否支援，或切換為標準模式重試。",
+  "responseSpeedSelectionUnavailable": "先前選擇的加速檔位已不可用，此對話將使用標準模式。",
+  "responseSpeedProviderDependent": "是否支援加速取決於目前的供應商。",
+  "responseSpeedTapTo": "點擊切換為{mode}",
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要啟用 Responses API。"
 }

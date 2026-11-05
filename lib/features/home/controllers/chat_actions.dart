@@ -2317,6 +2317,7 @@ class ChatActions {
         onToolCall: onToolCall,
         extraHeaders: ctx.extraHeaders,
         extraBody: ctx.extraBody,
+        serviceTier: ctx.serviceTier,
         stream: ctx.streamOutput,
         requestId: conversationId,
         conversationId: conversationId,
@@ -2835,7 +2836,18 @@ class ChatActions {
     final oauthFailure =
         e is ProviderOAuthException &&
         e.kind == ProviderOAuthFailure.loginRequired;
-    final errorText = oauthFailure ? '' : e.toString();
+    var errorText = oauthFailure ? '' : e.toString();
+    final tier = state.ctx.serviceTier;
+    final speedL10n = tier != null && contextProvider.mounted
+        ? AppLocalizations.of(contextProvider)
+        : null;
+    if (!oauthFailure &&
+        tier != null &&
+        tier != 'default' &&
+        speedL10n != null) {
+      final mode = tier == 'ultrafast' ? 'UltraFast' : 'Fast';
+      errorText = '${speedL10n.responseSpeedRequestFailed(mode)}\n\n$errorText';
+    }
 
     // Reset file processing state on error, scoped to this message so a
     // background conversation's indicator survives.

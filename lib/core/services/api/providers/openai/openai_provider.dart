@@ -18,6 +18,7 @@ import '../../../model_spec/model_spec_resolver.dart';
 import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../response_speed.dart';
 import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -44,6 +45,7 @@ Stream<StreamChunk> sendOpenAIStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   String? conversationId,
+  String? serviceTier,
   List<String>? userImagePaths,
   ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
@@ -596,6 +598,7 @@ Stream<StreamChunk> sendOpenAIStream(
   // Custom body keys go last so they win over the reasoning dialect.
   final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   CustomRequestMerger.applyBody(body, extraBodyCfg);
+  applyServiceTier(body, config, serviceTier);
   if (promptCacheKey != null) {
     body.putIfAbsent('prompt_cache_key', () => promptCacheKey);
   }
@@ -731,6 +734,7 @@ Stream<StreamChunk> sendOpenAIStream(
             onToolCall: effectiveOnToolCall,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
+            serviceTier: serviceTier,
             promptCacheKey: promptCacheKey,
             temperature: temperature,
             topP: topP,
@@ -987,6 +991,7 @@ Stream<StreamChunk> sendOpenAIStream(
             onToolCall: effectiveOnToolCall,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
+            serviceTier: serviceTier,
             promptCacheKey: promptCacheKey,
             temperature: temperature,
             topP: topP,
@@ -1091,6 +1096,7 @@ Stream<StreamChunk> sendOpenAIStream(
       tools: tools,
       builtInSearchQuery: builtInSearchQuery,
       extraBodyCfg: extraBodyCfg,
+      serviceTier: serviceTier,
       promptCacheKey: promptCacheKey,
       extraHeaders: extraHeaders,
       wantsImageOutput: wantsImageOutput,

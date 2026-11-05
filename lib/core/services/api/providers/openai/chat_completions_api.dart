@@ -13,6 +13,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../response_speed.dart';
 import '../../builtin_tools.dart';
 import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
@@ -867,6 +868,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required Object? builtInSearchQuery,
   required Map<String, dynamic> extraBodyCfg,
   required String? promptCacheKey,
+  String? serviceTier,
   required Map<String, String>? extraHeaders,
   required bool wantsImageOutput,
   required bool needsReasoningEcho,
@@ -946,6 +948,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         transport: ReasoningTransport.chatCompletions,
       );
       CustomRequestMerger.applyBody(body2, extraBodyCfg);
+      applyServiceTier(body2, config, serviceTier);
       if (promptCacheKey != null) {
         body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
       }

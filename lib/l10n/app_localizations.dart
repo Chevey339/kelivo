@@ -28217,6 +28217,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.'**
   String get contextRegenerateFixedStart;
+
+  /// No description provided for @responseSpeedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Response speed'**
+  String get responseSpeedLabel;
+
+  /// No description provided for @responseSpeedStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get responseSpeedStandard;
+
+  /// No description provided for @responseSpeedUsageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Faster modes use more quota or credits.'**
+  String get responseSpeedUsageHint;
+
+  /// No description provided for @responseSpeedLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking availability…'**
+  String get responseSpeedLoading;
+
+  /// No description provided for @responseSpeedUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No acceleration tier is available for this model.'**
+  String get responseSpeedUnavailable;
+
+  /// No description provided for @responseSpeedSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the response speed. Try again.'**
+  String get responseSpeedSaveFailed;
+
+  /// No description provided for @responseSpeedRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{mode} request failed. Check model and account availability, or switch to Standard and retry.'**
+  String responseSpeedRequestFailed(String mode);
+
+  /// No description provided for @responseSpeedSelectionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved speed is no longer available. This chat will use Standard.'**
+  String get responseSpeedSelectionUnavailable;
+
+  /// No description provided for @responseSpeedProviderDependent.
+  ///
+  /// In en, this message translates to:
+  /// **'Availability depends on your provider.'**
+  String get responseSpeedProviderDependent;
+
+  /// No description provided for @responseSpeedTapTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to switch to {mode}'**
+  String responseSpeedTapTo(String mode);
+
+  /// No description provided for @responseSpeedUltrafastNeedsResponses.
+  ///
+  /// In en, this message translates to:
+  /// **'UltraFast requires the Responses API.'**
+  String get responseSpeedUltrafastNeedsResponses;
 }
 
 class _AppLocalizationsDelegate

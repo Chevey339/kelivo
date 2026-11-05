@@ -58,6 +58,42 @@ void main() {
   tearDown(() => settings.dispose());
 
   test(
+    'Codex sync stores service tiers scoped to the authenticated session',
+    () async {
+      var tiers = <Map<String, String>>[
+        {'id': 'fast', 'name': 'Fast', 'description': 'Faster'},
+        {'id': 'ultrafast', 'name': 'Ultrafast', 'description': 'Fastest'},
+      ];
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient(
+          (_) async => jsonResponse({
+            'models': [
+              {'slug': 'gpt-6-astra', 'service_tiers': tiers},
+            ],
+          }),
+        ),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      await settings.setProviderConfig(
+        'account',
+        config(provider: OAuthProvider.chatgpt, expired: false),
+      );
+      await service.syncModels('account');
+      var saved =
+          settings.providerConfigs['account']!.modelOverrides['gpt-6-astra']
+              as Map;
+      expect(saved['oauthServiceTiers'], ['fast', 'ultrafast']);
+      expect(saved['oauthServiceTierSessionId'], 'session');
+      tiers = [];
+      await service.syncModels('account');
+      saved =
+          settings.providerConfigs['account']!.modelOverrides['gpt-6-astra']
+              as Map;
+      expect(saved['oauthServiceTiers'], isEmpty);
+    },
+  );
+
+  test(
     'refresh errors retain sanitized diagnostics through the service',
     () async {
       final service = ProviderOAuthService(
@@ -369,92 +405,112 @@ void main() {
     },
   );
 
-  test(
-    'Codex streaming applies subscription contract after user overrides',
-    () async {
-      final service = ProviderOAuthService()..bind(settings);
-      final original = config(provider: OAuthProvider.chatgpt, expired: false)
-          .copyWith(
-            customHeaders: [
-              {'name': 'Authorization', 'value': 'Bearer wrong'},
-            ],
-            customBody: [
-              {'key': 'store', 'value': 'true'},
-              {'key': 'max_output_tokens', 'value': '10'},
-              {'key': 'top_k', 'value': '50'},
-              {'key': 'min_p', 'value': '0.1'},
-              {'key': 'presence_penalty', 'value': '0.1'},
-              {'key': 'repetition_penalty', 'value': '1.1'},
-              {'key': 'frequency_penalty', 'value': '0.1'},
-              {'key': 'stop', 'value': '["END"]'},
-              {'key': 'service_tier', 'value': 'priority'},
-            ],
-          );
-      await settings.setProviderConfig(original.id, original);
-      final resolved = await service.resolve(original);
-      final requests = <http.Request>[];
-      final client = service.authenticatedClient(
-        MockClient((request) async {
-          requests.add(request);
-          return http.Response(
-            'data: {"type":"response.output_text.delta","delta":"Hello"}\n\ndata: {"type":"response.completed","response":{"id":"resp","output":[]}}\n\n',
-            200,
-            headers: {'content-type': 'text/event-stream'},
-          );
-        }),
-        resolved,
-      );
-      final chunks = await sendOpenAIStream(
-        client,
-        resolved,
-        'gpt-5.4',
-        [
-          {'role': 'user', 'content': 'Hi'},
-        ],
-        temperature: .7,
-        maxTokens: 32,
-        reasoning: legacyBudget(0),
-      ).toList();
-      expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'Hello');
-      final sent = requests.single;
-      expect(sent.headers['Authorization'], 'Bearer access');
-      expect(sent.headers['chatgpt-account-id'], 'workspace');
-      expect(sent.headers['version'], '0.159.0');
-      expect(sent.url.toString(), '${OAuthProvider.chatgpt.baseUrl}/responses');
-      final body = jsonDecode(sent.body) as Map;
-      expect(body['stream'], true);
-      expect(body['store'], false);
-      expect(body['instructions'], '');
-      expect(body.containsKey('temperature'), false);
-      expect(body.containsKey('max_output_tokens'), false);
-      for (final key in [
-        'top_k',
-        'min_p',
-        'presence_penalty',
-        'repetition_penalty',
-        'frequency_penalty',
-        'stop',
-      ]) {
-        expect(
-          body.containsKey(key),
-          false,
-          reason: '$key is unsupported by Codex',
+  for (final serviceTier in [null, 'default', 'fast', 'ultrafast']) {
+    test(
+      'Codex applies subscription contract and selected tier $serviceTier after user overrides',
+      () async {
+        final service = ProviderOAuthService()..bind(settings);
+        final original = config(provider: OAuthProvider.chatgpt, expired: false)
+            .copyWith(
+              customHeaders: [
+                {'name': 'Authorization', 'value': 'Bearer wrong'},
+              ],
+              customBody: [
+                {'key': 'store', 'value': 'true'},
+                {'key': 'max_output_tokens', 'value': '10'},
+                {'key': 'top_k', 'value': '50'},
+                {'key': 'min_p', 'value': '0.1'},
+                {'key': 'presence_penalty', 'value': '0.1'},
+                {'key': 'repetition_penalty', 'value': '1.1'},
+                {'key': 'frequency_penalty', 'value': '0.1'},
+                {'key': 'stop', 'value': '["END"]'},
+                {'key': 'service_tier', 'value': 'priority'},
+              ],
+            );
+        await settings.setProviderConfig(original.id, original);
+        final resolved = await service.resolve(original);
+        final requests = <http.Request>[];
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            requests.add(request);
+            return http.Response(
+              'data: {"type":"response.output_text.delta","delta":"Hello"}\n\ndata: {"type":"response.completed","response":{"id":"resp","output":[]}}\n\n',
+              200,
+              headers: {'content-type': 'text/event-stream'},
+            );
+          }),
+          resolved,
         );
-      }
-      expect(body['reasoning'], {'effort': 'none', 'summary': 'auto'});
-      expect(
-        sent.headers['x-codex-routing-hint'],
-        'model=gpt-5.4;tier=priority',
-      );
-      expect(body['include'], contains('reasoning.encrypted_content'));
-    },
-  );
+        final chunks = await sendOpenAIStream(
+          client,
+          resolved,
+          'gpt-5.4',
+          [
+            {'role': 'user', 'content': 'Hi'},
+          ],
+          serviceTier: serviceTier,
+          temperature: .7,
+          maxTokens: 32,
+          reasoning: legacyBudget(0),
+        ).toList();
+        expect(
+          chunks.whereType<TextDelta>().map((e) => e.text).join(),
+          'Hello',
+        );
+        final sent = requests.single;
+        expect(sent.headers['Authorization'], 'Bearer access');
+        expect(sent.headers['chatgpt-account-id'], 'workspace');
+        expect(sent.headers['version'], '0.159.0');
+        expect(
+          sent.url.toString(),
+          '${OAuthProvider.chatgpt.baseUrl}/responses',
+        );
+        final body = jsonDecode(sent.body) as Map;
+        expect(body['stream'], true);
+        expect(body['store'], false);
+        expect(body['instructions'], '');
+        expect(body.containsKey('temperature'), false);
+        expect(body.containsKey('max_output_tokens'), false);
+        for (final key in [
+          'top_k',
+          'min_p',
+          'presence_penalty',
+          'repetition_penalty',
+          'frequency_penalty',
+          'stop',
+        ]) {
+          expect(
+            body.containsKey(key),
+            false,
+            reason: '$key is unsupported by Codex',
+          );
+        }
+        expect(body['reasoning'], {'effort': 'none', 'summary': 'auto'});
+        expect(
+          sent.headers['x-codex-routing-hint'],
+          serviceTier == 'default'
+              ? 'model=gpt-5.4'
+              : 'model=gpt-5.4;tier=${serviceTier ?? 'priority'}',
+        );
+        expect(
+          body['service_tier'],
+          serviceTier == 'default' ? isNull : (serviceTier ?? 'priority'),
+        );
+        expect(body['include'], contains('reasoning.encrypted_content'));
+      },
+    );
+  }
 
   test(
     'Codex tool continuation preserves encrypted reasoning without server item references',
     () async {
       final service = ProviderOAuthService()..bind(settings);
-      final original = config(provider: OAuthProvider.chatgpt, expired: false);
+      final original = config(provider: OAuthProvider.chatgpt, expired: false)
+          .copyWith(
+            customBody: const [
+              {'key': 'service_tier', 'value': 'priority'},
+            ],
+          );
       await settings.setProviderConfig(original.id, original);
       final requests = <http.Request>[];
       final toolCalls = <String>[];
@@ -513,6 +569,7 @@ void main() {
         [
           {'role': 'user', 'content': 'Weather?'},
         ],
+        serviceTier: 'ultrafast',
         tools: [
           {
             'type': 'function',
@@ -530,6 +587,13 @@ void main() {
       expect(toolCalls, ['weather']);
       expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'Sunny');
       expect(requests.length, 2);
+      for (final request in requests) {
+        expect((jsonDecode(request.body) as Map)['service_tier'], 'ultrafast');
+        expect(
+          request.headers['x-codex-routing-hint'],
+          'model=gpt-5.4;tier=ultrafast',
+        );
+      }
       final body = jsonDecode(requests.last.body) as Map;
       final input = (body['input'] as List).cast<Map>();
       expect(input.any((item) => item.containsKey('id')), false);

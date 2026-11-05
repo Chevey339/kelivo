@@ -15992,4 +15992,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get contextRegenerateFixedStart =>
       'This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.';
+
+  @override
+  String get responseSpeedLabel => 'Response speed';
+
+  @override
+  String get responseSpeedStandard => 'Standard';
+
+  @override
+  String get responseSpeedUsageHint =>
+      'Faster modes use more quota or credits.';
+
+  @override
+  String get responseSpeedLoading => 'Checking availability…';
+
+  @override
+  String get responseSpeedUnavailable =>
+      'No acceleration tier is available for this model.';
+
+  @override
+  String get responseSpeedSaveFailed =>
+      'Could not save the response speed. Try again.';
+
+  @override
+  String responseSpeedRequestFailed(String mode) {
+    return '$mode request failed. Check model and account availability, or switch to Standard and retry.';
+  }
+
+  @override
+  String get responseSpeedSelectionUnavailable =>
+      'The saved speed is no longer available. This chat will use Standard.';
+
+  @override
+  String get responseSpeedProviderDependent =>
+      'Availability depends on your provider.';
+
+  @override
+  String responseSpeedTapTo(String mode) {
+    return 'Tap to switch to $mode';
+  }
+
+  @override
+  String get responseSpeedUltrafastNeedsResponses =>
+      'UltraFast requires the Responses API.';
 }

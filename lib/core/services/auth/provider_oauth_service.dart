@@ -397,7 +397,13 @@ class ProviderOAuthService extends ChangeNotifier {
           config.oauthProvider != OAuthProvider.chatgpt ||
           config.oauthCredentials == null ||
           config.oauthCredentials!.requiresLogin ||
-          config.oauthModelsClientVersion == codexClientVersion) {
+          (config.oauthModelsClientVersion == codexClientVersion &&
+              config.models.every((model) {
+                final override = config.modelOverrides[model];
+                return override is Map &&
+                    override['oauthServiceTierSessionId'] ==
+                        config.oauthCredentials!.sessionId;
+              }))) {
         continue;
       }
       try {
@@ -450,6 +456,15 @@ class ProviderOAuthService extends ChangeNotifier {
         reasoning: oauthDiscoveredReasoning(provider, row),
         contextWindow: _oauthContextWindow(row),
         extra: {
+          if (provider == OAuthProvider.chatgpt) ...{
+            'oauthServiceTiers': [
+              if (row['service_tiers'] is List)
+                for (final tier
+                    in (row['service_tiers'] as List).whereType<Map>())
+                  if (tier['id'] is String) tier['id'] as String,
+            ],
+            'oauthServiceTierSessionId': current.oauthCredentials!.sessionId,
+          },
           if (provider == OAuthProvider.kimi)
             'oauthProtocol': kimiOAuthProtocol(row),
         },

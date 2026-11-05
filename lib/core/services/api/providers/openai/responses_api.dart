@@ -13,6 +13,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../response_speed.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../reasoning/reasoning_dialects.dart';
@@ -215,6 +216,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required Map<String, String>? extraHeaders,
   required Map<String, dynamic>? extraBody,
   required String? promptCacheKey,
+  String? serviceTier,
   required double? temperature,
   required double? topP,
   required int? maxTokens,
@@ -282,6 +284,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
       CustomRequestMerger.applyBody(body2, extraCfg);
+      applyServiceTier(body2, config, serviceTier);
       if (promptCacheKey != null) {
         body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
       }

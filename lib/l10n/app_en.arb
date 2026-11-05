@@ -7504,5 +7504,18 @@
   "contextCancelFixedStart": "Cancel fixed context start",
   "contextFixedStartDescription": "Send history from this message onward, without the rolling message-count limit.",
   "contextBeforeFixedStart": "This message is before the fixed context start. Move or cancel the start before regenerating it.",
-  "contextRegenerateFixedStart": "This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating."
+  "contextRegenerateFixedStart": "This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.",
+  "responseSpeedLabel": "Response speed",
+  "responseSpeedStandard": "Standard",
+  "responseSpeedUsageHint": "Faster modes use more quota or credits.",
+  "responseSpeedLoading": "Checking availability…",
+  "responseSpeedUnavailable": "No acceleration tier is available for this model.",
+  "responseSpeedSaveFailed": "Could not save the response speed. Try again.",
+  "responseSpeedRequestFailed": "{mode} request failed. Check model and account availability, or switch to Standard and retry.",
+  "@responseSpeedRequestFailed": {"placeholders": {"mode": {"type": "String"}}},
+  "responseSpeedSelectionUnavailable": "The saved speed is no longer available. This chat will use Standard.",
+  "responseSpeedProviderDependent": "Availability depends on your provider.",
+  "responseSpeedTapTo": "Tap to switch to {mode}",
+  "responseSpeedUltrafastNeedsResponses": "UltraFast requires the Responses API.",
+  "@responseSpeedTapTo": {"placeholders": {"mode": {"type": "String"}}}
 }

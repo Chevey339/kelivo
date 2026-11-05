@@ -21,6 +21,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/response_speed.dart';
 import '../../../core/services/api/providers/openai/responses_history.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
@@ -1052,6 +1053,11 @@ class MessageGenerationService {
         customHeaders: generationController.buildCustomHeaders(assistant),
       ),
       extraBody: generationController.buildCustomBody(assistant),
+      serviceTier: ConversationResponseSpeed.requestTier(
+        chatService.getConversation(assistantMessage.conversationId),
+        settings.getProviderConfig(providerKey),
+        modelId,
+      ),
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: assistant?.streamOutput ?? true,

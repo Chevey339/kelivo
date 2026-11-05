@@ -75,6 +75,7 @@ void main() {
     bool desktopTools = false,
     double composerWidth = 800,
     VoidCallback? openBrowser,
+    GlobalKey? reasoningButtonKey,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
     final inputBarKey = GlobalKey();
@@ -110,6 +111,7 @@ void main() {
               builder: (context) {
                 final section = ChatInputSection(
                   inputBarKey: inputBarKey,
+                  reasoningButtonKey: reasoningButtonKey,
                   chatModelProviderKey: providerKey,
                   chatModelId: modelId,
                   chatModelIsConversationOverride: isConversationOverride,
@@ -166,6 +168,30 @@ void main() {
       supportsTools: true,
     ),
   ]) {
+    testWidgets(
+      'reasoning anchor follows the toolbar button and its overflow entry',
+      (tester) async {
+        final assistants = await loadAssistantWithMcp(tester);
+        final key = GlobalKey();
+        for (final width in [800.0, 180.0]) {
+          await pumpComposer(
+            tester,
+            assistants: assistants,
+            isConversationOverride: false,
+            supportsReasoning: true,
+            desktopTools: true,
+            composerWidth: width,
+            reasoningButtonKey: key,
+          );
+          await tester.pumpAndSettle();
+          expect(key.currentContext, isNotNull);
+          final box = key.currentContext!.findRenderObject() as RenderBox;
+          expect(box.size.width, lessThan(80));
+          expect(box.size.height, lessThan(60));
+        }
+      },
+    );
+
     testWidgets('desktop browser entry stays available with ${scenario.name}', (
       tester,
     ) async {

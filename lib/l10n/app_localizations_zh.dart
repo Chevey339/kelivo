@@ -15176,6 +15176,44 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get contextRegenerateFixedStart =>
       '这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。';
+
+  @override
+  String get responseSpeedLabel => '响应速度';
+
+  @override
+  String get responseSpeedStandard => '标准';
+
+  @override
+  String get responseSpeedUsageHint => '加速模式会消耗更多额度或余额。';
+
+  @override
+  String get responseSpeedLoading => '正在检查可用档位…';
+
+  @override
+  String get responseSpeedUnavailable => '当前模型没有可请求的加速档位。';
+
+  @override
+  String get responseSpeedSaveFailed => '响应速度保存失败，请重试。';
+
+  @override
+  String responseSpeedRequestFailed(String mode) {
+    return '$mode 请求失败。请检查模型及账号是否支持，或切换为标准模式重试。';
+  }
+
+  @override
+  String get responseSpeedSelectionUnavailable => '之前选择的加速档位已不可用，此会话将使用标准模式。';
+
+  @override
+  String get responseSpeedProviderDependent => '是否支持加速取决于当前供应商。';
+
+  @override
+  String responseSpeedTapTo(String mode) {
+    return '点击切换为$mode';
+  }
+
+  @override
+  String get responseSpeedUltrafastNeedsResponses =>
+      'UltraFast 需要启用 Responses API。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -30206,6 +30244,44 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get contextRegenerateFixedStart =>
       '这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。';
+
+  @override
+  String get responseSpeedLabel => '响应速度';
+
+  @override
+  String get responseSpeedStandard => '标准';
+
+  @override
+  String get responseSpeedUsageHint => '加速模式会消耗更多额度或余额。';
+
+  @override
+  String get responseSpeedLoading => '正在检查可用档位…';
+
+  @override
+  String get responseSpeedUnavailable => '当前模型没有可请求的加速档位。';
+
+  @override
+  String get responseSpeedSaveFailed => '响应速度保存失败，请重试。';
+
+  @override
+  String responseSpeedRequestFailed(String mode) {
+    return '$mode 请求失败。请检查模型及账号是否支持，或切换为标准模式重试。';
+  }
+
+  @override
+  String get responseSpeedSelectionUnavailable => '之前选择的加速档位已不可用，此会话将使用标准模式。';
+
+  @override
+  String get responseSpeedProviderDependent => '是否支持加速取决于当前供应商。';
+
+  @override
+  String responseSpeedTapTo(String mode) {
+    return '点击切换为$mode';
+  }
+
+  @override
+  String get responseSpeedUltrafastNeedsResponses =>
+      'UltraFast 需要启用 Responses API。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -45317,4 +45393,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get contextRegenerateFixedStart =>
       '這則回覆是固定上下文起點，其之前的問題已被排除。請將起點移到更早的訊息，或取消起點後再重新生成。';
+
+  @override
+  String get responseSpeedLabel => '回應速度';
+
+  @override
+  String get responseSpeedStandard => '標準';
+
+  @override
+  String get responseSpeedUsageHint => '加速模式會消耗更多額度或餘額。';
+
+  @override
+  String get responseSpeedLoading => '正在檢查可用檔位…';
+
+  @override
+  String get responseSpeedUnavailable => '目前模型沒有可請求的加速檔位。';
+
+  @override
+  String get responseSpeedSaveFailed => '回應速度儲存失敗，請重試。';
+
+  @override
+  String responseSpeedRequestFailed(String mode) {
+    return '$mode 請求失敗。請檢查模型及帳號是否支援，或切換為標準模式重試。';
+  }
+
+  @override
+  String get responseSpeedSelectionUnavailable => '先前選擇的加速檔位已不可用，此對話將使用標準模式。';
+
+  @override
+  String get responseSpeedProviderDependent => '是否支援加速取決於目前的供應商。';
+
+  @override
+  String responseSpeedTapTo(String mode) {
+    return '點擊切換為$mode';
+  }
+
+  @override
+  String get responseSpeedUltrafastNeedsResponses =>
+      'UltraFast 需要啟用 Responses API。';
 }

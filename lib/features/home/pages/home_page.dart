@@ -180,6 +180,7 @@ class _HomePageState extends State<HomePage>
       scroll_ctrl.ChatAutoFollowScrollController();
   String? _scrollConversationId;
   final GlobalKey _inputBarKey = GlobalKey();
+  final GlobalKey _reasoningButtonKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
@@ -1425,6 +1426,7 @@ class _HomePageState extends State<HomePage>
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));
       },
       onOpenSearch: _openSearchSettings,
+      reasoningButtonKey: _reasoningButtonKey,
       onConfigureReasoning: () async {
         await _openReasoningSettings();
       },
@@ -1727,13 +1729,20 @@ class _HomePageState extends State<HomePage>
       return;
     }
     final assistant = context.read<AssistantProvider>().currentAssistant;
+    final conversationId = await ensureConversationId(
+      context,
+      conversationId: _controller.currentConversation?.id,
+      assistantId: assistant?.id,
+    );
+    if (!mounted) return;
     if (PlatformUtils.isDesktop) {
       await showDesktopReasoningLevelPopover(
         context,
-        anchorKey: _inputBarKey,
+        anchorKey: _reasoningButtonKey,
         config: config,
         modelId: modelId,
         assistant: assistant,
+        conversationId: conversationId,
       );
     } else {
       await showReasoningLevelSheet(
@@ -1741,6 +1750,7 @@ class _HomePageState extends State<HomePage>
         config: config,
         modelId: modelId,
         assistant: assistant,
+        conversationId: conversationId,
       );
     }
   }
