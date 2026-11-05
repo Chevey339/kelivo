@@ -2,6 +2,7 @@
 
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
+#include <map>
 
 #include "cookie_manager.h"
 #include "headless_in_app_webview/headless_in_app_webview_manager.h"
@@ -15,6 +16,11 @@
 
 namespace flutter_inappwebview_plugin
 {
+  namespace {
+    // Non-owning index: resources remain owned by their engine's plugin.
+    std::map<FlutterDesktopMessengerRef, FlutterInappwebviewWindowsPlugin*> plugins;
+  }
+
   // static
   void FlutterInappwebviewWindowsPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows* registrar, FlutterDesktopMessengerRef messenger)
@@ -25,7 +31,8 @@ namespace flutter_inappwebview_plugin
 
   FlutterInappwebviewWindowsPlugin::FlutterInappwebviewWindowsPlugin(
     flutter::PluginRegistrarWindows* registrar, FlutterDesktopMessengerRef messenger)
-    : registrar(registrar), pluginMessenger(std::make_unique<PluginMessenger>(registrar->messenger(), messenger, alive))
+    : registrar(registrar), pluginMessenger(std::make_unique<PluginMessenger>(registrar->messenger(), messenger, alive)),
+      nativeMessenger_(messenger)
   {
     webViewEnvironmentManager = std::make_unique<WebViewEnvironmentManager>(this);
     inAppWebViewManager = std::make_unique<InAppWebViewManager>(this);
@@ -52,14 +59,28 @@ namespace flutter_inappwebview_plugin
       else if (call.method_name() == "supportsBrowserViewportInsets") result->Success(flutter::EncodableValue(false));
       else result->NotImplemented();
     });
+    plugins.emplace(messenger, this);
+  }
+
+  void FlutterInappwebviewWindowsPlugin::PrepareForShutdown(FlutterDesktopMessengerRef messenger)
+  {
+    const auto found = plugins.find(messenger);
+    if (found != plugins.end()) found->second->dispose();
   }
 
   FlutterInappwebviewWindowsPlugin::~FlutterInappwebviewWindowsPlugin()
   {
-    // Async creation callbacks may run while the dispatcher queue drains.
-    browserWindowChannel->SetMethodCallHandler(nullptr);
+    dispose();
+    plugins.erase(nativeMessenger_);
+  }
+
+  void FlutterInappwebviewWindowsPlugin::dispose()
+  {
+    // Invalidate every channel/creation callback before releasing resources.
+    // The runner invokes this while all engine registrars are still alive;
+    // the later plugin destructor must not pump the application queue again.
+    if (!alive->exchange(false)) return;
     browserShortcutsEnabled = false;
-    *alive = false;
     cookieManager = nullptr;
     headlessInAppWebViewManager = nullptr;
     inAppBrowserManager = nullptr;

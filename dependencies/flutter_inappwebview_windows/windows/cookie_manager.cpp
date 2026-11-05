@@ -29,8 +29,9 @@ namespace flutter_inappwebview_plugin
       ? plugin->webViewEnvironmentManager->webViewEnvironments.at(webViewEnvironmentId.value()).get() : nullptr;
 
     auto result_ = std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>(std::move(result));
-    auto callback = [this, result_, methodName, arguments](WebViewEnvironment* webViewEnvironment)
+    auto callback = [this, alive = plugin->alive, result_, methodName, arguments](WebViewEnvironment* webViewEnvironment)
       {
+        if (!*alive) return;
         if (!webViewEnvironment) {
           result_->Error("0", "Cannot obtain the WebViewEnvironment!");
           return;
@@ -296,8 +297,11 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
-    getCookies(webViewEnvironment, url, [this, webViewEnvironment, url, path, domain, completionHandler](const flutter::EncodableList& cookies)
+    getCookies(webViewEnvironment, url, [this, alive = plugin->alive, webViewEnvironment, url, path, domain, completionHandler](const flutter::EncodableList& cookies)
       {
+        // Cookie queries may complete while the shutdown dispatcher drains,
+        // after both this manager and its environment have been released.
+        if (!*alive) return;
         auto callbacksComplete = std::make_shared<CallbacksComplete<bool>>(
           [completionHandler](const std::vector<bool>& values)
           {

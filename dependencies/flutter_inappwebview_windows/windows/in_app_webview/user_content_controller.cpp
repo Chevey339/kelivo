@@ -404,8 +404,9 @@ namespace flutter_inappwebview_plugin
         {"worldName", worldName}
       };
       auto hr = webView_->webView->CallDevToolsProtocolMethod(L"Page.createIsolatedWorld", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-        [this, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+        [this, alive = alive_, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
         {
+          if (!*alive) return S_OK;
           if (succeededOrLog(errorCode) && completionHandler) {
             auto id = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson))["executionContextId"].get<int>();
             addPluginScriptsIfRequired(std::make_shared<ContentWorld>(worldName));

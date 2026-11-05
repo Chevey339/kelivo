@@ -1190,8 +1190,9 @@ namespace flutter_inappwebview_plugin
   void InAppWebView::goBackOrForward(const int64_t& steps)
   {
     getCopyBackForwardList(
-      [this, steps](std::unique_ptr<WebHistory> webHistory)
+      [this, alive = alive_, steps](std::unique_ptr<WebHistory> webHistory)
       {
+        if (!*alive) return;
         if (webHistory && webHistory->currentIndex.has_value() && webHistory->list.has_value()) {
           auto currentIndex = webHistory->currentIndex.value();
           auto items = &webHistory->list.value();
@@ -1304,8 +1305,9 @@ namespace flutter_inappwebview_plugin
     }
 
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [=, alive = alive_](const int& contextId)
       {
+        if (!*alive) return;
         nlohmann::json parameters = {
           {"expression", source},
           { "returnByValue", true }
@@ -1316,8 +1318,9 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, alive, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (!*alive) return S_OK;
             nlohmann::json result;
             if (succeededOrLog(errorCode)) {
               nlohmann::json json = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson));
@@ -1357,8 +1360,9 @@ namespace flutter_inappwebview_plugin
     }
 
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [=, alive = alive_](const int& contextId)
       {
+        if (!*alive) return;
         std::vector<std::string> functionArgumentNamesList;
         std::vector<std::string> functionArgumentValuesList;
 
@@ -1383,8 +1387,9 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, alive, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (!*alive) return S_OK;
             nlohmann::json result = {
               {"value", nlohmann::json{}},
               {"error", nlohmann::json{}}

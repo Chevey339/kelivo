@@ -33,6 +33,7 @@ namespace flutter_inappwebview_plugin
 
     static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar,
       FlutterDesktopMessengerRef messenger);
+    static void PrepareForShutdown(FlutterDesktopMessengerRef messenger);
 
     FlutterInappwebviewWindowsPlugin(flutter::PluginRegistrarWindows* registrar,
       FlutterDesktopMessengerRef messenger);
@@ -42,6 +43,10 @@ namespace flutter_inappwebview_plugin
     // Disallow copy and assign.
     FlutterInappwebviewWindowsPlugin(const FlutterInappwebviewWindowsPlugin&) = delete;
     FlutterInappwebviewWindowsPlugin& operator=(const FlutterInappwebviewWindowsPlugin&) = delete;
+
+  private:
+    FlutterDesktopMessengerRef nativeMessenger_;
+    void dispose();
   };
 }
 #endif  // FLUTTER_PLUGIN_FLUTTER_INAPPWEBVIEW_PLUGIN_PLUGIN_H_

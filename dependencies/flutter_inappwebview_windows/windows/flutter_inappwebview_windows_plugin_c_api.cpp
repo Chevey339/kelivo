@@ -12,3 +12,11 @@ void FlutterInappwebviewWindowsPluginCApiRegisterWithRegistrar(
     ->GetRegistrar<flutter::PluginRegistrarWindows>(registrar),
     FlutterDesktopPluginRegistrarGetMessenger(registrar));
 }
+
+void FlutterInappwebviewWindowsPluginCApiPrepareForShutdown(
+  FlutterDesktopPluginRegistrarRef registrar)
+{
+  if (!registrar) return;
+  flutter_inappwebview_plugin::FlutterInappwebviewWindowsPlugin::PrepareForShutdown(
+    FlutterDesktopPluginRegistrarGetMessenger(registrar));
+}

@@ -16,6 +16,12 @@ extern "C" {
   FLUTTER_PLUGIN_EXPORT void FlutterInappwebviewWindowsPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
+  // Call on the platform thread before destroying the Flutter view/engine.
+  // May dispatch native messages; all other plugins must still be alive.
+  // Repeated calls are harmless.
+  FLUTTER_PLUGIN_EXPORT void FlutterInappwebviewWindowsPluginCApiPrepareForShutdown(
+    FlutterDesktopPluginRegistrarRef registrar);
+
 #if defined(__cplusplus)
 }  // extern "C"
 #endif
