@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
@@ -169,8 +170,9 @@ void main() {
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
-      workspace: workspace(shellNeedsApproval: shellNeedsApproval)
-          .copyWith(disabledTools: disabledTools),
+      workspace: workspace(
+        shellNeedsApproval: shellNeedsApproval,
+      ).copyWith(disabledTools: disabledTools),
       permissionMode: fullAccess
           ? ToolPermissionMode.fullAccess
           : ToolPermissionMode.requestApproval,
@@ -221,44 +223,49 @@ void main() {
     return WorkspaceToolMetadata.fromJson(client(raw).metadata!);
   }
 
-  test('environment injection uses raw values but shell and file results are private', () async {
-    const secret = 'test-token-秘密-123';
-    var config = EnvironmentExecutionConfig(variables: {'TOKEN': secret});
-    final runtime = FakeWorkspaceRuntime(useRealProcess: true);
-    final tools = service(
-      runtime: runtime,
-      loadEnvironment: () async => config,
-    );
-    final context = ctx();
-    final raw = await tools.handle(context, 'shell', {
-      'command': r'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; printf "%s" "$TOKEN" > secret.txt; exit 1',
-    }, toolCallId: 'env-shell');
-    expect(runtime.requests.single.env['TOKEN'], secret);
-    expect(runtime.requests.single.env['NO_COLOR'], '1');
-    expect(client(raw).content, isNot(contains(secret)));
-    expect(jsonOf(raw)['exit_code'], 1);
-    expect(metaOf(raw).stdoutPreview, secret);
-    expect(metaOf(raw).stderrPreview, secret);
-    final read = await tools.handle(context, 'read_file', {
-      'path': 'secret.txt',
-    }, toolCallId: 'env-read');
-    expect(client(read).content, contains('[REDACTED]'));
-    expect(client(read).content, isNot(contains(secret)));
-    expect(metaOf(read).stdoutPreview, contains(secret));
-    config = EnvironmentExecutionConfig(
-      variables: {'TOKEN': secret},
-      privacyMode: false,
-    );
-    final unmasked = await tools.handle(context, 'shell', {
-      'command': r'printf "%s" "$TOKEN"',
-    }, toolCallId: 'env-off');
-    expect(client(unmasked).content, contains(secret));
-    config = EnvironmentExecutionConfig();
-    await tools.handle(context, 'shell', {
-      'command': 'true',
-    }, toolCallId: 'env-removed');
-    expect(runtime.requests.last.env.containsKey('TOKEN'), isFalse);
-  }, skip: !canRunReal);
+  test(
+    'environment injection uses raw values but shell and file results are private',
+    () async {
+      const secret = 'test-token-秘密-123';
+      var config = EnvironmentExecutionConfig(variables: {'TOKEN': secret});
+      final runtime = FakeWorkspaceRuntime(useRealProcess: true);
+      final tools = service(
+        runtime: runtime,
+        loadEnvironment: () async => config,
+      );
+      final context = ctx();
+      final raw = await tools.handle(context, 'shell', {
+        'command':
+            r'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; printf "%s" "$TOKEN" > secret.txt; exit 1',
+      }, toolCallId: 'env-shell');
+      expect(runtime.requests.single.env['TOKEN'], secret);
+      expect(runtime.requests.single.env['NO_COLOR'], '1');
+      expect(client(raw).content, isNot(contains(secret)));
+      expect(jsonOf(raw)['exit_code'], 1);
+      expect(metaOf(raw).stdoutPreview, secret);
+      expect(metaOf(raw).stderrPreview, secret);
+      final read = await tools.handle(context, 'read_file', {
+        'path': 'secret.txt',
+      }, toolCallId: 'env-read');
+      expect(client(read).content, contains('[REDACTED]'));
+      expect(client(read).content, isNot(contains(secret)));
+      expect(metaOf(read).stdoutPreview, contains(secret));
+      config = EnvironmentExecutionConfig(
+        variables: {'TOKEN': secret},
+        privacyMode: false,
+      );
+      final unmasked = await tools.handle(context, 'shell', {
+        'command': r'printf "%s" "$TOKEN"',
+      }, toolCallId: 'env-off');
+      expect(client(unmasked).content, contains(secret));
+      config = EnvironmentExecutionConfig();
+      await tools.handle(context, 'shell', {
+        'command': 'true',
+      }, toolCallId: 'env-removed');
+      expect(runtime.requests.last.env.containsKey('TOKEN'), isFalse);
+    },
+    skip: !canRunReal,
+  );
 
   test(
     'execution and redaction share a snapshot when settings change mid-command',
@@ -541,8 +548,9 @@ void main() {
         final result = await tools.handle(context, 'shell', {
           'command': 'download',
         }, toolCallId: 'progress-log');
-        final stored = await File(jsonOf(result)['output_file'] as String)
-            .readAsString();
+        final stored = await File(
+          jsonOf(result)['output_file'] as String,
+        ).readAsString();
         expect(stored, contains('${'log line\n' * 5000}100%'));
         expect(stored, contains('error\n'));
         expect(stored, isNot(contains('\r')));
@@ -845,8 +853,9 @@ void main() {
     });
 
     test('read_file binary returns hex preview', () async {
-      File(p.join(workspaceDir.path, 'blob.bin'))
-          .writeAsBytesSync(Uint8List.fromList([0x00, 0x01, 0xFF]));
+      File(
+        p.join(workspaceDir.path, 'blob.bin'),
+      ).writeAsBytesSync(Uint8List.fromList([0x00, 0x01, 0xFF]));
       final payload = jsonOf(
         await service().handle(ctx(), 'read_file', {
           'path': p.join(workspaceDir.path, 'blob.bin'),
@@ -857,8 +866,9 @@ void main() {
     });
 
     test('read_file image returns a structured image result', () async {
-      File(p.join(workspaceDir.path, 'pic.png'))
-          .writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
+      File(
+        p.join(workspaceDir.path, 'pic.png'),
+      ).writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
       final result = client(
         await service().handle(ctx(), 'read_file', {
           'path': p.join(workspaceDir.path, 'pic.png'),
@@ -914,8 +924,9 @@ void main() {
 
     test('list_dir / glob / grep listings', () async {
       Directory(p.join(workspaceDir.path, 'sub')).createSync();
-      File(p.join(workspaceDir.path, 'sub', 'a.txt'))
-          .writeAsStringSync('needle');
+      File(
+        p.join(workspaceDir.path, 'sub', 'a.txt'),
+      ).writeAsStringSync('needle');
       File(p.join(workspaceDir.path, 'b.md')).writeAsStringSync('hi');
       final tools = service();
       final native = ctx();
@@ -1272,7 +1283,8 @@ void main() {
       );
       final result = metaOf(
         await tools.handle(ctx(), 'shell', {
-          'command': 'printf new > existing.txt; printf new > result.csv; printf session > ../session/note.txt; printf outside > ../outside.txt; exit 1',
+          'command':
+              'printf new > existing.txt; printf new > result.csv; printf session > ../session/note.txt; printf outside > ../outside.txt; exit 1',
         }, toolCallId: 'failed-with-output'),
       );
       expect(result.exitCode, 1);

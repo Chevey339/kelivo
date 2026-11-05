@@ -37,10 +37,11 @@ export 'workspace_session_sync.dart' show AttachmentInfo, syncAttachments;
 export 'workspace_tool_context.dart';
 export 'workspace_tool_metadata.dart';
 
-typedef ConversationExtrasUpdater = Future<void> Function(
-  String conversationId,
-  Map<String, dynamic> Function(Map<String, dynamic> extras) update,
-);
+typedef ConversationExtrasUpdater =
+    Future<void> Function(
+      String conversationId,
+      Map<String, dynamic> Function(Map<String, dynamic> extras) update,
+    );
 
 /// Per-generation workspace tool definitions, approval, and execution.
 class WorkspaceToolsService {
@@ -726,7 +727,8 @@ class WorkspaceToolsService {
         tool: tool,
         error: 'environment_not_ready',
         message: status?.reason ?? 'Sandbox environment is not ready',
-        instruction: 'tell the user to install/enable the sandbox environment in Settings → Workspace',
+        instruction:
+            'tell the user to install/enable the sandbox environment in Settings → Workspace',
         meta: const WorkspaceToolMetadata(
           tool: tool,
           status: 'error',
