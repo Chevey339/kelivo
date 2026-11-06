@@ -33,7 +33,7 @@ String _authorizationServerHash(Uri authorizationServer) => base64UrlEncode(
 final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
   _AndroidMcpOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
-        scheme: 'psyche.kelivo',
+        scheme: 'psyche.kelivo.arona',
         host: 'mcp-oauth-callback',
         path: '/${_authorizationServerHash(authorizationServer)}',
       );

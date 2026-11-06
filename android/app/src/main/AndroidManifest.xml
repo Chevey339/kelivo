@@ -24,7 +24,7 @@
          startup gate rejects. Kelivo ships its own backup (WebDAV/S3/local
          export), so system backup is disabled. -->
     <application
-        android:label="Kelivo"
+        android:label="Kelivo Arona"
         android:name="${applicationName}"
         android:allowBackup="false"
         android:fullBackupContent="false"
@@ -70,7 +70,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="psyche.kelivo" android:host="mcp-oauth-callback"/>
+                <data android:scheme="psyche.kelivo.arona" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>
         <!-- Foreground service to keep Flutter isolate alive for background generation -->

@@ -41,7 +41,7 @@ void main() {
     );
     await callback.close();
 
-    expect(callback.redirectUri.scheme, 'psyche.kelivo');
+    expect(callback.redirectUri.scheme, 'psyche.kelivo.arona');
     expect(callback.redirectUri.host, 'mcp-oauth-callback');
     expect(callback.redirectUri.pathSegments, hasLength(1));
     expect(callback.redirectUri.hasQuery, isFalse);

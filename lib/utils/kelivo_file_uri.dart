@@ -106,6 +106,7 @@ final class KelivoFileUri {
   /// rejected — only exact whitelist entries count.
   static const Set<String> _knownBundleIds = {
     'com.psyche.kelivo',
+    'com.psyche.kelivo.arona',
     'psyche.kelivo',
   };
 

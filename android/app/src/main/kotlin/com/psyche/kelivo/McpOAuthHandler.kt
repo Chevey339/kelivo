@@ -11,7 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 
 internal object McpOAuthHandler {
     private const val CHANNEL_NAME = "app.mcp_oauth"
-    private const val CALLBACK_SCHEME = "psyche.kelivo"
+    private const val CALLBACK_SCHEME = "psyche.kelivo.arona"
     private const val CALLBACK_HOST = "mcp-oauth-callback"
 
     private var pendingResult: MethodChannel.Result? = null
