@@ -14,6 +14,7 @@ import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/model_tag_wrap.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
@@ -94,6 +95,8 @@ Future<void> _pumpModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  TextScaler textScaler = TextScaler.noScaling,
+  ValueChanged<ModelSelection?>? onSelected,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -106,6 +109,10 @@ Future<void> _pumpModelSelector(
       ],
       child: MaterialApp(
         theme: theme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -113,13 +120,14 @@ Future<void> _pumpModelSelector(
             builder: (context) {
               return TextButton(
                 key: const ValueKey('open-model-selector'),
-                onPressed: () {
-                  showModelSelector(
+                onPressed: () async {
+                  final selection = await showModelSelector(
                     context,
                     limitProviderKey: limitProviderKey,
                     initialProviderKey: initialProviderKey,
                     initialModelId: initialModelId,
                   );
+                  onSelected?.call(selection);
                 },
                 child: const Text('open'),
               );
@@ -734,6 +742,116 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 20)),
   );
+
+  for (final (width, textScale, pinned) in const [
+    (1200.0, 1.0, false),
+    (480.0, 1.0, false),
+    (480.0, 2.0, false),
+    (320.0, 1.0, true),
+  ]) {
+    testWidgets(
+      'desktop model selector keeps long names readable and selectable '
+      '(width=$width, textScale=$textScale, pinned=$pinned)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+        for (final key in settings.providerConfigs.keys.toList()) {
+          await settings.removeProviderConfig(key);
+        }
+        const providerKey = 'desktop-regression';
+        const providerName = 'Provider';
+        const modelId = 'long-model';
+        const name =
+            'vendor/long-context-multimodal-reasoning-extended-thinking-'
+            'instruct-preview-128k-2026-11-04-experimental';
+        await settings.setProviderConfig(
+          providerKey,
+          _providerConfig(providerKey, providerName, const [modelId]).copyWith(
+            modelOverrides: const {
+              modelId: {
+                'name': name,
+                'input': ['text', 'image', 'audio', 'video', 'pdf'],
+                'output': ['text', 'image'],
+                'abilities': ['tool', 'reasoning'],
+                'contextWindow': 1000000,
+              },
+            },
+          ),
+        );
+        await settings.setCurrentModel(providerKey, modelId);
+        if (pinned) await settings.togglePinModel(providerKey, modelId);
+        ModelSelection? selected;
+        try {
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            limitProviderKey: pinned ? null : providerKey,
+            textScaler: TextScaler.linear(textScale),
+            onSelected: (value) => selected = value,
+          );
+          await tester.pumpAndSettle();
+
+          final nameFinder = find.text(pinned ? '$name | $providerName' : name);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: nameFinder, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final tile = find.ancestor(
+            of: nameFinder,
+            matching: find.byType(IosCardPress),
+          );
+          final capabilities = find.descendant(
+            of: tile,
+            matching: find.byType(ModelCapsulesRow),
+          );
+          expect(
+            find.descendant(of: capabilities, matching: find.byType(Tooltip)),
+            findsNWidgets(8),
+          );
+          expect(
+            find.descendant(of: capabilities, matching: find.text('1M')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+
+          final favorite = find
+              .byKey(
+                const ValueKey('desktop-model-favorite-$providerKey::$modelId'),
+              )
+              .first;
+          await tester.ensureVisible(favorite);
+          await tester.tap(favorite);
+          await tester.pumpAndSettle();
+          expect(settings.isModelPinned(providerKey, modelId), !pinned);
+          expect(selected, isNull);
+
+          final model = find.text(name).first;
+          await tester.ensureVisible(model);
+          await tester.tap(model);
+          await tester.pumpAndSettle();
+          expect(selected?.providerKey, providerKey);
+          expect(selected?.modelId, modelId);
+          expect(tester.takeException(), isNull);
+        } finally {
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator).first,
+          );
+          if (navigator.canPop()) navigator.pop();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox());
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
 
   for (final layered in const [false, true]) {
     testWidgets(
