@@ -1025,51 +1025,43 @@ class _MemoryFullInjectionTypesSection extends StatelessWidget {
 
   final Assistant assistant;
 
+  Future<void> _openPicker(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<AssistantProvider>();
+    final selected = await showMemoryMultiOptionPicker<MemoryType>(
+      context,
+      title: l10n.assistantEditMemoryFullInjectionTypesTitle,
+      description: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
+      selected: assistant.memoryFullInjectionTypes,
+      options: [
+        for (final type in MemoryType.values)
+          MemoryPickerOption(value: type, label: memoryTypeLabel(l10n, type)),
+      ],
+    );
+    if (selected == null || !context.mounted) return;
+    final current = provider.getById(assistant.id);
+    if (current == null) return;
+    await provider.updateAssistant(
+      current.copyWith(memoryFullInjectionTypes: selected),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.assistantEditMemoryFullInjectionTypesTitle,
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-              TipIcon(
-                message: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final type in MemoryType.values)
-                MemorySelectChip(
-                  label: memoryTypeLabel(l10n, type),
-                  selected: assistant.memoryFullInjectionTypes.contains(type),
-                  onTap: () async {
-                    final provider = context.read<AssistantProvider>();
-                    final current = provider.getById(assistant.id);
-                    if (current == null) return;
-                    final types = current.memoryFullInjectionTypes.toSet();
-                    if (!types.remove(type)) types.add(type);
-                    await provider.updateAssistant(
-                      current.copyWith(memoryFullInjectionTypes: types),
-                    );
-                  },
-                ),
-            ],
-          ),
-        ],
-      ),
+    final selected = assistant.memoryFullInjectionTypes;
+    final detail = selected.isEmpty
+        ? l10n.assistantEditMemoryFullInjectionTypesNone
+        : selected.length == 1
+        ? memoryTypeLabel(l10n, selected.single)
+        : l10n.assistantEditMemoryFullInjectionTypesSelected(selected.length);
+    return _iosNavRow(
+      context,
+      icon: Lucide.ListChecks,
+      label: l10n.assistantEditMemoryFullInjectionTypesTitle,
+      tip: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
+      detailText: detail,
+      onTap: () => _openPicker(context),
     );
   }
 }

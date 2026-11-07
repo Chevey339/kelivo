@@ -7448,6 +7448,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditMemoryFullInjectionTypesTitle => '全量注入类型';
 
   @override
+  String get assistantEditMemoryFullInjectionTypesNone => '未选择';
+
+  @override
+  String assistantEditMemoryFullInjectionTypesSelected(int count) {
+    return '已选 $count 类';
+  }
+
+  @override
   String get assistantEditMemoryFullInjectionTypesSubtitle =>
       '仅对当前助手生效，可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
@@ -23085,6 +23093,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemoryFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get assistantEditMemoryFullInjectionTypesNone => '未选择';
+
+  @override
+  String assistantEditMemoryFullInjectionTypesSelected(int count) {
+    return '已选 $count 类';
+  }
 
   @override
   String get assistantEditMemoryFullInjectionTypesSubtitle =>
@@ -38729,6 +38745,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemoryFullInjectionTypesTitle => '全量注入類型';
+
+  @override
+  String get assistantEditMemoryFullInjectionTypesNone => '未選擇';
+
+  @override
+  String assistantEditMemoryFullInjectionTypesSelected(int count) {
+    return '已選 $count 類';
+  }
 
   @override
   String get assistantEditMemoryFullInjectionTypesSubtitle =>

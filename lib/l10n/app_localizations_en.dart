@@ -7751,7 +7751,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditMemoryFullInjectionTypesTitle =>
-      'Always inject these types';
+      'Full injection types';
+
+  @override
+  String get assistantEditMemoryFullInjectionTypesNone => 'None';
+
+  @override
+  String assistantEditMemoryFullInjectionTypesSelected(int count) {
+    return '$count selected';
+  }
 
   @override
   String get assistantEditMemoryFullInjectionTypesSubtitle =>

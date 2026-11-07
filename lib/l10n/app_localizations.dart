@@ -14098,8 +14098,20 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditMemoryFullInjectionTypesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Always inject these types'**
+  /// **'Full injection types'**
   String get assistantEditMemoryFullInjectionTypesTitle;
+
+  /// No description provided for @assistantEditMemoryFullInjectionTypesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get assistantEditMemoryFullInjectionTypesNone;
+
+  /// No description provided for @assistantEditMemoryFullInjectionTypesSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String assistantEditMemoryFullInjectionTypesSelected(int count);
 
   /// No description provided for @assistantEditMemoryFullInjectionTypesSubtitle.
   ///

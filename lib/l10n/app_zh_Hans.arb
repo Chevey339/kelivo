@@ -2727,6 +2727,8 @@
   "memorySettingsInjectionMaxItemsTitle": "每类注入条数",
   "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未在助手记忆设置中选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
   "assistantEditMemoryFullInjectionTypesTitle": "全量注入类型",
+  "assistantEditMemoryFullInjectionTypesNone": "未选择",
+  "assistantEditMemoryFullInjectionTypesSelected": "已选 {count} 类",
   "assistantEditMemoryFullInjectionTypesSubtitle": "仅对当前助手生效，可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {

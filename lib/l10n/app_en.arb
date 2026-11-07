@@ -3341,7 +3341,14 @@
   "memorySettingsInjectionSection": "Memory injection",
   "memorySettingsInjectionMaxItemsTitle": "Items injected per type",
   "memorySettingsInjectionMaxItemsSubtitle": "This limit applies to types not selected for full injection in the assistant’s memory settings. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.",
-  "assistantEditMemoryFullInjectionTypesTitle": "Always inject these types",
+  "assistantEditMemoryFullInjectionTypesTitle": "Full injection types",
+  "assistantEditMemoryFullInjectionTypesNone": "None",
+  "assistantEditMemoryFullInjectionTypesSelected": "{count} selected",
+  "@assistantEditMemoryFullInjectionTypesSelected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "assistantEditMemoryFullInjectionTypesSubtitle": "Applies only to this assistant. Select types to inject all their active global and assistant memories, ignoring the item limit. Uses more context and tokens.",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {

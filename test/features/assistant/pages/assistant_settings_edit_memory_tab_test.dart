@@ -26,6 +26,7 @@ import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dar
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/shared/widgets/tip_icon.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -241,50 +242,83 @@ void main() {
 
           await openAssistant(_assistantId);
           final l10n = await AppLocalizations.delegate.load(const Locale('en'));
-          final voice = find.widgetWithText(
-            MemorySelectChip,
-            l10n.memoryEntryTypeVoice,
+          Finder checkbox(String label) => find.byWidgetPredicate(
+            (widget) => widget is IosCheckbox && widget.semanticLabel == label,
           );
-          final instruction = find.widgetWithText(
-            MemorySelectChip,
-            l10n.memoryEntryTypeInstruction,
-          );
-          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
-          for (final chip in [voice, instruction]) {
-            await tester.ensureVisible(chip);
-            await tester.tap(chip);
-            await tester.pump();
-            await tester.pump(const Duration(milliseconds: 350));
+          final voice = checkbox(l10n.memoryEntryTypeVoice);
+          final instruction = checkbox(l10n.memoryEntryTypeInstruction);
+          Future<void> openPicker() async {
+            final row = find.text(
+              l10n.assistantEditMemoryFullInjectionTypesTitle,
+            );
+            await tester.ensureVisible(row);
+            await tester.tap(row);
+            await tester.pumpAndSettle();
+            expect(
+              find.byType(Dialog),
+              desktop ? findsOneWidget : findsNothing,
+            );
+            expect(
+              find.byType(BottomSheet),
+              desktop ? findsNothing : findsOneWidget,
+            );
           }
+
+          Future<void> toggle(Finder target) async {
+            await tester.ensureVisible(target);
+            await tester.tap(target);
+            await tester.pumpAndSettle();
+          }
+
+          Future<void> save() async {
+            await tester.tap(find.text(l10n.userProfileSave));
+            await tester.pumpAndSettle();
+          }
+
+          expect(find.byType(MemorySelectChip), findsNothing);
+          expect(
+            find.text(l10n.assistantEditMemoryFullInjectionTypesNone),
+            findsOneWidget,
+          );
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          await toggle(voice);
+          expect(ap.getById(_assistantId)!.memoryFullInjectionTypes, isEmpty);
+          await tester.tap(find.text(l10n.homePageCancel));
+          await tester.pumpAndSettle();
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          await toggle(voice);
+          await toggle(instruction);
+          await save();
           expect(ap.getById(_assistantId)!.memoryFullInjectionTypes, {
             MemoryType.voice,
             MemoryType.instruction,
           });
           expect(ap.getById(otherId)!.memoryFullInjectionTypes, isEmpty);
+          expect(
+            find.text(l10n.assistantEditMemoryFullInjectionTypesSelected(2)),
+            findsOneWidget,
+          );
 
           await openAssistant(otherId);
-          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
-          expect(
-            tester.widget<MemorySelectChip>(instruction).selected,
-            isFalse,
-          );
-          await tester.ensureVisible(voice);
-          await tester.tap(voice);
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 350));
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          expect(tester.widget<IosCheckbox>(instruction).value, isFalse);
+          await toggle(voice);
+          await save();
           expect(ap.getById(otherId)!.memoryFullInjectionTypes, {
             MemoryType.voice,
           });
+          expect(find.text(l10n.memoryEntryTypeVoice), findsOneWidget);
 
           await openAssistant(_assistantId);
-          expect(tester.widget<MemorySelectChip>(voice).selected, isTrue);
-          expect(tester.widget<MemorySelectChip>(instruction).selected, isTrue);
-          for (final chip in [voice, instruction]) {
-            await tester.ensureVisible(chip);
-            await tester.tap(chip);
-            await tester.pump();
-            await tester.pump(const Duration(milliseconds: 350));
-          }
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isTrue);
+          expect(tester.widget<IosCheckbox>(instruction).value, isTrue);
+          await toggle(voice);
+          await toggle(instruction);
+          await save();
           await ap.preferences.flushPendingWrites();
           final saved = Assistant.decodeList(
             ap.preferences.getString('assistants_v1')!,
