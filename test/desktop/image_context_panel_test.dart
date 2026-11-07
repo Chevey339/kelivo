@@ -194,6 +194,23 @@ void main() {
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
   });
 
+  testWidgets('remote reservations are not displayed as measured sizes', (
+    tester,
+  ) async {
+    usage.images = [
+      ChatContextImage(
+        identity: const ContextImageIdentity('remote', 'tool:1'),
+        uri: 'https://example.test/image.png',
+        source: ContextImageSource.tool,
+        label: 'remote',
+      ),
+    ];
+    await openPanel(tester);
+    expect(find.text('Size checked when sending'), findsOneWidget);
+    expect(find.textContaining('5.00 MiB'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('image panel allows recall control before the first image', (
     tester,
   ) async {

@@ -7729,5 +7729,90 @@
   "compressionScopeAllHint": "Summarize all history in the current context, including recent turns. Original messages stay available.",
   "compressionScopeStartHint": "Select earlier whole messages within the character budget. Other messages keep their original text.",
   "compressionScopeRecentHint": "Select recent whole messages within the character budget. Other messages keep their original text.",
-  "compressionAutoKeepHint": "Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression."
+  "compressionAutoKeepHint": "Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.",
+  "requestBudgetTitle": "Image & request budgets",
+  "requestBudgetInherited": "Inherited",
+  "requestBudgetCustom": "Custom",
+  "requestBudgetReset": "Reset",
+  "requestBudgetSingleImage": "Single image (MiB)",
+  "requestBudgetTotalImages": "All images (MiB)",
+  "requestBudgetImageCount": "Image count",
+  "requestBudgetBody": "Request body (MiB)",
+  "requestBudgetProviderHelp": "Local checks before sending, not provider limits. Leave a field empty to use the default shown. Image sizes include Base64 encoding; request size includes the complete JSON body.",
+  "requestBudgetModelHelp": "Override local sending limits for this model. Empty fields inherit the provider settings shown. Image sizes include Base64 encoding; request size includes the complete JSON body.",
+  "requestBudgetRetentionHelp": "Raising these limits does not increase automatic history image retention. Pin images to keep them. Larger budgets can increase device memory use.",
+  "requestBudgetInvalid": "Enter positive sizes and a positive whole image count, or leave fields empty to inherit.",
+  "requestBudgetBytes": "{mib} MiB ({bytes} bytes)",
+  "@requestBudgetBytes": {
+    "placeholders": {
+      "mib": {
+        "type": "String"
+      },
+      "bytes": {
+        "type": "int"
+      }
+    }
+  },
+  "requestBudgetSingleError": "Kelivo local preflight: image {index} has an encoded size of {actual}, exceeding the single-image limit of {limit}.",
+  "@requestBudgetSingleError": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "actual": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "requestBudgetTotalError": "Kelivo local preflight: encoded images total {actual}, exceeding the image budget of {limit}.",
+  "@requestBudgetTotalError": {
+    "placeholders": {
+      "actual": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "requestBudgetCountError": "Kelivo local preflight: the request contains {actual} images, exceeding the limit of {limit}.",
+  "@requestBudgetCountError": {
+    "placeholders": {
+      "actual": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "requestBudgetBodyError": "Kelivo local preflight: the complete request body is {actual}, exceeding the request budget of {limit}.",
+  "@requestBudgetBodyError": {
+    "placeholders": {
+      "actual": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "requestBudgetPinnedError": "This image is pinned.",
+  "requestBudgetImageHint": "Open Image context to review included images and pins. Reduce image size or count, unpin older images, or adjust the budget in provider/model settings.",
+  "requestBudgetBodyHint": "Shorten or compress the conversation, including tool results, or adjust the request body budget in provider/model settings.",
+  "imageContextEncodedSize": "{size} MiB encoded",
+  "@imageContextEncodedSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "imageContextPinned": "Pinned",
+  "imageContextSizeUnknown": "Size checked when sending",
+  "requestBudgetAtLeast": "at least {value}",
+  "@requestBudgetAtLeast": {"placeholders": {"value": {"type": "String"}}}
 }

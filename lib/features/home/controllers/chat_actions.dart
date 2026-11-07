@@ -1,3 +1,5 @@
+import '../../../core/models/image_context.dart';
+import '../../chat/utils/image_context_budget_error.dart';
 import '../../../core/services/chat/chat_context_reader.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/compression_config.dart';
@@ -3169,6 +3171,12 @@ class ChatActions {
         e is ProviderOAuthException &&
         e.kind == ProviderOAuthFailure.loginRequired;
     var errorText = oauthFailure ? '' : e.toString();
+    if (e is ImageContextBudgetException && contextProvider.mounted) {
+      errorText = formatImageContextBudgetError(
+        e,
+        AppLocalizations.of(contextProvider)!,
+      );
+    }
     final tier = state.ctx.serviceTier;
     final speedL10n = tier != null && contextProvider.mounted
         ? AppLocalizations.of(contextProvider)

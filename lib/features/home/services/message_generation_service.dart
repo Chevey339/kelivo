@@ -535,10 +535,8 @@ class MessageGenerationService {
           .where((m) => m.role == 'user' && !ContextOperation.isSummary(m))
           .lastOrNull
           ?.id,
-      maxImageBytes: kind == ProviderKind.google
-          ? 14 * 1024 * 1024
-          : 20 * 1024 * 1024,
-      maxBodyBytes: kind == ProviderKind.google ? 20000000 : 28 * 1024 * 1024,
+      budget: cfg.requestBudgetForModel(modelId),
+      historyBudget: cfg.defaultRequestBudget,
       canImageInput: spec.supportsImageInput,
       canRecall: packed.toolDefs.any(
         (t) => (t['function'] as Map?)?['name'] == 'read_chat_image',

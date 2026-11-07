@@ -15576,6 +15576,96 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint => '自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。';
+
+  @override
+  String get requestBudgetTitle => '图片与请求预算';
+
+  @override
+  String get requestBudgetInherited => '继承默认';
+
+  @override
+  String get requestBudgetCustom => '自定义';
+
+  @override
+  String get requestBudgetReset => '恢复默认';
+
+  @override
+  String get requestBudgetSingleImage => '单张图片（MiB）';
+
+  @override
+  String get requestBudgetTotalImages => '图片合计（MiB）';
+
+  @override
+  String get requestBudgetImageCount => '图片数量';
+
+  @override
+  String get requestBudgetBody => '请求体（MiB）';
+
+  @override
+  String get requestBudgetProviderHelp =>
+      '这些是发送前的本地检查，不代表供应商上限。留空使用提示中的默认值。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetModelHelp =>
+      '为此模型覆盖本地发送限制。留空继承提示中的供应商设置。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetRetentionHelp =>
+      '调大限制不会增加自动保留的历史图片，可固定需要保留的图片。较大的预算会增加设备内存占用。';
+
+  @override
+  String get requestBudgetInvalid => '请输入正数大小和正整数图片数量，或留空继承默认值。';
+
+  @override
+  String requestBudgetBytes(String mib, int bytes) {
+    return '$mib MiB（$bytes 字节）';
+  }
+
+  @override
+  String requestBudgetSingleError(int index, String actual, String limit) {
+    return 'Kelivo 本地预检：本次请求第 $index 张图片编码后为 $actual，超过单张预算 $limit。';
+  }
+
+  @override
+  String requestBudgetTotalError(String actual, String limit) {
+    return 'Kelivo 本地预检：图片编码后合计 $actual，超过图片总预算 $limit。';
+  }
+
+  @override
+  String requestBudgetCountError(String actual, int limit) {
+    return 'Kelivo 本地预检：本次请求包含 $actual 张图片，超过数量上限 $limit 张。';
+  }
+
+  @override
+  String requestBudgetBodyError(String actual, String limit) {
+    return 'Kelivo 本地预检：完整请求体为 $actual，超过请求体预算 $limit。';
+  }
+
+  @override
+  String get requestBudgetPinnedError => '这张图片已固定。';
+
+  @override
+  String get requestBudgetImageHint =>
+      '打开“图片上下文”查看本轮图片及固定状态。可缩小或减少图片、取消固定旧图片，或在供应商／模型设置中调整预算。';
+
+  @override
+  String get requestBudgetBodyHint => '请缩短或压缩会话上下文（包括工具记录），或在供应商／模型设置中调整请求体预算。';
+
+  @override
+  String imageContextEncodedSize(String size) {
+    return '编码后 $size MiB';
+  }
+
+  @override
+  String get imageContextPinned => '已固定';
+
+  @override
+  String get imageContextSizeUnknown => '大小待发送时确认';
+
+  @override
+  String requestBudgetAtLeast(String value) {
+    return '至少 $value';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31006,6 +31096,96 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressionAutoKeepHint => '自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。';
+
+  @override
+  String get requestBudgetTitle => '图片与请求预算';
+
+  @override
+  String get requestBudgetInherited => '继承默认';
+
+  @override
+  String get requestBudgetCustom => '自定义';
+
+  @override
+  String get requestBudgetReset => '恢复默认';
+
+  @override
+  String get requestBudgetSingleImage => '单张图片（MiB）';
+
+  @override
+  String get requestBudgetTotalImages => '图片合计（MiB）';
+
+  @override
+  String get requestBudgetImageCount => '图片数量';
+
+  @override
+  String get requestBudgetBody => '请求体（MiB）';
+
+  @override
+  String get requestBudgetProviderHelp =>
+      '这些是发送前的本地检查，不代表供应商上限。留空使用提示中的默认值。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetModelHelp =>
+      '为此模型覆盖本地发送限制。留空继承提示中的供应商设置。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetRetentionHelp =>
+      '调大限制不会增加自动保留的历史图片，可固定需要保留的图片。较大的预算会增加设备内存占用。';
+
+  @override
+  String get requestBudgetInvalid => '请输入正数大小和正整数图片数量，或留空继承默认值。';
+
+  @override
+  String requestBudgetBytes(String mib, int bytes) {
+    return '$mib MiB（$bytes 字节）';
+  }
+
+  @override
+  String requestBudgetSingleError(int index, String actual, String limit) {
+    return 'Kelivo 本地预检：本次请求第 $index 张图片编码后为 $actual，超过单张预算 $limit。';
+  }
+
+  @override
+  String requestBudgetTotalError(String actual, String limit) {
+    return 'Kelivo 本地预检：图片编码后合计 $actual，超过图片总预算 $limit。';
+  }
+
+  @override
+  String requestBudgetCountError(String actual, int limit) {
+    return 'Kelivo 本地预检：本次请求包含 $actual 张图片，超过数量上限 $limit 张。';
+  }
+
+  @override
+  String requestBudgetBodyError(String actual, String limit) {
+    return 'Kelivo 本地预检：完整请求体为 $actual，超过请求体预算 $limit。';
+  }
+
+  @override
+  String get requestBudgetPinnedError => '这张图片已固定。';
+
+  @override
+  String get requestBudgetImageHint =>
+      '打开“图片上下文”查看本轮图片及固定状态。可缩小或减少图片、取消固定旧图片，或在供应商／模型设置中调整预算。';
+
+  @override
+  String get requestBudgetBodyHint => '请缩短或压缩会话上下文（包括工具记录），或在供应商／模型设置中调整请求体预算。';
+
+  @override
+  String imageContextEncodedSize(String size) {
+    return '编码后 $size MiB';
+  }
+
+  @override
+  String get imageContextPinned => '已固定';
+
+  @override
+  String get imageContextSizeUnknown => '大小待发送时确认';
+
+  @override
+  String requestBudgetAtLeast(String value) {
+    return '至少 $value';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -46517,4 +46697,94 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressionAutoKeepHint => '自動壓縮始終保留最近原文，不受本次範圍選擇影響；輪數與手動壓縮共用。';
+
+  @override
+  String get requestBudgetTitle => '圖片與請求預算';
+
+  @override
+  String get requestBudgetInherited => '繼承預設';
+
+  @override
+  String get requestBudgetCustom => '自訂';
+
+  @override
+  String get requestBudgetReset => '恢復預設';
+
+  @override
+  String get requestBudgetSingleImage => '單張圖片（MiB）';
+
+  @override
+  String get requestBudgetTotalImages => '圖片合計（MiB）';
+
+  @override
+  String get requestBudgetImageCount => '圖片數量';
+
+  @override
+  String get requestBudgetBody => '請求體（MiB）';
+
+  @override
+  String get requestBudgetProviderHelp =>
+      '這些是傳送前的本機檢查，不代表供應商上限。留空使用提示中的預設值。圖片大小按 Base64 編碼後計算；請求體大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetModelHelp =>
+      '為此模型覆寫本機傳送限制。留空繼承提示中的供應商設定。圖片大小按 Base64 編碼後計算；請求體大小包含完整 JSON。';
+
+  @override
+  String get requestBudgetRetentionHelp =>
+      '調高限制不會增加自動保留的歷史圖片，可固定需要保留的圖片。較大的預算會增加裝置記憶體用量。';
+
+  @override
+  String get requestBudgetInvalid => '請輸入正數大小和正整數圖片數量，或留空繼承預設值。';
+
+  @override
+  String requestBudgetBytes(String mib, int bytes) {
+    return '$mib MiB（$bytes 位元組）';
+  }
+
+  @override
+  String requestBudgetSingleError(int index, String actual, String limit) {
+    return 'Kelivo 本機預檢：本次請求第 $index 張圖片編碼後為 $actual，超過單張預算 $limit。';
+  }
+
+  @override
+  String requestBudgetTotalError(String actual, String limit) {
+    return 'Kelivo 本機預檢：圖片編碼後合計 $actual，超過圖片總預算 $limit。';
+  }
+
+  @override
+  String requestBudgetCountError(String actual, int limit) {
+    return 'Kelivo 本機預檢：本次請求包含 $actual 張圖片，超過數量上限 $limit 張。';
+  }
+
+  @override
+  String requestBudgetBodyError(String actual, String limit) {
+    return 'Kelivo 本機預檢：完整請求體為 $actual，超過請求體預算 $limit。';
+  }
+
+  @override
+  String get requestBudgetPinnedError => '這張圖片已固定。';
+
+  @override
+  String get requestBudgetImageHint =>
+      '開啟「圖片上下文」查看本輪圖片及固定狀態。可縮小或減少圖片、取消固定舊圖片，或在供應商／模型設定中調整預算。';
+
+  @override
+  String get requestBudgetBodyHint => '請縮短或壓縮對話上下文（包括工具記錄），或在供應商／模型設定中調整請求體預算。';
+
+  @override
+  String imageContextEncodedSize(String size) {
+    return '編碼後 $size MiB';
+  }
+
+  @override
+  String get imageContextPinned => '已固定';
+
+  @override
+  String get imageContextSizeUnknown => '大小待傳送時確認';
+
+  @override
+  String requestBudgetAtLeast(String value) {
+    return '至少 $value';
+  }
 }

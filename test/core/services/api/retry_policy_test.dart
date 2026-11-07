@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:Kelivo/core/models/auto_retry_options.dart';
+import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/services/api/retry_policy.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +28,19 @@ void main() {
   });
 
   group('shouldRetryError', () {
+    test('local budget failures do not retry even with a matching keyword', () {
+      expect(
+        shouldRetryError(
+          const ImageContextBudgetException(
+            kind: ImageContextBudgetKind.requestBody,
+            actual: 101,
+            limit: 100,
+          ),
+          options.copyWith(retryKeywords: ['limit']),
+        ),
+        isFalse,
+      );
+    });
     test('retries 429 and 5xx status codes', () {
       expect(
         shouldRetryError(const HttpException('HTTP 429: busy'), options),

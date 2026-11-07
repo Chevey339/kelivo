@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 
 import '../../models/auto_retry_options.dart';
+import '../../models/image_context.dart';
 
 /// Process-wide auto-retry config, synced from [SettingsProvider].
 ///
@@ -31,7 +32,9 @@ bool shouldRetryError(
   AutoRetryOptions o, {
   bool? retryOnNetworkError,
 }) {
-  if (isUserCancelError(error)) return false;
+  if (error is ImageContextBudgetException || isUserCancelError(error)) {
+    return false;
+  }
   final text = error.toString();
   if (_containsKeyword(text, o.stopKeywords)) return false;
   final status = httpStatusFromError(error);

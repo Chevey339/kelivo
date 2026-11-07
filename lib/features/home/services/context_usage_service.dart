@@ -75,6 +75,7 @@ ContextUsageConfiguration contextUsageConfiguration({
     assistant?.id ?? assistantId,
     ProviderConfig.classify(providerKey, explicitType: config.providerType),
     ModelSpecResolver.instance.spec(config, modelId),
+    jsonEncode(config.requestBudgetForModel(modelId).toJson()),
     jsonEncode(assistant?.toJson()),
     settings.legacyMemoryMode,
     settings.memoryInjectionMaxItems,

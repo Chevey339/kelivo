@@ -11,6 +11,7 @@ import '../../models/provider_oauth.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
+import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
 import 'claude_oauth_request.dart';
@@ -872,6 +873,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
                 _claudeConversationId,
               )
             : jsonEncode(payload);
+        RequestImageContext.current?.validateBodyBytes(result.bodyBytes.length);
       }
       return result;
     }

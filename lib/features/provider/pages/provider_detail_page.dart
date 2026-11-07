@@ -39,6 +39,7 @@ import 'multi_key_manager_page.dart';
 import 'provider_balance_page.dart';
 import 'provider_custom_request_page.dart';
 import 'provider_network_page.dart';
+import '../widgets/request_budget_settings.dart';
 import '../../../core/services/haptics.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -918,6 +919,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   },
                 ),
               ),
+            ProviderRequestBudgetRow(providerId: widget.keyName),
             _TactileRow(
               onTap: () async {
                 await Navigator.of(context).push(

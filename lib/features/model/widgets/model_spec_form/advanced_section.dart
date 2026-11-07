@@ -1,3 +1,4 @@
+import '../../../provider/widgets/request_budget_settings.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/services/model_spec/model_spec_resolver.dart';
@@ -24,6 +25,16 @@ class AdvancedSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            RequestBudgetRow(
+              value: controller.requestBudget,
+              inherited: controller.config.requestBudget.applyTo(
+                controller.config
+                    .forModelProtocol(controller.modelKey)
+                    .defaultRequestBudget,
+              ),
+              modelOverride: true,
+              onChanged: (value) async => controller.setRequestBudget(value),
+            ),
             SpecFieldHeader(
               label: l10n.modelDetailSheetCustomHeadersTitle,
               source: controller.isHeadersOverridden

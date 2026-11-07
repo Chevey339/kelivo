@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/models/request_budget.dart';
 import '../../../../core/models/avatar_config.dart';
 import '../../../../utils/avatar_files.dart';
 import '../../../../core/providers/settings_provider.dart';
@@ -29,6 +30,10 @@ class ModelSpecFormController extends ChangeNotifier {
        _modelKey = modelKey,
        isNew = isNew {
     avatar = isNew ? null : config.modelAvatar(modelKey);
+    final override = isNew ? null : config.modelOverrides[modelKey];
+    requestBudget = RequestBudgetOverrides.fromJson(
+      override is Map ? override['requestBudget'] : null,
+    );
     final displayModelId = _initialDisplayModelId(config, modelKey, isNew);
     final resolveKey = isNew
         ? (displayModelId.isEmpty ? 'custom' : displayModelId)
@@ -94,6 +99,14 @@ class ModelSpecFormController extends ChangeNotifier {
   void setAvatar(AvatarConfig? value) {
     avatar = value;
     _avatarTouched = true;
+    notifyListeners();
+  }
+
+  late RequestBudgetOverrides requestBudget;
+  bool _requestBudgetTouched = false;
+  void setRequestBudget(RequestBudgetOverrides value) {
+    requestBudget = value;
+    _requestBudgetTouched = true;
     notifyListeners();
   }
 
@@ -581,6 +594,12 @@ class ModelSpecFormController extends ChangeNotifier {
       if (_avatarTouched) {
         payload.remove('avatar');
         if (savedAvatar != null) payload['avatar'] = savedAvatar.toJson();
+      }
+      if (_requestBudgetTouched) {
+        payload.remove('requestBudget');
+        if (!requestBudget.isEmpty) {
+          payload['requestBudget'] = requestBudget.toJson();
+        }
       }
       final overrides = Map<String, dynamic>.from(current.modelOverrides);
       overrides[key] = payload;

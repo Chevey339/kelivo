@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
@@ -43,6 +44,61 @@ void main() {
   setUpAll(() async {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
   });
+
+  test(
+    'request budget overrides save, survive unrelated edits, and reset to provider',
+    () async {
+      final cfg = _cfg().copyWith(
+        requestBudget: const RequestBudgetOverrides(imageCount: 60),
+      );
+      final settings = await _settings(cfg);
+      final controller = ModelSpecFormController(
+        config: cfg,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(controller.dispose);
+      controller.setRequestBudget(
+        const RequestBudgetOverrides(
+          imageCount: 100,
+          bodyBytes: 64 * RequestBudget.mib,
+        ),
+      );
+      expect(await controller.save(settings), isTrue);
+      final saved = settings.getProviderConfig(cfg.id);
+      expect(saved.requestBudgetForModel('plain-model').imageCount, 100);
+      final next = ModelSpecFormController(
+        config: saved,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(next.dispose);
+      next.setDisplayName('Renamed');
+      expect(await next.save(settings), isTrue);
+      expect(
+        settings
+            .getProviderConfig(cfg.id)
+            .requestBudgetForModel('plain-model')
+            .bodyBytes,
+        64 * RequestBudget.mib,
+      );
+      next.setRequestBudget(const RequestBudgetOverrides());
+      expect(await next.save(settings), isTrue);
+      expect(
+        settings
+            .getProviderConfig(cfg.id)
+            .requestBudgetForModel('plain-model')
+            .imageCount,
+        60,
+      );
+      expect(
+        (settings.getProviderConfig(cfg.id).modelOverrides['plain-model']
+                as Map)
+            .containsKey('requestBudget'),
+        isFalse,
+      );
+    },
+  );
 
   test('initial values match resolve spec', () {
     final cfg = _cfg(

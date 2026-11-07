@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'dart:convert';
+
+import '../models/request_budget.dart';
 import 'package:path/path.dart' as p;
 import '../services/search/search_service.dart';
 import '../services/search/web_fetch_service.dart';
@@ -6281,6 +6283,21 @@ class ProviderConfig {
   // multiple logical models can share the same backend model with different params.
   // {'<key>': {'apiModelId': String?, 'name': String?, 'type': 'chat'|'embedding', 'input': ['text','image'], 'output': [...], 'abilities': ['tool','reasoning']}}
   final Map<String, dynamic> modelOverrides;
+  final RequestBudgetOverrides requestBudget;
+
+  RequestBudget get defaultRequestBudget =>
+      classify(id, explicitType: providerType) == ProviderKind.google
+      ? RequestBudget.google
+      : const RequestBudget();
+
+  RequestBudget requestBudgetForModel(String modelId) {
+    final config = forModelProtocol(modelId);
+    final override = modelOverrides[modelId];
+    return RequestBudgetOverrides.fromJson(
+      override is Map ? override['requestBudget'] : null,
+    ).applyTo(requestBudget.applyTo(config.defaultRequestBudget));
+  }
+
   // Per-provider custom request overrides.
   final List<Map<String, String>> customHeaders;
   final List<Map<String, String>> customBody;
@@ -6387,6 +6404,7 @@ class ProviderConfig {
     this.models = const [],
     this.disabledModels = const {},
     this.modelOverrides = const {},
+    this.requestBudget = const RequestBudgetOverrides(),
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.proxyEnabled,
@@ -6447,6 +6465,7 @@ class ProviderConfig {
     List<String>? models,
     Set<String>? disabledModels,
     Map<String, dynamic>? modelOverrides,
+    RequestBudgetOverrides? requestBudget,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? proxyEnabled,
@@ -6496,6 +6515,7 @@ class ProviderConfig {
     models: models ?? this.models,
     disabledModels: disabledModels ?? this.disabledModels,
     modelOverrides: modelOverrides ?? this.modelOverrides,
+    requestBudget: requestBudget ?? this.requestBudget,
     customHeaders: customHeaders ?? this.customHeaders,
     customBody: customBody ?? this.customBody,
     proxyEnabled: proxyEnabled ?? this.proxyEnabled,
@@ -6553,6 +6573,7 @@ class ProviderConfig {
     'models': models,
     'disabledModels': disabledModels.toList(),
     'modelOverrides': modelOverrides,
+    if (!requestBudget.isEmpty) 'requestBudget': requestBudget.toJson(),
     'customHeaders': customHeaders,
     'customBody': customBody,
     'proxyEnabled': proxyEnabled,
@@ -6622,6 +6643,7 @@ class ProviderConfig {
           (k, v) => MapEntry(k.toString(), v),
         ) ??
         const {},
+    requestBudget: RequestBudgetOverrides.fromJson(json['requestBudget']),
     customHeaders: _customRequestRowsFromJson(
       json['customHeaders'],
       keyName: 'name',

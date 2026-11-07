@@ -614,7 +614,12 @@ final class BusinessSettingsRouter {
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
           objectLists: const {'balanceHeaders'},
-          maps: const {'modelOverrides', 'keyManagement', 'oauthCredentials'},
+          maps: const {
+            'modelOverrides',
+            'keyManagement',
+            'oauthCredentials',
+            'requestBudget',
+          },
         );
         _validateProviderChildren(kind, payload);
         return;

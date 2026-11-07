@@ -16435,4 +16435,96 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compressionAutoKeepHint =>
       'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.';
+
+  @override
+  String get requestBudgetTitle => 'Image & request budgets';
+
+  @override
+  String get requestBudgetInherited => 'Inherited';
+
+  @override
+  String get requestBudgetCustom => 'Custom';
+
+  @override
+  String get requestBudgetReset => 'Reset';
+
+  @override
+  String get requestBudgetSingleImage => 'Single image (MiB)';
+
+  @override
+  String get requestBudgetTotalImages => 'All images (MiB)';
+
+  @override
+  String get requestBudgetImageCount => 'Image count';
+
+  @override
+  String get requestBudgetBody => 'Request body (MiB)';
+
+  @override
+  String get requestBudgetProviderHelp =>
+      'Local checks before sending, not provider limits. Leave a field empty to use the default shown. Image sizes include Base64 encoding; request size includes the complete JSON body.';
+
+  @override
+  String get requestBudgetModelHelp =>
+      'Override local sending limits for this model. Empty fields inherit the provider settings shown. Image sizes include Base64 encoding; request size includes the complete JSON body.';
+
+  @override
+  String get requestBudgetRetentionHelp =>
+      'Raising these limits does not increase automatic history image retention. Pin images to keep them. Larger budgets can increase device memory use.';
+
+  @override
+  String get requestBudgetInvalid =>
+      'Enter positive sizes and a positive whole image count, or leave fields empty to inherit.';
+
+  @override
+  String requestBudgetBytes(String mib, int bytes) {
+    return '$mib MiB ($bytes bytes)';
+  }
+
+  @override
+  String requestBudgetSingleError(int index, String actual, String limit) {
+    return 'Kelivo local preflight: image $index has an encoded size of $actual, exceeding the single-image limit of $limit.';
+  }
+
+  @override
+  String requestBudgetTotalError(String actual, String limit) {
+    return 'Kelivo local preflight: encoded images total $actual, exceeding the image budget of $limit.';
+  }
+
+  @override
+  String requestBudgetCountError(String actual, int limit) {
+    return 'Kelivo local preflight: the request contains $actual images, exceeding the limit of $limit.';
+  }
+
+  @override
+  String requestBudgetBodyError(String actual, String limit) {
+    return 'Kelivo local preflight: the complete request body is $actual, exceeding the request budget of $limit.';
+  }
+
+  @override
+  String get requestBudgetPinnedError => 'This image is pinned.';
+
+  @override
+  String get requestBudgetImageHint =>
+      'Open Image context to review included images and pins. Reduce image size or count, unpin older images, or adjust the budget in provider/model settings.';
+
+  @override
+  String get requestBudgetBodyHint =>
+      'Shorten or compress the conversation, including tool results, or adjust the request body budget in provider/model settings.';
+
+  @override
+  String imageContextEncodedSize(String size) {
+    return '$size MiB encoded';
+  }
+
+  @override
+  String get imageContextPinned => 'Pinned';
+
+  @override
+  String get imageContextSizeUnknown => 'Size checked when sending';
+
+  @override
+  String requestBudgetAtLeast(String value) {
+    return 'at least $value';
+  }
 }

@@ -94,12 +94,40 @@ class ImageContextCandidate {
   final String? userTurnId;
 }
 
+enum ImageContextBudgetKind {
+  singleImage,
+  totalImages,
+  imageCount,
+  requestBody,
+}
+
 class ImageContextBudgetException implements Exception {
-  const ImageContextBudgetException();
+  const ImageContextBudgetException({
+    required this.kind,
+    required this.actual,
+    required this.limit,
+    this.imageIndex,
+    this.imageKey,
+    this.pinned = false,
+    this.minimum = false,
+  });
+
+  final ImageContextBudgetKind kind;
+  final int actual;
+  final int limit;
+  final int? imageIndex;
+  final String? imageKey;
+  final bool pinned;
+  // A guard may stop loading as soon as the measured prefix exceeds a limit.
+  final bool minimum;
+
   @override
   String toString() =>
-      'The request exceeds its image or payload budget. '
-      'Send fewer images, reduce their size, unpin older images, or shorten the context.';
+      'Kelivo local preflight: ${kind.name}'
+      '${imageIndex == null ? '' : ' (image $imageIndex${pinned ? ', pinned' : ''})'}'
+      ' exceeds the configured limit: ${minimum ? 'at least ' : ''}$actual > $limit '
+      '${kind == ImageContextBudgetKind.imageCount ? 'images' : 'bytes'}. '
+      '${kind == ImageContextBudgetKind.requestBody ? 'Shorten the context or adjust the request body budget.' : 'Review Image context, reduce images or unpin old images, or adjust the image budget.'}';
 }
 
 /// Deterministic replay. Always give [historyOmissions] the original branch's
@@ -124,6 +152,12 @@ abstract final class ImageContextPlanner {
         item.protected ||
         (item.userMessageId != null && item.userMessageId == currentUser);
     void trim({ImageContextCandidate? newest}) {
+      for (final old in List<ImageContextCandidate>.of(retained)) {
+        if (old.encodedBytes > maxSingleBytes && !protected(old)) {
+          omitted.add(old.key);
+          retained.remove(old);
+        }
+      }
       var bytes = retained.fold<int>(0, (sum, item) => sum + item.encodedBytes);
       for (final user in [false, true]) {
         for (final old in List<ImageContextCandidate>.of(retained)) {
@@ -165,10 +199,6 @@ abstract final class ImageContextPlanner {
           retained.remove(old);
         }
       }
-      if (image.encodedBytes > maxSingleBytes && !protected(image)) {
-        omitted.add(image.key);
-        retained.remove(image);
-      }
       trim(newest: image);
     }
     if (latestUserId != currentUser) {
@@ -182,11 +212,25 @@ abstract final class ImageContextPlanner {
     List<ImageContextCandidate> images, {
     required int maxBytes,
     int maxImages = 24,
+    bool minimum = false,
   }) {
     final bytes = images.fold<int>(0, (sum, image) => sum + image.encodedBytes);
-    if (bytes > maxBytes ||
-        images.fold<int>(0, (sum, image) => sum + image.count) > maxImages) {
-      throw const ImageContextBudgetException();
+    if (bytes > maxBytes) {
+      throw ImageContextBudgetException(
+        kind: ImageContextBudgetKind.totalImages,
+        actual: bytes,
+        limit: maxBytes,
+        minimum: minimum,
+      );
+    }
+    final count = images.fold<int>(0, (sum, image) => sum + image.count);
+    if (count > maxImages) {
+      throw ImageContextBudgetException(
+        kind: ImageContextBudgetKind.imageCount,
+        actual: count,
+        limit: maxImages,
+        minimum: minimum,
+      );
     }
   }
 }

@@ -3564,6 +3564,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               ],
                             ],
                             const SizedBox(height: 4),
+                            ProviderRequestBudgetRow(
+                              providerId: widget.providerKey,
+                            ),
+                            const SizedBox(height: 16),
                             // 5) Network proxy inline
                             row(
                               l10n.providerDetailPageNetworkTab,

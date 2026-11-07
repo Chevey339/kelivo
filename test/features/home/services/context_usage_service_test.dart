@@ -12,6 +12,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
 import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -204,6 +205,39 @@ void main() {
   );
 
   String tokenWords(int count) => List.filled(count, 'aa').join(' ');
+
+  test(
+    'request budget changes invalidate context usage configuration',
+    () async {
+      final providers = await createProviders();
+      final before = requestConfiguration(providers);
+      final config = providers.settings.getProviderConfig('TestProvider');
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        config.copyWith(
+          requestBudget: const RequestBudgetOverrides(imageCount: 10),
+        ),
+      );
+      final providerChanged = requestConfiguration(providers);
+      expect(providerChanged, isNot(before));
+      expect(requestConfiguration(providers), providerChanged);
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        providers.settings
+            .getProviderConfig('TestProvider')
+            .copyWith(
+              modelOverrides: {
+                ...config.modelOverrides,
+                'window-model': {
+                  ...(config.modelOverrides['window-model'] as Map),
+                  'requestBudget': {'imageCount': 4},
+                },
+              },
+            ),
+      );
+      expect(requestConfiguration(providers), isNot(providerChanged));
+    },
+  );
 
   test(
     'real isolate refresh completes after adding a historical image',

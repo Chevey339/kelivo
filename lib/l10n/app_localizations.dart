@@ -28973,6 +28973,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.'**
   String get compressionAutoKeepHint;
+
+  /// No description provided for @requestBudgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image & request budgets'**
+  String get requestBudgetTitle;
+
+  /// No description provided for @requestBudgetInherited.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherited'**
+  String get requestBudgetInherited;
+
+  /// No description provided for @requestBudgetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get requestBudgetCustom;
+
+  /// No description provided for @requestBudgetReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get requestBudgetReset;
+
+  /// No description provided for @requestBudgetSingleImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Single image (MiB)'**
+  String get requestBudgetSingleImage;
+
+  /// No description provided for @requestBudgetTotalImages.
+  ///
+  /// In en, this message translates to:
+  /// **'All images (MiB)'**
+  String get requestBudgetTotalImages;
+
+  /// No description provided for @requestBudgetImageCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Image count'**
+  String get requestBudgetImageCount;
+
+  /// No description provided for @requestBudgetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Request body (MiB)'**
+  String get requestBudgetBody;
+
+  /// No description provided for @requestBudgetProviderHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Local checks before sending, not provider limits. Leave a field empty to use the default shown. Image sizes include Base64 encoding; request size includes the complete JSON body.'**
+  String get requestBudgetProviderHelp;
+
+  /// No description provided for @requestBudgetModelHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Override local sending limits for this model. Empty fields inherit the provider settings shown. Image sizes include Base64 encoding; request size includes the complete JSON body.'**
+  String get requestBudgetModelHelp;
+
+  /// No description provided for @requestBudgetRetentionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Raising these limits does not increase automatic history image retention. Pin images to keep them. Larger budgets can increase device memory use.'**
+  String get requestBudgetRetentionHelp;
+
+  /// No description provided for @requestBudgetInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter positive sizes and a positive whole image count, or leave fields empty to inherit.'**
+  String get requestBudgetInvalid;
+
+  /// No description provided for @requestBudgetBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{mib} MiB ({bytes} bytes)'**
+  String requestBudgetBytes(String mib, int bytes);
+
+  /// No description provided for @requestBudgetSingleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo local preflight: image {index} has an encoded size of {actual}, exceeding the single-image limit of {limit}.'**
+  String requestBudgetSingleError(int index, String actual, String limit);
+
+  /// No description provided for @requestBudgetTotalError.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo local preflight: encoded images total {actual}, exceeding the image budget of {limit}.'**
+  String requestBudgetTotalError(String actual, String limit);
+
+  /// No description provided for @requestBudgetCountError.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo local preflight: the request contains {actual} images, exceeding the limit of {limit}.'**
+  String requestBudgetCountError(String actual, int limit);
+
+  /// No description provided for @requestBudgetBodyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo local preflight: the complete request body is {actual}, exceeding the request budget of {limit}.'**
+  String requestBudgetBodyError(String actual, String limit);
+
+  /// No description provided for @requestBudgetPinnedError.
+  ///
+  /// In en, this message translates to:
+  /// **'This image is pinned.'**
+  String get requestBudgetPinnedError;
+
+  /// No description provided for @requestBudgetImageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Image context to review included images and pins. Reduce image size or count, unpin older images, or adjust the budget in provider/model settings.'**
+  String get requestBudgetImageHint;
+
+  /// No description provided for @requestBudgetBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorten or compress the conversation, including tool results, or adjust the request body budget in provider/model settings.'**
+  String get requestBudgetBodyHint;
+
+  /// No description provided for @imageContextEncodedSize.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MiB encoded'**
+  String imageContextEncodedSize(String size);
+
+  /// No description provided for @imageContextPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get imageContextPinned;
+
+  /// No description provided for @imageContextSizeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Size checked when sending'**
+  String get imageContextSizeUnknown;
+
+  /// No description provided for @requestBudgetAtLeast.
+  ///
+  /// In en, this message translates to:
+  /// **'at least {value}'**
+  String requestBudgetAtLeast(String value);
 }
 
 class _AppLocalizationsDelegate

@@ -1,3 +1,4 @@
+import '../../../../models/image_context.dart';
 import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
@@ -319,6 +320,8 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           final errorBody = await resp2.stream.bytesToString();
           throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
         }
+      } on ImageContextBudgetException {
+        rethrow;
       } on ProviderOAuthException {
         rethrow;
       } on HttpException {

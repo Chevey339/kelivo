@@ -1,3 +1,4 @@
+import '../../../../models/image_context.dart';
 import '../../request_history_context.dart';
 import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
@@ -844,6 +845,8 @@ Stream<StreamChunk> sendOpenAIStream(
             : firstChoice['finish_reason'].toString(),
       );
       return;
+    } on ImageContextBudgetException {
+      rethrow;
     } catch (e) {
       throw HttpException('Invalid JSON: $e');
     }
@@ -1048,6 +1051,8 @@ Stream<StreamChunk> sendOpenAIStream(
         // through [DONE] or EOF before starting the next API request.
         if (data == '[DONE]') break;
       }
+    } on ImageContextBudgetException {
+      rethrow;
     } on ProviderOAuthException {
       rethrow;
     } on HttpException {

@@ -2,10 +2,12 @@ import 'request_history_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import '../../../features/intelligent_ui/host/ui_user_context_parts.dart';
 import '../../models/chat_message.dart';
 import '../../models/image_context.dart';
+import '../../models/request_budget.dart';
 import '../../models/message_part.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../utils/chat_image_result.dart';
@@ -56,11 +58,13 @@ class ImageContextPreviewItem {
     required this.included,
     required this.pinned,
     this.bytes,
+    this.sizeIsEstimate = false,
   });
   final ChatContextImage image;
   final bool included;
   final bool pinned;
   final int? bytes;
+  final bool sizeIsEstimate;
 }
 
 /// A generation's immutable inputs plus a memoized asset reader. No eviction or
@@ -72,9 +76,8 @@ class RequestImageContext {
     required List<ChatContextImage> images,
     this.latestUserId,
     this.targetMessageId = '',
-    this.maxImageBytes = 20 * 1024 * 1024,
-    this.maxBodyBytes = 28 * 1024 * 1024,
-    this.maxSingleImageBytes = 5 * 1024 * 1024,
+    this.budget = const RequestBudget(),
+    this.historyBudget = const RequestBudget(),
     bool canRecall = true,
     this.canImageInput = true,
     this.loader,
@@ -100,9 +103,10 @@ class RequestImageContext {
   final List<ChatContextImage> images;
   final String? latestUserId;
   String targetMessageId;
-  final int maxImageBytes;
-  final int maxBodyBytes;
-  final int maxSingleImageBytes;
+  final RequestBudget budget;
+  // Automatic retention stays conservative when users raise sending limits.
+  // Lower sending limits also constrain retention, so old images can be trimmed.
+  final RequestBudget historyBudget;
   final bool canRecall;
   bool get hasRecallableImages =>
       canRecall && images.any((image) => !_isUnavailable(image));
@@ -648,7 +652,7 @@ class RequestImageContext {
     if (isRemoteHttpUrl(image.uri)) {
       // Reserve a stable upper bound for inline URLs, including cold previews.
       return image.source == ContextImageSource.tool || inlineRemoteUsers
-          ? maxSingleImageBytes
+          ? math.min(budget.singleImageBytes, historyBudget.singleImageBytes)
           : 0;
     }
     final file = await _localAssetFile(image);
@@ -688,8 +692,12 @@ class RequestImageContext {
     }
     return ImageContextPlanner.historyOmissions(
       candidates,
-      maxBytes: maxImageBytes,
-      maxSingleBytes: maxSingleImageBytes,
+      maxBytes: math.min(budget.totalImageBytes, historyBudget.totalImageBytes),
+      maxSingleBytes: math.min(
+        budget.singleImageBytes,
+        historyBudget.singleImageBytes,
+      ),
+      maxImages: math.min(budget.imageCount, historyBudget.imageCount),
       latestUserId: latestUserId,
     );
   }
@@ -844,14 +852,18 @@ class RequestImageContext {
     final handles = <String>{};
     final occurrences = <String, int>{};
     final external = <String, String>{};
+    final wireKeys = <String>[];
     var externalIndex = 0;
     _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
       if (handle != null && _byHandle.containsKey(handle)) {
         handles.add(handle);
+        wireKeys.add(_byHandle[handle]!.key);
         occurrences.update(handle, (n) => n + 1, ifAbsent: () => 1);
       } else {
-        external['external:${externalIndex++}'] = url;
+        final key = 'external:${externalIndex++}';
+        wireKeys.add(key);
+        external[key] = url;
       }
       return part;
     });
@@ -862,6 +874,26 @@ class RequestImageContext {
             excludedOwners.contains(image.identity.messageId))
           image.key,
     };
+    final positions = <String, int>{};
+    var position = 0;
+    for (final key in wireKeys) {
+      if (!omittedByCount.contains(key)) {
+        final index = ++position;
+        positions.putIfAbsent(key, () => index);
+      }
+    }
+    void checkSingle(int bytes, String key) {
+      if (bytes <= budget.singleImageBytes) return;
+      throw ImageContextBudgetException(
+        kind: ImageContextBudgetKind.singleImage,
+        actual: bytes,
+        limit: budget.singleImageBytes,
+        imageIndex: positions[key],
+        imageKey: key,
+        pinned: settings.pinned.contains(key),
+      );
+    }
+
     final neededKeys = {
       for (final image in images)
         if (handles.contains(image.handle) &&
@@ -877,19 +909,20 @@ class RequestImageContext {
       final size = isRemoteHttpUrl(entry.uri)
           ? 0
           : await estimatedBytes(entry) ?? 0;
-      if (size > maxSingleImageBytes) throw const ImageContextBudgetException();
+      checkSingle(size, entry.key);
       estimates.add(
         ImageContextCandidate(
           key: entry.key,
           source: entry.source,
           encodedBytes: size * (occurrences[entry.handle] ?? 1),
-          count: occurrences[entry.handle] ?? 1,
+          // References may be unreadable. Count only resolved pixels below.
+          count: 0,
         ),
       );
     }
     for (final entry in external.entries) {
       final size = wireImageBytes(entry.value);
-      if (size > maxSingleImageBytes) throw const ImageContextBudgetException();
+      checkSingle(size, entry.key);
       estimates.add(
         ImageContextCandidate(
           key: entry.key,
@@ -898,65 +931,77 @@ class RequestImageContext {
         ),
       );
     }
-    ImageContextPlanner.validateBudget(estimates, maxBytes: maxImageBytes);
+    ImageContextPlanner.validateBudget(
+      estimates,
+      maxBytes: budget.totalImageBytes,
+      maxImages: budget.imageCount,
+      minimum: true,
+    );
     final urls = <String, String?>{};
-    for (final entry in images) {
-      if (!handles.contains(entry.handle) ||
-          omittedByCount.contains(entry.key)) {
-        continue;
-      }
-      urls[entry.handle] = await _load(entry);
-    }
-    final candidates = <ImageContextCandidate>[];
-    for (final entry in images) {
-      if (!handles.contains(entry.handle)) continue;
-      final url = urls[entry.handle];
-      candidates.add(
-        ImageContextCandidate(
-          key: entry.key,
-          source: entry.source,
-          count: occurrences[entry.handle] ?? 1,
-          encodedBytes: url == null
-              ? 0
-              : wireImageBytes(url) * (occurrences[entry.handle] ?? 1),
-          protected:
-              settings.pinned.contains(entry.key) ||
-              (entry.source == ContextImageSource.user &&
-                  entry.identity.messageId == latestUserId),
-        ),
-      );
-    }
-    for (final item in external.entries) {
-      candidates.add(
+    final candidates = <ImageContextCandidate>[
+      for (final item in external.entries)
         ImageContextCandidate(
           key: item.key,
           source: ContextImageSource.user,
           encodedBytes: wireImageBytes(item.value),
           protected: true,
         ),
-      );
-    }
+    ];
+    var resolvedBytes = candidates.fold<int>(
+      0,
+      (sum, image) => sum + image.encodedBytes,
+    );
+    var resolvedCount = candidates.length;
     final oversize = <String>{};
-    for (final candidate in candidates) {
-      final copies = images
-          .where((image) => image.key == candidate.key)
-          .firstOrNull;
-      final singleBytes = copies == null
-          ? candidate.encodedBytes
-          : candidate.encodedBytes ~/ (occurrences[copies.handle] ?? 1);
-      if (singleBytes <= maxSingleImageBytes) continue;
-      if (candidate.protected || !settings.automatic) {
-        throw const ImageContextBudgetException();
+    for (final entry in images) {
+      if (!handles.contains(entry.handle) ||
+          omittedByCount.contains(entry.key)) {
+        continue;
       }
-      oversize.add(candidate.key);
+      final url = urls[entry.handle] = await _load(entry);
+      if (url == null) continue;
+      final singleBytes = wireImageBytes(url);
+      final protected =
+          settings.pinned.contains(entry.key) ||
+          (entry.source == ContextImageSource.user &&
+              entry.identity.messageId == latestUserId);
+      final limit = protected || !settings.automatic
+          ? budget.singleImageBytes
+          : math.min(budget.singleImageBytes, historyBudget.singleImageBytes);
+      if (singleBytes > limit) {
+        if (protected || !settings.automatic) {
+          checkSingle(singleBytes, entry.key);
+        }
+        oversize.add(entry.key);
+        continue;
+      }
+      final count = occurrences[entry.handle] ?? 1;
+      candidates.add(
+        ImageContextCandidate(
+          key: entry.key,
+          source: entry.source,
+          count: count,
+          encodedBytes: singleBytes * count,
+          protected: protected,
+        ),
+      );
+      resolvedBytes += singleBytes * count;
+      resolvedCount += count;
+      if (resolvedBytes > budget.totalImageBytes ||
+          resolvedCount > budget.imageCount) {
+        // Stop before reading more images. The diagnostic explicitly reports
+        // a measured lower bound rather than pretending this is the full size.
+        ImageContextPlanner.validateBudget(
+          candidates,
+          maxBytes: budget.totalImageBytes,
+          maxImages: budget.imageCount,
+          minimum: true,
+        );
+      }
     }
     final omitted = {...omittedByCount, ...oversize};
     // The deterministic history replay owns eviction. The final wire check is
     // a hard guard, so a changing text size cannot silently resurrect images.
-    ImageContextPlanner.validateBudget(
-      candidates.where((image) => !omitted.contains(image.key)).toList(),
-      maxBytes: maxImageBytes,
-    );
     final toolNotes = <String, List<String>>{};
     final projected = _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
@@ -1044,11 +1089,27 @@ class RequestImageContext {
       );
       projected['messages'] = messages;
     }
-    final request = _projectTools(projected, this);
-    if (utf8.encode(jsonEncode(request)).length > maxBodyBytes) {
-      throw const ImageContextBudgetException();
-    }
+    final request = RequestHistoryContext.stripSources(
+      _projectTools(projected, this),
+    );
+    final byteCounter = _JsonByteCounter();
+    final encoder = json.encoder
+        .fuse(utf8.encoder)
+        .startChunkedConversion(byteCounter);
+    encoder.add(request);
+    encoder.close();
+    validateBodyBytes(byteCounter.length);
     return request;
+  }
+
+  /// Also checked after OAuth adapters add their final protocol fields.
+  void validateBodyBytes(int bytes) {
+    if (bytes <= budget.bodyBytes) return;
+    throw ImageContextBudgetException(
+      kind: ImageContextBudgetKind.requestBody,
+      actual: bytes,
+      limit: budget.bodyBytes,
+    );
   }
 
   List<Map<String, dynamic>> withoutImageInput(
@@ -1176,11 +1237,9 @@ class RequestImageContext {
     final history = RequestHistoryContext.current;
     final prepared = history == null ? body : await history.prepare(body);
     return jsonEncode(
-      RequestHistoryContext.stripSources(
-        context == null
-            ? _projectTools(prepared, null)
-            : await context.project(prepared),
-      ),
+      context == null
+          ? RequestHistoryContext.stripSources(_projectTools(prepared, null))
+          : await context.project(prepared),
     );
   }
 
@@ -1205,6 +1264,9 @@ class RequestImageContext {
               !omitted.contains(image.key),
           pinned: settings.pinned.contains(image.key),
           bytes: bytes,
+          sizeIsEstimate:
+              isRemoteHttpUrl(image.uri) &&
+              (image.source == ContextImageSource.tool || inlineRemoteUsers),
         ),
       );
     }
@@ -1238,4 +1300,14 @@ class RequestImageContext {
     );
     return saved == null ? null : SandboxPathResolver.resolveForIo(saved);
   }
+}
+
+/// Count serialized UTF-8 bytes without retaining another full JSON string and
+/// byte buffer alongside the image payload. encodeBody performs the final encode.
+class _JsonByteCounter implements Sink<List<int>> {
+  int length = 0;
+  @override
+  void add(List<int> data) => length += data.length;
+  @override
+  void close() {}
 }

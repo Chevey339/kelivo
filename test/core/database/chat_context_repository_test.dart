@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -226,7 +227,7 @@ void main() {
         images: images,
         latestUserId: original.id,
         userTurns: RequestImageContext.userTurnsFor(history),
-        maxImageBytes: 16,
+        budget: RequestBudget(totalImageBytes: 16),
       );
       final omitted = await request.historyOmissions();
       expect(omitted, {images[1].key});
@@ -244,7 +245,7 @@ void main() {
         ),
         latestUserId: original.id,
         userTurns: RequestImageContext.userTurnsFor(history),
-        maxImageBytes: 16,
+        budget: RequestBudget(totalImageBytes: 16),
       );
       expect(await restored.historyOmissions(), omitted);
     },
