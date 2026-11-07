@@ -1,6 +1,7 @@
 import '../../../../models/native_compaction.dart';
 import '../../native_compaction_context.dart';
 import '../../request_history_context.dart';
+import '../../request_image_context.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -67,13 +68,7 @@ Future<Map<String, dynamic>> buildOpenAIResponsesBody(
   // Collect assistant images to attach to the last user message.
   // Use last *user* index so tool follow-ups still receive stashed media.
   final List<String> lastAssistantImageUrls = <String>[];
-  int lastResponsesUserIndex = -1;
-  for (int i = messages.length - 1; i >= 0; i--) {
-    if ((messages[i]['role'] ?? '').toString() == 'user') {
-      lastResponsesUserIndex = i;
-      break;
-    }
-  }
+  final lastResponsesUserIndex = lastUserInputIndex(messages);
   for (int i = 0; i < messages.length; i++) {
     final m = messages[i];
     final sourceStart = input.length;

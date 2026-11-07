@@ -212,6 +212,11 @@ class MessageGenerationService {
     final includeToolMessages = switch (kind) {
       ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
     };
+    final usesClaudeHistory =
+        kind == ProviderKind.claude ||
+        (kind == ProviderKind.google &&
+            cfg.vertexAI == true &&
+            modelId.toLowerCase().startsWith('claude-'));
 
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
@@ -219,9 +224,9 @@ class MessageGenerationService {
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
       // Claude replays its rounds from the native turn artifact instead.
-      preserveToolTurns: kind != ProviderKind.claude,
+      preserveToolTurns: !usesClaudeHistory,
       googleProviderId: kind == ProviderKind.google ? providerKey : null,
-      claudeSource: kind == ProviderKind.claude
+      claudeSource: usesClaudeHistory
           ? (providerId: providerKey, modelId: modelId)
           : null,
       responsesScope: kind == ProviderKind.openai && cfg.useResponseApi == true
@@ -248,6 +253,19 @@ class MessageGenerationService {
         ? null
         : chatService.getConversation(currentConversation.id) ??
               currentConversation;
+
+    // Select real history before prompt injections can add synthetic user
+    // turns. World-book scanning and placement then see the selected context.
+    final hasFixedStart =
+        fixedContextStart ??
+        (currentConversation != null &&
+            ContextHistory.fixedStart(
+                  chatService.contextOperationsFor(currentConversation.id),
+                ) !=
+                null);
+    if (!hasFixedStart) {
+      messageBuilderService.applyContextLimit(apiMessages, assistant);
+    }
 
     messageBuilderService.injectSystemPrompt(
       apiMessages,
@@ -338,17 +356,6 @@ class MessageGenerationService {
       conversationId: currentConversation?.id,
       workspaceContext: workspaceContext,
     );
-
-    final hasFixedStart =
-        fixedContextStart ??
-        (currentConversation != null &&
-            ContextHistory.fixedStart(
-                  chatService.contextOperationsFor(currentConversation.id),
-                ) !=
-                null);
-    if (!hasFixedStart) {
-      messageBuilderService.applyContextLimit(apiMessages, assistant);
-    }
 
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,

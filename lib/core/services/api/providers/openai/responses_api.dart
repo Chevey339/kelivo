@@ -281,6 +281,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       };
       applyOpenAIResolvedRequest(
         body2,
+        config: config,
         spec: spec,
         reasoning: reasoning,
         transport: ReasoningTransport.responses,

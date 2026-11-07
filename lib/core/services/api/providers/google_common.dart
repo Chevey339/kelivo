@@ -364,6 +364,7 @@ Stream<StreamChunk> sendGoogleStream(
   final bool persistGeminiThoughtSigs =
       effective.reasoning.replay != ReasoningReplayPolicy.none;
   final wantsImageOutput = effective.output.contains(Modality.image);
+  final lastUserIndex = lastUserInputIndex(messages);
   // Non-streaming path: use generateContent
   if (!stream) {
     final isVertex = config.vertexAI == true;
@@ -416,7 +417,7 @@ Stream<StreamChunk> sendGoogleStream(
           if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
           continue;
         }
-        final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
+        final isLast = i == lastUserIndex;
         final parts = <Map<String, dynamic>>[];
         parts.addAll(
           await NativeInputAttachments(
@@ -791,42 +792,25 @@ Stream<StreamChunk> sendGoogleStream(
       emitCalls: true,
       onToolCall: onToolCall,
       append: (executed) async {
-        final results = [
-          for (final item in executed)
-            await ToolResultContent.read(
+        final responseParts = <Map<String, dynamic>>[];
+        for (var i = 0; i < executed.length; i++) {
+          final item = executed[i];
+          final call = (lastFunctionCallParts[i] as Map)['functionCall'] as Map;
+          responseParts.addAll(
+            await _googleFunctionResponseParts(
               item.call.name,
               item.content,
               metadata: item.metadata,
               toolCallId: item.call.id,
+              id: call['id']?.toString(),
               canImageInput: effective.input.contains(Modality.image),
             ),
-        ];
+          );
+        }
         currentContents = [
           ...currentContents,
           {'role': 'model', 'parts': lastParts},
-          {
-            'role': 'user',
-            'parts': [
-              for (var i = 0; i < executed.length; i++)
-                <String, dynamic>{
-                  toolSourceKey: executed[i].call.id,
-                  'functionResponse': {
-                    'name': executed[i].call.name,
-                    'response': {'result': results[i].text},
-                    if (i < lastFunctionCallParts.length &&
-                        lastFunctionCallParts[i] is Map &&
-                        ((lastFunctionCallParts[i] as Map)['functionCall']
-                                    as Map?)
-                                ?.containsKey('id') ==
-                            true)
-                      'id':
-                          ((lastFunctionCallParts[i] as Map)['functionCall']
-                              as Map)['id'],
-                  },
-                },
-              for (final result in results) ...result.googleImageParts,
-            ],
-          },
+          {'role': 'user', 'parts': responseParts},
         ];
       },
       finish: () => emitFinish(
@@ -894,7 +878,7 @@ Stream<StreamChunk> sendGoogleStream(
         if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
         continue;
       }
-      final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
+      final isLast = i == lastUserIndex;
       final parts = <Map<String, dynamic>>[];
       parts.addAll(
         await NativeInputAttachments(

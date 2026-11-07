@@ -419,11 +419,19 @@ class MessageBuilderService {
         continue;
       }
       final messageStart = out.length;
+      final matchesClaudeSource =
+          claudeSource != null &&
+          m.providerId == claudeSource.providerId &&
+          m.modelId == claudeSource.modelId;
+      final omitClaudeSignatures = claudeSource != null && !matchesClaudeSource;
       final omitGoogleSignatures =
           m.role == 'assistant' &&
           googleProviderId != null &&
           m.providerId != googleProviderId;
-      if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
+      if (includeToolMessages &&
+          !preserveToolTurns &&
+          m.role == 'assistant' &&
+          !omitClaudeSignatures) {
         thinkingRecovery.readArtifact(
           _providerArtifact(m, claudeThinkingRecoveryArtifactKind),
         );
@@ -462,9 +470,7 @@ class MessageBuilderService {
           includeToolMessages &&
               !preserveToolTurns &&
               m.role == 'assistant' &&
-              claudeSource != null &&
-              m.providerId == claudeSource.providerId &&
-              m.modelId == claudeSource.modelId &&
+              matchesClaudeSource &&
               chatService.getToolEventsForMessage(m).isEmpty
           ? _providerArtifact(m, claudeTurnArtifactKind)
           : null;
@@ -509,6 +515,10 @@ class MessageBuilderService {
 
             for (int i = 0; i < events.length; i++) {
               final e = events[i];
+              final metadata = e['metadata'] is Map
+                  ? Map<String, dynamic>.from(e['metadata'] as Map)
+                  : null;
+              if (omitClaudeSignatures) metadata?.remove('anthropic');
               final name = (e['name'] ?? '').toString().trim();
               if (name.isEmpty) continue;
               final rawId = (e['id'] ?? '').toString().trim();
@@ -530,10 +540,9 @@ class MessageBuilderService {
                 'id': id,
                 'type': 'function',
                 'function': {'name': name, 'arguments': argumentsJson},
-                if (e['metadata'] is Map || e['server'] == true)
+                if (metadata != null || e['server'] == true)
                   'metadata': {
-                    if (e['metadata'] is Map)
-                      ...(e['metadata'] as Map).cast<String, dynamic>(),
+                    ...?metadata,
                     if (e['server'] == true) 'server': true,
                   },
               });
@@ -544,8 +553,7 @@ class MessageBuilderService {
                 'name': name,
                 'tool_call_id': id,
                 'content': toolResultContentForModel(c?.toString()),
-                if (e['metadata'] is Map)
-                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+                if (metadata != null) 'metadata': metadata,
               });
             }
 
@@ -555,17 +563,18 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
-              final turn = _providerArtifact(m, claudeTurnArtifactKind);
+              final turn = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeTurnArtifactKind);
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
                 hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
-              final container = _providerArtifact(
-                m,
-                claudeContainerArtifactKind,
-              );
+              final container = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeContainerArtifactKind);
               if (container != null && container.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeContainerKey] =
                     container;
@@ -593,6 +602,7 @@ class MessageBuilderService {
                   length: (toolMessage['content'] ?? '').toString().length,
                 );
               }
+              identify(assistantToolMessage, m.id);
               out.add(assistantToolMessage);
               for (final toolMessage in toolMessages) {
                 identify(toolMessage, m.id);
@@ -640,7 +650,9 @@ class MessageBuilderService {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
         }
-        final container = _providerArtifact(m, claudeContainerArtifactKind);
+        final container = omitClaudeSignatures
+            ? null
+            : _providerArtifact(m, claudeContainerArtifactKind);
         if (container != null && container.isNotEmpty) {
           message[multimodalInternalClaudeContainerKey] = container;
         }

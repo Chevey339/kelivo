@@ -83,7 +83,11 @@ Stream<StreamChunk> sendOpenAIStream(
   final spec = ModelSpecResolver.instance.spec(config, modelId);
   final wantsImageOutput = spec.output.contains(Modality.image);
   final bool canImageInput = spec.input.contains(Modality.image);
-  final vendor = VendorDefaults.forProvider(config);
+  final maxTokensKey = VendorDefaults.forProvider(
+    config,
+    modelId: upstreamModelId,
+  ).maxTokensKey;
+  final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   final bool allowRemoteImages = canImageInput && spec.remoteImageUrls;
   // OpenRouter sends deltas, not cumulative snapshots. The decoder joins
   // fragments into complete blocks after collecting the response.
@@ -92,7 +96,11 @@ Stream<StreamChunk> sendOpenAIStream(
   final bool needsReasoningEcho =
       spec.reasoning.replay != ReasoningReplayPolicy.none;
   void setMaxTokens(Map<String, dynamic> map) {
-    if (maxTokens != null) map[vendor.maxTokensKey] = maxTokens;
+    if (maxTokens != null &&
+        !extraBodyCfg.containsKey('max_tokens') &&
+        !extraBodyCfg.containsKey('max_completion_tokens')) {
+      map[maxTokensKey] = maxTokens;
+    }
   }
 
   // Kimi K3 Formula web-search: fetch tool decls, then fiber-execute calls.
@@ -254,10 +262,9 @@ Stream<StreamChunk> sendOpenAIStream(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
     );
   }
-  applyOpenRouterClaudePromptCaching(body, config: config, spec: spec);
-
   applyOpenAIResolvedRequest(
     body,
+    config: config,
     spec: spec,
     reasoning: reasoning,
     transport: config.useResponseApi == true
@@ -265,7 +272,6 @@ Stream<StreamChunk> sendOpenAIStream(
         : ReasoningTransport.chatCompletions,
   );
   // Custom body keys go last so they win over the reasoning dialect.
-  final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   validateNativeCompactionOverrides(body, extraBodyCfg);
   CustomRequestMerger.applyBody(body, extraBodyCfg);
   applyServiceTier(body, config, serviceTier);

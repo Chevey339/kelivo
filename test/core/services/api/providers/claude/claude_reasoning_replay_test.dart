@@ -52,9 +52,19 @@ String _thinkingRound() => sseRound('m1', [
 ]);
 
 void main() {
-  for (final deepseek in [false, true]) {
-    final modelId = deepseek ? 'deepseek-flash' : 'claude-sonnet-4-6';
-    final config = deepseek ? deepSeekClaudeConfig() : claudeConfig();
+  for (final backend in ['claude', 'deepseek', 'vertex']) {
+    final deepseek = backend == 'deepseek';
+    final vertex = backend == 'vertex';
+    final modelId = vertex
+        ? 'claude-sonnet-4-6@20260217'
+        : deepseek
+        ? 'deepseek-flash'
+        : 'claude-sonnet-4-6';
+    final config = vertex
+        ? vertexClaudeConfig()
+        : deepseek
+        ? deepSeekClaudeConfig()
+        : claudeConfig();
     for (final stream in [false, true]) {
       test('records a no-tool response: $modelId, stream=$stream', () async {
         final exchange = await captureClaudeExchange(

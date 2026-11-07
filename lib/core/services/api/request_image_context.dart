@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import '../../../features/intelligent_ui/host/ui_user_context_parts.dart';
 import '../../models/chat_message.dart';
+import '../../models/context_operation.dart';
 import '../../models/image_context.dart';
 import '../../models/request_budget.dart';
 import '../../models/message_part.dart';
@@ -20,6 +21,28 @@ import 'chat_api_helpers.dart';
 /// Kept out of prompts and removed before a provider serializes a request.
 const imageContextOwnerKey = '_kelivo_image_owner';
 const _referencePrefix = 'kelivo-image-ref:';
+
+/// App requests identify persisted messages, while utility/API callers may
+/// supply plain role/content maps. Injected lore must never receive the
+/// composer's attachments or the preceding assistant's carried images.
+bool isUserInputMessage(
+  Map<String, dynamic> message, {
+  required bool hasOwners,
+}) {
+  if (message['role'] != 'user') return false;
+  if (!hasOwners) return true;
+  final owner = message[imageContextOwnerKey];
+  return owner is String &&
+      owner.isNotEmpty &&
+      !owner.startsWith(ContextOperation.summaryPrefix);
+}
+
+int lastUserInputIndex(List<Map<String, dynamic>> messages) {
+  final hasOwners = messages.any((m) => m.containsKey(imageContextOwnerKey));
+  return messages.lastIndexWhere(
+    (message) => isUserInputMessage(message, hasOwners: hasOwners),
+  );
+}
 
 class ChatContextImage {
   ChatContextImage({

@@ -174,7 +174,7 @@ class ModelSpecResolver {
         _catalog.lookup(cfg, upstreamId) ??
         (upstreamId != modelKey ? _catalog.lookup(cfg, modelKey) : null);
     final guess = ModelDefaultsGuesser.guess(upstreamId);
-    final vendor = VendorDefaults.forProvider(cfg);
+    final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
 
     final type = _resolveType(guess: guess, match: match, sources: sources);

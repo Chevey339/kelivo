@@ -37,6 +37,8 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
     'role': role,
     'content': m.containsKey('content') ? (m['content'] ?? '') : '',
     if (m[historySourceKey] != null) historySourceKey: m[historySourceKey],
+    if (m[imageContextOwnerKey] != null)
+      imageContextOwnerKey: m[imageContextOwnerKey],
   };
 
   // Preserve optional name (some providers support it on non-tool roles).
@@ -289,13 +291,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
   // assistant tool_calls / tool results still receive stashed assistant media.
-  int lastUserIndex = -1;
-  for (int i = messages.length - 1; i >= 0; i--) {
-    if ((messages[i]['role'] ?? '').toString() == 'user') {
-      lastUserIndex = i;
-      break;
-    }
-  }
+  final lastUserIndex = lastUserInputIndex(messages);
   final pendingAssistantMediaUrls = <String>[];
   final pendingToolImageParts = <Map<String, dynamic>>[];
   Object? pendingToolOwner;
@@ -950,6 +946,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       maybeAddStreamingUsageOptions(body2, stream: true, config: config);
       applyOpenAIResolvedRequest(
         body2,
+        config: config,
         spec: spec,
         reasoning: reasoning,
         transport: ReasoningTransport.chatCompletions,

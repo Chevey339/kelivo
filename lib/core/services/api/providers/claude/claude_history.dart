@@ -1,4 +1,5 @@
 import '../../request_history_context.dart';
+import '../../request_image_context.dart';
 import 'dart:convert';
 
 import '../../../../models/model_spec.dart';
@@ -157,6 +158,7 @@ class ClaudeHistory {
     this.skipImageParsing = false,
     this.canImageInput = true,
     this.userImagePaths,
+    this.downloadRemoteImage,
   });
 
   /// Only Anthropic runs a server tool or decrypts what one returned, so
@@ -169,6 +171,10 @@ class ClaudeHistory {
   final bool canImageInput;
   final NativeInputAttachments nativeInputs;
   final List<String>? userImagePaths;
+
+  /// Vertex requires base64 images, including authenticated Google media.
+  /// Other Messages endpoints retain remote references as text.
+  final Future<String> Function(String url)? downloadRemoteImage;
 
   /// The container the conversation's last code execution ran in, stored
   /// against that assistant message. The latest one wins. Set by [build].
@@ -228,6 +234,8 @@ class ClaudeHistory {
     _ReplayedTurn? turn;
     final turnSources = Expando<String>();
     final resultSources = <String, String>{};
+    final lastUserIndex = lastUserInputIndex(messages);
+    final hasOwners = messages.any((m) => m.containsKey(imageContextOwnerKey));
 
     /// A result is sent only once the call it answers has been: the API
     /// rejects one pointing at a `tool_use` that is not in the history.
@@ -342,7 +350,7 @@ class ClaudeHistory {
         ).where((doc) => isSandboxDataFile(fileName: doc.name, mime: doc.mime));
         dataFiles.addAll(files);
         unseenDataFiles.addAll(files);
-        if (i == messages.length - 1) turnDataFiles.addAll(files);
+        if (i == lastUserIndex) turnDataFiles.addAll(files);
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
@@ -439,8 +447,10 @@ class ClaudeHistory {
       final plainMessage = await _plainMessage(
         m,
         role,
-        isLast: i == messages.lastIndexWhere((m) => m['role'] == 'user'),
-        carriedImages: carriedImages,
+        isLast: i == lastUserIndex,
+        carriedImages: isUserInputMessage(m, hasOwners: hasOwners)
+            ? carriedImages
+            : <Map<String, dynamic>>[],
       );
       RequestHistoryContext.mark(m, [plainMessage]);
       out.add(plainMessage);
@@ -658,8 +668,31 @@ class ClaudeHistory {
       final normalized = normalizeSrc(source);
       if (!seenSources.add(normalized)) return;
       if (source.startsWith('http://') || source.startsWith('https://')) {
-        // Preserve prior official-Claude behavior for remote URLs.
-        text.add({'type': 'text', 'text': source});
+        final download = downloadRemoteImage;
+        if (download == null) {
+          text.add({'type': 'text', 'text': source});
+          return;
+        }
+        try {
+          final mime = normalizeClaudeImageMime(
+            explicitMime?.trim().isNotEmpty == true
+                ? explicitMime!
+                : mimeFromPath(Uri.parse(source).path),
+          );
+          images.add({
+            'type': 'image',
+            'source': {
+              'type': 'base64',
+              'media_type': mime,
+              'data': await download(source),
+            },
+          });
+        } catch (_) {
+          text.add({
+            'type': 'text',
+            'text': '(image failed to download) $source',
+          });
+        }
         return;
       }
       if (source.startsWith('data:')) {
