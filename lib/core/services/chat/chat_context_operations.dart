@@ -325,7 +325,7 @@ extension ChatContextOperations on ChatService {
 
   Future<ContextMessageCounts> loadContextMessageCounts(
     String id, {
-    required int limit,
+    int? limit,
   }) async {
     if (!_initialized || getConversation(id) == null) {
       throw StateError('conversation_not_found');
@@ -336,9 +336,6 @@ extension ChatContextOperations on ChatService {
       return _repo.getContextMessageCounts(id, limit: limit);
     }
     final snapshot = await loadContextSnapshot(id);
-    if (limit <= 0) {
-      return (stored: snapshot.messages.length, messages: 0, summaries: 0);
-    }
     final effective = ContextHistory.resolve(
       snapshot.messages,
       snapshot.operations,

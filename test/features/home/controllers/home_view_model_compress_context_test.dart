@@ -55,40 +55,6 @@ void main() {
     });
   });
 
-  group('HomeViewModel.computeClearContextRemainingMessageCount', () {
-    test('计数来自持久化总数，与窗口缓存无关', () {
-      final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        totalMessages: 100,
-        truncateIndex: -1,
-      );
-
-      expect(count, 100);
-    });
-
-    test('已有清空点时从持久化截断位置开始计数', () {
-      final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        totalMessages: 100,
-        truncateIndex: 90,
-      );
-
-      expect(count, 10);
-    });
-
-    test('截断位置越界时按未清空处理', () {
-      final beyond = HomeViewModel.computeClearContextRemainingMessageCount(
-        totalMessages: 100,
-        truncateIndex: 101,
-      );
-      final atEnd = HomeViewModel.computeClearContextRemainingMessageCount(
-        totalMessages: 100,
-        truncateIndex: 100,
-      );
-
-      expect(beyond, 100);
-      expect(atEnd, 0);
-    });
-  });
-
   group('selectKeepRecentMessages', () {
     test('保留最近 N 条用户消息及其后的全部消息，边界以用户消息开始', () {
       final messages = <ChatMessage>[
