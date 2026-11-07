@@ -13,6 +13,7 @@ import 'package:Kelivo/features/browser/pages/browser_bookmark_editor.dart';
 import 'package:Kelivo/features/browser/pages/browser_management_page.dart';
 import 'package:Kelivo/features/browser/widgets/browser_surface_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 void main() {
   final original = BrowserBookmark(

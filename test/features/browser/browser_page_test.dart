@@ -33,6 +33,7 @@ import 'package:Kelivo/features/browser/widgets/browser_window_chrome.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 BrowserPageState _scroll(
   double offset, {
