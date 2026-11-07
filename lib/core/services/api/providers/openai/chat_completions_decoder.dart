@@ -100,7 +100,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final toolChunks = <StreamChunk>[];
     var content = '';
-    String? reasoning;
+    final reasoning = StringBuffer();
     final pendingImages = <dynamic>[];
     final choices = obj['choices'];
     if (choices is List && choices.isNotEmpty) {
@@ -111,15 +111,24 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         final message = c0['message'];
         final delta = c0['delta'];
         if (delta is Map) {
-          final deltaContent = _extractDeltaText(delta);
-          if (deltaContent.isNotEmpty) {
-            content += deltaContent;
-            approxCompletionChars += deltaContent.length;
+          // A delta may carry thinking and text parts at once; keep both.
+          final isAudio =
+              (delta['type'] ?? '').toString() == 'response.audio.delta';
+          final parts = isAudio
+              ? (text: '', thinking: '')
+              : openAIContentParts(delta['content']);
+          if (parts.text.isNotEmpty) {
+            content += parts.text;
+            approxCompletionChars += parts.text.length;
           }
+          // Scalar reasoning is the canonical echo; typed thinking is only a
+          // fallback, so one frame never contributes the same thought twice.
           final rc = delta['reasoning_content'] ?? delta['reasoning'];
-          if (rc is String && rc.isNotEmpty) {
-            reasoning = rc;
-            if (needsReasoningEcho) reasoningEcho += rc;
+          final scalarReasoning = rc is String && rc.isNotEmpty ? rc : null;
+          final reasoningText = scalarReasoning ?? parts.thinking;
+          if (reasoningText.isNotEmpty) {
+            reasoning.write(reasoningText);
+            if (needsReasoningEcho) reasoningEcho += reasoningText;
           }
           final rdDelta = delta['reasoning_details'];
           if (rdDelta is List && rdDelta.isNotEmpty) {
@@ -136,15 +145,20 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
             _addReasoningDetails(rdMsg);
           }
           final rcMsg = message['reasoning_content'] ?? message['reasoning'];
-          if (rcMsg is String && rcMsg.isNotEmpty) {
-            if (needsReasoningEcho) reasoningEcho += rcMsg;
-            reasoning ??= rcMsg;
+          final scalarMsg = rcMsg is String && rcMsg.isNotEmpty ? rcMsg : null;
+          if (scalarMsg != null) {
+            if (needsReasoningEcho) reasoningEcho += scalarMsg;
+            reasoning.write(scalarMsg);
           }
           if (message['content'] != null) {
-            final messageContent = _messageText(message['content']);
-            if (messageContent.isNotEmpty) {
-              content += messageContent;
-              approxCompletionChars += messageContent.length;
+            final messageParts = openAIContentParts(message['content']);
+            if (messageParts.text.isNotEmpty) {
+              content += messageParts.text;
+              approxCompletionChars += messageParts.text.length;
+            }
+            if (scalarMsg == null && messageParts.thinking.isNotEmpty) {
+              if (needsReasoningEcho) reasoningEcho += messageParts.thinking;
+              reasoning.write(messageParts.thinking);
             }
             if (wantsImageOutput && message['content'] is List) {
               pendingImages.addAll([
@@ -207,8 +221,10 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
 
     chunks.addAll(decodeCitations(obj));
 
-    if (reasoning != null && reasoning.isNotEmpty) {
-      chunks.add(ReasoningDelta(id: _ids.reasoning(), text: reasoning));
+    if (reasoning.isNotEmpty) {
+      chunks.add(
+        ReasoningDelta(id: _ids.reasoning(), text: reasoning.toString()),
+      );
     }
     if (content.isNotEmpty) {
       assistantContent += content;
@@ -501,41 +517,52 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   }
 }
 
-String _extractDeltaText(Map? delta) {
-  if (delta == null) return '';
-  final deltaType = (delta['type'] ?? '').toString();
-  if (deltaType == 'response.audio.delta') return '';
-  final content = delta['content'];
-  if (content is String) return content;
-  if (content is List) {
-    final buffer = StringBuffer();
-    for (final item in content) {
-      if (item is! Map) continue;
-      final text = (item['text'] ?? item['delta'] ?? '').toString();
-      final type = (item['type'] ?? '').toString();
-      if (text.isEmpty) continue;
-      if (type.isEmpty || type == 'text') buffer.write(text);
-    }
-    return buffer.toString();
+/// Splits an OpenAI-compatible `content` value into visible text and thinking.
+///
+/// Mistral returns typed parts once reasoning is enabled:
+/// `{type: 'thinking', thinking: [{type: 'text', text: '...'}], closed: true}`
+/// alongside `{type: 'text', text: '...'}`, and one delta may carry both.
+/// `closed` is not an end signal, so it is deliberately ignored here.
+({String text, String thinking}) openAIContentParts(dynamic content) {
+  if (content is String) return (text: content, thinking: '');
+  if (content is Map) return (text: '', thinking: '');
+  if (content is! List) {
+    return (text: content == null ? '' : content.toString(), thinking: '');
   }
-  return '';
+  final text = StringBuffer();
+  final thinking = StringBuffer();
+  for (final item in content) {
+    if (item is! Map) continue;
+    final type = (item['type'] ?? '').toString();
+    if (type == 'thinking' || type == 'reasoning') {
+      thinking.write(_thinkingText(item));
+      continue;
+    }
+    if (type.isNotEmpty && type != 'text') continue;
+    final raw = item['text'] ?? item['delta'];
+    if (raw == null) continue;
+    text.write(raw is String ? raw : raw.toString());
+  }
+  return (text: text.toString(), thinking: thinking.toString());
 }
 
-String _messageText(dynamic mc) {
-  if (mc is String) return mc;
-  if (mc is List) {
-    final sb = StringBuffer();
-    for (final it in mc) {
-      if (it is! Map) continue;
-      final rawText = it['text'];
-      final t = rawText is String ? rawText : '';
-      if (t.isNotEmpty && (it['type'] == null || it['type'] == 'text')) {
-        sb.write(t);
-      }
+/// Reads a thinking part's payload, which is a list of text parts in the
+/// Mistral shape and a plain string in some compatible providers.
+String _thinkingText(Map part) {
+  final raw = part['thinking'] ?? part['text'] ?? part['reasoning'];
+  if (raw is String) return raw;
+  if (raw is! List) return raw == null ? '' : raw.toString();
+  final buffer = StringBuffer();
+  for (final inner in raw) {
+    if (inner is String) {
+      buffer.write(inner);
+      continue;
     }
-    return sb.toString();
+    if (inner is! Map) continue;
+    final piece = inner['text'] ?? inner['thinking'] ?? inner['delta'];
+    if (piece is String) buffer.write(piece);
   }
-  return (mc ?? '').toString();
+  return buffer.toString();
 }
 
 int? _resolveToolCallIndex(Map toolCall, {required int fallback}) {

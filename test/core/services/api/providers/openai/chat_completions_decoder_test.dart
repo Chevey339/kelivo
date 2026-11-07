@@ -1285,4 +1285,272 @@ void main() {
     expect(second.usage!.completionTokens, 20);
     expect(second.usage!.totalTokens, 120);
   });
+
+  group('openAIContentParts', () {
+    test('splits Mistral thinking and text parts', () {
+      expect(
+        openAIContentParts(<dynamic>[
+          <String, dynamic>{
+            'type': 'thinking',
+            'thinking': <dynamic>[
+              <String, dynamic>{'type': 'text', 'text': '先想'},
+              <String, dynamic>{'type': 'text', 'text': '一下'},
+            ],
+            'closed': true,
+          },
+          <String, dynamic>{'type': 'text', 'text': '答案'},
+        ]),
+        (text: '答案', thinking: '先想一下'),
+      );
+    });
+
+    test('accepts a string thinking payload', () {
+      expect(
+        openAIContentParts(<dynamic>[
+          <String, dynamic>{'type': 'thinking', 'thinking': '纯字符串思考'},
+          <String, dynamic>{'type': 'text', 'text': '正文'},
+        ]),
+        (text: '正文', thinking: '纯字符串思考'),
+      );
+    });
+
+    test('keeps plain strings and text-only part lists unchanged', () {
+      expect(openAIContentParts('hello'), (text: 'hello', thinking: ''));
+      expect(openAIContentParts(null), (text: '', thinking: ''));
+      expect(
+        openAIContentParts(<dynamic>[
+          <String, dynamic>{'type': 'text', 'text': 'a'},
+          <String, dynamic>{'type': 'text', 'text': 'b'},
+        ]),
+        (text: 'ab', thinking: ''),
+      );
+    });
+
+    test('empty thinking contributes nothing', () {
+      expect(
+        openAIContentParts(<dynamic>[
+          <String, dynamic>{
+            'type': 'thinking',
+            'thinking': <dynamic>[],
+            'closed': true,
+          },
+          <String, dynamic>{'type': 'text', 'text': 'ok'},
+        ]),
+        (text: 'ok', thinking: ''),
+      );
+    });
+  });
+
+  test('streams Mistral thinking parts as reasoning, not text', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{
+                'type': 'thinking',
+                'thinking': <dynamic>[
+                  <String, dynamic>{'type': 'text', 'text': '推理'},
+                ],
+                'closed': true,
+              },
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<TextDelta>(), isEmpty);
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '推理');
+    expect(decoder.assistantContent, '');
+    expect(decoder.reasoningEcho, '推理');
+  });
+
+  test('keeps thinking and text from the same delta', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{
+                'type': 'thinking',
+                'thinking': <dynamic>[
+                  <String, dynamic>{'type': 'text', 'text': '想'},
+                ],
+                'closed': false,
+              },
+              <String, dynamic>{'type': 'text', 'text': '答'},
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '想');
+    expect(result.chunks.whereType<TextDelta>().single.text, '答');
+    expect(decoder.reasoningEcho, '想');
+    expect(decoder.assistantContent, '答');
+    expect(
+      result.chunks.indexWhere((chunk) => chunk is ReasoningDelta),
+      lessThan(result.chunks.indexWhere((chunk) => chunk is TextDelta)),
+    );
+  });
+
+  test('a closed thinking part does not end the reasoning stream', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    Map<String, dynamic> thinking(String text) {
+      return _choice(
+        delta: <String, dynamic>{
+          'content': <dynamic>[
+            <String, dynamic>{
+              'type': 'thinking',
+              'thinking': <dynamic>[
+                <String, dynamic>{'type': 'text', 'text': text},
+              ],
+              'closed': true,
+            },
+          ],
+        },
+      );
+    }
+
+    decoder.accept(_event(thinking('一')));
+    final next = decoder.accept(_event(thinking('二')));
+
+    expect(next.chunks.whereType<ReasoningDelta>().single.text, '二');
+    expect(decoder.reasoningEcho, '一二');
+  });
+
+  test('scalar reasoning wins over typed thinking in one frame', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final streamed = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': '甲'},
+            ],
+            'reasoning_content': '乙',
+          },
+        ),
+      ),
+    );
+
+    expect(streamed.chunks.whereType<ReasoningDelta>().single.text, '乙');
+    expect(decoder.reasoningEcho, '乙');
+    expect(streamed.chunks.whereType<TextDelta>(), isEmpty);
+
+    final message = decoder.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': '丙'},
+              <String, dynamic>{'type': 'text', 'text': '正文'},
+            ],
+            'reasoning_content': '丁',
+          },
+          finishReason: 'stop',
+        ),
+      ),
+    );
+
+    expect(message.chunks.whereType<ReasoningDelta>().single.text, '丁');
+    expect(message.chunks.whereType<TextDelta>().single.text, '正文');
+    expect(decoder.reasoningEcho, '乙丁');
+  });
+
+  test('reads thinking parts from a complete message.content', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{
+                'type': 'thinking',
+                'thinking': <dynamic>[
+                  <String, dynamic>{'type': 'text', 'text': '计划'},
+                ],
+                'closed': true,
+              },
+              <String, dynamic>{'type': 'text', 'text': '最终答案'},
+            ],
+          },
+          finishReason: 'stop',
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '计划');
+    expect(result.chunks.whereType<TextDelta>().single.text, '最终答案');
+    expect(decoder.reasoningEcho, '计划');
+    expect(decoder.assistantContent, '最终答案');
+  });
+
+  test('keeps a thinking-only message.content beside tool calls', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{
+                'type': 'thinking',
+                'thinking': <dynamic>[
+                  <String, dynamic>{'type': 'text', 'text': '需要工具'},
+                ],
+                'closed': true,
+              },
+            ],
+            'tool_calls': <dynamic>[
+              <String, dynamic>{
+                'id': 'call_1',
+                'type': 'function',
+                'function': <String, dynamic>{
+                  'name': 'lookup',
+                  'arguments': '{}',
+                },
+              },
+            ],
+          },
+          finishReason: 'tool_calls',
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<TextDelta>(), isEmpty);
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '需要工具');
+    expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_1');
+    expect(decoder.reasoningEcho, '需要工具');
+  });
+
+  test('plain string content stays text and empty thinking is silent', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final plain = decoder.accept(
+      _event(_choice(delta: <String, dynamic>{'content': 'Hello'})),
+    );
+    expect(plain.chunks.whereType<TextDelta>().single.text, 'Hello');
+    expect(plain.chunks.whereType<ReasoningDelta>(), isEmpty);
+
+    final empty = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{
+                'type': 'thinking',
+                'thinking': <dynamic>[],
+                'closed': true,
+              },
+            ],
+          },
+        ),
+      ),
+    );
+    expect(empty.chunks, isEmpty);
+    expect(decoder.reasoningEcho, '');
+  });
 }

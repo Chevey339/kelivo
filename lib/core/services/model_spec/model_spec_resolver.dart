@@ -193,6 +193,7 @@ class ModelSpecResolver {
     final abilities = _resolveAbilities(
       match: match,
       guess: guess,
+      vendor: vendor,
       sources: sources,
     );
 
@@ -292,6 +293,7 @@ class ModelSpecResolver {
 
   static int _fingerprint(ProviderConfig cfg, String? displayName) {
     return Object.hash(
+      cfg.name,
       cfg.baseUrl,
       cfg.providerType,
       cfg.vertexAI,
@@ -357,18 +359,28 @@ class ModelSpecResolver {
   static List<ModelAbility> _resolveAbilities({
     required CatalogMatch? match,
     required ModelGuess guess,
+    required VendorDefaults vendor,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
+    final List<ModelAbility> abilities;
     if (match != null) {
       sources[ModelSpecField.abilities] = SpecSource.catalog;
-      return <ModelAbility>[
+      abilities = <ModelAbility>[
         if (match.model.toolCall) ModelAbility.tool,
         if (match.model.reasoning) ModelAbility.reasoning,
         if (match.model.structuredOutput) ModelAbility.structuredOutput,
       ];
+    } else {
+      sources[ModelSpecField.abilities] = SpecSource.guess;
+      abilities = List<ModelAbility>.of(guess.abilities);
     }
-    sources[ModelSpecField.abilities] = SpecSource.guess;
-    return guess.abilities;
+    // Mistral exposes reasoning only through `reasoning_effort`, which neither
+    // the catalog nor the guesser knows for a proxied model id.
+    if (vendor.effortDefaultIsOff &&
+        !abilities.contains(ModelAbility.reasoning)) {
+      abilities.add(ModelAbility.reasoning);
+    }
+    return abilities;
   }
 
   static ReasoningSpec _resolveReasoning({
@@ -424,6 +436,7 @@ class ModelSpecResolver {
       budgets: budgets,
       replay: replay.policy,
       replayField: replay.field,
+      effortDefaultIsOff: vendor.effortDefaultIsOff,
     );
   }
 
@@ -611,7 +624,10 @@ class ModelSpecResolver {
     required VendorDefaults vendor,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    if (guess.replay != null) {
+    // Mistral's typed-thinking replay is provider-wide, so its vendor policy
+    // must not be dropped by a hosted model's guesser.
+    final mistralReplay = vendor.effortDefaultIsOff && vendor.replay != null;
+    if (!mistralReplay && guess.replay != null) {
       sources[ModelSpecField.reasoningReplay] = SpecSource.guess;
       return (
         policy: guess.replay!,

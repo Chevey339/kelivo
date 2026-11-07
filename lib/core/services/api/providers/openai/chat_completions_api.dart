@@ -25,6 +25,7 @@ import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_decoder.dart';
+import 'mistral_thinking_replay.dart';
 import 'openai_tool_transcript.dart';
 import 'reasoning_details_replay.dart';
 import 'openai_request_shaping.dart';
@@ -218,44 +219,39 @@ List<EmitToolCall> openaiCallsFromCompletionMessage(Map<String, dynamic>? msg) {
 String? openaiReasoningText(Map<String, dynamic>? message) {
   final raw = (message?['reasoning_content'] ?? message?['reasoning'])
       ?.toString();
-  if (raw == null || raw.isEmpty) return null;
-  return raw;
+  if (raw != null && raw.isNotEmpty) return raw;
+  // Mistral returns the thought as typed content parts instead of a scalar
+  // field, so non-stream responses must read it from the body.
+  final thinking = openAIContentParts(message?['content']).thinking;
+  return thinking.isEmpty ? null : thinking;
 }
 
 ({String content, List<({String uri, String mimeType})> images})
 openaiVisibleOutputFromMessage(Map<String, dynamic>? cmsg) {
-  var content = '';
   final images = <({String uri, String mimeType})>[];
-  if (cmsg == null) return (content: content, images: images);
+  if (cmsg == null) return (content: '', images: images);
   final cc = cmsg['content'];
-  if (cc is String) {
-    content = cc;
-  } else if (cc is List) {
-    final buf = StringBuffer();
+  final content = openAIContentParts(cc).text;
+  if (cc is List) {
     for (final it in cc) {
-      if (it is Map && (it['type'] == 'text')) {
-        final t = (it['text'] ?? '').toString();
-        if (t.isNotEmpty) buf.write(t);
-      } else if (it is Map &&
-          (it['type'] == 'image_url' || it['type'] == 'image')) {
-        dynamic iu = it['image_url'];
-        String? url;
-        if (iu is String) {
-          url = iu;
-        } else if (iu is Map) {
-          final u2 = iu['url'];
-          if (u2 is String) url = u2;
-        }
-        if (url != null && url.isNotEmpty) {
-          final mime = mimeTypeFromImageUri(url) ?? 'image/png';
-          images.add((
-            uri: completeRenderableImageUri(url, mimeType: mime),
-            mimeType: mime,
-          ));
-        }
+      if (it is! Map) continue;
+      if (it['type'] != 'image_url' && it['type'] != 'image') continue;
+      dynamic iu = it['image_url'];
+      String? url;
+      if (iu is String) {
+        url = iu;
+      } else if (iu is Map) {
+        final u2 = iu['url'];
+        if (u2 is String) url = u2;
+      }
+      if (url != null && url.isNotEmpty) {
+        final mime = mimeTypeFromImageUri(url) ?? 'image/png';
+        images.add((
+          uri: completeRenderableImageUri(url, mimeType: mime),
+          mimeType: mime,
+        ));
       }
     }
-    content = buf.toString();
   }
   return (content: content, images: images);
 }
@@ -282,6 +278,14 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   final prefersStructuredReasoning =
       replayField == ReasoningReplayField.reasoningDetails ||
       BuiltInToolsHelper.isOpenRouterProvider(nativeInputs.config);
+  // Mistral-style effort models replay thinking as typed content parts. The
+  // resolved spec is authoritative: a provider merely named Mistral does not
+  // change the shape, and a Mistral-hosted model keeps it even when the
+  // guesser picked another dialect.
+  final specReasoning = nativeInputs.spec.reasoning;
+  final replaysTypedThinking =
+      specReasoning.effortDefaultIsOff &&
+      specReasoning.dialect == ReasoningDialect.openaiReasoningEffort;
   // Assistant turns cannot carry image_url/video_url; stash for the last user
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
@@ -334,6 +338,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       m,
       userPaths: i == lastUserIndex ? userMediaPaths : null,
     );
+    String? mistralThinking;
     void addMessage(Map<String, dynamic> message) {
       if (nativeParts.isNotEmpty) {
         final content = message['content'];
@@ -344,6 +349,12 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
             {'type': 'text', 'text': content},
           ...nativeParts,
         ];
+      }
+      if (isAssistant && replaysTypedThinking) {
+        final thinking = mistralThinking;
+        message['content'] = thinking != null
+            ? mistralAssistantContentWithThinking(message['content'], thinking)
+            : mistralAssistantContentWithoutThinking(message['content']);
       }
       out.add(message);
     }
@@ -440,6 +451,18 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
             outMsg[field] = replayValue;
           }
         }
+      }
+      if (replaysTypedThinking) {
+        // Mistral forbids all three echo fields; the thought travels as a typed
+        // thinking part in front of the visible body instead. Without a
+        // replayable thought (or with replay disabled) any existing typed
+        // thinking part is dropped rather than echoed back as-is.
+        if (keepReplay) {
+          mistralThinking = mistralReplayThinkingText(m);
+        }
+        outMsg.remove('reasoning_content');
+        outMsg.remove('reasoning');
+        outMsg.remove('reasoning_details');
       }
     }
 
@@ -1088,8 +1111,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
     append: (executed) {
       final msg =
           openaiFirstChoiceMessage(lastObj) ?? const <String, dynamic>{};
-      final reasoningForTools =
-          (msg['reasoning_content'] ?? msg['reasoning'])?.toString() ?? '';
+      final reasoningForTools = openaiReasoningText(msg) ?? '';
       currentMessages = [
         ...currentMessages,
         _buildAssistantToolCallMessage(

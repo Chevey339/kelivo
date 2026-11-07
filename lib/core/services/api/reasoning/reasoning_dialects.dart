@@ -110,6 +110,12 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
 /// (thinking-only DashScope models reject it). `thinkingType` over
 /// [ReasoningTransport.responses] uses `reasoning: {effort}` and owns
 /// `reasoning` only.
+///
+/// Mistral-style effort models (see [_effortDefaultIsOff]) are the exception to
+/// the `auto` rule: their provider default is "no reasoning", so `auto` writes
+/// `high` (and drops a stale `thinking` key), while `off` omits
+/// `reasoning_effort` instead of writing `none`. Neither ever writes a
+/// top-level `thinking` switch.
 Map<String, dynamic> applyReasoning(
   Map<String, dynamic> body,
   ModelSpec spec,
@@ -122,7 +128,7 @@ Map<String, dynamic> applyReasoning(
   }
   final resolution = resolveReasoning(spec, request);
   if (resolution.effective == ReasoningLevel.auto) {
-    _writeAutoSurfaceFlags(body, spec.reasoning.dialect, transport);
+    _writeAutoSurfaceFlags(body, spec, transport);
     return body;
   }
   _stripDialectOwnedKeys(body, spec.reasoning.dialect, transport);
@@ -208,6 +214,32 @@ bool _isOpenAiDialect(ReasoningDialect dialect) {
       dialect == ReasoningDialect.openaiResponsesReasoning;
 }
 
+/// Effort models whose provider default is "no reasoning" (Mistral).
+///
+/// `reasoning_effort` is the only switch: omitting it disables thinking, so
+/// `auto` must name an effort and `off` must omit the key. The flag is set by
+/// vendor defaults, so other effort models keep their provider-default `auto`
+/// and `none` off. A user-selected dialect still wins.
+bool _effortDefaultIsOff(ModelSpec spec) {
+  return spec.reasoning.effortDefaultIsOff &&
+      spec.reasoning.dialect == ReasoningDialect.openaiReasoningEffort;
+}
+
+void _writeEffortDefaultOff(
+  Map<String, dynamic> body,
+  ReasoningResolution resolution,
+) {
+  // Mistral rejects a top-level `thinking` switch at every level.
+  body.remove('thinking');
+  if (resolution.requested == ReasoningLevel.off) {
+    // Omitting the effort is the portable "off": some Mistral models reject
+    // `none`, and no effort already means "do not think". This also covers a
+    // non-disableable spec, where `off` resolves to the lowest level.
+    return;
+  }
+  body['reasoning_effort'] = resolution.effective.name;
+}
+
 ReasoningLevel _lowestExplicitLevel(ReasoningSpec spec) {
   if (spec.levels.isNotEmpty) {
     return spec.levels.reduce((a, b) => a.index <= b.index ? a : b);
@@ -242,9 +274,21 @@ bool _usesResponsesEnvelope(
 
 void _writeAutoSurfaceFlags(
   Map<String, dynamic> body,
-  ReasoningDialect dialect,
+  ModelSpec spec,
   ReasoningTransport transport,
 ) {
+  final dialect = spec.reasoning.dialect;
+  if (_effortDefaultIsOff(spec) &&
+      transport == ReasoningTransport.chatCompletions) {
+    // Omitting `reasoning_effort` means "do not think", so `auto` has to name
+    // an effort to keep its "reasoning on" meaning. `high` is fixed: it is the
+    // one effort every Mistral model accepts, while a user-editable ladder
+    // could otherwise make `auto` send `low`. Mistral also rejects a top-level
+    // `thinking` switch, so drop any stale one.
+    body.remove('thinking');
+    body['reasoning_effort'] = ReasoningLevel.high.name;
+    return;
+  }
   if (dialect == ReasoningDialect.openrouterReasoning) {
     final reasoning = _ensureMap(body, 'reasoning');
     reasoning.putIfAbsent('enabled', () => true);
@@ -336,6 +380,11 @@ void _writeDialect(
   ReasoningTransport transport,
 ) {
   final dialect = spec.reasoning.dialect;
+  if (_effortDefaultIsOff(spec) &&
+      transport == ReasoningTransport.chatCompletions) {
+    _writeEffortDefaultOff(body, resolution);
+    return;
+  }
   if (_isOpenAiDialect(dialect)) {
     _writeOpenAi(body, dialect, resolution, transport);
     return;

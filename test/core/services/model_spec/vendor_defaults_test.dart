@@ -1,6 +1,8 @@
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/reasoning/reasoning_dialects.dart';
+import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 import 'package:Kelivo/core/services/model_spec/vendor_defaults.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -146,6 +148,100 @@ void main() {
           _cfg(id: 'Kimi', baseUrl: 'https://api.kimi.com/coding/v1'),
         ).dialect,
         ReasoningDialect.kimiThinking,
+      );
+    });
+
+    test('Mistral overrides the model-id guesser with reasoning_effort', () {
+      final configs = <ProviderConfig>[
+        _cfg(id: 'Mistral', baseUrl: 'https://api.mistral.ai/v1'),
+        _cfg(id: 'custom', baseUrl: 'https://codestral.mistral.ai/v1'),
+        _cfg(id: 'Mistral proxy', baseUrl: 'https://llm.example.com/v1'),
+        _cfg(
+          id: 'custom',
+          name: 'Mistral',
+          baseUrl: 'https://llm.example.com/v1',
+        ),
+      ];
+      for (final config in configs) {
+        final defaults = VendorDefaults.forProvider(config);
+        expect(
+          defaults.dialect,
+          ReasoningDialect.openaiReasoningEffort,
+          reason: config.baseUrl,
+        );
+        expect(defaults.levels, const [ReasoningLevel.high]);
+        expect(defaults.canDisable, isTrue);
+        expect(defaults.replay, ReasoningReplayPolicy.all);
+        expect(defaults.replayField, ReasoningReplayField.reasoningContent);
+        expect(defaults.effortDefaultIsOff, isTrue);
+        expect(defaults.maxTokensKey, 'max_tokens');
+      }
+      final official = VendorDefaults.forProvider(configs.first);
+      expect(official.sendStreamOptions, isFalse);
+      expect(
+        VendorDefaults.forProvider(
+          _cfg(
+            id: 'Mistral',
+            name: 'Mistral',
+            baseUrl: 'https://openrouter.ai/api/v1',
+          ),
+        ).dialect,
+        ReasoningDialect.openrouterReasoning,
+      );
+    });
+
+    test('Mistral overrides a model-id guesser thinking dialect', () {
+      expect(
+        ModelDefaultsGuesser.guess(
+          'deepseek-v4-1-flash-1017',
+        ).reasoning?.dialect,
+        ReasoningDialect.thinkingType,
+      );
+      expect(
+        VendorDefaults.forProvider(
+          _cfg(id: 'Mistral', baseUrl: 'https://api.mistral.ai/v1'),
+        ).dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+    });
+
+    test('Mistral defaults send reasoning_effort and never thinking', () {
+      final defaults = VendorDefaults.forProvider(
+        _cfg(id: 'Mistral', baseUrl: 'https://api.mistral.ai/v1'),
+      );
+      final spec = ModelSpec(
+        id: 'deepseek-v4-1-flash-1017',
+        displayName: 'DeepSeek V4.1 Flash',
+        abilities: const [ModelAbility.reasoning],
+        reasoning: ReasoningSpec(
+          levels: defaults.levels!,
+          canDisable: defaults.canDisable!,
+          dialect: defaults.dialect!,
+          effortDefaultIsOff: defaults.effortDefaultIsOff,
+        ),
+      );
+      for (final request in const [
+        ReasoningRequest.auto,
+        ReasoningRequest(ReasoningLevel.low),
+        ReasoningRequest(ReasoningLevel.high),
+      ]) {
+        final body = applyReasoning(
+          <String, dynamic>{},
+          spec,
+          request,
+          transport: ReasoningTransport.chatCompletions,
+        );
+        expect(body['reasoning_effort'], 'high', reason: request.level.name);
+        expect(body.containsKey('thinking'), isFalse);
+      }
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          spec,
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        isEmpty,
       );
     });
 

@@ -17,6 +17,11 @@ class VendorDefaults {
   final ReasoningReplayPolicy? replay;
   final ReasoningReplayField? replayField;
 
+  /// The provider only thinks if an effort is named (Mistral). Propagated to
+  /// [ReasoningSpec.effortDefaultIsOff] so `auto` writes an effort and `off`
+  /// omits it.
+  final bool effortDefaultIsOff;
+
   const VendorDefaults({
     this.dialect,
     this.levels,
@@ -26,6 +31,7 @@ class VendorDefaults {
     this.sendStreamOptions = true,
     this.replay,
     this.replayField,
+    this.effortDefaultIsOff = false,
   });
 
   static VendorDefaults forProvider(ProviderConfig cfg) {
@@ -144,6 +150,30 @@ class VendorDefaults {
       dialect = ReasoningDialect.kimiThinking;
     }
 
+    // Mistral only thinks when `reasoning_effort` is present and rejects a
+    // top-level `thinking` switch, so a host-wide override is required: the
+    // model-id guesser can otherwise pick a `thinking.type` dialect (e.g. for
+    // a Mistral-hosted DeepSeek model). `high` is the only effort value every
+    // documented Mistral reasoning model accepts; per-model ladders stay
+    // editable in the model spec form. Checked after the host branches so a
+    // provider merely named "Mistral" does not override e.g. OpenRouter.
+    // History thinking is replayed as typed parts, hence `replay: all`.
+    if (dialect == null &&
+        kind == ProviderKind.openai &&
+        _isMistralProvider(cfg, host)) {
+      return VendorDefaults(
+        dialect: ReasoningDialect.openaiReasoningEffort,
+        levels: const [ReasoningLevel.high],
+        canDisable: true,
+        protocolDefault: protocolDefault,
+        maxTokensKey: maxTokensKey,
+        sendStreamOptions: sendStreamOptions,
+        replay: ReasoningReplayPolicy.all,
+        replayField: ReasoningReplayField.reasoningContent,
+        effortDefaultIsOff: true,
+      );
+    }
+
     return VendorDefaults(
       dialect: dialect,
       levels: levels,
@@ -168,7 +198,8 @@ class VendorDefaults {
             maxTokensKey == other.maxTokensKey &&
             sendStreamOptions == other.sendStreamOptions &&
             replay == other.replay &&
-            replayField == other.replayField);
+            replayField == other.replayField &&
+            effortDefaultIsOff == other.effortDefaultIsOff);
   }
 
   @override
@@ -181,6 +212,7 @@ class VendorDefaults {
     sendStreamOptions,
     replay,
     replayField,
+    effortDefaultIsOff,
   );
 }
 
@@ -201,6 +233,16 @@ ReasoningDialect _protocolDefault(ProviderKind kind, ProviderConfig cfg) {
       }
       return ReasoningDialect.openaiReasoningEffort;
   }
+}
+
+/// Official Mistral hosts (including `codestral.mistral.ai`) and providers the
+/// user named Mistral. Mirrors the request layer's Mistral detection so the
+/// dialect and the typed-thinking replay agree on which endpoint is Mistral.
+bool _isMistralProvider(ProviderConfig cfg, String host) {
+  if (host == 'mistral.ai' || host.endsWith('.mistral.ai')) return true;
+  final id = cfg.id.trim().toLowerCase();
+  final name = cfg.name.trim().toLowerCase();
+  return id.contains('mistral') || name.contains('mistral');
 }
 
 bool _isKimiAnthropicProvider(ProviderConfig cfg, String host) {

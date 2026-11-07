@@ -38,6 +38,7 @@ ModelSpec _spec({
   Map<ReasoningLevel, Map<String, dynamic>> customPatches = const {},
   SamplingPolicy sampling = SamplingPolicy.always,
   List<ModelAbility> abilities = const [ModelAbility.reasoning],
+  bool effortDefaultIsOff = false,
 }) {
   return ModelSpec(
     id: 'm',
@@ -49,6 +50,7 @@ ModelSpec _spec({
       dialect: dialect,
       budgets: budgets,
       customPatches: customPatches,
+      effortDefaultIsOff: effortDefaultIsOff,
     ),
     sampling: sampling,
   );
@@ -523,6 +525,180 @@ void main() {
         );
       },
     );
+  });
+
+  group('effort models whose provider default is off', () {
+    ModelSpec mistral({List<ReasoningLevel>? levels, bool canDisable = true}) {
+      return _spec(
+        dialect: ReasoningDialect.openaiReasoningEffort,
+        levels: levels ?? const [ReasoningLevel.high],
+        canDisable: canDisable,
+        budgets: const {},
+        effortDefaultIsOff: true,
+      );
+    }
+
+    test('auto names an effort so reasoning turns on', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          mistral(),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'high'},
+      );
+    });
+
+    test('auto always uses high, even when the ladder grows', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          mistral(levels: const [ReasoningLevel.low, ReasoningLevel.high]),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'high'},
+      );
+    });
+
+    test('off omits the effort instead of writing none', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          mistral(),
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('off still omits the effort when the spec cannot disable', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          mistral(canDisable: false),
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('every level clamps to the ladder and never writes thinking', () {
+      for (final level in _allExplicit) {
+        final body = applyReasoning(
+          <String, dynamic>{},
+          mistral(),
+          ReasoningRequest(level),
+          transport: ReasoningTransport.chatCompletions,
+        );
+        expect(body, {'reasoning_effort': 'high'}, reason: level.name);
+        expect(body.containsKey('thinking'), isFalse);
+      }
+    });
+
+    test('stale thinking and effort keys are replaced', () {
+      Map<String, dynamic> dirty() => <String, dynamic>{
+        'model': 'kept',
+        'thinking': {'type': 'enabled'},
+        'reasoning_effort': 'low',
+      };
+      expect(
+        applyReasoning(
+          dirty(),
+          mistral(),
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'model': 'kept'},
+      );
+      expect(
+        applyReasoning(
+          dirty(),
+          mistral(),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'model': 'kept', 'reasoning_effort': 'high'},
+      );
+    });
+
+    test('other effort models keep provider-default auto and none off', () {
+      final openai = _spec(
+        dialect: ReasoningDialect.openaiReasoningEffort,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
+        canDisable: true,
+        budgets: const {},
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          openai,
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        isEmpty,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          openai,
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'none'},
+      );
+    });
+
+    test('responses transport keeps the envelope behavior', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          mistral(),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.responses,
+        ),
+        {
+          'reasoning': {'summary': 'auto'},
+        },
+      );
+    });
+
+    test('a user-selected dialect still wins over the vendor flag', () {
+      final spec = _spec(
+        dialect: ReasoningDialect.thinkingType,
+        levels: const [ReasoningLevel.high],
+        canDisable: true,
+        budgets: const {},
+        effortDefaultIsOff: true,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          spec,
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        isEmpty,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          spec,
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {
+          'thinking': {'type': 'disabled'},
+        },
+      );
+    });
   });
 
   group('budget derivation', () {

@@ -499,6 +499,87 @@ void main() {
       );
     });
 
+    test('Mistral vendor defaults beat the guessed thinking dialect', () {
+      final resolved = resolver.resolve(
+        _cfg(
+          id: 'Mistral',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://api.mistral.ai/v1',
+        ),
+        'deepseek-v4-1-flash-1017',
+      );
+      expect(
+        resolved.spec.reasoning.dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+      expect(
+        resolved.sources[ModelSpecField.reasoningDialect],
+        SpecSource.vendor,
+      );
+      expect(resolved.spec.reasoning.levels, const [ReasoningLevel.high]);
+      expect(resolved.spec.reasoning.canDisable, isTrue);
+      expect(resolved.spec.reasoning.effortDefaultIsOff, isTrue);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
+      expect(
+        resolved.sources[ModelSpecField.reasoningReplay],
+        SpecSource.vendor,
+      );
+      expect(
+        resolved.spec.reasoning.replayField,
+        ReasoningReplayField.reasoningContent,
+      );
+    });
+
+    test('renaming a provider to Mistral invalidates the cached spec', () {
+      final before = resolver.resolve(
+        _cfg(
+          id: 'proxy',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://llm.example.com/v1',
+        ),
+        'deepseek-v4-1-flash-1017',
+      );
+      expect(before.spec.reasoning.dialect, ReasoningDialect.thinkingType);
+
+      final renamed = _cfg(
+        id: 'proxy',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://llm.example.com/v1',
+      ).copyWith(name: 'Mistral');
+      final after = resolver.resolve(renamed, 'deepseek-v4-1-flash-1017');
+      expect(
+        after.spec.reasoning.dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+    });
+
+    test('a named Mistral proxy gains reasoning for a catalog-less model', () {
+      final resolved = resolver.resolve(
+        _cfg(
+          id: 'proxy',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://llm.example.com/v1',
+        ).copyWith(name: 'Mistral'),
+        'magistral-medium-latest',
+      );
+      expect(resolved.catalog, isNull);
+      expect(resolved.spec.supportsReasoning, isTrue);
+      expect(resolved.sources[ModelSpecField.abilities], SpecSource.guess);
+      expect(
+        resolved.spec.reasoning.dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          resolved.spec,
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'high'},
+      );
+    });
+
     test('supported replay defaults to all and explicit overrides win', () {
       for (final target in [
         (config: _deepseek(), model: 'deepseek-v4-pro'),

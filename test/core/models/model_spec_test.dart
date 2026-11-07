@@ -480,6 +480,7 @@ void main() {
         },
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoning,
+        effortDefaultIsOff: true,
       );
       final restored = ReasoningSpec.fromJson(spec.toJson());
       expect(restored, spec);
