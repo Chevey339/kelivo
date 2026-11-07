@@ -104,7 +104,12 @@ void _expectReplay(Map message, List<Map<String, Object>> blocks) {
 }
 
 void main() {
-  for (final field in ReasoningReplayField.values) {
+  // `mistralThinking` has no echo field; its typed shape is asserted below.
+  for (final field in [
+    ReasoningReplayField.reasoningContent,
+    ReasoningReplayField.reasoning,
+    ReasoningReplayField.reasoningDetails,
+  ]) {
     test(
       'fragmented history uses one structured representation with $field',
       () async {
@@ -129,6 +134,41 @@ void main() {
       },
     );
   }
+
+  test(
+    'mistralThinking replays fragmented history as one typed thinking part',
+    () async {
+      final original = <String, dynamic>{
+        'role': 'assistant',
+        'content': 'Answer',
+        'reasoning': 'Let me me\ncheck.',
+        'reasoning_content': 'Let me me\ncheck.',
+        'reasoning_details': _plainFragments,
+      };
+      final messages = await buildOpenAIChatCompletionMessages(
+        [original],
+        nativeInputs: _nativeInputs,
+        canImageInput: false,
+        allowRemoteImages: false,
+        reasoningReplay: ReasoningReplayPolicy.all,
+        replayField: ReasoningReplayField.mistralThinking,
+      );
+      expect(messages.single, {
+        'role': 'assistant',
+        'content': [
+          {
+            'type': 'thinking',
+            'thinking': [
+              {'type': 'text', 'text': 'Let me me\ncheck.'},
+            ],
+          },
+          {'type': 'text', 'text': 'Answer'},
+        ],
+      });
+      expect(original['reasoning_details'], _plainFragments);
+      expect(original['reasoning_content'], 'Let me me\ncheck.');
+    },
+  );
 
   test(
     'plain reasoning keeps its configured field when no details exist',

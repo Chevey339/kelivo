@@ -7561,6 +7561,18 @@ abstract class AppLocalizations {
   /// **'thinking'**
   String get modelSpecFormDialectKimiThinkingSubtitle;
 
+  /// No description provided for @modelSpecFormDialectMistral.
+  ///
+  /// In en, this message translates to:
+  /// **'Mistral reasoning effort'**
+  String get modelSpecFormDialectMistral;
+
+  /// No description provided for @modelSpecFormDialectMistralSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning_effort; Auto → high, Off omits it'**
+  String get modelSpecFormDialectMistralSubtitle;
+
   /// No description provided for @modelSpecFormDialectCustom.
   ///
   /// In en, this message translates to:
@@ -7782,6 +7794,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'reasoning_details'**
   String get modelSpecFormReplayFieldReasoningDetails;
+
+  /// No description provided for @modelSpecFormReplayFieldMistralThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Mistral typed thinking'**
+  String get modelSpecFormReplayFieldMistralThinking;
+
+  /// No description provided for @modelSpecFormReplayFieldMistralThinkingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'content[].thinking'**
+  String get modelSpecFormReplayFieldMistralThinkingSubtitle;
+
+  /// No description provided for @modelSpecFormMistralDialectReplayWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'History is sent with the selected replay field; official Mistral may reject that format.'**
+  String get modelSpecFormMistralDialectReplayWarning;
+
+  /// No description provided for @modelSpecFormMistralReplayFieldWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'History is still replayed as content[].thinking; check that the current provider supports this format.'**
+  String get modelSpecFormMistralReplayFieldWarning;
 
   /// No description provided for @modelSpecFormLimitsSection.
   ///

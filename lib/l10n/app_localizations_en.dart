@@ -4127,6 +4127,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
 
   @override
+  String get modelSpecFormDialectMistral => 'Mistral reasoning effort';
+
+  @override
+  String get modelSpecFormDialectMistralSubtitle =>
+      'reasoning_effort; Auto → high, Off omits it';
+
+  @override
   String get modelSpecFormDialectCustom => 'Custom JSON';
 
   @override
@@ -4251,6 +4258,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinking =>
+      'Mistral typed thinking';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinkingSubtitle =>
+      'content[].thinking';
+
+  @override
+  String get modelSpecFormMistralDialectReplayWarning =>
+      'History is sent with the selected replay field; official Mistral may reject that format.';
+
+  @override
+  String get modelSpecFormMistralReplayFieldWarning =>
+      'History is still replayed as content[].thinking; check that the current provider supports this format.';
 
   @override
   String get modelSpecFormLimitsSection => 'Limits';

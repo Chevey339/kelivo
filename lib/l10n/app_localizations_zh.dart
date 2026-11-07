@@ -3975,6 +3975,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
 
   @override
+  String get modelSpecFormDialectMistral => 'Mistral reasoning effort';
+
+  @override
+  String get modelSpecFormDialectMistralSubtitle =>
+      'reasoning_effort；自动 → high，关闭时省略';
+
+  @override
   String get modelSpecFormDialectCustom => '自定义 JSON';
 
   @override
@@ -4091,6 +4098,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinking => 'Mistral 类型化思考';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinkingSubtitle =>
+      'content[].thinking';
+
+  @override
+  String get modelSpecFormMistralDialectReplayWarning =>
+      '历史将按所选字段发送；官方 Mistral 可能拒绝该格式。';
+
+  @override
+  String get modelSpecFormMistralReplayFieldWarning =>
+      '仍会按 content[].thinking 回放；请确认当前 Provider 支持该格式。';
 
   @override
   String get modelSpecFormLimitsSection => '限额';
@@ -19187,6 +19209,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
 
   @override
+  String get modelSpecFormDialectMistral => 'Mistral reasoning effort';
+
+  @override
+  String get modelSpecFormDialectMistralSubtitle =>
+      'reasoning_effort；自动 → high，关闭时省略';
+
+  @override
   String get modelSpecFormDialectCustom => '自定义 JSON';
 
   @override
@@ -19303,6 +19332,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinking => 'Mistral 类型化思考';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinkingSubtitle =>
+      'content[].thinking';
+
+  @override
+  String get modelSpecFormMistralDialectReplayWarning =>
+      '历史将按所选字段发送；官方 Mistral 可能拒绝该格式。';
+
+  @override
+  String get modelSpecFormMistralReplayFieldWarning =>
+      '仍会按 content[].thinking 回放；请确认当前 Provider 支持该格式。';
 
   @override
   String get modelSpecFormLimitsSection => '限额';
@@ -34255,6 +34299,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
 
   @override
+  String get modelSpecFormDialectMistral => 'Mistral reasoning effort';
+
+  @override
+  String get modelSpecFormDialectMistralSubtitle =>
+      'reasoning_effort；自動 → high，關閉時省略';
+
+  @override
   String get modelSpecFormDialectCustom => '自訂 JSON';
 
   @override
@@ -34371,6 +34422,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinking => 'Mistral 型別化思考';
+
+  @override
+  String get modelSpecFormReplayFieldMistralThinkingSubtitle =>
+      'content[].thinking';
+
+  @override
+  String get modelSpecFormMistralDialectReplayWarning =>
+      '歷史將按所選欄位傳送；官方 Mistral 可能拒絕該格式。';
+
+  @override
+  String get modelSpecFormMistralReplayFieldWarning =>
+      '仍會按 content[].thinking 回放；請確認目前 Provider 支援該格式。';
 
   @override
   String get modelSpecFormLimitsSection => '限額';

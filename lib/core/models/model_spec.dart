@@ -25,6 +25,7 @@ enum ReasoningDialect {
   internThinkingMode,
   chatTemplateKwargs,
   kimiThinking,
+  mistral,
   custom,
 }
 
@@ -33,12 +34,15 @@ enum ReasoningReplayPolicy { none, toolTurns, all }
 enum ReasoningReplayField {
   reasoningContent,
   reasoning,
-  reasoningDetails;
+  reasoningDetails,
+  mistralThinking;
 
   String get wireName => switch (this) {
     ReasoningReplayField.reasoningContent => 'reasoning_content',
     ReasoningReplayField.reasoning => 'reasoning',
     ReasoningReplayField.reasoningDetails => 'reasoning_details',
+    // Encoded as typed `thinking` parts inside `content`.
+    ReasoningReplayField.mistralThinking => 'content',
   };
 }
 
@@ -198,11 +202,6 @@ class ReasoningSpec {
   final ReasoningReplayPolicy replay;
   final ReasoningReplayField replayField;
 
-  /// True when the provider only thinks if an effort is named (Mistral):
-  /// omitting `reasoning_effort` disables thinking, so `auto` must write one
-  /// and `off` must omit it. Set by vendor defaults, never derived per model.
-  final bool effortDefaultIsOff;
-
   const ReasoningSpec({
     this.levels = const [],
     this.canDisable = false,
@@ -212,7 +211,6 @@ class ReasoningSpec {
     this.customPatches = const {},
     this.replay = ReasoningReplayPolicy.none,
     this.replayField = ReasoningReplayField.reasoningContent,
-    this.effortDefaultIsOff = false,
   });
 
   ReasoningSpec copyWith({
@@ -224,7 +222,6 @@ class ReasoningSpec {
     Map<ReasoningLevel, Map<String, dynamic>>? customPatches,
     ReasoningReplayPolicy? replay,
     ReasoningReplayField? replayField,
-    bool? effortDefaultIsOff,
   }) {
     return ReasoningSpec(
       levels: _normalizeReasoningLevels(levels ?? this.levels),
@@ -235,7 +232,6 @@ class ReasoningSpec {
       customPatches: customPatches ?? this.customPatches,
       replay: replay ?? this.replay,
       replayField: replayField ?? this.replayField,
-      effortDefaultIsOff: effortDefaultIsOff ?? this.effortDefaultIsOff,
     );
   }
 
@@ -253,7 +249,6 @@ class ReasoningSpec {
       },
       'replay': replay.name,
       'replayField': replayField.name,
-      'effortDefaultIsOff': effortDefaultIsOff,
     };
   }
 
@@ -309,7 +304,6 @@ class ReasoningSpec {
       replayField:
           _enumByName(ReasoningReplayField.values, json['replayField']) ??
           ReasoningReplayField.reasoningContent,
-      effortDefaultIsOff: json['effortDefaultIsOff'] == true,
     );
   }
 
@@ -325,8 +319,7 @@ class ReasoningSpec {
             mapEquals(budgets, other.budgets) &&
             _deepEquals(customPatches, other.customPatches) &&
             replay == other.replay &&
-            replayField == other.replayField &&
-            effortDefaultIsOff == other.effortDefaultIsOff);
+            replayField == other.replayField);
   }
 
   @override
@@ -339,7 +332,6 @@ class ReasoningSpec {
     _deepHash(customPatches),
     replay,
     replayField,
-    effortDefaultIsOff,
   );
 }
 

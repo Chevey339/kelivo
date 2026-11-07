@@ -6,6 +6,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_settings_rows.dart';
 import '../../../../shared/widgets/option_sheet.dart';
 import 'model_spec_form_controller.dart';
+import 'reasoning_section.dart';
 import 'spec_field_header.dart';
 
 class StrategySection extends StatelessWidget {
@@ -52,9 +53,16 @@ class StrategySection extends StatelessWidget {
             ),
             IosNavRow(
               label: l10n.modelSpecFormReplayField,
-              subtitle: spec.reasoning.replayField.wireName,
+              subtitle: _replayFieldSubtitle(l10n, spec.reasoning.replayField),
               onTap: () => _pickReplayField(context),
             ),
+            if (spec.reasoning.replayField ==
+                    ReasoningReplayField.mistralThinking &&
+                spec.reasoning.dialect != ReasoningDialect.mistral)
+              ReasoningFormWarning(
+                key: const ValueKey('model-spec-mistral-replay-field-warning'),
+                message: l10n.modelSpecFormMistralReplayFieldWarning,
+              ),
           ],
         );
       },
@@ -104,18 +112,12 @@ class StrategySection extends StatelessWidget {
       title: l10n.modelSpecFormReplayField,
       selected: controller.spec.reasoning.replayField,
       items: [
-        OptionSheetItem(
-          value: ReasoningReplayField.reasoningContent,
-          label: l10n.modelSpecFormReplayFieldReasoningContent,
-        ),
-        OptionSheetItem(
-          value: ReasoningReplayField.reasoning,
-          label: l10n.modelSpecFormReplayFieldReasoning,
-        ),
-        OptionSheetItem(
-          value: ReasoningReplayField.reasoningDetails,
-          label: l10n.modelSpecFormReplayFieldReasoningDetails,
-        ),
+        for (final field in ReasoningReplayField.values)
+          OptionSheetItem(
+            value: field,
+            label: _replayFieldLabel(l10n, field),
+            subtitle: _replayFieldSubtitle(l10n, field),
+          ),
       ],
     );
     if (picked != null) controller.setReplayField(picked);
@@ -154,5 +156,27 @@ String _replaySubtitle(AppLocalizations l10n, ReasoningReplayPolicy policy) {
     ReasoningReplayPolicy.toolTurns =>
       l10n.modelSpecFormReplayToolTurnsSubtitle,
     ReasoningReplayPolicy.all => l10n.modelSpecFormReplayAllSubtitle,
+  };
+}
+
+String _replayFieldLabel(AppLocalizations l10n, ReasoningReplayField field) {
+  return switch (field) {
+    ReasoningReplayField.reasoningContent =>
+      l10n.modelSpecFormReplayFieldReasoningContent,
+    ReasoningReplayField.reasoning => l10n.modelSpecFormReplayFieldReasoning,
+    ReasoningReplayField.reasoningDetails =>
+      l10n.modelSpecFormReplayFieldReasoningDetails,
+    ReasoningReplayField.mistralThinking =>
+      l10n.modelSpecFormReplayFieldMistralThinking,
+  };
+}
+
+String _replayFieldSubtitle(AppLocalizations l10n, ReasoningReplayField field) {
+  return switch (field) {
+    ReasoningReplayField.reasoningContent ||
+    ReasoningReplayField.reasoning ||
+    ReasoningReplayField.reasoningDetails => field.wireName,
+    ReasoningReplayField.mistralThinking =>
+      l10n.modelSpecFormReplayFieldMistralThinkingSubtitle,
   };
 }

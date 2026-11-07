@@ -7,9 +7,10 @@
 /// content part ahead of the visible body, while the request enables reasoning
 /// through `reasoning_effort`.
 ///
-/// The request builder gates this on the resolved model spec
-/// (`ReasoningSpec.effortDefaultIsOff` with the effort dialect), so a provider
-/// merely named Mistral does not change the replay shape.
+/// The request builder dispatches on the selected replay field
+/// (`ReasoningReplayField.mistralThinking`), so a provider merely named Mistral
+/// does not change the replay shape, and any other field keeps that provider's
+/// own echo form.
 library;
 
 import 'chat_completions_decoder.dart';

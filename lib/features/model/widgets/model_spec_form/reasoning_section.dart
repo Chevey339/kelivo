@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/models/model_spec.dart';
 import '../../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_checkbox.dart';
 import '../../../../shared/widgets/ios_form_text_field.dart';
@@ -42,6 +43,13 @@ class ReasoningSection extends StatelessWidget {
               subtitleMaxLines: 2,
               onTap: () => _pickDialect(context),
             ),
+            if (dialect == ReasoningDialect.mistral &&
+                spec.reasoning.replayField !=
+                    ReasoningReplayField.mistralThinking)
+              ReasoningFormWarning(
+                key: const ValueKey('model-spec-mistral-dialect-warning'),
+                message: l10n.modelSpecFormMistralDialectReplayWarning,
+              ),
             const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormLevels,
@@ -195,6 +203,42 @@ class ReasoningSection extends StatelessWidget {
   }
 }
 
+/// Inline, non-blocking hint for a dialect / replay-field pairing that does
+/// not match. Selection stays fully editable.
+class ReasoningFormWarning extends StatelessWidget {
+  const ReasoningFormWarning({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(Lucide.TriangleAlert, size: 14, color: cs.error),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CheckRow extends StatelessWidget {
   const _CheckRow({
     required this.label,
@@ -281,6 +325,7 @@ String dialectLabel(AppLocalizations l10n, ReasoningDialect dialect) {
     ReasoningDialect.chatTemplateKwargs =>
       l10n.modelSpecFormDialectChatTemplateKwargs,
     ReasoningDialect.kimiThinking => l10n.modelSpecFormDialectKimiThinking,
+    ReasoningDialect.mistral => l10n.modelSpecFormDialectMistral,
     ReasoningDialect.custom => l10n.modelSpecFormDialectCustom,
   };
 }
@@ -318,6 +363,7 @@ String dialectSubtitle(AppLocalizations l10n, ReasoningDialect dialect) {
       l10n.modelSpecFormDialectChatTemplateKwargsSubtitle,
     ReasoningDialect.kimiThinking =>
       l10n.modelSpecFormDialectKimiThinkingSubtitle,
+    ReasoningDialect.mistral => l10n.modelSpecFormDialectMistralSubtitle,
     ReasoningDialect.custom => l10n.modelSpecFormDialectCustomSubtitle,
   };
 }

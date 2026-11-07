@@ -142,6 +142,17 @@ bool _isRemoteImageContentPart(dynamic part) {
   return rawUrl is String && isRemoteHttpUrl(rawUrl);
 }
 
+/// Internal carrier key for the reasoning echo of a tool round.
+///
+/// `mistralThinking` has no echo field on the wire: the thought is carried as
+/// `reasoning_content` and [buildOpenAIChatCompletionMessages] turns it into a
+/// typed thinking part. Every other field is its own wire name.
+String _reasoningEchoField(ReasoningReplayField field) {
+  return field == ReasoningReplayField.mistralThinking
+      ? 'reasoning_content'
+      : field.wireName;
+}
+
 Map<String, dynamic> _buildAssistantToolCallMessage({
   required List<Map<String, dynamic>> calls,
   dynamic content,
@@ -278,14 +289,11 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   final prefersStructuredReasoning =
       replayField == ReasoningReplayField.reasoningDetails ||
       BuiltInToolsHelper.isOpenRouterProvider(nativeInputs.config);
-  // Mistral-style effort models replay thinking as typed content parts. The
-  // resolved spec is authoritative: a provider merely named Mistral does not
-  // change the shape, and a Mistral-hosted model keeps it even when the
-  // guesser picked another dialect.
-  final specReasoning = nativeInputs.spec.reasoning;
+  // Typed thinking parts are a replay-field choice, not a dialect or provider
+  // property: selecting `mistralThinking` converts assistant history, while
+  // every other field keeps that provider's own echo shape.
   final replaysTypedThinking =
-      specReasoning.effortDefaultIsOff &&
-      specReasoning.dialect == ReasoningDialect.openaiReasoningEffort;
+      replayField == ReasoningReplayField.mistralThinking;
   // Assistant turns cannot carry image_url/video_url; stash for the last user
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
@@ -385,73 +393,11 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
             openaiToolCallForRequest(toolCall),
         ];
       }
-      final rawDetails = outMsg['reasoning_details'];
-      // The all-history policy must not turn legacy unsigned Claude text into
-      // a thinking block. Only its native details can carry the signature.
-      final signedDetails =
-          requiresSignedReasoning ||
-          reasoningDetailsNeedSignedReplay(rawDetails);
       final keepReplay =
           (currentToolMessagesStart != null && i >= currentToolMessagesStart) ||
           reasoningReplay == ReasoningReplayPolicy.all ||
           (reasoningReplay == ReasoningReplayPolicy.toolTurns &&
               toolTurnIds.contains(messageTurnIds[i]));
-      final details = keepReplay
-          ? normalizeReasoningDetailsForReplay(rawDetails)
-          : null;
-      final field = replayField.wireName;
-      Object? replayValue;
-      for (final key in [field, 'reasoning_content', 'reasoning']) {
-        final value = outMsg[key];
-        replayValue ??= value;
-        if (value is String && value.isNotEmpty) {
-          replayValue = value;
-          break;
-        }
-      }
-      // Plain history imported from another endpoint must still use the
-      // target's scalar field (e.g. native DeepSeek). An empty tool echo is
-      // not a replacement for details, and signed/opaque blocks stay intact.
-      final replayAsText =
-          !prefersStructuredReasoning &&
-          !signedDetails &&
-          replayValue is String &&
-          replayValue.isNotEmpty &&
-          details != null &&
-          details.every(
-            (entry) =>
-                entry['type'] == null ||
-                entry['type'] == 'reasoning.text' ||
-                entry['type'] == 'reasoning.summary',
-          );
-      if (!keepReplay) {
-        outMsg.remove('reasoning_content');
-        outMsg.remove('reasoning');
-        outMsg.remove('reasoning_details');
-      } else if (details != null && !replayAsText) {
-        // Structured reasoning is the complete replay representation. Sending
-        // its parallel plain text echo as well can duplicate the same thought.
-        outMsg['reasoning_details'] = details;
-        outMsg.remove('reasoning_content');
-        outMsg.remove('reasoning');
-      } else {
-        // An explicitly empty array can mark a non-thinking response. It has
-        // no duplicated prose, so retain it for providers that replay it.
-        if (rawDetails is! List || rawDetails.isNotEmpty) {
-          outMsg.remove('reasoning_details');
-        }
-        if (signedDetails) {
-          outMsg.remove('reasoning_details');
-          outMsg.remove('reasoning_content');
-          outMsg.remove('reasoning');
-        } else if (replayField != ReasoningReplayField.reasoningDetails) {
-          outMsg.remove('reasoning_content');
-          outMsg.remove('reasoning');
-          if (replayValue != null) {
-            outMsg[field] = replayValue;
-          }
-        }
-      }
       if (replaysTypedThinking) {
         // Mistral forbids all three echo fields; the thought travels as a typed
         // thinking part in front of the visible body instead. Without a
@@ -460,9 +406,76 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         if (keepReplay) {
           mistralThinking = mistralReplayThinkingText(m);
         }
-        outMsg.remove('reasoning_content');
-        outMsg.remove('reasoning');
-        outMsg.remove('reasoning_details');
+        for (final key in [
+          'reasoning_content',
+          'reasoning',
+          'reasoning_details',
+        ]) {
+          outMsg.remove(key);
+        }
+      } else {
+        final rawDetails = outMsg['reasoning_details'];
+        // The all-history policy must not turn legacy unsigned Claude text into
+        // a thinking block. Only its native details can carry the signature.
+        final signedDetails =
+            requiresSignedReasoning ||
+            reasoningDetailsNeedSignedReplay(rawDetails);
+        final details = keepReplay
+            ? normalizeReasoningDetailsForReplay(rawDetails)
+            : null;
+        final field = replayField.wireName;
+        Object? replayValue;
+        for (final key in [field, 'reasoning_content', 'reasoning']) {
+          final value = outMsg[key];
+          replayValue ??= value;
+          if (value is String && value.isNotEmpty) {
+            replayValue = value;
+            break;
+          }
+        }
+        // Plain history imported from another endpoint must still use the
+        // target's scalar field (e.g. native DeepSeek). An empty tool echo is
+        // not a replacement for details, and signed/opaque blocks stay intact.
+        final replayAsText =
+            !prefersStructuredReasoning &&
+            !signedDetails &&
+            replayValue is String &&
+            replayValue.isNotEmpty &&
+            details != null &&
+            details.every(
+              (entry) =>
+                  entry['type'] == null ||
+                  entry['type'] == 'reasoning.text' ||
+                  entry['type'] == 'reasoning.summary',
+            );
+        if (!keepReplay) {
+          outMsg.remove('reasoning_content');
+          outMsg.remove('reasoning');
+          outMsg.remove('reasoning_details');
+        } else if (details != null && !replayAsText) {
+          // Structured reasoning is the complete replay representation. Sending
+          // its parallel plain text echo as well can duplicate the same thought.
+          outMsg['reasoning_details'] = details;
+          outMsg.remove('reasoning_content');
+          outMsg.remove('reasoning');
+        } else {
+          // An explicitly empty array can mark a non-thinking response. It has
+          // no duplicated prose, so retain it for providers that replay it.
+          if (rawDetails is! List || rawDetails.isNotEmpty) {
+            outMsg.remove('reasoning_details');
+          }
+          if (signedDetails) {
+            outMsg.remove('reasoning_details');
+            outMsg.remove('reasoning_content');
+            outMsg.remove('reasoning');
+          } else if (replayField != ReasoningReplayField.reasoningDetails) {
+            outMsg.remove('reasoning_content');
+            outMsg.remove('reasoning');
+            if (replayValue != null) {
+              outMsg[field] = replayValue;
+            }
+          }
+        }
       }
     }
 
@@ -929,7 +942,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           calls: openaiToolCallMaps([for (final item in executed) item.call]),
           content: assistantContent(),
           reasoningContent: needsReasoningEcho ? reasoningEcho() : null,
-          reasoningField: spec.reasoning.replayField.wireName,
+          reasoningField: _reasoningEchoField(spec.reasoning.replayField),
           includeEmptyReasoningContent: needsReasoningEcho,
           reasoningDetails: reasoningDetails(),
         ),
@@ -1118,7 +1131,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
           calls: openaiToolCallMaps([for (final item in executed) item.call]),
           content: msg['content'],
           reasoningContent: needsReasoningEcho ? reasoningForTools : null,
-          reasoningField: spec.reasoning.replayField.wireName,
+          reasoningField: _reasoningEchoField(spec.reasoning.replayField),
           includeEmptyReasoningContent: needsReasoningEcho,
           reasoningDetails: msg['reasoning_details'],
         ),

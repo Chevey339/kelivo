@@ -11,10 +11,9 @@ const _model = 'mistral-large-latest';
 const _mistralReasoning = ReasoningSpec(
   levels: [ReasoningLevel.high],
   canDisable: true,
-  dialect: ReasoningDialect.openaiReasoningEffort,
+  dialect: ReasoningDialect.mistral,
   replay: ReasoningReplayPolicy.all,
-  replayField: ReasoningReplayField.reasoningContent,
-  effortDefaultIsOff: true,
+  replayField: ReasoningReplayField.mistralThinking,
 );
 
 final _mistralSpec = ModelSpec(
@@ -33,6 +32,18 @@ final _openRouterSpec = ModelSpec(
   id: _model,
   displayName: _model,
   reasoning: _openRouterReasoning,
+);
+
+const _deepSeekReasoning = ReasoningSpec(
+  dialect: ReasoningDialect.thinkingType,
+  replay: ReasoningReplayPolicy.all,
+  replayField: ReasoningReplayField.reasoningContent,
+);
+
+final _deepSeekSpec = ModelSpec(
+  id: _model,
+  displayName: _model,
+  reasoning: _deepSeekReasoning,
 );
 
 final _plainSpec = ModelSpec(id: _model, displayName: _model);
@@ -65,7 +76,7 @@ Future<List<Map<String, dynamic>>> _build(
   ProviderConfig? config,
   ModelSpec? spec,
   ReasoningReplayPolicy replay = ReasoningReplayPolicy.all,
-  ReasoningReplayField field = ReasoningReplayField.reasoningContent,
+  ReasoningReplayField field = ReasoningReplayField.mistralThinking,
   int? currentToolMessagesStart,
   bool canImageInput = false,
 }) {
@@ -96,15 +107,19 @@ const _toolCall = {
 };
 
 void main() {
-  group('Mistral-style spec gate', () {
-    test('the official host does not override a non-Mistral spec', () async {
-      final messages = await _build([
-        {
-          'role': 'assistant',
-          'content': 'Answer',
-          'reasoning_content': 'Let me think.',
-        },
-      ], spec: _plainSpec);
+  group('replay field dispatch', () {
+    test('the official host does not decide the replay shape', () async {
+      final messages = await _build(
+        [
+          {
+            'role': 'assistant',
+            'content': 'Answer',
+            'reasoning_content': 'Let me think.',
+          },
+        ],
+        spec: _plainSpec,
+        field: ReasoningReplayField.reasoningContent,
+      );
 
       expect(messages.single, {
         'role': 'assistant',
@@ -135,7 +150,7 @@ void main() {
       ]);
     });
 
-    test('the provider name does not override a non-Mistral spec', () async {
+    test('the provider name does not decide the replay shape', () async {
       final messages = await _build(
         [
           {
@@ -156,6 +171,7 @@ void main() {
           baseUrl: 'https://openrouter.ai/api/v1',
         ),
         spec: _openRouterSpec,
+        field: ReasoningReplayField.reasoningContent,
       );
 
       expect(messages.single, {
@@ -167,7 +183,7 @@ void main() {
       });
     });
 
-    test('requires the effort dialect, not just the flag', () async {
+    test('a mistral dialect keeps the scalar echo for another field', () async {
       final messages = await _build(
         [
           {
@@ -176,21 +192,54 @@ void main() {
             'reasoning_content': 'Let me think.',
           },
         ],
-        spec: ModelSpec(
-          id: _model,
-          displayName: _model,
-          reasoning: const ReasoningSpec(
-            dialect: ReasoningDialect.thinkingType,
-            replay: ReasoningReplayPolicy.all,
-            effortDefaultIsOff: true,
-          ),
-        ),
+        spec: _mistralSpec,
+        field: ReasoningReplayField.reasoningContent,
       );
 
       expect(messages.single, {
         'role': 'assistant',
         'content': 'Answer',
         'reasoning_content': 'Let me think.',
+      });
+    });
+
+    test('a mistral dialect keeps details for reasoningDetails', () async {
+      final messages = await _build(
+        [
+          {
+            'role': 'assistant',
+            'content': 'Answer',
+            'reasoning_content': 'Let me think.',
+            'reasoning_details': [
+              {'type': 'reasoning.text', 'text': 'Let me think.'},
+            ],
+          },
+        ],
+        spec: _mistralSpec,
+        field: ReasoningReplayField.reasoningDetails,
+      );
+
+      expect(messages.single, {
+        'role': 'assistant',
+        'content': 'Answer',
+        'reasoning_details': [
+          {'type': 'reasoning.text', 'text': 'Let me think.'},
+        ],
+      });
+    });
+
+    test('another dialect converts when mistralThinking is selected', () async {
+      final messages = await _build([
+        {
+          'role': 'assistant',
+          'content': 'Answer',
+          'reasoning_content': 'Let me think.',
+        },
+      ], spec: _deepSeekSpec);
+
+      expect(messages.single, {
+        'role': 'assistant',
+        'content': [_thinking('Let me think.'), _text('Answer')],
       });
     });
   });
@@ -466,6 +515,7 @@ void main() {
           baseUrl: 'https://openrouter.ai/api/v1',
         ),
         spec: _plainSpec,
+        field: ReasoningReplayField.reasoningContent,
       );
 
       expect(messages.single, {
@@ -492,6 +542,7 @@ void main() {
           baseUrl: 'https://api.deepseek.com/v1',
         ),
         spec: _plainSpec,
+        field: ReasoningReplayField.reasoningContent,
       );
 
       expect(messages.single, {

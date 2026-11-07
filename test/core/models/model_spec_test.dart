@@ -471,7 +471,7 @@ void main() {
         levels: [ReasoningLevel.minimal, ReasoningLevel.max],
         canDisable: true,
         defaultLevel: ReasoningLevel.medium,
-        dialect: ReasoningDialect.custom,
+        dialect: ReasoningDialect.mistral,
         budgets: {ReasoningLevel.minimal: 16},
         customPatches: {
           ReasoningLevel.max: {
@@ -479,12 +479,12 @@ void main() {
           },
         },
         replay: ReasoningReplayPolicy.all,
-        replayField: ReasoningReplayField.reasoning,
-        effortDefaultIsOff: true,
+        replayField: ReasoningReplayField.mistralThinking,
       );
       final restored = ReasoningSpec.fromJson(spec.toJson());
       expect(restored, spec);
       expect(restored.hashCode, spec.hashCode);
+      expect(spec.toJson().containsKey('effortDefaultIsOff'), isFalse);
 
       final messy = ReasoningSpec.fromJson({
         'levels': ['auto', 'off', 'low', 'low', 'zzz'],
@@ -542,6 +542,7 @@ void main() {
         ReasoningReplayField.reasoningDetails.wireName,
         'reasoning_details',
       );
+      expect(ReasoningReplayField.mistralThinking.wireName, 'content');
     });
 
     test('ModelPricing round-trips', () {

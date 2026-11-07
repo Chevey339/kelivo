@@ -193,7 +193,6 @@ class ModelSpecResolver {
     final abilities = _resolveAbilities(
       match: match,
       guess: guess,
-      vendor: vendor,
       sources: sources,
     );
 
@@ -359,7 +358,6 @@ class ModelSpecResolver {
   static List<ModelAbility> _resolveAbilities({
     required CatalogMatch? match,
     required ModelGuess guess,
-    required VendorDefaults vendor,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
     final List<ModelAbility> abilities;
@@ -373,12 +371,6 @@ class ModelSpecResolver {
     } else {
       sources[ModelSpecField.abilities] = SpecSource.guess;
       abilities = List<ModelAbility>.of(guess.abilities);
-    }
-    // Mistral exposes reasoning only through `reasoning_effort`, which neither
-    // the catalog nor the guesser knows for a proxied model id.
-    if (vendor.effortDefaultIsOff &&
-        !abilities.contains(ModelAbility.reasoning)) {
-      abilities.add(ModelAbility.reasoning);
     }
     return abilities;
   }
@@ -436,7 +428,6 @@ class ModelSpecResolver {
       budgets: budgets,
       replay: replay.policy,
       replayField: replay.field,
-      effortDefaultIsOff: vendor.effortDefaultIsOff,
     );
   }
 
@@ -477,6 +468,12 @@ class ModelSpecResolver {
     if (guessLevels != null && guessLevels.isNotEmpty) {
       sources[ModelSpecField.reasoningLevels] = SpecSource.guess;
       return guessLevels;
+    }
+    // Mistral always needs a named effort, so a toggle-only guess cannot leave
+    // the ladder empty; `high` is accepted by every documented model.
+    if (dialect == ReasoningDialect.mistral) {
+      sources[ModelSpecField.reasoningLevels] = SpecSource.fallback;
+      return const [ReasoningLevel.high];
     }
     if (_budgetDialects.contains(dialect)) {
       sources[ModelSpecField.reasoningLevels] = SpecSource.fallback;
@@ -624,10 +621,13 @@ class ModelSpecResolver {
     required VendorDefaults vendor,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    // Mistral's typed-thinking replay is provider-wide, so its vendor policy
-    // must not be dropped by a hosted model's guesser.
-    final mistralReplay = vendor.effortDefaultIsOff && vendor.replay != null;
-    if (!mistralReplay && guess.replay != null) {
+    // Mistral's typed-thinking replay is a protocol requirement, so its vendor
+    // policy must not be dropped by a hosted model's guesser. Other vendors
+    // keep Guess -> Catalog -> Vendor order.
+    final vendorTypedThinking =
+        vendor.replay != null &&
+        vendor.replayField == ReasoningReplayField.mistralThinking;
+    if (!vendorTypedThinking && guess.replay != null) {
       sources[ModelSpecField.reasoningReplay] = SpecSource.guess;
       return (
         policy: guess.replay!,

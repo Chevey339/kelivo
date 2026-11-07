@@ -111,11 +111,11 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
 /// [ReasoningTransport.responses] uses `reasoning: {effort}` and owns
 /// `reasoning` only.
 ///
-/// Mistral-style effort models (see [_effortDefaultIsOff]) are the exception to
-/// the `auto` rule: their provider default is "no reasoning", so `auto` writes
-/// `high` (and drops a stale `thinking` key), while `off` omits
-/// `reasoning_effort` instead of writing `none`. Neither ever writes a
-/// top-level `thinking` switch.
+/// [ReasoningDialect.mistral] is the exception to the `auto` rule: its provider
+/// default is "no reasoning", so `auto` writes `high` (and drops a stale
+/// `thinking` key), while `off` omits `reasoning_effort` instead of writing
+/// `none`. It never writes a top-level `thinking` switch and never uses the
+/// Responses envelope, whatever the transport.
 Map<String, dynamic> applyReasoning(
   Map<String, dynamic> body,
   ModelSpec spec,
@@ -214,21 +214,13 @@ bool _isOpenAiDialect(ReasoningDialect dialect) {
       dialect == ReasoningDialect.openaiResponsesReasoning;
 }
 
-/// Effort models whose provider default is "no reasoning" (Mistral).
+/// [ReasoningDialect.mistral] effort models.
 ///
 /// `reasoning_effort` is the only switch: omitting it disables thinking, so
-/// `auto` must name an effort and `off` must omit the key. The flag is set by
-/// vendor defaults, so other effort models keep their provider-default `auto`
-/// and `none` off. A user-selected dialect still wins.
-bool _effortDefaultIsOff(ModelSpec spec) {
-  return spec.reasoning.effortDefaultIsOff &&
-      spec.reasoning.dialect == ReasoningDialect.openaiReasoningEffort;
-}
-
-void _writeEffortDefaultOff(
-  Map<String, dynamic> body,
-  ReasoningResolution resolution,
-) {
+/// `auto` must name an effort and `off` must omit the key. The dialect decides
+/// this by itself, so other effort models keep their provider-default `auto`
+/// and `none` off.
+void _writeMistral(Map<String, dynamic> body, ReasoningResolution resolution) {
   // Mistral rejects a top-level `thinking` switch at every level.
   body.remove('thinking');
   if (resolution.requested == ReasoningLevel.off) {
@@ -263,6 +255,9 @@ bool _usesResponsesEnvelope(
   ReasoningDialect dialect,
   ReasoningTransport transport,
 ) {
+  // Mistral only has chat completions: its effort is always top-level, even
+  // when a caller passes the Responses transport.
+  if (dialect == ReasoningDialect.mistral) return false;
   return switch (transport) {
     ReasoningTransport.responses => true,
     ReasoningTransport.chatCompletions => false,
@@ -278,8 +273,7 @@ void _writeAutoSurfaceFlags(
   ReasoningTransport transport,
 ) {
   final dialect = spec.reasoning.dialect;
-  if (_effortDefaultIsOff(spec) &&
-      transport == ReasoningTransport.chatCompletions) {
+  if (dialect == ReasoningDialect.mistral) {
     // Omitting `reasoning_effort` means "do not think", so `auto` has to name
     // an effort to keep its "reasoning on" meaning. `high` is fixed: it is the
     // one effort every Mistral model accepts, while a user-editable ladder
@@ -325,6 +319,10 @@ void _stripDialectOwnedKeys(
   ReasoningTransport transport,
 ) {
   switch (dialect) {
+    case ReasoningDialect.mistral:
+      // Owns the effort and must never leave a top-level `thinking` switch.
+      body.remove('reasoning_effort');
+      body.remove('thinking');
     case ReasoningDialect.openaiReasoningEffort:
     case ReasoningDialect.openaiResponsesReasoning:
       if (_usesResponsesEnvelope(dialect, transport)) {
@@ -380,16 +378,13 @@ void _writeDialect(
   ReasoningTransport transport,
 ) {
   final dialect = spec.reasoning.dialect;
-  if (_effortDefaultIsOff(spec) &&
-      transport == ReasoningTransport.chatCompletions) {
-    _writeEffortDefaultOff(body, resolution);
-    return;
-  }
   if (_isOpenAiDialect(dialect)) {
     _writeOpenAi(body, dialect, resolution, transport);
     return;
   }
   switch (dialect) {
+    case ReasoningDialect.mistral:
+      _writeMistral(body, resolution);
     case ReasoningDialect.openrouterReasoning:
       _writeOpenRouter(body, spec, resolution);
     case ReasoningDialect.anthropicBudget:
