@@ -51,6 +51,7 @@ class BrandAssets {
         MapEntry(RegExp(r'aliyun|阿里云|百炼'), 'alibabacloud-color.svg'),
         MapEntry(RegExp(r'bytedance|火山'), 'bytedance-color.svg'),
         MapEntry(RegExp(r'silicon|硅基'), 'siliconflow-color.svg'),
+        MapEntry(RegExp(r'sambanova'), 'sambanova-color.png'),
         MapEntry(RegExp(r'aihubmix'), 'aihubmix-color.svg'),
         MapEntry(RegExp(r'ollama'), 'ollama.svg'),
         MapEntry(RegExp(r'github'), 'github.svg'),
@@ -180,6 +181,11 @@ class BrandAssets {
       id: 'siliconflow',
       label: 'SiliconFlow',
       asset: 'assets/icons/siliconflow-color.svg',
+    ),
+    BrandIconOption(
+      id: 'sambanova',
+      label: 'SambaNova',
+      asset: 'assets/icons/sambanova-color.png',
     ),
     BrandIconOption(
       id: 'sensenova',

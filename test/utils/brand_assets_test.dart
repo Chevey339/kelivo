@@ -10,6 +10,14 @@ void main() {
       expect(BrandAssets.assetNeedsDarkInvert(asset), isTrue);
     });
 
+    test('SambaNova icon resolves and is selectable', () {
+      const asset = 'assets/icons/sambanova-color.png';
+      expect(BrandAssets.assetForName('SambaNova'), asset);
+      expect(BrandAssets.assetForName('sambanova'), asset);
+      expect(BrandAssets.selectableAssetOrNull(asset), asset);
+      expect(BrandAssets.assetNeedsDarkInvert(asset), isFalse);
+    });
+
     test('mapped Metaso icon is selectable as a built-in provider avatar', () {
       final asset = BrandAssets.assetForName('metaso');
 
