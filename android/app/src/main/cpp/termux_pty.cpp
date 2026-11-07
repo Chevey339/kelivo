@@ -14,6 +14,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <vector>
+#include "workspace_process.h"
 
 #define LOG_TAG "KelivoPtyJni"
 
@@ -102,6 +103,9 @@ Java_com_psyche_kelivo_workspace_PtyJni_createSubprocess(
     }
 
     if (pid == 0) {
+        // ART blocks SIGQUIT in its threads. PRoot must be able to receive the
+        // shutdown signal after exec, including after the app process dies.
+        if (!reset_workspace_signal_mask()) _exit(127);
         setsid();
         const int slave = open(slave_name, O_RDWR);
         if (slave < 0) _exit(127);
@@ -117,6 +121,9 @@ Java_com_psyche_kelivo_workspace_PtyJni_createSubprocess(
         dup2(slave, STDERR_FILENO);
         if (slave > STDERR_FILENO) close(slave);
         close(master);
+        // A terminal opened after an MCP must not keep its stdin pipe alive
+        // when the app dies. Only the three PTY standard descriptors survive.
+        if (!close_inherited_workspace_fds()) _exit(127);
 
         if (working_dir != nullptr && working_dir[0] != '\0') {
             chdir(working_dir);
