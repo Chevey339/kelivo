@@ -1,5 +1,8 @@
+import 'dart:ui' as ui;
+
 import 'package:Kelivo/features/home/widgets/chat_input_overlay_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -372,25 +375,192 @@ void main() {
     expect(find.byKey(topBackgroundKey), findsOneWidget);
     expect(find.byKey(backgroundKey), findsNWidgets(2));
 
-    final clipRect = tester.widget<ClipRect>(
-      find.ancestor(
-        of: find.byKey(topBackgroundKey),
-        matching: find.byType(ClipRect),
-      ),
+    final topMask = find.descendant(
+      of: find.byKey(topBackgroundKey),
+      matching: find.byType(ShaderMask),
     );
-    final clip = clipRect.clipper!.getClip(const Size(400, 600));
-    expect(clip.height, 116);
-
-    final bottomClipRect = tester.widget<ClipRect>(
-      find.ancestor(
-        of: find.byKey(bottomBackgroundKey),
-        matching: find.byType(ClipRect),
-      ),
+    final bottomMask = find.descendant(
+      of: find.byKey(bottomBackgroundKey),
+      matching: find.byType(ShaderMask),
     );
-    final bottomClip = bottomClipRect.clipper!.getClip(const Size(400, 600));
-    expect(bottomClip.top, 420);
-    expect(bottomClip.height, 180);
+    // The composited masks themselves must fit the strips, not just their
+    // outer clips. Their full-window artwork must still share one origin.
+    expect(tester.getRect(topMask), const Rect.fromLTWH(0, 0, 400, 116));
+    expect(tester.getRect(bottomMask), const Rect.fromLTWH(0, 420, 400, 180));
+    for (final mask in [topMask, bottomMask]) {
+      expect(
+        tester.getRect(
+          find.descendant(of: mask, matching: find.byType(ClipRect)),
+        ),
+        tester.getRect(mask),
+      );
+    }
+    for (final background in find.byKey(backgroundKey).evaluate()) {
+      final renderBox = background.renderObject! as RenderBox;
+      expect(renderBox.size, const Size(400, 600));
+      expect(renderBox.localToGlobal(Offset.zero), Offset.zero);
+    }
   });
+
+  for (final brightness in Brightness.values) {
+    testWidgets('背景图加载和透明区域不会让正文穿过覆盖层 ($brightness)', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 800);
+      addTearDown(tester.view.reset);
+      final boundaryKey = GlobalKey();
+      final wallpaper = ValueNotifier<Color?>(null);
+      addTearDown(wallpaper.dispose);
+      final surface = brightness == Brightness.dark
+          ? Colors.black
+          : Colors.white;
+
+      void expectColor(Color actual, Color expected, String reason) {
+        for (final channel in [
+          (actual.r, expected.r),
+          (actual.g, expected.g),
+          (actual.b, expected.b),
+          (actual.a, expected.a),
+        ]) {
+          expect(channel.$1, closeTo(channel.$2, 2 / 255), reason: reason);
+        }
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.purple,
+              brightness: brightness,
+            ).copyWith(surface: surface),
+          ),
+          home: RepaintBoundary(
+            key: boundaryKey,
+            child: Scaffold(
+              body: ValueListenableBuilder<Color?>(
+                valueListenable: wallpaper,
+                builder: (context, color, _) => ChatInputOverlayLayout(
+                  topInset: 100,
+                  backgroundImageActive: true,
+                  topBackground: color == null
+                      ? const SizedBox.expand()
+                      : ColoredBox(color: color),
+                  content: const ColoredBox(color: Colors.red),
+                  bottomOverlay: const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (final color in [
+        null,
+        Colors.green.withValues(alpha: 0.5),
+        Colors.green,
+        null,
+      ]) {
+        wallpaper.value = color;
+        await tester.pumpAndSettle();
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = boundary.toImageSync();
+        final bytes = await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        );
+        Color sample(int y) {
+          final offset = (y * image.width + 200) * 4;
+          return Color.fromARGB(
+            bytes!.getUint8(offset + 3),
+            bytes.getUint8(offset),
+            bytes.getUint8(offset + 1),
+            bytes.getUint8(offset + 2),
+          );
+        }
+
+        final top = sample(24);
+        final middle = sample(400);
+        final bottom = sample(799);
+        image.dispose();
+        final background = Color.alphaBlend(
+          color ?? Colors.transparent,
+          surface,
+        );
+        expectColor(top, background, 'Top bar: $color');
+        expectColor(middle, Colors.red, 'Visible messages: $color');
+        final expectedBottom = Color.alphaBlend(
+          background.withValues(
+            alpha: brightness == Brightness.dark ? 0.92 : 0.98,
+          ),
+          Colors.red,
+        );
+        expectColor(bottom, expectedBottom, 'Bottom bar: $color');
+      }
+    });
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('横屏键盘缩短视口时保持底部渐变范围 ($brightness)', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 390);
+      addTearDown(tester.view.reset);
+      final boundaryKey = GlobalKey();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: brightness),
+          home: RepaintBoundary(
+            key: boundaryKey,
+            child: const Scaffold(
+              resizeToAvoidBottomInset: true,
+              body: ChatInputOverlayLayout(
+                topInset: 56,
+                backgroundImageActive: true,
+                topBackground: ColoredBox(color: Colors.white),
+                content: ColoredBox(color: Colors.black),
+                bottomOverlay: SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Future<List<int>> sampleColumn() async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = boundary.toImageSync();
+        try {
+          final bytes = await tester.runAsync(
+            () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+          );
+          return [
+            for (var y = 0; y < image.height; y++)
+              bytes!.getUint8((y * image.width + image.width ~/ 2) * 4),
+          ];
+        } finally {
+          image.dispose();
+        }
+      }
+
+      final baseline = await sampleColumn();
+      for (final height in [180, 160, 140, 120]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: 390.0 - height);
+        await tester.pumpAndSettle();
+        final actual = await sampleColumn();
+        // Below the 56px toolbar + 16px top fade, opacity depends only on
+        // distance from the bottom, even when part of the fade is offscreen.
+        for (var y = 72; y < height; y++) {
+          expect(
+            actual[y],
+            closeTo(baseline[y + 390 - height], 1),
+            reason: 'body height=$height, y=$y',
+          );
+        }
+      }
+    });
+  }
 
   testWidgets('键盘弹出时背景仍按键盘收起时的高度布局', (tester) async {
     const backgroundKey = Key('background');
