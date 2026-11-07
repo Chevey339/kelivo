@@ -1,3 +1,4 @@
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -2869,7 +2870,7 @@ void main() {
         final labels = tester.widgetList<Text>(host).toList();
         expect(labels, hasLength(progress > 0 && progress < 1 ? 2 : 1));
         for (final text in labels) {
-          expect(text.style!.fontWeight, FontWeight.w500);
+          expect(text.style!.fontWeight, AppFontWeights.medium);
           expect(text.style!.fontSize, 16);
         }
       }
