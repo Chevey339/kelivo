@@ -4840,6 +4840,18 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get reasoningLevelOff;
 
+  /// No description provided for @reasoningLevelOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get reasoningLevelOn;
+
+  /// No description provided for @reasoningLevelOnSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable reasoning'**
+  String get reasoningLevelOnSubtitle;
+
   /// No description provided for @reasoningLevelOffSubtitle.
   ///
   /// In en, this message translates to:

@@ -912,6 +912,8 @@
   "reasoningLevelAuto": "自動",
   "reasoningLevelAutoSubtitle": "使用模型或供應商的預設設定",
   "reasoningLevelOff": "關閉",
+  "reasoningLevelOn": "開啟",
+  "reasoningLevelOnSubtitle": "啟用推理",
   "reasoningLevelOffSubtitle": "關閉推理，直接回答",
   "reasoningLevelMinimal": "最低",
   "reasoningLevelMinimalSubtitle": "使用極少推理來回答問題",

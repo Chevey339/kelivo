@@ -905,6 +905,8 @@
   "reasoningLevelAuto": "自动",
   "reasoningLevelAutoSubtitle": "使用模型或供应商的默认设置",
   "reasoningLevelOff": "关闭",
+  "reasoningLevelOn": "开启",
+  "reasoningLevelOnSubtitle": "启用推理",
   "reasoningLevelOffSubtitle": "关闭推理，直接回答",
   "reasoningLevelMinimal": "最低",
   "reasoningLevelMinimalSubtitle": "使用极少推理来回答问题",

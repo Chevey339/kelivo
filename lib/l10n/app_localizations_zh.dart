@@ -2498,6 +2498,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningLevelOff => '关闭';
 
   @override
+  String get reasoningLevelOn => '开启';
+
+  @override
+  String get reasoningLevelOnSubtitle => '启用推理';
+
+  @override
   String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
 
   @override
@@ -18205,6 +18211,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningLevelOff => '关闭';
 
   @override
+  String get reasoningLevelOn => '开启';
+
+  @override
+  String get reasoningLevelOnSubtitle => '启用推理';
+
+  @override
   String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
 
   @override
@@ -33766,6 +33778,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningLevelOff => '關閉';
+
+  @override
+  String get reasoningLevelOn => '開啟';
+
+  @override
+  String get reasoningLevelOnSubtitle => '啟用推理';
 
   @override
   String get reasoningLevelOffSubtitle => '關閉推理，直接回答';

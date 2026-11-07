@@ -2592,6 +2592,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningLevelOff => 'Off';
 
   @override
+  String get reasoningLevelOn => 'On';
+
+  @override
+  String get reasoningLevelOnSubtitle => 'Enable reasoning';
+
+  @override
   String get reasoningLevelOffSubtitle =>
       'Turn off reasoning and answer directly';
 

@@ -15,6 +15,7 @@ import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
 import '../services/model_spec/model_spec_resolver.dart';
+import '../services/model_spec/ollama_model_service.dart';
 import '../services/model_catalog/model_catalog_service.dart';
 
 abstract class BaseProvider {
@@ -36,6 +37,13 @@ class _Http {
 }
 
 class OpenAIProvider extends BaseProvider {
+  OpenAIProvider({OllamaModelService? ollama, ModelSpecResolver? resolver})
+    : _ollama = ollama ?? OllamaModelService.instance,
+      _resolver = resolver ?? ModelSpecResolver.instance;
+
+  final OllamaModelService _ollama;
+  final ModelSpecResolver _resolver;
+
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
@@ -46,16 +54,18 @@ class OpenAIProvider extends BaseProvider {
       );
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-      final res = await client.get(
-        uri,
-        headers: _Http.modelListHeaders(cfg, headers),
-      );
+      final mergedHeaders = _Http.modelListHeaders(cfg, headers);
+      final ollamaIds = await _ollama.fetchModels(cfg, mergedHeaders);
+      if (ollamaIds != null) {
+        return [for (final id in ollamaIds) _resolver.spec(cfg, id)];
+      }
+      final res = await client.get(uri, headers: mergedHeaders);
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelSpecResolver.instance
+              _resolver
                   .resolve(
                     cfg,
                     e['id'] as String,

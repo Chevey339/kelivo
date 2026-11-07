@@ -1102,6 +1102,8 @@
   "reasoningLevelAuto": "Auto",
   "reasoningLevelAutoSubtitle": "Uses the model or provider default",
   "reasoningLevelOff": "Off",
+  "reasoningLevelOn": "On",
+  "reasoningLevelOnSubtitle": "Enable reasoning",
   "reasoningLevelOffSubtitle": "Turn off reasoning and answer directly",
   "reasoningLevelMinimal": "Minimal",
   "reasoningLevelMinimalSubtitle": "Use the lightest reasoning to answer questions",

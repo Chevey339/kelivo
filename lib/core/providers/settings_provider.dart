@@ -41,6 +41,7 @@ import '../models/memory_entry.dart';
 import '../models/model_spec.dart';
 import '../models/reasoning_request.dart';
 import '../services/model_spec/model_spec_resolver.dart';
+import '../services/model_spec/ollama_model_service.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
@@ -680,6 +681,7 @@ class SettingsProvider extends ChangeNotifier {
     final prefs = _preferences;
     await prefs.load();
     final localPreferences = await SharedPreferences.getInstance();
+    await OllamaModelService.instance.ensureLoaded();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
     final m = prefs.getString(_themeModeKey);
     switch (m) {

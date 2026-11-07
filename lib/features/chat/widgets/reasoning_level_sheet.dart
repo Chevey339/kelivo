@@ -100,6 +100,7 @@ String reasoningLevelLabel(AppLocalizations l10n, ReasoningLevel level) {
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAuto,
     ReasoningLevel.off => l10n.reasoningLevelOff,
+    ReasoningLevel.on => l10n.reasoningLevelOn,
     ReasoningLevel.minimal => l10n.reasoningLevelMinimal,
     ReasoningLevel.low => l10n.reasoningLevelLow,
     ReasoningLevel.medium => l10n.reasoningLevelMedium,
@@ -113,6 +114,7 @@ String reasoningLevelCompactLabel(AppLocalizations l10n, ReasoningLevel level) {
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAuto,
     ReasoningLevel.off => l10n.reasoningLevelOff,
+    ReasoningLevel.on => l10n.reasoningLevelOn,
     ReasoningLevel.minimal => l10n.reasoningLevelCompactMin,
     ReasoningLevel.low => l10n.reasoningLevelCompactLow,
     ReasoningLevel.medium => l10n.reasoningLevelCompactMid,
@@ -129,6 +131,7 @@ String reasoningLevelEffortSubtitle(
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAutoSubtitle,
     ReasoningLevel.off => l10n.reasoningLevelOffSubtitle,
+    ReasoningLevel.on => l10n.reasoningLevelOnSubtitle,
     ReasoningLevel.minimal => l10n.reasoningLevelMinimalSubtitle,
     ReasoningLevel.low => l10n.reasoningLevelLowSubtitle,
     ReasoningLevel.medium => l10n.reasoningLevelMediumSubtitle,

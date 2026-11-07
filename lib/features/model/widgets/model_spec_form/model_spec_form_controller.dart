@@ -76,7 +76,7 @@ class ModelSpecFormController extends ChangeNotifier {
           ? (draft.pricing?.currency ?? 'USD')
           : (pricing?.currency ?? ''),
     );
-    for (final level in kModelSpecEditableLevels) {
+    for (final level in [ReasoningLevel.on, ...kModelSpecEditableLevels]) {
       budgetControllers[level] = TextEditingController(
         text: _formatInt(draft.reasoning?.budgets?[level]),
       );
@@ -190,7 +190,7 @@ class ModelSpecFormController extends ChangeNotifier {
         _patchReasoning((current) => current.copyWith(clearDefaultLevel: true));
       case ModelSpecField.reasoningBudgets:
         _patchReasoning((current) => current.copyWith(clearBudgets: true));
-        for (final level in kModelSpecEditableLevels) {
+        for (final level in [ReasoningLevel.on, ...kModelSpecEditableLevels]) {
           _setControllerText(budgetControllers[level]!, '');
         }
       case ModelSpecField.reasoningReplay:
