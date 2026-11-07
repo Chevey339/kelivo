@@ -2,8 +2,11 @@ import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
+
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +18,7 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
@@ -64,6 +68,33 @@ class _InterruptedWriter extends FakeWorkspaceRuntime {
     yield const CommandStarted();
     File(p.join(request.cwd, 'partial.txt')).writeAsStringSync('saved');
     if (throwError) throw StateError('stream interrupted');
+  }
+}
+
+class _ConcurrentShellRuntime extends FakeWorkspaceRuntime {
+  final firstStarted = Completer<void>();
+  final secondStarted = Completer<void>();
+  final releaseFirst = Completer<void>();
+
+  @override
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    if (request.command == 'first') {
+      yield const CommandStarted(pid: 1);
+      File(p.join(request.cwd, 'from-first.txt')).writeAsStringSync('first');
+      firstStarted.complete();
+      await releaseFirst.future;
+    } else {
+      secondStarted.complete();
+      yield const CommandStarted(pid: 2);
+      File(p.join(request.cwd, 'from-second.txt')).writeAsStringSync('second');
+    }
+    yield const CommandExited(
+      exitCode: 0,
+      timedOut: false,
+      cancelled: false,
+      interrupted: false,
+      duration: Duration.zero,
+    );
   }
 }
 
@@ -121,18 +152,21 @@ void main() {
     Set<String> disabledTools = const {},
     List<Mount> externalMounts = const [],
     Future<List<Mount>> Function()? loadExternalMounts,
+    Directory? sessionOverride,
+    String? conversationIdOverride,
   }) {
+    final session = sessionOverride ?? sessionDir;
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
             externalMounts: externalMounts,
             loadExternalMounts: loadExternalMounts,
             workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           )
         : WorkspacePaths.native(
             workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
@@ -144,9 +178,9 @@ void main() {
           : ToolPermissionMode.requestApproval,
       binding: WorkspaceBinding(workspaceId: 'ws1', toolsUsed: toolsUsed),
       paths: paths,
-      sessionDir: sessionDir,
-      outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
-      conversationId: 'conv-1',
+      sessionDir: session,
+      outputsDir: Directory(p.join(session.path, 'outputs')),
+      conversationId: conversationIdOverride ?? 'conv-1',
       runtimeStatus:
           status ??
           RuntimeStatus(ready: true, engine: 'fake', sandboxed: sandboxed),
@@ -631,6 +665,93 @@ void main() {
         expect(changed, isNotNull);
         expect(changed, anyElement(contains('new.txt')));
         expect(File(p.join(workspaceDir.path, 'new.txt')).existsSync(), isTrue);
+      },
+    );
+
+    test(
+      'serializes shared-workspace shells before taking snapshots',
+      () async {
+        final secondSession = await Directory(
+          p.join(tmp.path, 'second-session'),
+        ).create();
+        await Directory(p.join(secondSession.path, 'outputs')).create();
+        final runtime = _ConcurrentShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(
+          ctx(conversationIdOverride: 'first-conversation'),
+          'shell',
+          {'command': 'first'},
+          toolCallId: 'first-shell',
+        );
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+
+        final second = tools.handle(
+          ctx(
+            conversationIdOverride: 'second-conversation',
+            sessionOverride: secondSession,
+          ),
+          'shell',
+          {'command': 'second'},
+          toolCallId: 'second-shell',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+
+        runtime.releaseFirst.complete();
+        final firstMeta = metaOf(await first);
+        final secondMeta = metaOf(await second);
+        expect(firstMeta.files.map((file) => p.basename(file.path)).toList(), [
+          'from-first.txt',
+        ]);
+        expect(secondMeta.files.map((file) => p.basename(file.path)).toList(), [
+          'from-second.txt',
+        ]);
+      },
+    );
+
+    test(
+      'cancelling a shell queued behind another conversation releases it',
+      () async {
+        final secondSession = await Directory(
+          p.join(tmp.path, 'cancelled-session'),
+        ).create();
+        await Directory(p.join(secondSession.path, 'outputs')).create();
+        final runtime = _ConcurrentShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(
+          ctx(conversationIdOverride: 'first-conversation'),
+          'shell',
+          {'command': 'first'},
+          toolCallId: 'first-shell',
+        );
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+
+        final cancelled = Completer<void>();
+        var isCancelled = false;
+        final second =
+            ToolCallCancellation(
+              isCancelled: () => isCancelled,
+              cancelled: cancelled.future,
+            ).run(
+              () => tools.handle(
+                ctx(
+                  conversationIdOverride: 'cancelled-conversation',
+                  sessionOverride: secondSession,
+                ),
+                'shell',
+                {'command': 'second'},
+                toolCallId: 'cancelled-shell',
+              ),
+            );
+        isCancelled = true;
+        cancelled.complete();
+        final result = await second.timeout(const Duration(seconds: 3));
+        expect(jsonOf(result)['error'], 'tool_failed');
+        expect(jsonOf(result)['message'], contains('tool_call_cancelled'));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+
+        runtime.releaseFirst.complete();
+        await first;
       },
     );
 
