@@ -96,6 +96,82 @@ void main() {
       expect(usage.limit, isNull);
     });
 
+    test('estimates DeepSeek requests from the account balance', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.toString(), 'https://api.deepseek.com/user/balance');
+        expect(request.headers['Authorization'], 'Bearer sk-test');
+        return http.Response('''
+          {
+            "is_available": true,
+            "balance_infos": [
+              {
+                "currency": "CNY",
+                "total_balance": "110.00",
+                "granted_balance": "10.00",
+                "topped_up_balance": "100.00"
+              },
+              {
+                "currency": "USD",
+                "total_balance": "1.50",
+                "granted_balance": "0.00",
+                "topped_up_balance": "1.50"
+              }
+            ]
+          }
+          ''', 200);
+      });
+
+      final usage = await SearchServiceUsageService.fetch(
+        DeepSeekOptions(id: 'deepseek', apiKey: ' sk-test '),
+        client: client,
+      );
+
+      // CNY 110 / (5 per 1,000) + USD 1.50 / (0.75 per 1,000).
+      expect(usage.remaining, 24000);
+      expect(usage.balances, {'CNY': 110, 'USD': 1.5});
+      expect(usage.used, isNull);
+      expect(usage.limit, isNull);
+    });
+
+    test('does not count a negative DeepSeek balance', () async {
+      final client = MockClient((_) async {
+        return http.Response('''
+          {
+            "is_available": false,
+            "balance_infos": [
+              {"currency": "CNY", "total_balance": "-0.50"}
+            ]
+          }
+          ''', 200);
+      });
+
+      final usage = await SearchServiceUsageService.fetch(
+        DeepSeekOptions(id: 'deepseek', apiKey: 'sk-test'),
+        client: client,
+      );
+
+      expect(usage.remaining, 0);
+      expect(usage.balances, {'CNY': -0.5});
+    });
+
+    test('rejects a DeepSeek balance without a priced currency', () async {
+      final client = MockClient((_) async {
+        return http.Response(
+          '{"balance_infos":[{"currency":"EUR","total_balance":"5.00"}]}',
+          200,
+        );
+      });
+
+      expect(
+        () => SearchServiceUsageService.fetch(
+          DeepSeekOptions(id: 'deepseek', apiKey: 'sk-test'),
+          client: client,
+        ),
+        throwsA(isA<SearchServiceUsageException>()),
+      );
+    });
+
     test('retries a transient Tavily TLS handshake failure', () async {
       var attempts = 0;
       final client = MockClient((_) async {

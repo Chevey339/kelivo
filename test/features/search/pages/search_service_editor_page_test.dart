@@ -991,6 +991,48 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
+  testWidgets('shows DeepSeek requests estimated from the balance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(deepSeekSearchUsageCardPreview());
+
+    expect(find.text('约可调用 22,000 次搜索/抓取'), findsOneWidget);
+    expect(find.text('余额 ¥110.00 · 每千次 ¥5.00'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('queries DeepSeek balance when the editor opens', (tester) async {
+    var queryCount = 0;
+    await _pumpEditor(
+      tester,
+      initialService: DeepSeekOptions(id: 'deepseek', apiKey: 'sk-test'),
+      autoQueryUsage: true,
+      usageFetcher: (options) async {
+        queryCount++;
+        expect(options, isA<DeepSeekOptions>());
+        return const SearchServiceUsageInfo(
+          remaining: 24000,
+          balances: {'CNY': 110, 'USD': 1.5},
+        );
+      },
+      onResult: (_) {},
+    );
+
+    expect(queryCount, 1);
+    expect(
+      find.text('About 24,000 Search/Fetch requests left'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Balance ¥110.00 · ¥5.00 per 1,000 requests'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(r'Balance $1.50 · $0.75 per 1,000 requests'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('manages the full key pool on the API keys page', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(

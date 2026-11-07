@@ -1344,6 +1344,14 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         endpoint: '',
       );
     }
+    if (options is DeepSeekOptions) {
+      return (
+        id: options.id,
+        provider: 'deepseek',
+        credential: options.apiKey.trim(),
+        endpoint: '',
+      );
+    }
     return null;
   }
 
@@ -1914,6 +1922,39 @@ class _SearchServiceUsageCard extends StatelessWidget {
         ),
       );
     }
+    if (service is DeepSeekOptions) {
+      const prices = SearchServiceUsageService.deepSeekPricePer1000Requests;
+      return Column(
+        key: ValueKey('deepseek-usage-${value.remaining}'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.searchServiceEditorUsageDeepSeekRequests(
+              _formatUsageNumber(context, value.remaining),
+            ),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.primary,
+            ),
+          ),
+          for (final MapEntry(key: currency, value: amount)
+              in value.balances.entries) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.searchServiceEditorUsageDeepSeekBalance(
+                _formatUsageCurrency(context, amount, currency),
+                _formatUsageCurrency(context, prices[currency]!, currency),
+              ),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: cs.onSurface.withValues(alpha: 0.68),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     return Text(
       l10n.searchServiceEditorUsageRemaining(
         _formatUsageNumber(context, value.remaining),
@@ -1955,6 +1996,13 @@ String _formatUsageNumber(BuildContext context, num value) {
         ..minimumFractionDigits = 0
         ..maximumFractionDigits = 2;
   return format.format(value);
+}
+
+String _formatUsageCurrency(BuildContext context, num value, String currency) {
+  return NumberFormat.simpleCurrency(
+    locale: Localizations.localeOf(context).toLanguageTag(),
+    name: currency,
+  ).format(value);
 }
 
 class _SearchEditorDropdown extends StatelessWidget {
@@ -2718,6 +2766,7 @@ bool _hasUsageCredential(SearchServiceOptions? options) {
   return switch (options) {
     TavilyOptions value => value.apiKey.trim().isNotEmpty,
     LinkUpOptions value => value.apiKey.trim().isNotEmpty,
+    DeepSeekOptions value => value.apiKey.trim().isNotEmpty,
     _ => false,
   };
 }
@@ -3011,6 +3060,28 @@ Widget linkUpSearchUsageCardPreview() {
   return _searchUsageCardPreview(
     service: LinkUpOptions(id: 'preview-linkup', apiKey: 'linkup-preview-key'),
     usage: const SearchServiceUsageInfo(remaining: 123.46),
+  );
+}
+
+@Preview(
+  name: 'DeepSeek balance · Light',
+  group: 'Search service usage',
+  size: Size(390, 220),
+  brightness: Brightness.light,
+)
+@Preview(
+  name: 'DeepSeek balance · Dark',
+  group: 'Search service usage',
+  size: Size(390, 220),
+  brightness: Brightness.dark,
+)
+Widget deepSeekSearchUsageCardPreview() {
+  return _searchUsageCardPreview(
+    service: DeepSeekOptions(id: 'preview-deepseek', apiKey: 'sk-preview-key'),
+    usage: const SearchServiceUsageInfo(
+      remaining: 22000,
+      balances: {'CNY': 110},
+    ),
   );
 }
 
