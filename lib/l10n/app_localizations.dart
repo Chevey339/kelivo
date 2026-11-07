@@ -4627,19 +4627,19 @@ abstract class AppLocalizations {
   /// No description provided for @compressContextKeepStart.
   ///
   /// In en, this message translates to:
-  /// **'Start sample'**
+  /// **'Earlier history'**
   String get compressContextKeepStart;
 
   /// No description provided for @compressContextKeepRecent.
   ///
   /// In en, this message translates to:
-  /// **'End sample'**
+  /// **'Recent history'**
   String get compressContextKeepRecent;
 
   /// No description provided for @compressContextUnlimited.
   ///
   /// In en, this message translates to:
-  /// **'All content'**
+  /// **'All active history'**
   String get compressContextUnlimited;
 
   /// No description provided for @compressContextMaxCharsLabel.
@@ -4675,7 +4675,7 @@ abstract class AppLocalizations {
   /// No description provided for @compressContextKeepRecentMessages.
   ///
   /// In en, this message translates to:
-  /// **'Keep N'**
+  /// **'Keep recent turns'**
   String get compressContextKeepRecentMessages;
 
   /// No description provided for @compressContextKeepCountLabel.
@@ -27135,7 +27135,7 @@ abstract class AppLocalizations {
   /// No description provided for @compressIncludeAttachmentsDesc.
   ///
   /// In en, this message translates to:
-  /// **'Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.'**
+  /// **'Include available attachment text and complete tool records in their original order. Images are not reinterpreted.'**
   String get compressIncludeAttachmentsDesc;
 
   /// No description provided for @worldBookEntriesMoved.
@@ -28283,6 +28283,696 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'UltraFast requires the Responses API.'**
   String get responseSpeedUltrafastNeedsResponses;
+
+  /// No description provided for @compressionTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary template'**
+  String get compressionTemplate;
+
+  /// No description provided for @compressionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get compressionGeneral;
+
+  /// No description provided for @compressionCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get compressionCode;
+
+  /// No description provided for @compressionWriting.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing'**
+  String get compressionWriting;
+
+  /// No description provided for @compressionResearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Research'**
+  String get compressionResearch;
+
+  /// No description provided for @compressionRoleplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Roleplay'**
+  String get compressionRoleplay;
+
+  /// No description provided for @compressionOriginalPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'My original prompt'**
+  String get compressionOriginalPrompt;
+
+  /// No description provided for @compressionMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More settings'**
+  String get compressionMore;
+
+  /// No description provided for @compressionFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus for this run'**
+  String get compressionFocus;
+
+  /// No description provided for @compressionFocusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional: key decisions, progress or character details'**
+  String get compressionFocusHint;
+
+  /// No description provided for @compressionForConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'For this conversation'**
+  String get compressionForConversation;
+
+  /// No description provided for @compressionFollowGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow global defaults'**
+  String get compressionFollowGlobal;
+
+  /// No description provided for @compressionSetGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as global defaults'**
+  String get compressionSetGlobal;
+
+  /// No description provided for @compressionGlobalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Affects conversations that follow global defaults. Conversation overrides stay unchanged.'**
+  String get compressionGlobalDescription;
+
+  /// No description provided for @compressionAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic compression'**
+  String get compressionAutoTitle;
+
+  /// No description provided for @compressionAutoOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get compressionAutoOff;
+
+  /// No description provided for @compressionAutoNotify.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify only'**
+  String get compressionAutoNotify;
+
+  /// No description provided for @compressionAutoOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get compressionAutoOn;
+
+  /// No description provided for @compressionNearLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Context is near its estimated capacity. You can keep chatting or compress manually.'**
+  String get compressionNearLimit;
+
+  /// No description provided for @compressionKeepTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recent'**
+  String get compressionKeepTurns;
+
+  /// No description provided for @compressionKeepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A turn includes a user message, its replies and tools.'**
+  String get compressionKeepHint;
+
+  /// No description provided for @compressionLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary limit (tokens)'**
+  String get compressionLength;
+
+  /// No description provided for @compressionTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Start at'**
+  String get compressionTrigger;
+
+  /// No description provided for @compressionTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress to'**
+  String get compressionTarget;
+
+  /// No description provided for @compressionWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning window'**
+  String get compressionWindow;
+
+  /// No description provided for @compressionRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum calls'**
+  String get compressionRequests;
+
+  /// No description provided for @compressionReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference active world books and memory'**
+  String get compressionReference;
+
+  /// No description provided for @compressionReferenceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference explains names and rules; it is not evidence that events happened or characters know them.'**
+  String get compressionReferenceHint;
+
+  /// No description provided for @compressionToolReferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference consumed tool results'**
+  String get compressionToolReferences;
+
+  /// No description provided for @compressionToolReferencesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only with tool access. Keeps the latest unread results and allows exact, read-only recall.'**
+  String get compressionToolReferencesHint;
+
+  /// No description provided for @compressionSummaryScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Include summaries in world book keyword matching'**
+  String get compressionSummaryScan;
+
+  /// No description provided for @compressionChatModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the current chat model'**
+  String get compressionChatModel;
+
+  /// No description provided for @compressionManageTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage templates & recipes'**
+  String get compressionManageTemplates;
+
+  /// No description provided for @compressionLocalPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview request · no model call'**
+  String get compressionLocalPreview;
+
+  /// No description provided for @compressionTry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try summary · uses model tokens'**
+  String get compressionTry;
+
+  /// No description provided for @compressionPreviewOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Candidate only. Review and apply when ready.'**
+  String get compressionPreviewOnly;
+
+  /// No description provided for @compressionTemplateChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.'**
+  String get compressionTemplateChanged;
+
+  /// No description provided for @compressionRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize {count} messages · keep {turns} user turns verbatim'**
+  String compressionRange(int count, int turns);
+
+  /// No description provided for @compressionCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} model calls'**
+  String compressionCalls(int count);
+
+  /// No description provided for @compressionActualUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary model usage'**
+  String get compressionActualUsage;
+
+  /// No description provided for @compressionUsageValues.
+  ///
+  /// In en, this message translates to:
+  /// **'Input {input} · output {output} tokens'**
+  String compressionUsageValues(String input, String output);
+
+  /// No description provided for @compressionUsageUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage not returned for {count} attempts; these calls are not counted as free.'**
+  String compressionUsageUnknown(int count);
+
+  /// No description provided for @compressionBudgetError.
+  ///
+  /// In en, this message translates to:
+  /// **'The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.'**
+  String get compressionBudgetError;
+
+  /// No description provided for @compressionIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'The summary was truncated or refused and was not applied. Adjust the output limit or model.'**
+  String get compressionIncomplete;
+
+  /// No description provided for @compressionReferenceTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.'**
+  String get compressionReferenceTooLarge;
+
+  /// No description provided for @compressionReferenceChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Referenced background changed. Review the candidate or regenerate.'**
+  String get compressionReferenceChanged;
+
+  /// No description provided for @compressionTargetNotReached.
+  ///
+  /// In en, this message translates to:
+  /// **'The candidate did not reduce the full request below the automatic trigger. Original context was kept.'**
+  String get compressionTargetNotReached;
+
+  /// No description provided for @compressionTemplateMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected template is unavailable. Select another template.'**
+  String get compressionTemplateMissing;
+
+  /// No description provided for @compressionTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get compressionTemplates;
+
+  /// No description provided for @compressionRecipes.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipes'**
+  String get compressionRecipes;
+
+  /// No description provided for @compressionNewTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'New template'**
+  String get compressionNewTemplate;
+
+  /// No description provided for @compressionEditTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit template'**
+  String get compressionEditTemplate;
+
+  /// No description provided for @compressionRestoreDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get compressionRestoreDefault;
+
+  /// No description provided for @compressionCopyEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy & edit'**
+  String get compressionCopyEdit;
+
+  /// No description provided for @compressionTemplateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get compressionTemplateName;
+
+  /// No description provided for @compressionPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary instructions'**
+  String get compressionPrompt;
+
+  /// No description provided for @compressionLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Output language'**
+  String get compressionLanguage;
+
+  /// No description provided for @compressionLanguageConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the conversation'**
+  String get compressionLanguageConversation;
+
+  /// No description provided for @compressionLanguageLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep original template language behavior'**
+  String get compressionLanguageLegacy;
+
+  /// No description provided for @compressionLanguageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Language code, or conversation / legacy'**
+  String get compressionLanguageHint;
+
+  /// No description provided for @compressionVariables.
+  ///
+  /// In en, this message translates to:
+  /// **'Supported variables; history is appended automatically if omitted:'**
+  String get compressionVariables;
+
+  /// No description provided for @compressionDeleteTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.'**
+  String get compressionDeleteTemplate;
+
+  /// No description provided for @compressionTemplateReferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by {count} conversation overrides.'**
+  String compressionTemplateReferences(int count);
+
+  /// No description provided for @compressionSaveRecipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Save these settings as a recipe'**
+  String get compressionSaveRecipe;
+
+  /// No description provided for @compressionBindModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Include the selected summary model'**
+  String get compressionBindModel;
+
+  /// No description provided for @compressionRecipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipes do not enable automatic compression. Import adds to the library without applying.'**
+  String get compressionRecipeHint;
+
+  /// No description provided for @compressionImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON'**
+  String get compressionImport;
+
+  /// No description provided for @compressionExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export JSON'**
+  String get compressionExport;
+
+  /// No description provided for @compressionCopyJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy JSON'**
+  String get compressionCopyJson;
+
+  /// No description provided for @compressionApplyRecipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply recipe'**
+  String get compressionApplyRecipe;
+
+  /// No description provided for @compressionInvalidSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the values: target must be below trigger, and call and token limits must be positive.'**
+  String get compressionInvalidSettings;
+
+  /// No description provided for @compressionOverflowAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress once, then retry the failed response'**
+  String get compressionOverflowAction;
+
+  /// No description provided for @compressionPlannedCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated {count} request(s) · limit {limit}, including retries'**
+  String compressionPlannedCalls(int count, int limit);
+
+  /// No description provided for @compressionGlobalTemplateReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Also used as the global default.'**
+  String get compressionGlobalTemplateReference;
+
+  /// No description provided for @compressionRecipeReferences.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} recipes keep independent template snapshots.'**
+  String compressionRecipeReferences(int count);
+
+  /// No description provided for @compressionReplacementTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement template'**
+  String get compressionReplacementTemplate;
+
+  /// No description provided for @compressionGeneralDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Current topic, decisions and unresolved questions.'**
+  String get compressionGeneralDescription;
+
+  /// No description provided for @compressionCodeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Code changes, actual checks and the next engineering step.'**
+  String get compressionCodeDescription;
+
+  /// No description provided for @compressionWritingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted text, structure, voice and editing constraints.'**
+  String get compressionWritingDescription;
+
+  /// No description provided for @compressionResearchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Evidence, sources, measurements and uncertainty.'**
+  String get compressionResearchDescription;
+
+  /// No description provided for @compressionRoleplayDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Scene continuity, character state and who knows what.'**
+  String get compressionRoleplayDescription;
+
+  /// No description provided for @compressionLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used: {date}'**
+  String compressionLastUsed(String date);
+
+  /// No description provided for @compressionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get compressionManage;
+
+  /// No description provided for @compressionOutputSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary settings'**
+  String get compressionOutputSettings;
+
+  /// No description provided for @compressionSourceSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'References & original text'**
+  String get compressionSourceSettings;
+
+  /// No description provided for @compressionSavedSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview & saved settings'**
+  String get compressionSavedSettings;
+
+  /// No description provided for @compressionNoRecipes.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved recipes yet'**
+  String get compressionNoRecipes;
+
+  /// No description provided for @compressionNoTemplatesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching templates'**
+  String get compressionNoTemplatesFound;
+
+  /// No description provided for @compressionBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get compressionBuiltIn;
+
+  /// No description provided for @compressionGlobalDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Global default'**
+  String get compressionGlobalDefault;
+
+  /// No description provided for @compressionCustomLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Other language'**
+  String get compressionCustomLanguage;
+
+  /// No description provided for @compressionCustomLanguageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Language name or code, e.g. Japanese / ja'**
+  String get compressionCustomLanguageHint;
+
+  /// No description provided for @compressionLibraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates & recipes'**
+  String get compressionLibraryTitle;
+
+  /// No description provided for @compressionBuiltInTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in templates'**
+  String get compressionBuiltInTemplates;
+
+  /// No description provided for @compressionMyTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'My templates'**
+  String get compressionMyTemplates;
+
+  /// No description provided for @compressionSearchTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Search templates'**
+  String get compressionSearchTemplates;
+
+  /// No description provided for @compressionSearchRecipes.
+  ///
+  /// In en, this message translates to:
+  /// **'Search recipes'**
+  String get compressionSearchRecipes;
+
+  /// No description provided for @compressionRecipeCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a recipe from More settings to reuse a configuration.'**
+  String get compressionRecipeCreateHint;
+
+  /// No description provided for @compressionTurnUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'turns'**
+  String get compressionTurnUnit;
+
+  /// No description provided for @compressionCallUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'calls'**
+  String get compressionCallUnit;
+
+  /// No description provided for @compressionAdvancedOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression details'**
+  String get compressionAdvancedOptions;
+
+  /// No description provided for @compressionAdvancedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'References, original-history rereading and request limits'**
+  String get compressionAdvancedHint;
+
+  /// No description provided for @compressionAutomaticWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get compressionAutomaticWindow;
+
+  /// No description provided for @compressionAutoOffHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress manually whenever you need.'**
+  String get compressionAutoOffHint;
+
+  /// No description provided for @compressionAutoNotifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify near the threshold; you decide when to compress.'**
+  String get compressionAutoNotifyHint;
+
+  /// No description provided for @compressionAutoOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize older history at the threshold. Extra model usage applies.'**
+  String get compressionAutoOnHint;
+
+  /// No description provided for @compressionBudgetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentages use the available input budget.'**
+  String get compressionBudgetHint;
+
+  /// No description provided for @compressionPreviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Local preview'**
+  String get compressionPreviewAction;
+
+  /// No description provided for @compressionSaveRecipeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save recipe'**
+  String get compressionSaveRecipeAction;
+
+  /// No description provided for @compressionManualRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope for this compression'**
+  String get compressionManualRange;
+
+  /// No description provided for @compressionScopeKeepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.'**
+  String get compressionScopeKeepHint;
+
+  /// No description provided for @compressionScopeAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize all history in the current context, including recent turns. Original messages stay available.'**
+  String get compressionScopeAllHint;
+
+  /// No description provided for @compressionScopeStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select earlier whole messages within the character budget. Other messages keep their original text.'**
+  String get compressionScopeStartHint;
+
+  /// No description provided for @compressionScopeRecentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select recent whole messages within the character budget. Other messages keep their original text.'**
+  String get compressionScopeRecentHint;
+
+  /// No description provided for @compressionAutoKeepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.'**
+  String get compressionAutoKeepHint;
 }
 
 class _AppLocalizationsDelegate

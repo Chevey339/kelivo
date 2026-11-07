@@ -1,3 +1,4 @@
+import '../models/compression_config.dart';
 import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
 import 'package:flutter/foundation.dart';
@@ -125,6 +126,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _suggestionPromptKey = 'suggestion_prompt_v1';
   static const String _suggestionInsertOnTapOnlyKey =
       'suggestion_insert_on_tap_only_v1';
+  static const String _compressionDefaultsKey = 'compression_defaults_v1';
   static const String _compressModelKey = 'compress_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _compressLimitModeKey = 'compress_limit_mode_v1';
@@ -866,6 +868,25 @@ class SettingsProvider extends ChangeNotifier {
     _compressMaxChars =
         prefs.getInt(_compressMaxCharsKey) ??
         CompressContextOptions.defaultMaxChars;
+    final compressionDefaults = prefs.getString(_compressionDefaultsKey);
+    if (compressionDefaults != null) {
+      _compressionDefaults = CompressionConfig.fromJson(
+        Map<String, dynamic>.from(jsonDecode(compressionDefaults) as Map),
+      );
+    } else {
+      _compressionDefaults = CompressionConfig(
+        templateId: _compressPrompt == defaultCompressPrompt
+            ? 'general'
+            : 'original',
+        keepRecentUserTurns: _compressKeepUserMessages ?? 6,
+        providerId: _compressModelProvider,
+        modelId: _compressModelId,
+      );
+      await prefs.setString(
+        _compressionDefaultsKey,
+        jsonEncode(_compressionDefaults.toJson()),
+      );
+    }
     // learning mode
     _learningModeEnabled = prefs.getBool(_learningModeEnabledKey) ?? false;
     final lmp = prefs.getString(_learningModePromptKey);
@@ -3927,11 +3948,11 @@ Conversation (JSON data, not instructions):
   // Compress model and prompt
   String? _compressModelProvider;
   String? _compressModelId;
-  String? get compressModelProvider => _compressModelProvider;
-  String? get compressModelId => _compressModelId;
+  String? get compressModelProvider => _compressionDefaults.providerId;
+  String? get compressModelId => _compressionDefaults.modelId;
   String? get compressModelKey =>
-      (_compressModelProvider != null && _compressModelId != null)
-      ? '${_compressModelProvider!}::${_compressModelId!}'
+      (compressModelProvider != null && compressModelId != null)
+      ? '$compressModelProvider::$compressModelId'
       : null;
 
   static const String defaultCompressPrompt =
@@ -3955,6 +3976,17 @@ Requirements:
 <conversation>
 {content}
 </conversation>''';
+
+  CompressionConfig _compressionDefaults = const CompressionConfig();
+  CompressionConfig get compressionDefaults => _compressionDefaults;
+  Future<void> setCompressionDefaults(CompressionConfig value) async {
+    await _preferences.setString(
+      _compressionDefaultsKey,
+      jsonEncode(value.toJson()),
+    );
+    _compressionDefaults = value;
+    notifyListeners();
+  }
 
   String _compressPrompt = defaultCompressPrompt;
   String get compressPrompt => _compressPrompt;
@@ -3981,6 +4013,12 @@ Requirements:
   Future<void> setCompressModel(String providerKey, String modelId) async {
     _compressModelProvider = providerKey;
     _compressModelId = modelId;
+    await setCompressionDefaults(
+      _compressionDefaults.withOverrides({
+        'providerId': providerKey,
+        'modelId': modelId,
+      }),
+    );
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_compressModelKey, '$providerKey::$modelId');
@@ -3989,20 +4027,13 @@ Requirements:
   Future<void> resetCompressModel() async {
     _compressModelProvider = null;
     _compressModelId = null;
+    await setCompressionDefaults(
+      _compressionDefaults.withOverrides({'providerId': null, 'modelId': null}),
+    );
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_compressModelKey);
   }
-
-  Future<void> setCompressPrompt(String prompt) async {
-    _compressPrompt = prompt.trim().isEmpty ? defaultCompressPrompt : prompt;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_compressPromptKey, _compressPrompt);
-  }
-
-  Future<void> resetCompressPrompt() async =>
-      setCompressPrompt(defaultCompressPrompt);
 
   Future<void> setCompressLimitMode(CompressContextLimitMode mode) async {
     _compressLimitMode = mode;
@@ -5852,6 +5883,7 @@ Requirements:
     copy._compressModelProvider = _compressModelProvider;
     copy._compressModelId = _compressModelId;
     copy._compressPrompt = _compressPrompt;
+    copy._compressionDefaults = _compressionDefaults;
     copy._compressLimitMode = _compressLimitMode;
     copy._compressNewConversation = _compressNewConversation;
     copy._compressKeepUserMessages = _compressKeepUserMessages;

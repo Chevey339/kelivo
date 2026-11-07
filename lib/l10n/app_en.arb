@@ -3,7 +3,6 @@
   "modelAvatarTitle": "Model icon",
   "avatarColor": "Color",
   "avatarMonochrome": "Monochrome",
-
   "settingsSearchHint": "Search settings",
   "settingsSearchCancel": "Cancel",
   "settingsSearchClear": "Clear search",
@@ -1048,15 +1047,15 @@
   "compressContextEmptySummary": "Compression returned an empty summary",
   "compressContextOptionsTitle": "Compress Context",
   "compressContextOptionsDesc": "Create an editable, reversible summary in this chat. Original messages are kept.",
-  "compressContextKeepStart": "Start sample",
-  "compressContextKeepRecent": "End sample",
-  "compressContextUnlimited": "All content",
+  "compressContextKeepStart": "Earlier history",
+  "compressContextKeepRecent": "Recent history",
+  "compressContextUnlimited": "All active history",
   "compressContextMaxCharsLabel": "Characters",
   "compressContextInvalidLimit": "Enter a positive character count",
   "compressContextStartButton": "Compress",
   "compressContextModelLabel": "Model",
   "compressContextModelUnset": "Select a model",
-  "compressContextKeepRecentMessages": "Keep N",
+  "compressContextKeepRecentMessages": "Keep recent turns",
   "compressContextKeepCountLabel": "Recent user messages",
   "compressContextKeepAllMessages": "Keeping that many covers all messages — nothing to compress",
   "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
@@ -1947,7 +1946,9 @@
   "providerDetailPageBalanceRequestHint": "These settings apply only to balance queries. Use {apiKeyPlaceholder} in headers or the body to insert the current API key. Authentication defaults to Bearer; a blank header value removes that header.",
   "@providerDetailPageBalanceRequestHint": {
     "placeholders": {
-      "apiKeyPlaceholder": { "type": "String" }
+      "apiKeyPlaceholder": {
+        "type": "String"
+      }
     }
   },
   "providerDetailPageBalanceBodyLabel": "Request Body (Optional)",
@@ -5821,11 +5822,19 @@
   "oauthQuotaAdvisory": "For reference only: active weekly credits make this monthly limit uncertain.",
   "oauthCreditsValue": "{value} credits",
   "@oauthCreditsValue": {
-    "placeholders": {"value": {"type": "String"}}
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
   },
   "oauthRemainingValue": "Remaining {value}",
   "@oauthRemainingValue": {
-    "placeholders": {"value": {"type": "String"}}
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
   },
   "oauthPromptCachingHelp": "Reuse context across messages and choose how long the cache is retained.",
   "scheduledTasksPreparation": "Execution and notifications",
@@ -7137,7 +7146,7 @@
   "compressCopyResult": "Copy result",
   "contextDetailInUse": "In use",
   "contextImpactDescription": "Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.",
-  "compressIncludeAttachmentsDesc": "Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.",
+  "compressIncludeAttachmentsDesc": "Include available attachment text and complete tool records in their original order. Images are not reinterpreted.",
   "worldBookEntriesMoved": "{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}",
   "contextImpactSourceDescription": "Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.",
   "contextEditTitle": "Edit summary",
@@ -7404,7 +7413,9 @@
   "@selectionQuoteMarker": {
     "description": "Numbered quote reference in sent, copied, and exported messages",
     "placeholders": {
-      "index": {"type": "int"}
+      "index": {
+        "type": "int"
+      }
     }
   },
   "selectionTranslate": "Translate",
@@ -7429,7 +7440,16 @@
   "recoveryCopyPreview": "Copy preview",
   "recoveryRestoreRetryBody": "The restore could not be completed. The selected copy has been kept. Check local copies again or reopen Kelivo to continue.",
   "recoverySpaceAmount": "Last check: {available} available; at least {required} of free space is needed to prepare your data safely.",
-  "@recoverySpaceAmount": {"placeholders": {"required": {"type": "String"}, "available": {"type": "String"}}},
+  "@recoverySpaceAmount": {
+    "placeholders": {
+      "required": {
+        "type": "String"
+      },
+      "available": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryCopiesNeedUpdate": "Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.",
   "imageContextAllowRecall": "Allow the model to recall images",
   "imageContextAllowRecallDescription": "Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.",
@@ -7512,10 +7532,202 @@
   "responseSpeedUnavailable": "No acceleration tier is available for this model.",
   "responseSpeedSaveFailed": "Could not save the response speed. Try again.",
   "responseSpeedRequestFailed": "{mode} request failed. Check model and account availability, or switch to Standard and retry.",
-  "@responseSpeedRequestFailed": {"placeholders": {"mode": {"type": "String"}}},
+  "@responseSpeedRequestFailed": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "responseSpeedSelectionUnavailable": "The saved speed is no longer available. This chat will use Standard.",
   "responseSpeedProviderDependent": "Availability depends on your provider.",
   "responseSpeedTapTo": "Tap to switch to {mode}",
   "responseSpeedUltrafastNeedsResponses": "UltraFast requires the Responses API.",
-  "@responseSpeedTapTo": {"placeholders": {"mode": {"type": "String"}}}
+  "@responseSpeedTapTo": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionTemplate": "Summary template",
+  "compressionGeneral": "General",
+  "compressionCode": "Code",
+  "compressionWriting": "Writing",
+  "compressionResearch": "Research",
+  "compressionRoleplay": "Roleplay",
+  "compressionOriginalPrompt": "My original prompt",
+  "compressionMore": "More settings",
+  "compressionFocus": "Focus for this run",
+  "compressionFocusHint": "Optional: key decisions, progress or character details",
+  "compressionForConversation": "For this conversation",
+  "compressionFollowGlobal": "Follow global defaults",
+  "compressionSetGlobal": "Set as global defaults",
+  "compressionGlobalDescription": "Affects conversations that follow global defaults. Conversation overrides stay unchanged.",
+  "compressionAutoTitle": "Automatic compression",
+  "compressionAutoOff": "Off",
+  "compressionAutoNotify": "Notify only",
+  "compressionAutoOn": "Automatic",
+  "compressionNearLimit": "Context is near its estimated capacity. You can keep chatting or compress manually.",
+  "compressionKeepTurns": "Keep recent",
+  "compressionKeepHint": "A turn includes a user message, its replies and tools.",
+  "compressionLength": "Summary limit (tokens)",
+  "compressionTrigger": "Start at",
+  "compressionTarget": "Compress to",
+  "compressionWindow": "Planning window",
+  "compressionRequests": "Maximum calls",
+  "compressionReference": "Reference active world books and memory",
+  "compressionReferenceHint": "Reference explains names and rules; it is not evidence that events happened or characters know them.",
+  "compressionToolReferences": "Reference consumed tool results",
+  "compressionToolReferencesHint": "Only with tool access. Keeps the latest unread results and allows exact, read-only recall.",
+  "compressionSummaryScan": "Include summaries in world book keyword matching",
+  "compressionChatModel": "Follow the current chat model",
+  "compressionManageTemplates": "Manage templates & recipes",
+  "compressionLocalPreview": "Preview request · no model call",
+  "compressionTry": "Try summary · uses model tokens",
+  "compressionPreviewOnly": "Candidate only. Review and apply when ready.",
+  "compressionTemplateChanged": "This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.",
+  "compressionRange": "Summarize {count} messages · keep {turns} user turns verbatim",
+  "compressionCalls": "{count} model calls",
+  "compressionActualUsage": "Summary model usage",
+  "compressionUsageValues": "Input {input} · output {output} tokens",
+  "compressionUsageUnknown": "Usage not returned for {count} attempts; these calls are not counted as free.",
+  "compressionBudgetError": "The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.",
+  "compressionIncomplete": "The summary was truncated or refused and was not applied. Adjust the output limit or model.",
+  "compressionReferenceTooLarge": "The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.",
+  "compressionReferenceChanged": "Referenced background changed. Review the candidate or regenerate.",
+  "compressionTargetNotReached": "The candidate did not reduce the full request below the automatic trigger. Original context was kept.",
+  "compressionTemplateMissing": "The selected template is unavailable. Select another template.",
+  "compressionTemplates": "Templates",
+  "compressionRecipes": "Recipes",
+  "compressionNewTemplate": "New template",
+  "compressionEditTemplate": "Edit template",
+  "compressionRestoreDefault": "Restore defaults",
+  "compressionCopyEdit": "Copy & edit",
+  "compressionTemplateName": "Name",
+  "compressionPrompt": "Summary instructions",
+  "compressionLanguage": "Output language",
+  "compressionLanguageConversation": "Follow the conversation",
+  "compressionLanguageLegacy": "Keep original template language behavior",
+  "compressionLanguageHint": "Language code, or conversation / legacy",
+  "compressionVariables": "Supported variables; history is appended automatically if omitted:",
+  "compressionDeleteTemplate": "Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.",
+  "compressionTemplateReferences": "Used by {count} conversation overrides.",
+  "compressionSaveRecipe": "Save these settings as a recipe",
+  "compressionBindModel": "Include the selected summary model",
+  "compressionRecipeHint": "Recipes do not enable automatic compression. Import adds to the library without applying.",
+  "compressionImport": "Import JSON",
+  "compressionExport": "Export JSON",
+  "compressionCopyJson": "Copy JSON",
+  "compressionApplyRecipe": "Apply recipe",
+  "compressionInvalidSettings": "Check the values: target must be below trigger, and call and token limits must be positive.",
+  "compressionOverflowAction": "Compress once, then retry the failed response",
+  "@compressionRange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "turns": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionUsageValues": {
+    "placeholders": {
+      "input": {
+        "type": "String"
+      },
+      "output": {
+        "type": "String"
+      }
+    }
+  },
+  "@compressionUsageUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionTemplateReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionPlannedCalls": "Estimated {count} request(s) · limit {limit}, including retries",
+  "@compressionPlannedCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGlobalTemplateReference": "Also used as the global default.",
+  "compressionRecipeReferences": "{count} recipes keep independent template snapshots.",
+  "compressionReplacementTemplate": "Replacement template",
+  "@compressionRecipeReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGeneralDescription": "Current topic, decisions and unresolved questions.",
+  "compressionCodeDescription": "Code changes, actual checks and the next engineering step.",
+  "compressionWritingDescription": "Accepted text, structure, voice and editing constraints.",
+  "compressionResearchDescription": "Evidence, sources, measurements and uncertainty.",
+  "compressionRoleplayDescription": "Scene continuity, character state and who knows what.",
+  "compressionLastUsed": "Last used: {date}",
+  "@compressionLastUsed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionManage": "Manage",
+  "compressionOutputSettings": "Summary settings",
+  "compressionSourceSettings": "References & original text",
+  "compressionSavedSettings": "Preview & saved settings",
+  "compressionNoRecipes": "No saved recipes yet",
+  "compressionNoTemplatesFound": "No matching templates",
+  "compressionBuiltIn": "Built-in",
+  "compressionGlobalDefault": "Global default",
+  "compressionCustomLanguage": "Other language",
+  "compressionCustomLanguageHint": "Language name or code, e.g. Japanese / ja",
+  "compressionLibraryTitle": "Templates & recipes",
+  "compressionBuiltInTemplates": "Built-in templates",
+  "compressionMyTemplates": "My templates",
+  "compressionSearchTemplates": "Search templates",
+  "compressionSearchRecipes": "Search recipes",
+  "compressionRecipeCreateHint": "Save a recipe from More settings to reuse a configuration.",
+  "compressionTurnUnit": "turns",
+  "compressionCallUnit": "calls",
+  "compressionAdvancedOptions": "Compression details",
+  "compressionAdvancedHint": "References, original-history rereading and request limits",
+  "compressionAutomaticWindow": "Auto",
+  "compressionAutoOffHint": "Compress manually whenever you need.",
+  "compressionAutoNotifyHint": "Notify near the threshold; you decide when to compress.",
+  "compressionAutoOnHint": "Summarize older history at the threshold. Extra model usage applies.",
+  "compressionBudgetHint": "Percentages use the available input budget.",
+  "compressionPreviewAction": "Local preview",
+  "compressionSaveRecipeAction": "Save recipe",
+  "compressionManualRange": "Scope for this compression",
+  "compressionScopeKeepHint": "Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.",
+  "compressionScopeAllHint": "Summarize all history in the current context, including recent turns. Original messages stay available.",
+  "compressionScopeStartHint": "Select earlier whole messages within the character budget. Other messages keep their original text.",
+  "compressionScopeRecentHint": "Select recent whole messages within the character budget. Other messages keep their original text.",
+  "compressionAutoKeepHint": "Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression."
 }

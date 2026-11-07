@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/compression_config.dart';
+import 'package:Kelivo/features/home/controllers/home_view_model.dart';
+import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:Kelivo/core/models/memory_entry.dart';
@@ -115,6 +118,35 @@ class _Generation extends Fake implements GenerationController {
     WorkspaceToolContext? workspaceContext,
     String? conversationId,
   }) => [];
+}
+
+class _ClockGeneration extends MessageGenerationService {
+  _ClockGeneration({
+    required super.chatService,
+    required super.messageBuilderService,
+    required super.generationController,
+    required super.streamController,
+    required super.contextProvider,
+  });
+  DateTime wallClock = DateTime(2020, 1, 1, 12);
+  @override
+  Future<ContextAssemblyPreview> previewContextAssembly({
+    bool? fixedContextStart,
+    DateTime? promptTime,
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+    List<ChatMessage>? messagesOverride,
+  }) => super.previewContextAssembly(
+    fixedContextStart: fixedContextStart,
+    promptTime: promptTime ?? wallClock,
+    conversationId: conversationId,
+    providerKey: providerKey,
+    modelId: modelId,
+    assistantId: assistantId,
+    messagesOverride: messagesOverride,
+  );
 }
 
 class _Usage extends ContextUsageService {
@@ -324,6 +356,73 @@ void main() {
     memories: memories,
     assemble: g.previewContextAssembly,
     runEstimate: <T>(T Function() computation) async => computation(),
+  );
+
+  testWidgets(
+    'compression references freeze clock but still detect real prompt edits',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        await seedUser('hello');
+        await assistants.updateAssistant(
+          assistants
+              .getById('assistant')!
+              .copyWith(
+                systemPrompt: 'RULES {cur_date} {cur_time} {cur_datetime}',
+              ),
+        );
+        final g = _ClockGeneration(
+          chatService: chat,
+          messageBuilderService: builder,
+          generationController: _Generation(),
+          streamController: _Stream(),
+          contextProvider: context,
+        );
+        final controller = ChatController(chatService: chat);
+        final vm = HomeViewModel(
+          chatService: chat,
+          messageBuilderService: builder,
+          messageGenerationService: g,
+          generationController: g.generationController,
+          streamController: g.streamController,
+          chatController: controller,
+          contextProvider: context,
+          getTitleForLocale: (_) => 'title',
+        );
+        try {
+          const options = CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          );
+          final request = await vm.buildCompressionRequest(
+            'one',
+            options: options,
+            configOverride: const CompressionConfig(),
+          );
+          final selection = selectCompressionHistory(
+            chat.storedMessages,
+            [],
+            options,
+          );
+          final first = await request.loadReference!(selection);
+          expect(first, contains('RULES'));
+          expect(first, isNot(contains('{cur_')));
+          g.wallClock = g.wallClock.add(const Duration(days: 1, minutes: 2));
+          final later = await request.loadReference!(selection);
+          expect(later, first);
+          await assistants.updateAssistant(
+            assistants
+                .getById('assistant')!
+                .copyWith(systemPrompt: 'CHANGED {cur_datetime}'),
+          );
+          final edited = await request.loadReference!(selection);
+          expect(edited, contains('CHANGED'));
+          expect(edited, isNot(first));
+        } finally {
+          vm.dispose();
+          controller.dispose();
+        }
+      });
+    },
   );
 
   testWidgets('profile edit invalidates the cached memory bucket', (

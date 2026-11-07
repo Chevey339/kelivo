@@ -1,3 +1,4 @@
+import '../../request_history_context.dart';
 import 'dart:convert';
 
 import '../../../../models/model_spec.dart';
@@ -225,6 +226,8 @@ class ClaudeHistory {
     // here and open the following user message, so the model still sees them.
     final carriedImages = <Map<String, dynamic>>[];
     _ReplayedTurn? turn;
+    final turnSources = Expando<String>();
+    final resultSources = <String, String>{};
 
     /// A result is sent only once the call it answers has been: the API
     /// rejects one pointing at a `tool_use` that is not in the history.
@@ -236,7 +239,15 @@ class ClaudeHistory {
         if (replayedClientCalls.contains(id)) taken.add(result);
         return true;
       });
-      if (taken.isNotEmpty) out.add({'role': 'user', 'content': taken});
+      if (taken.isNotEmpty) {
+        out.add({
+          'role': 'user',
+          'content': taken,
+          if (resultSources[taken.first['tool_use_id']]
+              case final String source)
+            historySourceKey: source,
+        });
+      }
     }
 
     /// Emits the next response of [turn], behind the client results of the
@@ -258,6 +269,8 @@ class ClaudeHistory {
         final message = <String, dynamic>{
           'role': 'assistant',
           'content': blocks,
+          if (turnSources[turn] case final String source)
+            historySourceKey: source,
         };
         out.add(message);
         turn.messages.add(message);
@@ -302,7 +315,12 @@ class ClaudeHistory {
         (last['content'] as List).add({'type': 'text', 'text': rest});
       } else {
         flushResults();
-        out.add({'role': 'assistant', 'content': rest});
+        out.add({
+          'role': 'assistant',
+          'content': rest,
+          if (m[historySourceKey] != null)
+            historySourceKey: m[historySourceKey],
+        });
       }
     }
 
@@ -328,6 +346,9 @@ class ClaudeHistory {
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
+        if (m[historySourceKey] case final String source) {
+          resultSources[id] = source;
+        }
         // A server tool replayed as its own blocks already carries its result.
         if (id.isNotEmpty && !(turn?.serverToolIds.contains(id) ?? false)) {
           pendingResults.add({
@@ -373,6 +394,9 @@ class ClaudeHistory {
         final toolCalls = m['tool_calls'] as List;
         turn = _readTurn(m, toolCalls);
         if (turn != null) {
+          if (m[historySourceKey] case final String source) {
+            turnSources[turn] = source;
+          }
           if (turn.responses.isNotEmpty) emitResponse(turn);
         } else {
           // Nothing recorded of the turn: rebuild it from the calls.
@@ -386,7 +410,12 @@ class ClaudeHistory {
             if (block != null) blocks.add(block);
           }
           if (blocks.isNotEmpty) {
-            out.add({'role': 'assistant', 'content': blocks});
+            out.add({
+              'role': 'assistant',
+              'content': blocks,
+              if (m[historySourceKey] != null)
+                historySourceKey: m[historySourceKey],
+            });
             replayedClientCalls.addAll(toolUseIdsInBlocks(blocks));
           }
         }
@@ -396,6 +425,9 @@ class ClaudeHistory {
       if (role == 'assistant') {
         final plainTurn = _readTurn(m, const []);
         if (plainTurn != null) {
+          if (m[historySourceKey] case final String source) {
+            turnSources[plainTurn] = source;
+          }
           while (plainTurn.emitted < plainTurn.responses.length) {
             emitResponse(plainTurn);
           }
@@ -404,14 +436,14 @@ class ClaudeHistory {
         }
       }
 
-      out.add(
-        await _plainMessage(
-          m,
-          role,
-          isLast: i == messages.lastIndexWhere((m) => m['role'] == 'user'),
-          carriedImages: carriedImages,
-        ),
+      final plainMessage = await _plainMessage(
+        m,
+        role,
+        isLast: i == messages.lastIndexWhere((m) => m['role'] == 'user'),
+        carriedImages: carriedImages,
       );
+      RequestHistoryContext.mark(m, [plainMessage]);
+      out.add(plainMessage);
     }
 
     if (turn != null && turn.emitted < turn.responses.length) {

@@ -1,3 +1,6 @@
+import 'generation/model_request_attempts.dart';
+import '../../models/compress_context_options.dart' show isContextLengthError;
+import 'request_history_context.dart';
 import 'request_image_context.dart';
 import '../auth/provider_oauth_service.dart';
 import 'dart:async';
@@ -247,6 +250,7 @@ class ChatApiService {
     bool textOnly = false,
     AutoRetryOptions? retryOverride,
     RequestImageContext? imageContext,
+    RequestHistoryContext? historyContext,
   }) async* {
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
@@ -291,7 +295,11 @@ class ChatApiService {
           shouldUseOpenAIImagesApi(config, modelId);
       final useZhipuLayoutParsing =
           !textOnly && shouldUseZhipuLayoutParsing(config, modelId);
-      final unicodeSafeMessages = _sanitizeMessages(messages);
+      final unicodeSafeMessages = _sanitizeMessages(
+        historyContext == null
+            ? messages
+            : RequestHistoryContext.identify(messages),
+      );
       final spec = _stripSpecForRequest(
         spec: ModelSpecResolver.instance.spec(config, modelId),
         keepImages:
@@ -325,11 +333,13 @@ class ChatApiService {
           options: options,
           isCancelled: () => sessionToken.isCancelled,
           cancelled: _whenCancelled(sessionToken),
-          shouldRetry: (error) => shouldRetryError(
-            error,
-            options,
-            retryOnNetworkError: retryNetworkErrors ? null : false,
-          ),
+          shouldRetry: (error) =>
+              !isContextLengthError(error) &&
+              shouldRetryError(
+                error,
+                options,
+                retryOnNetworkError: retryNetworkErrors ? null : false,
+              ),
           retryEvent: emitRetryUi
               ? (attempt, delay, error) => RetryPending(
                   attempt: attempt + 1,
@@ -342,13 +352,25 @@ class ChatApiService {
           attemptStartEvent: emitRetryUi
               ? () => const RetryAttemptStart()
               : null,
-          attempt: (_) => carrySplitSurrogates(sendRound()),
+          attempt: (_) => carrySplitSurrogates(
+            historyContext == null
+                ? sendRound()
+                : historyContext.recoverOverflow(sendRound),
+          ),
         );
       }
 
       Stream<StreamChunk> inImageContext(
         Stream<StreamChunk> Function() action,
-      ) => imageContext == null ? action() : imageContext.run(action);
+      ) {
+        Stream<StreamChunk> withImages() => imageContext == null
+            ? RequestImageContext.without(action)
+            : imageContext.run(action);
+        return historyContext == null
+            ? RequestHistoryContext.without(withImages)
+            : historyContext.run(withImages);
+      }
+
       yield* retryRound(
         () => inImageContext(
           () => toolCancellation.runStream(
@@ -457,7 +479,9 @@ class ChatApiService {
     final cancelToken = CancelToken();
     _bridgeCancel(sessionToken, cancelToken);
     final client = ProviderOAuthService.instance.authenticatedClient(
-      providerHttpClient(config, cancelToken: cancelToken),
+      ModelRequestAttempts.wrap(
+        providerHttpClient(config, cancelToken: cancelToken),
+      ),
       config,
     );
     try {
@@ -670,6 +694,7 @@ class ChatApiService {
       if (chunk is RetryAttemptStart) {
         onRetry?.call(null);
       }
+      if (textOnly && chunk is Usage && chunk.estimated) continue;
       handler.handle(chunk);
       if (chunk is Usage) onUsage?.call(chunk);
     }

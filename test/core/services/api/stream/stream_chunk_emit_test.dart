@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_emit.dart';
@@ -6,6 +7,24 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_ids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'fallback counts are marked estimates, reported zero remains actual',
+    () async {
+      final estimated = await emitDone(
+        ids: StreamChunkIds('estimate'),
+        totalTokens: 42,
+      ).toList();
+      expect(estimated.whereType<Usage>().single.estimated, isTrue);
+      final reported = await emitDone(
+        ids: StreamChunkIds('reported'),
+        usage: const TokenUsage(promptTokens: 0, completionTokens: 0),
+        totalTokens: 42,
+      ).toList();
+      expect(reported.whereType<Usage>().single.estimated, isFalse);
+      expect(reported.whereType<Usage>().single.usage.totalTokens, 0);
+    },
+  );
+
   test(
     'per-round emit ids keep fallback text out of the previous TextPart',
     () async {

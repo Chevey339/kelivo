@@ -647,6 +647,18 @@ class _MessageListViewState extends State<MessageListView> {
     });
   }
 
+  bool _showsOperationDivider(ContextOperation operation, ChatMessage message) {
+    final group = ContextHistory.group(message);
+    if (operation.revoked || operation.anchorGroupId != group) return false;
+    // A new conversation already displays its copied summary as a message.
+    // Keep the operation for context assembly without repeating it in the UI.
+    return !(operation.isCompression &&
+        !operation.isEdited &&
+        operation.sourceGroups.length == 1 &&
+        operation.sourceGroups.single == group &&
+        operation.summary == message.content);
+  }
+
   /// Rough height of a message bubble, used for items that never got laid out.
   ///
   /// SuperSliverList's default estimate is a flat 100px. In a long chat a real
@@ -667,9 +679,10 @@ class _MessageListViewState extends State<MessageListView> {
         ? 0
         : widget.contextOperations
               .where(
-                (op) =>
-                    !op.revoked &&
-                    op.anchorGroupId == _effectiveRenderModels[index].slotId,
+                (op) => _showsOperationDivider(
+                  op,
+                  _effectiveRenderModels[index].message,
+                ),
               )
               .length;
     return _estimateMessageExtent(index, crossAxisExtent) +
@@ -1327,10 +1340,26 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.contextTaskRevision != widget.contextTaskRevision ||
         !listEquals(
           oldWidget.contextOperations
-              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .map(
+                (op) => (
+                  op.id,
+                  op.revoked,
+                  op.anchorGroupId,
+                  op.summary,
+                  op.isEdited,
+                ),
+              )
               .toList(),
           widget.contextOperations
-              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .map(
+                (op) => (
+                  op.id,
+                  op.revoked,
+                  op.anchorGroupId,
+                  op.summary,
+                  op.isEdited,
+                ),
+              )
               .toList(),
         ) ||
         oldWidget.chatFontScale != widget.chatFontScale ||
@@ -2124,9 +2153,8 @@ class _MessageListViewState extends State<MessageListView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final operation in widget.contextOperations)
-          if (!operation.revoked &&
-              operation.isFixedStart &&
-              operation.anchorGroupId == (message.groupId ?? message.id))
+          if (operation.isFixedStart &&
+              _showsOperationDivider(operation, message))
             Padding(
               padding: widget.dividerPadding,
               child: ContextOperationDivider(
@@ -2240,9 +2268,8 @@ class _MessageListViewState extends State<MessageListView> {
           ],
         ),
         for (final operation in widget.contextOperations)
-          if (!operation.revoked &&
-              !operation.isFixedStart &&
-              operation.anchorGroupId == (message.groupId ?? message.id))
+          if (!operation.isFixedStart &&
+              _showsOperationDivider(operation, message))
             Padding(
               padding: widget.dividerPadding,
               child: ContextOperationDivider(

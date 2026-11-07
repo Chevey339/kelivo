@@ -1,3 +1,4 @@
+import '../../chat/widgets/compression_template_library.dart';
 import '../../home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -190,6 +191,9 @@ class DefaultModelPage extends StatelessWidget {
               }
             },
             configAction: () => _showCompressPromptSheet(context),
+            footer: const _ThinkingSwitchRow(
+              task: _BackgroundModelTask.compress,
+            ),
           ),
           const SizedBox(height: 16),
           _ModelCard(
@@ -604,116 +608,7 @@ class DefaultModelPage extends StatelessWidget {
   }
 
   Future<void> _showCompressPromptSheet(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController(text: settings.compressPrompt);
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.overlaySurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 12,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _ThinkingSwitchRow(task: _BackgroundModelTask.compress),
-                const SizedBox(height: 18),
-                Text(
-                  l10n.defaultModelPagePromptLabel,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: AppFontWeights.semibold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageCompressPromptHint,
-                    filled: true,
-                    fillColor: ctx.appColors.surfaceFill,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.primary.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        await settings.resetCompressPrompt();
-                        await settings.resetCompressGenerationThinkingEnabled();
-                        controller.text = settings.compressPrompt;
-                      },
-                      child: Text(l10n.defaultModelPageResetDefault),
-                    ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () async {
-                        await settings.setCompressPrompt(
-                          controller.text.trim(),
-                        );
-                        if (ctx.mounted) Navigator.of(ctx).pop();
-                      },
-                      child: Text(l10n.defaultModelPageSave),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.defaultModelPageCompressVars('{content}', '{locale}'),
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    await showCompressionTemplateLibrary(context);
   }
 
   Future<void> _showSuggestionPromptSheet(BuildContext context) async {
@@ -847,6 +742,7 @@ class _ModelCard extends StatelessWidget {
     this.resetTooltip,
     this.onDisable,
     this.configAction,
+    this.footer,
   });
 
   final IconData icon;
@@ -863,6 +759,7 @@ class _ModelCard extends StatelessWidget {
   final VoidCallback? onReset;
   final VoidCallback? onDisable;
   final VoidCallback? configAction;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -1021,6 +918,7 @@ class _ModelCard extends StatelessWidget {
                 );
               },
             ),
+            if (footer != null) ...[const SizedBox(height: 12), footer!],
           ],
         ),
       ),

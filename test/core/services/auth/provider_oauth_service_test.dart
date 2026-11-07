@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_service.dart';
@@ -1506,10 +1505,6 @@ void main() {
         'grok-4.7-build-fast',
       );
       expect(fastSpec.contextWindow, 500000);
-      expect(
-        compressRequestCharBudget(contextWindowTokens: fastSpec.contextWindow),
-        100000,
-      );
       expect(
         synced.modelOverrides['grok-4.7-build-fast']['abilities'],
         contains('reasoning'),

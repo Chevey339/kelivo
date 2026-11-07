@@ -386,6 +386,8 @@ class _HomePageState extends State<HomePage>
         void retry() => _controller.compressContext(
           options: task.options,
           targetConversationId: task.conversationId,
+          beforeMessageId: task.protectedMessageId,
+          effectiveMessageIds: task.effectiveMessageIds,
         );
         void options() => _showCompressContextOptions(
           targetConversationId: task.conversationId,
@@ -435,9 +437,9 @@ class _HomePageState extends State<HomePage>
           case CompressionPhase.review:
             showAppSnackBar(
               context,
-              message: task.error == 'context_budget_exceeded'
-                  ? l10n.compressOverSnack
-                  : l10n.contextSummaryNotSmaller,
+              message: task.error == null
+                  ? l10n.compressionPreviewOnly
+                  : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
               actionLabel: l10n.compressAdjust,
               onAction: () => showCompressionReview(
@@ -1198,6 +1200,8 @@ class _HomePageState extends State<HomePage>
         onRetry: () => _controller.compressContext(
           options: task.options,
           targetConversationId: task.conversationId,
+          beforeMessageId: task.protectedMessageId,
+          effectiveMessageIds: task.effectiveMessageIds,
         ),
         onAdjust: () => _showCompressContextOptions(
           targetConversationId: task.conversationId,
@@ -1979,6 +1983,8 @@ class _HomePageState extends State<HomePage>
       onRetry: (task) => _controller.compressContext(
         options: task.options,
         targetConversationId: id,
+        beforeMessageId: task.protectedMessageId,
+        effectiveMessageIds: task.effectiveMessageIds,
       ),
       onAdjust: (task) => _showCompressContextOptions(
         targetConversationId: id,
@@ -2022,9 +2028,13 @@ class _HomePageState extends State<HomePage>
     final snapshot = await chat.loadContextSnapshot(conversation.id);
     if (!mounted) return;
     final estimator = chat.contextCompression.estimateCandidate;
-    final options = await showDialog<CompressContextOptions>(
+    final options = await showCompressContextOptions(
       context: context,
-      builder: (_) => CompressContextOptionsDialog(
+      builder: (sheet) => CompressContextOptionsDialog(
+        sheet: sheet,
+        conversationId: conversation.id,
+        previewRequest: (options, config) => _controller
+            .previewCompressionRequest(conversation.id, options, config),
         messages: snapshot.messages,
         operations: snapshot.operations,
         messageWindow: messageWindow,

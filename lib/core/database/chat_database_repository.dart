@@ -1,3 +1,6 @@
+import 'compression_repository.dart';
+import 'extension_entity_store.dart';
+import '../models/compression_config.dart';
 import '../models/image_context.dart';
 import '../utils/chat_image_result.dart';
 import '../models/quote_ref.dart';
@@ -63,6 +66,7 @@ import '../services/backup/restore_previous_plan.dart';
 
 part 'chat_context_repository.dart';
 part 'chat_image_context_repository.dart';
+part 'chat_compression_repository.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -188,6 +192,7 @@ class ChatDatabaseRepository {
        _observer = observer ?? ChatDatabaseObserver.instance;
 
   final AppDatabase _db;
+  late final compression = CompressionRepository(ExtensionEntityStore(_db));
   late final _timelineIndex = MessageTimelineIndex(_db);
   final Zone _lifetimeZone = Zone.current;
   late final UiStateRepository genUiStates = UiStateRepository(
@@ -4704,10 +4709,15 @@ class ChatDatabaseRepository {
         groupIdMap: groupIdMap,
       );
       await _copyImageContext(sourceId, targetId, messageIdMap);
+      await compression.saveOverrides(
+        targetId,
+        await compression.overrides(sourceId),
+      );
       await _copyContextOperations(
         sourceId: sourceId,
         targetId: targetId,
         groups: groupIdMap,
+        messages: messageIdMap,
         completeHistory: true,
       );
       return duplicate;
@@ -4973,10 +4983,15 @@ class ChatDatabaseRepository {
         resetVersions: !preserveVersions,
       );
       await _copyImageContext(sourceId, targetId, messageIdMap);
+      await compression.saveOverrides(
+        targetId,
+        await compression.overrides(sourceId),
+      );
       await _copyContextOperations(
         sourceId: sourceId,
         targetId: targetId,
         groups: groupIdMap,
+        messages: messageIdMap,
       );
       if (preserveVersions && !selectedIds.contains(target.id)) {
         await _revokeContextForGroups(targetId, {groupIdMap[targetGroupId]!});
@@ -5825,6 +5840,10 @@ class ChatDatabaseRepository {
         geminiSignaturesByMessageId: const {},
       );
 
+      for (final conversation in conversations) {
+        await compression.saveOverrides(conversation.id, {'mode': 'off'});
+      }
+
       for (final entry in messagesToAppend.entries) {
         final current = await getConversation(entry.key);
         if (current == null) {
@@ -5892,6 +5911,7 @@ class ChatDatabaseRepository {
           "SELECT kind, id, sort_order, owner_id, payload, updated_at "
           "FROM merge_source.extension_entity_rows WHERE kind IN ('workspace', 'skill', 'composerPublishedFile');",
         );
+        final compressionTemplateIds = await _importCompressionLibrary();
         final sourceRows = await _db
             .customSelect(
               'SELECT id FROM merge_source.conversation_rows ORDER BY id;',
@@ -5989,6 +6009,7 @@ class ChatDatabaseRepository {
             targetId: targetId,
             messageIdMap: messageIdMap,
             importedQuoteExtras: importedQuoteExtras,
+            compressionTemplateIds: compressionTemplateIds,
           );
           imported += 1;
           importedIds.add(targetId);
@@ -6377,6 +6398,7 @@ class ChatDatabaseRepository {
               ),
               mcpRows.map((row) => row.data).toList(),
               messages,
+              await _compressionFingerprint(schema, id),
               await _imageContextFingerprint(schema, id, {
                 for (var i = 0; i < messageRows.length; i++)
                   messageRows[i].read<String>('id'): '$i',
@@ -6506,6 +6528,7 @@ class ChatDatabaseRepository {
     required String targetId,
     required Map<String, String> messageIdMap,
     required Map<String, String> importedQuoteExtras,
+    required Map<String, String> compressionTemplateIds,
   }) async {
     await _invalidateEmptyAcknowledgement();
     final transfer = UiStateTransfer(_db);
@@ -6630,6 +6653,17 @@ class ChatDatabaseRepository {
       targetConversationId: targetId,
     );
     await _sealGenUiSearch(messageIdMap.values);
+    final importedCompression = await _compressionSettingsFrom(
+      'merge_source',
+      sourceId,
+    );
+    final importedTemplateId = importedCompression['templateId'] as String;
+    await compression.saveOverrides(targetId, {
+      ...importedCompression,
+      'mode': 'off',
+      'templateId':
+          compressionTemplateIds[importedTemplateId] ?? importedTemplateId,
+    });
     final sourceImages = await _db
         .customSelect(
           'SELECT payload FROM merge_source.extension_entity_rows WHERE kind=? AND id=?',
@@ -6661,6 +6695,7 @@ class ChatDatabaseRepository {
         sourceId: sourceId,
         targetId: targetId,
         groups: groupIdMap,
+        messages: messageIdMap,
         sourcePayload: sourceContext.read<String>('payload'),
         completeHistory: true,
       );
@@ -7022,6 +7057,7 @@ class ChatDatabaseRepository {
                   row.kind.isIn([
                     ContextOperation.entityKind,
                     'contextCompressionTask',
+                    CompressionConfig.conversationKind,
                     ImageContextSettings.entityKind,
                   ]) &
                   row.ownerId.equals(id),
@@ -7277,7 +7313,7 @@ class ChatDatabaseRepository {
   Future<void> _clearChatRows() async {
     genUiStates.invalidateAfterCommit(all: true);
     await _db.customStatement(
-      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile','conversationContext','contextCompressionTask','conversationImageContext')",
+      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile','conversationContext','contextCompressionTask','conversationImageContext','conversationCompression')",
     );
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();

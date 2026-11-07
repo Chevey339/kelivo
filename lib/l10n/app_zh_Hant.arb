@@ -5,7 +5,6 @@
   "modelAvatarTitle": "模型圖示",
   "avatarColor": "彩色",
   "avatarMonochrome": "單色",
-
   "settingsSearchHint": "搜尋設定",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清除搜尋",
@@ -858,15 +857,15 @@
   "compressContextEmptySummary": "壓縮返回了空摘要",
   "compressContextOptionsTitle": "壓縮上下文",
   "compressContextOptionsDesc": "在目前聊天產生可查看、可編輯、可撤銷的摘要。原始訊息保留。",
-  "compressContextKeepStart": "開頭取樣",
-  "compressContextKeepRecent": "末尾取樣",
-  "compressContextUnlimited": "全部內容",
+  "compressContextKeepStart": "較早歷史",
+  "compressContextKeepRecent": "較近歷史",
+  "compressContextUnlimited": "全部歷史",
   "compressContextMaxCharsLabel": "字元數",
   "compressContextInvalidLimit": "請輸入大於 0 的字元數",
   "compressContextStartButton": "開始壓縮",
   "compressContextModelLabel": "壓縮模型",
   "compressContextModelUnset": "選擇模型",
-  "compressContextKeepRecentMessages": "保留 N 則",
+  "compressContextKeepRecentMessages": "保留最近原文",
   "compressContextKeepCountLabel": "保留使用者訊息數",
   "compressContextKeepAllMessages": "保留條數涵蓋全部訊息，無內容可壓縮",
   "compressContextEstimatePreview": "總結 {summarized} 字元，原樣保留 {kept} 字元 → 壓縮後約 {minTokens}–{maxTokens} tokens（原文約 {totalTokens} tokens）",
@@ -5584,7 +5583,7 @@
   "compressCopyResult": "複製結果",
   "contextDetailInUse": "目前直接使用",
   "contextImpactDescription": "相關摘要將一併撤銷；原始聊天訊息保留，不會自動呼叫模型。獨立的上下文節點保持不變。",
-  "compressIncludeAttachmentsDesc": "納入已有附件文字、工具參數與結果；過長內容會截斷並標明，不會重新識圖。",
+  "compressIncludeAttachmentsDesc": "按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。",
   "worldBookEntriesMoved": "已移動 {count} 個條目",
   "contextImpactSourceDescription": "確認後變更原文，並撤銷概括過它的摘要及相依後繼。其他訊息與獨立節點保留，不會自動呼叫模型。",
   "contextEditTitle": "編輯摘要",
@@ -5831,5 +5830,185 @@
   "responseSpeedSelectionUnavailable": "先前選擇的加速檔位已不可用，此對話將使用標準模式。",
   "responseSpeedProviderDependent": "是否支援加速取決於目前的供應商。",
   "responseSpeedTapTo": "點擊切換為{mode}",
-  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要啟用 Responses API。"
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要啟用 Responses API。",
+  "compressionTemplate": "摘要範本",
+  "compressionGeneral": "通用",
+  "compressionCode": "程式碼",
+  "compressionWriting": "寫作",
+  "compressionResearch": "研究",
+  "compressionRoleplay": "角色扮演",
+  "compressionOriginalPrompt": "我的原提示詞",
+  "compressionMore": "更多設定",
+  "compressionFocus": "本次重點保留",
+  "compressionFocusHint": "選填：關鍵決定、任務進展、人物狀態",
+  "compressionForConversation": "用於此對話",
+  "compressionFollowGlobal": "跟隨全域預設",
+  "compressionSetGlobal": "設為全域預設",
+  "compressionGlobalDescription": "影響跟隨全域預設的對話；已有個別設定的對話維持不變。",
+  "compressionAutoTitle": "自動壓縮",
+  "compressionAutoOff": "關閉",
+  "compressionAutoNotify": "僅提醒",
+  "compressionAutoOn": "自動",
+  "compressionNearLimit": "上下文接近估算容量，可以繼續傳送或手動壓縮。",
+  "compressionKeepTurns": "保留最近",
+  "compressionKeepHint": "一輪包含一則使用者訊息及其後續回覆、工具內容。",
+  "compressionLength": "摘要上限（tokens）",
+  "compressionTrigger": "觸發門檻",
+  "compressionTarget": "壓縮後目標",
+  "compressionWindow": "規劃視窗",
+  "compressionRequests": "最多呼叫",
+  "compressionReference": "參考目前生效的世界書與記憶",
+  "compressionReferenceHint": "參考用於理解人名與規則，不代表事件已發生或角色已知情。",
+  "compressionToolReferences": "以引用替代已讀工具結果",
+  "compressionToolReferencesHint": "僅工具可用時生效。保留最新未讀結果，可唯讀回查原紀錄。",
+  "compressionSummaryScan": "摘要參與世界書關鍵字比對",
+  "compressionChatModel": "跟隨目前對話模型",
+  "compressionManageTemplates": "管理範本與方案",
+  "compressionLocalPreview": "預覽傳送內容 · 不呼叫模型",
+  "compressionTry": "試產生摘要 · 會產生模型用量",
+  "compressionPreviewOnly": "僅產生候選，審閱後可套用。",
+  "compressionTemplateChanged": "新範本用於後續摘要。已有摘要維持原樣；可從原文重新產生以補回細節。",
+  "compressionRange": "壓縮 {count} 則歷史 · 保留 {turns} 輪原文",
+  "compressionCalls": "模型呼叫 {count} 次",
+  "compressionActualUsage": "摘要模型實際用量",
+  "compressionUsageValues": "輸入 {input} · 輸出 {output} tokens",
+  "compressionUsageUnknown": "有 {count} 次呼叫未回傳用量，不能視為免費。",
+  "compressionBudgetError": "預計呼叫數超過上限。請調高上限或選擇更大視窗的摘要模型；未套用部分摘要。",
+  "compressionIncomplete": "摘要被截斷或拒絕，未套用。請調整輸出上限或模型。",
+  "compressionReferenceTooLarge": "範本、參考或工作摘要占滿了摘要模型預算。請減少參考或選擇更大視窗模型。",
+  "compressionReferenceChanged": "引用背景已變更，請審閱候選或重新產生。",
+  "compressionTargetNotReached": "候選未使完整請求降到自動觸發門檻以下，已保留原上下文。",
+  "compressionTemplateMissing": "所選範本無法使用，請選擇其他範本。",
+  "compressionTemplates": "範本",
+  "compressionRecipes": "方案",
+  "compressionNewTemplate": "新增範本",
+  "compressionEditTemplate": "編輯範本",
+  "compressionRestoreDefault": "還原預設",
+  "compressionCopyEdit": "複製並修改",
+  "compressionTemplateName": "名稱",
+  "compressionPrompt": "摘要提示詞",
+  "compressionLanguage": "輸出語言",
+  "compressionLanguageConversation": "跟隨對話",
+  "compressionLanguageLegacy": "沿用原範本語言行為",
+  "compressionLanguageHint": "語言名稱或代碼，或 conversation / legacy",
+  "compressionVariables": "支援以下變數；缺少歷史變數時會自動附加歷史：",
+  "compressionDeleteTemplate": "選擇替代範本並刪除？已接受的摘要和方案快照仍保留。",
+  "compressionTemplateReferences": "被 {count} 個對話單獨引用。",
+  "compressionSaveRecipe": "儲存目前設定為方案",
+  "compressionBindModel": "綁定所選摘要模型",
+  "compressionRecipeHint": "方案不會開啟自動壓縮；匯入只加入資料庫，不立即套用。",
+  "compressionImport": "匯入 JSON",
+  "compressionExport": "匯出 JSON",
+  "compressionCopyJson": "複製 JSON",
+  "compressionApplyRecipe": "套用方案",
+  "compressionInvalidSettings": "請檢查參數：壓縮後目標需低於觸發門檻，呼叫數與 token 上限需有效。",
+  "compressionOverflowAction": "壓縮一次後重試失敗的回覆",
+  "@compressionRange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "turns": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionUsageValues": {
+    "placeholders": {
+      "input": {
+        "type": "String"
+      },
+      "output": {
+        "type": "String"
+      }
+    }
+  },
+  "@compressionUsageUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionTemplateReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionPlannedCalls": "預計 {count} 次請求 · 本次上限 {limit} 次（含重試）",
+  "@compressionPlannedCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGlobalTemplateReference": "同時用作全域預設範本。",
+  "compressionRecipeReferences": "{count} 個方案將保留各自獨立的範本快照。",
+  "compressionReplacementTemplate": "替代範本",
+  "@compressionRecipeReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGeneralDescription": "保留目前話題、決定與未解決問題。",
+  "compressionCodeDescription": "區分程式碼改動、實際驗證與下一步工作。",
+  "compressionWritingDescription": "儲存已採納文字、結構、文風與編輯要求。",
+  "compressionResearchDescription": "保留證據、來源、數值與不確定性。",
+  "compressionRoleplayDescription": "保持場景、人物狀態與各角色的知識界線。",
+  "compressionLastUsed": "最近使用：{date}",
+  "@compressionLastUsed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionManage": "管理",
+  "compressionOutputSettings": "摘要設定",
+  "compressionSourceSettings": "參考與原文",
+  "compressionSavedSettings": "預覽與方案",
+  "compressionNoRecipes": "尚無儲存的方案",
+  "compressionNoTemplatesFound": "找不到相符範本",
+  "compressionBuiltIn": "內建",
+  "compressionGlobalDefault": "全域預設",
+  "compressionCustomLanguage": "其他語言",
+  "compressionCustomLanguageHint": "語言名稱或代碼，例如日語 / ja",
+  "compressionLibraryTitle": "範本與方案",
+  "compressionBuiltInTemplates": "內建範本",
+  "compressionMyTemplates": "我的範本",
+  "compressionSearchTemplates": "搜尋範本",
+  "compressionSearchRecipes": "搜尋方案",
+  "compressionRecipeCreateHint": "在「更多設定」中將目前配置儲存為方案。",
+  "compressionTurnUnit": "輪",
+  "compressionCallUnit": "次",
+  "compressionAdvancedOptions": "壓縮細節",
+  "compressionAdvancedHint": "參考內容、原文回讀與呼叫限制",
+  "compressionAutomaticWindow": "自動",
+  "compressionAutoOffHint": "需要時可在壓縮頁手動開始。",
+  "compressionAutoNotifyHint": "接近門檻時提醒，由你決定何時壓縮。",
+  "compressionAutoOnHint": "達到門檻後自動整理較早歷史，會產生額外模型用量。",
+  "compressionBudgetHint": "百分比以目前可用的輸入預算為基準。",
+  "compressionPreviewAction": "本機預覽",
+  "compressionSaveRecipeAction": "儲存方案",
+  "compressionManualRange": "本次壓縮範圍",
+  "compressionScopeKeepHint": "保留最近原文，壓縮更早歷史；此輪數也用於自動壓縮。",
+  "compressionScopeAllHint": "目前上下文的歷史全部納入摘要，不保留最近原文；原訊息仍可查看。",
+  "compressionScopeStartHint": "按字元預算選取較早的完整訊息，未選中的歷史保留原文。",
+  "compressionScopeRecentHint": "按字元預算選取較近的完整訊息，未選中的歷史保留原文。",
+  "compressionAutoKeepHint": "自動壓縮始終保留最近原文，不受本次範圍選擇影響；輪數與手動壓縮共用。"
 }

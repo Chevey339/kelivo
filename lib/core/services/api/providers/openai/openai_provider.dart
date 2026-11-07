@@ -1,3 +1,4 @@
+import '../../request_history_context.dart';
 import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
@@ -157,6 +158,9 @@ Stream<StreamChunk> sendOpenAIStream(
   final responsesRecorder = ResponsesTurnRecorder(
     responsesReplayScope(config, modelId),
   );
+  RequestHistoryContext.current?.format = config.useResponseApi == true
+      ? HistoryWireFormat.responses
+      : HistoryWireFormat.chatCompletions;
   if (config.useResponseApi == true) {
     messages = filterResponsesReasoningHistory(messages, spec.reasoning.replay);
     final input = <Map<String, dynamic>>[];
@@ -198,287 +202,297 @@ Stream<StreamChunk> sendOpenAIStream(
     }
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
-      final originalContent = m['content'];
-      final raw = originalContent is List
-          ? textFromContentParts(originalContent)
-          : (originalContent ?? '').toString();
-      final roleRaw = (m['role'] ?? 'user').toString();
+      final sourceStart = input.length;
+      try {
+        final originalContent = m['content'];
+        final raw = originalContent is List
+            ? textFromContentParts(originalContent)
+            : (originalContent ?? '').toString();
+        final roleRaw = (m['role'] ?? 'user').toString();
 
-      if (roleRaw == 'assistant' &&
-          m[multimodalInternalResponsesItemKey] is Map) {
-        input.add(responsesInputItem(m));
-        continue;
-      }
-
-      // Responses API supports a top-level `instructions` field that has higher priority
-      if (roleRaw == 'system') {
-        if (raw.isNotEmpty) {
-          instructions = instructions.isEmpty ? raw : ('$instructions\n\n$raw');
+        if (roleRaw == 'assistant' &&
+            m[multimodalInternalResponsesItemKey] is Map) {
+          input.add(responsesInputItem(m));
+          continue;
         }
-        continue;
-      }
 
-      // Handle tool result messages (role: 'tool') - convert to function_call_output format
-      if (roleRaw == 'tool') {
-        final toolCallId = (m['tool_call_id'] ?? '').toString();
-        final content = (m['content'] ?? '').toString();
-        if (toolCallId.isNotEmpty) {
-          input.add({
-            'type': 'function_call_output',
-            'call_id': toolCallId,
-            'output': (await ToolResultContent.read(
-              (m['name'] ?? '').toString(),
-              content,
-              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
-              toolCallId: m['tool_call_id']?.toString(),
-              canImageInput: canImageInput,
-            )).responsesOutput,
-          });
+        // Responses API supports a top-level `instructions` field that has higher priority
+        if (roleRaw == 'system') {
+          if (raw.isNotEmpty) {
+            instructions = instructions.isEmpty
+                ? raw
+                : ('$instructions\n\n$raw');
+          }
+          continue;
         }
-        continue;
-      }
 
-      final nativeParts =
-          await NativeInputAttachments(
-            config: config,
-            spec: spec,
-            protocol: NativeInputProtocol.responses,
-          ).build(
-            m,
-            userPaths: i == lastResponsesUserIndex ? userImagePaths : null,
-          );
-      void addMessage(Map<String, dynamic> message) {
-        if (nativeParts.isNotEmpty) {
-          final content = message['content'];
-          message['content'] = [
-            if (content is List)
-              ...content
-            else if (content is String && content.isNotEmpty)
-              {'type': 'input_text', 'text': content},
-            ...nativeParts,
-          ];
-        }
-        input.add(message);
-      }
-
-      final isAssistant = roleRaw == 'assistant';
-      // Reconstructed assistant text precedes its calls. Insert it here so
-      // no message separates a tool-call batch from its matching results.
-      final assistantMessageIndex = input.length;
-
-      // Handle assistant messages with tool_calls - convert to function_call format
-      if (isAssistant && m['tool_calls'] is List) {
-        final toolCalls = m['tool_calls'] as List;
-        for (final tc in toolCalls) {
-          if (tc is! Map) continue;
-          final callId = (tc['id'] ?? '').toString();
-          final fn = tc['function'];
-          if (fn is! Map) continue;
-          final name = (fn['name'] ?? '').toString();
-          final arguments = (fn['arguments'] ?? '{}').toString();
-          if (callId.isNotEmpty && name.isNotEmpty) {
+        // Handle tool result messages (role: 'tool') - convert to function_call_output format
+        if (roleRaw == 'tool') {
+          final toolCallId = (m['tool_call_id'] ?? '').toString();
+          final content = (m['content'] ?? '').toString();
+          if (toolCallId.isNotEmpty) {
             input.add({
-              'type': 'function_call',
-              'call_id': callId,
-              'name': name,
-              'arguments': arguments,
+              'type': 'function_call_output',
+              'call_id': toolCallId,
+              'output': (await ToolResultContent.read(
+                (m['name'] ?? '').toString(),
+                content,
+                metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+                toolCallId: m['tool_call_id']?.toString(),
+                canImageInput: canImageInput,
+              )).responsesOutput,
             });
           }
+          continue;
         }
-        // Skip adding the assistant message content if it only contains tool calls
-        if (raw.trim().isEmpty || raw.trim() == '\n\n') continue;
-      }
 
-      // Only parse images if there are images to process.
-      // Semantic media detection only - custom attachment markers are not
-      // recognized. Attachments arrive via structured media-path keys /
-      // userImagePaths, plus Markdown ![](...).
-      final hasMarkdownImages = shouldParseMarkdownImages(
-        raw,
-        skipImageParsing: skipImageParsing,
-      );
-      final internalMediaRefs = parseInternalMediaRefs(
-        m[multimodalInternalMediaPathsKey],
-      );
-      // Consume injected media refs for user and assistant history turns.
-      final hasInternalMedia = canImageInput && internalMediaRefs.isNotEmpty;
-      final hasAttachedImages =
-          canImageInput &&
-          (m['role'] == 'user') &&
-          i == lastResponsesUserIndex &&
-          (userImagePaths?.isNotEmpty == true);
-      // For the last user message, also attach the last assistant image if available
-      final shouldAttachAssistantImage =
-          canImageInput &&
-          (m['role'] == 'user') &&
-          i == lastResponsesUserIndex &&
-          lastAssistantImageUrls.isNotEmpty;
+        final nativeParts =
+            await NativeInputAttachments(
+              config: config,
+              spec: spec,
+              protocol: NativeInputProtocol.responses,
+            ).build(
+              m,
+              userPaths: i == lastResponsesUserIndex ? userImagePaths : null,
+            );
+        void addMessage(Map<String, dynamic> message) {
+          if (nativeParts.isNotEmpty) {
+            final content = message['content'];
+            message['content'] = [
+              if (content is List)
+                ...content
+              else if (content is String && content.isNotEmpty)
+                {'type': 'input_text', 'text': content},
+              ...nativeParts,
+            ];
+          }
+          input.add(message);
+        }
 
-      if (hasMarkdownImages ||
-          hasAttachedImages ||
-          hasInternalMedia ||
-          shouldAttachAssistantImage) {
-        final parsed = await parseTextAndImages(
+        final isAssistant = roleRaw == 'assistant';
+        // Reconstructed assistant text precedes its calls. Insert it here so
+        // no message separates a tool-call batch from its matching results.
+        final assistantMessageIndex = input.length;
+
+        // Handle assistant messages with tool_calls - convert to function_call format
+        if (isAssistant && m['tool_calls'] is List) {
+          final toolCalls = m['tool_calls'] as List;
+          for (final tc in toolCalls) {
+            if (tc is! Map) continue;
+            final callId = (tc['id'] ?? '').toString();
+            final fn = tc['function'];
+            if (fn is! Map) continue;
+            final name = (fn['name'] ?? '').toString();
+            final arguments = (fn['arguments'] ?? '{}').toString();
+            if (callId.isNotEmpty && name.isNotEmpty) {
+              input.add({
+                'type': 'function_call',
+                'call_id': callId,
+                'name': name,
+                'arguments': arguments,
+              });
+            }
+          }
+          // Skip adding the assistant message content if it only contains tool calls
+          if (raw.trim().isEmpty || raw.trim() == '\n\n') continue;
+        }
+
+        // Only parse images if there are images to process.
+        // Semantic media detection only - custom attachment markers are not
+        // recognized. Attachments arrive via structured media-path keys /
+        // userImagePaths, plus Markdown ![](...).
+        final hasMarkdownImages = shouldParseMarkdownImages(
           raw,
-          literalText: internalLiteralText(m),
-          imageReferences: internalImageReferences(m),
-          allowRemoteImages: allowRemoteImages,
-          allowLocalImages: canImageInput,
-          allowDataImages: canImageInput,
-          keepRemoteMarkdownText: true,
-          keepDisallowedImageText: canImageInput,
           skipImageParsing: skipImageParsing,
         );
-        if (!canImageInput) {
+        final internalMediaRefs = parseInternalMediaRefs(
+          m[multimodalInternalMediaPathsKey],
+        );
+        // Consume injected media refs for user and assistant history turns.
+        final hasInternalMedia = canImageInput && internalMediaRefs.isNotEmpty;
+        final hasAttachedImages =
+            canImageInput &&
+            (m['role'] == 'user') &&
+            i == lastResponsesUserIndex &&
+            (userImagePaths?.isNotEmpty == true);
+        // For the last user message, also attach the last assistant image if available
+        final shouldAttachAssistantImage =
+            canImageInput &&
+            (m['role'] == 'user') &&
+            i == lastResponsesUserIndex &&
+            lastAssistantImageUrls.isNotEmpty;
+
+        if (hasMarkdownImages ||
+            hasAttachedImages ||
+            hasInternalMedia ||
+            shouldAttachAssistantImage) {
+          final parsed = await parseTextAndImages(
+            raw,
+            literalText: internalLiteralText(m),
+            imageReferences: internalImageReferences(m),
+            allowRemoteImages: allowRemoteImages,
+            allowLocalImages: canImageInput,
+            allowDataImages: canImageInput,
+            keepRemoteMarkdownText: true,
+            keepDisallowedImageText: canImageInput,
+            skipImageParsing: skipImageParsing,
+          );
+          if (!canImageInput) {
+            if (isAssistant) {
+              input.insert(assistantMessageIndex, {
+                'type': 'message',
+                'role': 'assistant',
+                'status': 'completed',
+                'content': [
+                  {'type': 'output_text', 'text': parsed.text},
+                ],
+              });
+            } else {
+              addMessage({'role': roleRaw, 'content': parsed.text});
+            }
+            continue;
+          }
+
+          final parts = <Map<String, dynamic>>[];
+          final seenImageSources = <String>{};
+          final seenImageUrls = <String>{};
+          String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
+
+          void addImage(String url) {
+            if (url.isEmpty) return;
+            if (!allowRemoteImages && isRemoteHttpUrl(url)) return;
+            if (seenImageUrls.add(url)) {
+              parts.add({'type': 'input_image', 'image_url': url});
+            }
+          }
+
+          if (parsed.text.isNotEmpty) {
+            // Use output_text for assistant, input_text for user
+            parts.add({
+              'type': isAssistant ? 'output_text' : 'input_text',
+              'text': parsed.text,
+            });
+          }
+          // Images extracted from this message's text
+          for (final ref in parsed.images) {
+            final normalized = normalizeSrc(ref.src);
+            if (!seenImageSources.add(normalized)) continue;
+            final String? url;
+            if (ref.kind == 'data') {
+              url = ref.src;
+            } else if (ref.kind == 'path') {
+              url = await tryEncodeBase64DataUrl(ref.src);
+              if (url == null) continue;
+            } else {
+              url = ref.src; // http(s)
+            }
+            // For assistant messages, collect images; for user messages, add directly
+            if (isAssistant) {
+              if (!lastAssistantImageUrls.contains(url)) {
+                lastAssistantImageUrls.add(url);
+              }
+            } else {
+              addImage(url);
+            }
+          }
+          // Structured / attached media refs (user + assistant history turns)
+          final supplementalRefs = supplementalMediaRefs(
+            internalRaw: m[multimodalInternalMediaPathsKey],
+            userPaths: userImagePaths,
+            includeUserPaths: hasAttachedImages,
+          );
+          for (final mediaRef in supplementalRefs) {
+            final p = mediaRef.uri;
+            final String mime = mimeForInternalMediaRef(mediaRef);
+            final bool isAv = isAudioMime(mime) || isVideoMime(mime);
+            if ((isAv || isPdfMime(mime)) && !isAssistant) continue;
+            if (isAv) {
+              // Responses path has no first-class A/V input parts here; never
+              // encode video/audio as input_image. Keep a text reference for both
+              // remote and local paths so pure A/V attachments do not become
+              // content: [] (API reject / silent drop).
+              final normalized = normalizeSrc(p);
+              if (seenImageSources.add(normalized)) {
+                parts.add({
+                  'type': isAssistant ? 'output_text' : 'input_text',
+                  'text': p,
+                });
+              }
+              continue;
+            }
+            if (!allowRemoteImages && isRemoteHttpUrl(p)) {
+              // Keep the remote reference visible as text when image embed is off.
+              final normalized = normalizeSrc(p);
+              if (!seenImageSources.add(normalized)) continue;
+              parts.add({
+                'type': isAssistant ? 'output_text' : 'input_text',
+                'text': p,
+              });
+              continue;
+            }
+            final normalized = normalizeSrc(p);
+            if (!seenImageSources.add(normalized)) continue;
+            final dataUrl = (isRemoteHttpUrl(p) || p.startsWith('data:'))
+                ? p
+                : await tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
+            if (dataUrl == null) continue;
+            // Assistant Responses messages may only contain output_text/refusal.
+            // Mirror the markdown path: stash for the following user turn.
+            if (isAssistant) {
+              if (!lastAssistantImageUrls.contains(dataUrl)) {
+                lastAssistantImageUrls.add(dataUrl);
+              }
+            } else {
+              addImage(dataUrl);
+            }
+          }
+          // Attach all stashed assistant images to the last user message
+          if (shouldAttachAssistantImage) {
+            for (final url in lastAssistantImageUrls) {
+              addImage(url);
+            }
+          }
+          // Use proper message object format for assistant messages
           if (isAssistant) {
+            // Never emit input_image inside assistant completed output.
+            final assistantContent = <Map<String, dynamic>>[
+              for (final part in parts)
+                if (part['type'] == 'output_text' || part['type'] == 'refusal')
+                  part,
+            ];
+            if (assistantContent.isEmpty) {
+              assistantContent.add({
+                'type': 'output_text',
+                'text': parsed.text,
+              });
+            }
+            input.insert(assistantMessageIndex, {
+              'type': 'message',
+              'role': 'assistant',
+              'status': 'completed',
+              'content': assistantContent,
+            });
+          } else {
+            addMessage({'role': roleRaw, 'content': parts});
+          }
+        } else {
+          // No images
+          if (isAssistant) {
+            // Use proper message object format for assistant messages
             input.insert(assistantMessageIndex, {
               'type': 'message',
               'role': 'assistant',
               'status': 'completed',
               'content': [
-                {'type': 'output_text', 'text': parsed.text},
+                {'type': 'output_text', 'text': raw},
               ],
             });
           } else {
-            addMessage({'role': roleRaw, 'content': parsed.text});
-          }
-          continue;
-        }
-
-        final parts = <Map<String, dynamic>>[];
-        final seenImageSources = <String>{};
-        final seenImageUrls = <String>{};
-        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
-
-        void addImage(String url) {
-          if (url.isEmpty) return;
-          if (!allowRemoteImages && isRemoteHttpUrl(url)) return;
-          if (seenImageUrls.add(url)) {
-            parts.add({'type': 'input_image', 'image_url': url});
+            addMessage({'role': roleRaw, 'content': raw});
           }
         }
-
-        if (parsed.text.isNotEmpty) {
-          // Use output_text for assistant, input_text for user
-          parts.add({
-            'type': isAssistant ? 'output_text' : 'input_text',
-            'text': parsed.text,
-          });
-        }
-        // Images extracted from this message's text
-        for (final ref in parsed.images) {
-          final normalized = normalizeSrc(ref.src);
-          if (!seenImageSources.add(normalized)) continue;
-          final String? url;
-          if (ref.kind == 'data') {
-            url = ref.src;
-          } else if (ref.kind == 'path') {
-            url = await tryEncodeBase64DataUrl(ref.src);
-            if (url == null) continue;
-          } else {
-            url = ref.src; // http(s)
-          }
-          // For assistant messages, collect images; for user messages, add directly
-          if (isAssistant) {
-            if (!lastAssistantImageUrls.contains(url)) {
-              lastAssistantImageUrls.add(url);
-            }
-          } else {
-            addImage(url);
-          }
-        }
-        // Structured / attached media refs (user + assistant history turns)
-        final supplementalRefs = supplementalMediaRefs(
-          internalRaw: m[multimodalInternalMediaPathsKey],
-          userPaths: userImagePaths,
-          includeUserPaths: hasAttachedImages,
-        );
-        for (final mediaRef in supplementalRefs) {
-          final p = mediaRef.uri;
-          final String mime = mimeForInternalMediaRef(mediaRef);
-          final bool isAv = isAudioMime(mime) || isVideoMime(mime);
-          if ((isAv || isPdfMime(mime)) && !isAssistant) continue;
-          if (isAv) {
-            // Responses path has no first-class A/V input parts here; never
-            // encode video/audio as input_image. Keep a text reference for both
-            // remote and local paths so pure A/V attachments do not become
-            // content: [] (API reject / silent drop).
-            final normalized = normalizeSrc(p);
-            if (seenImageSources.add(normalized)) {
-              parts.add({
-                'type': isAssistant ? 'output_text' : 'input_text',
-                'text': p,
-              });
-            }
-            continue;
-          }
-          if (!allowRemoteImages && isRemoteHttpUrl(p)) {
-            // Keep the remote reference visible as text when image embed is off.
-            final normalized = normalizeSrc(p);
-            if (!seenImageSources.add(normalized)) continue;
-            parts.add({
-              'type': isAssistant ? 'output_text' : 'input_text',
-              'text': p,
-            });
-            continue;
-          }
-          final normalized = normalizeSrc(p);
-          if (!seenImageSources.add(normalized)) continue;
-          final dataUrl = (isRemoteHttpUrl(p) || p.startsWith('data:'))
-              ? p
-              : await tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
-          if (dataUrl == null) continue;
-          // Assistant Responses messages may only contain output_text/refusal.
-          // Mirror the markdown path: stash for the following user turn.
-          if (isAssistant) {
-            if (!lastAssistantImageUrls.contains(dataUrl)) {
-              lastAssistantImageUrls.add(dataUrl);
-            }
-          } else {
-            addImage(dataUrl);
-          }
-        }
-        // Attach all stashed assistant images to the last user message
-        if (shouldAttachAssistantImage) {
-          for (final url in lastAssistantImageUrls) {
-            addImage(url);
-          }
-        }
-        // Use proper message object format for assistant messages
-        if (isAssistant) {
-          // Never emit input_image inside assistant completed output.
-          final assistantContent = <Map<String, dynamic>>[
-            for (final part in parts)
-              if (part['type'] == 'output_text' || part['type'] == 'refusal')
-                part,
-          ];
-          if (assistantContent.isEmpty) {
-            assistantContent.add({'type': 'output_text', 'text': parsed.text});
-          }
-          input.insert(assistantMessageIndex, {
-            'type': 'message',
-            'role': 'assistant',
-            'status': 'completed',
-            'content': assistantContent,
-          });
-        } else {
-          addMessage({'role': roleRaw, 'content': parts});
-        }
-      } else {
-        // No images
-        if (isAssistant) {
-          // Use proper message object format for assistant messages
-          input.insert(assistantMessageIndex, {
-            'type': 'message',
-            'role': 'assistant',
-            'status': 'completed',
-            'content': [
-              {'type': 'output_text', 'text': raw},
-            ],
-          });
-        } else {
-          addMessage({'role': roleRaw, 'content': raw});
-        }
+      } finally {
+        RequestHistoryContext.mark(m, input.skip(sourceStart));
       }
     }
     body = {
@@ -753,6 +767,7 @@ Stream<StreamChunk> sendOpenAIStream(
           ids: ids,
           content: outText,
           reasoning: reasoningText.isEmpty ? null : reasoningText,
+          finishReason: responsesFinishReason(obj as Map),
           usage: usage,
           totalTokens: usage?.totalTokens ?? 0,
         );
@@ -1010,6 +1025,7 @@ Stream<StreamChunk> sendOpenAIStream(
             approxPromptTokens + approxTokensFromChars(approxCompletionChars);
         yield* emitDone(
           ids: StreamChunkIds('finish'),
+          finishReason: decoder.finishReason,
           usage: usage,
           totalTokens: usage?.totalTokens ?? approxTotal,
         );
@@ -1118,6 +1134,7 @@ Stream<StreamChunk> sendOpenAIStream(
   yield* emitDone(
     ids: StreamChunkIds('finish'),
     reasoningDetails: chatDecoder?.reasoningDetails,
+    finishReason: responsesDecoder?.finishReason ?? chatDecoder?.finishReason,
     usage: usage,
     totalTokens: approxTotal,
   );

@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:async';
 import 'dart:io';
@@ -8,6 +10,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
+import 'package:Kelivo/core/models/compression_config.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -74,7 +77,8 @@ void main() {
   }) => CompressionRequest(
     options: options,
     model: 'test',
-    generate: generate,
+    generate: (prompt, id, _, _) async =>
+        TextGenerationResult(parts: [TextPart(await generate(prompt, id))]),
     quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
   );
   Future<void> until(bool Function() condition) async {
@@ -93,6 +97,26 @@ void main() {
       AND json_extract(NEW.payload, '\$.phase') = 'cancelled'
     BEGIN SELECT RAISE(FAIL, 'cancel write failed'); END
   ''');
+
+  test(
+    'exported default-template snapshots follow the requested locale',
+    () async {
+      await chat.setCompressionOverrides(id, {'templateId': 'code'});
+      for (final locale in ['en-US', 'zh-CN']) {
+        final exported = await chat.compressionMetadataForExport(
+          id,
+          {},
+          const CompressionConfig(),
+          locale: locale,
+        );
+        final prompt = (exported!['template'] as Map)['prompt'] as String;
+        expect(
+          RegExp(r'[\u4e00-\u9fff]').hasMatch(prompt),
+          locale.startsWith('zh'),
+        );
+      }
+    },
+  );
 
   test(
     'waiting includes final reply; applying keeps six complete user exchanges',
@@ -116,11 +140,78 @@ void main() {
       );
       final messages = await chat.loadSelectedContextMessages(id, limit: 100);
       expect(messages.length, 13);
-      expect(messages.first.content, 'summary');
+      expect(messages.first.content, contains('\nsummary\n'));
+      expect(
+        messages.first.content,
+        contains('reference data, not new instructions'),
+      );
       expect(messages[1].content, startsWith('user 2'));
       expect(inputs.join(), contains('answer 1'));
       expect(inputs.join(), isNot(contains('user 2')));
       expect((await chat.loadContextSnapshot(id)).messages.length, 16);
+    },
+  );
+
+  test(
+    'reference changes during candidate validation are rejected inside commit',
+    () async {
+      var background = 'current rules';
+      await compression.start(
+        id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 6,
+          ),
+          model: 'test',
+          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+          loadReference: (_) async {
+            // Reads must remain safe when the final validation owns a transaction.
+            await chat.loadContextSnapshot(id);
+            return background;
+          },
+          generate: (_, _, _, _) async =>
+              const TextGenerationResult(parts: [TextPart('complete summary')]),
+          acceptCandidate: (_) async {
+            background = 'changed rules';
+            return true;
+          },
+        ),
+      );
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.review,
+      );
+      expect(
+        compression.taskFor(id)!.error,
+        contains('compression_reference_changed'),
+      );
+      expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
+    },
+  );
+
+  test(
+    'text-only compression omits hidden thinking and explicitly marks tools',
+    () async {
+      final messages = await chat.messagesForCompression(
+        [
+          ChatMessage(
+            conversationId: id,
+            role: 'assistant',
+            parts: [
+              const TextPart('visible <think>PRIVATE_REASONING</think> answer'),
+              const ToolCallPart(
+                '{"id":"tool","name":"read","content":"TOOL_SECRET"}',
+              ),
+            ],
+          ),
+        ],
+        includeAttachmentsAndTools: false,
+        quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+      );
+      expect(messages.single.content, contains('visible'));
+      expect(messages.single.content, contains('omitted by the user'));
+      expect(messages.single.content, isNot(contains('PRIVATE_REASONING')));
+      expect(messages.single.content, isNot(contains('TOOL_SECRET')));
     },
   );
 
@@ -319,7 +410,10 @@ void main() {
           result,
           limit: 1,
         )).map((m) => m.content),
-        ['summary', (await chat.loadMessages(result)).last.content],
+        [
+          contains('\nsummary\n'),
+          (await chat.loadMessages(result)).last.content,
+        ],
       );
       expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
       final retained = (await chat.loadMessages(result)).last;
@@ -330,6 +424,49 @@ void main() {
       );
     },
   );
+
+  for (final mode in [
+    CompressContextLimitMode.start,
+    CompressContextLimitMode.recent,
+  ]) {
+    test(
+      'reviewed character-window copy keeps unselected history for $mode',
+      () async {
+        final source = await chat.loadContextSnapshot(id);
+        final options = CompressContextOptions(
+          mode: mode,
+          maxChars: 1,
+          newConversation: true,
+          previewOnly: true,
+        );
+        final selection = selectCompressionHistory(
+          source.messages,
+          source.operations,
+          options,
+        );
+        expect(selection.retained, hasLength(15));
+        await compression.start(
+          id,
+          request((_, _) async => 'summary', options: options),
+        );
+        await until(
+          () => compression.taskFor(id)!.phase == CompressionPhase.review,
+        );
+        await compression.applyReviewed(id, 'approved summary');
+        final target = compression.taskFor(id)!.resultConversationId!;
+        final copied = await chat.loadMessages(target);
+        expect(copied.first.content, contains('approved summary'));
+        expect(
+          copied.skip(1).map((m) => (m.role, m.content)),
+          selection.retained.map((m) => (m.role, m.content)),
+        );
+        expect(
+          (await chat.loadContextSnapshot(id)).fingerprint,
+          source.fingerprint,
+        );
+      },
+    );
+  }
 
   test(
     'continuing from an installed summary leaves its compression task unchanged',
@@ -370,7 +507,7 @@ void main() {
   );
 
   test(
-    'attachment-only messages count toward N; tool output is bounded text',
+    'attachment-only messages count toward N; tool output is complete text',
     () async {
       final source = await chat.addMessage(
         conversationId: id,
@@ -396,8 +533,8 @@ void main() {
         tool,
       ], quoteMarker: AppLocalizationsEn().selectionQuoteMarker);
       expect(input.first.content, contains('image content not summarized'));
-      expect(input.last.content.length, lessThan(8200));
-      expect(input.last.content, contains('truncated'));
+      expect(input.last.content, contains('a' * 10000));
+      expect(input.last.content, isNot(contains('truncated')));
     },
   );
 
@@ -520,6 +657,157 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(compression.taskFor(id), isNull);
       expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
+    },
+  );
+  test(
+    'in-turn safe point protects current user and streaming tool suffix',
+    () async {
+      final current = await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        content: 'protected current question',
+      );
+      final streaming = await chat.addMessage(
+        conversationId: id,
+        role: 'assistant',
+        content: 'active tools',
+        isStreaming: true,
+      );
+      compression.isConversationBusy = (_) => true;
+      // The complete native request callback, not the generic UI estimate,
+      // owns admission at a safe point.
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
+          (usedTokens: 99999, contextWindow: 4000);
+      final task = await compression.runAtSafePoint(
+        id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 1,
+          ),
+          model: 'test',
+          beforeMessageId: current.id,
+          automatic: true,
+          acceptCandidate: (_) async => true,
+          quoteMarker: (_) => 'quote',
+          generate: (prompt, _, _, _) async {
+            expect(prompt, isNot(contains('protected current question')));
+            expect(prompt, isNot(contains('active tools')));
+            await chat.updateMessage(
+              streaming.id,
+              content: 'tool results persisted at safe point',
+            );
+            return const TextGenerationResult(
+              parts: [TextPart('handoff')],
+              finishReason: 'stop',
+            );
+          },
+        ),
+      );
+      expect(task.phase, CompressionPhase.completed);
+      final effective = await chat.loadSelectedContextMessages(id, limit: 100);
+      expect(
+        effective.map((m) => m.id),
+        containsAll([current.id, streaming.id]),
+      );
+      expect(effective.last.content, 'tool results persisted at safe point');
+      expect(
+        (await chat.loadContextOperations(id)).single.sourceGroups,
+        isNot(contains(current.id)),
+      );
+    },
+  );
+
+  test(
+    'cancellation acknowledged at apply boundary prevents the transaction',
+    () async {
+      void cancelOnApply() {
+        if (compression.taskFor(id)?.phase == CompressionPhase.applying) {
+          unawaited(compression.cancel(id));
+        }
+      }
+
+      compression.addListener(cancelOnApply);
+      await compression.start(id, request((_, _) async => 'summary'));
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.cancelled,
+      );
+      expect(await chat.loadContextOperations(id), isEmpty);
+      compression.removeListener(cancelOnApply);
+    },
+  );
+
+  test('trial produces a review candidate and no installed summary', () async {
+    await compression.start(
+      id,
+      request(
+        (_, _) async => 'summary',
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 2,
+          previewOnly: true,
+        ),
+      ),
+    );
+    await until(
+      () => compression.taskFor(id)!.phase == CompressionPhase.review,
+    );
+    expect(await chat.loadContextOperations(id), isEmpty);
+    await compression.applyReviewed(id, 'edited candidate');
+    expect(
+      (await chat.loadContextOperations(id)).single.summary,
+      'edited candidate',
+    );
+  });
+
+  test(
+    'temporary compression and new chat never persist messages, settings or jobs',
+    () async {
+      final temporary = await chat.createDraftConversation(
+        title: 'temporary',
+        temporary: true,
+      );
+      for (var i = 0; i < 3; i++) {
+        await chat.addMessage(
+          conversationId: temporary.id,
+          role: 'user',
+          content: 'temporary secret $i ${'history ' * 100}',
+        );
+      }
+      await chat.setCompressionOverrides(temporary.id, {
+        'mode': 'auto',
+        'templateId': 'research',
+      });
+      await compression.start(
+        temporary.id,
+        request(
+          (_, _) async => 'temporary summary',
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 1,
+            newConversation: true,
+          ),
+        ),
+      );
+      await until(
+        () =>
+            compression.taskFor(temporary.id)!.phase ==
+            CompressionPhase.completed,
+      );
+      final target = compression.taskFor(temporary.id)!.resultConversationId!;
+      expect(chat.isTemporaryConversation(target), isTrue);
+      expect(await repo.getConversation(target), isNull);
+      expect(await repo.compression.overrides(temporary.id), isEmpty);
+      expect(await repo.compression.overrides(target), isEmpty);
+      expect(
+        await chat.compressionOverrides(target),
+        containsPair('templateId', 'research'),
+      );
+      expect(
+        await chat.readCompressionTaskRecords(),
+        isNot(contains(temporary.id)),
+      );
+      expect((await chat.loadContextSnapshot(target)).messages.length, 2);
     },
   );
 }

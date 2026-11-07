@@ -82,17 +82,20 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
       key: const ValueKey('context-usage-header'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ContextUsageBreakdown(
-          snapshot: snapshot,
-          headerTrailing: snapshot?.state == ContextUsageState.failed
-              ? IosIconButton(
-                  tooltip: l10n.retry,
-                  semanticLabel: l10n.retry,
-                  icon: Lucide.RefreshCw,
-                  size: 16,
-                  onTap: () => _refresh(force: true),
-                )
-              : null,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: ContextUsageBreakdown(
+            snapshot: snapshot,
+            headerTrailing: snapshot?.state == ContextUsageState.failed
+                ? IosIconButton(
+                    tooltip: l10n.retry,
+                    semanticLabel: l10n.retry,
+                    icon: Lucide.RefreshCw,
+                    size: 16,
+                    onTap: () => _refresh(force: true),
+                  )
+                : null,
+          ),
         ),
         if (showSetWindow) ...[
           const SizedBox(height: 12),

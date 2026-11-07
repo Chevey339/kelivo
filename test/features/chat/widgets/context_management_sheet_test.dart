@@ -8,6 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/context_management_sheet.dart';
+import 'package:Kelivo/features/chat/widgets/context_dialog.dart';
 import 'package:Kelivo/features/chat/widgets/context_usage_header.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -51,6 +52,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('header renders and triggers refresh on open', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final settings = SettingsProvider(createBusinessTestPreferences());
     final assistants = AssistantProvider(
       preferences: createBusinessTestPreferences(),
@@ -63,8 +68,9 @@ void main() {
     final worldBooks = WorldBookProvider(
       preferences: createBusinessTestPreferences(),
     );
+    final chat = ChatService();
     final usage = _RecordingUsage(
-      chatService: ChatService(),
+      chatService: chat,
       settings: settings,
       assistants: assistants,
       instructions: instructions,
@@ -96,10 +102,12 @@ void main() {
     addTearDown(usage.dispose);
 
     var operationsOpened = 0;
+    var imagesOpened = 0, compressionsOpened = 0, clears = 0;
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: chat),
           ChangeNotifierProvider<ContextUsageService>.value(value: usage),
         ],
         child: MaterialApp(
@@ -111,12 +119,41 @@ void main() {
               conversationId: 'c1',
               draftText: 'draft',
               onOperations: () => operationsOpened++,
+              onImages: () => imagesOpened++,
+              onCompress: () => compressionsOpened++,
+              onClear: () => clears++,
             ),
           ),
         ),
       ),
     );
     await tester.pump();
+
+    for (final row in find.byType(ContextActionRow).evaluate()) {
+      expect(
+        tester.getSize(find.byWidget(row.widget)).height,
+        lessThanOrEqualTo(64),
+      );
+    }
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-history')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('context-usage-toggle-details')),
+      findsNothing,
+    );
+    expect(find.text('For this conversation'), findsNothing);
+    expect(find.text('Clear Context').hitTestable(), findsOneWidget);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(ContextManagementSheet)),
+    )!;
+    await tester.tap(find.text(l10n.imageContextTitle));
+    await tester.tap(find.text(l10n.compressContext));
+    await tester.tap(find.text(l10n.bottomToolsSheetClearContext));
+    expect(imagesOpened, 1);
+    expect(compressionsOpened, 1);
+    expect(clears, 1);
 
     await tester.ensureVisible(find.text('Context operations'));
     await tester.tap(find.text('Context operations'));
@@ -155,10 +192,7 @@ void main() {
     );
 
     // All sources on a short phone must remain reachable by scrolling.
-    tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 440);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
     const detailed = ContextUsageBuckets(
       history: 40,
       system: 12,
@@ -202,5 +236,13 @@ void main() {
     await tester.pump();
     expect(find.byTooltip('Retry'), findsNothing);
     expect(find.text('Estimated'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-history')),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Clear Context'));
+    await tester.pumpAndSettle();
+    expect(find.text('Clear Context').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

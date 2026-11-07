@@ -1,3 +1,4 @@
+import '../../request_history_context.dart';
 import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
@@ -34,6 +35,7 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   final out = <String, dynamic>{
     'role': role,
     'content': m.containsKey('content') ? (m['content'] ?? '') : '',
+    if (m[historySourceKey] != null) historySourceKey: m[historySourceKey],
   };
 
   // Preserve optional name (some providers support it on non-tool roles).
@@ -295,11 +297,13 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   }
   final pendingAssistantMediaUrls = <String>[];
   final pendingToolImageParts = <Map<String, dynamic>>[];
+  Object? pendingToolOwner;
   void flushToolImages() {
     if (pendingToolImageParts.isEmpty) return;
     out.add({
       'role': 'user',
       'content': [...pendingToolImageParts],
+      if (pendingToolOwner != null) historySourceKey: pendingToolOwner,
     });
     pendingToolImageParts.clear();
   }
@@ -345,6 +349,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           ...nativeParts,
         ];
       }
+      RequestHistoryContext.mark(m, [message]);
       out.add(message);
     }
 
@@ -647,6 +652,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       outMsg['content'] = result.text;
       addMessage(outMsg);
       if (result.imageUrls.isNotEmpty) {
+        pendingToolOwner = m[historySourceKey];
         pendingToolImageParts.add({
           'type': 'text',
           'text': 'Image returned by ${m['name']} (${m['tool_call_id']}):',
@@ -1020,6 +1026,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
         ids: StreamChunkIds('finish'),
+        finishReason: lastRound?.finishReason,
         reasoningDetails: includeReasoningDetailsOnDone
             ? reasoningDetails()
             : null,

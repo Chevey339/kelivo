@@ -229,6 +229,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
+  String? finishReason;
   var chars = approxCompletionChars;
   var round = streamRound;
   var currentInput = <Map<String, dynamic>>[...initialInput];
@@ -330,6 +331,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         final raw = await decodeUtf8Stream(resp2.stream);
         throwIfInBandStreamError(raw);
         final obj = jsonDecode(raw) as Map;
+        finishReason = responsesFinishReason(obj);
         for (final chunk
             in ResponsesStreamDecoder(
               sourceId: 'round-$round',
@@ -394,6 +396,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           sourceId: 'round-${round++}',
         );
         yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
+        finishReason = followUpDecoder.finishReason;
         usage = followUpDecoder.usage ?? usage;
         chars += followUpDecoder.approxCompletionChars;
         outputItemsForAppend = followUpDecoder.outputItems;
@@ -427,6 +430,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
         ids: StreamChunkIds('finish'),
+        finishReason: finishReason,
         usage: usage,
         totalTokens: usage?.totalTokens ?? approxTotal,
       );

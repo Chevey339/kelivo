@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
@@ -28,6 +29,8 @@ class ContextAssemblyPreview {
     this.skillsText = '',
     this.workspaceText = '',
     this.searchText = '',
+    this.referenceText = '',
+    this.apiMessages = const [],
     this.mcpTools = const [],
     this.imageContext,
   });
@@ -43,6 +46,8 @@ class ContextAssemblyPreview {
   final String skillsText;
   final String workspaceText;
   final String searchText;
+  final String referenceText;
+  final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> mcpTools;
 
   /// Attribute the assembled, trimmed payload by origin, not by message role.
@@ -59,6 +64,7 @@ class ContextAssemblyPreview {
       imageContext: imageContext,
     );
     final text = <ContextSource, StringBuffer>{};
+    final references = <String>{};
     for (final message in apiMessages) {
       for (final segment in segmentsFromTaggedMessage(
         imageContext?.previewMessage(message) ?? message,
@@ -66,6 +72,17 @@ class ContextAssemblyPreview {
         elideDataUris: false,
       )) {
         text.putIfAbsent(segment.source, StringBuffer.new).write(segment.text);
+        if (const {
+              ContextSource.systemPrompt,
+              ContextSource.instructionInjection,
+              ContextSource.memorySnapshot,
+              ContextSource.worldBook,
+            }.contains(segment.source) &&
+            segment.text.trim().isNotEmpty) {
+          references.add(
+            '[reference ${segment.source.name}; ${jsonEncode(segment.meta ?? const {})}]\n${segment.text}',
+          );
+        }
       }
       final reasoning = message['reasoning_content'];
       if (reasoning is String) {
@@ -79,6 +96,8 @@ class ContextAssemblyPreview {
     bool isMcp(Map<String, dynamic> tool) =>
         mcpToolNames.contains((tool['function'] as Map?)?['name']);
     return ContextAssemblyPreview(
+      apiMessages: apiMessages,
+      referenceText: references.join('\n\n'),
       systemText: content([ContextSource.systemPrompt]),
       injectionsText: content([ContextSource.instructionInjection]),
       historyText: content([

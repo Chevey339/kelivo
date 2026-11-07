@@ -1,3 +1,4 @@
+import '../../features/chat/widgets/compression_template_library.dart';
 import '../../features/home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -239,6 +240,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       }
                     },
                     configAction: () => _showCompressPromptDialog(context),
+                    footer: const _ThinkingSwitchRow(
+                      task: _BackgroundModelTask.compress,
+                      trailing: SizedBox.shrink(),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -698,99 +703,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
   }
 
   Future<void> _showCompressPromptDialog(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.read<SettingsProvider>();
-    final ctrl = TextEditingController(text: sp.compressPrompt);
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: context.overlaySurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _ThinkingSwitchRow(
-                    task: _BackgroundModelTask.compress,
-                    trailing: SizedBox.shrink(),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _promptEditor(
-                    ctx,
-                    controller: ctrl,
-                    hintText: l10n.defaultModelPageCompressPromptHint,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageResetDefault,
-                        filled: false,
-                        dense: true,
-                        onTap: () async {
-                          await sp.resetCompressPrompt();
-                          await sp.resetCompressGenerationThinkingEnabled();
-                          ctrl.text = sp.compressPrompt;
-                        },
-                      ),
-                      const Spacer(),
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageSave,
-                        filled: true,
-                        dense: true,
-                        onTap: () async {
-                          await sp.setCompressPrompt(ctrl.text.trim());
-                          if (ctx.mounted) Navigator.of(ctx).maybePop();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.defaultModelPageCompressVars('{content}', '{locale}'),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    await showCompressionTemplateLibrary(context);
   }
 
   Future<void> _showSuggestionPromptDialog(BuildContext context) async {
@@ -909,6 +822,7 @@ class _ModelCard extends StatefulWidget {
     this.onReset,
     this.onDisable,
     this.configAction,
+    this.footer,
   });
 
   final IconData icon;
@@ -925,6 +839,7 @@ class _ModelCard extends StatefulWidget {
   final VoidCallback? onDisable;
   final VoidCallback onPick;
   final VoidCallback? configAction;
+  final Widget? footer;
 
   @override
   State<_ModelCard> createState() => _ModelCardState();
@@ -1083,6 +998,10 @@ class _ModelCardState extends State<_ModelCard> {
                 ),
               ),
             ),
+            if (widget.footer != null) ...[
+              const SizedBox(height: 12),
+              widget.footer!,
+            ],
           ],
         ),
       ),

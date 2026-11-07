@@ -1,3 +1,4 @@
+import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import 'dart:async';
@@ -175,6 +176,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     assistantHeaders: extraHeaders,
   );
 
+  RequestHistoryContext.current?.format = HistoryWireFormat.claude;
   // Extract system prompt
   String systemPrompt = '';
   final nonSystemMessages = <Map<String, dynamic>>[];
@@ -207,189 +209,197 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final initialMessages = <Map<String, dynamic>>[];
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
-    final isLast =
-        i == nonSystemMessages.lastIndexWhere((m) => m['role'] == 'user');
-    final roleName = (m['role'] ?? 'user').toString();
-    final raw = (m['content'] ?? '').toString();
-    if (roleName == 'tool') {
-      initialMessages.add({
-        'role': 'user',
-        'content': [
-          {
-            'type': 'tool_result',
-            'tool_use_id': m['tool_call_id'],
-            'content': (await ToolResultContent.read(
-              (m['name'] ?? '').toString(),
-              raw,
-              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
-              toolCallId: m['tool_call_id']?.toString(),
-              canImageInput: canImageInput,
-            )).claudeContent,
-          },
-        ],
-      });
-      continue;
-    }
-    if (roleName == 'assistant' && m['tool_calls'] is List) {
-      final content = <Map<String, dynamic>>[
-        if (raw.trim().isNotEmpty) {'type': 'text', 'text': raw},
-      ];
-      for (final call in (m['tool_calls'] as List).whereType<Map>()) {
-        final fn = call['function'];
-        if (fn is! Map) continue;
-        Map<String, dynamic> args;
-        try {
-          args = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
-              .cast<String, dynamic>();
-        } catch (_) {
-          args = {};
-        }
-        content.add({
-          'type': 'tool_use',
-          'id': call['id'],
-          'name': fn['name'],
-          'input': args,
-        });
-      }
-      initialMessages.add({'role': 'assistant', 'content': content});
-      continue;
-    }
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
-    final hasMarkdownImages = shouldParseMarkdownImages(
-      raw,
-      skipImageParsing: skipImageParsing,
-    );
-    final internalMediaRefs = parseInternalMediaRefs(
-      m[multimodalInternalMediaPathsKey],
-    );
-    // Consume injected media refs for user and assistant history turns.
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
-    final hasAttachedImages =
-        isLast && roleName == 'user' && (userImagePaths?.isNotEmpty == true);
-    final nativeParts = await NativeInputAttachments(
-      config: config,
-      spec: ModelSpecResolver.instance.spec(config, modelId),
-      protocol: NativeInputProtocol.claude,
-    ).build(m, userPaths: isLast ? userImagePaths : null);
-
-    if ((roleName == 'user' || roleName == 'assistant') &&
-        (hasMarkdownImages ||
-            hasInternalMedia ||
-            hasAttachedImages ||
-            nativeParts.isNotEmpty)) {
-      final parts = <Map<String, dynamic>>[...nativeParts];
-      final seenSources = <String>{};
-      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
-
-      Future<void> addVertexClaudeImage(
-        String source, {
-        String? explicitMime,
-      }) async {
-        final normalized = normalizeSrc(source);
-        if (!seenSources.add(normalized)) return;
-        // Vertex AI Claude does not support remote URLs in 'image' blocks generally.
-        // We must download and encode.
-        String mime;
-        String b64;
-        if (source.startsWith('http://') || source.startsWith('https://')) {
-          try {
-            b64 = await downloadRemoteAsBase64(client, config, source);
-            mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
-                ? explicitMime.trim()
-                : 'image/png'; // TODO: detect mime from response or url
-            if (explicitMime == null || explicitMime.trim().isEmpty) {
-              final lower = source.toLowerCase();
-              if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-                mime = 'image/jpeg';
-              }
-              if (lower.endsWith('.webp')) mime = 'image/webp';
-              if (lower.endsWith('.gif')) mime = 'image/gif';
-            }
-          } catch (_) {
-            parts.add({
-              'type': 'text',
-              'text': '(image failed to download) $source',
-            });
-            return;
-          }
-        } else if (source.startsWith('data:')) {
-          mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
-              ? explicitMime.trim()
-              : mimeFromDataUrl(source);
-          final idx = source.indexOf('base64,');
-          if (idx > 0) {
-            b64 = source.substring(idx + 7);
-          } else {
-            return;
-          }
-        } else {
-          mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
-              ? explicitMime.trim()
-              : mimeFromPath(source);
-          final encoded = await tryEncodeBase64File(source, withPrefix: false);
-          if (encoded == null) return;
-          b64 = encoded;
-        }
-        if (b64.isNotEmpty) {
-          parts.add({
-            'type': 'image',
-            'source': {
-              'type': 'base64',
-              'media_type': normalizeClaudeImageMime(mime),
-              'data': b64,
+    final sourceStart = initialMessages.length;
+    try {
+      final isLast =
+          i == nonSystemMessages.lastIndexWhere((m) => m['role'] == 'user');
+      final roleName = (m['role'] ?? 'user').toString();
+      final raw = (m['content'] ?? '').toString();
+      if (roleName == 'tool') {
+        initialMessages.add({
+          'role': 'user',
+          'content': [
+            {
+              'type': 'tool_result',
+              'tool_use_id': m['tool_call_id'],
+              'content': (await ToolResultContent.read(
+                (m['name'] ?? '').toString(),
+                raw,
+                metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+                toolCallId: m['tool_call_id']?.toString(),
+                canImageInput: canImageInput,
+              )).claudeContent,
             },
+          ],
+        });
+        continue;
+      }
+      if (roleName == 'assistant' && m['tool_calls'] is List) {
+        final content = <Map<String, dynamic>>[
+          if (raw.trim().isNotEmpty) {'type': 'text', 'text': raw},
+        ];
+        for (final call in (m['tool_calls'] as List).whereType<Map>()) {
+          final fn = call['function'];
+          if (fn is! Map) continue;
+          Map<String, dynamic> args;
+          try {
+            args = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
+                .cast<String, dynamic>();
+          } catch (_) {
+            args = {};
+          }
+          content.add({
+            'type': 'tool_use',
+            'id': call['id'],
+            'name': fn['name'],
+            'input': args,
           });
         }
+        initialMessages.add({'role': 'assistant', 'content': content});
+        continue;
       }
-
-      final parsed = await parseTextAndImages(
+      // Semantic media detection only - custom attachment markers are not
+      // recognized. Attachments arrive via structured media-path keys /
+      // userImagePaths, plus Markdown ![](...).
+      final hasMarkdownImages = shouldParseMarkdownImages(
         raw,
-        literalText: internalLiteralText(m),
-        imageReferences: internalImageReferences(m),
-        allowRemoteImages: true,
-        allowLocalImages: true,
-        keepRemoteMarkdownText: true,
         skipImageParsing: skipImageParsing,
       );
-      if (parsed.text.isNotEmpty) {
-        parts.add({'type': 'text', 'text': parsed.text});
-      }
-      for (final ref in parsed.images) {
-        await addVertexClaudeImage(ref.src);
-      }
-      final supplementalRefs = supplementalMediaRefs(
-        internalRaw: m[multimodalInternalMediaPathsKey],
-        userPaths: userImagePaths,
-        includeUserPaths: hasAttachedImages,
+      final internalMediaRefs = parseInternalMediaRefs(
+        m[multimodalInternalMediaPathsKey],
       );
-      for (final mediaRef in supplementalRefs) {
-        final mime = mimeForInternalMediaRef(mediaRef);
-        // Never emit Anthropic image blocks for video/audio or other
-        // non-Claude image MIME types (e.g. video/mp4).
-        if (isVideoMime(mime) ||
-            isAudioMime(mime) ||
-            !isClaudeSupportedImageMime(mime)) {
-          final uri = mediaRef.uri;
-          final isRemote =
-              uri.startsWith('http://') || uri.startsWith('https://');
-          if (isRemote) {
-            final normalized = normalizeSrc(uri);
-            if (seenSources.add(normalized)) {
-              parts.add({'type': 'text', 'text': uri});
+      // Consume injected media refs for user and assistant history turns.
+      final hasInternalMedia = internalMediaRefs.isNotEmpty;
+      final hasAttachedImages =
+          isLast && roleName == 'user' && (userImagePaths?.isNotEmpty == true);
+      final nativeParts = await NativeInputAttachments(
+        config: config,
+        spec: ModelSpecResolver.instance.spec(config, modelId),
+        protocol: NativeInputProtocol.claude,
+      ).build(m, userPaths: isLast ? userImagePaths : null);
+
+      if ((roleName == 'user' || roleName == 'assistant') &&
+          (hasMarkdownImages ||
+              hasInternalMedia ||
+              hasAttachedImages ||
+              nativeParts.isNotEmpty)) {
+        final parts = <Map<String, dynamic>>[...nativeParts];
+        final seenSources = <String>{};
+        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
+
+        Future<void> addVertexClaudeImage(
+          String source, {
+          String? explicitMime,
+        }) async {
+          final normalized = normalizeSrc(source);
+          if (!seenSources.add(normalized)) return;
+          // Vertex AI Claude does not support remote URLs in 'image' blocks generally.
+          // We must download and encode.
+          String mime;
+          String b64;
+          if (source.startsWith('http://') || source.startsWith('https://')) {
+            try {
+              b64 = await downloadRemoteAsBase64(client, config, source);
+              mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
+                  ? explicitMime.trim()
+                  : 'image/png'; // TODO: detect mime from response or url
+              if (explicitMime == null || explicitMime.trim().isEmpty) {
+                final lower = source.toLowerCase();
+                if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+                  mime = 'image/jpeg';
+                }
+                if (lower.endsWith('.webp')) mime = 'image/webp';
+                if (lower.endsWith('.gif')) mime = 'image/gif';
+              }
+            } catch (_) {
+              parts.add({
+                'type': 'text',
+                'text': '(image failed to download) $source',
+              });
+              return;
             }
+          } else if (source.startsWith('data:')) {
+            mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
+                ? explicitMime.trim()
+                : mimeFromDataUrl(source);
+            final idx = source.indexOf('base64,');
+            if (idx > 0) {
+              b64 = source.substring(idx + 7);
+            } else {
+              return;
+            }
+          } else {
+            mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
+                ? explicitMime.trim()
+                : mimeFromPath(source);
+            final encoded = await tryEncodeBase64File(
+              source,
+              withPrefix: false,
+            );
+            if (encoded == null) return;
+            b64 = encoded;
           }
-          continue;
+          if (b64.isNotEmpty) {
+            parts.add({
+              'type': 'image',
+              'source': {
+                'type': 'base64',
+                'media_type': normalizeClaudeImageMime(mime),
+                'data': b64,
+              },
+            });
+          }
         }
-        await addVertexClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
+
+        final parsed = await parseTextAndImages(
+          raw,
+          literalText: internalLiteralText(m),
+          imageReferences: internalImageReferences(m),
+          allowRemoteImages: true,
+          allowLocalImages: true,
+          keepRemoteMarkdownText: true,
+          skipImageParsing: skipImageParsing,
+        );
+        if (parsed.text.isNotEmpty) {
+          parts.add({'type': 'text', 'text': parsed.text});
+        }
+        for (final ref in parsed.images) {
+          await addVertexClaudeImage(ref.src);
+        }
+        final supplementalRefs = supplementalMediaRefs(
+          internalRaw: m[multimodalInternalMediaPathsKey],
+          userPaths: userImagePaths,
+          includeUserPaths: hasAttachedImages,
+        );
+        for (final mediaRef in supplementalRefs) {
+          final mime = mimeForInternalMediaRef(mediaRef);
+          // Never emit Anthropic image blocks for video/audio or other
+          // non-Claude image MIME types (e.g. video/mp4).
+          if (isVideoMime(mime) ||
+              isAudioMime(mime) ||
+              !isClaudeSupportedImageMime(mime)) {
+            final uri = mediaRef.uri;
+            final isRemote =
+                uri.startsWith('http://') || uri.startsWith('https://');
+            if (isRemote) {
+              final normalized = normalizeSrc(uri);
+              if (seenSources.add(normalized)) {
+                parts.add({'type': 'text', 'text': uri});
+              }
+            }
+            continue;
+          }
+          await addVertexClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
+        }
+        initialMessages.add({
+          'role': roleName,
+          'content': parts.isEmpty ? raw : parts,
+        });
+      } else {
+        initialMessages.add({'role': roleName, 'content': raw});
       }
-      initialMessages.add({
-        'role': roleName,
-        'content': parts.isEmpty ? raw : parts,
-      });
-    } else {
-      initialMessages.add({'role': roleName, 'content': raw});
+    } finally {
+      RequestHistoryContext.mark(m, initialMessages.skip(sourceStart));
     }
   }
 
@@ -463,6 +473,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     initialMessages,
   );
   TokenUsage? totalUsage;
+  String? finishReason;
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
   var lastAssistantBlocks = <Map<String, dynamic>>[];
@@ -474,6 +485,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     retryRound: retryRound,
     sendRound: () async* {
       totalUsage = null;
+      finishReason = null;
       pendingCalls = [];
       lastStreamResults = [];
       lastText = '';
@@ -525,6 +537,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         // Vertex rawPredict response is same as Anthropic non-stream response
         final txt = await decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
+        finishReason = obj['stop_reason']?.toString();
         // Usage
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
@@ -639,14 +652,14 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 
       final usage = decoder.usage;
       final assistantBlocks = decoder.assistantBlocks;
-      final lastStopReason = decoder.lastStopReason;
+      finishReason = decoder.lastStopReason;
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
 
       lastAssistantBlocks = assistantBlocks;
       if (decoder.clientTools.isEmpty) {
-        pauseTurn = (lastStopReason ?? '') == 'pause_turn';
+        pauseTurn = allTools.isNotEmpty && (finishReason ?? '') == 'pause_turn';
         return;
       }
 
@@ -720,6 +733,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     finish: () => emitDone(
       ids: StreamChunkIds('finish'),
       content: lastText,
+      finishReason: finishReason,
       usage: totalUsage,
       totalTokens: totalUsage?.totalTokens ?? 0,
     ),

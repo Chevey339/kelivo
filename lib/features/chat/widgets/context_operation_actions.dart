@@ -495,34 +495,55 @@ Future<void> showContextOperations(
   required ValueChanged<ContextCompressionTask> onRetry,
   required ValueChanged<ContextCompressionTask> onAdjust,
   required ValueChanged<String> onOpenConversation,
-}) => _showContextContent(
-  context,
-  title: AppLocalizations.of(context)!.contextOperationsTitle,
-  builder: (panelContext) {
-    void leave(VoidCallback action) {
-      Navigator.of(panelContext).pop();
-      action();
-    }
+}) async {
+  final service = chat.contextCompression;
+  final viewedTask = service.taskFor(conversationId);
+  await _showContextContent(
+    context,
+    title: AppLocalizations.of(context)!.contextOperationsTitle,
+    builder: (panelContext) {
+      void leave(VoidCallback action) {
+        Navigator.of(panelContext).pop();
+        action();
+      }
 
-    return ContextOperationsPanel(
-      chat: chat,
-      conversationId: conversationId,
-      messageLimit: messageLimit,
-      onOpenOperation: (operation) => leave(() => onOpenOperation(operation)),
-      onRetry: (task) => leave(() => onRetry(task)),
-      onAdjust: (task) => leave(() => onAdjust(task)),
-      onReview: (task) => leave(
-        () => showCompressionReview(
-          context,
-          chat: chat,
-          task: task,
-          onRecompress: () => onAdjust(task),
+      return ContextOperationsPanel(
+        chat: chat,
+        conversationId: conversationId,
+        messageLimit: messageLimit,
+        onOpenOperation: (operation) => leave(() => onOpenOperation(operation)),
+        onRetry: (task) => leave(() => onRetry(task)),
+        onAdjust: (task) => leave(() => onAdjust(task)),
+        onReview: (task) => leave(
+          () => showCompressionReview(
+            context,
+            chat: chat,
+            task: task,
+            onRecompress: () => onAdjust(task),
+          ),
         ),
-      ),
-      onOpenConversation: (id) => leave(() => onOpenConversation(id)),
-    );
-  },
-);
+        onOpenConversation: (id) => leave(() => onOpenConversation(id)),
+      );
+    },
+  );
+  // Viewing a completed result acknowledges its notice. Do not dismiss a task
+  // that still needs attention, or a replacement started from this panel.
+  if (viewedTask?.phase != CompressionPhase.completed ||
+      !identical(service.taskFor(conversationId), viewedTask)) {
+    return;
+  }
+  try {
+    await service.dismiss(conversationId);
+  } catch (error) {
+    if (context.mounted) {
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: NotificationType.error,
+      );
+    }
+  }
+}
 
 Future<void> showCompressionReview(
   BuildContext context, {

@@ -1,3 +1,4 @@
+import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import 'dart:async';
@@ -206,6 +207,7 @@ Future<List<Map<String, dynamic>>> _googleFunctionResponseParts(
   }
   return [
     {
+      if (toolCallId != null) toolSourceKey: toolCallId,
       'functionResponse': {
         'name': name,
         'response': response,
@@ -352,6 +354,7 @@ Stream<StreamChunk> sendGoogleStream(
   }
 
   final upstreamModelId = apiModelId(config, modelId);
+  RequestHistoryContext.current?.format = HistoryWireFormat.google;
   final bool mixedBuiltInAndFunctionTools =
       supportsMixedBuiltInAndFunctionTools(upstreamModelId);
   final builtIns = builtInTools(config, modelId);
@@ -375,173 +378,179 @@ Stream<StreamChunk> sendGoogleStream(
     final contents = <Map<String, dynamic>>[];
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
-      final roleRaw = (msg['role'] ?? 'user').toString();
-      if (roleRaw == 'system') {
-        final s = (msg['content'] ?? '').toString();
-        if (s.isNotEmpty) {
-          systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+      final sourceStart = contents.length;
+      try {
+        final roleRaw = (msg['role'] ?? 'user').toString();
+        if (roleRaw == 'system') {
+          final s = (msg['content'] ?? '').toString();
+          if (s.isNotEmpty) {
+            systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+          }
+          continue;
         }
-        continue;
-      }
-      final role = roleRaw == 'assistant' ? 'model' : 'user';
-      if (roleRaw == 'tool') {
-        _addGoogleFunctionResponseParts(
-          contents,
-          await _googleFunctionResponsePartsFromToolMessage(
-            msg,
-            canImageInput: effective.input.contains(Modality.image),
-          ),
-        );
-        continue;
-      }
-      if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+        final role = roleRaw == 'assistant' ? 'model' : 'user';
+        if (roleRaw == 'tool') {
+          _addGoogleFunctionResponseParts(
+            contents,
+            await _googleFunctionResponsePartsFromToolMessage(
+              msg,
+              canImageInput: effective.input.contains(Modality.image),
+            ),
+          );
+          continue;
+        }
+        if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+          final parts = <Map<String, dynamic>>[];
+          final raw = _geminiHistoryText(msg);
+          if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
+            parts.add({'text': raw});
+          }
+          for (final tc in msg['tool_calls'] as List) {
+            if (tc is! Map) continue;
+            final part = _googleFunctionCallPartFromToolCall(tc);
+            if (part != null) parts.add(part);
+          }
+          if (persistGeminiThoughtSigs) {
+            _ensureGeminiFunctionCallThoughtSig(parts);
+          }
+          if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
+          continue;
+        }
+        final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
         final parts = <Map<String, dynamic>>[];
-        final raw = _geminiHistoryText(msg);
-        if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
-          parts.add({'text': raw});
-        }
-        for (final tc in msg['tool_calls'] as List) {
-          if (tc is! Map) continue;
-          final part = _googleFunctionCallPartFromToolCall(tc);
-          if (part != null) parts.add(part);
-        }
-        if (persistGeminiThoughtSigs) {
-          _ensureGeminiFunctionCallThoughtSig(parts);
-        }
-        if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
-        continue;
-      }
-      final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
-      final parts = <Map<String, dynamic>>[];
-      parts.addAll(
-        await NativeInputAttachments(
-          config: config,
-          spec: effective,
-          protocol: NativeInputProtocol.gemini,
-        ).build(msg, userPaths: isLast ? userImagePaths : null),
-      );
-      final meta = _geminiHistoryMeta(msg);
-      final raw = meta.cleanedText;
-      final seenSources = <String>{};
-      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
+        parts.addAll(
+          await NativeInputAttachments(
+            config: config,
+            spec: effective,
+            protocol: NativeInputProtocol.gemini,
+          ).build(msg, userPaths: isLast ? userImagePaths : null),
+        );
+        final meta = _geminiHistoryMeta(msg);
+        final raw = meta.cleanedText;
+        final seenSources = <String>{};
+        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
-      // Semantic media detection only - custom attachment markers are not
-      // recognized. Attachments arrive via structured media-path keys /
-      // userImagePaths, plus Markdown ![](...).
-      final hasMarkdownImages = shouldParseMarkdownImages(
-        raw,
-        skipImageParsing: skipImageParsing,
-      );
-      final internalMediaRefs = parseInternalMediaRefs(
-        msg[multimodalInternalMediaPathsKey],
-      );
-      // Consume injected media refs for user and assistant history turns.
-      final hasInternalMedia = internalMediaRefs.isNotEmpty;
-      final hasAttachedImages =
-          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-      if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-        final parsed = await parseTextAndImages(
+        // Semantic media detection only - custom attachment markers are not
+        // recognized. Attachments arrive via structured media-path keys /
+        // userImagePaths, plus Markdown ![](...).
+        final hasMarkdownImages = shouldParseMarkdownImages(
           raw,
-          literalText: internalLiteralText(msg),
-          imageReferences: internalImageReferences(msg),
-          // Gemini API 目前无法直接拉取远程 http(s) 图片
-          allowRemoteImages: false,
-          allowLocalImages: true,
-          keepRemoteMarkdownText: true,
           skipImageParsing: skipImageParsing,
         );
-        if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
-        for (final ref in parsed.images) {
-          final normalized = normalizeSrc(ref.src);
-          if (!seenSources.add(normalized)) continue;
-          if (ref.kind == 'data') {
-            final mime = mimeFromDataUrl(ref.src);
-            final idx = ref.src.indexOf('base64,');
-            if (idx > 0) {
-              final b64 = ref.src.substring(idx + 7);
-              parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
-              });
-            } else {
-              parts.add({'text': ref.src});
-            }
-          } else if (ref.kind == 'path') {
-            final mime = mimeFromPath(ref.src);
-            final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
-            if (b64 == null) continue;
-            parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
-            });
-          } else {
-            parts.add({'text': '(image) ${ref.src}'});
-          }
-        }
-        final supplementalRefs = supplementalMediaRefs(
-          internalRaw: msg[multimodalInternalMediaPathsKey],
-          userPaths: userImagePaths,
-          includeUserPaths: hasAttachedImages,
+        final internalMediaRefs = parseInternalMediaRefs(
+          msg[multimodalInternalMediaPathsKey],
         );
-        if (supplementalRefs.isNotEmpty) {
-          for (final mediaRef in supplementalRefs) {
-            final p = mediaRef.uri;
-            final inputMime = mimeForInternalMediaRef(mediaRef);
-            if (role == 'user' &&
-                (isAudioMime(inputMime) ||
-                    isVideoMime(inputMime) ||
-                    isPdfMime(inputMime))) {
-              continue;
-            }
-            final normalized = normalizeSrc(p);
+        // Consume injected media refs for user and assistant history turns.
+        final hasInternalMedia = internalMediaRefs.isNotEmpty;
+        final hasAttachedImages =
+            isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+        if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
+          final parsed = await parseTextAndImages(
+            raw,
+            literalText: internalLiteralText(msg),
+            imageReferences: internalImageReferences(msg),
+            // Gemini API 目前无法直接拉取远程 http(s) 图片
+            allowRemoteImages: false,
+            allowLocalImages: true,
+            keepRemoteMarkdownText: true,
+            skipImageParsing: skipImageParsing,
+          );
+          if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
+          for (final ref in parsed.images) {
+            final normalized = normalizeSrc(ref.src);
             if (!seenSources.add(normalized)) continue;
-            if (p.startsWith('data:')) {
-              final mime = mimeForInternalMediaRef(mediaRef);
-              final idx = p.indexOf('base64,');
+            if (ref.kind == 'data') {
+              final mime = mimeFromDataUrl(ref.src);
+              final idx = ref.src.indexOf('base64,');
               if (idx > 0) {
-                final b64 = p.substring(idx + 7);
+                final b64 = ref.src.substring(idx + 7);
                 parts.add({
                   'inline_data': {'mime_type': mime, 'data': b64},
                 });
+              } else {
+                parts.add({'text': ref.src});
               }
-            } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-              final mime = mimeForInternalMediaRef(mediaRef);
-              final b64 = await tryEncodeBase64File(p, withPrefix: false);
+            } else if (ref.kind == 'path') {
+              final mime = mimeFromPath(ref.src);
+              final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
               if (b64 == null) continue;
               parts.add({
                 'inline_data': {'mime_type': mime, 'data': b64},
               });
             } else {
-              parts.add({'text': '(image) $p'});
+              parts.add({'text': '(image) ${ref.src}'});
+            }
+          }
+          final supplementalRefs = supplementalMediaRefs(
+            internalRaw: msg[multimodalInternalMediaPathsKey],
+            userPaths: userImagePaths,
+            includeUserPaths: hasAttachedImages,
+          );
+          if (supplementalRefs.isNotEmpty) {
+            for (final mediaRef in supplementalRefs) {
+              final p = mediaRef.uri;
+              final inputMime = mimeForInternalMediaRef(mediaRef);
+              if (role == 'user' &&
+                  (isAudioMime(inputMime) ||
+                      isVideoMime(inputMime) ||
+                      isPdfMime(inputMime))) {
+                continue;
+              }
+              final normalized = normalizeSrc(p);
+              if (!seenSources.add(normalized)) continue;
+              if (p.startsWith('data:')) {
+                final mime = mimeForInternalMediaRef(mediaRef);
+                final idx = p.indexOf('base64,');
+                if (idx > 0) {
+                  final b64 = p.substring(idx + 7);
+                  parts.add({
+                    'inline_data': {'mime_type': mime, 'data': b64},
+                  });
+                }
+              } else if (!(p.startsWith('http://') ||
+                  p.startsWith('https://'))) {
+                final mime = mimeForInternalMediaRef(mediaRef);
+                final b64 = await tryEncodeBase64File(p, withPrefix: false);
+                if (b64 == null) continue;
+                parts.add({
+                  'inline_data': {'mime_type': mime, 'data': b64},
+                });
+              } else {
+                parts.add({'text': '(image) $p'});
+              }
+            }
+          }
+        } else {
+          if (raw.isNotEmpty) parts.add({'text': raw});
+        }
+        // YouTube URL ingestion as file_data parts (Gemini official API)
+        // Only inject on the last user message of this request.
+        if (role == 'user' && isLast && enableYoutube) {
+          final urls = extractYouTubeUrls(raw);
+          for (final u in urls) {
+            // Vertex AI requires mime_type for file_data
+            if (isVertex) {
+              parts.add({
+                'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+              });
+            } else {
+              parts.add({
+                'file_data': {'file_uri': u},
+              });
             }
           }
         }
-      } else {
-        if (raw.isNotEmpty) parts.add({'text': raw});
-      }
-      // YouTube URL ingestion as file_data parts (Gemini official API)
-      // Only inject on the last user message of this request.
-      if (role == 'user' && isLast && enableYoutube) {
-        final urls = extractYouTubeUrls(raw);
-        for (final u in urls) {
-          // Vertex AI requires mime_type for file_data
-          if (isVertex) {
-            parts.add({
-              'file_data': {'file_uri': u, 'mime_type': 'video/*'},
-            });
-          } else {
-            parts.add({
-              'file_data': {'file_uri': u},
-            });
-          }
+        if (role == 'model') {
+          applyGeminiThoughtSignatures(
+            meta,
+            parts,
+            attachDummyWhenMissing: persistGeminiThoughtSigs,
+          );
         }
+        contents.add({'role': role, 'parts': parts});
+      } finally {
+        RequestHistoryContext.mark(msg, contents.skip(sourceStart));
       }
-      if (role == 'model') {
-        applyGeminiThoughtSignatures(
-          meta,
-          parts,
-          attachDummyWhenMissing: persistGeminiThoughtSigs,
-        );
-      }
-      contents.add({'role': role, 'parts': parts});
     }
 
     // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
@@ -643,6 +652,7 @@ Stream<StreamChunk> sendGoogleStream(
     CustomRequestMerger.applyBody(baseBody, extraG);
 
     TokenUsage? totalUsage;
+    String? finishReason;
     List<Map<String, dynamic>> currentContents =
         List<Map<String, dynamic>>.from(contents);
     var pendingCalls = <EmitToolCall>[];
@@ -653,6 +663,7 @@ Stream<StreamChunk> sendGoogleStream(
       retryRound: retryRound,
       sendRound: () async* {
         totalUsage = null;
+        finishReason = null;
         pendingCalls = [];
         lastParts = [];
         lastFunctionCallParts = [];
@@ -678,6 +689,7 @@ Stream<StreamChunk> sendGoogleStream(
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
         if (candidates.isEmpty) return;
         final cand = (candidates.first as Map).cast<String, dynamic>();
+        finishReason = cand['finishReason']?.toString();
         final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
         final functionCallParts = parts
             .where((e) => e is Map && e.containsKey('functionCall'))
@@ -797,6 +809,7 @@ Stream<StreamChunk> sendGoogleStream(
             'parts': [
               for (var i = 0; i < executed.length; i++)
                 <String, dynamic>{
+                  toolSourceKey: executed[i].call.id,
                   'functionResponse': {
                     'name': executed[i].call.name,
                     'response': {'result': results[i].text},
@@ -818,6 +831,7 @@ Stream<StreamChunk> sendGoogleStream(
       },
       finish: () => emitFinish(
         ids: StreamChunkIds('finish'),
+        finishReason: finishReason,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       ),
@@ -842,178 +856,185 @@ Stream<StreamChunk> sendGoogleStream(
   final contents = <Map<String, dynamic>>[];
   for (int i = 0; i < messages.length; i++) {
     final msg = messages[i];
-    final roleRaw = (msg['role'] ?? 'user').toString();
-    if (roleRaw == 'system') {
-      final s = (msg['content'] ?? '').toString();
-      if (s.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+    final sourceStart = contents.length;
+    try {
+      final roleRaw = (msg['role'] ?? 'user').toString();
+      if (roleRaw == 'system') {
+        final s = (msg['content'] ?? '').toString();
+        if (s.isNotEmpty) {
+          systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+        }
+        continue;
       }
-      continue;
-    }
-    final role = roleRaw == 'assistant' ? 'model' : 'user';
-    if (roleRaw == 'tool') {
-      _addGoogleFunctionResponseParts(
-        contents,
-        await _googleFunctionResponsePartsFromToolMessage(
-          msg,
-          canImageInput: effective.input.contains(Modality.image),
-        ),
-      );
-      continue;
-    }
-    if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+      final role = roleRaw == 'assistant' ? 'model' : 'user';
+      if (roleRaw == 'tool') {
+        _addGoogleFunctionResponseParts(
+          contents,
+          await _googleFunctionResponsePartsFromToolMessage(
+            msg,
+            canImageInput: effective.input.contains(Modality.image),
+          ),
+        );
+        continue;
+      }
+      if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+        final parts = <Map<String, dynamic>>[];
+        final raw = _geminiHistoryText(msg);
+        if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
+          parts.add({'text': raw});
+        }
+        for (final tc in msg['tool_calls'] as List) {
+          if (tc is! Map) continue;
+          final part = _googleFunctionCallPartFromToolCall(tc);
+          if (part != null) parts.add(part);
+        }
+        if (persistGeminiThoughtSigs) {
+          _ensureGeminiFunctionCallThoughtSig(parts);
+        }
+        if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
+        continue;
+      }
+      final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
       final parts = <Map<String, dynamic>>[];
-      final raw = _geminiHistoryText(msg);
-      if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
-        parts.add({'text': raw});
-      }
-      for (final tc in msg['tool_calls'] as List) {
-        if (tc is! Map) continue;
-        final part = _googleFunctionCallPartFromToolCall(tc);
-        if (part != null) parts.add(part);
-      }
-      if (persistGeminiThoughtSigs) _ensureGeminiFunctionCallThoughtSig(parts);
-      if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
-      continue;
-    }
-    final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
-    final parts = <Map<String, dynamic>>[];
-    parts.addAll(
-      await NativeInputAttachments(
-        config: config,
-        spec: effective,
-        protocol: NativeInputProtocol.gemini,
-      ).build(msg, userPaths: isLast ? userImagePaths : null),
-    );
-    final meta = _geminiHistoryMeta(msg);
-    final raw = meta.cleanedText;
-    final seenSources = <String>{};
-    String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
+      parts.addAll(
+        await NativeInputAttachments(
+          config: config,
+          spec: effective,
+          protocol: NativeInputProtocol.gemini,
+        ).build(msg, userPaths: isLast ? userImagePaths : null),
+      );
+      final meta = _geminiHistoryMeta(msg);
+      final raw = meta.cleanedText;
+      final seenSources = <String>{};
+      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
-    // Only parse images if there are images to process.
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
-    final hasMarkdownImages = shouldParseMarkdownImages(
-      raw,
-      skipImageParsing: skipImageParsing,
-    );
-    final internalMediaRefs = parseInternalMediaRefs(
-      msg[multimodalInternalMediaPathsKey],
-    );
-    // Consume injected media refs for user and assistant history turns.
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
-    final hasAttachedImages =
-        isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-
-    if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-      final parsed = await parseTextAndImages(
+      // Only parse images if there are images to process.
+      // Semantic media detection only - custom attachment markers are not
+      // recognized. Attachments arrive via structured media-path keys /
+      // userImagePaths, plus Markdown ![](...).
+      final hasMarkdownImages = shouldParseMarkdownImages(
         raw,
-        literalText: internalLiteralText(msg),
-        imageReferences: internalImageReferences(msg),
-        // Gemini API 目前无法直接拉取远程 http(s) 图片
-        allowRemoteImages: false,
-        allowLocalImages: true,
-        keepRemoteMarkdownText: true,
         skipImageParsing: skipImageParsing,
       );
-      if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
-      // Images extracted from this message's text
-      for (final ref in parsed.images) {
-        final normalized = normalizeSrc(ref.src);
-        if (!seenSources.add(normalized)) continue;
-        if (ref.kind == 'data') {
-          final mime = mimeFromDataUrl(ref.src);
-          final idx = ref.src.indexOf('base64,');
-          if (idx > 0) {
-            final b64 = ref.src.substring(idx + 7);
-            parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
-            });
-          } else {
-            // If malformed data URL, include as plain text fallback
-            parts.add({'text': ref.src});
-          }
-        } else if (ref.kind == 'path') {
-          final mime = mimeFromPath(ref.src);
-          final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
-          if (b64 == null) continue;
-          parts.add({
-            'inline_data': {'mime_type': mime, 'data': b64},
-          });
-        } else {
-          // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
-          parts.add({'text': '(image) ${ref.src}'});
-        }
-      }
-      final supplementalRefs = supplementalMediaRefs(
-        internalRaw: msg[multimodalInternalMediaPathsKey],
-        userPaths: userImagePaths,
-        includeUserPaths: hasAttachedImages,
+      final internalMediaRefs = parseInternalMediaRefs(
+        msg[multimodalInternalMediaPathsKey],
       );
-      if (supplementalRefs.isNotEmpty) {
-        for (final mediaRef in supplementalRefs) {
-          final p = mediaRef.uri;
-          final inputMime = mimeForInternalMediaRef(mediaRef);
-          if (role == 'user' &&
-              (isAudioMime(inputMime) ||
-                  isVideoMime(inputMime) ||
-                  isPdfMime(inputMime))) {
-            continue;
-          }
-          final normalized = normalizeSrc(p);
+      // Consume injected media refs for user and assistant history turns.
+      final hasInternalMedia = internalMediaRefs.isNotEmpty;
+      final hasAttachedImages =
+          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+
+      if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
+        final parsed = await parseTextAndImages(
+          raw,
+          literalText: internalLiteralText(msg),
+          imageReferences: internalImageReferences(msg),
+          // Gemini API 目前无法直接拉取远程 http(s) 图片
+          allowRemoteImages: false,
+          allowLocalImages: true,
+          keepRemoteMarkdownText: true,
+          skipImageParsing: skipImageParsing,
+        );
+        if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
+        // Images extracted from this message's text
+        for (final ref in parsed.images) {
+          final normalized = normalizeSrc(ref.src);
           if (!seenSources.add(normalized)) continue;
-          if (p.startsWith('data:')) {
-            final mime = mimeForInternalMediaRef(mediaRef);
-            final idx = p.indexOf('base64,');
+          if (ref.kind == 'data') {
+            final mime = mimeFromDataUrl(ref.src);
+            final idx = ref.src.indexOf('base64,');
             if (idx > 0) {
-              final b64 = p.substring(idx + 7);
+              final b64 = ref.src.substring(idx + 7);
               parts.add({
                 'inline_data': {'mime_type': mime, 'data': b64},
               });
+            } else {
+              // If malformed data URL, include as plain text fallback
+              parts.add({'text': ref.src});
             }
-          } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-            final mime = mimeForInternalMediaRef(mediaRef);
-            final b64 = await tryEncodeBase64File(p, withPrefix: false);
+          } else if (ref.kind == 'path') {
+            final mime = mimeFromPath(ref.src);
+            final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
             if (b64 == null) continue;
             parts.add({
               'inline_data': {'mime_type': mime, 'data': b64},
             });
           } else {
-            // http url fallback reference text
-            parts.add({'text': '(image) $p'});
+            // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
+            parts.add({'text': '(image) ${ref.src}'});
+          }
+        }
+        final supplementalRefs = supplementalMediaRefs(
+          internalRaw: msg[multimodalInternalMediaPathsKey],
+          userPaths: userImagePaths,
+          includeUserPaths: hasAttachedImages,
+        );
+        if (supplementalRefs.isNotEmpty) {
+          for (final mediaRef in supplementalRefs) {
+            final p = mediaRef.uri;
+            final inputMime = mimeForInternalMediaRef(mediaRef);
+            if (role == 'user' &&
+                (isAudioMime(inputMime) ||
+                    isVideoMime(inputMime) ||
+                    isPdfMime(inputMime))) {
+              continue;
+            }
+            final normalized = normalizeSrc(p);
+            if (!seenSources.add(normalized)) continue;
+            if (p.startsWith('data:')) {
+              final mime = mimeForInternalMediaRef(mediaRef);
+              final idx = p.indexOf('base64,');
+              if (idx > 0) {
+                final b64 = p.substring(idx + 7);
+                parts.add({
+                  'inline_data': {'mime_type': mime, 'data': b64},
+                });
+              }
+            } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
+              final mime = mimeForInternalMediaRef(mediaRef);
+              final b64 = await tryEncodeBase64File(p, withPrefix: false);
+              if (b64 == null) continue;
+              parts.add({
+                'inline_data': {'mime_type': mime, 'data': b64},
+              });
+            } else {
+              // http url fallback reference text
+              parts.add({'text': '(image) $p'});
+            }
+          }
+        }
+      } else {
+        // No images, use simple text content
+        if (raw.isNotEmpty) parts.add({'text': raw});
+      }
+      // YouTube URL ingestion as file_data parts (Gemini official API)
+      // Only inject on the last user message of this request.
+      if (role == 'user' && isLast && enableYoutube) {
+        final urls = extractYouTubeUrls(raw);
+        for (final u in urls) {
+          // Vertex AI requires mime_type for file_data
+          if (isVertex) {
+            parts.add({
+              'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+            });
+          } else {
+            parts.add({
+              'file_data': {'file_uri': u},
+            });
           }
         }
       }
-    } else {
-      // No images, use simple text content
-      if (raw.isNotEmpty) parts.add({'text': raw});
-    }
-    // YouTube URL ingestion as file_data parts (Gemini official API)
-    // Only inject on the last user message of this request.
-    if (role == 'user' && isLast && enableYoutube) {
-      final urls = extractYouTubeUrls(raw);
-      for (final u in urls) {
-        // Vertex AI requires mime_type for file_data
-        if (isVertex) {
-          parts.add({
-            'file_data': {'file_uri': u, 'mime_type': 'video/*'},
-          });
-        } else {
-          parts.add({
-            'file_data': {'file_uri': u},
-          });
-        }
+      if (role == 'model') {
+        applyGeminiThoughtSignatures(
+          meta,
+          parts,
+          attachDummyWhenMissing: persistGeminiThoughtSigs,
+        );
       }
+      contents.add({'role': role, 'parts': parts});
+    } finally {
+      RequestHistoryContext.mark(msg, contents.skip(sourceStart));
     }
-    if (role == 'model') {
-      applyGeminiThoughtSignatures(
-        meta,
-        parts,
-        attachDummyWhenMissing: persistGeminiThoughtSigs,
-      );
-    }
-    contents.add({'role': role, 'parts': parts});
   }
 
   bool expectImage = wantsImageOutput;
@@ -1064,6 +1085,7 @@ Stream<StreamChunk> sendGoogleStream(
   // Maintain a rolling conversation for multi-round tool calls
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(contents);
   TokenUsage? usage;
+  String? finishReason;
   int totalTokens = 0;
 
   // Accumulate built-in search citations across stream rounds
@@ -1264,6 +1286,7 @@ Stream<StreamChunk> sendGoogleStream(
         yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
       }
 
+      finishReason = decoder.finishReason;
       receivedImage = decoder.receivedImage;
       usage = decoder.usage ?? usage;
       totalTokens = usage?.totalTokens ?? totalTokens;
@@ -1354,6 +1377,7 @@ Stream<StreamChunk> sendGoogleStream(
     },
     finish: () => emitDone(
       ids: StreamChunkIds('finish'),
+      finishReason: finishReason,
       usage: usage,
       totalTokens: totalTokens,
     ),

@@ -1,12 +1,12 @@
+import 'compression_controls.dart';
+import 'context_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../../../shared/widgets/section_card.dart';
 import 'context_usage_header.dart';
 
 /// Bottom sheet for mobile: compress context or clear context.
@@ -66,7 +66,7 @@ class ContextManagementSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Flexible(
             child: SingleChildScrollView(
               child: Column(
@@ -76,134 +76,53 @@ class ContextManagementSheet extends StatelessWidget {
                     conversationId: conversationId,
                     draftText: draftText,
                   ),
-                  const SizedBox(height: 16),
-                  if (onOperations != null) ...[
-                    _OptionRow(
-                      icon: Lucide.History,
-                      label: l10n.contextOperationsTitle,
-                      description: l10n.contextOperationsDescription,
-                      onTap: onOperations,
-                      showChevron: true,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (onImages != null) ...[
-                    _OptionRow(
-                      icon: Lucide.Image,
-                      label: l10n.imageContextTitle,
-                      description: l10n.imageContextEntryDescription,
-                      onTap: onImages,
-                      showChevron: true,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  _OptionRow(
+                  const SizedBox(height: 6),
+                  if (conversationId != null)
+                    AutoCompressionControl(conversationId: conversationId!),
+                  ContextActionRow(
                     icon: Lucide.package2,
                     label: l10n.compressContext,
-                    description: l10n.compressContextDesc,
                     onTap: () {
                       Haptics.light();
                       onCompress?.call();
                     },
                   ),
-                  const SizedBox(height: 8),
-                  _OptionRow(
+                  if (onOperations != null)
+                    ContextActionRow(
+                      icon: Lucide.History,
+                      label: l10n.contextOperationsTitle,
+                      onTap: onOperations,
+                      showChevron: true,
+                    ),
+                  if (onImages != null)
+                    ContextActionRow(
+                      icon: Lucide.Image,
+                      label: l10n.imageContextTitle,
+                      onTap: onImages,
+                      showChevron: true,
+                    ),
+                  ContextActionRow(
                     icon: Lucide.Eraser,
                     label: l10n.bottomToolsSheetClearContext,
-                    description: l10n.clearContextDesc,
-                    trailing: messageCountLabel,
+                    trailing: messageCountLabel == null
+                        ? null
+                        : Text(
+                            messageCountLabel!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: AppFontWeights.medium,
+                              color: cs.onSurface.withValues(alpha: .55),
+                            ),
+                          ),
                     onTap: () {
                       Haptics.light();
                       onClear?.call();
                     },
                   ),
-                  const SizedBox(height: 8),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OptionRow extends StatelessWidget {
-  const _OptionRow({
-    required this.icon,
-    required this.label,
-    required this.description,
-    this.onTap,
-    this.trailing,
-    this.showChevron = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String description;
-  final VoidCallback? onTap;
-  final String? trailing;
-  final bool showChevron;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final cardColor = sheetTileColor(context);
-    final radius = BorderRadius.circular(14);
-
-    return IosCardPress(
-      baseColor: cardColor,
-      borderRadius: radius,
-      pressedScale: 0.98,
-      duration: const Duration(milliseconds: 260),
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Icon(icon, size: 22, color: cs.onSurface),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.semibold,
-                    color: cs.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurface.withValues(alpha: 0.55),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            Text(
-              trailing!,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: AppFontWeights.medium,
-                color: cs.onSurface.withValues(alpha: 0.55),
-              ),
-            ),
-          ],
-          if (showChevron) ...[
-            const SizedBox(width: 10),
-            Icon(
-              Lucide.ChevronRight,
-              size: 17,
-              color: cs.onSurface.withValues(alpha: 0.35),
-            ),
-          ],
         ],
       ),
     );

@@ -2477,13 +2477,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create an editable, reversible summary in this chat. Original messages are kept.';
 
   @override
-  String get compressContextKeepStart => 'Start sample';
+  String get compressContextKeepStart => 'Earlier history';
 
   @override
-  String get compressContextKeepRecent => 'End sample';
+  String get compressContextKeepRecent => 'Recent history';
 
   @override
-  String get compressContextUnlimited => 'All content';
+  String get compressContextUnlimited => 'All active history';
 
   @override
   String get compressContextMaxCharsLabel => 'Characters';
@@ -2501,7 +2501,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextModelUnset => 'Select a model';
 
   @override
-  String get compressContextKeepRecentMessages => 'Keep N';
+  String get compressContextKeepRecentMessages => 'Keep recent turns';
 
   @override
   String get compressContextKeepCountLabel => 'Recent user messages';
@@ -15346,7 +15346,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressIncludeAttachmentsDesc =>
-      'Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.';
+      'Include available attachment text and complete tool records in their original order. Images are not reinterpreted.';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -16035,4 +16035,404 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get responseSpeedUltrafastNeedsResponses =>
       'UltraFast requires the Responses API.';
+
+  @override
+  String get compressionTemplate => 'Summary template';
+
+  @override
+  String get compressionGeneral => 'General';
+
+  @override
+  String get compressionCode => 'Code';
+
+  @override
+  String get compressionWriting => 'Writing';
+
+  @override
+  String get compressionResearch => 'Research';
+
+  @override
+  String get compressionRoleplay => 'Roleplay';
+
+  @override
+  String get compressionOriginalPrompt => 'My original prompt';
+
+  @override
+  String get compressionMore => 'More settings';
+
+  @override
+  String get compressionFocus => 'Focus for this run';
+
+  @override
+  String get compressionFocusHint =>
+      'Optional: key decisions, progress or character details';
+
+  @override
+  String get compressionForConversation => 'For this conversation';
+
+  @override
+  String get compressionFollowGlobal => 'Follow global defaults';
+
+  @override
+  String get compressionSetGlobal => 'Set as global defaults';
+
+  @override
+  String get compressionGlobalDescription =>
+      'Affects conversations that follow global defaults. Conversation overrides stay unchanged.';
+
+  @override
+  String get compressionAutoTitle => 'Automatic compression';
+
+  @override
+  String get compressionAutoOff => 'Off';
+
+  @override
+  String get compressionAutoNotify => 'Notify only';
+
+  @override
+  String get compressionAutoOn => 'Automatic';
+
+  @override
+  String get compressionNearLimit =>
+      'Context is near its estimated capacity. You can keep chatting or compress manually.';
+
+  @override
+  String get compressionKeepTurns => 'Keep recent';
+
+  @override
+  String get compressionKeepHint =>
+      'A turn includes a user message, its replies and tools.';
+
+  @override
+  String get compressionLength => 'Summary limit (tokens)';
+
+  @override
+  String get compressionTrigger => 'Start at';
+
+  @override
+  String get compressionTarget => 'Compress to';
+
+  @override
+  String get compressionWindow => 'Planning window';
+
+  @override
+  String get compressionRequests => 'Maximum calls';
+
+  @override
+  String get compressionReference => 'Reference active world books and memory';
+
+  @override
+  String get compressionReferenceHint =>
+      'Reference explains names and rules; it is not evidence that events happened or characters know them.';
+
+  @override
+  String get compressionToolReferences => 'Reference consumed tool results';
+
+  @override
+  String get compressionToolReferencesHint =>
+      'Only with tool access. Keeps the latest unread results and allows exact, read-only recall.';
+
+  @override
+  String get compressionSummaryScan =>
+      'Include summaries in world book keyword matching';
+
+  @override
+  String get compressionChatModel => 'Follow the current chat model';
+
+  @override
+  String get compressionManageTemplates => 'Manage templates & recipes';
+
+  @override
+  String get compressionLocalPreview => 'Preview request · no model call';
+
+  @override
+  String get compressionTry => 'Try summary · uses model tokens';
+
+  @override
+  String get compressionPreviewOnly =>
+      'Candidate only. Review and apply when ready.';
+
+  @override
+  String get compressionTemplateChanged =>
+      'This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.';
+
+  @override
+  String compressionRange(int count, int turns) {
+    return 'Summarize $count messages · keep $turns user turns verbatim';
+  }
+
+  @override
+  String compressionCalls(int count) {
+    return '$count model calls';
+  }
+
+  @override
+  String get compressionActualUsage => 'Summary model usage';
+
+  @override
+  String compressionUsageValues(String input, String output) {
+    return 'Input $input · output $output tokens';
+  }
+
+  @override
+  String compressionUsageUnknown(int count) {
+    return 'Usage not returned for $count attempts; these calls are not counted as free.';
+  }
+
+  @override
+  String get compressionBudgetError =>
+      'The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.';
+
+  @override
+  String get compressionIncomplete =>
+      'The summary was truncated or refused and was not applied. Adjust the output limit or model.';
+
+  @override
+  String get compressionReferenceTooLarge =>
+      'The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.';
+
+  @override
+  String get compressionReferenceChanged =>
+      'Referenced background changed. Review the candidate or regenerate.';
+
+  @override
+  String get compressionTargetNotReached =>
+      'The candidate did not reduce the full request below the automatic trigger. Original context was kept.';
+
+  @override
+  String get compressionTemplateMissing =>
+      'The selected template is unavailable. Select another template.';
+
+  @override
+  String get compressionTemplates => 'Templates';
+
+  @override
+  String get compressionRecipes => 'Recipes';
+
+  @override
+  String get compressionNewTemplate => 'New template';
+
+  @override
+  String get compressionEditTemplate => 'Edit template';
+
+  @override
+  String get compressionRestoreDefault => 'Restore defaults';
+
+  @override
+  String get compressionCopyEdit => 'Copy & edit';
+
+  @override
+  String get compressionTemplateName => 'Name';
+
+  @override
+  String get compressionPrompt => 'Summary instructions';
+
+  @override
+  String get compressionLanguage => 'Output language';
+
+  @override
+  String get compressionLanguageConversation => 'Follow the conversation';
+
+  @override
+  String get compressionLanguageLegacy =>
+      'Keep original template language behavior';
+
+  @override
+  String get compressionLanguageHint =>
+      'Language code, or conversation / legacy';
+
+  @override
+  String get compressionVariables =>
+      'Supported variables; history is appended automatically if omitted:';
+
+  @override
+  String get compressionDeleteTemplate =>
+      'Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.';
+
+  @override
+  String compressionTemplateReferences(int count) {
+    return 'Used by $count conversation overrides.';
+  }
+
+  @override
+  String get compressionSaveRecipe => 'Save these settings as a recipe';
+
+  @override
+  String get compressionBindModel => 'Include the selected summary model';
+
+  @override
+  String get compressionRecipeHint =>
+      'Recipes do not enable automatic compression. Import adds to the library without applying.';
+
+  @override
+  String get compressionImport => 'Import JSON';
+
+  @override
+  String get compressionExport => 'Export JSON';
+
+  @override
+  String get compressionCopyJson => 'Copy JSON';
+
+  @override
+  String get compressionApplyRecipe => 'Apply recipe';
+
+  @override
+  String get compressionInvalidSettings =>
+      'Check the values: target must be below trigger, and call and token limits must be positive.';
+
+  @override
+  String get compressionOverflowAction =>
+      'Compress once, then retry the failed response';
+
+  @override
+  String compressionPlannedCalls(int count, int limit) {
+    return 'Estimated $count request(s) · limit $limit, including retries';
+  }
+
+  @override
+  String get compressionGlobalTemplateReference =>
+      'Also used as the global default.';
+
+  @override
+  String compressionRecipeReferences(int count) {
+    return '$count recipes keep independent template snapshots.';
+  }
+
+  @override
+  String get compressionReplacementTemplate => 'Replacement template';
+
+  @override
+  String get compressionGeneralDescription =>
+      'Current topic, decisions and unresolved questions.';
+
+  @override
+  String get compressionCodeDescription =>
+      'Code changes, actual checks and the next engineering step.';
+
+  @override
+  String get compressionWritingDescription =>
+      'Accepted text, structure, voice and editing constraints.';
+
+  @override
+  String get compressionResearchDescription =>
+      'Evidence, sources, measurements and uncertainty.';
+
+  @override
+  String get compressionRoleplayDescription =>
+      'Scene continuity, character state and who knows what.';
+
+  @override
+  String compressionLastUsed(String date) {
+    return 'Last used: $date';
+  }
+
+  @override
+  String get compressionManage => 'Manage';
+
+  @override
+  String get compressionOutputSettings => 'Summary settings';
+
+  @override
+  String get compressionSourceSettings => 'References & original text';
+
+  @override
+  String get compressionSavedSettings => 'Preview & saved settings';
+
+  @override
+  String get compressionNoRecipes => 'No saved recipes yet';
+
+  @override
+  String get compressionNoTemplatesFound => 'No matching templates';
+
+  @override
+  String get compressionBuiltIn => 'Built-in';
+
+  @override
+  String get compressionGlobalDefault => 'Global default';
+
+  @override
+  String get compressionCustomLanguage => 'Other language';
+
+  @override
+  String get compressionCustomLanguageHint =>
+      'Language name or code, e.g. Japanese / ja';
+
+  @override
+  String get compressionLibraryTitle => 'Templates & recipes';
+
+  @override
+  String get compressionBuiltInTemplates => 'Built-in templates';
+
+  @override
+  String get compressionMyTemplates => 'My templates';
+
+  @override
+  String get compressionSearchTemplates => 'Search templates';
+
+  @override
+  String get compressionSearchRecipes => 'Search recipes';
+
+  @override
+  String get compressionRecipeCreateHint =>
+      'Save a recipe from More settings to reuse a configuration.';
+
+  @override
+  String get compressionTurnUnit => 'turns';
+
+  @override
+  String get compressionCallUnit => 'calls';
+
+  @override
+  String get compressionAdvancedOptions => 'Compression details';
+
+  @override
+  String get compressionAdvancedHint =>
+      'References, original-history rereading and request limits';
+
+  @override
+  String get compressionAutomaticWindow => 'Auto';
+
+  @override
+  String get compressionAutoOffHint => 'Compress manually whenever you need.';
+
+  @override
+  String get compressionAutoNotifyHint =>
+      'Notify near the threshold; you decide when to compress.';
+
+  @override
+  String get compressionAutoOnHint =>
+      'Summarize older history at the threshold. Extra model usage applies.';
+
+  @override
+  String get compressionBudgetHint =>
+      'Percentages use the available input budget.';
+
+  @override
+  String get compressionPreviewAction => 'Local preview';
+
+  @override
+  String get compressionSaveRecipeAction => 'Save recipe';
+
+  @override
+  String get compressionManualRange => 'Scope for this compression';
+
+  @override
+  String get compressionScopeKeepHint =>
+      'Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.';
+
+  @override
+  String get compressionScopeAllHint =>
+      'Summarize all history in the current context, including recent turns. Original messages stay available.';
+
+  @override
+  String get compressionScopeStartHint =>
+      'Select earlier whole messages within the character budget. Other messages keep their original text.';
+
+  @override
+  String get compressionScopeRecentHint =>
+      'Select recent whole messages within the character budget. Other messages keep their original text.';
+
+  @override
+  String get compressionAutoKeepHint =>
+      'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.';
 }

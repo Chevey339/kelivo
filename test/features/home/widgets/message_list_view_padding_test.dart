@@ -32,6 +32,73 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets('copied summaries do not repeat a compression divider', (
+    tester,
+  ) async {
+    final key = GlobalKey<_PrependingMessageListHarnessState>();
+    await tester.pumpWidget(_PrependingMessageListHarness(key: key));
+    await tester.pumpAndSettle();
+    final state = key.currentState!;
+    final summary = ChatMessage(
+      id: 'copied-summary',
+      role: 'user',
+      content: 'Summary carried into a new conversation.',
+      conversationId: 'conversation-1',
+      timestamp: DateTime(2026),
+    );
+    final tail = ChatMessage(
+      id: 'retained-turn',
+      role: 'user',
+      content: 'Continue from here.',
+      conversationId: 'conversation-1',
+    );
+    final copied = ContextOperation.fromJson(
+      ContextOperation.forCopiedSummary(summary, keepUserMessages: 1).toJson(),
+    );
+    state.replaceMessages([summary, tail]);
+    state.updateContext(null, [copied]);
+    await tester.pumpAndSettle();
+    final divider = find.byKey(ValueKey('context-node-${copied.id}'));
+    expect(find.byKey(ValueKey(summary.id)), findsOneWidget);
+    expect(find.byKey(ValueKey(tail.id)), findsOneWidget);
+    expect(divider, findsNothing);
+    expect(
+      ContextHistory.resolve(
+        [summary, tail],
+        [copied],
+        limit: 1,
+      ).map((m) => m.content),
+      [summary.content, tail.content],
+    );
+
+    // A different, edited summary still needs its own operation entry.
+    state.updateContext(null, [copied.copyWith(summary: 'Edited summary')]);
+    await tester.pumpAndSettle();
+    expect(divider, findsOneWidget);
+    await tester.tap(divider);
+    expect(state.openedOperations, 1);
+
+    // Branches remap operation and message IDs independently.
+    final forkedSummary = summary.copyWith(
+      id: 'fork-summary',
+      groupId: 'fork-summary',
+    );
+    final forked = copied.remap(
+      groups: {summary.id: forkedSummary.id},
+      operations: {copied.id: 'fork-operation'},
+      messages: {summary.id: forkedSummary.id},
+    );
+    state.replaceMessages([forkedSummary, tail]);
+    state.updateContext(null, [forked]);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('context-node-fork-operation')),
+      findsNothing,
+    );
+    expect(find.byKey(ValueKey(forkedSummary.id)), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'completed compression replaces its task and survives window reloads',
     (tester) async {
@@ -1375,7 +1442,7 @@ class _PrependingMessageListHarnessState
   int openedOperations = 0;
 
   void updateContext(
-    ContextCompressionTask task,
+    ContextCompressionTask? task,
     List<ContextOperation> operations,
   ) {
     setState(() {

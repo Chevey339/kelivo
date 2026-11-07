@@ -1,3 +1,5 @@
+import '../../../core/models/compression_config.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../chat/controllers/quote_editing_controller.dart';
 import '../../intelligent_ui/models/ui_context_attachment.dart';
 import '../../intelligent_ui/host/ui_composer_context_chip.dart';
@@ -861,6 +863,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   final GlobalKey _contextMgmtAnchorKey = GlobalKey(
     debugLabel: 'context-mgmt-anchor',
   );
+  bool _contextManagementMenuOpen = false;
+  bool _savingAutoCompression = false;
   static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
@@ -3474,30 +3478,83 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         if (widget.onClearContext != null) {
-          void showContextMenu() {
-            showDesktopAnchoredMenu(
-              context,
-              anchorKey: _contextMgmtAnchorKey,
-              items: [
-                if (widget.onContextOperations != null)
+          Future<void> showContextMenu() async {
+            if (_contextManagementMenuOpen) return;
+            _contextManagementMenuOpen = true;
+            try {
+              final conversationId = widget.conversationId;
+              final chat = context.read<ChatService?>();
+              final config = conversationId == null || chat == null
+                  ? null
+                  : await chat.compressionConfig(
+                      conversationId,
+                      context.read<SettingsProvider>().compressionDefaults,
+                    );
+              if (!context.mounted || widget.conversationId != conversationId) {
+                return;
+              }
+              await showDesktopAnchoredMenu(
+                context,
+                anchorKey: _contextMgmtAnchorKey,
+                items: [
+                  if (conversationId != null && chat != null && config != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.Sparkles,
+                      label: l10n.compressionAutoTitle,
+                      checked: config.mode == AutoCompressionMode.auto,
+                      onTap: _savingAutoCompression
+                          ? null
+                          : () async {
+                              if (_savingAutoCompression) return;
+                              _savingAutoCompression = true;
+                              try {
+                                await chat.setAutoCompressionEnabled(
+                                  conversationId,
+                                  config.mode != AutoCompressionMode.auto,
+                                );
+                              } catch (error) {
+                                if (context.mounted) {
+                                  showAppSnackBar(
+                                    context,
+                                    message: error.toString(),
+                                    type: NotificationType.error,
+                                  );
+                                }
+                              } finally {
+                                _savingAutoCompression = false;
+                              }
+                            },
+                    ),
+                  if (widget.onContextOperations != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.History,
+                      label: l10n.contextOperationsTitle,
+                      onTap: widget.onContextOperations,
+                    ),
+                  if (widget.onCompressContext != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.package2,
+                      label: l10n.compressContext,
+                      onTap: lockTap(widget.onCompressContext),
+                    ),
                   DesktopContextMenuItem(
-                    icon: Lucide.History,
-                    label: l10n.contextOperationsTitle,
-                    onTap: widget.onContextOperations,
+                    icon: Lucide.Eraser,
+                    label: l10n.bottomToolsSheetClearContext,
+                    onTap: lockTap(widget.onClearContext),
                   ),
-                if (widget.onCompressContext != null)
-                  DesktopContextMenuItem(
-                    icon: Lucide.package2,
-                    label: l10n.compressContext,
-                    onTap: lockTap(widget.onCompressContext),
-                  ),
-                DesktopContextMenuItem(
-                  icon: Lucide.Eraser,
-                  label: l10n.bottomToolsSheetClearContext,
-                  onTap: lockTap(widget.onClearContext),
-                ),
-              ],
-            );
+                ],
+              );
+            } catch (error) {
+              if (context.mounted) {
+                showAppSnackBar(
+                  context,
+                  message: error.toString(),
+                  type: NotificationType.error,
+                );
+              }
+            } finally {
+              _contextManagementMenuOpen = false;
+            }
           }
 
           actions.add(

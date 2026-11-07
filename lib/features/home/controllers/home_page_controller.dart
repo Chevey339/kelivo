@@ -1,3 +1,7 @@
+import '../../../core/models/context_compression_task.dart'
+    show CompressionRequestPreview;
+import '../../chat/widgets/context_compression_status.dart';
+import '../../../core/models/compression_config.dart';
 import '../../chat/controllers/quote_editing_controller.dart';
 import '../../side_panel/desktop_side_panel_controller.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_search_navigation.dart';
@@ -927,12 +931,30 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _wireViewModelCallbacks() {
-    _viewModel.onError = (error) {
+    _viewModel.onContextOverflow = (message, error, originalParts) {
+      if (!_context.mounted) return;
       final l10n = AppLocalizations.of(_context)!;
       showAppSnackBar(
         _context,
         message: _localizeGenerationError(l10n, error),
-        type: NotificationType.error,
+        type: NotificationType.warning,
+        actionLabel: l10n.compressionOverflowAction,
+        onAction: () => _viewModel.compressAndRetryContext(
+          message,
+          originalParts: originalParts,
+        ),
+      );
+    };
+    _viewModel.onError = (error) {
+      final l10n = AppLocalizations.of(_context)!;
+      showAppSnackBar(
+        _context,
+        message: error == 'compression_near_limit'
+            ? l10n.compressionNearLimit
+            : _localizeGenerationError(l10n, error),
+        type: error == 'compression_near_limit'
+            ? NotificationType.info
+            : NotificationType.error,
       );
     };
     _viewModel.onWarning = (warning) {
@@ -982,6 +1004,9 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
+    if (error.contains('compression_')) {
+      return compressionErrorLabel(l10n, error);
+    }
     if (error.contains('context_changed')) return l10n.contextChanged;
     if (error.contains('context_budget_exceeded')) {
       return l10n.contextBudgetExceeded;
@@ -2031,12 +2056,22 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<CompressionRequestPreview> previewCompressionRequest(
+    String id,
+    CompressContextOptions options,
+    CompressionConfig config,
+  ) => _viewModel.previewCompressionRequest(id, options, config);
+
   Future<String?> compressContext({
     required CompressContextOptions options,
     String? targetConversationId,
+    String? beforeMessageId,
+    Set<String>? effectiveMessageIds,
   }) => _viewModel.compressContext(
     options: options,
     targetConversationId: targetConversationId,
+    beforeMessageId: beforeMessageId,
+    effectiveMessageIds: effectiveMessageIds,
   );
 
   // ============================================================================

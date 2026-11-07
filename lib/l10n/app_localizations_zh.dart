@@ -2385,13 +2385,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextOptionsDesc => '在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。';
 
   @override
-  String get compressContextKeepStart => '开头取样';
+  String get compressContextKeepStart => '较早历史';
 
   @override
-  String get compressContextKeepRecent => '末尾取样';
+  String get compressContextKeepRecent => '较近历史';
 
   @override
-  String get compressContextUnlimited => '全部内容';
+  String get compressContextUnlimited => '全部历史';
 
   @override
   String get compressContextMaxCharsLabel => '字符数';
@@ -2409,7 +2409,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextModelUnset => '选择模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留 N 条';
+  String get compressContextKeepRecentMessages => '保留最近原文';
 
   @override
   String get compressContextKeepCountLabel => '保留用户消息数';
@@ -14563,8 +14563,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。';
 
   @override
-  String get compressIncludeAttachmentsDesc =>
-      '纳入已有附件文字、工具参数与结果；过长内容会截断并标明，不会重新识图。';
+  String get compressIncludeAttachmentsDesc => '按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -15214,6 +15213,369 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get responseSpeedUltrafastNeedsResponses =>
       'UltraFast 需要启用 Responses API。';
+
+  @override
+  String get compressionTemplate => '摘要模板';
+
+  @override
+  String get compressionGeneral => '通用';
+
+  @override
+  String get compressionCode => '代码';
+
+  @override
+  String get compressionWriting => '写作';
+
+  @override
+  String get compressionResearch => '研究';
+
+  @override
+  String get compressionRoleplay => '角色扮演';
+
+  @override
+  String get compressionOriginalPrompt => '我的原提示词';
+
+  @override
+  String get compressionMore => '更多设置';
+
+  @override
+  String get compressionFocus => '本次重点保留';
+
+  @override
+  String get compressionFocusHint => '可选：关键决定、任务进展、人物状态';
+
+  @override
+  String get compressionForConversation => '用于此会话';
+
+  @override
+  String get compressionFollowGlobal => '跟随全局默认';
+
+  @override
+  String get compressionSetGlobal => '设为全局默认';
+
+  @override
+  String get compressionGlobalDescription => '影响跟随全局默认的会话；已有会话覆盖保持不变。';
+
+  @override
+  String get compressionAutoTitle => '自动压缩';
+
+  @override
+  String get compressionAutoOff => '关闭';
+
+  @override
+  String get compressionAutoNotify => '仅提醒';
+
+  @override
+  String get compressionAutoOn => '自动';
+
+  @override
+  String get compressionNearLimit => '上下文接近估算容量，可以继续发送或手动压缩。';
+
+  @override
+  String get compressionKeepTurns => '保留最近';
+
+  @override
+  String get compressionKeepHint => '一轮包含一条用户消息及其后续回复、工具内容。';
+
+  @override
+  String get compressionLength => '摘要上限（tokens）';
+
+  @override
+  String get compressionTrigger => '触发阈值';
+
+  @override
+  String get compressionTarget => '压缩后目标';
+
+  @override
+  String get compressionWindow => '规划窗口';
+
+  @override
+  String get compressionRequests => '最多调用';
+
+  @override
+  String get compressionReference => '参考当前生效的世界书与记忆';
+
+  @override
+  String get compressionReferenceHint => '参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
+
+  @override
+  String get compressionToolReferences => '以引用替代已读工具结果';
+
+  @override
+  String get compressionToolReferencesHint => '仅工具可用时生效。保留最新未读结果，可只读回查原记录。';
+
+  @override
+  String get compressionSummaryScan => '摘要参与世界书关键词匹配';
+
+  @override
+  String get compressionChatModel => '跟随当前对话模型';
+
+  @override
+  String get compressionManageTemplates => '管理模板与方案';
+
+  @override
+  String get compressionLocalPreview => '预览发送内容 · 不调用模型';
+
+  @override
+  String get compressionTry => '试生成摘要 · 会产生模型用量';
+
+  @override
+  String get compressionPreviewOnly => '仅生成候选，审阅后可应用。';
+
+  @override
+  String get compressionTemplateChanged => '新模板用于后续摘要。已有摘要保持原样；可从原文重新生成以补回细节。';
+
+  @override
+  String compressionRange(int count, int turns) {
+    return '压缩 $count 条历史 · 保留 $turns 轮原文';
+  }
+
+  @override
+  String compressionCalls(int count) {
+    return '模型调用 $count 次';
+  }
+
+  @override
+  String get compressionActualUsage => '摘要模型实际用量';
+
+  @override
+  String compressionUsageValues(String input, String output) {
+    return '输入 $input · 输出 $output tokens';
+  }
+
+  @override
+  String compressionUsageUnknown(int count) {
+    return '有 $count 次调用未返回用量，不能视为免费。';
+  }
+
+  @override
+  String get compressionBudgetError => '预计调用数超过上限。请调高上限或选择更大窗口的摘要模型；未应用部分摘要。';
+
+  @override
+  String get compressionIncomplete => '摘要被截断或拒绝，未应用。请调整输出上限或模型。';
+
+  @override
+  String get compressionReferenceTooLarge =>
+      '模板、参考或工作摘要占满了摘要模型预算。请减少参考或选择更大窗口模型。';
+
+  @override
+  String get compressionReferenceChanged => '引用背景已改变，请审阅候选或重新生成。';
+
+  @override
+  String get compressionTargetNotReached => '候选未使完整请求降到自动触发线以下，已保留原上下文。';
+
+  @override
+  String get compressionTemplateMissing => '所选模板不可用，请选择其他模板。';
+
+  @override
+  String get compressionTemplates => '模板';
+
+  @override
+  String get compressionRecipes => '方案';
+
+  @override
+  String get compressionNewTemplate => '新建模板';
+
+  @override
+  String get compressionEditTemplate => '编辑模板';
+
+  @override
+  String get compressionRestoreDefault => '恢复默认';
+
+  @override
+  String get compressionCopyEdit => '复制并修改';
+
+  @override
+  String get compressionTemplateName => '名称';
+
+  @override
+  String get compressionPrompt => '摘要提示词';
+
+  @override
+  String get compressionLanguage => '输出语言';
+
+  @override
+  String get compressionLanguageConversation => '跟随对话';
+
+  @override
+  String get compressionLanguageLegacy => '沿用原模板语言行为';
+
+  @override
+  String get compressionLanguageHint => '语言名称或代码，或 conversation / legacy';
+
+  @override
+  String get compressionVariables => '支持以下变量；缺少历史变量时会自动附加历史：';
+
+  @override
+  String get compressionDeleteTemplate => '选择替代模板并删除？已接受的摘要和方案快照仍保留。';
+
+  @override
+  String compressionTemplateReferences(int count) {
+    return '被 $count 个会话单独引用。';
+  }
+
+  @override
+  String get compressionSaveRecipe => '保存当前设置为方案';
+
+  @override
+  String get compressionBindModel => '绑定所选摘要模型';
+
+  @override
+  String get compressionRecipeHint => '方案不会开启自动压缩；导入只加入库，不立即应用。';
+
+  @override
+  String get compressionImport => '导入 JSON';
+
+  @override
+  String get compressionExport => '导出 JSON';
+
+  @override
+  String get compressionCopyJson => '复制 JSON';
+
+  @override
+  String get compressionApplyRecipe => '应用方案';
+
+  @override
+  String get compressionInvalidSettings =>
+      '请检查参数：压后目标需低于触发阈值，调用数与 token 上限需有效。';
+
+  @override
+  String get compressionOverflowAction => '压缩一次后重试失败的回复';
+
+  @override
+  String compressionPlannedCalls(int count, int limit) {
+    return '预计 $count 次请求 · 本次上限 $limit 次（含重试）';
+  }
+
+  @override
+  String get compressionGlobalTemplateReference => '同时用作全局默认模板。';
+
+  @override
+  String compressionRecipeReferences(int count) {
+    return '$count 个方案将保留各自独立的模板快照。';
+  }
+
+  @override
+  String get compressionReplacementTemplate => '替代模板';
+
+  @override
+  String get compressionGeneralDescription => '保留当前话题、决定与未解决问题。';
+
+  @override
+  String get compressionCodeDescription => '区分代码改动、实际验证与下一步工作。';
+
+  @override
+  String get compressionWritingDescription => '保存已采纳文本、结构、文风与编辑要求。';
+
+  @override
+  String get compressionResearchDescription => '保留证据、来源、数值与不确定性。';
+
+  @override
+  String get compressionRoleplayDescription => '保持场景、人物状态与各角色的知识边界。';
+
+  @override
+  String compressionLastUsed(String date) {
+    return '最近使用：$date';
+  }
+
+  @override
+  String get compressionManage => '管理';
+
+  @override
+  String get compressionOutputSettings => '摘要设置';
+
+  @override
+  String get compressionSourceSettings => '参考与原文';
+
+  @override
+  String get compressionSavedSettings => '预览与方案';
+
+  @override
+  String get compressionNoRecipes => '暂无保存的方案';
+
+  @override
+  String get compressionNoTemplatesFound => '没有匹配的模板';
+
+  @override
+  String get compressionBuiltIn => '内置';
+
+  @override
+  String get compressionGlobalDefault => '全局默认';
+
+  @override
+  String get compressionCustomLanguage => '其他语言';
+
+  @override
+  String get compressionCustomLanguageHint => '语言名称或代码，例如日语 / ja';
+
+  @override
+  String get compressionLibraryTitle => '模板与方案';
+
+  @override
+  String get compressionBuiltInTemplates => '内置模板';
+
+  @override
+  String get compressionMyTemplates => '我的模板';
+
+  @override
+  String get compressionSearchTemplates => '搜索模板';
+
+  @override
+  String get compressionSearchRecipes => '搜索方案';
+
+  @override
+  String get compressionRecipeCreateHint => '在「更多设置」中将当前配置保存为方案。';
+
+  @override
+  String get compressionTurnUnit => '轮';
+
+  @override
+  String get compressionCallUnit => '次';
+
+  @override
+  String get compressionAdvancedOptions => '压缩细节';
+
+  @override
+  String get compressionAdvancedHint => '参考内容、原文回读与调用限制';
+
+  @override
+  String get compressionAutomaticWindow => '自动';
+
+  @override
+  String get compressionAutoOffHint => '需要时可在压缩页手动开始。';
+
+  @override
+  String get compressionAutoNotifyHint => '接近阈值时提醒，由你决定何时压缩。';
+
+  @override
+  String get compressionAutoOnHint => '达到阈值后自动整理较早历史，会产生额外模型用量。';
+
+  @override
+  String get compressionBudgetHint => '百分比以当前可用的输入预算为基准。';
+
+  @override
+  String get compressionPreviewAction => '本地预览';
+
+  @override
+  String get compressionSaveRecipeAction => '保存方案';
+
+  @override
+  String get compressionManualRange => '本次压缩范围';
+
+  @override
+  String get compressionScopeKeepHint => '保留最近原文，压缩更早历史；此轮数也用于自动压缩。';
+
+  @override
+  String get compressionScopeAllHint => '当前上下文的历史全部纳入摘要，不保留最近原文；原消息仍可查看。';
+
+  @override
+  String get compressionScopeStartHint => '按字符预算选取较早的完整消息，未选中的历史保留原文。';
+
+  @override
+  String get compressionScopeRecentHint => '按字符预算选取较近的完整消息，未选中的历史保留原文。';
+
+  @override
+  String get compressionAutoKeepHint => '自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -17597,13 +17959,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextOptionsDesc => '在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。';
 
   @override
-  String get compressContextKeepStart => '开头取样';
+  String get compressContextKeepStart => '较早历史';
 
   @override
-  String get compressContextKeepRecent => '末尾取样';
+  String get compressContextKeepRecent => '较近历史';
 
   @override
-  String get compressContextUnlimited => '全部内容';
+  String get compressContextUnlimited => '全部历史';
 
   @override
   String get compressContextMaxCharsLabel => '字符数';
@@ -17621,7 +17983,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextModelUnset => '选择模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留 N 条';
+  String get compressContextKeepRecentMessages => '保留最近原文';
 
   @override
   String get compressContextKeepCountLabel => '保留用户消息数';
@@ -29701,8 +30063,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。';
 
   @override
-  String get compressIncludeAttachmentsDesc =>
-      '纳入已有附件文字、工具参数与结果；过长内容会截断并标明，不会重新识图。';
+  String get compressIncludeAttachmentsDesc => '按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -30282,6 +30643,369 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get responseSpeedUltrafastNeedsResponses =>
       'UltraFast 需要启用 Responses API。';
+
+  @override
+  String get compressionTemplate => '摘要模板';
+
+  @override
+  String get compressionGeneral => '通用';
+
+  @override
+  String get compressionCode => '代码';
+
+  @override
+  String get compressionWriting => '写作';
+
+  @override
+  String get compressionResearch => '研究';
+
+  @override
+  String get compressionRoleplay => '角色扮演';
+
+  @override
+  String get compressionOriginalPrompt => '我的原提示词';
+
+  @override
+  String get compressionMore => '更多设置';
+
+  @override
+  String get compressionFocus => '本次重点保留';
+
+  @override
+  String get compressionFocusHint => '可选：关键决定、任务进展、人物状态';
+
+  @override
+  String get compressionForConversation => '用于此会话';
+
+  @override
+  String get compressionFollowGlobal => '跟随全局默认';
+
+  @override
+  String get compressionSetGlobal => '设为全局默认';
+
+  @override
+  String get compressionGlobalDescription => '影响跟随全局默认的会话；已有会话覆盖保持不变。';
+
+  @override
+  String get compressionAutoTitle => '自动压缩';
+
+  @override
+  String get compressionAutoOff => '关闭';
+
+  @override
+  String get compressionAutoNotify => '仅提醒';
+
+  @override
+  String get compressionAutoOn => '自动';
+
+  @override
+  String get compressionNearLimit => '上下文接近估算容量，可以继续发送或手动压缩。';
+
+  @override
+  String get compressionKeepTurns => '保留最近';
+
+  @override
+  String get compressionKeepHint => '一轮包含一条用户消息及其后续回复、工具内容。';
+
+  @override
+  String get compressionLength => '摘要上限（tokens）';
+
+  @override
+  String get compressionTrigger => '触发阈值';
+
+  @override
+  String get compressionTarget => '压缩后目标';
+
+  @override
+  String get compressionWindow => '规划窗口';
+
+  @override
+  String get compressionRequests => '最多调用';
+
+  @override
+  String get compressionReference => '参考当前生效的世界书与记忆';
+
+  @override
+  String get compressionReferenceHint => '参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
+
+  @override
+  String get compressionToolReferences => '以引用替代已读工具结果';
+
+  @override
+  String get compressionToolReferencesHint => '仅工具可用时生效。保留最新未读结果，可只读回查原记录。';
+
+  @override
+  String get compressionSummaryScan => '摘要参与世界书关键词匹配';
+
+  @override
+  String get compressionChatModel => '跟随当前对话模型';
+
+  @override
+  String get compressionManageTemplates => '管理模板与方案';
+
+  @override
+  String get compressionLocalPreview => '预览发送内容 · 不调用模型';
+
+  @override
+  String get compressionTry => '试生成摘要 · 会产生模型用量';
+
+  @override
+  String get compressionPreviewOnly => '仅生成候选，审阅后可应用。';
+
+  @override
+  String get compressionTemplateChanged => '新模板用于后续摘要。已有摘要保持原样；可从原文重新生成以补回细节。';
+
+  @override
+  String compressionRange(int count, int turns) {
+    return '压缩 $count 条历史 · 保留 $turns 轮原文';
+  }
+
+  @override
+  String compressionCalls(int count) {
+    return '模型调用 $count 次';
+  }
+
+  @override
+  String get compressionActualUsage => '摘要模型实际用量';
+
+  @override
+  String compressionUsageValues(String input, String output) {
+    return '输入 $input · 输出 $output tokens';
+  }
+
+  @override
+  String compressionUsageUnknown(int count) {
+    return '有 $count 次调用未返回用量，不能视为免费。';
+  }
+
+  @override
+  String get compressionBudgetError => '预计调用数超过上限。请调高上限或选择更大窗口的摘要模型；未应用部分摘要。';
+
+  @override
+  String get compressionIncomplete => '摘要被截断或拒绝，未应用。请调整输出上限或模型。';
+
+  @override
+  String get compressionReferenceTooLarge =>
+      '模板、参考或工作摘要占满了摘要模型预算。请减少参考或选择更大窗口模型。';
+
+  @override
+  String get compressionReferenceChanged => '引用背景已改变，请审阅候选或重新生成。';
+
+  @override
+  String get compressionTargetNotReached => '候选未使完整请求降到自动触发线以下，已保留原上下文。';
+
+  @override
+  String get compressionTemplateMissing => '所选模板不可用，请选择其他模板。';
+
+  @override
+  String get compressionTemplates => '模板';
+
+  @override
+  String get compressionRecipes => '方案';
+
+  @override
+  String get compressionNewTemplate => '新建模板';
+
+  @override
+  String get compressionEditTemplate => '编辑模板';
+
+  @override
+  String get compressionRestoreDefault => '恢复默认';
+
+  @override
+  String get compressionCopyEdit => '复制并修改';
+
+  @override
+  String get compressionTemplateName => '名称';
+
+  @override
+  String get compressionPrompt => '摘要提示词';
+
+  @override
+  String get compressionLanguage => '输出语言';
+
+  @override
+  String get compressionLanguageConversation => '跟随对话';
+
+  @override
+  String get compressionLanguageLegacy => '沿用原模板语言行为';
+
+  @override
+  String get compressionLanguageHint => '语言名称或代码，或 conversation / legacy';
+
+  @override
+  String get compressionVariables => '支持以下变量；缺少历史变量时会自动附加历史：';
+
+  @override
+  String get compressionDeleteTemplate => '选择替代模板并删除？已接受的摘要和方案快照仍保留。';
+
+  @override
+  String compressionTemplateReferences(int count) {
+    return '被 $count 个会话单独引用。';
+  }
+
+  @override
+  String get compressionSaveRecipe => '保存当前设置为方案';
+
+  @override
+  String get compressionBindModel => '绑定所选摘要模型';
+
+  @override
+  String get compressionRecipeHint => '方案不会开启自动压缩；导入只加入库，不立即应用。';
+
+  @override
+  String get compressionImport => '导入 JSON';
+
+  @override
+  String get compressionExport => '导出 JSON';
+
+  @override
+  String get compressionCopyJson => '复制 JSON';
+
+  @override
+  String get compressionApplyRecipe => '应用方案';
+
+  @override
+  String get compressionInvalidSettings =>
+      '请检查参数：压后目标需低于触发阈值，调用数与 token 上限需有效。';
+
+  @override
+  String get compressionOverflowAction => '压缩一次后重试失败的回复';
+
+  @override
+  String compressionPlannedCalls(int count, int limit) {
+    return '预计 $count 次请求 · 本次上限 $limit 次（含重试）';
+  }
+
+  @override
+  String get compressionGlobalTemplateReference => '同时用作全局默认模板。';
+
+  @override
+  String compressionRecipeReferences(int count) {
+    return '$count 个方案将保留各自独立的模板快照。';
+  }
+
+  @override
+  String get compressionReplacementTemplate => '替代模板';
+
+  @override
+  String get compressionGeneralDescription => '保留当前话题、决定与未解决问题。';
+
+  @override
+  String get compressionCodeDescription => '区分代码改动、实际验证与下一步工作。';
+
+  @override
+  String get compressionWritingDescription => '保存已采纳文本、结构、文风与编辑要求。';
+
+  @override
+  String get compressionResearchDescription => '保留证据、来源、数值与不确定性。';
+
+  @override
+  String get compressionRoleplayDescription => '保持场景、人物状态与各角色的知识边界。';
+
+  @override
+  String compressionLastUsed(String date) {
+    return '最近使用：$date';
+  }
+
+  @override
+  String get compressionManage => '管理';
+
+  @override
+  String get compressionOutputSettings => '摘要设置';
+
+  @override
+  String get compressionSourceSettings => '参考与原文';
+
+  @override
+  String get compressionSavedSettings => '预览与方案';
+
+  @override
+  String get compressionNoRecipes => '暂无保存的方案';
+
+  @override
+  String get compressionNoTemplatesFound => '没有匹配的模板';
+
+  @override
+  String get compressionBuiltIn => '内置';
+
+  @override
+  String get compressionGlobalDefault => '全局默认';
+
+  @override
+  String get compressionCustomLanguage => '其他语言';
+
+  @override
+  String get compressionCustomLanguageHint => '语言名称或代码，例如日语 / ja';
+
+  @override
+  String get compressionLibraryTitle => '模板与方案';
+
+  @override
+  String get compressionBuiltInTemplates => '内置模板';
+
+  @override
+  String get compressionMyTemplates => '我的模板';
+
+  @override
+  String get compressionSearchTemplates => '搜索模板';
+
+  @override
+  String get compressionSearchRecipes => '搜索方案';
+
+  @override
+  String get compressionRecipeCreateHint => '在「更多设置」中将当前配置保存为方案。';
+
+  @override
+  String get compressionTurnUnit => '轮';
+
+  @override
+  String get compressionCallUnit => '次';
+
+  @override
+  String get compressionAdvancedOptions => '压缩细节';
+
+  @override
+  String get compressionAdvancedHint => '参考内容、原文回读与调用限制';
+
+  @override
+  String get compressionAutomaticWindow => '自动';
+
+  @override
+  String get compressionAutoOffHint => '需要时可在压缩页手动开始。';
+
+  @override
+  String get compressionAutoNotifyHint => '接近阈值时提醒，由你决定何时压缩。';
+
+  @override
+  String get compressionAutoOnHint => '达到阈值后自动整理较早历史，会产生额外模型用量。';
+
+  @override
+  String get compressionBudgetHint => '百分比以当前可用的输入预算为基准。';
+
+  @override
+  String get compressionPreviewAction => '本地预览';
+
+  @override
+  String get compressionSaveRecipeAction => '保存方案';
+
+  @override
+  String get compressionManualRange => '本次压缩范围';
+
+  @override
+  String get compressionScopeKeepHint => '保留最近原文，压缩更早历史；此轮数也用于自动压缩。';
+
+  @override
+  String get compressionScopeAllHint => '当前上下文的历史全部纳入摘要，不保留最近原文；原消息仍可查看。';
+
+  @override
+  String get compressionScopeStartHint => '按字符预算选取较早的完整消息，未选中的历史保留原文。';
+
+  @override
+  String get compressionScopeRecentHint => '按字符预算选取较近的完整消息，未选中的历史保留原文。';
+
+  @override
+  String get compressionAutoKeepHint => '自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -32665,13 +33389,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextOptionsDesc => '在目前聊天產生可查看、可編輯、可撤銷的摘要。原始訊息保留。';
 
   @override
-  String get compressContextKeepStart => '開頭取樣';
+  String get compressContextKeepStart => '較早歷史';
 
   @override
-  String get compressContextKeepRecent => '末尾取樣';
+  String get compressContextKeepRecent => '較近歷史';
 
   @override
-  String get compressContextUnlimited => '全部內容';
+  String get compressContextUnlimited => '全部歷史';
 
   @override
   String get compressContextMaxCharsLabel => '字元數';
@@ -32689,7 +33413,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextModelUnset => '選擇模型';
 
   @override
-  String get compressContextKeepRecentMessages => '保留 N 則';
+  String get compressContextKeepRecentMessages => '保留最近原文';
 
   @override
   String get compressContextKeepCountLabel => '保留使用者訊息數';
@@ -44849,8 +45573,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '相關摘要將一併撤銷；原始聊天訊息保留，不會自動呼叫模型。獨立的上下文節點保持不變。';
 
   @override
-  String get compressIncludeAttachmentsDesc =>
-      '納入已有附件文字、工具參數與結果；過長內容會截斷並標明，不會重新識圖。';
+  String get compressIncludeAttachmentsDesc => '按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -45431,4 +46154,367 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get responseSpeedUltrafastNeedsResponses =>
       'UltraFast 需要啟用 Responses API。';
+
+  @override
+  String get compressionTemplate => '摘要範本';
+
+  @override
+  String get compressionGeneral => '通用';
+
+  @override
+  String get compressionCode => '程式碼';
+
+  @override
+  String get compressionWriting => '寫作';
+
+  @override
+  String get compressionResearch => '研究';
+
+  @override
+  String get compressionRoleplay => '角色扮演';
+
+  @override
+  String get compressionOriginalPrompt => '我的原提示詞';
+
+  @override
+  String get compressionMore => '更多設定';
+
+  @override
+  String get compressionFocus => '本次重點保留';
+
+  @override
+  String get compressionFocusHint => '選填：關鍵決定、任務進展、人物狀態';
+
+  @override
+  String get compressionForConversation => '用於此對話';
+
+  @override
+  String get compressionFollowGlobal => '跟隨全域預設';
+
+  @override
+  String get compressionSetGlobal => '設為全域預設';
+
+  @override
+  String get compressionGlobalDescription => '影響跟隨全域預設的對話；已有個別設定的對話維持不變。';
+
+  @override
+  String get compressionAutoTitle => '自動壓縮';
+
+  @override
+  String get compressionAutoOff => '關閉';
+
+  @override
+  String get compressionAutoNotify => '僅提醒';
+
+  @override
+  String get compressionAutoOn => '自動';
+
+  @override
+  String get compressionNearLimit => '上下文接近估算容量，可以繼續傳送或手動壓縮。';
+
+  @override
+  String get compressionKeepTurns => '保留最近';
+
+  @override
+  String get compressionKeepHint => '一輪包含一則使用者訊息及其後續回覆、工具內容。';
+
+  @override
+  String get compressionLength => '摘要上限（tokens）';
+
+  @override
+  String get compressionTrigger => '觸發門檻';
+
+  @override
+  String get compressionTarget => '壓縮後目標';
+
+  @override
+  String get compressionWindow => '規劃視窗';
+
+  @override
+  String get compressionRequests => '最多呼叫';
+
+  @override
+  String get compressionReference => '參考目前生效的世界書與記憶';
+
+  @override
+  String get compressionReferenceHint => '參考用於理解人名與規則，不代表事件已發生或角色已知情。';
+
+  @override
+  String get compressionToolReferences => '以引用替代已讀工具結果';
+
+  @override
+  String get compressionToolReferencesHint => '僅工具可用時生效。保留最新未讀結果，可唯讀回查原紀錄。';
+
+  @override
+  String get compressionSummaryScan => '摘要參與世界書關鍵字比對';
+
+  @override
+  String get compressionChatModel => '跟隨目前對話模型';
+
+  @override
+  String get compressionManageTemplates => '管理範本與方案';
+
+  @override
+  String get compressionLocalPreview => '預覽傳送內容 · 不呼叫模型';
+
+  @override
+  String get compressionTry => '試產生摘要 · 會產生模型用量';
+
+  @override
+  String get compressionPreviewOnly => '僅產生候選，審閱後可套用。';
+
+  @override
+  String get compressionTemplateChanged => '新範本用於後續摘要。已有摘要維持原樣；可從原文重新產生以補回細節。';
+
+  @override
+  String compressionRange(int count, int turns) {
+    return '壓縮 $count 則歷史 · 保留 $turns 輪原文';
+  }
+
+  @override
+  String compressionCalls(int count) {
+    return '模型呼叫 $count 次';
+  }
+
+  @override
+  String get compressionActualUsage => '摘要模型實際用量';
+
+  @override
+  String compressionUsageValues(String input, String output) {
+    return '輸入 $input · 輸出 $output tokens';
+  }
+
+  @override
+  String compressionUsageUnknown(int count) {
+    return '有 $count 次呼叫未回傳用量，不能視為免費。';
+  }
+
+  @override
+  String get compressionBudgetError => '預計呼叫數超過上限。請調高上限或選擇更大視窗的摘要模型；未套用部分摘要。';
+
+  @override
+  String get compressionIncomplete => '摘要被截斷或拒絕，未套用。請調整輸出上限或模型。';
+
+  @override
+  String get compressionReferenceTooLarge =>
+      '範本、參考或工作摘要占滿了摘要模型預算。請減少參考或選擇更大視窗模型。';
+
+  @override
+  String get compressionReferenceChanged => '引用背景已變更，請審閱候選或重新產生。';
+
+  @override
+  String get compressionTargetNotReached => '候選未使完整請求降到自動觸發門檻以下，已保留原上下文。';
+
+  @override
+  String get compressionTemplateMissing => '所選範本無法使用，請選擇其他範本。';
+
+  @override
+  String get compressionTemplates => '範本';
+
+  @override
+  String get compressionRecipes => '方案';
+
+  @override
+  String get compressionNewTemplate => '新增範本';
+
+  @override
+  String get compressionEditTemplate => '編輯範本';
+
+  @override
+  String get compressionRestoreDefault => '還原預設';
+
+  @override
+  String get compressionCopyEdit => '複製並修改';
+
+  @override
+  String get compressionTemplateName => '名稱';
+
+  @override
+  String get compressionPrompt => '摘要提示詞';
+
+  @override
+  String get compressionLanguage => '輸出語言';
+
+  @override
+  String get compressionLanguageConversation => '跟隨對話';
+
+  @override
+  String get compressionLanguageLegacy => '沿用原範本語言行為';
+
+  @override
+  String get compressionLanguageHint => '語言名稱或代碼，或 conversation / legacy';
+
+  @override
+  String get compressionVariables => '支援以下變數；缺少歷史變數時會自動附加歷史：';
+
+  @override
+  String get compressionDeleteTemplate => '選擇替代範本並刪除？已接受的摘要和方案快照仍保留。';
+
+  @override
+  String compressionTemplateReferences(int count) {
+    return '被 $count 個對話單獨引用。';
+  }
+
+  @override
+  String get compressionSaveRecipe => '儲存目前設定為方案';
+
+  @override
+  String get compressionBindModel => '綁定所選摘要模型';
+
+  @override
+  String get compressionRecipeHint => '方案不會開啟自動壓縮；匯入只加入資料庫，不立即套用。';
+
+  @override
+  String get compressionImport => '匯入 JSON';
+
+  @override
+  String get compressionExport => '匯出 JSON';
+
+  @override
+  String get compressionCopyJson => '複製 JSON';
+
+  @override
+  String get compressionApplyRecipe => '套用方案';
+
+  @override
+  String get compressionInvalidSettings =>
+      '請檢查參數：壓縮後目標需低於觸發門檻，呼叫數與 token 上限需有效。';
+
+  @override
+  String get compressionOverflowAction => '壓縮一次後重試失敗的回覆';
+
+  @override
+  String compressionPlannedCalls(int count, int limit) {
+    return '預計 $count 次請求 · 本次上限 $limit 次（含重試）';
+  }
+
+  @override
+  String get compressionGlobalTemplateReference => '同時用作全域預設範本。';
+
+  @override
+  String compressionRecipeReferences(int count) {
+    return '$count 個方案將保留各自獨立的範本快照。';
+  }
+
+  @override
+  String get compressionReplacementTemplate => '替代範本';
+
+  @override
+  String get compressionGeneralDescription => '保留目前話題、決定與未解決問題。';
+
+  @override
+  String get compressionCodeDescription => '區分程式碼改動、實際驗證與下一步工作。';
+
+  @override
+  String get compressionWritingDescription => '儲存已採納文字、結構、文風與編輯要求。';
+
+  @override
+  String get compressionResearchDescription => '保留證據、來源、數值與不確定性。';
+
+  @override
+  String get compressionRoleplayDescription => '保持場景、人物狀態與各角色的知識界線。';
+
+  @override
+  String compressionLastUsed(String date) {
+    return '最近使用：$date';
+  }
+
+  @override
+  String get compressionManage => '管理';
+
+  @override
+  String get compressionOutputSettings => '摘要設定';
+
+  @override
+  String get compressionSourceSettings => '參考與原文';
+
+  @override
+  String get compressionSavedSettings => '預覽與方案';
+
+  @override
+  String get compressionNoRecipes => '尚無儲存的方案';
+
+  @override
+  String get compressionNoTemplatesFound => '找不到相符範本';
+
+  @override
+  String get compressionBuiltIn => '內建';
+
+  @override
+  String get compressionGlobalDefault => '全域預設';
+
+  @override
+  String get compressionCustomLanguage => '其他語言';
+
+  @override
+  String get compressionCustomLanguageHint => '語言名稱或代碼，例如日語 / ja';
+
+  @override
+  String get compressionLibraryTitle => '範本與方案';
+
+  @override
+  String get compressionBuiltInTemplates => '內建範本';
+
+  @override
+  String get compressionMyTemplates => '我的範本';
+
+  @override
+  String get compressionSearchTemplates => '搜尋範本';
+
+  @override
+  String get compressionSearchRecipes => '搜尋方案';
+
+  @override
+  String get compressionRecipeCreateHint => '在「更多設定」中將目前配置儲存為方案。';
+
+  @override
+  String get compressionTurnUnit => '輪';
+
+  @override
+  String get compressionCallUnit => '次';
+
+  @override
+  String get compressionAdvancedOptions => '壓縮細節';
+
+  @override
+  String get compressionAdvancedHint => '參考內容、原文回讀與呼叫限制';
+
+  @override
+  String get compressionAutomaticWindow => '自動';
+
+  @override
+  String get compressionAutoOffHint => '需要時可在壓縮頁手動開始。';
+
+  @override
+  String get compressionAutoNotifyHint => '接近門檻時提醒，由你決定何時壓縮。';
+
+  @override
+  String get compressionAutoOnHint => '達到門檻後自動整理較早歷史，會產生額外模型用量。';
+
+  @override
+  String get compressionBudgetHint => '百分比以目前可用的輸入預算為基準。';
+
+  @override
+  String get compressionPreviewAction => '本機預覽';
+
+  @override
+  String get compressionSaveRecipeAction => '儲存方案';
+
+  @override
+  String get compressionManualRange => '本次壓縮範圍';
+
+  @override
+  String get compressionScopeKeepHint => '保留最近原文，壓縮更早歷史；此輪數也用於自動壓縮。';
+
+  @override
+  String get compressionScopeAllHint => '目前上下文的歷史全部納入摘要，不保留最近原文；原訊息仍可查看。';
+
+  @override
+  String get compressionScopeStartHint => '按字元預算選取較早的完整訊息，未選中的歷史保留原文。';
+
+  @override
+  String get compressionScopeRecentHint => '按字元預算選取較近的完整訊息，未選中的歷史保留原文。';
+
+  @override
+  String get compressionAutoKeepHint => '自動壓縮始終保留最近原文，不受本次範圍選擇影響；輪數與手動壓縮共用。';
 }

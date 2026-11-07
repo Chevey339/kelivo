@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
+import '../../shared/responsive/screen_type_helper.dart';
 import '../../theme/app_semantic_colors.dart';
+import '../../utils/platform_utils.dart';
 
 class DesktopSelectOption<T> {
   const DesktopSelectOption({
@@ -156,23 +158,40 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
     final hasSubtitles = widget.options.any(_optionHasSubtitle);
+    final desktop =
+        PlatformUtils.isDesktopTarget || ResponsiveHelper.isDesktop(context);
     var overlayWidth = triggerWidth;
-    var overlayDx = 0.0;
-    if (hasSubtitles) {
-      overlayWidth = triggerWidth < 360 ? 360.0 : triggerWidth;
-      if (overlayWidth > 440) overlayWidth = 440.0;
-      overlayDx = triggerWidth - overlayWidth;
+    if (!hasSubtitles || desktop) {
+      final labelStyle = DefaultTextStyle.of(context).style.merge(
+        TextStyle(fontSize: 14, fontWeight: AppFontWeights.semibold),
+      );
+      var labelWidth = 0.0;
+      for (final option in widget.options) {
+        final painter = TextPainter(
+          text: TextSpan(text: option.label, style: labelStyle),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        labelWidth = math.max(labelWidth, painter.width);
+        painter.dispose();
+      }
+      // Include item padding and the checkmark, even for a narrow trigger.
+      final contentWidth = math.max(
+        labelWidth + 60,
+        hasSubtitles ? 360.0 : 0.0,
+      );
+      overlayWidth = math.max(triggerWidth, math.min(contentWidth, 440));
     }
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject()! as RenderBox;
     final origin = rb.localToGlobal(Offset.zero, ancestor: overlayBox);
     final size = overlayBox.size;
     overlayWidth = overlayWidth.clamp(0, math.max(0, size.width - 16));
-    final left = (origin.dx + overlayDx).clamp(
+    final left = (origin.dx + triggerWidth - overlayWidth).clamp(
       8.0,
       math.max(8, size.width - overlayWidth - 8),
     );
-    overlayDx = left - origin.dx;
+    final overlayDx = left - origin.dx;
     final below = size.height - origin.dy - triggerSize.height - 14;
     final above = origin.dy - 14;
     final upward = below < 180 && above > below;
@@ -553,8 +572,6 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
   Widget _labelColumn(ColorScheme cs) {
     final label = Text(
       widget.label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontSize: 14,
         color: cs.onSurface.withValues(alpha: 0.88),

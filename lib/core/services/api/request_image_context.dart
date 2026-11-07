@@ -1,3 +1,4 @@
+import 'request_history_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -112,6 +113,7 @@ class RequestImageContext {
   final bool omitUserImages;
   final Set<String> viewImageUris;
   final activeHandles = <String>{};
+  final compressedOwners = <String>{};
   final Future<String?> Function(ChatContextImage)? loader;
   final _byHandle = <String, ChatContextImage>{};
   final _loads = <String, Future<String?>>{};
@@ -129,23 +131,28 @@ class RequestImageContext {
   static RequestImageContext? get current =>
       Zone.current[_zoneKey] as RequestImageContext?;
 
-  Stream<T> run<T>(Stream<T> Function() action) =>
-      Stream<T>.multi((controller) {
-        late Zone requestZone;
-        final subscription = runZoned(() {
-          requestZone = Zone.current;
-          return action().listen(
-            controller.addSync,
-            onError: controller.addErrorSync,
-            onDone: controller.closeSync,
-          );
-        }, zoneValues: {_zoneKey: this});
-        // Async stream generators resume in the caller's zone. Re-enter the
-        // request scope when an await-for consumer applies backpressure.
-        controller.onPause = () => requestZone.run(subscription.pause);
-        controller.onResume = () => requestZone.run(subscription.resume);
-        controller.onCancel = () => requestZone.run(subscription.cancel);
-      });
+  Stream<T> run<T>(Stream<T> Function() action) => _run(this, action);
+  static Stream<T> without<T>(Stream<T> Function() action) =>
+      _run(null, action);
+  static Stream<T> _run<T>(
+    RequestImageContext? context,
+    Stream<T> Function() action,
+  ) => Stream<T>.multi((controller) {
+    late Zone requestZone;
+    final subscription = runZoned(() {
+      requestZone = Zone.current;
+      return action().listen(
+        controller.addSync,
+        onError: controller.addErrorSync,
+        onDone: controller.closeSync,
+      );
+    }, zoneValues: {_zoneKey: context});
+    // Async stream generators resume in the caller's zone. Re-enter the
+    // request scope when an await-for consumer applies backpressure.
+    controller.onPause = () => requestZone.run(subscription.pause);
+    controller.onResume = () => requestZone.run(subscription.resume);
+    controller.onCancel = () => requestZone.run(subscription.cancel);
+  });
 
   static List<ChatContextImage> collect(List<ChatMessage> messages) {
     final out = <ChatContextImage>[];
@@ -830,7 +837,10 @@ class RequestImageContext {
     return part;
   }
 
-  Future<Map<String, dynamic>> project(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> project(
+    Map<String, dynamic> body, {
+    Set<String> excludedOwners = const {},
+  }) async {
     final handles = <String>{};
     final occurrences = <String, int>{};
     final external = <String, String>{};
@@ -845,7 +855,13 @@ class RequestImageContext {
       }
       return part;
     });
-    final omittedByCount = await historyOmissions();
+    final omittedByCount = {
+      ...await historyOmissions(),
+      for (final image in images)
+        if (compressedOwners.contains(image.identity.messageId) ||
+            excludedOwners.contains(image.identity.messageId))
+          image.key,
+    };
     final neededKeys = {
       for (final image in images)
         if (handles.contains(image.handle) &&
@@ -1157,8 +1173,14 @@ class RequestImageContext {
 
   static Future<String> encodeBody(Map<String, dynamic> body) async {
     final context = current;
+    final history = RequestHistoryContext.current;
+    final prepared = history == null ? body : await history.prepare(body);
     return jsonEncode(
-      context == null ? _projectTools(body, null) : await context.project(body),
+      RequestHistoryContext.stripSources(
+        context == null
+            ? _projectTools(prepared, null)
+            : await context.project(prepared),
+      ),
     );
   }
 

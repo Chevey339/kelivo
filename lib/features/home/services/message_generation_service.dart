@@ -165,6 +165,7 @@ class MessageGenerationService {
   /// OCR, document extraction, or inline-image encoding.
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     bool? fixedContextStart,
+    DateTime? promptTime,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
@@ -238,6 +239,7 @@ class MessageGenerationService {
       assistant,
       modelId,
       conversation: promptConversation,
+      promptTime: promptTime,
     );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
@@ -360,11 +362,49 @@ class MessageGenerationService {
 
   Future<ContextAssemblyPreview> previewContextAssembly({
     bool? fixedContextStart,
+    DateTime? promptTime,
     required String conversationId,
     required String providerKey,
     required String modelId,
     required String? assistantId,
     List<ChatMessage>? messagesOverride,
+  }) => _contextAssembly(
+    fixedContextStart: fixedContextStart,
+    promptTime: promptTime,
+    conversationId: conversationId,
+    providerKey: providerKey,
+    modelId: modelId,
+    assistantId: assistantId,
+    messagesOverride: messagesOverride,
+    persistWorldBookActivation: false,
+  );
+
+  Future<ContextAssemblyPreview> prepareCompressedContext({
+    bool? fixedContextStart,
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+    List<ChatMessage>? messagesOverride,
+  }) => _contextAssembly(
+    fixedContextStart: fixedContextStart,
+    conversationId: conversationId,
+    providerKey: providerKey,
+    modelId: modelId,
+    assistantId: assistantId,
+    messagesOverride: messagesOverride,
+    persistWorldBookActivation: true,
+  );
+
+  Future<ContextAssemblyPreview> _contextAssembly({
+    bool? fixedContextStart,
+    DateTime? promptTime,
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+    List<ChatMessage>? messagesOverride,
+    required bool persistWorldBookActivation,
   }) async {
     final settings = contextProvider.read<SettingsProvider>();
     Assistant? assistant;
@@ -383,6 +423,7 @@ class MessageGenerationService {
         );
     final packed = await assembleUnprocessedRequestContext(
       fixedContextStart: fixedContextStart,
+      promptTime: promptTime,
       messages: messages,
       versionSelections: chatService.getVersionSelections(conversationId),
       currentConversation: conversation?.copyWith(truncateIndex: -1),
@@ -392,7 +433,7 @@ class MessageGenerationService {
       providerKey: providerKey,
       modelId: modelId,
       syncWorkspaceAttachments: false,
-      persistWorldBookActivation: false,
+      persistWorldBookActivation: persistWorldBookActivation,
     );
     // Reuse the send path to include the live memory snapshot and frozen user
     // prompts. Previewing must never freeze a draft, run OCR, or write extras.
@@ -668,41 +709,6 @@ class MessageGenerationService {
       await messageBuilderService.inlineLocalImages(apiMessages);
     }
 
-    if (currentConversation != null &&
-        chatService.contextOperationsFor(currentConversation.id).isNotEmpty) {
-      final window = ModelSpecResolver.instance
-          .spec(cfg, modelId)
-          .contextWindow;
-      if (window != null) {
-        final preview = ContextAssemblyPreview.fromApiMessages(
-          imageContext: imageContext,
-          apiMessages: apiMessages,
-          tools: toolDefs,
-          mcpToolNames: const {},
-          images: imageRefsFromApiMessages(
-            apiMessages,
-            sourceMessages: messages,
-          ),
-        );
-        final used = estimateContextBuckets(
-          ContextEstimateJob(
-            preview: preview,
-            kind: ProviderConfig.classify(
-              providerKey,
-              explicitType: cfg.providerType,
-            ),
-          ),
-        ).total;
-        final reserve = assistant?.maxTokens ?? (window ~/ 10).clamp(1, 4096);
-        if (used + reserve > window) {
-          throw StateError(
-            contextProvider.mounted
-                ? AppLocalizations.of(contextProvider)!.contextBudgetExceeded
-                : 'context_budget_exceeded',
-          );
-        }
-      }
-    }
     if (ContextLogger.enabled) {
       final providerName = cfg.name.trim();
       ContextLogger.logPrepared(

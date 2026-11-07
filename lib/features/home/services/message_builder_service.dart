@@ -2028,6 +2028,7 @@ class MessageBuilderService {
     Assistant? assistant,
     String modelId, {
     Conversation? conversation,
+    DateTime? promptTime,
   }) {
     final prompt = ConversationPromptSettings.fromExtras(
       conversation?.extras ?? const {},
@@ -2039,6 +2040,7 @@ class MessageBuilderService {
         modelId: modelId,
         modelName: modelId,
         userNickname: contextProvider.read<UserProvider>().name,
+        now: promptTime,
       );
       final sys = PromptTransformer.replacePlaceholders(prompt, vars);
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
@@ -2296,6 +2298,9 @@ class MessageBuilderService {
     bool persistActivation = true,
     void Function(int before, int after)? onActivationPersisted,
   }) async {
+    final compressionDefaults = contextProvider
+        .read<SettingsProvider>()
+        .compressionDefaults;
     try {
       List<WorldBook> books = const <WorldBook>[];
       try {
@@ -2370,9 +2375,25 @@ class MessageBuilderService {
           ...requestHistory.skip(lastRecorded + 1),
         ];
       }
+      final scanSummary = conversation == null
+          ? true
+          : (await chatService.compressionConfig(
+              conversation.id,
+              compressionDefaults,
+            )).summaryInWorldBookScan;
       final result = WorldBookActivation.evaluate(
         books: books,
-        scanMessages: apiMessages,
+        scanMessages: scanSummary
+            ? apiMessages
+            : apiMessages
+                  .where(
+                    (message) =>
+                        !(message[imageContextOwnerKey]?.toString().startsWith(
+                              ContextOperation.summaryPrefix,
+                            ) ??
+                            false),
+                  )
+                  .toList(),
         history: historyMessages == null
             ? [
                 for (final message in apiMessages)
