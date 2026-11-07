@@ -7814,5 +7814,17 @@
   "imageContextPinned": "Pinned",
   "imageContextSizeUnknown": "Size checked when sending",
   "requestBudgetAtLeast": "at least {value}",
-  "@requestBudgetAtLeast": {"placeholders": {"value": {"type": "String"}}}
+  "@requestBudgetAtLeast": {"placeholders": {"value": {"type": "String"}}},
+  "compressionNativeTitle": "Use OpenAI native compaction",
+  "compressionNativeHint": "Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.",
+  "compressionNativeScopeHint": "Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.",
+  "compressionNativeLabel": "Native compaction",
+  "compressionNativeDescription": "The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.",
+  "compressionNativeIncomplete": "The service did not return a complete native compaction result. The original context is unchanged.",
+  "compressionNativeScopeChanged": "This native context belongs to another connection or account. Undo its compaction, or create a text summary from the original history before continuing.",
+  "compressionNativeTokenHint": "Token usage for opaque native context is determined by the service.",
+  "compressionNativeCopyHint": "A new conversation keeps original messages so native compaction can be undone.",
+  "compressionNativeInputOverride": "The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.",
+  "compressionNativeAllHint": "Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.",
+  "compressionNativeAutoHint": "At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization."
 }

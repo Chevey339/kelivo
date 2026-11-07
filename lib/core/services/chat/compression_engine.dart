@@ -148,7 +148,7 @@ class CompressionEngine {
       TokenUsage? reported;
       try {
         final result = await ModelRequestAttempts.run(
-          action: () => request.generate(
+          action: () => request.generate!(
             payload,
             task.id,
             output,

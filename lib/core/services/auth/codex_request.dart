@@ -65,7 +65,9 @@ void applyCodexRequest(
     body['input'] = _repairToolPairs([
       for (final item in input)
         if (item is! Map || item['type'] != 'item_reference')
-          item is Map && item['type'] != 'computer_call'
+          item is Map &&
+                  item['type'] != 'computer_call' &&
+                  item['type'] != 'compaction'
               ? (Map<String, dynamic>.from(item)..remove('id'))
               : item,
     ]);

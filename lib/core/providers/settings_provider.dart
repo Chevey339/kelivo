@@ -1,3 +1,4 @@
+import '../models/native_compaction.dart';
 import '../models/compression_config.dart';
 import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
@@ -132,6 +133,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _compressModelKey = 'compress_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _compressLimitModeKey = 'compress_limit_mode_v1';
+  static const String _nativeCompressionKey = 'native_compression_v1';
   static const String _compressNewConversationKey = 'compress_new_conversation';
   static const String _compressKeepUserMessagesKey =
       'compress_keep_user_messages_v1';
@@ -860,6 +862,12 @@ class SettingsProvider extends ChangeNotifier {
         ? defaultCompressPrompt
         : compressp;
     final compressModeName = prefs.getString(_compressLimitModeKey);
+    final nativeCompression = prefs.getString(_nativeCompressionKey);
+    if (nativeCompression != null) {
+      _nativeCompression = NativeCompressionPreferences.fromJson(
+        Map<String, dynamic>.from(jsonDecode(nativeCompression) as Map),
+      );
+    }
     _compressLimitMode = CompressContextLimitMode.values.firstWhere(
       (mode) => mode.name == compressModeName,
       orElse: () => CompressContextLimitMode.keepRecent,
@@ -3993,6 +4001,18 @@ Requirements:
   String _compressPrompt = defaultCompressPrompt;
   String get compressPrompt => _compressPrompt;
 
+  NativeCompressionPreferences _nativeCompression =
+      const NativeCompressionPreferences();
+  NativeCompressionPreferences get nativeCompression => _nativeCompression;
+  Future<void> setNativeCompression(NativeCompressionPreferences value) async {
+    await _preferences.setString(
+      _nativeCompressionKey,
+      jsonEncode(value.toJson()),
+    );
+    _nativeCompression = value;
+    notifyListeners();
+  }
+
   CompressContextLimitMode _compressLimitMode =
       CompressContextLimitMode.keepRecent;
   CompressContextLimitMode get compressLimitMode => _compressLimitMode;
@@ -5887,6 +5907,7 @@ Requirements:
     copy._compressPrompt = _compressPrompt;
     copy._compressionDefaults = _compressionDefaults;
     copy._compressLimitMode = _compressLimitMode;
+    copy._nativeCompression = _nativeCompression;
     copy._compressNewConversation = _compressNewConversation;
     copy._compressKeepUserMessages = _compressKeepUserMessages;
     copy._compressMaxChars = _compressMaxChars;

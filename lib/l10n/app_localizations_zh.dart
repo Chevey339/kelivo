@@ -15666,6 +15666,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String requestBudgetAtLeast(String value) {
     return '至少 $value';
   }
+
+  @override
+  String get compressionNativeTitle => '使用 OpenAI 原生压缩';
+
+  @override
+  String get compressionNativeHint =>
+      '使用当前对话模型和 Responses 协议；本会话开启自动压缩时也使用原生方式，支持情况由服务端决定。';
+
+  @override
+  String get compressionNativeScopeHint =>
+      '保留最近原文，压缩较早历史；此轮数也用于原生自动压缩，不修改文本摘要的保留轮数。';
+
+  @override
+  String get compressionNativeLabel => '原生压缩';
+
+  @override
+  String get compressionNativeDescription =>
+      '已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。';
+
+  @override
+  String get compressionNativeIncomplete => '服务端未返回完整的原生压缩结果，原上下文未改变。';
+
+  @override
+  String get compressionNativeScopeChanged =>
+      '此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。';
+
+  @override
+  String get compressionNativeTokenHint => '原生上下文的 token 用量以服务端统计为准。';
+
+  @override
+  String get compressionNativeCopyHint => '新会话会保留原始消息，以便撤销原生压缩。';
+
+  @override
+  String get compressionNativeInputOverride =>
+      '自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。';
+
+  @override
+  String get compressionNativeAllHint =>
+      '将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。';
+
+  @override
+  String get compressionNativeAutoHint =>
+      '达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31186,6 +31229,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String requestBudgetAtLeast(String value) {
     return '至少 $value';
   }
+
+  @override
+  String get compressionNativeTitle => '使用 OpenAI 原生压缩';
+
+  @override
+  String get compressionNativeHint =>
+      '使用当前对话模型和 Responses 协议；本会话开启自动压缩时也使用原生方式，支持情况由服务端决定。';
+
+  @override
+  String get compressionNativeScopeHint =>
+      '保留最近原文，压缩较早历史；此轮数也用于原生自动压缩，不修改文本摘要的保留轮数。';
+
+  @override
+  String get compressionNativeLabel => '原生压缩';
+
+  @override
+  String get compressionNativeDescription =>
+      '已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。';
+
+  @override
+  String get compressionNativeIncomplete => '服务端未返回完整的原生压缩结果，原上下文未改变。';
+
+  @override
+  String get compressionNativeScopeChanged =>
+      '此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。';
+
+  @override
+  String get compressionNativeTokenHint => '原生上下文的 token 用量以服务端统计为准。';
+
+  @override
+  String get compressionNativeCopyHint => '新会话会保留原始消息，以便撤销原生压缩。';
+
+  @override
+  String get compressionNativeInputOverride =>
+      '自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。';
+
+  @override
+  String get compressionNativeAllHint =>
+      '将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。';
+
+  @override
+  String get compressionNativeAutoHint =>
+      '达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -46787,4 +46873,47 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String requestBudgetAtLeast(String value) {
     return '至少 $value';
   }
+
+  @override
+  String get compressionNativeTitle => '使用 OpenAI 原生壓縮';
+
+  @override
+  String get compressionNativeHint =>
+      '使用目前對話模型和 Responses 協定；本對話開啟自動壓縮時也使用原生方式，支援情況由服務端決定。';
+
+  @override
+  String get compressionNativeScopeHint =>
+      '保留最近原文，壓縮較早歷史；此輪數也用於原生自動壓縮，不修改文字摘要的保留輪數。';
+
+  @override
+  String get compressionNativeLabel => '原生壓縮';
+
+  @override
+  String get compressionNativeDescription =>
+      '已在本機儲存服務端傳回的原生上下文，用於後續請求，無法作為文字檢視或編輯。原始訊息仍保留，可以復原本次壓縮。';
+
+  @override
+  String get compressionNativeIncomplete => '服務端未傳回完整的原生壓縮結果，原上下文未變更。';
+
+  @override
+  String get compressionNativeScopeChanged =>
+      '此原生上下文來自其他連線或帳號。請復原該次壓縮，或用原始歷史產生文字摘要後繼續。';
+
+  @override
+  String get compressionNativeTokenHint => '原生上下文的 token 用量以服務端統計為準。';
+
+  @override
+  String get compressionNativeCopyHint => '新對話會保留原始訊息，以便復原原生壓縮。';
+
+  @override
+  String get compressionNativeInputOverride =>
+      '自訂 input 欄位會覆蓋原生壓縮資料。請先移除供應商、模型或助手設定中的 input 參數，再繼續對話。';
+
+  @override
+  String get compressionNativeAllHint =>
+      '將目前上下文的全部歷史提交給原生壓縮，不另外保留最近原文。原始訊息仍可檢視。';
+
+  @override
+  String get compressionNativeAutoHint =>
+      '達到門檻時，用目前對話模型執行原生壓縮後繼續傳送。失敗時保留原上下文，不會改用文字摘要。';
 }

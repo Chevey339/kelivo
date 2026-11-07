@@ -46,6 +46,13 @@ String compressionStatusLabel(
 };
 
 String compressionErrorLabel(AppLocalizations l10n, String error) {
+  if (error.contains('native_compaction_scope_changed')) {
+    return l10n.compressionNativeScopeChanged;
+  }
+  if (error.contains('native_compaction_missing') ||
+      error.contains('native_compaction_incomplete')) {
+    return l10n.compressionNativeIncomplete;
+  }
   if (error.contains('compression_near_limit')) {
     return l10n.compressionNearLimit;
   }

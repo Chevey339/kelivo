@@ -1,3 +1,4 @@
+import '../../models/native_compaction.dart';
 import 'dart:async';
 import 'request_image_context.dart';
 import '../../models/compress_context_options.dart';
@@ -17,10 +18,14 @@ class RequestHistoryContext {
     required this.targetMessageId,
     required this.beforeRequest,
     required this.isCancelled,
+    this.nativeCompression = false,
+    this.onUsage,
   });
   final String currentUserId;
   final String targetMessageId;
   final bool Function() isCancelled;
+  final bool nativeCompression;
+  final void Function(Map<String, dynamic> body, TokenUsage usage)? onUsage;
   final Future<List<Map<String, dynamic>>?> Function(
     Map<String, dynamic> body,
     Map<String, dynamic> Function(List<Map<String, dynamic>>) projectCandidate,
@@ -34,6 +39,13 @@ class RequestHistoryContext {
   int lastEstimatedTokens = 0;
   double calibration = 1;
   void recordUsage(TokenUsage usage) {
+    final body = _lastBody;
+    if (body != null) {
+      onUsage?.call(
+        _replacement == null ? body : projectCandidate(body, _replacement!),
+        usage,
+      );
+    }
     if (usage.promptTokens > 0 && lastEstimatedTokens > 0) {
       calibration = usage.promptTokens / lastEstimatedTokens;
     }
@@ -156,6 +168,23 @@ class RequestHistoryContext {
       if (message['role'] == 'system' &&
           format != HistoryWireFormat.chatCompletions) {
         system.add(message['content']?.toString() ?? '');
+      } else if (message[nativeCompactionMessageKey] case final Map value) {
+        if (format != HistoryWireFormat.responses) {
+          throw StateError('compression_protocol_unavailable');
+        }
+        final native = NativeCompactionPayload.fromJson(
+          Map<String, dynamic>.from(value),
+        );
+        if (owner == null || emitted.add(owner)) {
+          next.addAll([
+            for (final item in native.output)
+              {
+                ...item,
+                nativeCompactionWireKey: true,
+                if (owner != null) historySourceKey: owner,
+              },
+          ]);
+        }
       } else if (owner != null && groups.containsKey(owner)) {
         if (emitted.add(owner)) next.addAll(groups[owner]!);
       } else if (owner == null || owner.startsWith('context-summary:')) {
@@ -278,7 +307,8 @@ class RequestHistoryContext {
   static Set<String> toolResultIds(Map<String, dynamic> body) {
     final ids = <String>{};
     for (final key in ['messages', 'input', 'contents']) {
-      for (final item in (body[key] as List? ?? const []).whereType<Map>()) {
+      if (body[key] is! List) continue;
+      for (final item in (body[key] as List).whereType<Map>()) {
         if (item['role'] == 'tool' && item['tool_call_id'] is String) {
           ids.add(item['tool_call_id'] as String);
         }
@@ -323,6 +353,7 @@ class RequestHistoryContext {
           if (raw is Map)
             (() {
               final message = Map<String, dynamic>.from(raw);
+              if (message[nativeCompactionWireKey] == true) return message;
               final id = message['tool_call_id'] ?? message['call_id'];
               if ((message['role'] == 'tool' ||
                       message['type'] == 'function_call_output') &&
@@ -418,7 +449,9 @@ class RequestHistoryContext {
           if (raw is Map)
             (() {
               final item = Map<String, dynamic>.from(raw)
-                ..remove(historySourceKey);
+                ..remove(historySourceKey)
+                ..remove(nativeCompactionWireKey);
+              if (raw[nativeCompactionWireKey] == true) return item;
               for (final field in ['content', 'parts']) {
                 if (item[field] is List) {
                   item[field] = [

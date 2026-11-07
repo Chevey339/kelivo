@@ -6010,5 +6010,17 @@
   "imageContextEncodedSize": "编码后 {size} MiB",
   "imageContextPinned": "已固定",
   "imageContextSizeUnknown": "大小待发送时确认",
-  "requestBudgetAtLeast": "至少 {value}"
+  "requestBudgetAtLeast": "至少 {value}",
+  "compressionNativeTitle": "使用 OpenAI 原生压缩",
+  "compressionNativeHint": "使用当前对话模型和 Responses 协议；本会话开启自动压缩时也使用原生方式，支持情况由服务端决定。",
+  "compressionNativeScopeHint": "保留最近原文，压缩较早历史；此轮数也用于原生自动压缩，不修改文本摘要的保留轮数。",
+  "compressionNativeLabel": "原生压缩",
+  "compressionNativeDescription": "已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。",
+  "compressionNativeIncomplete": "服务端未返回完整的原生压缩结果，原上下文未改变。",
+  "compressionNativeScopeChanged": "此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。",
+  "compressionNativeTokenHint": "原生上下文的 token 用量以服务端统计为准。",
+  "compressionNativeCopyHint": "新会话会保留原始消息，以便撤销原生压缩。",
+  "compressionNativeInputOverride": "自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。",
+  "compressionNativeAllHint": "将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。",
+  "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。"
 }

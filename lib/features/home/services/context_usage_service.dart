@@ -1,3 +1,4 @@
+import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/request_image_context.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -27,7 +28,15 @@ import '../utils/model_display_helper.dart';
 import 'context_assembly.dart';
 import 'draft_token_counter.dart';
 
-enum ContextUsageState { none, computing, exact, estimated, stale, failed }
+enum ContextUsageState {
+  none,
+  computing,
+  exact,
+  estimated,
+  stale,
+  failed,
+  opaque,
+}
 
 typedef ContextUsageConfiguration = ({
   Object settings,
@@ -272,7 +281,10 @@ class ContextUsageSnapshot {
   final DateTime? computedAt;
   final bool calibrated;
 
-  bool get hasUsage => state != ContextUsageState.none && computedAt != null;
+  bool get hasUsage =>
+      state != ContextUsageState.none &&
+      state != ContextUsageState.opaque &&
+      computedAt != null;
 
   double? get ratio {
     final window = contextWindow;
@@ -644,6 +656,9 @@ class ContextUsageService extends ChangeNotifier {
         revision: revision,
         resolved: resolved,
         buckets: buckets,
+        opaque: preview.apiMessages.any(
+          (m) => m[nativeCompactionMessageKey] is Map,
+        ),
       );
       notifyListeners();
     } catch (error, stack) {
@@ -703,6 +718,7 @@ class ContextUsageService extends ChangeNotifier {
     required int revision,
     required _ResolvedIdentity resolved,
     required ContextUsageBuckets buckets,
+    bool opaque = false,
   }) {
     final anchor = _anchors[conversationId];
     if (anchor != null && _anchorMatches(conversationId, revision, resolved)) {
@@ -740,7 +756,7 @@ class ContextUsageService extends ChangeNotifier {
     }
     _clearExactAnchor(conversationId);
     return ContextUsageSnapshot(
-      state: ContextUsageState.estimated,
+      state: opaque ? ContextUsageState.opaque : ContextUsageState.estimated,
       buckets: buckets,
       usedTokens: buckets.total,
       contextWindow: resolved.contextWindow,
@@ -749,7 +765,7 @@ class ContextUsageService extends ChangeNotifier {
       providerKey: resolved.providerKey,
       modelId: resolved.modelId,
       assistantId: resolved.assistantId,
-      computedAt: DateTime.now(),
+      computedAt: opaque ? null : DateTime.now(),
     );
   }
 
@@ -788,7 +804,8 @@ class ContextUsageService extends ChangeNotifier {
     _ResolvedIdentity resolved,
   ) {
     if (snapshot.state != ContextUsageState.exact &&
-        snapshot.state != ContextUsageState.estimated) {
+        snapshot.state != ContextUsageState.estimated &&
+        snapshot.state != ContextUsageState.opaque) {
       return false;
     }
     return snapshot.revision == _chatService.contextRevision(conversationId) &&

@@ -410,7 +410,9 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                             operation.isFixedStart
                                 ? l10n.contextFixedStart
                                 : operation.isCompression
-                                ? l10n.contextDividerCompressed
+                                ? operation.isNative
+                                      ? l10n.compressionNativeLabel
+                                      : l10n.contextDividerCompressed
                                 : l10n.contextDetailClearTitle,
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
@@ -421,7 +423,8 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                               color: cs.onSurfaceVariant,
                             ),
                           ),
-                          if (operation.isCompression) ...[
+                          if (operation.isCompression &&
+                              !operation.isNative) ...[
                             const SizedBox(height: 6),
                             Text(
                               truncateHeadUtf16Safe(operation.summary, 240),

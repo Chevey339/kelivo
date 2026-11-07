@@ -133,6 +133,7 @@ class _ClockGeneration extends MessageGenerationService {
   Future<ContextAssemblyPreview> previewContextAssembly({
     bool? fixedContextStart,
     DateTime? promptTime,
+    bool forceResponses = false,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -141,6 +142,7 @@ class _ClockGeneration extends MessageGenerationService {
   }) => super.previewContextAssembly(
     fixedContextStart: fixedContextStart,
     promptTime: promptTime ?? wallClock,
+    forceResponses: forceResponses,
     conversationId: conversationId,
     providerKey: providerKey,
     modelId: modelId,

@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/models/image_context.dart';
 import 'dart:convert';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -237,6 +238,95 @@ void main() {
       await history.run(() => images.run(parent)).drain<void>();
     },
   );
+
+  for (final streaming in [false, true]) {
+    test(
+      'native automatic replacement preserves a live tool round: stream=$streaming',
+      () async {
+        final payload = NativeCompactionPayload(
+          protocol: NativeCompactionProtocol.compact,
+          scope: 'test',
+          modelId: 'test',
+          output: [
+            {
+              'type': 'compaction',
+              'id': 'c',
+              'encrypted_content': 'NATIVE_STATE',
+            },
+            {'type': 'future_item', 'keep': true},
+          ],
+        );
+        final requests = <Map<String, dynamic>>[];
+        var toolsRun = 0;
+        final client = MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          requests.add(body);
+          final tool = requests.length == 1;
+          return http.Response(wireResponse('responses', tool, streaming), 200);
+        });
+        final history = RequestHistoryContext(
+          currentUserId: 'current',
+          targetMessageId: 'reply',
+          nativeCompression: true,
+          isCancelled: () => false,
+          beforeRequest: (body, project, overflow) async {
+            if (toolsRun == 0) return null;
+            return [
+              {
+                'role': 'user',
+                'content': '',
+                imageContextOwnerKey: 'context-summary:native',
+                nativeCompactionMessageKey: payload.toJson(),
+              },
+              {
+                'role': 'user',
+                'content': 'CURRENT',
+                imageContextOwnerKey: 'current',
+              },
+            ];
+          },
+        );
+        final config = ProviderConfig(
+          id: 'custom',
+          name: 'custom',
+          enabled: true,
+          apiKey: 'test',
+          baseUrl: 'https://custom.example/v1',
+          useResponseApi: true,
+        );
+        await history
+            .run(
+              () => sendOpenAIStream(
+                client,
+                config,
+                'unknown-model',
+                [
+                  {'role': 'user', 'content': 'OLD', historySourceKey: 'old'},
+                  {
+                    'role': 'user',
+                    'content': 'CURRENT',
+                    historySourceKey: 'current',
+                  },
+                ],
+                stream: streaming,
+                onToolCall: (name, args, {toolCallId}) async {
+                  toolsRun++;
+                  return 'ALREADY_EXECUTED';
+                },
+              ),
+            )
+            .drain<void>();
+        expect(toolsRun, 1);
+        expect(requests, hasLength(2));
+        final input = requests.last['input'] as List;
+        expect(input.take(2).toList(), payload.output);
+        expect(jsonEncode(input), contains('CURRENT'));
+        expect(jsonEncode(input), contains('ALREADY_EXECUTED'));
+        expect(jsonEncode(input), isNot(contains('OLD')));
+        expect(jsonEncode(input), isNot(contains('_kelivo')));
+      },
+    );
+  }
 
   for (final protocol in ['chat', 'responses', 'claude', 'google', 'vertex']) {
     for (final streaming in [false, true]) {

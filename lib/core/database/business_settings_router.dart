@@ -114,6 +114,7 @@ final class BusinessKeyRegistry {
     'suggestion_insert_on_tap_only_v1',
     'compress_model_v1',
     'compress_prompt_v1',
+    'native_compression_v1',
     'compression_defaults_v1',
     'reasoning_choice_by_model_v1',
     'image_cropper_enabled_v1',

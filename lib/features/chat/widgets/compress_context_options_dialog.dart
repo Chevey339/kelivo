@@ -1,3 +1,4 @@
+import '../../../core/models/native_compaction.dart';
 import 'dart:convert';
 import 'context_compression_status.dart';
 import 'dart:async';
@@ -79,6 +80,11 @@ class _CompressContextOptionsDialogState
   late ContextHistorySource _source;
   late bool _newConversation;
   bool _advanced = false;
+  bool _native = false;
+  late NativeCompressionPreferences _nativePreferences;
+  late CompressContextLimitMode _textMode;
+  late String _textKeep;
+  late bool _textNewConversation;
   bool _detailsExpanded = false;
   bool _saving = false;
   bool _savingRecipe = false;
@@ -87,6 +93,7 @@ class _CompressContextOptionsDialogState
   final _keep = TextEditingController();
   final _length = TextEditingController();
   final _trigger = TextEditingController();
+  final _nativeTrigger = TextEditingController();
   final _target = TextEditingController();
   final _window = TextEditingController();
   final _attempts = TextEditingController();
@@ -102,7 +109,10 @@ class _CompressContextOptionsDialogState
   void initState() {
     super.initState();
     final settings = context.read<SettingsProvider>();
-    final initial = widget.initialOptions;
+    final initial = widget.initialOptions?.native == true
+        ? null
+        : widget.initialOptions;
+    _nativePreferences = settings.nativeCompression;
     _config = settings.compressionDefaults;
     _mode = initial?.mode ?? settings.compressLimitMode;
     _source = initial?.historySource ?? ContextHistorySource.effective;
@@ -114,7 +124,73 @@ class _CompressContextOptionsDialogState
     _includeAttachments = initial?.includeAttachmentsAndTools ?? true;
     _fillFields();
     if (initial?.keepUserMessages case final int keep) _keep.text = '$keep';
+    _textMode = _mode;
+    _textKeep = _keep.text;
+    _textNewConversation = _newConversation;
+    final nativeInitial = widget.initialOptions?.native == true
+        ? widget.initialOptions
+        : null;
+    if (nativeInitial != null) {
+      _nativePreferences = NativeCompressionPreferences(
+        enabled: true,
+        allHistory: nativeInitial.mode == CompressContextLimitMode.unlimited,
+        keepUserTurns:
+            nativeInitial.keepUserMessages ?? _nativePreferences.keepUserTurns,
+        newConversation: nativeInitial.newConversation,
+      );
+    }
+    if (nativeInitial != null ||
+        (initial == null &&
+            (widget.conversationId == null
+                ? _nativePreferences.enabled
+                : _config.nativeEnabled))) {
+      _native = true;
+      _restoreNativeFields();
+    }
   }
+
+  void _restoreNativeFields() {
+    _mode = _nativePreferences.allHistory
+        ? CompressContextLimitMode.unlimited
+        : CompressContextLimitMode.keepRecent;
+    _keep.text = '${_nativePreferences.keepUserTurns}';
+    _newConversation = _nativePreferences.newConversation;
+  }
+
+  NativeCompressionPreferences _nativeValues({
+    required bool enabled,
+    bool validate = true,
+  }) {
+    var keep = int.tryParse(_keep.text);
+    if (keep == null || keep < 0 || keep > 10000) {
+      if (validate) throw const FormatException('Invalid retained turn count');
+      keep = _nativePreferences.keepUserTurns;
+    }
+    return NativeCompressionPreferences(
+      enabled: enabled,
+      allHistory: _mode == CompressContextLimitMode.unlimited,
+      keepUserTurns: keep,
+      newConversation: _newConversation,
+    );
+  }
+
+  void _setNative(bool value) => setState(() {
+    if (value == _native) return;
+    if (value) {
+      _textMode = _mode;
+      _textKeep = _keep.text;
+      _textNewConversation = _newConversation;
+      _restoreNativeFields();
+    } else {
+      _nativePreferences = _nativeValues(enabled: false, validate: false);
+      _mode = _textMode;
+      _keep.text = _textKeep;
+      _newConversation = _textNewConversation;
+    }
+    _native = value;
+    _advanced = false;
+    _error = null;
+  });
 
   @override
   void didChangeDependencies() {
@@ -132,6 +208,7 @@ class _CompressContextOptionsDialogState
     _keep.text = '${_config.keepRecentUserTurns}';
     _length.text = '${_config.summaryTokens}';
     _trigger.text = '${(_config.triggerInputRatio * 100).round()}';
+    _nativeTrigger.text = '${(_config.nativeTriggerInputRatio * 100).round()}';
     _target.text = '${(_config.targetInputRatio * 100).round()}';
     _window.text = _config.planningWindow?.toString() ?? '';
     _attempts.text = '${_config.maxRequestAttempts}';
@@ -160,9 +237,27 @@ class _CompressContextOptionsDialogState
           _configLoaded = true;
           _overrides = overrides;
           _config = settings.compressionDefaults.withOverrides(overrides);
+          final nativeKeep = _keep.text;
           _fillFields();
-          if (widget.initialOptions?.keepUserMessages case final int keep) {
-            _keep.text = '$keep';
+          if (widget.initialOptions?.native != true &&
+              widget.initialOptions?.keepUserMessages != null) {
+            _keep.text = '${widget.initialOptions!.keepUserMessages}';
+          }
+          if (_native) {
+            _textKeep = _keep.text;
+            _keep.text = nativeKeep;
+          }
+          if (widget.initialOptions == null && widget.conversationId != null) {
+            _nativePreferences = NativeCompressionPreferences(
+              enabled: _config.nativeEnabled,
+              allHistory: _nativePreferences.allHistory,
+              keepUserTurns: _config.nativeKeepRecentUserTurns,
+              newConversation: _nativePreferences.newConversation,
+            );
+            if (_native != _config.nativeEnabled) {
+              _setNative(_config.nativeEnabled);
+            }
+            if (_native) _keep.text = '${_config.nativeKeepRecentUserTurns}';
           }
         }
       });
@@ -180,6 +275,7 @@ class _CompressContextOptionsDialogState
       _keep,
       _length,
       _trigger,
+      _nativeTrigger,
       _target,
       _window,
       _attempts,
@@ -205,6 +301,7 @@ class _CompressContextOptionsDialogState
     bool regenerate = false,
   }) => CompressContextOptions(
     mode: _mode,
+    native: _native,
     maxChars:
         _mode == CompressContextLimitMode.start ||
             _mode == CompressContextLimitMode.recent
@@ -213,12 +310,13 @@ class _CompressContextOptionsDialogState
     keepUserMessages: _mode == CompressContextLimitMode.keepRecent
         ? int.tryParse(_keep.text)
         : null,
-    historySource: _source,
+    historySource: _native ? ContextHistorySource.effective : _source,
     includeEditedSummaries: _includeManual,
-    includeAttachmentsAndTools: _includeAttachments,
+    includeAttachmentsAndTools: _native || _includeAttachments,
     newConversation: _newConversation,
-    focus: _focus.text,
-    regenerateExisting: regenerate || _source != ContextHistorySource.effective,
+    focus: _native ? '' : _focus.text,
+    regenerateExisting:
+        regenerate || (!_native && _source != ContextHistorySource.effective),
     previewOnly: trial,
   );
   void _change(Map<String, dynamic> changes) => setState(() {
@@ -237,22 +335,61 @@ class _CompressContextOptionsDialogState
   Future<void> _saveSettings() async {
     final settings = context.read<SettingsProvider>();
     final chat = context.read<ChatService?>();
-    final values = _values();
+    final values = _native
+        ? _config.withOverrides({
+            'nativeEnabled': true,
+            'nativeKeepRecentUserTurns': _nativeValues(
+              enabled: true,
+            ).keepUserTurns,
+            'nativeTriggerInputRatio': double.parse(_nativeTrigger.text) / 100,
+            'planningWindow': _window.text.trim().isEmpty
+                ? null
+                : int.parse(_window.text),
+          })
+        : _values().withOverrides({'nativeEnabled': false});
+    const nativeKeys = {
+      'nativeEnabled',
+      'nativeKeepRecentUserTurns',
+      'nativeTriggerInputRatio',
+      'mode',
+      'planningWindow',
+    };
     final original = _config.toJson();
     final changed = {
       for (final e in values.toJson().entries)
-        if (original[e.key] != e.value) e.key: e.value,
+        if ((!_native || nativeKeys.contains(e.key)) &&
+            (e.key == 'nativeEnabled' ||
+                original[e.key] != e.value ||
+                _overrides.containsKey(e.key)))
+          e.key: e.value,
     };
     if (widget.conversationId != null && chat != null) {
+      final previous = _native
+          ? await chat.compressionOverrides(widget.conversationId!)
+          : _overrides;
       await chat.setCompressionOverrides(widget.conversationId!, {
-        ..._overrides,
+        ...previous,
         ...changed,
       });
     } else {
-      await settings.setCompressionDefaults(values);
+      await settings.setCompressionDefaults(
+        _native ? settings.compressionDefaults.withOverrides(changed) : values,
+      );
     }
-    await _saveManualRange(settings);
-    await settings.setCompressNewConversation(_newConversation);
+    if (_native) {
+      await settings.setNativeCompression(_nativeValues(enabled: true));
+    } else {
+      await _saveManualRange(settings);
+      await settings.setCompressNewConversation(_newConversation);
+      await settings.setNativeCompression(
+        NativeCompressionPreferences(
+          enabled: false,
+          allHistory: _nativePreferences.allHistory,
+          keepUserTurns: _nativePreferences.keepUserTurns,
+          newConversation: _nativePreferences.newConversation,
+        ),
+      );
+    }
   }
 
   Future<void> _submit({bool trial = false, bool regenerate = false}) async {
@@ -307,6 +444,9 @@ class _CompressContextOptionsDialogState
         final mode = _config.mode;
         _config = result.settings.withOverrides({
           'mode': mode.name,
+          'nativeEnabled': _config.nativeEnabled,
+          'nativeKeepRecentUserTurns': _config.nativeKeepRecentUserTurns,
+          'nativeTriggerInputRatio': _config.nativeTriggerInputRatio,
           'templateId': template.id,
         });
         _overrides.addAll(_config.toJson(includeMode: false));
@@ -472,10 +612,15 @@ class _CompressContextOptionsDialogState
   void _selectRange(CompressContextLimitMode mode) => setState(() {
     if (mode != CompressContextLimitMode.keepRecent) {
       // An abandoned, invalid value must not block a scope that does not use it.
-      try {
-        _config.withOverrides({'keepRecentUserTurns': int.parse(_keep.text)});
-      } on FormatException {
-        _keep.text = '${_config.keepRecentUserTurns}';
+      if (_native) {
+        _keep.text =
+            '${_nativeValues(enabled: true, validate: false).keepUserTurns}';
+      } else {
+        try {
+          _config.withOverrides({'keepRecentUserTurns': int.parse(_keep.text)});
+        } on FormatException {
+          _keep.text = '${_config.keepRecentUserTurns}';
+        }
       }
     }
     _mode = mode;
@@ -490,13 +635,17 @@ class _CompressContextOptionsDialogState
         CompressContextLimitMode.recent => l10n.compressContextKeepRecent,
       };
 
-  String _rangeHint(AppLocalizations l10n, CompressContextLimitMode mode) =>
-      switch (mode) {
-        CompressContextLimitMode.keepRecent => l10n.compressionScopeKeepHint,
-        CompressContextLimitMode.unlimited => l10n.compressionScopeAllHint,
-        CompressContextLimitMode.start => l10n.compressionScopeStartHint,
-        CompressContextLimitMode.recent => l10n.compressionScopeRecentHint,
-      };
+  String _rangeHint(
+    AppLocalizations l10n,
+    CompressContextLimitMode mode,
+  ) => switch (mode) {
+    CompressContextLimitMode.keepRecent =>
+      _native ? l10n.compressionNativeScopeHint : l10n.compressionScopeKeepHint,
+    CompressContextLimitMode.unlimited =>
+      _native ? l10n.compressionNativeAllHint : l10n.compressionScopeAllHint,
+    CompressContextLimitMode.start => l10n.compressionScopeStartHint,
+    CompressContextLimitMode.recent => l10n.compressionScopeRecentHint,
+  };
 
   Widget _rangeSettings(CompressionSelection selection) {
     final l10n = AppLocalizations.of(context)!;
@@ -510,11 +659,11 @@ class _CompressContextOptionsDialogState
           maxLabelWidth: 320,
           semanticLabel: l10n.compressionManualRange,
           options: [
-            for (final mode in const [
+            for (final mode in [
               CompressContextLimitMode.keepRecent,
               CompressContextLimitMode.unlimited,
-              CompressContextLimitMode.start,
-              CompressContextLimitMode.recent,
+              if (!_native) CompressContextLimitMode.start,
+              if (!_native) CompressContextLimitMode.recent,
             ])
               DesktopSelectOption(
                 value: mode,
@@ -604,8 +753,8 @@ class _CompressContextOptionsDialogState
         .read<AssistantProvider?>()
         ?.resolveConversationAssistant(conversation?.assistantId);
     final resolved = resolveCompressContextModel(
-      compressProvider: _config.providerId,
-      compressModelId: _config.modelId,
+      compressProvider: _native ? null : _config.providerId,
+      compressModelId: _native ? null : _config.modelId,
       assistantProvider:
           conversation?.chatModelProvider ?? assistant?.chatModelProvider,
       assistantModelId: conversation?.chatModelId ?? assistant?.chatModelId,
@@ -655,86 +804,125 @@ class _CompressContextOptionsDialogState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!_advanced) ...[
-                  CompressionSectionTitle(
-                    title: l10n.compressionTemplate,
-                    action: IosTextButton(
-                      label: l10n.compressionManage,
-                      icon: LucideIcons.library,
-                      padding: const EdgeInsets.only(left: 10),
-                      onPressed: _library,
+                  if (_native) ...[
+                    Text(l10n.compressionNativeHint, style: hintStyle),
+                    const SizedBox(height: 12),
+                    SectionCard(
+                      child: CompressionSettingRow(
+                        leading: CurrentModelIcon(
+                          providerKey: resolved.providerKey,
+                          modelId: resolved.modelId,
+                          size: 34,
+                          iconScale: .65,
+                          withBackground: false,
+                        ),
+                        label:
+                            resolved.modelId ?? l10n.compressContextModelUnset,
+                        subtitle:
+                            '${provider?.name ?? ''} · ${l10n.compressionChatModel}',
+                      ),
                     ),
-                  ),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final columns = constraints.maxWidth < 420 ? 3 : 5;
-                      final width =
-                          (constraints.maxWidth - 8 * (columns - 1)) / columns;
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final template in quickTemplates)
-                            SizedBox(
-                              width: width,
-                              child: CompressionTemplateChoice(
-                                label: compressionTemplateName(l10n, template),
-                                selected: template.id == _config.templateId,
-                                onTap: () =>
-                                    _change({'templateId': template.id}),
+                    const SizedBox(height: 18),
+                  ] else ...[
+                    CompressionSectionTitle(
+                      title: l10n.compressionTemplate,
+                      action: IosTextButton(
+                        label: l10n.compressionManage,
+                        icon: LucideIcons.library,
+                        padding: const EdgeInsets.only(left: 10),
+                        onPressed: _library,
+                      ),
+                    ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = constraints.maxWidth < 420 ? 3 : 5;
+                        final width =
+                            (constraints.maxWidth - 8 * (columns - 1)) /
+                            columns;
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final template in quickTemplates)
+                              SizedBox(
+                                width: width,
+                                child: CompressionTemplateChoice(
+                                  label: compressionTemplateName(
+                                    l10n,
+                                    template,
+                                  ),
+                                  selected: template.id == _config.templateId,
+                                  onTap: () =>
+                                      _change({'templateId': template.id}),
+                                ),
                               ),
+                          ],
+                        );
+                      },
+                    ),
+                    if (selectedTemplate != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 10, 2, 20),
+                        child: Text(
+                          compressionTemplateDescription(
+                            l10n,
+                            selectedTemplate,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: hintStyle,
+                        ),
+                      ),
+                    CompressionSectionTitle(
+                      title: l10n.compressContextModelLabel,
+                      action: _config.providerId == null
+                          ? null
+                          : IosTextButton(
+                              label: l10n.compressionChatModel,
+                              fontSize: 12,
+                              padding: const EdgeInsets.only(left: 8),
+                              onPressed: () => _change({
+                                'providerId': null,
+                                'modelId': null,
+                              }),
                             ),
-                        ],
-                      );
-                    },
-                  ),
-                  if (selectedTemplate != null)
+                    ),
+                    SectionCard(
+                      child: CompressionSettingRow(
+                        leading: resolved.modelId == null
+                            ? Icon(
+                                LucideIcons.bot,
+                                size: 28,
+                                color: cs.onSurfaceVariant,
+                              )
+                            : CurrentModelIcon(
+                                providerKey: resolved.providerKey,
+                                modelId: resolved.modelId,
+                                size: 34,
+                                iconScale: .65,
+                                withBackground: false,
+                              ),
+                        label:
+                            resolved.modelId ?? l10n.compressContextModelUnset,
+                        subtitle: [
+                          if (provider != null) provider.name,
+                          if (_config.providerId == null)
+                            l10n.compressionChatModel,
+                        ].join(' · '),
+                        onTap: () => _selectModel(resolved),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                  _rangeSettings(selection),
+                  if (_native && _newConversation)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(2, 10, 2, 20),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
-                        compressionTemplateDescription(l10n, selectedTemplate),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        l10n.compressionNativeCopyHint,
                         style: hintStyle,
                       ),
                     ),
-                  CompressionSectionTitle(
-                    title: l10n.compressContextModelLabel,
-                    action: _config.providerId == null
-                        ? null
-                        : IosTextButton(
-                            label: l10n.compressionChatModel,
-                            fontSize: 12,
-                            padding: const EdgeInsets.only(left: 8),
-                            onPressed: () =>
-                                _change({'providerId': null, 'modelId': null}),
-                          ),
-                  ),
-                  SectionCard(
-                    child: CompressionSettingRow(
-                      leading: resolved.modelId == null
-                          ? Icon(
-                              LucideIcons.bot,
-                              size: 28,
-                              color: cs.onSurfaceVariant,
-                            )
-                          : CurrentModelIcon(
-                              providerKey: resolved.providerKey,
-                              modelId: resolved.modelId,
-                              size: 34,
-                              iconScale: .65,
-                              withBackground: false,
-                            ),
-                      label: resolved.modelId ?? l10n.compressContextModelUnset,
-                      subtitle: [
-                        if (provider != null) provider.name,
-                        if (_config.providerId == null)
-                          l10n.compressionChatModel,
-                      ].join(' · '),
-                      onTap: () => _selectModel(resolved),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _rangeSettings(selection),
                   SectionCard(
                     children: [
                       _switch(
@@ -758,6 +946,14 @@ class _CompressContextOptionsDialogState
                         ),
                         onTap: () => setState(() => _advanced = true),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Container(
+                          height: .6,
+                          color: context.appColors.hairline,
+                        ),
+                      ),
+                      _switch(l10n.compressionNativeTitle, _native, _setNative),
                     ],
                   ),
                   Padding(
@@ -765,7 +961,8 @@ class _CompressContextOptionsDialogState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (widget.previewRequest != null &&
+                        if (!_native &&
+                            widget.previewRequest != null &&
                             selection.covered.isNotEmpty)
                           FutureBuilder<CompressionRequestPreview>(
                             future: _plan(),
@@ -795,9 +992,10 @@ class _CompressContextOptionsDialogState
                             l10n.compressContextKeepAllMessages,
                             style: hintStyle,
                           ),
-                        if (widget.operations.any(
-                          (op) => op.isCompression && !op.revoked,
-                        ))
+                        if (!_native &&
+                            widget.operations.any(
+                              (op) => op.isCompression && !op.revoked,
+                            ))
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
@@ -809,25 +1007,26 @@ class _CompressContextOptionsDialogState
                     ),
                   ),
                 ] else ...[
-                  _section(l10n.compressionOutputSettings, [
-                    _number(l10n.compressionLength, _length),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Container(
-                        height: .6,
-                        color: context.appColors.hairline,
+                  if (!_native)
+                    _section(l10n.compressionOutputSettings, [
+                      _number(l10n.compressionLength, _length),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Container(
+                          height: .6,
+                          color: context.appColors.hairline,
+                        ),
                       ),
-                    ),
-                    IosFormTextField(
-                      label: l10n.compressionFocus,
-                      controller: _focus,
-                      hintText: l10n.compressionFocusHint,
-                      inlineLabel: false,
-                      minLines: 2,
-                      maxLines: 3,
-                      outerPadding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                    ),
-                  ]),
+                      IosFormTextField(
+                        label: l10n.compressionFocus,
+                        controller: _focus,
+                        hintText: l10n.compressionFocusHint,
+                        inlineLabel: false,
+                        minLines: 2,
+                        maxLines: 3,
+                        outerPadding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                      ),
+                    ]),
                   _section(l10n.compressionAutoTitle, [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
@@ -851,11 +1050,18 @@ class _CompressContextOptionsDialogState
                         AutoCompressionMode.off => l10n.compressionAutoOffHint,
                         AutoCompressionMode.notify =>
                           l10n.compressionAutoNotifyHint,
-                        AutoCompressionMode.auto => l10n.compressionAutoOnHint,
+                        AutoCompressionMode.auto =>
+                          _native
+                              ? l10n.compressionNativeAutoHint
+                              : l10n.compressionAutoOnHint,
                       }, style: hintStyle),
                     ),
                     if (_config.mode != AutoCompressionMode.off)
-                      _number(l10n.compressionTrigger, _trigger, unit: '%'),
+                      _number(
+                        l10n.compressionTrigger,
+                        _native ? _nativeTrigger : _trigger,
+                        unit: '%',
+                      ),
                     if (_config.mode == AutoCompressionMode.auto) ...[
                       _number(
                         l10n.compressionKeepTurns,
@@ -865,12 +1071,14 @@ class _CompressContextOptionsDialogState
                       Padding(
                         padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
                         child: Text(
-                          l10n.compressionAutoKeepHint,
+                          _native
+                              ? l10n.compressionNativeScopeHint
+                              : l10n.compressionAutoKeepHint,
                           style: hintStyle,
                         ),
                       ),
                     ],
-                    if (_config.mode == AutoCompressionMode.auto)
+                    if (!_native && _config.mode == AutoCompressionMode.auto)
                       _number(l10n.compressionTarget, _target, unit: '%'),
                     if (_config.mode != AutoCompressionMode.off)
                       Padding(
@@ -881,151 +1089,171 @@ class _CompressContextOptionsDialogState
                         ),
                       ),
                   ]),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: SectionCard(
-                      child: CompressionDisclosure(
-                        title: l10n.compressionAdvancedOptions,
-                        description: l10n.compressionAdvancedHint,
-                        expanded: _detailsExpanded,
-                        onToggle: () => setState(
-                          () => _detailsExpanded = !_detailsExpanded,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _number(
-                              l10n.compressionWindow,
-                              _window,
-                              hint: l10n.compressionAutomaticWindow,
-                            ),
-                            _number(
-                              l10n.compressionRequests,
-                              _attempts,
-                              unit: l10n.compressionCallUnit,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                              child: CompressionSectionTitle(
-                                title: l10n.compressionSourceSettings,
+                  if (!_native)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: SectionCard(
+                        child: CompressionDisclosure(
+                          title: l10n.compressionAdvancedOptions,
+                          description: l10n.compressionAdvancedHint,
+                          expanded: _detailsExpanded,
+                          onToggle: () => setState(
+                            () => _detailsExpanded = !_detailsExpanded,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _number(
+                                l10n.compressionWindow,
+                                _window,
+                                hint: l10n.compressionAutomaticWindow,
                               ),
-                            ),
-                            _switch(
-                              l10n.compressionReference,
-                              _config.includeReference,
-                              (v) => _change({'includeReference': v}),
-                              hint: l10n.compressionReferenceHint,
-                            ),
-                            _switch(
-                              l10n.compressionToolReferences,
-                              _config.replaceConsumedTools,
-                              (v) => _change({'replaceConsumedTools': v}),
-                              hint: l10n.compressionToolReferencesHint,
-                            ),
-                            _switch(
-                              l10n.compressionSummaryScan,
-                              _config.summaryInWorldBookScan,
-                              (v) => _change({'summaryInWorldBookScan': v}),
-                            ),
-                            _switch(
-                              l10n.compressIncludeAttachments,
-                              _includeAttachments,
-                              (v) => setState(() => _includeAttachments = v),
-                            ),
-                            _switch(
-                              l10n.compressReread,
-                              _source == ContextHistorySource.original,
-                              (v) => setState(
-                                () => _source = v
-                                    ? ContextHistorySource.original
-                                    : ContextHistorySource.effective,
+                              _number(
+                                l10n.compressionRequests,
+                                _attempts,
+                                unit: l10n.compressionCallUnit,
                               ),
-                              hint: l10n.compressRereadDesc,
-                            ),
-                            if (_source != ContextHistorySource.effective)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  12,
+                                  14,
+                                  0,
+                                ),
+                                child: CompressionSectionTitle(
+                                  title: l10n.compressionSourceSettings,
+                                ),
+                              ),
                               _switch(
-                                l10n.compressIncludeManual(0),
-                                _includeManual,
-                                (v) => setState(() => _includeManual = v),
+                                l10n.compressionReference,
+                                _config.includeReference,
+                                (v) => _change({'includeReference': v}),
+                                hint: l10n.compressionReferenceHint,
                               ),
-                            IosTextButton(
-                              label: l10n.compressionSetGlobal,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              onPressed: () async {
-                                try {
-                                  await settings.setCompressionDefaults(
-                                    _values().withOverrides({
-                                      'mode': settings
-                                          .compressionDefaults
-                                          .mode
-                                          .name,
-                                    }),
-                                  );
-                                  await _saveManualRange(settings);
-                                } catch (_) {
-                                  if (mounted) {
-                                    setState(
-                                      () => _error =
-                                          l10n.compressionInvalidSettings,
+                              _switch(
+                                l10n.compressionToolReferences,
+                                _config.replaceConsumedTools,
+                                (v) => _change({'replaceConsumedTools': v}),
+                                hint: l10n.compressionToolReferencesHint,
+                              ),
+                              _switch(
+                                l10n.compressionSummaryScan,
+                                _config.summaryInWorldBookScan,
+                                (v) => _change({'summaryInWorldBookScan': v}),
+                              ),
+                              _switch(
+                                l10n.compressIncludeAttachments,
+                                _includeAttachments,
+                                (v) => setState(() => _includeAttachments = v),
+                              ),
+                              _switch(
+                                l10n.compressReread,
+                                _source == ContextHistorySource.original,
+                                (v) => setState(
+                                  () => _source = v
+                                      ? ContextHistorySource.original
+                                      : ContextHistorySource.effective,
+                                ),
+                                hint: l10n.compressRereadDesc,
+                              ),
+                              if (_source != ContextHistorySource.effective)
+                                _switch(
+                                  l10n.compressIncludeManual(0),
+                                  _includeManual,
+                                  (v) => setState(() => _includeManual = v),
+                                ),
+                              IosTextButton(
+                                label: l10n.compressionSetGlobal,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                onPressed: () async {
+                                  try {
+                                    await settings.setCompressionDefaults(
+                                      _values().withOverrides({
+                                        'mode': settings
+                                            .compressionDefaults
+                                            .mode
+                                            .name,
+                                        'nativeEnabled': settings
+                                            .compressionDefaults
+                                            .nativeEnabled,
+                                        'nativeKeepRecentUserTurns': settings
+                                            .compressionDefaults
+                                            .nativeKeepRecentUserTurns,
+                                        'nativeTriggerInputRatio': settings
+                                            .compressionDefaults
+                                            .nativeTriggerInputRatio,
+                                      }),
                                     );
+                                    await _saveManualRange(settings);
+                                  } catch (_) {
+                                    if (mounted) {
+                                      setState(
+                                        () => _error =
+                                            l10n.compressionInvalidSettings,
+                                      );
+                                    }
                                   }
-                                }
-                              },
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
+                                },
                               ),
-                              child: Text(
-                                l10n.compressionGlobalDescription,
-                                style: hintStyle,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                child: Text(
+                                  l10n.compressionGlobalDescription,
+                                  style: hintStyle,
+                                ),
                               ),
-                            ),
-                            IosTextButton(
-                              label: l10n.compressionFollowGlobal,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              onPressed: () => setState(() {
-                                _overrides = {};
-                                _config = settings.compressionDefaults;
-                                _mode = settings.compressLimitMode;
-                                _maxChars.text = '${settings.compressMaxChars}';
-                                _fillFields();
-                              }),
-                            ),
-                          ],
+                              IosTextButton(
+                                label: l10n.compressionFollowGlobal,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                onPressed: () => setState(() {
+                                  _overrides = {};
+                                  _config = settings.compressionDefaults;
+                                  _mode = settings.compressLimitMode;
+                                  _maxChars.text =
+                                      '${settings.compressMaxChars}';
+                                  _fillFields();
+                                }),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  CompressionSectionTitle(title: l10n.compressionSavedSettings),
-                  Wrap(
-                    spacing: 18,
-                    children: [
-                      IosTextButton(
-                        label: l10n.compressionPreviewAction,
-                        icon: LucideIcons.fileText,
-                        padding: EdgeInsets.zero,
-                        onPressed: _preview,
-                      ),
-                      IosTextButton(
-                        label: l10n.compressionSaveRecipeAction,
-                        icon: LucideIcons.bookmark,
-                        padding: EdgeInsets.zero,
-                        onPressed: _savingRecipe ? null : _saveRecipe,
-                      ),
-                    ],
-                  ),
-                  IosTextButton(
-                    label: l10n.compressionTry,
-                    icon: LucideIcons.play,
-                    fontSize: 12,
-                    color: cs.onSurfaceVariant,
-                    padding: EdgeInsets.zero,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    onPressed: selection.covered.isEmpty
-                        ? null
-                        : () => _submit(trial: true, regenerate: true),
-                  ),
+                  if (!_native) ...[
+                    CompressionSectionTitle(
+                      title: l10n.compressionSavedSettings,
+                    ),
+                    Wrap(
+                      spacing: 18,
+                      children: [
+                        IosTextButton(
+                          label: l10n.compressionPreviewAction,
+                          icon: LucideIcons.fileText,
+                          padding: EdgeInsets.zero,
+                          onPressed: _preview,
+                        ),
+                        IosTextButton(
+                          label: l10n.compressionSaveRecipeAction,
+                          icon: LucideIcons.bookmark,
+                          padding: EdgeInsets.zero,
+                          onPressed: _savingRecipe ? null : _saveRecipe,
+                        ),
+                      ],
+                    ),
+                    IosTextButton(
+                      label: l10n.compressionTry,
+                      icon: LucideIcons.play,
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      padding: EdgeInsets.zero,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      onPressed: selection.covered.isEmpty
+                          ? null
+                          : () => _submit(trial: true, regenerate: true),
+                    ),
+                  ],
                 ],
                 if (_error != null)
                   Padding(

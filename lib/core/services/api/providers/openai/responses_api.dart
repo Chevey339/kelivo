@@ -4,6 +4,7 @@ import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
+import '../../native_compaction_context.dart';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -285,6 +286,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         transport: ReasoningTransport.responses,
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
+      validateNativeCompactionOverrides(body2, extraCfg);
       CustomRequestMerger.applyBody(body2, extraCfg);
       applyServiceTier(body2, config, serviceTier);
       if (promptCacheKey != null) {

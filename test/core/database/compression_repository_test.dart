@@ -42,6 +42,42 @@ void main() {
   });
 
   test(
+    'native settings survive snapshots without enabling automation',
+    () async {
+      const config = CompressionConfig(
+        mode: AutoCompressionMode.auto,
+        nativeEnabled: true,
+        nativeKeepRecentUserTurns: 2,
+        nativeTriggerInputRatio: .5,
+        keepRecentUserTurns: 6,
+      );
+      await repo.compression.saveOverrides('chat', config.toJson());
+      final stored = CompressionConfig.fromJson(
+        await repo.compression.overrides('chat'),
+      );
+      final restored = CompressionConfig.fromJson(
+        stored.toJson(includeMode: false),
+      );
+      expect(restored.mode, AutoCompressionMode.off);
+      expect(restored.nativeEnabled, isTrue);
+      expect(restored.nativeKeepRecentUserTurns, 2);
+      expect(restored.nativeTriggerInputRatio, .5);
+      expect(restored.triggerInputRatio, .8);
+      expect(restored.targetInputRatio, .6);
+      expect(restored.keepRecentUserTurns, 6);
+      const budget = CompressionInputBudget(window: 10000, output: 1500);
+      expect(budget.shouldTrigger(4000, restored), isTrue);
+      expect(
+        budget.shouldTrigger(
+          4000,
+          restored.withOverrides({'nativeEnabled': false}),
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'locale changes localize defaults without replacing edits or recipe snapshots',
     () async {
       final zh = await repo.compression.template('code', locale: 'zh-CN');

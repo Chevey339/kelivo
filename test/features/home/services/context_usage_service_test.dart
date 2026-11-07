@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
@@ -236,6 +237,62 @@ void main() {
             ),
       );
       expect(requestConfiguration(providers), isNot(providerChanged));
+    },
+  );
+
+  test(
+    'native state stays unknown until actual provider usage arrives',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(title: 'Native');
+      final reply = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'reply',
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => const ContextAssemblyPreview(
+              systemText: '',
+              injectionsText: '',
+              historyText: '',
+              tools: [],
+              images: [],
+              apiMessages: [
+                {
+                  nativeCompactionMessageKey: {'opaque': true},
+                },
+              ],
+            ),
+      );
+      usage.setActiveConversation(conversation.id);
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.opaque);
+      expect(usage.current!.hasUsage, isFalse);
+      expect(usage.current!.ratio, isNull);
+      await usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: null,
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(providers),
+        usage: const TokenUsage(promptTokens: 321, completionTokens: 2),
+        assistantMessage: reply,
+      );
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.exact);
+      expect(usage.current!.usedTokens, 323);
+      expect(usage.current!.hasUsage, isTrue);
     },
   );
 

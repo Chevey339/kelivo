@@ -69,6 +69,7 @@ String contextUsageStateLabel(
   return switch (state) {
     ContextUsageState.exact => l10n.contextUsageStateExact,
     ContextUsageState.estimated => l10n.contextUsageStateEstimated,
+    ContextUsageState.opaque => l10n.compressionNativeTokenHint,
     ContextUsageState.stale => l10n.contextUsageStateStale,
     ContextUsageState.computing => l10n.contextUsageStateComputing,
     ContextUsageState.failed =>

@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/models/context_compression_task.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -120,6 +121,63 @@ void main() {
       home: Scaffold(body: child),
     ),
   );
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    check(
+      'native details expose undo and metadata but no text editor on $platform',
+      (tester) async {
+        await prepare(tester, platform);
+        var undone = false;
+        final native = op.copyWith(
+          summary: '',
+          compressionDetails: {
+            'nativeCompaction': NativeCompactionPayload(
+              protocol: NativeCompactionProtocol.compact,
+              scope: 'fixture',
+              modelId: 'private',
+              output: [
+                {
+                  'type': 'compaction',
+                  'encrypted_content': 'never display this',
+                },
+              ],
+            ).toJson(),
+          },
+        );
+        await tester.pumpWidget(
+          app(
+            ContextOperationContent(
+              operation: native,
+              initiallyEditing: true,
+              rangeLabel: '1–10',
+              onClose: () {},
+              onUndo: () async {
+                undone = true;
+                return true;
+              },
+            ),
+          ),
+        );
+        final l10n = AppLocalizationsEn();
+        expect(find.text(l10n.compressionNativeDescription), findsOneWidget);
+        expect(find.text(l10n.assistantSettingsCopyButton), findsNothing);
+        expect(find.text(l10n.assistantSettingsEditButton), findsNothing);
+        expect(find.text('never display this'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('context-summary-content')),
+          findsNothing,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('context-summary-details-toggle')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('1–10'), findsOneWidget);
+        await tester.tap(find.text(l10n.contextUndoCompressTooltip));
+        await tester.pumpAndSettle();
+        expect(undone, isTrue);
+      },
+    );
+  }
 
   for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
     check(
@@ -453,7 +511,7 @@ void main() {
       await tester.pumpAndSettle();
       final start = find.byType(FormSheetActions);
       expect(tester.widget<FormSheetActions>(start).onConfirm, isNull);
-      expect(find.byType(IosSwitch), findsOneWidget);
+      expect(find.byType(IosSwitch), findsNWidgets(2));
       expect(
         tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
         isFalse,
@@ -732,8 +790,11 @@ void main() {
     );
     await tester.tap(find.text('open options'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byType(IosSwitch).first);
-    await tester.tap(find.byType(IosSwitch).first);
+    final newChat = find.byWidgetPredicate(
+      (w) => w is IosSwitch && w.semanticLabel == 'Compress into a new chat',
+    );
+    await tester.ensureVisible(newChat);
+    await tester.tap(newChat);
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
@@ -752,10 +813,7 @@ void main() {
     expect(settings.compressNewConversation, isTrue);
     await tester.tap(find.text('open options'));
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
-      isTrue,
-    );
+    expect(tester.widget<IosSwitch>(newChat).value, isTrue);
     expect(tester.takeException(), isNull);
   });
 

@@ -375,6 +375,10 @@ extension ChatContextOperations on ChatService {
       if (summary != null && summary.trim().isEmpty) {
         throw ArgumentError('empty_summary');
       }
+      if (summary != null &&
+          operations.any((op) => op.id == operationId && op.isNative)) {
+        throw StateError('native_compaction_read_only');
+      }
       _contextOperations[id] = [
         for (final op in operations)
           if (op.id == operationId && summary != null)
@@ -431,6 +435,73 @@ extension ChatContextOperations on ChatService {
     Future<void> Function()? validateBeforeCommit,
     void Function()? checkBeforeCommit,
   }) async {
+    if (operation.isNative) {
+      final snapshot = await loadContextSnapshot(id);
+      if (snapshot.fingerprint != expectedFingerprint) {
+        throw StateError('context_changed');
+      }
+      final source = getConversation(id)!;
+      final active =
+          (snapshot.operations.any((op) => op.id == operation.id)
+                  ? snapshot.operations
+                  : ContextHistory.appendOperation(
+                      snapshot.operations,
+                      operation,
+                    ))
+              .where((op) => !op.revoked)
+              .toList();
+      // A native fork keeps originals in its own storage so undo remains
+      // meaningful even if the source conversation is later deleted.
+      return _forkSelectedMessages(
+        title: source.title,
+        assistantId: source.assistantId,
+        activate: false,
+        temporary: _temporaryConversationIds.contains(id),
+        sourceMessages: snapshot.messages,
+        sourceExtras: Map<String, dynamic>.from(source.extras),
+        sourceMcpServerIds: ConversationMcpSettings.isOverridden(source)
+            ? List.of(source.mcpServerIds)
+            : null,
+        activationOwner: _currentConversationId,
+        beforePublish: (created) async {
+          await validateBeforeCommit?.call();
+          checkBeforeCommit?.call();
+          final target = await loadContextSnapshot(created.id);
+          final groups = <String, String>{};
+          final messages = <String, String>{};
+          for (var i = 0; i < snapshot.messages.length; i++) {
+            groups[ContextHistory.group(snapshot.messages[i])] =
+                ContextHistory.group(target.messages[i]);
+            messages[snapshot.messages[i].id] = target.messages[i].id;
+          }
+          final operations = {
+            for (final op in active) op.id: const Uuid().v4(),
+          };
+          await restoreContextOperations(created.id, [
+            for (final op in active)
+              op.remap(
+                groups: groups,
+                operations: operations,
+                messages: messages,
+              ),
+          ], expectedFingerprint: target.fingerprint);
+          await setCompressionOverrides(
+            created.id,
+            await compressionOverrides(id),
+          );
+          await setConversationModel(
+            created.id,
+            providerKey: source.chatModelProvider,
+            modelId: source.chatModelId,
+          );
+          if ((await loadContextSnapshot(id)).fingerprint !=
+              expectedFingerprint) {
+            throw StateError('context_changed');
+          }
+          checkBeforeCommit?.call();
+        },
+      );
+    }
     if (_temporaryConversationIds.contains(id)) {
       await validateBeforeCommit?.call();
       checkBeforeCommit?.call();

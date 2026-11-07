@@ -398,7 +398,8 @@ extension ChatContextRepository on ChatDatabaseRepository {
     }
     final target = operations.firstWhere((op) => op.id == operationId);
     if (target.revoked) throw StateError('context_changed');
-    if (summary != null && (!target.isCompression || summary.trim().isEmpty)) {
+    if (summary != null &&
+        (!target.isCompression || target.isNative || summary.trim().isEmpty)) {
       throw ArgumentError('empty_summary');
     }
     final affected = ContextHistory.affectedOperations(

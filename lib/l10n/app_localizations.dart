@@ -29117,6 +29117,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'at least {value}'**
   String requestBudgetAtLeast(String value);
+
+  /// No description provided for @compressionNativeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use OpenAI native compaction'**
+  String get compressionNativeTitle;
+
+  /// No description provided for @compressionNativeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.'**
+  String get compressionNativeHint;
+
+  /// No description provided for @compressionNativeScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.'**
+  String get compressionNativeScopeHint;
+
+  /// No description provided for @compressionNativeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Native compaction'**
+  String get compressionNativeLabel;
+
+  /// No description provided for @compressionNativeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.'**
+  String get compressionNativeDescription;
+
+  /// No description provided for @compressionNativeIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'The service did not return a complete native compaction result. The original context is unchanged.'**
+  String get compressionNativeIncomplete;
+
+  /// No description provided for @compressionNativeScopeChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This native context belongs to another connection or account. Undo its compaction, or create a text summary from the original history before continuing.'**
+  String get compressionNativeScopeChanged;
+
+  /// No description provided for @compressionNativeTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Token usage for opaque native context is determined by the service.'**
+  String get compressionNativeTokenHint;
+
+  /// No description provided for @compressionNativeCopyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A new conversation keeps original messages so native compaction can be undone.'**
+  String get compressionNativeCopyHint;
+
+  /// No description provided for @compressionNativeInputOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.'**
+  String get compressionNativeInputOverride;
+
+  /// No description provided for @compressionNativeAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.'**
+  String get compressionNativeAllHint;
+
+  /// No description provided for @compressionNativeAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.'**
+  String get compressionNativeAutoHint;
 }
 
 class _AppLocalizationsDelegate

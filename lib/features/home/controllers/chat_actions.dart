@@ -1,5 +1,8 @@
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
+import 'dart:math' as math;
+import '../../../core/models/native_compaction.dart';
+import '../../../core/services/api/native_compaction_context.dart';
 import '../../../core/services/chat/chat_context_reader.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/compression_config.dart';
@@ -269,6 +272,7 @@ class ChatActions {
   final BuildContext contextProvider;
   final ContextUsageService? contextUsage;
   final _historyContexts = <String, RequestHistoryContext>{};
+  final _nativeUsage = <String, NativeCompactionUsage>{};
   final _contextReaders = <String, ChatContextReader>{};
 
   // ============================================================================
@@ -2250,6 +2254,10 @@ class ChatActions {
     );
     var disposed = false;
     var allowed = preferences.mode == AutoCompressionMode.auto;
+    final useNative = preferences.nativeEnabled && allowed;
+    final nativeScope =
+        '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
+    var nativeAttempted = false;
     var notified = false;
     final attempted = <String>{};
     bool cancelled() =>
@@ -2275,7 +2283,9 @@ class ChatActions {
         liveSettings.compressionDefaults,
       );
       if (cancelled()) return;
-      allowed = current.mode == AutoCompressionMode.auto;
+      allowed =
+          current.mode == AutoCompressionMode.auto &&
+          current.nativeEnabled == preferences.nativeEnabled;
       if (!allowed &&
           chatService.contextCompression.taskFor(id)?.automatic == true) {
         await chatService.contextCompression.cancel(id);
@@ -2290,20 +2300,56 @@ class ChatActions {
       currentUserId: userId,
       targetMessageId: state.messageId,
       isCancelled: cancelled,
+      nativeCompression: useNative,
+      onUsage: (body, usage) {
+        final anchor = NativeCompactionUsage.record(body, nativeScope, usage);
+        if (anchor != null) _nativeUsage[id] = anchor;
+      },
       beforeRequest: (body, project, overflow) async {
         if (cancelled()) return null;
+        // A custom Responses input replaces the transcript. It has no message
+        // ownership to compact or safely project back into this request.
+        final input = body['input'];
+        if (input != null && input is! List) return null;
         final current = await chatService.compressionConfig(
           id,
           liveSettings.compressionDefaults,
         );
-        allowed = current.mode == AutoCompressionMode.auto;
-        if (current.mode == AutoCompressionMode.off) return null;
-        final before = await estimate(body);
+        allowed =
+            current.mode == AutoCompressionMode.auto &&
+            current.nativeEnabled == preferences.nativeEnabled;
+        if (current.mode == AutoCompressionMode.off ||
+            current.nativeEnabled != preferences.nativeEnabled ||
+            (current.nativeEnabled &&
+                current.mode == AutoCompressionMode.auto &&
+                !useNative) ||
+            nativeAttempted) {
+          return null;
+        }
+        var before = await estimate(body);
         history.lastEstimatedTokens = (before / history.calibration).ceil();
         final output = normalizedRequestOutputReserve(body, spec.maxOutput);
         final budget = window == null
             ? null
             : CompressionInputBudget(window: window, output: output);
+        final opaque = (input as List? ?? const []).whereType<Map>().any(
+          (item) => item[nativeCompactionWireKey] == true,
+        );
+        if (opaque) {
+          final measured = contextUsage?.snapshot(id);
+          final nativeEstimate = _nativeUsage[id]?.estimate(body, nativeScope);
+          // A pre-compaction/stale estimate must not immediately trigger text
+          // compression and replace the native result the user just created.
+          if (!overflow &&
+              nativeEstimate == null &&
+              (measured?.state != ContextUsageState.exact ||
+                  measured?.revision != chatService.contextRevision(id))) {
+            return null;
+          }
+          before = overflow
+              ? math.max(before, budget?.input ?? window ?? before)
+              : nativeEstimate ?? measured!.usedTokens;
+        }
         if (!overflow &&
             (budget == null || !budget.shouldTrigger(before, preferences))) {
           return null;
@@ -2324,7 +2370,10 @@ class ChatActions {
         final source = ContextHistory.throughMessage(snapshot.messages, userId);
         final options = CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
-          keepUserMessages: preferences.keepRecentUserTurns,
+          native: useNative,
+          keepUserMessages: useNative
+              ? preferences.nativeKeepRecentUserTurns
+              : preferences.keepRecentUserTurns,
         );
         final selection = selectCompressionHistory(
           source,
@@ -2341,6 +2390,7 @@ class ChatActions {
           snapshot.operations,
         );
         if (!attempted.add(fingerprint)) return null;
+        nativeAttempted = useNative;
         final excluded = selection.covered.map((m) => m.id).toSet();
         List<ChatMessage> candidateHistory(ContextOperation candidate) =>
             ContextHistory.resolve(source, [...snapshot.operations, candidate])
@@ -2367,7 +2417,7 @@ class ChatActions {
         List<Map<String, dynamic>>? replacement;
         try {
           var runtimeConfig = preferences;
-          if (budget != null) {
+          if (budget != null && !useNative) {
             final empty = ContextOperation(
               id: 'planning',
               kind: ContextOperationKind.compress,
@@ -2404,9 +2454,24 @@ class ChatActions {
             beforeMessageId: userId,
             effectiveMessageIds: Set.unmodifiable(allowedMessageIds),
             configOverride: runtimeConfig,
+            nativeModel: useNative
+                ? (
+                    providerKey: ctx.providerKey,
+                    modelId: ctx.modelId,
+                    config: ctx.config,
+                  )
+                : null,
             isCancelled: () => cancelled() || !allowed,
             acceptCandidate: (candidate) async {
               final next = await rebuild(candidate);
+              if (useNative) {
+                // Validate the wire projection before committing the operation.
+                // Only the provider can measure the resulting opaque window.
+                validateNativeCompactionScope(next, ctx.config);
+                project(next);
+                replacement = next;
+                return true;
+              }
               final after = await estimate(project(next), excluded: excluded);
               final accepted = budget == null
                   ? after < before

@@ -65,7 +65,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
   late final MessageEditingController _editor = MessageEditingController(
     text: widget.operation.summary,
   );
-  late bool _editing = widget.initiallyEditing;
+  late bool _editing = widget.initiallyEditing && !widget.operation.isNative;
   bool _detailsExpanded = false;
   bool _saving = false;
   String? _error;
@@ -312,7 +312,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           label: operation.isCompression
               ? l10n.contextDetailNext
               : l10n.contextDetailCurrent,
-          value: widget.budget == null
+          value: operation.isNative || widget.budget == null
               ? '—'
               : l10n.compressApproxTokens(
                   contextTokenValue(widget.budget!.usedTokens),
@@ -331,6 +331,18 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (operation.isNative) ...[
+          const SizedBox(height: 12),
+          Text(
+            l10n.compressionNativeDescription,
+            style: TextStyle(fontSize: 14, height: 1.5, color: cs.onSurface),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.compressionNativeTokenHint,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
         if (operation.isCompression)
           Semantics(
             button: true,
@@ -378,7 +390,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
               ),
             ),
           ),
-        if (operation.isCompression) ...[
+        if (operation.isCompression && !operation.isNative) ...[
           const SizedBox(height: 12),
           Row(
             children: [
@@ -528,7 +540,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                               operation.isFixedStart
                                   ? l10n.contextFixedStart
                                   : operation.isCompression
-                                  ? l10n.contextDetailTitle
+                                  ? operation.isNative
+                                        ? l10n.compressionNativeLabel
+                                        : l10n.contextDetailTitle
                                   : l10n.contextDetailClearTitle,
                               style: TextStyle(
                                 fontSize: 17,

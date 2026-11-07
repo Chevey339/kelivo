@@ -107,7 +107,9 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
         : '${operation!.isFixedStart
                   ? l10n.contextFixedStart
                   : operation.isCompression
-                  ? l10n.contextDividerCompressed
+                  ? operation.isNative
+                        ? l10n.compressionNativeLabel
+                        : l10n.contextDividerCompressed
                   : l10n.homePageClearContext}'
               '${operation.isCompression && operation.isEdited ? ' · ${l10n.contextDividerEdited}' : ''}';
     final undoLabel = operation?.isFixedStart == true

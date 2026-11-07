@@ -1,3 +1,4 @@
+import '../../models/native_compaction.dart';
 import 'request_history_context.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -763,8 +764,9 @@ class RequestImageContext {
 
   static Map<String, dynamic> _mapBody(
     Map<String, dynamic> body,
-    dynamic Function(Map<String, dynamic>, String) image,
-  ) {
+    dynamic Function(Map<String, dynamic>, String) image, {
+    void Function(String)? nativeImage,
+  }) {
     final result = Map<String, dynamic>.from(body);
     for (final key in ['messages', 'input', 'contents']) {
       final messages = body[key];
@@ -776,6 +778,22 @@ class RequestImageContext {
               final message = Map<String, dynamic>.from(value)
                 ..remove(imageContextOwnerKey)
                 ..remove(multimodalInternalImageReferencesKey);
+              if (message[nativeCompactionWireKey] == true) {
+                if (nativeImage != null) {
+                  dynamic observe(Map<String, dynamic> part, String url) {
+                    nativeImage(url);
+                    return part;
+                  }
+
+                  for (final field in ['content', 'parts']) {
+                    _mapContent(message[field], observe);
+                  }
+                  if (message['type'] == 'function_call_output') {
+                    _mapContent(message['output'], observe);
+                  }
+                }
+                return message;
+              }
               for (final field in ['content', 'parts']) {
                 if (message.containsKey(field)) {
                   message[field] = _mapContent(message[field], image);
@@ -848,12 +866,19 @@ class RequestImageContext {
   Future<Map<String, dynamic>> project(
     Map<String, dynamic> body, {
     Set<String> excludedOwners = const {},
+    bool preserveSources = false,
   }) async {
     final handles = <String>{};
     final occurrences = <String, int>{};
     final external = <String, String>{};
     final wireKeys = <String>[];
     var externalIndex = 0;
+    void addExternal(String url) {
+      final key = 'external:${externalIndex++}';
+      wireKeys.add(key);
+      external[key] = url;
+    }
+
     _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
       if (handle != null && _byHandle.containsKey(handle)) {
@@ -861,12 +886,10 @@ class RequestImageContext {
         wireKeys.add(_byHandle[handle]!.key);
         occurrences.update(handle, (n) => n + 1, ifAbsent: () => 1);
       } else {
-        final key = 'external:${externalIndex++}';
-        wireKeys.add(key);
-        external[key] = url;
+        addExternal(url);
       }
       return part;
-    });
+    }, nativeImage: addExternal);
     final omittedByCount = {
       ...await historyOmissions(),
       for (final image in images)
@@ -1089,9 +1112,8 @@ class RequestImageContext {
       );
       projected['messages'] = messages;
     }
-    final request = RequestHistoryContext.stripSources(
-      _projectTools(projected, this),
-    );
+    final projectedTools = _projectTools(projected, this);
+    final request = RequestHistoryContext.stripSources(projectedTools);
     final byteCounter = _JsonByteCounter();
     final encoder = json.encoder
         .fuse(utf8.encoder)
@@ -1099,7 +1121,9 @@ class RequestImageContext {
     encoder.add(request);
     encoder.close();
     validateBodyBytes(byteCounter.length);
-    return request;
+    // Compaction needs message ownership until it has selected which real
+    // user items to retain. Always measure the clean wire representation.
+    return preserveSources ? projectedTools : request;
   }
 
   /// Also checked after OAuth adapters add their final protocol fields.

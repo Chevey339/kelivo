@@ -66,6 +66,7 @@ class _PackedGenerationService extends MessageGenerationService {
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     bool? fixedContextStart,
     DateTime? promptTime,
+    bool forceResponses = false,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,

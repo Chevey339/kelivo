@@ -1,3 +1,4 @@
+import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../intelligent_ui/host/ui_user_context_parts.dart';
@@ -406,6 +407,17 @@ class MessageBuilderService {
 
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      final native = NativeCompactionPayload.forMessage(m);
+      if (native != null) {
+        out.add({
+          'role': 'user',
+          'content': '',
+          '_contextSummary': true,
+          imageContextOwnerKey: m.id,
+          nativeCompactionMessageKey: native.toJson(),
+        });
+        continue;
+      }
       final messageStart = out.length;
       final omitGoogleSignatures =
           m.role == 'assistant' &&

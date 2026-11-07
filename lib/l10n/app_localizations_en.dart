@@ -16527,4 +16527,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String requestBudgetAtLeast(String value) {
     return 'at least $value';
   }
+
+  @override
+  String get compressionNativeTitle => 'Use OpenAI native compaction';
+
+  @override
+  String get compressionNativeHint =>
+      'Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.';
+
+  @override
+  String get compressionNativeScopeHint =>
+      'Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.';
+
+  @override
+  String get compressionNativeLabel => 'Native compaction';
+
+  @override
+  String get compressionNativeDescription =>
+      'The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.';
+
+  @override
+  String get compressionNativeIncomplete =>
+      'The service did not return a complete native compaction result. The original context is unchanged.';
+
+  @override
+  String get compressionNativeScopeChanged =>
+      'This native context belongs to another connection or account. Undo its compaction, or create a text summary from the original history before continuing.';
+
+  @override
+  String get compressionNativeTokenHint =>
+      'Token usage for opaque native context is determined by the service.';
+
+  @override
+  String get compressionNativeCopyHint =>
+      'A new conversation keeps original messages so native compaction can be undone.';
+
+  @override
+  String get compressionNativeInputOverride =>
+      'The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.';
+
+  @override
+  String get compressionNativeAllHint =>
+      'Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.';
+
+  @override
+  String get compressionNativeAutoHint =>
+      'At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.';
 }

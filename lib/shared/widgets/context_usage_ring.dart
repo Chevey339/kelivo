@@ -41,7 +41,8 @@ Color contextUsageColor(
     ContextUsageState.failed => cs.error,
     ContextUsageState.exact ||
     ContextUsageState.estimated ||
-    ContextUsageState.none => base,
+    ContextUsageState.none ||
+    ContextUsageState.opaque => base,
   };
 }
 

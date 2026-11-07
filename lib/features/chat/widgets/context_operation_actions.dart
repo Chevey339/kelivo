@@ -320,7 +320,9 @@ Future<void> showContextOperationDetails(
     title: operation.isFixedStart
         ? l10n.contextFixedStart
         : operation.isCompression
-        ? l10n.contextDetailTitle
+        ? operation.isNative
+              ? l10n.compressionNativeLabel
+              : l10n.contextDetailTitle
         : l10n.contextDetailClearTitle,
     maxWidth: operation.isCompression ? 560 : 500,
     builder: (detailContext) => ContextOperationContent(
@@ -335,7 +337,7 @@ Future<void> showContextOperationDetails(
           ? l10n.contextDetailSuperseded
           : '',
       onClose: () => Navigator.of(detailContext).pop(),
-      onSave: operation.revoked
+      onSave: operation.revoked || operation.isNative
           ? null
           : (summary) => changeContextOperationWithConfirmation(
               context,
@@ -592,7 +594,8 @@ Future<void> showCompressionReview(
     ]);
   }
 
-  if (!PlatformUtils.isDesktopTarget && task.phase == CompressionPhase.review) {
+  final canEdit = task.phase == CompressionPhase.review && !operation.isNative;
+  if (!PlatformUtils.isDesktopTarget && canEdit) {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ContextSummaryEditorPage(
@@ -610,12 +613,12 @@ Future<void> showCompressionReview(
     title: AppLocalizations.of(context)!.contextTaskReview,
     builder: (detailContext) => ContextOperationContent(
       operation: operation,
-      initiallyEditing: task.phase == CompressionPhase.review,
+      initiallyEditing: canEdit,
       budget: task.budget,
       showHeader: PlatformUtils.isDesktopTarget,
       onClose: () => Navigator.of(detailContext).pop(),
       estimateSummary: estimate,
-      onSave: task.phase != CompressionPhase.review ? null : save,
+      onSave: canEdit ? save : null,
       onRecompress: onRecompress == null
           ? null
           : () {

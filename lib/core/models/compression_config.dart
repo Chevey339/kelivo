@@ -11,6 +11,9 @@ enum AutoCompressionMode { off, notify, auto }
 class CompressionConfig {
   const CompressionConfig({
     this.mode = AutoCompressionMode.off,
+    this.nativeEnabled = false,
+    this.nativeKeepRecentUserTurns = 6,
+    this.nativeTriggerInputRatio = .8,
     this.templateId = 'general',
     this.keepRecentUserTurns = 6,
     this.triggerInputRatio = .8,
@@ -27,6 +30,9 @@ class CompressionConfig {
 
   static const conversationKind = 'conversationCompression';
   final AutoCompressionMode mode;
+  final bool nativeEnabled;
+  final int nativeKeepRecentUserTurns;
+  final double nativeTriggerInputRatio;
   final String templateId;
   final int keepRecentUserTurns;
   final double triggerInputRatio;
@@ -45,6 +51,9 @@ class CompressionConfig {
 
   Map<String, dynamic> toJson({bool includeMode = true}) => {
     if (includeMode) 'mode': mode.name,
+    'nativeEnabled': nativeEnabled,
+    'nativeKeepRecentUserTurns': nativeKeepRecentUserTurns,
+    'nativeTriggerInputRatio': nativeTriggerInputRatio,
     'templateId': templateId,
     'keepRecentUserTurns': keepRecentUserTurns,
     'triggerInputRatio': triggerInputRatio,
@@ -62,6 +71,10 @@ class CompressionConfig {
   factory CompressionConfig.fromJson(Map<String, dynamic> json) {
     final config = CompressionConfig(
       mode: AutoCompressionMode.values.byName(json['mode'] as String? ?? 'off'),
+      nativeEnabled: json['nativeEnabled'] == true,
+      nativeKeepRecentUserTurns: json['nativeKeepRecentUserTurns'] as int? ?? 6,
+      nativeTriggerInputRatio: (json['nativeTriggerInputRatio'] as num? ?? .8)
+          .toDouble(),
       templateId: json['templateId'] as String? ?? 'general',
       keepRecentUserTurns: json['keepRecentUserTurns'] as int? ?? 6,
       triggerInputRatio: (json['triggerInputRatio'] as num? ?? .8).toDouble(),
@@ -76,6 +89,11 @@ class CompressionConfig {
       modelId: json['modelId'] as String?,
     );
     if (config.templateId.isEmpty ||
+        config.nativeKeepRecentUserTurns < 0 ||
+        config.nativeKeepRecentUserTurns > 10000 ||
+        !config.nativeTriggerInputRatio.isFinite ||
+        config.nativeTriggerInputRatio <= 0 ||
+        config.nativeTriggerInputRatio >= 1 ||
         config.keepRecentUserTurns < 0 ||
         config.keepRecentUserTurns > 10000 ||
         !config.triggerInputRatio.isFinite ||
@@ -194,7 +212,12 @@ class CompressionInputBudget {
   final int output;
   int get input => (window - output - (window * .05).ceil()).clamp(0, window);
   bool shouldTrigger(int tokens, CompressionConfig config) =>
-      input > 0 && tokens >= input * config.triggerInputRatio;
+      input > 0 &&
+      tokens >=
+          input *
+              (config.nativeEnabled
+                  ? config.nativeTriggerInputRatio
+                  : config.triggerInputRatio);
   bool accepts({
     required int before,
     required int after,

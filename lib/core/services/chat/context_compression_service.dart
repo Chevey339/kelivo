@@ -333,6 +333,10 @@ class ContextCompressionService extends ChangeNotifier {
       final covered = selection.covered;
       final dependencies = selection.dependencies;
       task.anchorGroupId = ContextHistory.group(covered.last);
+      if (task.options.native) {
+        await _runNative(task, snapshot, sourceMessages, selection);
+        return;
+      }
       try {
         task.previousBudget = await estimateCandidate?.call(
           task.conversationId,
@@ -513,7 +517,8 @@ class ContextCompressionService extends ChangeNotifier {
       task.phase = task.cancelRequested || requestCancelled(task)
           ? CompressionPhase.cancelled
           : error.toString().contains('compression_reference_changed') &&
-                task.candidate != null
+                task.candidate != null &&
+                !task.options.native
           ? CompressionPhase.review
           : CompressionPhase.failed;
       task.error = error.toString();
@@ -553,10 +558,77 @@ class ContextCompressionService extends ChangeNotifier {
   bool requestCancelled(ContextCompressionTask task) =>
       task.request?.isCancelled?.call() ?? false;
 
+  Future<void> _runNative(
+    ContextCompressionTask task,
+    ConversationContextSnapshot snapshot,
+    List<ChatMessage> source,
+    CompressionSelection selection,
+  ) async {
+    final request = task.request!;
+    if (request.compactNative == null) {
+      throw StateError('native_compaction_unavailable');
+    }
+    task.sourceFingerprint = ContextHistory.fingerprint(
+      source,
+      snapshot.operations,
+    );
+    final reference = await request.loadReference?.call(selection);
+    if (reference != null) {
+      task.validateReferences = () async {
+        if (await request.loadReference!(selection) != reference) {
+          throw StateError('compression_reference_changed');
+        }
+      };
+    }
+    _check(task);
+    task.phase = CompressionPhase.summarizing;
+    task.totalParts = 1;
+    task.requestAttempts = 1;
+    await _publish(task);
+    final result = await request.compactNative!(selection, task.id);
+    _check(task);
+    task.completedParts = 1;
+    task.usage = result.usage;
+    task.unknownUsageAttempts = result.usage == null ? 1 : 0;
+    task.candidate = ContextOperation(
+      id: task.id,
+      kind: ContextOperationKind.compress,
+      anchorGroupId: ContextHistory.group(selection.covered.last),
+      appliedAfterGroupId: ContextHistory.group(source.last),
+      sourceGroups: selection.covered.map(ContextHistory.group).toList(),
+      dependencies: selection.dependencies,
+      createdAt: DateTime.now(),
+      keepUserMessages: countUserMessages(selection.retained),
+      model: request.model,
+      inputMode: task.options.mode.name,
+      inputParts: 1,
+      compressionDetails: {
+        'nativeCompaction': result.toJson(),
+        'sourceRevisionIds': selection.covered.map((m) => m.id).toList(),
+        'automatic': request.automatic,
+        'requestAttempts': task.requestAttempts,
+        'usage': result.usage?.toJson(),
+        'unknownUsageAttempts': task.unknownUsageAttempts,
+        'durationMs': DateTime.now().difference(task.startedAt).inMilliseconds,
+      },
+    );
+    await task.validateReferences?.call();
+    _check(task);
+    if (!(await request.acceptCandidate?.call(task.candidate!) ?? true)) {
+      throw StateError('native_compaction_incomplete');
+    }
+    _check(task);
+    // Native output is opaque. Text length and summary-token heuristics cannot
+    // validate it; the provider's complete result is committed atomically.
+    await _apply(task, retained: selection.retained);
+  }
+
   Future<void> applyReviewed(String id, String summary) async {
     final task = _tasks[id];
     if (task == null ||
         task.phase != CompressionPhase.review ||
+        task.options.native ||
+        task.candidate?.isNative == true ||
         summary.trim().isEmpty) {
       return;
     }

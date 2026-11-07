@@ -1,3 +1,6 @@
+import '../../../core/models/native_compaction.dart';
+import '../../../core/models/compression_config.dart';
+import '../../../core/services/api/native_compaction_context.dart';
 import '../../../core/services/api/providers/zhipu_layout_parsing.dart';
 import '../../../core/models/context_operation.dart';
 import '../../../core/services/api/request_image_context.dart';
@@ -166,6 +169,7 @@ class MessageGenerationService {
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     bool? fixedContextStart,
     DateTime? promptTime,
+    bool forceResponses = false,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
@@ -179,16 +183,6 @@ class MessageGenerationService {
     bool persistWorldBookActivation = true,
     void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
-    final cfg = settings
-        .getProviderConfig(providerKey)
-        .forModelProtocol(modelId);
-    final kind = ProviderConfig.classify(
-      providerKey,
-      explicitType: cfg.providerType,
-    );
-    final includeToolMessages = switch (kind) {
-      ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
-    };
     WorkspaceProvider? workspaceProvider;
     WorkspaceRuntimeProvider? runtimeProvider;
     ExternalMountsProvider? externalMounts;
@@ -197,6 +191,27 @@ class MessageGenerationService {
       runtimeProvider = contextProvider.read<WorkspaceRuntimeProvider>();
       externalMounts = contextProvider.read<ExternalMountsProvider?>();
     } catch (_) {}
+
+    var cfg = settings.getProviderConfig(providerKey).forModelProtocol(modelId);
+    final compression = currentConversation == null
+        ? settings.compressionDefaults
+        : await chatService.compressionConfig(
+            currentConversation.id,
+            settings.compressionDefaults,
+          );
+    if (forceResponses ||
+        (compression.nativeEnabled &&
+            compression.mode == AutoCompressionMode.auto) ||
+        messages.any((m) => NativeCompactionPayload.forMessage(m) != null)) {
+      cfg = nativeResponsesConfig(cfg);
+    }
+    final kind = ProviderConfig.classify(
+      providerKey,
+      explicitType: cfg.providerType,
+    );
+    final includeToolMessages = switch (kind) {
+      ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
+    };
 
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
@@ -363,6 +378,7 @@ class MessageGenerationService {
   Future<ContextAssemblyPreview> previewContextAssembly({
     bool? fixedContextStart,
     DateTime? promptTime,
+    bool forceResponses = false,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -371,6 +387,7 @@ class MessageGenerationService {
   }) => _contextAssembly(
     fixedContextStart: fixedContextStart,
     promptTime: promptTime,
+    forceResponses: forceResponses,
     conversationId: conversationId,
     providerKey: providerKey,
     modelId: modelId,
@@ -399,6 +416,7 @@ class MessageGenerationService {
   Future<ContextAssemblyPreview> _contextAssembly({
     bool? fixedContextStart,
     DateTime? promptTime,
+    bool forceResponses = false,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -424,6 +442,7 @@ class MessageGenerationService {
     final packed = await assembleUnprocessedRequestContext(
       fixedContextStart: fixedContextStart,
       promptTime: promptTime,
+      forceResponses: forceResponses,
       messages: messages,
       versionSelections: chatService.getVersionSelections(conversationId),
       currentConversation: conversation?.copyWith(truncateIndex: -1),

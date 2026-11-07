@@ -17,6 +17,7 @@ class CompressContextOptions {
     this.newConversation = false,
     this.focus = '',
     this.previewOnly = false,
+    this.native = false,
   });
 
   static const int defaultMaxChars = 6000;
@@ -34,6 +35,7 @@ class CompressContextOptions {
   final bool newConversation;
   final String focus;
   final bool previewOnly;
+  final bool native;
 
   Map<String, dynamic> toJson() => {
     'mode': mode.name,
@@ -46,6 +48,7 @@ class CompressContextOptions {
     'newConversation': newConversation,
     'focus': focus,
     'previewOnly': previewOnly,
+    'native': native,
   };
 
   factory CompressContextOptions.fromJson(Map<String, dynamic> json) =>
@@ -62,6 +65,7 @@ class CompressContextOptions {
         newConversation: json['newConversation'] as bool,
         focus: json['focus'] as String? ?? '',
         previewOnly: json['previewOnly'] == true,
+        native: json['native'] == true,
       );
 }
 
@@ -146,6 +150,7 @@ CompressionSelection selectCompressionHistory(
     operations,
     source: options.historySource,
     includeEditedSummaries: options.includeEditedSummaries,
+    includeNative: options.native,
   );
   return (
     effective: effective,
@@ -155,6 +160,7 @@ CompressionSelection selectCompressionHistory(
         .toList(),
     dependencies: dependencies,
     needsRegeneration:
+        !options.native &&
         prefix.isNotEmpty &&
         prefix.every(ContextOperation.isSummary) &&
         options.historySource == ContextHistorySource.effective &&

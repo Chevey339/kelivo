@@ -11,6 +11,9 @@ int estimateRequestInput(Map<String, dynamic> body, ProviderKind kind) {
     if (value is List) return value.map(countable).toList();
     if (value is! Map) return value;
     final type = value['type'];
+    // Encrypted state is not text tokens. Callers need a provider measurement
+    // for a complete native-context count; never tokenize its base64 payload.
+    if (type == 'compaction') return '[opaque native context]';
     final inline = value['inline_data'] ?? value['inlineData'];
     if (type == 'image' ||
         type == 'image_url' ||
