@@ -92,6 +92,7 @@ class SettingsProvider extends ChangeNotifier {
     'STA1N API',
     'OpenRouter',
     'KelivoIN',
+    '10dian-API',
     'DeepSeek',
     'SiliconFlow',
     'AIhubmix',
@@ -6728,6 +6729,7 @@ class ProviderConfig {
     if (k.contains('vercel')) return 'https://ai-gateway.vercel.sh/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('sta1n')) return 'https://sta1n.ai/v1';
+    if (k.contains('10dian')) return 'https://api.10dianai.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
     if (k.contains('marucode') || k.contains('muteki')) {
       return 'https://api.muteki.site/v1';

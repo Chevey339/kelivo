@@ -155,6 +155,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'KelivoIN',
         'OpenAI',
         'STA1N API',
+        '10dian-API',
         'Gemini',
         'SiliconFlow',
         'OpenRouter',

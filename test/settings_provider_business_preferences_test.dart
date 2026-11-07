@@ -207,6 +207,7 @@ void main() {
       const migratedOrder = <String>[
         ...legacyOrder,
         'STA1N API',
+        '10dian-API',
         '随想AI中转站',
         'MaruCode',
         '砂糖酒馆',

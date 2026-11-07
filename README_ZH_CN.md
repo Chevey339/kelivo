@@ -49,6 +49,13 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">
+  <a href="https://api.10dianai.com"><img src="docs/sponsors/10dian.png" alt="10dian-API" width="150"></a><br />
+  <b><a href="https://api.10dianai.com">10dian-API</a></b>
+</td>
+<td valign="middle">感谢<a href="https://api.10dianai.com">10dian-API</a>对本项目的赞助！10dian-API 为广大开发者和玩家提供安全·快速·稳定的 API 服务，资费透明·价格低廉·体验至上，承诺 100% 不掺水。用一把钥匙，召唤全世界的 AI～</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
   <a href="https://sui-xiang.com"><img src="docs/sponsors/suixiang.jpg" alt="随想AI中转" width="150"></a><br />
   <b><a href="https://sui-xiang.com">随想AI中转</a></b>
 </td>

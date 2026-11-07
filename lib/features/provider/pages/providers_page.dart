@@ -501,6 +501,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     _p('STA1N API', 'STA1N API', enabled: false, models: 0),
     _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
     _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
+    _p('10dian-API', '10dian-API', enabled: false, models: 0),
     _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
     _p(
       l10n.providersPageSiliconFlowName,

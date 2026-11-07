@@ -49,6 +49,13 @@ Conversations, settings and files are stored locally. Kelivo has no account syst
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">
+  <a href="https://api.10dianai.com"><img src="docs/sponsors/10dian.png" alt="10dian-API" width="150"></a><br />
+  <b><a href="https://api.10dianai.com">10dian-API</a></b>
+</td>
+<td valign="middle">Thanks to <a href="https://api.10dianai.com">10dian-API</a> for sponsoring Kelivo! 10dian-API provides secure, fast and stable API services for developers and AI enthusiasts, with transparent, affordable pricing and a focus on user experience. It promises 100% genuine models with no substitution. One key to unlock a world of AI!</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
   <a href="https://sui-xiang.com"><img src="docs/sponsors/suixiang.jpg" alt="随想AI中转" width="150"></a><br />
   <b><a href="https://sui-xiang.com">随想AI中转</a></b>
 </td>

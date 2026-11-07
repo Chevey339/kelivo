@@ -16,6 +16,12 @@ class ProviderSponsorCard extends StatelessWidget {
         website: 'https://sta1n.ai/',
         purchaseUrl: null,
       ),
+      '10dian-api' => (
+        description:
+            '10dian-API 为广大开发者和玩家提供安全·快速·稳定的 API 服务，资费透明·价格低廉·体验至上，承诺 100% 不掺水。用一把钥匙，召唤全世界的 AI～',
+        website: 'https://api.10dianai.com',
+        purchaseUrl: null,
+      ),
       '砂糖酒馆' => (
         description:
             '主营角色聊天，按次收费，价格透明。提供 Gemini、Claude、DeepSeek、GLM 等主流文本模型，以及 NAI 生图、TTS 和视频模型。注重隐私，无数据倒卖，无模型掺水，充值额度 1:1。',

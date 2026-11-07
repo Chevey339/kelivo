@@ -319,6 +319,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'STA1N API', key: 'STA1N API'),
       (name: 'OpenRouter', key: 'OpenRouter'),
       (name: 'KelivoIN', key: 'KelivoIN'),
+      (name: '10dian-API', key: '10dian-API'),
       (name: 'DeepSeek', key: 'DeepSeek'),
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'AIhubmix', key: 'AIhubmix'),
