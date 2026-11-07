@@ -760,5 +760,134 @@ void main() {
       expect(messages.first['content'], 'Stable persona and long context.');
       expect(receivedBody!.containsKey('cache_control'), isFalse);
     });
+
+    for (final useResponseApi in [false, true]) {
+      final route = useResponseApi ? 'Responses' : 'Chat Completions';
+      test(
+        'Claude prompt caching keeps OpenRouter cache control on $route tool follow-ups',
+        () async {
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() async {
+            await server.close(force: true);
+          });
+
+          final bodies = <Map<String, dynamic>>[];
+          server.listen((request) async {
+            bodies.add(
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>,
+            );
+            final tool = bodies.length == 1;
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            void emit(Map<String, dynamic> event) =>
+                request.response.write('data: ${jsonEncode(event)}\n\n');
+            if (useResponseApi) {
+              final item = tool
+                  ? {
+                      'type': 'function_call',
+                      'call_id': 'call_1',
+                      'name': 'get_time',
+                      'arguments': '{}',
+                    }
+                  : {
+                      'type': 'message',
+                      'role': 'assistant',
+                      'content': [
+                        {'type': 'output_text', 'text': 'ok'},
+                      ],
+                    };
+              if (tool) {
+                emit({
+                  'type': 'response.output_item.done',
+                  'output_index': 0,
+                  'item': item,
+                });
+              } else {
+                emit({'type': 'response.output_text.delta', 'delta': 'ok'});
+              }
+              emit({
+                'type': 'response.completed',
+                'response': {
+                  'id': 'response_${bodies.length}',
+                  'status': 'completed',
+                  'output': [item],
+                },
+              });
+            } else {
+              emit({
+                'choices': [
+                  {
+                    'index': 0,
+                    'delta': {
+                      'role': 'assistant',
+                      if (tool)
+                        'tool_calls': [
+                          {
+                            'index': 0,
+                            'id': 'call_1',
+                            'type': 'function',
+                            'function': {'name': 'get_time', 'arguments': '{}'},
+                          },
+                        ]
+                      else
+                        'content': 'ok',
+                    },
+                    'finish_reason': tool ? 'tool_calls' : 'stop',
+                  },
+                ],
+              });
+            }
+            request.response.write('data: [DONE]\n\n');
+            await request.response.close();
+          });
+
+          await HttpOverrides.runZoned(
+            () async {
+              final chunks = await ChatApiService.sendMessageStream(
+                config: _openRouterConfig(
+                  modelId: 'anthropic/claude-sonnet-4.5',
+                  searchEnabled: false,
+                  useResponseApi: useResponseApi,
+                  claudePromptCachingEnabled: true,
+                ),
+                modelId: 'anthropic/claude-sonnet-4.5',
+                messages: const <Map<String, dynamic>>[
+                  {'role': 'user', 'content': 'what time is it?'},
+                ],
+                tools: const [
+                  {
+                    'type': 'function',
+                    'function': {
+                      'name': 'get_time',
+                      'parameters': {
+                        'type': 'object',
+                        'properties': <String, dynamic>{},
+                      },
+                    },
+                  },
+                ],
+                onToolCall: (name, args, {toolCallId}) async => '12:34',
+                stream: true,
+              ).toList();
+
+              expect(chunks.isGenerationDone, isTrue);
+            },
+            createHttpClient: (context) {
+              return _ProxyHttpOverrides(server.port).createHttpClient(context);
+            },
+          );
+
+          expect(bodies, hasLength(2));
+          expect(
+            bodies.map((body) => body['cache_control']),
+            everyElement({'type': 'ephemeral'}),
+          );
+        },
+      );
+    }
   });
 }
