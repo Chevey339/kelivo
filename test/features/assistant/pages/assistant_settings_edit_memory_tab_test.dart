@@ -22,6 +22,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
+import 'package:Kelivo/features/assistant/pages/assistant_memory_page.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
@@ -180,6 +181,14 @@ Future<void> _openMemoryTab(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
   expect(find.text('Use long-term memory').hitTestable(), findsOneWidget);
+}
+
+Future<void> _openAssistantMemoryPage(WidgetTester tester) async {
+  final entry = find.text('Manage assistant memory').hitTestable();
+  await tester.ensureVisible(entry);
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
+  expect(find.byType(AssistantMemoryPage), findsOneWidget);
 }
 
 Future<void> _tapSwitchNearLabel(WidgetTester tester, String label) async {
@@ -404,10 +413,7 @@ void main() {
     expect(a.enableMemory, isFalse);
     expect(find.text('Auto-organize memory'), findsNothing);
     expect(find.text('Memory write scope'), findsNothing);
-    expect(
-      find.text('Long-term memory is off for this assistant'),
-      findsOneWidget,
-    );
+    expect(find.text('Manage assistant memory'), findsOneWidget);
   });
 
   testWidgets('memory tab has no about row or inline option subtitles', (
@@ -466,7 +472,7 @@ void main() {
   });
 
   testWidgets(
-    'add memory from tab uses assistant scope when write scope is assistant',
+    'assistant memory page adds with assistant scope when write scope is assistant',
     (tester) async {
       final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
       _setLargeSurface(tester);
@@ -489,6 +495,7 @@ void main() {
         ),
       );
       await _openMemoryTab(tester);
+      await _openAssistantMemoryPage(tester);
 
       final addButton = find.text('Add memory').hitTestable();
       await tester.ensureVisible(addButton);
@@ -506,7 +513,7 @@ void main() {
     },
   );
 
-  testWidgets('add memory sheet opens and cancels without throwing', (
+  testWidgets('assistant memory add sheet opens and cancels without throwing', (
     tester,
   ) async {
     final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
@@ -525,6 +532,7 @@ void main() {
       ),
     );
     await _openMemoryTab(tester);
+    await _openAssistantMemoryPage(tester);
 
     final addButton = find.text('Add memory').hitTestable();
     await tester.ensureVisible(addButton);
@@ -539,6 +547,46 @@ void main() {
     expect(find.byType(MemoryEntryEditForm), findsNothing);
     expect(tester.takeException(), isNull);
     expect(memoryV2.entries, isEmpty);
+  });
+
+  testWidgets('memory tab links to visible memories through one entry', (
+    tester,
+  ) async {
+    final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
+    _setLargeSurface(tester);
+    await memoryV2.create(
+      scope: MemoryScope.global,
+      type: MemoryType.identity,
+      content: 'Shared fact',
+      source: MemorySource.manual,
+    );
+    await memoryV2.create(
+      scope: MemoryScope.assistant,
+      assistantId: _assistantId,
+      type: MemoryType.workflow,
+      content: 'Private fact',
+      source: MemorySource.manual,
+    );
+
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: ap,
+        chatService: chat,
+        memoryV2: memoryV2,
+        pipeline: pipeline,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await _openMemoryTab(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shared fact'), findsNothing);
+    expect(find.text('2 memories visible to this assistant'), findsOneWidget);
+
+    await _openAssistantMemoryPage(tester);
+    expect(find.text('Shared fact'), findsOneWidget);
+    expect(find.text('Private fact'), findsOneWidget);
+    expect(find.text('Organize'), findsOneWidget);
   });
 
   testWidgets('memory tab exposes only the global memory settings link', (
