@@ -648,6 +648,56 @@ void main() {
       expect(after.sources[ModelSpecField.reasoningReplay], SpecSource.vendor);
     });
 
+    test('Mistral replay beats a catalog interleaved reasoning field', () {
+      final resolved = resolver.resolve(_mistral(), 'mistral-medium-latest');
+      expect(resolved.catalog?.provider.id, 'mistral');
+      expect(resolved.catalog?.model.interleavedField, 'reasoning_content');
+      expect(resolved.spec.reasoning.dialect, ReasoningDialect.mistral);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
+      expect(
+        resolved.spec.reasoning.replayField,
+        ReasoningReplayField.mistralThinking,
+      );
+      expect(
+        resolved.sources[ModelSpecField.reasoningReplay],
+        SpecSource.vendor,
+      );
+      expect(resolved.spec.reasoning.levels, const [ReasoningLevel.high]);
+    });
+
+    test('non-Mistral replay keeps Guess -> Catalog -> Vendor order', () {
+      // Catalog interleaved beats the vendor default when no guesser applies.
+      final claude = resolver.resolve(_anthropic(), 'claude-sonnet-4.6');
+      expect(
+        claude.spec.reasoning.replayField,
+        ReasoningReplayField.reasoningContent,
+      );
+      expect(
+        claude.sources[ModelSpecField.reasoningReplay],
+        SpecSource.catalog,
+      );
+
+      // A guessed replay still beats the catalog interleaved field.
+      final deepseek = resolver.resolve(_deepseek(), 'deepseek-v4-pro');
+      expect(
+        deepseek.spec.reasoning.replayField,
+        ReasoningReplayField.reasoningContent,
+      );
+      expect(
+        deepseek.sources[ModelSpecField.reasoningReplay],
+        SpecSource.guess,
+      );
+
+      // Vendor replay applies when neither the guesser nor the catalog has one.
+      final vendor = resolver.resolve(_deepseek(), 'stealth/ox-alpha');
+      expect(vendor.spec.reasoning.replay, ReasoningReplayPolicy.all);
+      expect(
+        vendor.spec.reasoning.replayField,
+        ReasoningReplayField.reasoningContent,
+      );
+      expect(vendor.sources[ModelSpecField.reasoningReplay], SpecSource.vendor);
+    });
+
     test('a named Mistral proxy does not grant reasoning by itself', () {
       final resolved = resolver.resolve(
         _mistralProxy(),
@@ -1273,6 +1323,14 @@ ModelCatalogData _catalogData() {
             reasoningOptions: const [
               CatalogReasoningOption(type: 'effort', values: ['low', 'high']),
             ],
+          ),
+          _model(
+            'mistral-medium-latest',
+            tool: true,
+            reasoning: true,
+            interleaved: true,
+            interleavedField: 'reasoning_content',
+            reasoningOptions: const [CatalogReasoningOption(type: 'toggle')],
           ),
         ],
       ),

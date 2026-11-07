@@ -110,6 +110,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         finishReason = fr is String ? fr : null;
         final message = c0['message'];
         final delta = c0['delta'];
+        var deltaReasoning = false;
         if (delta is Map) {
           // A delta may carry thinking and text parts at once; keep both.
           final isAudio =
@@ -127,6 +128,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
           final scalarReasoning = rc is String && rc.isNotEmpty ? rc : null;
           final reasoningText = scalarReasoning ?? parts.thinking;
           if (reasoningText.isNotEmpty) {
+            deltaReasoning = true;
             reasoning.write(reasoningText);
             if (needsReasoningEcho) reasoningEcho += reasoningText;
           }
@@ -144,9 +146,12 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
           if (rdMsg is List && rdMsg.isNotEmpty) {
             _addReasoningDetails(rdMsg);
           }
+          // The message body is a one-shot fallback: when the delta already
+          // carried reasoning in this event, repeating it would double the
+          // thought.
           final rcMsg = message['reasoning_content'] ?? message['reasoning'];
           final scalarMsg = rcMsg is String && rcMsg.isNotEmpty ? rcMsg : null;
-          if (scalarMsg != null) {
+          if (!deltaReasoning && scalarMsg != null) {
             if (needsReasoningEcho) reasoningEcho += scalarMsg;
             reasoning.write(scalarMsg);
           }
@@ -156,7 +161,9 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
               content += messageParts.text;
               approxCompletionChars += messageParts.text.length;
             }
-            if (scalarMsg == null && messageParts.thinking.isNotEmpty) {
+            if (!deltaReasoning &&
+                scalarMsg == null &&
+                messageParts.thinking.isNotEmpty) {
               if (needsReasoningEcho) reasoningEcho += messageParts.thinking;
               reasoning.write(messageParts.thinking);
             }

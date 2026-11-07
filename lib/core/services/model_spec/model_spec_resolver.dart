@@ -622,12 +622,17 @@ class ModelSpecResolver {
     required Map<ModelSpecField, SpecSource> sources,
   }) {
     // Mistral's typed-thinking replay is a protocol requirement, so its vendor
-    // policy must not be dropped by a hosted model's guesser. Other vendors
-    // keep Guess -> Catalog -> Vendor order.
-    final vendorTypedThinking =
-        vendor.replay != null &&
-        vendor.replayField == ReasoningReplayField.mistralThinking;
-    if (!vendorTypedThinking && guess.replay != null) {
+    // policy wins over both the hosted model's guesser and any catalog
+    // interleaved field. Other vendors keep Guess -> Catalog -> Vendor.
+    if (vendor.replay != null &&
+        vendor.replayField == ReasoningReplayField.mistralThinking) {
+      sources[ModelSpecField.reasoningReplay] = SpecSource.vendor;
+      return (
+        policy: vendor.replay!,
+        field: ReasoningReplayField.mistralThinking,
+      );
+    }
+    if (guess.replay != null) {
       sources[ModelSpecField.reasoningReplay] = SpecSource.guess;
       return (
         policy: guess.replay!,

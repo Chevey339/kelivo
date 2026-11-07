@@ -1462,6 +1462,60 @@ void main() {
     expect(decoder.reasoningEcho, '乙丁');
   });
 
+  test('one event does not duplicate reasoning across delta and message', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': '甲'},
+            ],
+          },
+          message: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': '甲'},
+              <String, dynamic>{'type': 'text', 'text': '正文'},
+            ],
+            'reasoning_content': '甲',
+          },
+          finishReason: 'stop',
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<ReasoningDelta>(), hasLength(1));
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '甲');
+    expect(decoder.reasoningEcho, '甲');
+    expect(result.chunks.whereType<TextDelta>().single.text, '正文');
+  });
+
+  test('empty delta reasoning still falls back to the message', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': ''},
+            ],
+            'reasoning_content': '',
+          },
+          message: <String, dynamic>{
+            'content': <dynamic>[
+              <String, dynamic>{'type': 'thinking', 'thinking': '乙'},
+              <String, dynamic>{'type': 'text', 'text': '正文'},
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, '乙');
+    expect(decoder.reasoningEcho, '乙');
+    expect(result.chunks.whereType<TextDelta>().single.text, '正文');
+  });
+
   test('reads thinking parts from a complete message.content', () {
     final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
     final result = decoder.accept(
