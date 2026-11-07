@@ -87,6 +87,29 @@ assert.equal(window.scrollY, 300);
 scroll(-20);
 resize(687);
 assert.equal(window.scrollY, -20);
+
+// Insets may preserve a reading position beyond the new end. Clamp only after
+// CSS reflow, when viewport-relative content has its final height.
+root.scrollHeight = 2044;
+scroll(1337);
+resize(746);
+assert.equal(window.scrollY, 1298);
+resize(687);
+assert.equal(window.scrollY, 1357, 'the newly reached footer remains anchored');
+root.scrollHeight = 1418;
+scroll(711);
+resize(746, 1536);
+assert.equal(window.scrollY, 711, 'dvh content growth must preserve a legal reading position');
+resize(687, 1418);
+assert.equal(window.scrollY, 711);
+
+// A gesture can move the document in the same frame as a toolbar resize.
+// Do not restore the previous offset over a new, still-valid user position.
+scroll(300);
+window.scrollY = 340;
+resize(721);
+assert.equal(window.scrollY, 340);
+
 scroll(root.scrollHeight - window.innerHeight);
 document.activeElement = {tagName: 'INPUT', type: 'text'};
 const beforeKeyboard = window.scrollY;

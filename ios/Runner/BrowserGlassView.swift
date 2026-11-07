@@ -10,7 +10,9 @@ final class BrowserViewportInsetsBridge {
     weak var view: WKWebView?
     var owner: String
     let originalInsets: UIEdgeInsets
+    let originalScrollTop: CGFloat
     let originalScrollBottom: CGFloat
+    private var top: CGFloat = 0
     private var bottom: CGFloat = 0
     private var scrollInsetObservation: NSKeyValueObservation?
     private var offsetBeforeInsetChange: CGPoint?
@@ -20,6 +22,7 @@ final class BrowserViewportInsetsBridge {
       self.view = view
       self.owner = owner
       self.originalInsets = originalInsets
+      originalScrollTop = view.scrollView.contentInset.top
       originalScrollBottom = view.scrollView.contentInset.bottom
       // The plugin resets contentInset whenever Flutter updates the view frame.
       // Keep the browser's scroll allowance through keyboard/rotation/reattachment.
@@ -39,18 +42,30 @@ final class BrowserViewportInsetsBridge {
     func apply(top: CGFloat, bottom: CGFloat) {
       guard let view else { return }
       let scrollView = view.scrollView
-      let oldBottom = max(-scrollView.adjustedContentInset.top,
+      let previousTop = view.obscuredContentInsets.top
+      let previousOffset = scrollView.contentOffset.y
+      let oldTop = -max(previousTop, scrollView.adjustedContentInset.top)
+      let pinnedToTop = previousOffset <= oldTop + 1
+      let oldBottom = max(oldTop,
                           scrollView.contentSize.height - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
-      let overscroll = scrollView.contentOffset.y - oldBottom
+      let overscroll = previousOffset - oldBottom
       let pinnedToBottom = overscroll >= -1
+      self.top = top
       self.bottom = bottom
       view.obscuredContentInsets = UIEdgeInsets(
         top: top, left: originalInsets.left, bottom: bottom, right: originalInsets.right)
       synchronizeScrollInset()
-      // Expanding the toolbar must carry an already reached footer upward.
-      // UIKit clamps a shrinking inset, but does not pin an expanding one.
-      if pinnedToBottom {
-        let nextBottom = max(-scrollView.adjustedContentInset.top,
+      if top != previousTop {
+        // WebKit's document offset includes the obscured top inset. Changing
+        // that inset alone scrolls past the header, even on an already loaded
+        // page's first attachment. Keep the same document position instead.
+        // Viewport-relative CSS can still change contentSize asynchronously;
+        // the viewport anchor script clamps or pins its end after reflow.
+        scrollView.contentOffset.y = previousOffset + previousTop - top
+      } else if pinnedToBottom && !pinnedToTop {
+        // Expanding the toolbar must carry an already reached footer upward.
+        // A short document at both edges keeps its header anchored instead.
+        let nextBottom = max(-max(top, scrollView.adjustedContentInset.top),
                              scrollView.contentSize.height - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
         scrollView.contentOffset.y = nextBottom + max(0, overscroll)
       }
@@ -58,14 +73,17 @@ final class BrowserViewportInsetsBridge {
 
     private func synchronizeScrollInset(restoring offset: CGPoint? = nil) {
       guard let scrollView = view?.scrollView else { return }
-      let target = originalScrollBottom + bottom
-      guard scrollView.contentInset.bottom != target else { return }
+      let targetTop = originalScrollTop + top
+      let targetBottom = originalScrollBottom + bottom
+      guard scrollView.contentInset.top != targetTop ||
+              scrollView.contentInset.bottom != targetBottom else { return }
       // Obscured insets position fixed/sticky elements; scroll insets also let
-      // ordinary document footers scroll fully above the floating controls.
+      // ordinary document edges stay clear of the status bar and controls.
       synchronizingScrollInset = true
       defer { synchronizingScrollInset = false }
       var insets = scrollView.contentInset
-      insets.bottom = target
+      insets.top = targetTop
+      insets.bottom = targetBottom
       scrollView.contentInset = insets
       // UIKit can shift the offset while the plugin briefly removes the inset.
       // Restore the position from before that write, not its already shifted value.
@@ -76,10 +94,17 @@ final class BrowserViewportInsetsBridge {
       scrollInsetObservation?.invalidate()
       scrollInsetObservation = nil
       if #available(iOS 26.0, *), let view {
+        let scrollView = view.scrollView
+        let topDelta = originalInsets.top - view.obscuredContentInsets.top
+        let previousOffset = scrollView.contentOffset.y
         view.obscuredContentInsets = originalInsets
-        var insets = view.scrollView.contentInset
+        var insets = scrollView.contentInset
+        insets.top = originalScrollTop
         insets.bottom = originalScrollBottom
-        view.scrollView.contentInset = insets
+        scrollView.contentInset = insets
+        if topDelta != 0 {
+          scrollView.contentOffset.y = previousOffset - topDelta
+        }
       }
     }
   }

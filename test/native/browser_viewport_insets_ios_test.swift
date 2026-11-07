@@ -100,6 +100,105 @@ private struct BrowserViewportInsetsIOSTest {
     return InsetsTestWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 844), configuration: config)
   }
 
+  @available(iOS 26.0, *)
+  static func testTopInsets(window: UIWindow) {
+    let marker = "/* kelivo-browser-tab:dG9w */"
+    let view = makeView(marker: marker)
+    view.scrollView.contentInsetAdjustmentBehavior = .never
+    window.addSubview(view)
+    let messenger = InsetsTestMessenger()
+    let bridge = BrowserViewportInsetsBridge()
+    bridge.register(messenger: messenger, window: window) { _ in "top" }
+    defer {
+      bridge.dispose()
+      view.removeFromSuperview()
+    }
+    let navigation = InsetsTestNavigation()
+    view.navigationDelegate = navigation
+    func load(height: String) {
+      navigation.loaded = false
+      view.loadHTMLString("""
+        <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+        <body style="margin:0"><div id="header" style="height:44px">Header</div>
+        <div style="height:\(height)">Document</div></body>
+        """, baseURL: nil)
+      waitUntil { navigation.loaded }
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    }
+    func apply(top: Double) {
+      precondition(messenger.call("setBrowserViewportInsets", [
+        "owner": "top-host", "marker": marker, "top": top, "bottom": 98.0
+      ]) as? Bool == true)
+    }
+    func resize(top: Double, size: CGSize, insetFirst: Bool) {
+      if insetFirst { apply(top: top) }
+      view.frame.size = size
+      if !insetFirst { apply(top: top) }
+    }
+    func checkPosition(_ expected: Double, _ message: String) {
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      let actual = evaluate(view, "window.scrollY") as! Double
+      precondition(abs(actual - expected) < 0.5, "\(message): expected \(expected), got \(actual)")
+      let header = evaluate(view, "document.getElementById('header').getBoundingClientRect().top") as! Double
+      precondition(abs(header + expected) < 0.5, "The document header must retain its viewport position")
+    }
+
+    // A retained/headless page can finish loading before its visible host
+    // receives the inset. Attaching it must not scroll past the page header.
+    load(height: "2000px")
+    checkPosition(0, "Initial document position")
+    apply(top: 59)
+    checkPosition(0, "Attaching a loaded page must retain its header")
+
+    for height in ["2000px", "100px"] {
+      load(height: height)
+      checkPosition(0, "Navigation must start below the status bar")
+      for insetFirst in [true, false] {
+        resize(top: 0, size: CGSize(width: 844, height: 390), insetFirst: insetFirst)
+        checkPosition(0, "Landscape must retain the page top")
+        resize(top: 59, size: CGSize(width: 390, height: 844), insetFirst: insetFirst)
+        checkPosition(0, "Portrait must retain the page top")
+      }
+    }
+
+    load(height: "2000px")
+    _ = evaluate(view, "window.scrollTo(0, 500)")
+    checkPosition(500, "Reading position before inset changes")
+    for top in [0.0, 59.0, 20.0, 59.0] {
+      apply(top: top)
+      view.frame = view.frame
+      checkPosition(500, "Inset changes must preserve the reading position")
+    }
+    _ = messenger.call("releaseBrowserViewportInsets", "top-host")
+    checkPosition(500, "Releasing the host must preserve the reading position")
+    apply(top: 59)
+    checkPosition(500, "Reattaching the host must preserve the reading position")
+
+    _ = evaluate(view, "window.scrollTo(0, document.documentElement.scrollHeight - innerHeight - 20)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    apply(top: 0)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    var end = evaluate(view, "document.documentElement.scrollHeight - innerHeight") as! Double
+    checkPosition(end, "An expanded viewport must clamp a near-bottom position to the new end")
+    apply(top: 59)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    end = evaluate(view, "document.documentElement.scrollHeight - innerHeight") as! Double
+    checkPosition(end, "A reached footer must remain visible when the viewport shrinks again")
+
+    load(height: "200dvh")
+    _ = evaluate(view, "window.scrollTo(0, document.documentElement.scrollHeight - innerHeight - 20)")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+    let readingPosition = evaluate(view, "window.scrollY") as! Double
+    for top in [0.0, 59.0] {
+      apply(top: top)
+      checkPosition(readingPosition, "Reflowing dvh content must retain a legal reading position")
+    }
+    _ = messenger.call("releaseBrowserViewportInsets", "top-host")
+    checkPosition(readingPosition, "Releasing a dvh page must use its expanded document bounds")
+    apply(top: 59)
+    checkPosition(readingPosition, "Reattaching a dvh page must retain its reading position")
+  }
+
   static func main() {
     guard #available(iOS 26.0, *) else {
       fatalError("Requires iOS 26 obscured-content-inset API")
@@ -108,6 +207,7 @@ private struct BrowserViewportInsetsIOSTest {
     let secondMarker = "/* kelivo-browser-tab:c2Vjb25k */"
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
     window.isHidden = false
+    testTopInsets(window: window)
     let first = makeView(marker: firstMarker)
     let second = makeView(marker: secondMarker)
     window.addSubview(first)
@@ -170,6 +270,17 @@ private struct BrowserViewportInsetsIOSTest {
         return hit === element;
       })
       """) as? Bool == true, "Both footer buttons must remain hit-testable")
+
+    for top in [0.0, 59.0, 20.0, 59.0] {
+      precondition(apply(firstMarker, top: top))
+      first.frame = first.frame
+      // The WebKit process must finish viewport-relative CSS reflow and its
+      // resize handler before the ordinary footer reaches the new boundary.
+      waitUntil {
+        let footer = evaluate(first, "document.getElementById('footer').getBoundingClientRect().bottom") as! Double
+        return abs(footer - (844 - top - 98)) < 0.5
+      }
+    }
 
     // Both directions of the chrome animation must keep a reached footer
     // visible, including the compact 64-point reservation on this device.
@@ -312,6 +423,6 @@ private struct BrowserViewportInsetsIOSTest {
       precondition(legacy.scrollView.contentOffset.y == 500,
                    "Physical viewport changes must preserve mid-document reading position")
     }
-    print("iOS viewport insets: dynamic native/physical viewports, normal/fixed footers, plugin frame resets, keyboard updates, tab transfer, crop and restoration passed")
+    print("iOS viewport insets: loaded-page attachment, rotation, top/reading anchors, dynamic native/physical viewports, normal/fixed footers, plugin frame resets, keyboard updates, tab transfer, crop and restoration passed")
   }
 }
