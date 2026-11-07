@@ -3328,7 +3328,7 @@
   "memoryAboutScopeTitle": "Global vs assistant",
   "memoryAboutScopeBody": "Global memories are injected for every assistant. Assistant-scope memories are only visible to that assistant. Use global for facts that should follow the user everywhere; use assistant scope for rules or context that belong to one persona.",
   "memoryAboutInjectionTitle": "How memories are injected",
-  "memoryAboutInjectionBody": "At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost.",
+  "memoryAboutInjectionBody": "At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost. In each assistant’s memory settings, select types to always inject in full.",
   "memoryAboutPipelineTitle": "Background pipeline",
   "memoryAboutPipelineBody": "Auto-organize runs after chats: decide whether anything is worth remembering, extract candidates, dedupe and merge, then distill identity items into the user profile when needed. You can also tap Organize on the assistant Memory tab. That is why the processing model is called often.",
   "memoryAboutCacheTitle": "Keep caching healthy",
@@ -3340,9 +3340,9 @@
   "memorySettingsThinkingSubtitle": "Allow the memory model to use reasoning when supported",
   "memorySettingsInjectionSection": "Memory injection",
   "memorySettingsInjectionMaxItemsTitle": "Items injected per type",
-  "memorySettingsInjectionMaxItemsSubtitle": "This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.",
-  "memorySettingsFullInjectionTypesTitle": "Always inject these types",
-  "memorySettingsFullInjectionTypesSubtitle": "Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.",
+  "memorySettingsInjectionMaxItemsSubtitle": "This limit applies to types not selected for full injection in the assistant’s memory settings. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.",
+  "assistantEditMemoryFullInjectionTypesTitle": "Always inject these types",
+  "assistantEditMemoryFullInjectionTypesSubtitle": "Applies only to this assistant. Select types to inject all their active global and assistant memories, ignoring the item limit. Uses more context and tokens.",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {

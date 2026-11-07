@@ -33,6 +33,7 @@ final _source = Assistant(
   chatModelId: 'model',
   temperature: 0.4,
   enableMemory: true,
+  memoryFullInjectionTypes: {MemoryType.voice, MemoryType.instruction},
   searchEnabled: true,
   mcpServerIds: ['mcp'],
   allowConversationMcp: true,

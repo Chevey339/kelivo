@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'assistant_regex.dart';
 import 'health_data_type.dart';
+import 'memory_entry.dart';
 import 'preset_message.dart';
 import 'reasoning_request.dart';
 
@@ -84,6 +85,7 @@ class Assistant {
   final List<Map<String, String>> customBody; // [{key:'foo', value:'{"a":1}'}]
   // Memory features (§4.1)
   final bool enableMemory;
+  final Set<MemoryType> memoryFullInjectionTypes;
   final bool autoOrganizeMemory;
   final int memoryOrganizeEveryNTurns;
   final MemorySmartAddMode memorySmartAddMode;
@@ -136,6 +138,7 @@ class Assistant {
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
+    this.memoryFullInjectionTypes = const {},
     this.autoOrganizeMemory = false,
     this.memoryOrganizeEveryNTurns = defaultMemoryOrganizeEveryNTurns,
     this.memorySmartAddMode = MemorySmartAddMode.batched,
@@ -185,6 +188,7 @@ class Assistant {
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? enableMemory,
+    Set<MemoryType>? memoryFullInjectionTypes,
     bool? autoOrganizeMemory,
     int? memoryOrganizeEveryNTurns,
     MemorySmartAddMode? memorySmartAddMode,
@@ -264,6 +268,9 @@ class Assistant {
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
       enableMemory: enableMemory ?? this.enableMemory,
+      memoryFullInjectionTypes: Set<MemoryType>.unmodifiable(
+        memoryFullInjectionTypes ?? this.memoryFullInjectionTypes,
+      ),
       autoOrganizeMemory: autoOrganizeMemory ?? this.autoOrganizeMemory,
       memoryOrganizeEveryNTurns:
           memoryOrganizeEveryNTurns ?? this.memoryOrganizeEveryNTurns,
@@ -319,6 +326,10 @@ class Assistant {
     'customHeaders': customHeaders,
     'customBody': customBody,
     'enableMemory': enableMemory,
+    'memoryFullInjectionTypes': MemoryType.values
+        .where(memoryFullInjectionTypes.contains)
+        .map(MemoryEntry.typeToString)
+        .toList(),
     'autoOrganizeMemory': autoOrganizeMemory,
     'memoryOrganizeEveryNTurns': memoryOrganizeEveryNTurns,
     'memorySmartAddMode': memorySmartAddModeToString(memorySmartAddMode),
@@ -431,6 +442,15 @@ class Assistant {
       return const <Map<String, String>>[];
     })(),
     enableMemory: json['enableMemory'] as bool? ?? false,
+    memoryFullInjectionTypes: Set<MemoryType>.unmodifiable(
+      MemoryType.values.where(
+        (type) =>
+            (json['memoryFullInjectionTypes'] as List?)?.contains(
+              MemoryEntry.typeToString(type),
+            ) ??
+            false,
+      ),
+    ),
     autoOrganizeMemory: json['autoOrganizeMemory'] as bool? ?? false,
     memoryOrganizeEveryNTurns: (() {
       final raw = (json['memoryOrganizeEveryNTurns'] as num?)?.toInt();

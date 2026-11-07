@@ -2713,7 +2713,7 @@
   "memoryAboutScopeTitle": "全局与助手范围",
   "memoryAboutScopeBody": "全局记忆会对所有助手注入。助手范围的记忆只对该助手可见。跨助手都该知道的事实用全局；只属于某一个助手的规则或上下文用助手范围。",
   "memoryAboutInjectionTitle": "记忆如何注入",
-  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。",
+  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。 可在各助手的记忆设置中选择需要全量注入的类型。",
   "memoryAboutPipelineTitle": "后台整理",
   "memoryAboutPipelineBody": "开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。",
   "memoryAboutCacheTitle": "保持缓存良好",
@@ -2725,9 +2725,9 @@
   "memorySettingsThinkingSubtitle": "在模型支持时允许记忆模型使用推理",
   "memorySettingsInjectionSection": "记忆注入",
   "memorySettingsInjectionMaxItemsTitle": "每类注入条数",
-  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
-  "memorySettingsFullInjectionTypesTitle": "全量注入类型",
-  "memorySettingsFullInjectionTypesSubtitle": "可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
+  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未在助手记忆设置中选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "assistantEditMemoryFullInjectionTypesTitle": "全量注入类型",
+  "assistantEditMemoryFullInjectionTypesSubtitle": "仅对当前助手生效，可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {

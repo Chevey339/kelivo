@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
@@ -125,12 +126,16 @@ Widget _buildHarness({
   required MemoryProviderV2 memoryV2,
   required MemoryPipelineService pipeline,
   required Widget child,
+  SettingsProvider? settings,
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(assistantProvider.preferences),
-      ),
+      if (settings != null)
+        ChangeNotifierProvider.value(value: settings)
+      else
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(assistantProvider.preferences),
+        ),
       ChangeNotifierProvider.value(value: assistantProvider),
       ChangeNotifierProvider.value(value: chatService),
       ChangeNotifierProvider(
@@ -184,6 +189,123 @@ Future<void> _tapSwitchNearLabel(WidgetTester tester, String label) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'full injection choices belong to the edited assistant (desktop=$desktop)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = desktop
+            ? TargetPlatform.macOS
+            : TargetPlatform.iOS;
+        try {
+          tester.view.physicalSize = desktop
+              ? const Size(1100, 900)
+              : const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
+          final settings = SettingsProvider(ap.preferences);
+          addTearDown(settings.dispose);
+          await settings.loaded;
+          // Start on the tab under test, without laying out basic settings.
+          await settings.setMobileAssistantEditTabOrder(['memory']);
+          final otherId = await ap.addAssistant(name: 'Other');
+          for (final id in [_assistantId, otherId]) {
+            await ap.updateAssistant(
+              ap.getById(id)!.copyWith(enableMemory: true),
+            );
+          }
+
+          Future<void> openAssistant(String id) async {
+            await tester.pumpWidget(
+              _buildHarness(
+                assistantProvider: ap,
+                chatService: chat,
+                memoryV2: memoryV2,
+                pipeline: pipeline,
+                settings: settings,
+                child: AssistantSettingsEditPage(
+                  key: ValueKey(id),
+                  assistantId: id,
+                ),
+              ),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 350));
+            expect(
+              find.text('Use long-term memory').hitTestable(),
+              findsOneWidget,
+            );
+          }
+
+          await openAssistant(_assistantId);
+          final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+          final voice = find.widgetWithText(
+            MemorySelectChip,
+            l10n.memoryEntryTypeVoice,
+          );
+          final instruction = find.widgetWithText(
+            MemorySelectChip,
+            l10n.memoryEntryTypeInstruction,
+          );
+          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
+          for (final chip in [voice, instruction]) {
+            await tester.ensureVisible(chip);
+            await tester.tap(chip);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 350));
+          }
+          expect(ap.getById(_assistantId)!.memoryFullInjectionTypes, {
+            MemoryType.voice,
+            MemoryType.instruction,
+          });
+          expect(ap.getById(otherId)!.memoryFullInjectionTypes, isEmpty);
+
+          await openAssistant(otherId);
+          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
+          expect(
+            tester.widget<MemorySelectChip>(instruction).selected,
+            isFalse,
+          );
+          await tester.ensureVisible(voice);
+          await tester.tap(voice);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 350));
+          expect(ap.getById(otherId)!.memoryFullInjectionTypes, {
+            MemoryType.voice,
+          });
+
+          await openAssistant(_assistantId);
+          expect(tester.widget<MemorySelectChip>(voice).selected, isTrue);
+          expect(tester.widget<MemorySelectChip>(instruction).selected, isTrue);
+          for (final chip in [voice, instruction]) {
+            await tester.ensureVisible(chip);
+            await tester.tap(chip);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 350));
+          }
+          await ap.preferences.flushPendingWrites();
+          final saved = Assistant.decodeList(
+            ap.preferences.getString('assistants_v1')!,
+          );
+          expect(
+            saved
+                .firstWhere((a) => a.id == _assistantId)
+                .memoryFullInjectionTypes,
+            isEmpty,
+          );
+          expect(
+            saved.firstWhere((a) => a.id == otherId).memoryFullInjectionTypes,
+            {MemoryType.voice},
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
 
   testWidgets('memory tab switches persist and reveal nested rows', (
     tester,

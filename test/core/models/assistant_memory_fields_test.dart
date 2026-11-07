@@ -1,12 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/memory_entry.dart';
 
 void main() {
   group('Assistant memory fields (§4.1)', () {
     test('defaults match the design doc', () {
       const a = Assistant(id: 'a', name: 'A');
       expect(a.enableMemory, isFalse);
+      expect(a.memoryFullInjectionTypes, isEmpty);
       expect(a.autoOrganizeMemory, isFalse);
       expect(a.memoryOrganizeEveryNTurns, 1);
       expect(a.memorySmartAddMode, MemorySmartAddMode.batched);
@@ -15,6 +17,60 @@ void main() {
       expect(a.generateConversationSummary, isFalse);
       expect(a.appendCurrentTimeToUserMessage, isFalse);
       expect(a.useIso8601TimeFormat, isFalse);
+    });
+
+    test('full injection selection survives serialization and copies', () {
+      final selected = {MemoryType.instruction, MemoryType.voice};
+      const original = Assistant(id: 'a', name: 'A');
+      final updated = original.copyWith(memoryFullInjectionTypes: selected);
+      selected.clear();
+      expect(original.memoryFullInjectionTypes, isEmpty);
+      expect(updated.toJson()['memoryFullInjectionTypes'], [
+        'voice',
+        'instruction',
+      ]);
+      final restored = Assistant.decodeList(
+        Assistant.encodeList([updated]),
+      ).single;
+      final copy = restored.copyWith(id: 'b');
+      expect(copy.memoryFullInjectionTypes, updated.memoryFullInjectionTypes);
+      expect(
+        () => copy.memoryFullInjectionTypes.clear(),
+        throwsUnsupportedError,
+      );
+      expect(
+        copy.copyWith(memoryFullInjectionTypes: {}).memoryFullInjectionTypes,
+        isEmpty,
+      );
+      expect(restored.memoryFullInjectionTypes, {
+        MemoryType.voice,
+        MemoryType.instruction,
+      });
+    });
+
+    test('full injection defaults empty and ignores unknown types', () {
+      expect(
+        Assistant.fromJson({'id': 'a', 'name': 'A'}).memoryFullInjectionTypes,
+        isEmpty,
+      );
+      final assistant = Assistant.fromJson({
+        'id': 'a',
+        'name': 'A',
+        'memoryFullInjectionTypes': [
+          'instruction',
+          'unknown',
+          'voice',
+          'voice',
+        ],
+      });
+      expect(assistant.memoryFullInjectionTypes.toList(), [
+        MemoryType.voice,
+        MemoryType.instruction,
+      ]);
+      expect(
+        () => assistant.memoryFullInjectionTypes.clear(),
+        throwsUnsupportedError,
+      );
     });
 
     test('time format defaults off and survives serialization and copies', () {

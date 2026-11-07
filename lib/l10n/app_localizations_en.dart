@@ -7705,7 +7705,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memoryAboutInjectionBody =>
-      'At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost.';
+      'At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost. In each assistant’s memory settings, select types to always inject in full.';
 
   @override
   String get memoryAboutPipelineTitle => 'Background pipeline';
@@ -7747,15 +7747,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+      'This limit applies to types not selected for full injection in the assistant’s memory settings. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
 
   @override
-  String get memorySettingsFullInjectionTypesTitle =>
+  String get assistantEditMemoryFullInjectionTypesTitle =>
       'Always inject these types';
 
   @override
-  String get memorySettingsFullInjectionTypesSubtitle =>
-      'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.';
+  String get assistantEditMemoryFullInjectionTypesSubtitle =>
+      'Applies only to this assistant. Select types to inject all their active global and assistant memories, ignoring the item limit. Uses more context and tokens.';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {

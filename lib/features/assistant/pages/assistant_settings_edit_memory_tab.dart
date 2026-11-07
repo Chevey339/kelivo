@@ -221,6 +221,8 @@ class _MemoryTabState extends State<_MemoryTab> {
                     ? Column(
                         children: [
                           _iosDivider(context),
+                          _MemoryFullInjectionTypesSection(assistant: a),
+                          _iosDivider(context),
                           _iosSwitchRow(
                             context,
                             icon: Lucide.Sparkles,
@@ -1016,6 +1018,60 @@ Widget _memoryDesktopSelectRow<T>({
       ],
     ),
   );
+}
+
+class _MemoryFullInjectionTypesSection extends StatelessWidget {
+  const _MemoryFullInjectionTypesSection({required this.assistant});
+
+  final Assistant assistant;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.assistantEditMemoryFullInjectionTypesTitle,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              TipIcon(
+                message: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final type in MemoryType.values)
+                MemorySelectChip(
+                  label: memoryTypeLabel(l10n, type),
+                  selected: assistant.memoryFullInjectionTypes.contains(type),
+                  onTap: () async {
+                    final provider = context.read<AssistantProvider>();
+                    final current = provider.getById(assistant.id);
+                    if (current == null) return;
+                    final types = current.memoryFullInjectionTypes.toSet();
+                    if (!types.remove(type)) types.add(type);
+                    await provider.updateAssistant(
+                      current.copyWith(memoryFullInjectionTypes: types),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MemoryOrganizeFrequencySection extends StatelessWidget {
