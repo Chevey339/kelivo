@@ -512,7 +512,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sponsorPageAfdianTitle => '爱发电';
 
   @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
+  String get sponsorPageAfdianSubtitle => 'ifdian.net/a/kelivo';
 
   @override
   String get sponsorPageWeChatTitle => '微信赞助';
@@ -16233,7 +16233,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sponsorPageAfdianTitle => '爱发电';
 
   @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
+  String get sponsorPageAfdianSubtitle => 'ifdian.net/a/kelivo';
 
   @override
   String get sponsorPageWeChatTitle => '微信赞助';
@@ -31810,7 +31810,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sponsorPageAfdianTitle => '愛發電';
 
   @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
+  String get sponsorPageAfdianSubtitle => 'ifdian.net/a/kelivo';
 
   @override
   String get sponsorPageWeChatTitle => '微信贊助';
