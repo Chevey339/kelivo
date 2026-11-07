@@ -14,6 +14,7 @@ import '../model_spec/model_spec_resolver.dart';
 import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
+import 'codex_turn_state.dart';
 import 'claude_oauth_request.dart';
 import 'oauth_cancellation.dart';
 import 'provider_oauth_adapter.dart';
@@ -512,8 +513,13 @@ class ProviderOAuthService extends ChangeNotifier {
     }
   }
 
-  http.Client authenticatedClient(http.Client client, ProviderConfig config) =>
-      config.isOAuth ? _ProviderOAuthHttpClient(client, config, this) : client;
+  http.Client authenticatedClient(
+    http.Client client,
+    ProviderConfig config, {
+    CodexTurnState? codexTurnState,
+  }) => config.isOAuth
+      ? _ProviderOAuthHttpClient(client, config, this, codexTurnState)
+      : client;
 }
 
 const _deletedOAuthThinkingKeys = {
@@ -739,12 +745,18 @@ class _OAuthModelSpec extends ModelSpec {
 /// Attaches current credentials and enforces each subscription wire contract
 /// after custom request overrides, for initial requests and tool follow-ups.
 class _ProviderOAuthHttpClient extends http.BaseClient {
-  _ProviderOAuthHttpClient(this.inner, this.config, this.service)
-    : _sessionId = config.oauthCredentials?.sessionId;
+  _ProviderOAuthHttpClient(
+    this.inner,
+    this.config,
+    this.service,
+    CodexTurnState? codexTurnState,
+  ) : _sessionId = config.oauthCredentials?.sessionId,
+      _codexTurnState = codexTurnState ?? CodexTurnState();
   final http.Client inner;
   ProviderConfig config;
   final ProviderOAuthService service;
   final String? _sessionId;
+  final CodexTurnState _codexTurnState;
   final String _claudeConversationId = const Uuid().v4();
 
   void _checkSession() {
@@ -801,6 +813,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
         result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
+      if (config.oauthProvider == OAuthProvider.chatgpt) {
+        _codexTurnState.apply(result.headers, config);
+      }
       if (isClaude) {
         result.headers.remove('x-api-key');
         setClaudeOAuthHeader(
@@ -882,7 +897,13 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     var retriedClaudeVersion = false;
     while (true) {
       final requestVersion = claudeCodeVersion;
+      final requestConfig = config;
       final response = await inner.send(build());
+      if (requestConfig.oauthProvider == OAuthProvider.chatgpt &&
+          response.statusCode >= 200 &&
+          response.statusCode < 300) {
+        _codexTurnState.capture(response.headers, requestConfig);
+      }
       if (response.statusCode == 401) {
         await response.stream.drain<void>();
         _checkSession();

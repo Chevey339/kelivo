@@ -7,6 +7,7 @@ import '../../models/compress_context_options.dart' show isContextLengthError;
 import 'request_history_context.dart';
 import 'request_image_context.dart';
 import '../auth/provider_oauth_service.dart';
+import '../auth/codex_turn_state.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:dio/dio.dart';
@@ -371,6 +372,9 @@ class ChatApiService {
         conversationId: conversationId,
         extraHeaders: extraHeaders,
       );
+      final codexTurnState = config.oauthProvider == OAuthProvider.chatgpt
+          ? CodexTurnState()
+          : null;
       final kind = ProviderConfig.classify(
         config.id,
         explicitType: config.providerType,
@@ -491,6 +495,7 @@ class ChatApiService {
               useOpenAIImagesApi: useOpenAIImagesApi,
               useZhipuLayoutParsing: useZhipuLayoutParsing,
               sessionToken: sessionToken,
+              codexTurnState: codexTurnState,
               retryRound: retryRound,
             ),
           ),
@@ -561,6 +566,7 @@ class ChatApiService {
     required bool useOpenAIImagesApi,
     required bool useZhipuLayoutParsing,
     required CancelToken sessionToken,
+    required CodexTurnState? codexTurnState,
     required StreamRoundRunner retryRound,
   }) async* {
     if (sessionToken.isCancelled) {
@@ -573,6 +579,7 @@ class ChatApiService {
         providerHttpClient(config, cancelToken: cancelToken),
       ),
       config,
+      codexTurnState: codexTurnState,
     );
     try {
       if (useZhipuLayoutParsing) {

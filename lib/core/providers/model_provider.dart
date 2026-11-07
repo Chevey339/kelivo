@@ -9,6 +9,8 @@ import 'settings_provider.dart';
 import '../services/network/provider_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
+import '../services/api/chat_api_helpers.dart' show throwIfInBandStreamError;
+import '../services/api/stream/sse_framing.dart';
 import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
@@ -306,6 +308,41 @@ class ProviderManager {
     );
   }
 
+  static void _validateResponsesStream(String body) {
+    final parser = SseEventParser();
+    var completed = false;
+    for (final event in [...parser.add(body), ...parser.close()]) {
+      final data = event.data.trim();
+      if (data.isEmpty || data == '[DONE]') continue;
+      throwIfInBandStreamError(data);
+      final dynamic payload;
+      try {
+        payload = jsonDecode(data);
+      } on FormatException {
+        throw HttpException('Invalid Responses stream event');
+      }
+      if (payload is! Map) {
+        throw HttpException('Invalid Responses stream event');
+      }
+      final type = payload['type'] ?? event.event;
+      // Some SSE servers put the type only in the event field.
+      if (payload['type'] == null && type != null) {
+        throwIfInBandStreamError(jsonEncode({...payload, 'type': type}));
+      }
+      if (type == 'response.completed') {
+        final response = payload['response'];
+        if (response is! Map || response['status'] != 'completed') {
+          throw HttpException('Response did not complete successfully');
+        }
+        throwIfInBandStreamError(jsonEncode(response));
+        completed = true;
+      }
+    }
+    if (!completed) {
+      throw HttpException('Stream ended without a completed response');
+    }
+  }
+
   static Future<void> testConnection(
     ProviderConfig cfg,
     String modelId, {
@@ -387,7 +424,9 @@ class ProviderManager {
           );
         }
         // For streaming, verify the response contains SSE data
-        if (useStream) {
+        if (useStream && cfg.useResponseApi == true) {
+          _validateResponsesStream(res.body);
+        } else if (useStream) {
           final contentType = res.headers['content-type'] ?? '';
           if (!contentType.contains('text/event-stream') && res.body.isEmpty) {
             throw HttpException('Stream response expected but not received');
