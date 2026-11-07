@@ -61,6 +61,7 @@ class BrandAssets {
         MapEntry(RegExp(r'kelivo'), 'kelivo.png'),
         MapEntry(RegExp(r'tensdaq'), 'tensdaq-color.svg'),
         MapEntry(RegExp(r'marucode|muteki'), 'marucode.png'),
+        MapEntry(RegExp(r'sta1n'), 'sta1n.png'),
         MapEntry(RegExp(r'iflow|心流'), 'iflow-color.svg'),
         MapEntry(RegExp(r'bing|必应'), 'bing-color.svg'),
         MapEntry(RegExp(r'tavily'), 'tavily-color.svg'),
@@ -266,6 +267,11 @@ class BrandAssets {
       id: 'marucode',
       label: 'MaruCode',
       asset: 'assets/icons/marucode.png',
+    ),
+    BrandIconOption(
+      id: 'sta1n',
+      label: 'STA1N API',
+      asset: 'assets/icons/sta1n.png',
     ),
     BrandIconOption(
       id: 'longcat',

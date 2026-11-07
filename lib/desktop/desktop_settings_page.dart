@@ -9,6 +9,7 @@ import '../features/provider/utils/provider_url_editor.dart';
 import '../features/provider/widgets/provider_input_row.dart';
 import '../features/provider/widgets/provider_base_url_field.dart';
 import '../features/provider/widgets/provider_icon_picker.dart';
+import '../features/provider/widgets/provider_sponsor_card.dart';
 import 'macos_window_drag_area.dart';
 import '../features/provider/widgets/oauth_connection_info.dart';
 import '../features/provider/widgets/oauth_model_switch.dart';

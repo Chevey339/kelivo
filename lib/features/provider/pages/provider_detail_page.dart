@@ -5,6 +5,7 @@ import '../utils/provider_url_editor.dart';
 import '../widgets/provider_input_row.dart';
 import '../widgets/provider_base_url_field.dart';
 import '../widgets/provider_icon_picker.dart';
+import '../widgets/provider_sponsor_card.dart';
 import '../widgets/avatar_input_dialog.dart';
 import '../../../core/models/avatar_config.dart';
 import '../widgets/prompt_cache_ttl_control.dart';
@@ -153,6 +154,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       const fixed = {
         'KelivoIN',
         'OpenAI',
+        'STA1N API',
         'Gemini',
         'SiliconFlow',
         'OpenRouter',
@@ -162,6 +164,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'AIhubmix',
         '随想AI中转站',
         'MaruCode',
+        '砂糖酒馆',
         'Aliyun',
         'Zhipu AI',
         'Claude',
@@ -744,6 +747,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
           const SizedBox(height: 12),
         ],
+        ProviderSponsorCard(providerKey: widget.keyName),
         // 顶部管理分组标题（左侧缩进以对齐卡片内容）
         Padding(
           padding: const EdgeInsets.only(left: 12),

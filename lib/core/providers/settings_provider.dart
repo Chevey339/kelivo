@@ -88,16 +88,18 @@ class SettingsProvider extends ChangeNotifier {
   static const String providerUngroupedGroupKey = '__ungrouped__';
   static const List<String> _builtInProviderKeysInOrder = [
     'OpenAI',
-    'SiliconFlow',
     'Gemini',
+    'STA1N API',
     'OpenRouter',
-    'Vercel',
     'KelivoIN',
-    'Tensdaq',
     'DeepSeek',
+    'SiliconFlow',
     'AIhubmix',
     '随想AI中转站',
     'MaruCode',
+    '砂糖酒馆',
+    'Vercel',
+    'Tensdaq',
     'Aliyun',
     'Zhipu AI',
     'Claude',
@@ -6725,10 +6727,12 @@ class ProviderConfig {
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('vercel')) return 'https://ai-gateway.vercel.sh/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
+    if (k.contains('sta1n')) return 'https://sta1n.ai/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
     if (k.contains('marucode') || k.contains('muteki')) {
       return 'https://api.muteki.site/v1';
     }
+    if (k.contains('砂糖酒馆')) return 'https://ai.ota1245.top/v1';
     if (RegExp(r'qwen|aliyun|dashscope').hasMatch(k)) {
       return 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     }
