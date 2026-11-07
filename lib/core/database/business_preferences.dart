@@ -110,7 +110,7 @@ final class BusinessPreferences {
 
   int? getInt(String key) => _values[key] as int?;
 
-  double? getDouble(String key) => _values[key] as double?;
+  double? getDouble(String key) => (_values[key] as num?)?.toDouble();
 
   String? getString(String key) => _values[key] as String?;
 
