@@ -7034,15 +7034,31 @@ class _ModelRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(displayName, style: TextStyle(fontSize: 13.5)),
-                  if (!isSelectionMode) ...[
-                    const SizedBox(height: 4),
-                    ModelCapsulesRow(model: info),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        style: TextStyle(fontSize: 13.5),
+                      ),
+                    ),
+                    if (!isSelectionMode) ...[
+                      const SizedBox(width: 8),
+                      ConstrainedBox(
+                        // Leave room for the full name while capabilities wrap
+                        // within the trailing half on narrower panes.
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth / 2,
+                        ),
+                        child: ModelCapsulesRow(
+                          model: info,
+                          alignment: WrapAlignment.end,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             const SizedBox(width: 8),

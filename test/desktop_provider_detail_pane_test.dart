@@ -7,7 +7,9 @@ import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/model_tag_wrap.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +42,8 @@ ProviderConfig _providerConfig(String id) {
 Widget _harness(
   SettingsProvider settings, {
   required String initialProviderKey,
+  TextScaler textScaler = TextScaler.noScaling,
+  Widget? body,
 }) {
   return MultiProvider(
     providers: [
@@ -50,10 +54,15 @@ Widget _harness(
       ),
     ],
     child: MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        body: DesktopSettingsPage(initialProviderKey: initialProviderKey),
+        body:
+            body ?? DesktopSettingsPage(initialProviderKey: initialProviderKey),
       ),
     ),
   );
@@ -71,14 +80,24 @@ Future<SettingsProvider> _buildSettings(WidgetTester tester) async {
 
 Future<void> _pumpProviderSettings(
   WidgetTester tester,
-  SettingsProvider settings,
-) async {
-  tester.view.physicalSize = const Size(1400, 900);
+  SettingsProvider settings, {
+  double width = 1400,
+  TextScaler textScaler = TextScaler.noScaling,
+  Widget? body,
+}) async {
+  tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  await tester.pumpWidget(_harness(settings, initialProviderKey: 'ProviderA'));
+  await tester.pumpWidget(
+    _harness(
+      settings,
+      initialProviderKey: 'ProviderA',
+      textScaler: textScaler,
+      body: body,
+    ),
+  );
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 }
@@ -380,6 +399,126 @@ void main() {
       {'key': 'desktop', 'value': 'true'},
     ]);
   });
+
+  for (final (width, textScale, oauth) in const [
+    (1400.0, 1.0, false),
+    (360.0, 1.0, false),
+    (1400.0, 2.0, false),
+    (760.0, 1.0, true),
+    (360.0, 1.0, true),
+  ]) {
+    testWidgets(
+      'desktop provider model rows retain full names and working actions '
+      '(width=$width, textScale=$textScale, oauth=$oauth)',
+      (tester) async {
+        final settings = await _buildSettings(tester);
+        addTearDown(settings.dispose);
+        const modelId = 'long-model';
+        const name =
+            'vendor/long-context-multimodal-reasoning-extended-thinking-'
+            'instruct-preview-128k-2026-11-04-experimental';
+        await settings.setProviderConfig(
+          'ProviderA',
+          _providerConfig('ProviderA').copyWith(
+            oauthProvider: oauth ? OAuthProvider.chatgpt : null,
+            models: const [modelId],
+            modelOverrides: const {
+              modelId: {
+                'name': name,
+                'input': ['text', 'image', 'audio', 'video', 'pdf'],
+                'output': ['text', 'image'],
+                'abilities': ['tool', 'reasoning'],
+                'contextWindow': 1000000,
+              },
+            },
+          ),
+        );
+        await _pumpProviderSettings(
+          tester,
+          settings,
+          width: width,
+          textScaler: TextScaler.linear(textScale),
+          body: oauth
+              ? const DesktopProviderDetailPane(
+                  providerKey: 'ProviderA',
+                  displayName: 'ProviderA',
+                )
+              : null,
+        );
+        await tester.pumpAndSettle();
+
+        void expectFullName() {
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.text(name),
+              matching: find.byType(RichText),
+            ),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.takeException(), isNull);
+        }
+
+        expectFullName();
+        final capabilities = find.byType(ModelCapsulesRow);
+        expect(capabilities, findsOneWidget);
+        expect(
+          find.descendant(of: capabilities, matching: find.byType(Tooltip)),
+          findsNWidgets(8),
+        );
+        expect(find.text('1M'), findsOneWidget);
+
+        final edit = find.byKey(
+          const ValueKey('desktop-provider-model-settings-$modelId'),
+        );
+        await tester.ensureVisible(edit);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final dialog = find.byKey(const ValueKey('model-spec-edit-dialog'));
+        expect(dialog, findsOneWidget);
+        Navigator.of(tester.element(dialog)).pop();
+        await tester.pumpAndSettle();
+
+        if (oauth) {
+          final toggle = find.byKey(
+            const ValueKey('oauth-model-enabled-$modelId'),
+          );
+          await tester.ensureVisible(toggle);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+            settings.getProviderConfig('ProviderA').isModelEnabled(modelId),
+            isFalse,
+          );
+          expect(
+            settings.getProviderConfig('ProviderA').models,
+            contains(modelId),
+          );
+          expectFullName();
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+            settings.getProviderConfig('ProviderA').isModelEnabled(modelId),
+            isTrue,
+          );
+        } else {
+          final multiSelect = find.byTooltip('Multi-select').first;
+          await tester.ensureVisible(multiSelect);
+          await tester.tap(multiSelect);
+          await tester.pumpAndSettle();
+          expectFullName();
+          expect(capabilities, findsNothing);
+          await tester.ensureVisible(find.text(name));
+          await tester.tap(find.text(name));
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<IosCheckbox>(find.byType(IosCheckbox).last).value,
+            isTrue,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'desktop provider model rows pin action icons to a shared right edge',
