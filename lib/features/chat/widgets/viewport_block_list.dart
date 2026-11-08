@@ -78,15 +78,17 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       _textScale = scale;
       _width = null;
     }
-    final storage = PageStorage.maybeOf(context);
-    if (!identical(storage, _storage)) {
-      _storage = storage;
-      _storedExtents = _readStoredExtents();
-      _extents.clear();
-      _measurements.clear();
-    }
-    _storedExtents ??= _readStoredExtents();
+    _syncStorage();
     _scheduleRefresh();
+  }
+
+  void _syncStorage({bool storageIdChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (!storageIdChanged && identical(storage, _storage)) return;
+    _storage = storage;
+    _storedExtents = _readStoredExtents();
+    _extents.clear();
+    _measurements.clear();
   }
 
   /// Extents outlive this state in the enclosing [PageStorage], so a rebuilt
@@ -133,11 +135,10 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   @override
   void didUpdateWidget(ViewportBlockList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.storageId != widget.storageId) {
-      _storedExtents = _readStoredExtents();
-      _extents.clear();
-      _measurements.clear();
-    }
+    // PageStorage is not inherited: replacing its bucket does not trigger
+    // didChangeDependencies. Switch caches before pruning or measuring a new
+    // message version, even when it keeps the same storageId.
+    _syncStorage(storageIdChanged: oldWidget.storageId != widget.storageId);
     if (oldWidget.structureToken != widget.structureToken) {
       _preserveReadingAnchor(oldWidget);
       // A changed shape may insert/reorder blocks. Transfer only measured

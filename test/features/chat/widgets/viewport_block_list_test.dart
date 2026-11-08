@@ -351,6 +351,92 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final changeStorageId in [false, true]) {
+    testWidgets(
+      changeStorageId
+          ? 'changing bucket and storage id preserves each version after recycling'
+          : 'changing only the bucket preserves each version after recycling',
+      (tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+        final buckets = [PageStorageBucket(), PageStorageBucket()];
+        var version = 0;
+        var generation = 0;
+
+        Widget host() {
+          final message = version;
+          return MaterialApp(
+            home: Scaffold(
+              body: PageStorage(
+                bucket: buckets[message],
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 600,
+                    child: SingleChildScrollView(
+                      controller: controller,
+                      child: ViewportBlockList(
+                        key: ValueKey(generation),
+                        storageId: changeStorageId ? 'body-$message' : 'body',
+                        itemCount: 100,
+                        structureToken: message,
+                        itemKey: (i) => (message, i),
+                        estimateExtent: (i, width) => 40,
+                        itemBuilder: (context, i) => SizedBox(
+                          key: ValueKey('version-$message-item-$i'),
+                          height: message == 0 ? 100 : 130,
+                          child: Text('version-$message-item-$i'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        await _visitOffset(tester, controller, 5025);
+        final firstExtent = controller.position.maxScrollExtent;
+        final state = tester.state(find.byType(ViewportBlockList));
+
+        controller.jumpTo(0);
+        version = 1;
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        expect(tester.state(find.byType(ViewportBlockList)), same(state));
+        await _visitOffset(tester, controller, 6525);
+        final secondExtent = controller.position.maxScrollExtent;
+        final readingItem = find.byKey(const ValueKey('version-1-item-50'));
+        expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+        // Recycle the new version while keeping its bucket and scroll offset.
+        generation++;
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        expect(controller.offset, closeTo(6525, .5));
+        expect(controller.position.maxScrollExtent, closeTo(secondExtent, .5));
+        expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+
+        // Measurements from the second version must not replace the first's.
+        controller.jumpTo(0);
+        version = 0;
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+        expect(controller.position.maxScrollExtent, closeTo(firstExtent, .5));
+        controller.jumpTo(5025);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('version-0-item-50'))).dy,
+          closeTo(-25, .5),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('resize yields to the outer controller following the bottom', (
     tester,
   ) async {
