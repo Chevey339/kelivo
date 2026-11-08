@@ -70,6 +70,11 @@ class BrowserFailure implements Exception {
         'Ask the user to enable browser control.',
         recoverable: false,
       ),
+      'browser_settings_updating' => const BrowserFailure(
+        'browser_settings_updating',
+        'Browser settings are being applied.',
+        'Wait for the settings update to finish, then inspect the page before continuing.',
+      ),
       'browser_human_control' => const BrowserFailure(
         'browser_human_control',
         'The user has taken control of the browser.',

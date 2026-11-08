@@ -1504,7 +1504,7 @@ class BrowserPageViewState extends State<BrowserPage>
     if (activity == BrowserAgentActivity.idle) return null;
     return BrowserAgentStatusChip(
       activity: activity,
-      pauseReason: _service.agentPauseReason,
+      pauseReason: _service.agentPauseFor(_visibleConversationId)?.reason,
       onPause: () => _service.takeOver(
         sessionId: _visibleConversationId,
         tabId: _service.activeTabId,
@@ -2454,7 +2454,7 @@ class BrowserPageViewState extends State<BrowserPage>
             value: _BrowserMenu.agent,
             group: BrowserMenuGroup.application,
             icon: LucideIcons.hand,
-            label: _service.agentPaused
+            label: _service.agentPauseFor(_visibleConversationId) != null
                 ? l.browserAllowAgent
                 : l.browserTakeOver,
           ),
@@ -2537,7 +2537,7 @@ class BrowserPageViewState extends State<BrowserPage>
           });
         }
       case _BrowserMenu.agent:
-        if (_service.agentPaused) {
+        if (_service.agentPauseFor(_visibleConversationId) != null) {
           _service.allowAgentControl(sessionId: _visibleConversationId);
         } else {
           _service.takeOver(

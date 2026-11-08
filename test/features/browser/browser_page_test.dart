@@ -1894,6 +1894,7 @@ void main() {
       );
       await mount(tester, conversationId: 'chat-a');
       await service.selectTab(other.id);
+      service.takeOver(sessionId: 'chat-a');
       final pending = Completer<void>();
       final action = service.runAgentAction<void>(
         sessionId: 'chat-b',
@@ -1908,12 +1909,22 @@ void main() {
       try {
         await tester.pumpAndSettle();
         expect(find.text('AI is working'), findsOneWidget);
+        await tester.tap(find.byTooltip('More').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Allow to continue'), findsNothing);
+        await tester.tapAt(const Offset(8, 80));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Take over'));
         await tester.pumpAndSettle();
-        expect(service.pausedAgentSessionId, 'chat-b');
+        expect(service.agentPauseFor('chat-b'), isNotNull);
         expect(find.text('AI actions paused'), findsOneWidget);
         pending.complete();
         expect(await outcome, isA<StateError>());
+        await tester.tap(find.text('Allow to continue'));
+        await tester.pumpAndSettle();
+        expect(service.agentPauseFor('chat-b'), isNull);
+        expect(service.agentPauseFor('chat-a'), isNotNull);
+        expect(find.text('AI actions paused'), findsNothing);
       } finally {
         if (!pending.isCompleted) pending.complete();
       }
