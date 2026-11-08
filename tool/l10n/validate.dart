@@ -1,5 +1,5 @@
-// Run with the installed Flutter SDK's flutter_tools package configuration.
-// Using its parser keeps validation aligned with the project's gen-l10n dialect.
+// This package declares flutter_tools as an SDK dependency so the IDE and CLI
+// use the same parser and package resolution as the installed Flutter SDK.
 import 'dart:convert';
 import 'dart:io';
 

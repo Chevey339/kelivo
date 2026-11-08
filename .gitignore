@@ -52,6 +52,7 @@ pubspec.lock
 # Commit lockfiles for the packages checked by CI.
 !/pubspec.lock
 !/dependencies/markstream/pubspec.lock
+!/tool/l10n/pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc
 /linux/flutter/generated_plugin_registrant.h

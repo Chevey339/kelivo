@@ -15,12 +15,13 @@ Kelivo is a cross-platform LLM chat client built with Flutter, targeting iOS, An
 ## Pre-commit checklist
 
 Format changed Dart files with `dart format`, including files under `lib/`,
-`test/`, `integration_test/`, `dependencies/markstream/lib/`, and
+`test/`, `integration_test/`, `tool/`, `dependencies/markstream/lib/`, and
 `dependencies/markstream/test/`. For code changes, run static analysis before
 committing:
 
 ```bash
-dart analyze --fatal-infos lib test integration_test
+flutter pub get --directory tool/l10n --enforce-lockfile
+dart analyze --fatal-infos lib test integration_test tool
 (cd dependencies/markstream && flutter pub get && dart analyze --fatal-infos)
 ```
 

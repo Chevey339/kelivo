@@ -9,10 +9,19 @@ this description together with the source text.
 Run from the repository root, with Python 3 and the project's Flutter SDK on PATH:
 
 ```sh
+flutter pub get --directory tool/l10n --enforce-lockfile
 python3 tool/l10n/translate.py status
 python3 tool/l10n/translate.py sync
 python3 tool/l10n/translate.py check
 ```
+
+The first command initializes the tool's separate Dart package after checkout.
+Its declared SDK dependency on `flutter_tools` gives the
+IDE and command-line validator the same package resolution, without adding the
+Flutter build tools to the app's dependencies. CI analyzes `tool/` along with
+`lib/`, `test/`, and `integration_test/`.
+When upgrading the pinned Flutter SDK, refresh this package's lockfile with
+`flutter pub get --directory tool/l10n` and commit the updated lockfile.
 
 `sync` translates only missing or stale messages, synchronizes Simplified Chinese
 aliases, updates changed native resources, and runs `flutter gen-l10n`. Commit the ARBs, `tool/l10n/state/*.json`, and

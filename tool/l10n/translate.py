@@ -134,14 +134,16 @@ def validate(en, translated, locale=None):
     if not flutter:
         raise RuntimeError('flutter must be on PATH')
     sdk = Path(flutter).resolve().parent.parent
-    config = sdk / 'packages/flutter_tools/.dart_tool/package_config.json'
+    tool_dir = Path(__file__).resolve().parent
+    if not (tool_dir/'.dart_tool/package_config.json').exists():
+        raise RuntimeError('Initialize localization tool dependencies: '
+                           'flutter pub get --directory tool/l10n')
     dart = sdk / 'bin' / ('dart.bat' if os.name == 'nt' else 'dart')
     payload = {'messages': {key: {'source': en[key], 'target': value}
                             for key, value in translated.items()}}
     result = subprocess.run(
-        [str(dart), '--enable-asserts', f'--packages={config}',
-         str(Path(__file__).with_name('validate.dart'))],
-        input=json.dumps(payload), encoding='utf-8', capture_output=True, cwd=ROOT)
+        [str(dart), 'run', '--enable-asserts', 'validate.dart'],
+        input=json.dumps(payload), encoding='utf-8', capture_output=True, cwd=tool_dir)
     if result.returncode not in (0, 1) or not result.stdout.strip():
         raise RuntimeError('Flutter message validation failed: ' + result.stderr[-1500:])
     errors = loads(result.stdout)
