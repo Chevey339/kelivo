@@ -1689,7 +1689,18 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupPageChatsLabel => 'Sohbetler';
 
   @override
-  String get backupPageFilesLabel => 'Dosyalar';
+  String get backupPageFilesDescription =>
+      'Sohbet ekleri, avatarlar, arka planlar ve özel yazı tipleri. Avatarları veya arka planları geri yüklemek için ilgili asistanları, sağlayıcıları veya ayarları da seçin.';
+
+  @override
+  String get backupPageChooseBackupFolder => 'Yedek klasörü seçin';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      'iCloud Drive\'ı veya \"iPhone\'um > Kelivo\" dışında bir klasör seçin. Kelivo klasöründeki dosyalar uygulamayla birlikte silinir. Yedek kaydedilmedi.';
+
+  @override
+  String get backupPageFilesLabel => 'Dosyalar ve Görseller';
 
   @override
   String get backupPageScopeTitle => 'Yedekleme ve içe aktarma içeriği';
@@ -2177,11 +2188,11 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get backupPageExportToFile => 'Dosyaya Aktar';
+  String get backupPageExportToFile => 'Şimdi Yedekle';
 
   @override
   String get backupPageExportToFileSubtitle =>
-      'Uygulama verilerini bir dosyaya aktar';
+      'Seçilen içeriği yedek dosyası olarak kaydet';
 
   @override
   String get backupPageImportBackupFile => 'Yedek Dosyasını İçe Aktar';
@@ -2272,7 +2283,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo\'nun yerel verileri iCloud cihaz yedeklerinden hariç tutulacak şekilde ayarlanmıştır. Cihaz değiştirmeden veya uygulamayı silmeden önce bir yedek dosyası dışa aktarın.';
+      'Kelivo\'nun yerel verileri iCloud cihaz yedeklemelerine dahil edilmez. Cihaz değiştirmeden veya uygulamayı silmeden önce iCloud Drive\'a ya da Kelivo dışında bir klasöre yedekleyin. \"iPhone\'um > Kelivo\" içindeki dosyalar uygulamayla birlikte silinir.';
 
   @override
   String get backupPageImportFromCherryStudio => 'Cherry Studio\'dan İçe Aktar';

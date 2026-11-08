@@ -248,7 +248,7 @@ void main() {
         } else {
           await _pumpBackupPage(tester, settings: settings, business: business);
         }
-        expect(find.text('Export to File').hitTestable(), findsOneWidget);
+        expect(find.text('Back Up Now').hitTestable(), findsOneWidget);
         expect(find.text('Import Backup File').hitTestable(), findsOneWidget);
         expect(
           find.byKey(const ValueKey('backup-scope-providers')),

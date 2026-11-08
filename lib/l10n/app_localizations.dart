@@ -3196,10 +3196,28 @@ abstract class AppLocalizations {
   /// **'Chats'**
   String get backupPageChatsLabel;
 
-  /// Backup category label for files, used in the category label mapping.
+  /// Description under Files and Images in the backup and import scope selector. Image files are selected here; their references require the corresponding configuration category to be selected too.
   ///
   /// In en, this message translates to:
-  /// **'Files'**
+  /// **'Chat attachments, avatars, backgrounds and custom fonts. To restore avatars or backgrounds, also select the corresponding assistants, providers or settings.'**
+  String get backupPageFilesDescription;
+
+  /// Title of the iOS folder picker for saving a local backup outside the app container.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a backup folder'**
+  String get backupPageChooseBackupFolder;
+
+  /// Error shown when an iOS local backup destination is inside the app container. No file is copied and the backup is not counted as successful. Ask the user to choose a folder that survives deleting Kelivo.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.'**
+  String get backupPageChooseExternalFolder;
+
+  /// Category label in the backup and import content selector. Includes attachments, avatars, background images, custom fonts and session files.
+  ///
+  /// In en, this message translates to:
+  /// **'Files and Images'**
   String get backupPageFilesLabel;
 
   /// Title of the backup scope selector tile listing which content categories to back up or import.
@@ -4036,16 +4054,16 @@ abstract class AppLocalizations {
   /// **'{done} / {total}'**
   String backupProgressItems(String done, String total);
 
-  /// Button label and task title for exporting app data to a local file in the backup settings pane.
+  /// Button label and task title in Local Backup. Creates a backup file containing the selected content and lets the user save it.
   ///
   /// In en, this message translates to:
-  /// **'Export to File'**
+  /// **'Back Up Now'**
   String get backupPageExportToFile;
 
-  /// Subtitle under the Export to File option describing that it exports app data to a file.
+  /// Subtitle below the Back Up Now action in Local Backup, explaining that the action saves a backup file.
   ///
   /// In en, this message translates to:
-  /// **'Export app data to a file'**
+  /// **'Save the selected content as a backup file'**
   String get backupPageExportToFileSubtitle;
 
   /// Button label and task title for importing a backup file; also used as the progress dialog title during import.
@@ -4216,10 +4234,10 @@ abstract class AppLocalizations {
   /// **'Local Backup'**
   String get backupPageLocalBackup;
 
-  /// Warning note explaining local data is excluded from iCloud device backups and advising exporting a backup before switching devices or deleting the app.
+  /// Note below Local Backup on iOS. Distinguishes iCloud device backups from an exported backup in iCloud Drive, and explains that the app-owned Kelivo folder is deleted when the app is deleted.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo\'s local data is set to be excluded from iCloud device backups. Export a backup file before changing devices or deleting the app.'**
+  /// **'Kelivo\'s local data is excluded from iCloud device backups. Before changing devices or deleting the app, back up to iCloud Drive or another folder outside Kelivo. Files in On My iPhone > Kelivo are deleted with the app.'**
   String get backupPageIosSystemBackupNote;
 
   /// Button label and task title for importing data from a Cherry Studio backup.

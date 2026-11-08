@@ -1709,7 +1709,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupPageChatsLabel => 'Чаты';
 
   @override
-  String get backupPageFilesLabel => 'Файлы';
+  String get backupPageFilesDescription =>
+      'Вложения чатов, аватары, фоны и пользовательские шрифты. Чтобы восстановить аватары или фоны, также выберите соответствующих ассистентов, провайдеров или настройки.';
+
+  @override
+  String get backupPageChooseBackupFolder =>
+      'Выберите папку для резервной копии';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      'Выберите iCloud Drive или папку вне «На моём iPhone > Kelivo». Файлы в папке Kelivo удаляются вместе с приложением. Резервная копия не сохранена.';
+
+  @override
+  String get backupPageFilesLabel => 'Файлы и изображения';
 
   @override
   String get backupPageScopeTitle => 'Содержимое резервной копии и импорта';
@@ -2199,11 +2211,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get backupPageExportToFile => 'Экспорт в файл';
+  String get backupPageExportToFile => 'Создать резервную копию';
 
   @override
   String get backupPageExportToFileSubtitle =>
-      'Экспорт данных приложения в файл';
+      'Сохранить выбранное содержимое в файл резервной копии';
 
   @override
   String get backupPageImportBackupFile => 'Импорт файла резервной копии';
@@ -2294,7 +2306,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Локальные данные Kelivo исключены из резервных копий устройств iCloud. Перед сменой устройства или удалением приложения экспортируйте файл резервной копии.';
+      'Локальные данные Kelivo не включаются в резервные копии устройств iCloud. Перед сменой устройства или удалением приложения сохраните резервную копию в iCloud Drive или другую папку вне Kelivo. Файлы в «На моём iPhone > Kelivo» удаляются вместе с приложением.';
 
   @override
   String get backupPageImportFromCherryStudio => 'Импорт из Cherry Studio';

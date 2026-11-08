@@ -1614,7 +1614,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageChatsLabel => '聊天记录';
 
   @override
-  String get backupPageFilesLabel => '文件';
+  String get backupPageFilesDescription =>
+      '聊天附件、头像、背景图和自定义字体。恢复头像或背景图时，还需选中对应的助手、服务商或设置。';
+
+  @override
+  String get backupPageChooseBackupFolder => '选择备份保存文件夹';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      '请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。';
+
+  @override
+  String get backupPageFilesLabel => '文件与图片';
 
   @override
   String get backupPageScopeTitle => '备份与导入内容';
@@ -2080,10 +2091,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get backupPageExportToFile => '导出为文件';
+  String get backupPageExportToFile => '立即备份';
 
   @override
-  String get backupPageExportToFileSubtitle => '导出APP数据为文件';
+  String get backupPageExportToFileSubtitle => '将所选内容保存为备份文件';
 
   @override
   String get backupPageImportBackupFile => '备份文件导入';
@@ -2173,7 +2184,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo 的本地数据已设置为不参与 iCloud 系统备份。换机或卸载 App 前，请先导出备份文件。';
+      'Kelivo 的本地数据不参与 iCloud 系统备份。换机或卸载 App 前，请将备份保存到 iCloud 云盘或 Kelivo 之外的文件夹。“我的 iPhone > Kelivo”中的文件会随 App 卸载而删除。';
 
   @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
@@ -17380,7 +17391,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageChatsLabel => '聊天记录';
 
   @override
-  String get backupPageFilesLabel => '文件';
+  String get backupPageFilesDescription =>
+      '聊天附件、头像、背景图和自定义字体。恢复头像或背景图时，还需选中对应的助手、服务商或设置。';
+
+  @override
+  String get backupPageChooseBackupFolder => '选择备份保存文件夹';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      '请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。';
+
+  @override
+  String get backupPageFilesLabel => '文件与图片';
 
   @override
   String get backupPageScopeTitle => '备份与导入内容';
@@ -17846,10 +17868,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get backupPageExportToFile => '导出为文件';
+  String get backupPageExportToFile => '立即备份';
 
   @override
-  String get backupPageExportToFileSubtitle => '导出APP数据为文件';
+  String get backupPageExportToFileSubtitle => '将所选内容保存为备份文件';
 
   @override
   String get backupPageImportBackupFile => '备份文件导入';
@@ -17939,7 +17961,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo 的本地数据已设置为不参与 iCloud 系统备份。换机或卸载 App 前，请先导出备份文件。';
+      'Kelivo 的本地数据不参与 iCloud 系统备份。换机或卸载 App 前，请将备份保存到 iCloud 云盘或 Kelivo 之外的文件夹。“我的 iPhone > Kelivo”中的文件会随 App 卸载而删除。';
 
   @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
@@ -33146,7 +33168,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageChatsLabel => '聊天記錄';
 
   @override
-  String get backupPageFilesLabel => '檔案';
+  String get backupPageFilesDescription =>
+      '聊天附件、頭像、背景圖和自訂字型。若要還原頭像或背景圖，還需選取對應的助手、服務商或設定。';
+
+  @override
+  String get backupPageChooseBackupFolder => '選擇備份儲存資料夾';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      '請選擇 iCloud 雲碟或「我的 iPhone > Kelivo」以外的資料夾。Kelivo 資料夾會隨 App 解除安裝而刪除，本次備份尚未儲存。';
+
+  @override
+  String get backupPageFilesLabel => '檔案與圖片';
 
   @override
   String get backupPageScopeTitle => '備份與匯入內容';
@@ -33613,10 +33646,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get backupPageExportToFile => '匯出為檔案';
+  String get backupPageExportToFile => '立即備份';
 
   @override
-  String get backupPageExportToFileSubtitle => '匯出APP資料為檔案';
+  String get backupPageExportToFileSubtitle => '將所選內容儲存為備份檔案';
 
   @override
   String get backupPageImportBackupFile => '備份檔案匯入';
@@ -33706,7 +33739,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo 的本機資料已設定為不參與 iCloud 系統備份。更換裝置或移除 App 前，請先匯出備份檔案。';
+      'Kelivo 的本機資料不參與 iCloud 系統備份。更換裝置或解除安裝 App 前，請將備份儲存到 iCloud 雲碟或 Kelivo 以外的資料夾。「我的 iPhone > Kelivo」中的檔案會隨 App 解除安裝而刪除。';
 
   @override
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 // ignore: depend_on_referenced_packages
@@ -16,18 +17,24 @@ import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/utils/app_directories.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _Paths extends PathProviderPlatform {
-  _Paths(this.root);
+  _Paths(this.root, {this.separateDirectories = false});
   final String root;
+  final bool separateDirectories;
   @override
-  Future<String?> getApplicationSupportPath() async => root;
+  Future<String?> getApplicationSupportPath() async =>
+      separateDirectories ? '$root/Library/Application Support' : root;
   @override
-  Future<String?> getApplicationDocumentsPath() async => root;
+  Future<String?> getApplicationDocumentsPath() async =>
+      separateDirectories ? '$root/Documents' : root;
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
 }
@@ -156,11 +163,140 @@ void main() {
   });
 
   tearDown(() async {
+    debugDefaultTargetPlatformOverride = null;
+    SandboxPathResolver.debugSetDirs();
     await source.close();
     await target.close();
     PathProviderPlatform.instance = previousPaths;
     await root.delete(recursive: true);
   });
+
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.macOS,
+  ]) {
+    for (final mode in RestoreMode.values) {
+      test(
+        '$platform $mode restores avatars and backgrounds into a new container',
+        () async {
+          debugDefaultTargetPlatformOverride = platform;
+          PathProviderPlatform.instance = _Paths(
+            '${root.path}/old-container',
+            separateDirectories: true,
+          );
+          final oldContent = await AppDirectories.getContentDirectory();
+          final assets = {
+            'avatars/user.png': 'user-avatar',
+            'avatars/assistant.png': 'assistant-avatar',
+            'avatars/provider.png': 'provider-avatar',
+            'avatars/model.png': 'model-avatar',
+            'images/background.png': 'assistant-background',
+          };
+          for (final entry in assets.entries) {
+            final asset = File('${oldContent.path}/${entry.key}');
+            await asset.parent.create(recursive: true);
+            await asset.writeAsString(entry.value);
+          }
+          await BusinessRestoreService(sourceRepository).overwrite({
+            ..._fixture('source'),
+            'avatar_type': 'file',
+            'avatar_value': '${oldContent.path}/avatars/user.png',
+            'assistants_v1': jsonEncode([
+              {
+                'id': 'source',
+                'name': 'Assistant',
+                'avatar': '${oldContent.path}/avatars/assistant.png',
+                'background': '${oldContent.path}/images/background.png',
+              },
+            ]),
+            'provider_configs_v1': jsonEncode({
+              'source': {
+                'id': 'source',
+                'avatarType': 'file',
+                'avatarValue': '${oldContent.path}/avatars/provider.png',
+                'modelOverrides': {
+                  'model': {
+                    'avatar': {
+                      'type': 'file',
+                      'value': '${oldContent.path}/avatars/model.png',
+                    },
+                  },
+                },
+              },
+            }),
+          });
+          final scope = _only({
+            BackupCategory.files,
+            BackupCategory.assistants,
+            BackupCategory.providers,
+            BackupCategory.settings,
+          });
+          final backup = await exporter.prepareBackupFile(
+            WebDavConfig(scope: scope),
+          );
+          final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+          for (final entry in assets.entries) {
+            expect(
+              utf8.decode(archive.findFile(entry.key)!.readBytes()!),
+              entry.value,
+            );
+          }
+          // Simulate uninstalling the old app: original absolute paths no longer exist.
+          await oldContent.delete(recursive: true);
+          PathProviderPlatform.instance = _Paths(
+            '${root.path}/new-container',
+            separateDirectories: true,
+          );
+          await SandboxPathResolver.init();
+          await importer.restoreFromLocalFile(
+            backup,
+            WebDavConfig(scope: scope),
+            mode: mode,
+          );
+          final newContent = await AppDirectories.getContentDirectory();
+          for (final entry in assets.entries) {
+            expect(
+              await File('${newContent.path}/${entry.key}').readAsString(),
+              entry.value,
+            );
+          }
+          final preferences = BusinessPreferences(targetRepository);
+          await preferences.load();
+          final assistants = AssistantProvider(preferences: preferences);
+          await assistants.loaded;
+          addTearDown(assistants.dispose);
+          final assistant = assistants.assistants.singleWhere(
+            (a) => a.id == 'source',
+          );
+          expect(assistant.avatar, '${newContent.path}/avatars/assistant.png');
+          expect(
+            assistant.background,
+            '${newContent.path}/images/background.png',
+          );
+          expect(
+            SandboxPathResolver.fix(preferences.getString('avatar_value')!),
+            '${newContent.path}/avatars/user.png',
+          );
+          final providers =
+              jsonDecode(preferences.getString('provider_configs_v1')!) as Map;
+          expect(
+            SandboxPathResolver.fix(
+              providers['source']['avatarValue'] as String,
+            ),
+            '${newContent.path}/avatars/provider.png',
+          );
+          expect(
+            SandboxPathResolver.fix(
+              providers['source']['modelOverrides']['model']['avatar']['value']
+                  as String,
+            ),
+            '${newContent.path}/avatars/model.png',
+          );
+        },
+      );
+    }
+  }
 
   test(
     'all categories default on and both remote configs persist selection',

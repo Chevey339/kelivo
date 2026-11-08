@@ -1648,7 +1648,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupPageChatsLabel => '채팅';
 
   @override
-  String get backupPageFilesLabel => '파일';
+  String get backupPageFilesDescription =>
+      '채팅 첨부 파일, 아바타, 배경 및 사용자 지정 글꼴입니다. 아바타나 배경을 복원하려면 해당 어시스턴트, 공급자 또는 설정도 함께 선택하세요.';
+
+  @override
+  String get backupPageChooseBackupFolder => '백업 폴더 선택';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      'iCloud Drive 또는 \'내 iPhone > Kelivo\' 외부의 폴더를 선택하세요. Kelivo 폴더의 파일은 앱과 함께 삭제됩니다. 백업이 저장되지 않았습니다.';
+
+  @override
+  String get backupPageFilesLabel => '파일 및 이미지';
 
   @override
   String get backupPageScopeTitle => '백업 및 가져오기 내용';
@@ -2123,10 +2134,10 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get backupPageExportToFile => '파일로 내보내기';
+  String get backupPageExportToFile => '지금 백업';
 
   @override
-  String get backupPageExportToFileSubtitle => '앱 데이터를 파일로 내보내기';
+  String get backupPageExportToFileSubtitle => '선택한 콘텐츠를 백업 파일로 저장';
 
   @override
   String get backupPageImportBackupFile => '백업 파일 가져오기';
@@ -2216,7 +2227,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo의 로컬 데이터는 iCloud 기기 백업에서 제외되도록 설정되어 있습니다. 기기를 변경하거나 앱을 삭제하기 전에 백업 파일을 내보내세요.';
+      'Kelivo의 로컬 데이터는 iCloud 기기 백업에 포함되지 않습니다. 기기를 변경하거나 앱을 삭제하기 전에 iCloud Drive 또는 Kelivo 외부의 폴더에 백업하세요. \'내 iPhone > Kelivo\'의 파일은 앱과 함께 삭제됩니다.';
 
   @override
   String get backupPageImportFromCherryStudio => 'Cherry Studio에서 가져오기';

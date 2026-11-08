@@ -928,6 +928,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
             ],
           ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text(
+              l10n.backupPageExportToFileSubtitle,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
           if (Platform.isIOS)
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),

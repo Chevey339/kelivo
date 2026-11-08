@@ -696,7 +696,19 @@
   "backupPagePassword": "Password",
   "backupPagePath": "Path",
   "backupPageChatsLabel": "Chats",
-  "backupPageFilesLabel": "Files",
+  "backupPageFilesDescription": "Chat attachments, avatars, backgrounds and custom fonts. To restore avatars or backgrounds, also select the corresponding assistants, providers or settings.",
+  "@backupPageFilesDescription": {
+    "description": "Description under Files and Images in the backup and import scope selector. Image files are selected here; their references require the corresponding configuration category to be selected too."
+  },
+  "backupPageChooseBackupFolder": "Choose a backup folder",
+  "@backupPageChooseBackupFolder": {
+    "description": "Title of the iOS folder picker for saving a local backup outside the app container."
+  },
+  "backupPageChooseExternalFolder": "Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.",
+  "@backupPageChooseExternalFolder": {
+    "description": "Error shown when an iOS local backup destination is inside the app container. No file is copied and the backup is not counted as successful. Ask the user to choose a folder that survives deleting Kelivo."
+  },
+  "backupPageFilesLabel": "Files and Images",
   "backupPageScopeTitle": "Backup and import content",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "@backupPageScopeSelectedCount": {
@@ -971,8 +983,8 @@
     },
     "description": "Progress counter for item-based operations; {done} and {total} are locale-formatted numbers, shown as 'done / total'."
   },
-  "backupPageExportToFile": "Export to File",
-  "backupPageExportToFileSubtitle": "Export app data to a file",
+  "backupPageExportToFile": "Back Up Now",
+  "backupPageExportToFileSubtitle": "Save the selected content as a backup file",
   "backupPageImportBackupFile": "Import Backup File",
   "backupPageImportBackupFileSubtitle": "Import a local backup file",
   "backupPageImportFromOtherApps": "Import from Other Apps",
@@ -1001,7 +1013,7 @@
   "backupPageSave": "Save",
   "backupPageBackupNow": "Backup Now",
   "backupPageLocalBackup": "Local Backup",
-  "backupPageIosSystemBackupNote": "Kelivo's local data is set to be excluded from iCloud device backups. Export a backup file before changing devices or deleting the app.",
+  "backupPageIosSystemBackupNote": "Kelivo's local data is excluded from iCloud device backups. Before changing devices or deleting the app, back up to iCloud Drive or another folder outside Kelivo. Files in On My iPhone > Kelivo are deleted with the app.",
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
   "backupPageCherryStudioUnsupportedBackupVersion": "This backup uses Cherry Studio format version {version}, which Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a Kelivo update that supports Cherry Studio v2 backups.",
   "@backupPageCherryStudioUnsupportedBackupVersion": {
@@ -9763,7 +9775,7 @@
     "description": "Backup category label for chat history, used in the category label mapping."
   },
   "@backupPageFilesLabel": {
-    "description": "Backup category label for files, used in the category label mapping."
+    "description": "Category label in the backup and import content selector. Includes attachments, avatars, background images, custom fonts and session files."
   },
   "@backupPageScopeTitle": {
     "description": "Title of the backup scope selector tile listing which content categories to back up or import."
@@ -10138,10 +10150,10 @@
     "description": "Backup progress phase label shown in the progress dialog for BackupPhase.finalizing, the last step of a backup or restore task."
   },
   "@backupPageExportToFile": {
-    "description": "Button label and task title for exporting app data to a local file in the backup settings pane."
+    "description": "Button label and task title in Local Backup. Creates a backup file containing the selected content and lets the user save it."
   },
   "@backupPageExportToFileSubtitle": {
-    "description": "Subtitle under the Export to File option describing that it exports app data to a file."
+    "description": "Subtitle below the Back Up Now action in Local Backup, explaining that the action saves a backup file."
   },
   "@backupPageImportBackupFile": {
     "description": "Button label and task title for importing a backup file; also used as the progress dialog title during import."
@@ -10228,7 +10240,7 @@
     "description": "Section header for local backup options."
   },
   "@backupPageIosSystemBackupNote": {
-    "description": "Warning note explaining local data is excluded from iCloud device backups and advising exporting a backup before switching devices or deleting the app."
+    "description": "Note below Local Backup on iOS. Distinguishes iCloud device backups from an exported backup in iCloud Drive, and explains that the app-owned Kelivo folder is deleted when the app is deleted."
   },
   "@backupPageImportFromCherryStudio": {
     "description": "Button label and task title for importing data from a Cherry Studio backup."

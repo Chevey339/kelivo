@@ -38,6 +38,7 @@
 		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
 		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
 		BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC000000000000000000002 /* AppBackupPolicy.swift */; };
+		BAC000000000000000000003 /* BackupExportDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC000000000000000000004 /* BackupExportDestination.swift */; };
 		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
 		CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */; };
 		W5A0000000000000000000A1 /* WorkspacePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B1 /* WorkspacePlugin.swift */; };
@@ -157,6 +158,7 @@
 		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
 		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
 		BAC000000000000000000002 /* AppBackupPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupPolicy.swift; sourceTree = "<group>"; };
+		BAC000000000000000000004 /* BackupExportDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupExportDestination.swift; sourceTree = "<group>"; };
 		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
 		C7611D570BED92819FE5AADD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskNotifications.swift; sourceTree = "<group>"; };
@@ -316,6 +318,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				BAC000000000000000000002 /* AppBackupPolicy.swift */,
+				BAC000000000000000000004 /* BackupExportDestination.swift */,
 				B610A5500000000000000002 /* BrowserGlassView.swift */,
 				B610A5500000000000000006 /* BrowserScrollBridge.swift */,
 				B610A5500000000000000008 /* IosSelectionMenuHandler.swift */,
@@ -758,6 +761,7 @@
 				A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				BAC000000000000000000001 /* AppBackupPolicy.swift in Sources */,
+				BAC000000000000000000003 /* BackupExportDestination.swift in Sources */,
 				B610A5500000000000000001 /* BrowserGlassView.swift in Sources */,
 				B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */,
 				B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */,
