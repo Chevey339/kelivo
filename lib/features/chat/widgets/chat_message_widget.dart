@@ -3465,6 +3465,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
               final widgets = <Widget>[
                 ViewportBlockList(
+                  storageId: 'body',
                   itemCount: visibleBlocks.length,
                   spacing: 8,
                   structureToken: (
@@ -5205,6 +5206,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     ),
                   ),
                 ViewportBlockList(
+                  storageId: ('steps', widget.key),
                   itemCount: visibleSteps.length,
                   structureToken: (visibleSteps.length, hiddenCount),
                   itemKey: (i) {
@@ -6189,6 +6191,7 @@ class _ChainOfThoughtBrowserGroupState
       }
       steps.add(
         ViewportBlockList(
+          storageId: ('browser-steps', tools.first.id),
           itemCount: _actions.length - firstVisible,
           structureToken: (_structureRevision, firstVisible),
           itemKey: (i) => timelineToolStepKey(

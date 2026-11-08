@@ -151,6 +151,298 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('measured heights and reading anchor survive a state rebuild', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final bucket = PageStorageBucket();
+    final items = List.generate(100, (i) => i);
+    var generation = 0;
+
+    Widget host() => MaterialApp(
+      home: Scaffold(
+        body: PageStorage(
+          bucket: bucket,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 600,
+              child: SingleChildScrollView(
+                controller: controller,
+                child: ViewportBlockList(
+                  // A new key destroys the state while the bucket and the
+                  // scroll position stay alive.
+                  key: ValueKey(generation),
+                  storageId: 'message-1',
+                  itemCount: items.length,
+                  structureToken: items,
+                  itemKey: (i) => items[i],
+                  estimateExtent: (i, width) => 40,
+                  itemBuilder: (context, i) => SizedBox(
+                    key: ValueKey('item-${items[i]}'),
+                    height: 100,
+                    child: Text('item-${items[i]}'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await _visitOffset(tester, controller, 5025);
+    final readingItem = find.byKey(const ValueKey('item-50'));
+    expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+    final measuredExtent = controller.position.maxScrollExtent;
+    // Well past the 100 * 40 the list would guess without measurements.
+    expect(measuredExtent, greaterThan(5000));
+
+    generation++;
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    expect(controller.offset, closeTo(5025, .5));
+    expect(controller.position.maxScrollExtent, closeTo(measuredExtent, .5));
+    expect(tester.getTopLeft(readingItem).dy, closeTo(-25, .5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('stored extents are keyed by item, width and text scale', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final bucket = PageStorageBucket();
+    final items = List.generate(100, (i) => i);
+
+    Widget host({double width = 600, double textScale = 1}) => MaterialApp(
+      home: Scaffold(
+        body: PageStorage(
+          bucket: bucket,
+          child: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: width,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: ViewportBlockList(
+                    storageId: 'message-1',
+                    itemCount: items.length,
+                    structureToken: items,
+                    itemKey: (i) => items[i],
+                    estimateExtent: (i, width) => 40,
+                    itemBuilder: (context, i) => SizedBox(
+                      key: ValueKey('item-${items[i]}'),
+                      height: 100 * MediaQuery.textScalerOf(context).scale(1),
+                      child: Text('item-${items[i]}'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Map<Object, double> storedExtents() {
+      final stored = bucket.readState(
+        tester.element(find.byType(ViewportBlockList)),
+        identifier: 'message-1',
+      );
+      expect(stored, isA<Map<Object, double>>());
+      return stored as Map<Object, double>;
+    }
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await _visitOffset(tester, controller, 5025);
+    final atDefault = storedExtents();
+    expect(atDefault, isNotEmpty);
+    expect(
+      atDefault.keys.cast<(Object, double, double)>().every(
+        (key) => key.$2 == 600 && key.$3 == 1,
+      ),
+      isTrue,
+    );
+
+    await tester.pumpWidget(host(textScale: 2));
+    await tester.pumpAndSettle();
+    final atScale = storedExtents();
+    expect(identical(atScale, atDefault), isTrue);
+    expect(
+      atScale.keys.cast<(Object, double, double)>().every(
+        (key) => key.$2 == 600 && key.$3 == 2,
+      ),
+      isTrue,
+    );
+
+    await tester.pumpWidget(host(width: 400, textScale: 2));
+    await tester.pumpAndSettle();
+    expect(
+      storedExtents().keys.cast<(Object, double, double)>().every(
+        (key) => key.$2 == 400 && key.$3 == 2,
+      ),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('changing storage identity switches the extent cache', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final bucket = PageStorageBucket();
+    final items = List.generate(100, (i) => i);
+
+    Widget host(String storageId) => MaterialApp(
+      home: Scaffold(
+        body: PageStorage(
+          bucket: bucket,
+          child: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              controller: controller,
+              child: ViewportBlockList(
+                storageId: storageId,
+                itemCount: items.length,
+                structureToken: items,
+                itemKey: (i) => items[i],
+                estimateExtent: (i, width) => 40,
+                itemBuilder: (context, i) => SizedBox(
+                  key: ValueKey('item-${items[i]}'),
+                  height: 100,
+                  child: Text('item-${items[i]}'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Map<Object, double> storedExtents(String storageId) {
+      final stored = bucket.readState(
+        tester.element(find.byType(ViewportBlockList)),
+        identifier: storageId,
+      );
+      expect(stored, isA<Map<Object, double>>());
+      return stored as Map<Object, double>;
+    }
+
+    await tester.pumpWidget(host('first'));
+    await tester.pumpAndSettle();
+    await _visitOffset(tester, controller, 5025);
+    final first = storedExtents('first');
+
+    await tester.pumpWidget(host('second'));
+    await tester.pumpAndSettle();
+    await _visitOffset(tester, controller, 5025);
+    final second = storedExtents('second');
+    expect(identical(first, second), isFalse);
+    expect(second, isNotEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final changeStructure in [false, true]) {
+    testWidgets('changing PageStorage bucket switches the extent cache '
+        '${changeStructure ? 'with' : 'without'} a structure change', (
+      tester,
+    ) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      final firstBucket = PageStorageBucket();
+      final secondBucket = PageStorageBucket();
+      final firstItems = List.generate(100, (i) => i);
+      final secondItems = changeStructure
+          ? List.generate(100, (i) => i + 100)
+          : firstItems;
+
+      Widget host(PageStorageBucket bucket, List<int> items) => MaterialApp(
+        home: Scaffold(
+          body: PageStorage(
+            bucket: bucket,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 600,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: ViewportBlockList(
+                    storageId: 'body',
+                    itemCount: items.length,
+                    structureToken: items,
+                    itemKey: (i) => items[i],
+                    estimateExtent: (i, width) => 40,
+                    itemBuilder: (context, i) => SizedBox(
+                      key: ValueKey('item-${items[i]}'),
+                      height: 100,
+                      child: Text('item-${items[i]}'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      Map<Object, double> storedExtents(PageStorageBucket bucket) {
+        final stored = bucket.readState(
+          tester.element(find.byType(ViewportBlockList)),
+          identifier: 'body',
+        );
+        expect(stored, isA<Map<Object, double>>());
+        return stored as Map<Object, double>;
+      }
+
+      await tester.pumpWidget(host(firstBucket, firstItems));
+      await tester.pumpAndSettle();
+      await _visitOffset(tester, controller, 5025);
+      final state = tester.state(find.byType(ViewportBlockList));
+      final first = storedExtents(firstBucket);
+      final firstSnapshot = Map<Object, double>.of(first);
+      final firstMaxExtent = controller.position.maxScrollExtent;
+      expect(firstSnapshot, isNotEmpty);
+
+      await tester.pumpWidget(host(secondBucket, secondItems));
+      await tester.pumpAndSettle();
+
+      expect(tester.state(find.byType(ViewportBlockList)), same(state));
+      expect(storedExtents(firstBucket), equals(firstSnapshot));
+      final second = storedExtents(secondBucket);
+      expect(second, isNotEmpty);
+      expect(second, isNot(same(first)));
+      expect(
+        second.keys.cast<(Object, double, double)>().every(
+          (key) => secondItems.contains(key.$1),
+        ),
+        isTrue,
+      );
+      expect(second.values, everyElement(100));
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      final secondSnapshot = Map<Object, double>.of(second);
+
+      // Restore the first message while retaining the list's State. Its
+      // offscreen measurements must still be available in the original bucket.
+      await tester.pumpWidget(host(firstBucket, firstItems));
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(ViewportBlockList)), same(state));
+      expect(storedExtents(firstBucket), same(first));
+      expect(storedExtents(secondBucket), equals(secondSnapshot));
+      expect(controller.position.maxScrollExtent, closeTo(firstMaxExtent, .5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('resize yields to the outer controller following the bottom', (
     tester,
   ) async {
