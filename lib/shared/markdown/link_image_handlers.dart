@@ -14,6 +14,7 @@ import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/shared/widgets/scroll_layout_anchor.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/utils/svg_image_provider.dart';
 import 'package:open_filex/open_filex.dart';
@@ -222,6 +223,7 @@ class _MarkdownImageState extends State<_MarkdownImage> {
         if (synchronous) {
           _aspect = aspect;
         } else {
+          preserveScrollLayoutAnchor(context);
           setState(() => _aspect = aspect);
         }
       },
@@ -254,7 +256,10 @@ class _MarkdownImageState extends State<_MarkdownImage> {
             context,
             widget.url,
             conversationId: _conversationId,
-          );
+          ).then((file) {
+            if (mounted) preserveScrollLayoutAnchor(context);
+            return file;
+          });
   }
 
   ImageProvider? _imageProvider(String source) {
@@ -338,6 +343,10 @@ class _MarkdownImageState extends State<_MarkdownImage> {
             _listenForAspect(resized);
             final height = _displaySize(constraints).height;
             return Container(
+              width: width,
+              // File resolution and pixel decoding are separate async stages.
+              // Keep the loading extent until the first decoded aspect arrives.
+              height: height ?? (_aspect == null ? 36 : null),
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(widget.theme.imageRadius),
                 border: Border.all(

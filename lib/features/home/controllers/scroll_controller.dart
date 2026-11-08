@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import '../../../shared/widgets/scroll_layout_anchor.dart';
 
 // ============================================================================
 // Auto-follow ScrollController / ScrollPosition
@@ -84,7 +85,8 @@ class ChatAutoFollowScrollController extends ScrollController {
   }
 }
 
-class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
+class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
+    with ScrollLayoutAnchor {
   _AutoFollowScrollPosition({
     required super.physics,
     required super.context,
@@ -133,6 +135,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
         (controller.shouldAutoFollow() &&
             userScrollDirection == ScrollDirection.idle);
     if (shouldPositionAtBottom) {
+      clearScrollLayoutAnchor();
       final gap = this.maxScrollExtent - pixels;
       if (gap > 0.5) {
         correctPixels(this.maxScrollExtent);
@@ -141,6 +144,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
     }
     if (controller._preserveDistanceFromEndDuringLayout &&
         userScrollDirection == ScrollDirection.idle) {
+      clearScrollLayoutAnchor();
       final target =
           (this.maxScrollExtent - controller._preservedDistanceFromEnd).clamp(
             this.minScrollExtent,
@@ -151,7 +155,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
         return false;
       }
     }
-    return result;
+    return result && applyScrollLayoutAnchor();
   }
 }
 
