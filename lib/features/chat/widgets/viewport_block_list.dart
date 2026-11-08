@@ -78,15 +78,17 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       _textScale = scale;
       _width = null;
     }
-    final storage = PageStorage.maybeOf(context);
-    if (!identical(storage, _storage)) {
-      _storage = storage;
-      _storedExtents = _readStoredExtents();
-      _extents.clear();
-      _measurements.clear();
-    }
-    _storedExtents ??= _readStoredExtents();
+    _syncStorage();
     _scheduleRefresh();
+  }
+
+  void _syncStorage({bool storageIdChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (identical(storage, _storage) && !storageIdChanged) return;
+    _storage = storage;
+    _storedExtents = _readStoredExtents();
+    _extents.clear();
+    _measurements.clear();
   }
 
   /// Extents outlive this state in the enclosing [PageStorage], so a rebuilt
@@ -133,11 +135,9 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   @override
   void didUpdateWidget(ViewportBlockList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.storageId != widget.storageId) {
-      _storedExtents = _readStoredExtents();
-      _extents.clear();
-      _measurements.clear();
-    }
+    // PageStorage is not inherited, so a bucket change alone does not notify
+    // didChangeDependencies. Switch caches before transferring/pruning extents.
+    _syncStorage(storageIdChanged: oldWidget.storageId != widget.storageId);
     if (oldWidget.structureToken != widget.structureToken) {
       _preserveReadingAnchor(oldWidget);
       // A changed shape may insert/reorder blocks. Transfer only measured
@@ -316,6 +316,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
 
   @override
   Widget build(BuildContext context) {
+    _syncStorage();
     if (widget.itemCount <= widget.threshold ||
         _position == null ||
         ExportCaptureScope.of(context)) {

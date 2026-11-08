@@ -351,6 +351,98 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final changeStructure in [false, true]) {
+    testWidgets('changing PageStorage bucket switches the extent cache '
+        '${changeStructure ? 'with' : 'without'} a structure change', (
+      tester,
+    ) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      final firstBucket = PageStorageBucket();
+      final secondBucket = PageStorageBucket();
+      final firstItems = List.generate(100, (i) => i);
+      final secondItems = changeStructure
+          ? List.generate(100, (i) => i + 100)
+          : firstItems;
+
+      Widget host(PageStorageBucket bucket, List<int> items) => MaterialApp(
+        home: Scaffold(
+          body: PageStorage(
+            bucket: bucket,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 600,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: ViewportBlockList(
+                    storageId: 'body',
+                    itemCount: items.length,
+                    structureToken: items,
+                    itemKey: (i) => items[i],
+                    estimateExtent: (i, width) => 40,
+                    itemBuilder: (context, i) => SizedBox(
+                      key: ValueKey('item-${items[i]}'),
+                      height: 100,
+                      child: Text('item-${items[i]}'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      Map<Object, double> storedExtents(PageStorageBucket bucket) {
+        final stored = bucket.readState(
+          tester.element(find.byType(ViewportBlockList)),
+          identifier: 'body',
+        );
+        expect(stored, isA<Map<Object, double>>());
+        return stored as Map<Object, double>;
+      }
+
+      await tester.pumpWidget(host(firstBucket, firstItems));
+      await tester.pumpAndSettle();
+      await _visitOffset(tester, controller, 5025);
+      final state = tester.state(find.byType(ViewportBlockList));
+      final first = storedExtents(firstBucket);
+      final firstSnapshot = Map<Object, double>.of(first);
+      final firstMaxExtent = controller.position.maxScrollExtent;
+      expect(firstSnapshot, isNotEmpty);
+
+      await tester.pumpWidget(host(secondBucket, secondItems));
+      await tester.pumpAndSettle();
+
+      expect(tester.state(find.byType(ViewportBlockList)), same(state));
+      expect(storedExtents(firstBucket), equals(firstSnapshot));
+      final second = storedExtents(secondBucket);
+      expect(second, isNotEmpty);
+      expect(second, isNot(same(first)));
+      expect(
+        second.keys.cast<(Object, double, double)>().every(
+          (key) => secondItems.contains(key.$1),
+        ),
+        isTrue,
+      );
+      expect(second.values, everyElement(100));
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      final secondSnapshot = Map<Object, double>.of(second);
+
+      // Restore the first message while retaining the list's State. Its
+      // offscreen measurements must still be available in the original bucket.
+      await tester.pumpWidget(host(firstBucket, firstItems));
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(ViewportBlockList)), same(state));
+      expect(storedExtents(firstBucket), same(first));
+      expect(storedExtents(secondBucket), equals(secondSnapshot));
+      expect(controller.position.maxScrollExtent, closeTo(firstMaxExtent, .5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('resize yields to the outer controller following the bottom', (
     tester,
   ) async {
