@@ -29,6 +29,8 @@ void main() {
         final controller = ScrollController();
         addTearDown(controller.dispose);
         addTearDown(settings.dispose);
+        final timelineStorage = PageStorageBucket();
+        var generation = 0;
         final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
         final parts = <MessagePart>[
           for (var i = 0; i < count; i++) ...[
@@ -77,6 +79,8 @@ void main() {
                     return SingleChildScrollView(
                       controller: controller,
                       child: ChatMessageWidget(
+                        key: ValueKey(generation),
+                        timelineStorage: timelineStorage,
                         message: ChatMessage(
                           id: 'long',
                           role: 'assistant',
@@ -123,6 +127,16 @@ void main() {
         update(() {});
         await frames();
         expect(controller.offset, moreOrLessEquals(readingOffset, epsilon: 1));
+        expect(cards().evaluate().length, lessThan(150));
+
+        final measuredExtent = controller.position.maxScrollExtent;
+        update(() => generation++);
+        await frames();
+        expect(controller.offset, moreOrLessEquals(readingOffset, epsilon: 1));
+        expect(
+          controller.position.maxScrollExtent,
+          moreOrLessEquals(measuredExtent, epsilon: 1),
+        );
         expect(cards().evaluate().length, lessThan(150));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
