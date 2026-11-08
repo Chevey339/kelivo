@@ -1930,7 +1930,6 @@ class _HomePageState extends State<HomePage>
               _inputController.quotes,
               quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
             ),
-            messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;

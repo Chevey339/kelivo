@@ -107,6 +107,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
           ChangeNotifierProvider<ChatService>.value(value: chat),
           ChangeNotifierProvider<ContextUsageService>.value(value: usage),
         ],

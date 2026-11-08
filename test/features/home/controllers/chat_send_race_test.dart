@@ -2615,10 +2615,6 @@ void main() {
           controller.debugViewModel.onError = errors.add;
           await service.setConversationContextStart(convo.id, users[2].id);
           expect(service.getContextStartIndex(convo.id), 4);
-          expect(
-            controller.debugViewModel.getContextMessageCount().configured,
-            isNull,
-          );
           final beforeCount = (await service.loadMessages(convo.id)).length;
           expect(
             await controller.debugViewModel.regenerateAtMessage(users.first),

@@ -1,7 +1,7 @@
 import 'compression_controls.dart';
 import 'context_dialog.dart';
+import 'context_message_count.dart';
 import 'package:flutter/material.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -15,7 +15,6 @@ class ContextManagementSheet extends StatelessWidget {
     super.key,
     this.onCompress,
     this.onClear,
-    this.messageCountLabel,
     this.conversationId,
     this.draftText = '',
     this.onImages,
@@ -25,8 +24,6 @@ class ContextManagementSheet extends StatelessWidget {
   final VoidCallback? onCompress;
   final VoidCallback? onClear;
 
-  /// Messages currently in context, e.g. "12 messages". Shown on the clear row.
-  final String? messageCountLabel;
   final String? conversationId;
   final String draftText;
   final VoidCallback? onImages;
@@ -104,16 +101,9 @@ class ContextManagementSheet extends StatelessWidget {
                   ContextActionRow(
                     icon: Lucide.Eraser,
                     label: l10n.bottomToolsSheetClearContext,
-                    trailing: messageCountLabel == null
-                        ? null
-                        : Text(
-                            messageCountLabel!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: AppFontWeights.medium,
-                              color: cs.onSurface.withValues(alpha: .55),
-                            ),
-                          ),
+                    trailing: ContextMessageCount(
+                      conversationId: conversationId,
+                    ),
                     onTap: () {
                       Haptics.light();
                       onClear?.call();

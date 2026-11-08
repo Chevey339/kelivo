@@ -1863,40 +1863,6 @@ class HomeViewModel extends ChangeNotifier {
     return _chatController.groupMessagesByGroup();
   }
 
-  /// Messages currently in the conversation context.
-  ///
-  /// [actual] counts the messages after the context boundary, capped by the
-  /// assistant's limit when one is set. [configured] is that limit, or null
-  /// when context messages are unlimited.
-  ({int actual, int? configured}) getContextMessageCount() {
-    final assistant = _contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
-    final fixedStart =
-        currentConversation != null &&
-        ContextHistory.fixedStart(
-              _chatService.contextOperationsFor(currentConversation!.id),
-            ) !=
-            null;
-    final configured = !fixedStart && (assistant?.limitContextMessages ?? false)
-        ? (assistant?.contextMessageSize ?? 0)
-        : 0;
-    // Timeline totals and truncateIndex both use logical message slots.
-    final remaining = computeClearContextRemainingMessageCount(
-      totalMessages: _chatController.totalMessageCount,
-      truncateIndex: currentConversation == null
-          ? -1
-          : _chatService.getContextStartIndex(currentConversation!.id),
-    );
-    if (configured > 0) {
-      return (
-        actual: remaining > configured ? configured : remaining,
-        configured: configured,
-      );
-    }
-    return (actual: remaining, configured: null);
-  }
-
   /// Test entry for [_maybeGenerateSummaryFor].
   @visibleForTesting
   Future<void> debugMaybeGenerateSummaryFor(String conversationId) =>
@@ -1908,18 +1874,6 @@ class HomeViewModel extends ChangeNotifier {
     String conversationId, {
     bool force = false,
   }) => _maybeGenerateTitleFor(conversationId, force: force);
-
-  @visibleForTesting
-  static int computeClearContextRemainingMessageCount({
-    required int totalMessages,
-    required int truncateIndex,
-  }) {
-    final safeTruncateIndex =
-        (truncateIndex < 0 || truncateIndex > totalMessages)
-        ? 0
-        : truncateIndex;
-    return totalMessages - safeTruncateIndex;
-  }
 
   // ============================================================================
   // Title Generation
