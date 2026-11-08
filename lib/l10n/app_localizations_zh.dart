@@ -5399,7 +5399,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
-  String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
+  String get displaySettingsPageAutoScrollDisabledLabel => '关闭';
 
   @override
   String get displaySettingsPageChatFontSampleText => '这是一个示例的聊天文本';
@@ -21120,7 +21120,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageAutoScrollEnableTitle => '自动跟随底部';
 
   @override
-  String get displaySettingsPageAutoScrollDisabledLabel => '已关闭';
+  String get displaySettingsPageAutoScrollDisabledLabel => '关闭';
 
   @override
   String get displaySettingsPageChatFontSampleText => '这是一个示例的聊天文本';
@@ -36696,7 +36696,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageAutoScrollEnableTitle => '自動跟隨底部';
 
   @override
-  String get displaySettingsPageAutoScrollDisabledLabel => '已關閉';
+  String get displaySettingsPageAutoScrollDisabledLabel => '關閉';
 
   @override
   String get displaySettingsPageChatFontSampleText => '這是一個範例的聊天文本';
