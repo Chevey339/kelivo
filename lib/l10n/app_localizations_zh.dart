@@ -15723,6 +15723,51 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get compressionNativeAutoHint =>
       '达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。';
+
+  @override
+  String get languageDisplayRussian => '俄语';
+
+  @override
+  String get languageDisplayTurkish => '土耳其语';
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '删除“$title”？';
+  }
+
+  @override
+  String get backupPageCherryImportWarning =>
+      '此功能目前仍处于实验阶段，可导入助手、对话、供应商和文件。部分供应商需要在基础 URL 后添加 /v1 或 /v1beta。为确保数据安全，请在导入前备份。是否继续选择文件？';
+
+  @override
+  String get themePaletteDefault => '默认';
+
+  @override
+  String get themePaletteBlue => '海霄蓝';
+
+  @override
+  String get themePaletteGreen => '竹影绿';
+
+  @override
+  String get themePalettePurple => '暮紫韵';
+
+  @override
+  String get themePaletteYellow => '琥珀金';
+
+  @override
+  String get themePaletteSmokyRose => '暮霭玫';
+
+  @override
+  String get themePaletteTerracotta => '陶砂红';
+
+  @override
+  String get themePaletteMonochrome => '纸墨灰';
+
+  @override
+  String get themePaletteDocument => '樱桃绿';
+
+  @override
+  String get themePaletteCustom => '自定义';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -17005,7 +17050,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
-  String get assistantEditVariableRole => '角色';
+  String get assistantEditVariableRole => '助手';
 
   @override
   String get assistantEditVariableMessage => '内容';
@@ -20776,7 +20821,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageAppName => 'Kelivo';
 
   @override
-  String get aboutPageAppDescription => '开源 AI 助手';
+  String get aboutPageAppDescription => '开源AI 助手';
 
   @override
   String get aboutPageNoQQGroup => '暂无QQ群';
@@ -21617,7 +21662,81 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldLanguageLabel => '语言';
 
   @override
+  String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音频格式';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '输出格式';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '采样率';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音调';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '语言增强';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '比特率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '声道数';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '生成字幕';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '发音词典（每行一项）';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '风格／音色描述';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '流式输出';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '优化播报文本';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '参考音频（WAV/MP3 数据 URI）';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '选择参考音频';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '随机度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延迟模式';
+
+  @override
+  String get ttsServicesEmotionAutoLabel => '自动匹配';
+
+  @override
   String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／参考 ID 不能为空';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
 
   @override
   String get ttsServicesViewDetailsButton => '查看详情';
@@ -22190,7 +22309,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarQuickPhraseTooltip => '快捷短语';
 
   @override
-  String get assistantEditQuickPhraseDescription => '管理该助手的快捷短语。点击下方按钮添加或编辑短语。';
+  String get assistantEditQuickPhraseDescription => '管理该助手的快捷短语。点击下方按钮添加短语。';
 
   @override
   String get assistantEditManageQuickPhraseButton => '管理快捷短语';
@@ -30713,6 +30832,76 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。';
 
   @override
+  String get imageContextTitle => '图片上下文';
+
+  @override
+  String get imageContextAutomatic => '自动管理历史图片';
+
+  @override
+  String get imageContextDescription => '管理本轮使用的图片，原图仍保留在聊天中。';
+
+  @override
+  String get imageContextIncluded => '本轮发送';
+
+  @override
+  String get imageContextOmitted => '本轮不发送';
+
+  @override
+  String get imageContextPin => '固定图片';
+
+  @override
+  String get imageContextUnpin => '取消固定';
+
+  @override
+  String get imageContextAttachAgain => '再次添加到输入框';
+
+  @override
+  String get imageContextEmpty => '还没有图片';
+
+  @override
+  String get imageContextUnavailable => '当前上下文无法读取这张图片。';
+
+  @override
+  String get imageContextEntryDescription => '查看和管理本轮使用的图片';
+
+  @override
+  String get imageContextAutomaticDescription => '优先保留你上传的图片，分批收起较早的工具图片。';
+
+  @override
+  String get imageContextActionsHint => '固定以优先保留，或再次添加到输入框。';
+
+  @override
+  String get imageContextEmptyDescription => '发送图片或让工具读取图片后，会显示在这里。';
+
+  @override
+  String get imageContextUserImages => '你上传的图片';
+
+  @override
+  String get imageContextToolImages => '工具图片';
+
+  @override
+  String get imageContextAssistantImages => '生成的图片';
+
+  @override
+  String imageContextImageNumber(int index) {
+    return '图片 $index';
+  }
+
+  @override
+  String imageContextIncludedCount(int included, int total) {
+    return '本轮发送 $included / $total 张';
+  }
+
+  @override
+  String get imageContextMissing => '图片不可用';
+
+  @override
+  String get imageContextLoadFailed => '暂时无法加载图片，请重试。';
+
+  @override
+  String get imageContextUpdateFailed => '未能保存修改，请重试。';
+
+  @override
   String get contextOperationsTitle => '上下文操作记录';
 
   @override
@@ -31300,6 +31489,51 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get compressionNativeAutoHint =>
       '达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。';
+
+  @override
+  String get languageDisplayRussian => '俄语';
+
+  @override
+  String get languageDisplayTurkish => '土耳其语';
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '删除“$title”？';
+  }
+
+  @override
+  String get backupPageCherryImportWarning =>
+      '此功能目前仍处于实验阶段，可导入助手、对话、供应商和文件。部分供应商需要在基础 URL 后添加 /v1 或 /v1beta。为确保数据安全，请在导入前备份。是否继续选择文件？';
+
+  @override
+  String get themePaletteDefault => '默认';
+
+  @override
+  String get themePaletteBlue => '海霄蓝';
+
+  @override
+  String get themePaletteGreen => '竹影绿';
+
+  @override
+  String get themePalettePurple => '暮紫韵';
+
+  @override
+  String get themePaletteYellow => '琥珀金';
+
+  @override
+  String get themePaletteSmokyRose => '暮霭玫';
+
+  @override
+  String get themePaletteTerracotta => '陶砂红';
+
+  @override
+  String get themePaletteMonochrome => '纸墨灰';
+
+  @override
+  String get themePaletteDocument => '樱桃绿';
+
+  @override
+  String get themePaletteCustom => '自定义';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -46371,6 +46605,76 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '允許模型按需讀取本對話中的圖片。關閉後不影響歷史圖片的自動管理。';
 
   @override
+  String get imageContextTitle => '圖片上下文';
+
+  @override
+  String get imageContextAutomatic => '自動管理歷史圖片';
+
+  @override
+  String get imageContextDescription => '管理本輪使用的圖片，原圖仍保留在對話中。';
+
+  @override
+  String get imageContextIncluded => '本輪傳送';
+
+  @override
+  String get imageContextOmitted => '本輪不傳送';
+
+  @override
+  String get imageContextPin => '固定圖片';
+
+  @override
+  String get imageContextUnpin => '取消固定';
+
+  @override
+  String get imageContextAttachAgain => '再次加入輸入框';
+
+  @override
+  String get imageContextEmpty => '尚無圖片';
+
+  @override
+  String get imageContextUnavailable => '目前上下文無法讀取這張圖片。';
+
+  @override
+  String get imageContextEntryDescription => '檢視與管理本輪使用的圖片';
+
+  @override
+  String get imageContextAutomaticDescription => '優先保留你上傳的圖片，分批收起較早的工具圖片。';
+
+  @override
+  String get imageContextActionsHint => '固定以優先保留，或再次加入輸入框。';
+
+  @override
+  String get imageContextEmptyDescription => '傳送圖片或讓工具讀取圖片後，會顯示在這裡。';
+
+  @override
+  String get imageContextUserImages => '你上傳的圖片';
+
+  @override
+  String get imageContextToolImages => '工具圖片';
+
+  @override
+  String get imageContextAssistantImages => '生成的圖片';
+
+  @override
+  String imageContextImageNumber(int index) {
+    return '圖片 $index';
+  }
+
+  @override
+  String imageContextIncludedCount(int included, int total) {
+    return '本輪傳送 $included / $total 張';
+  }
+
+  @override
+  String get imageContextMissing => '圖片不可用';
+
+  @override
+  String get imageContextLoadFailed => '暫時無法載入圖片，請重試。';
+
+  @override
+  String get imageContextUpdateFailed => '未能儲存修改，請重試。';
+
+  @override
   String get contextOperationsTitle => '上下文操作記錄';
 
   @override
@@ -46958,4 +47262,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get compressionNativeAutoHint =>
       '達到門檻時，用目前對話模型執行原生壓縮後繼續傳送。失敗時保留原上下文，不會改用文字摘要。';
+
+  @override
+  String get languageDisplayRussian => '俄語';
+
+  @override
+  String get languageDisplayTurkish => '土耳其語';
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return '刪除「$title」？';
+  }
+
+  @override
+  String get backupPageCherryImportWarning =>
+      '此功能目前仍處於實驗階段，可匯入助手、對話、供應商和檔案。部分供應商需要在基礎 URL 後加上 /v1 或 /v1beta。為確保資料安全，請在匯入前備份。是否繼續選擇檔案？';
+
+  @override
+  String get themePaletteDefault => '預設';
+
+  @override
+  String get themePaletteBlue => '海霄藍';
+
+  @override
+  String get themePaletteGreen => '竹影綠';
+
+  @override
+  String get themePalettePurple => '暮紫韻';
+
+  @override
+  String get themePaletteYellow => '琥珀金';
+
+  @override
+  String get themePaletteSmokyRose => '暮靄玫';
+
+  @override
+  String get themePaletteTerracotta => '陶砂紅';
+
+  @override
+  String get themePaletteMonochrome => '紙墨灰';
+
+  @override
+  String get themePaletteDocument => '櫻桃綠';
+
+  @override
+  String get themePaletteCustom => '自訂';
 }

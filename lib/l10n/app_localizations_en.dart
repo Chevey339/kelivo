@@ -16587,4 +16587,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compressionNativeAutoHint =>
       'At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.';
+
+  @override
+  String get languageDisplayRussian => 'Russian';
+
+  @override
+  String get languageDisplayTurkish => 'Turkish';
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return 'Delete \"$title\"?';
+  }
+
+  @override
+  String get backupPageCherryImportWarning =>
+      'This feature is experimental. It imports assistants, conversations, providers, and files. Some providers require /v1 or /v1beta at the end of the base URL. Back up your data before importing. Continue to choose a file?';
+
+  @override
+  String get themePaletteDefault => 'Default';
+
+  @override
+  String get themePaletteBlue => 'Aether Blue';
+
+  @override
+  String get themePaletteGreen => 'Bamboo Green';
+
+  @override
+  String get themePalettePurple => 'Twilight Purple';
+
+  @override
+  String get themePaletteYellow => 'Amber Gold';
+
+  @override
+  String get themePaletteSmokyRose => 'Smoky Rose';
+
+  @override
+  String get themePaletteTerracotta => 'Terracotta Clay';
+
+  @override
+  String get themePaletteMonochrome => 'Frost Gray';
+
+  @override
+  String get themePaletteDocument => 'Verdant Mint';
+
+  @override
+  String get themePaletteCustom => 'Custom';
 }

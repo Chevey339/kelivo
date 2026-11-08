@@ -53,6 +53,7 @@
 		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
 		W5D0000000000000000000A1 /* WorkspaceDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */; };
 		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
+		86D62B0E68B9579C81AA43DE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 723B0BAE986F5114BEC4E56C /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -183,6 +184,12 @@
 		W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDirectoryAccess.swift; sourceTree = "<group>"; };
 		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
 		W5D0000000000000000F003 /* KelivoISHMountTarget.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHMountTarget.m; sourceTree = "<group>"; };
+		586CC3B2EDA355BDA5BD7C05 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		D38BF89BD66F5291B6027BB7 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		79CC0C5679E351F1ACAF7648 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		62693DCCFA645A69A327F8C5 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
+		AA693DF4B0C751998617E581 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		3F1F124EB9CD5FA5B176FCC3 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -303,6 +310,7 @@
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
 				97C147021CF9000F007C117D /* Info.plist */,
+				723B0BAE986F5114BEC4E56C /* InfoPlist.strings */,
 				A2DT00000000000000000021 /* Runner.entitlements */,
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
@@ -526,6 +534,9 @@
 				"zh-Hans",
 				"zh-Hant",
 				en,
+				ru,
+				ko,
+				tr,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
@@ -556,6 +567,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				86D62B0E68B9579C81AA43DE /* InfoPlist.strings in Resources */,
 				W5A0000000000000000000A6 /* alpine-rootfs.zip in Resources */,
 				W5A0000000000000000000A7 /* overlay in Resources */,
 				W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */,
@@ -818,6 +830,9 @@
 				31790E2C03AF99B98A3F05B1 /* en */,
 				F91265C744C63BBCFA99BC1C /* zh-Hans */,
 				6ECC4D7E49DE76801658ECA7 /* zh-Hant */,
+				D38BF89BD66F5291B6027BB7 /* ru */,
+				62693DCCFA645A69A327F8C5 /* ko */,
+				3F1F124EB9CD5FA5B176FCC3 /* tr */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -842,6 +857,16 @@
 				54161FB12E6B1519001222B5 /* en */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		723B0BAE986F5114BEC4E56C /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				586CC3B2EDA355BDA5BD7C05 /* ru */,
+				79CC0C5679E351F1ACAF7648 /* ko */,
+				AA693DF4B0C751998617E581 /* tr */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

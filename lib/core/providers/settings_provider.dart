@@ -1,4 +1,5 @@
 import '../models/native_compaction.dart';
+import '../../l10n/app_language.dart';
 import '../models/compression_config.dart';
 import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
@@ -2141,11 +2142,13 @@ class SettingsProvider extends ChangeNotifier {
   // Desktop: right sidebar visible state
 
   // ===== App locale (UI language) =====
-  String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'
+  String? _appLocaleTag;
   static String _readAppLocaleTag(BusinessPreferences preferences) {
     final value = preferences.get(_appLocaleKey);
-    const supportedTags = {'system', 'zh_CN', 'zh_Hant', 'en_US'};
-    return value is String && supportedTags.contains(value) ? value : 'system';
+    return value is String &&
+            (value == 'system' || AppLanguage.fromTag(value) != null)
+        ? value
+        : 'system';
   }
 
   Locale get appLocale => _parseLocaleTag(_appLocaleTag ?? 'en_US');
@@ -2171,25 +2174,11 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   String _localeToTag(Locale l) {
-    final lc = l.languageCode.toLowerCase();
-    if (lc == 'zh') {
-      final script = (l.scriptCode ?? '').toLowerCase();
-      if (script == 'hant') return 'zh_Hant';
-      return 'zh_CN';
-    }
-    return 'en_US';
+    return AppLanguage.fromLocale(l).tag;
   }
 
   Locale _parseLocaleTag(String tag) {
-    switch (tag) {
-      case 'zh_CN':
-        return const Locale('zh', 'CN');
-      case 'zh_Hant':
-        return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
-      case 'en_US':
-      default:
-        return const Locale('en', 'US');
-    }
+    return (AppLanguage.fromTag(tag) ?? AppLanguage.english).locale;
   }
 
   // ===== Backup & WebDAV settings =====

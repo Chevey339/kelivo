@@ -1,0 +1,9 @@
+"saved" = "Kelivo'ya kaydedildi";
+"savedMessage" = "Bu taslağı incelemek ve göndermek için Kelivo'yu açın.";
+"partialMessage" = "Bazı dosyalar kaydedilemedi. Alınan içeriği incelemek için Kelivo'yu açın.";
+"done" = "Bitti";
+"failed" = "Kaydedilemedi";
+"failedMessage" = "Dosyaların kullanılabilir olduğunu ve yeterli depolama alanı bulunduğunu kontrol edip tekrar deneyin. En fazla 32 dosya desteklenir.";
+"importing" = "İçe aktarılıyor";
+"cancel" = "İptal";
+"opening" = "Kelivo açılıyor…";

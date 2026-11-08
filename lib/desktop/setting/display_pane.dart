@@ -1119,9 +1119,8 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
           final style = TextStyle(fontSize: 14);
           final labels = <String>[
             '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
-            '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
-            '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
-            '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
+            for (final language in AppLanguage.values)
+              '${language.flag} ${language.nativeName}',
           ];
           double maxText = 0;
           for (final s in labels) {
@@ -1180,19 +1179,10 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    String labelFor(Locale l) {
-      if (l.languageCode == 'zh') {
-        if ((l.scriptCode ?? '').toLowerCase() == 'hant') {
-          return l10n.languageDisplayTraditionalChinese;
-        }
-        return l10n.displaySettingsPageLanguageChineseLabel;
-      }
-      return l10n.displaySettingsPageLanguageEnglishLabel;
-    }
 
     final current = sp.isFollowingSystemLocale
         ? l10n.settingsPageSystemMode
-        : labelFor(sp.appLocale);
+        : AppLanguage.fromLocale(sp.appLocale).nativeName;
     return _LabeledRow(
       label: l10n.displaySettingsPageLanguageTitle,
       trailing: CompositedTransformTarget(
@@ -1491,34 +1481,16 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
         sp.isFollowingSystemLocale,
       ),
-      (
-        _LangItem(
-          flag: '🇨🇳',
-          label: l10n.displaySettingsPageLanguageChineseLabel,
-          tag: 'zh_CN',
+      for (final language in AppLanguage.values)
+        (
+          _LangItem(
+            flag: language.flag,
+            label: language.nativeName,
+            tag: language.tag,
+          ),
+          !sp.isFollowingSystemLocale &&
+              AppLanguage.fromLocale(sp.appLocale) == language,
         ),
-        (!sp.isFollowingSystemLocale &&
-            sp.appLocale.languageCode == 'zh' &&
-            (sp.appLocale.scriptCode ?? '').isEmpty),
-      ),
-      (
-        _LangItem(
-          flag: '🇨🇳',
-          label: l10n.languageDisplayTraditionalChinese,
-          tag: 'zh_Hant',
-        ),
-        (!sp.isFollowingSystemLocale &&
-            sp.appLocale.languageCode == 'zh' &&
-            (sp.appLocale.scriptCode ?? '').toLowerCase() == 'hant'),
-      ),
-      (
-        _LangItem(
-          flag: '🇺🇸',
-          label: l10n.displaySettingsPageLanguageEnglishLabel,
-          tag: 'en_US',
-        ),
-        (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en'),
-      ),
     ];
     final maxH = MediaQuery.of(context).size.height * 0.5;
     return AnimatedOpacity(
@@ -1559,32 +1531,14 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                         item: ent.$1,
                         checked: ent.$2,
                         onTap: () async {
-                          switch (ent.$1.tag) {
-                            case 'system':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocaleFollowSystem();
-                              break;
-                            case 'zh_CN':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(const Locale('zh', 'CN'));
-                              break;
-                            case 'zh_Hant':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(
-                                    const Locale.fromSubtags(
-                                      languageCode: 'zh',
-                                      scriptCode: 'Hant',
-                                    ),
-                                  );
-                              break;
-                            case 'en_US':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(const Locale('en', 'US'));
-                              break;
+                          final settings = context.read<SettingsProvider>();
+                          if (ent.$1.tag == 'system') {
+                            await settings.setAppLocaleFollowSystem();
+                          } else {
+                            final language = AppLanguage.fromTag(ent.$1.tag);
+                            if (language != null) {
+                              await settings.setAppLocale(language.locale);
+                            }
                           }
                           if (!mounted) return;
                           widget.onClose();
@@ -1604,7 +1558,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 class _LangItem {
   final String flag;
   final String label;
-  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US'
+  final String tag;
   const _LangItem({required this.flag, required this.label, required this.tag});
 }
 

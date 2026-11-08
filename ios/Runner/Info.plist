@@ -19,6 +19,9 @@
 		<string>en</string>
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
+		<string>ru</string>
+		<string>ko</string>
+		<string>tr</string>
 	</array>
 	<key>CFBundleName</key>
 	<string>kelivo</string>
@@ -68,9 +71,9 @@
 	<key>NSRemindersUsageDescription</key>
 	<string>Kelivo 需要访问提醒事项，以便在您确认后查询、创建和完成提醒。提醒内容可能会发送给您选择的 AI 服务以生成回答。 / Kelivo needs reminders access so it can query, create, and complete reminders after you confirm. Reminder content may be sent to the AI provider you selected to generate answers.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Kelivo 需要访问日历，以便 AI 助手在您授权后查询和创建日程；数据仅在设备上处理，我们不会收集这些信息。 / Kelivo needs calendar access so the AI assistant can query and create events when you enable the calendar tools; data is processed on-device and Kelivo does not collect this information.</string>
+	<string>Kelivo 需要访问日历，以便 AI 助手在您授权后查询和创建日程。日程内容可能会发送给您选择的 AI 服务以生成回答。 / Kelivo needs calendar access so the AI assistant can query and create events when you enable the calendar tools. Event content may be sent to the AI provider you selected to generate answers.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Kelivo 需要访问日历，以便 AI 助手在您授权后查询和创建日程；数据仅在设备上处理，我们不会收集这些信息。 / Kelivo needs calendar access so the AI assistant can query and create events when you enable the calendar tools; data is processed on-device and Kelivo does not collect this information.</string>
+	<string>Kelivo 需要访问日历，以便 AI 助手在您授权后查询和创建日程。日程内容可能会发送给您选择的 AI 服务以生成回答。 / Kelivo needs calendar access so the AI assistant can query and create events when you enable the calendar tools. Event content may be sent to the AI provider you selected to generate answers.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Kelivo 需要使用相机拍摄照片，以便您将图片发送给 AI 助手进行分析。您可以选择是否上传照片。 / Kelivo uses the camera to capture photos that you can share with AI assistants for analysis. Your photo may be uploaded by your choice.</string>
 	<key>NSMicrophoneUsageDescription</key>

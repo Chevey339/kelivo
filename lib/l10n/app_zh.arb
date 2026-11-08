@@ -6072,5 +6072,26 @@
   "compressionNativeCopyHint": "新会话会保留原始消息，以便撤销原生压缩。",
   "compressionNativeInputOverride": "自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。",
   "compressionNativeAllHint": "将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。",
-  "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。"
+  "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。",
+  "languageDisplayRussian": "俄语",
+  "languageDisplayTurkish": "土耳其语",
+  "sideDrawerDeleteConfirmContent": "删除“{title}”？",
+  "backupPageCherryImportWarning": "此功能目前仍处于实验阶段，可导入助手、对话、供应商和文件。部分供应商需要在基础 URL 后添加 /v1 或 /v1beta。为确保数据安全，请在导入前备份。是否继续选择文件？",
+  "themePaletteDefault": "默认",
+  "themePaletteBlue": "海霄蓝",
+  "themePaletteGreen": "竹影绿",
+  "themePalettePurple": "暮紫韵",
+  "themePaletteYellow": "琥珀金",
+  "themePaletteSmokyRose": "暮霭玫",
+  "themePaletteTerracotta": "陶砂红",
+  "themePaletteMonochrome": "纸墨灰",
+  "themePaletteDocument": "樱桃绿",
+  "themePaletteCustom": "自定义",
+  "@sideDrawerDeleteConfirmContent": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

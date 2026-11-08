@@ -15,6 +15,7 @@ import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/app_language.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
@@ -42,9 +43,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     String paletteName() {
       final settings = context.read<SettingsProvider>();
       final palette = ThemePalettes.byId(settings.themePaletteId);
-      return Localizations.localeOf(context).languageCode == 'zh'
-          ? palette.displayNameZh
-          : palette.displayNameEn;
+      return palette.displayName(l10n);
     }
 
     return Scaffold(
@@ -83,13 +82,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 detailBuilder: (ctx) {
                   final settings = ctx.watch<SettingsProvider>();
                   String labelFor(Locale l) {
-                    if (l.languageCode == 'zh') {
-                      if ((l.scriptCode ?? '').toLowerCase() == 'hant') {
-                        return l10n.languageDisplayTraditionalChinese;
-                      }
-                      return l10n.displaySettingsPageLanguageChineseLabel;
-                    }
-                    return l10n.displaySettingsPageLanguageEnglishLabel;
+                    return AppLanguage.fromLocale(l).nativeName;
                   }
 
                   return Text(
@@ -423,33 +416,25 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _sheetOption(
-                  ctx,
-                  label: l10n.settingsPageSystemMode,
-                  onTap: () => Navigator.of(ctx).pop('system'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.displaySettingsPageLanguageChineseLabel,
-                  onTap: () => Navigator.of(ctx).pop('zh_CN'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.languageDisplayTraditionalChinese,
-                  onTap: () => Navigator.of(ctx).pop('zh_Hant'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.displaySettingsPageLanguageEnglishLabel,
-                  onTap: () => Navigator.of(ctx).pop('en_US'),
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _sheetOption(
+                    ctx,
+                    label: l10n.settingsPageSystemMode,
+                    onTap: () => Navigator.of(ctx).pop('system'),
+                  ),
+                  for (final language in AppLanguage.values) ...[
+                    _sheetDividerNoIcon(ctx),
+                    _sheetOption(
+                      ctx,
+                      label: language.nativeName,
+                      onTap: () => Navigator.of(ctx).pop(language.tag),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         );
@@ -459,21 +444,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     if (!context.mounted) return;
 
     final settings = context.read<SettingsProvider>();
-    switch (selected) {
-      case 'system':
-        await settings.setAppLocaleFollowSystem();
-        break;
-      case 'zh_CN':
-        await settings.setAppLocale(const Locale('zh', 'CN'));
-        break;
-      case 'zh_Hant':
-        await settings.setAppLocale(
-          const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
-        );
-        break;
-      case 'en_US':
-      default:
-        await settings.setAppLocale(const Locale('en', 'US'));
+    if (selected == 'system') {
+      await settings.setAppLocaleFollowSystem();
+    } else {
+      final language = AppLanguage.fromTag(selected);
+      if (language != null) await settings.setAppLocale(language.locale);
     }
   }
 
