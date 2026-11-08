@@ -1,5 +1,8 @@
 import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/models/request_budget.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
+import 'package:Kelivo/core/services/api/providers/openai/native_compaction.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
@@ -543,6 +546,7 @@ void main() {
         expect(sent.headers['Authorization'], 'Bearer access');
         expect(sent.headers['chatgpt-account-id'], 'workspace');
         expect(sent.headers['version'], '0.159.0');
+        expect(sent.headers, isNot(contains('openai-beta')));
         expect(
           sent.url.toString(),
           '${OAuthProvider.chatgpt.baseUrl}/responses',
@@ -603,6 +607,9 @@ void main() {
         'name': 'weather',
         'arguments': '{}',
         'status': 'completed',
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 7,
+        },
       };
       final client = service.authenticatedClient(
         MockClient((request) async {
@@ -623,6 +630,9 @@ void main() {
                           'id': 'rs_temporary',
                           'summary': [],
                           'encrypted_content': 'opaque',
+                          'internal_chat_message_metadata_passthrough': {
+                            'content_token_count': 3,
+                          },
                         },
                         call,
                       ],
@@ -680,6 +690,14 @@ void main() {
       final input = (body['input'] as List).cast<Map>();
       expect(input.any((item) => item.containsKey('id')), false);
       expect(
+        input.any(
+          (item) =>
+              item.containsKey('internal_chat_message_metadata_passthrough'),
+        ),
+        false,
+      );
+      expect(call, contains('internal_chat_message_metadata_passthrough'));
+      expect(
         input
             .where((item) => item['type'] == 'reasoning')
             .single['encrypted_content'],
@@ -694,6 +712,128 @@ void main() {
       expect(body['store'], false);
       expect(body['instructions'], '');
       expect(body['include'], contains('reasoning.encrypted_content'));
+    },
+  );
+
+  test(
+    'Codex sanitizes saved history, compaction input and compacted continuation at the wire',
+    () async {
+      const model = 'gpt-5.4';
+      final original = config(provider: OAuthProvider.chatgpt, expired: false);
+      await settings.setProviderConfig(original.id, original);
+      final service = ProviderOAuthService()..bind(settings);
+      addTearDown(service.dispose);
+      final resolved = await service.resolve(original);
+      final savedItem = <String, dynamic>{
+        'type': 'message',
+        'id': 'message-id',
+        'role': 'assistant',
+        'content': [
+          {'type': 'output_text', 'text': 'answer'},
+        ],
+        'metadata': {'keep': true},
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 7,
+        },
+      };
+      final scope = responsesReplayScope(resolved, model);
+      final stored = ResponsesTurnRecorder(
+        scope,
+      ).record([savedItem], []).payload;
+      final history = buildResponsesHistory(
+        payload: stored,
+        scope: scope,
+        toolEvents: [],
+        content: 'answer',
+      )!;
+      final historyBefore = jsonEncode(history);
+      final compactItem = <String, dynamic>{
+        'type': 'compaction',
+        'id': 'compaction-id',
+        'encrypted_content': 'opaque-compaction',
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 2,
+        },
+      };
+      final requests = <http.Request>[];
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          requests.add(request);
+          return http.Response(
+            'data: ${jsonEncode({
+              'type': 'response.completed',
+              'response': {
+                'status': 'completed',
+                'output': requests.length == 1 ? [compactItem] : [],
+              },
+            })}\n\n',
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }),
+        resolved,
+      );
+      addTearDown(client.close);
+      final prepared = <String, dynamic>{
+        'model': model,
+        'input': [
+          {'role': 'user', 'content': 'earlier'},
+          savedItem,
+        ],
+      };
+      final preparedBefore = jsonEncode(prepared);
+      final compacted = await requestNativeCompaction(
+        client,
+        resolved,
+        model,
+        prepared,
+      );
+      final compactedBefore = jsonEncode(compacted.toJson());
+      await sendOpenAIStream(client, resolved, model, [
+        {
+          'role': 'user',
+          'content': '',
+          nativeCompactionMessageKey: compacted.toJson(),
+        },
+        {'role': 'user', 'content': 'next'},
+      ]).toList();
+      await sendOpenAIStream(client, resolved, model, [
+        {'role': 'user', 'content': 'earlier'},
+        ...history,
+        {'role': 'user', 'content': 'next'},
+      ]).toList();
+      expect(requests, hasLength(3));
+      for (final request in requests) {
+        expect(request.headers, isNot(contains('openai-beta')));
+        final input = (jsonDecode(request.body)['input'] as List).cast<Map>();
+        expect(
+          input.any(
+            (item) =>
+                item.containsKey('internal_chat_message_metadata_passthrough'),
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        requests.first.headers['x-codex-beta-features'],
+        'remote_compaction_v2',
+      );
+      final continued = (jsonDecode(requests[1].body)['input'] as List)
+          .cast<Map>();
+      expect(continued.singleWhere((item) => item['type'] == 'compaction'), {
+        'type': 'compaction',
+        'id': 'compaction-id',
+        'encrypted_content': 'opaque-compaction',
+      });
+      final replayed = (jsonDecode(requests.last.body)['input'] as List)
+          .cast<Map>();
+      expect(
+        replayed.singleWhere((item) => item['role'] == 'assistant')['metadata'],
+        {'keep': true},
+      );
+      expect(jsonEncode(prepared), preparedBefore);
+      expect(jsonEncode(history), historyBefore);
+      expect(jsonEncode(compacted.toJson()), compactedBefore);
     },
   );
 

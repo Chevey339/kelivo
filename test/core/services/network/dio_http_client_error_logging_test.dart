@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/network/dio_http_client.dart';
 import 'package:Kelivo/core/services/network/request_logger.dart';
+import 'package:Kelivo/core/services/network/provider_http_exception.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -26,16 +27,22 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 class _RealHttpOverrides extends HttpOverrides {}
 
 class _StreamingAdapter implements HttpClientAdapter {
-  _StreamingAdapter(this.stream);
+  _StreamingAdapter(
+    this.stream, {
+    this.statusCode = 200,
+    this.headers = const {},
+  });
 
   final Stream<Uint8List> stream;
+  final int statusCode;
+  final Map<String, List<String>> headers;
 
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) async => ResponseBody(stream, 200);
+  ) async => ResponseBody(stream, statusCode, headers: headers);
 
   @override
   void close({bool force = false}) {}
@@ -63,6 +70,31 @@ void main() {
       await tempDir.delete(recursive: true);
     }
   });
+
+  test(
+    'logging an interrupted error body retains the no-retry verdict',
+    () async {
+      const failure = HttpException('Connection closed while receiving data');
+      final client = DioHttpClient(
+        adapter: _StreamingAdapter(
+          Stream<Uint8List>.error(failure),
+          statusCode: 503,
+          headers: {
+            'x-should-retry': ['false'],
+          },
+        ),
+      );
+      addTearDown(client.close);
+      await expectLater(
+        client.send(http.Request('GET', Uri.parse('https://test.invalid'))),
+        throwsA(
+          isA<ProviderHttpException>()
+              .having((e) => e.prohibitsRetry, 'no retry', isTrue)
+              .having((e) => e.bodyReadError, 'cause', same(failure)),
+        ),
+      );
+    },
+  );
 
   Future<String> waitForLog(List<String> expected) async {
     final file = File('${tempDir.path}/logs/logs.txt');

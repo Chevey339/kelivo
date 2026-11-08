@@ -11,6 +11,61 @@ void main() {
   String token(Map<String, dynamic> claims) =>
       'e30.${base64UrlEncode(utf8.encode(jsonEncode({'https://api.openai.com/auth': claims})))}.signature';
 
+  test('replay strips only backend metadata and preserves opaque items', () {
+    final input = <Map<String, dynamic>>[
+      for (final type in [
+        'message',
+        'reasoning',
+        'compaction',
+        'computer_call',
+      ])
+        {
+          'type': type,
+          'id': '$type-id',
+          if (type == 'computer_call') 'call_id': 'computer-1',
+          if (type == 'message') ...{
+            'role': 'assistant',
+            'content': [
+              {'type': 'output_text', 'text': 'hello'},
+            ],
+          },
+          if (type == 'reasoning' || type == 'compaction')
+            'encrypted_content': 'opaque-$type',
+          'metadata': {
+            'content_token_count': 12,
+            'internal_chat_message_metadata_passthrough': 'user data',
+          },
+          'internal_chat_message_metadata_passthrough': {
+            'content_token_count': 7,
+          },
+        },
+      {
+        'type': 'computer_call_output',
+        'call_id': 'computer-1',
+        'output': {
+          'type': 'computer_screenshot',
+          'image_url': 'data:image/png;base64,YQ==',
+        },
+      },
+    ];
+    final original = jsonEncode(input);
+    final body = <String, dynamic>{'input': input};
+    applyCodexRequest(body, {}, 'token');
+    final sent = (body['input'] as List).cast<Map>();
+    expect(sent, hasLength(input.length));
+    for (var i = 0; i < 4; i++) {
+      final expected = Map<String, dynamic>.from(input[i])
+        ..remove('internal_chat_message_metadata_passthrough');
+      if (i < 2) expected.remove('id');
+      expect(sent[i], expected);
+    }
+    expect(sent.last, input.last);
+    expect(jsonEncode(input), original);
+    final once = jsonEncode(body);
+    applyCodexRequest(body, {}, 'token');
+    expect(jsonEncode(body), once);
+  });
+
   test('Codex session headers and automatic cache key stay stable', () {
     final config = ProviderConfig(
       id: 'codex',

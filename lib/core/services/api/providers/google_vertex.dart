@@ -1,9 +1,9 @@
+import '../../network/provider_http_exception.dart';
 import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -112,7 +112,7 @@ Future<String> downloadRemoteAsBase64(
   final resp = await client.send(req);
   if (resp.statusCode < 200 || resp.statusCode >= 300) {
     final err = await resp.stream.bytesToString();
-    throw HttpException('HTTP ${resp.statusCode}: $err');
+    throw ProviderHttpException(resp, err);
   }
   final bytes = await resp.stream.fold<List<int>>(<int>[], (acc, b) {
     acc.addAll(b);
@@ -349,7 +349,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       final response = await client.send(httpRequest);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        throw ProviderHttpException(response, errorBody);
       }
 
       if (!stream) {

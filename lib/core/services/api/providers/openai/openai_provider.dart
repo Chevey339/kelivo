@@ -1,3 +1,4 @@
+import '../../../network/provider_http_exception.dart';
 import '../../../../models/image_context.dart';
 import 'responses_request.dart';
 import '../../native_compaction_context.dart';
@@ -295,7 +296,7 @@ Stream<StreamChunk> sendOpenAIStream(
   final response = await client.send(request);
   if (response.statusCode < 200 || response.statusCode >= 300) {
     final errorBody = await response.stream.bytesToString();
-    throw HttpException('HTTP ${response.statusCode}: $errorBody');
+    throw ProviderHttpException(response, errorBody);
   }
 
   // Non-streaming path: parse one-shot JSON and optionally follow tool calls.

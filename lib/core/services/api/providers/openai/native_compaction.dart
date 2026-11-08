@@ -1,5 +1,5 @@
+import '../../../network/provider_http_exception.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../../models/native_compaction.dart';
@@ -64,8 +64,9 @@ Future<NativeCompactionPayload> requestNativeCompaction(
   RequestImageContext.current?.validateBodyBytes(request.bodyBytes.length);
   final response = await client.send(request);
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw HttpException(
-      'HTTP ${response.statusCode}: ${await response.stream.bytesToString()}',
+    throw ProviderHttpException(
+      response,
+      await response.stream.bytesToString(),
     );
   }
   if (!codex) {

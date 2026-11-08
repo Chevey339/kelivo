@@ -72,11 +72,17 @@ void applyCodexRequest(
     body['input'] = _repairToolPairs([
       for (final item in input)
         if (item is! Map || item['type'] != 'item_reference')
-          item is Map &&
-                  item['type'] != 'computer_call' &&
-                  item['type'] != 'compaction'
-              ? (Map<String, dynamic>.from(item)..remove('id'))
-              : item,
+          if (item is Map)
+            (Map<String, dynamic>.from(item)
+              ..remove('internal_chat_message_metadata_passthrough')
+              ..removeWhere(
+                (key, _) =>
+                    key == 'id' &&
+                    item['type'] != 'computer_call' &&
+                    item['type'] != 'compaction',
+              ))
+          else
+            item,
     ]);
   }
 

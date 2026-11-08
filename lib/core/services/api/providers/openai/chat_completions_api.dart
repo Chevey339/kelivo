@@ -1,3 +1,4 @@
+import '../../../network/provider_http_exception.dart';
 import '../../../../models/image_context.dart';
 import '../../request_history_context.dart';
 import '../../request_image_context.dart';
@@ -983,7 +984,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         resp2 = await client.send(req2);
         if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
           final errorBody = await resp2.stream.bytesToString();
-          throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+          throw ProviderHttpException(resp2, errorBody);
         }
       } on ImageContextBudgetException {
         rethrow;
@@ -1146,7 +1147,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       final resp2 = await client.send(req);
       if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
         final errorBody = await resp2.stream.bytesToString();
-        throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+        throw ProviderHttpException(resp2, errorBody);
       }
       lastObj =
           jsonDecode(await decodeUtf8Stream(resp2.stream))

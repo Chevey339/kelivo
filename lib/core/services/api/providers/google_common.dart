@@ -1,3 +1,4 @@
+import '../../network/provider_http_exception.dart';
 import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
@@ -676,7 +677,7 @@ Stream<StreamChunk> sendGoogleStream(
         final resp = await client.send(req);
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           final errorBody = await resp.stream.bytesToString();
-          throw HttpException('HTTP ${resp.statusCode}: $errorBody');
+          throw ProviderHttpException(resp, errorBody);
         }
         final txt = await decodeUtf8Stream(resp.stream);
         final obj = jsonDecode(txt) as Map<String, dynamic>;
@@ -1156,7 +1157,7 @@ Stream<StreamChunk> sendGoogleStream(
       final resp = await client.send(request);
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         final errorBody = await resp.stream.bytesToString();
-        throw HttpException('HTTP ${resp.statusCode}: $errorBody');
+        throw ProviderHttpException(resp, errorBody);
       }
 
       final sse = resp.stream.transform(utf8.decoder);

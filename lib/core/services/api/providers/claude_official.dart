@@ -1,3 +1,4 @@
+import '../../network/provider_http_exception.dart';
 import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
@@ -6,7 +7,6 @@ import '../../../models/provider_oauth.dart';
 import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -428,7 +428,7 @@ Stream<StreamChunk> sendClaudeStream(
             body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
-          throw HttpException('HTTP ${response.statusCode}: $errorBody');
+          throw ProviderHttpException(response, errorBody);
         }
         retriedContainer = true;
         container = null;

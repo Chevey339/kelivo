@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../../models/provider_oauth.dart';
 import '../network/dio_http_client.dart';
+import '../network/provider_http_exception.dart';
 import 'oauth_callback_types.dart';
 
 /// Only classifications cross the OAuth boundary. Transport messages, URLs,
@@ -12,6 +13,9 @@ import 'oauth_callback_types.dart';
 ProviderOAuthException oauthFailure(Object error) {
   if (error is ProviderOAuthException) return error;
   if (error is TransportClientException) return oauthFailure(error.cause);
+  if (error is ProviderHttpException && error.bodyReadError != null) {
+    return oauthFailure(error.bodyReadError!);
+  }
   if (error is OAuthCallbackException) {
     return ProviderOAuthException(
       error.cancelled

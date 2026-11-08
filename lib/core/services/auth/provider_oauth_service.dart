@@ -214,6 +214,7 @@ class ProviderOAuthService extends ChangeNotifier {
   Future<ProviderConfig> resolve(
     ProviderConfig config, {
     bool force = false,
+    bool usageProbe = false,
   }) async {
     if (!config.isOAuth) return config;
     final current = _requireCurrentSession(config);
@@ -233,17 +234,31 @@ class ProviderOAuthService extends ChangeNotifier {
         )) {
       return _forRequest(current);
     }
+    final settings = _settings;
     final key = _sessionKey(current);
     final pending = _refreshes[key];
-    if (pending != null) return pending;
-    final request = _refresh(current);
-    _refreshes[key] = request;
-    notifyListeners();
+    final request = pending ?? _refresh(current);
+    if (pending == null) {
+      _refreshes[key] = request;
+      notifyListeners();
+    }
     try {
       return await request;
+    } on ProviderOAuthException catch (error) {
+      // Refreshes are shared with usage probes. Each caller decides whether
+      // its failure can invalidate the account; token rotation is still saved
+      // once by _refresh regardless of who started it.
+      if (!usageProbe &&
+          identical(settings, _settings) &&
+          error.kind == ProviderOAuthFailure.loginRequired) {
+        await markLoginRequired(current);
+      }
+      rethrow;
     } finally {
-      _refreshes.remove(key);
-      notifyListeners();
+      if (pending == null) {
+        _refreshes.remove(key);
+        notifyListeners();
+      }
     }
   }
 
@@ -285,9 +300,6 @@ class ProviderOAuthService extends ChangeNotifier {
         );
       }
       _requireCurrentSession(original);
-      if (error.kind == ProviderOAuthFailure.loginRequired) {
-        await markLoginRequired(original);
-      }
       throw ProviderOAuthException(
         error.kind,
         providerId: original.id,
@@ -324,27 +336,44 @@ class ProviderOAuthService extends ChangeNotifier {
 
   Future<T> _authenticated<T>(
     ProviderConfig original,
-    Future<T> Function(OAuthWire, ProviderConfig) operation,
-  ) async {
-    var config = await resolve(original);
-    final client = _clientFactory(config);
+    Future<T> Function(OAuthWire, ProviderConfig) operation, {
+    bool usageProbe = false,
+  }) async {
     try {
+      var config = await resolve(original, usageProbe: usageProbe);
+      final client = _clientFactory(config);
       try {
-        return await operation(OAuthWire(client), config);
-      } on ProviderOAuthException catch (error) {
-        if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
-        config = await resolve(config, force: true);
         try {
           return await operation(OAuthWire(client), config);
         } on ProviderOAuthException catch (error) {
-          if (error.kind == ProviderOAuthFailure.loginRequired) {
-            await markLoginRequired(config);
+          if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
+          config = await resolve(config, force: true, usageProbe: usageProbe);
+          try {
+            return await operation(OAuthWire(client), config);
+          } on ProviderOAuthException catch (error) {
+            if (!usageProbe &&
+                error.kind == ProviderOAuthFailure.loginRequired) {
+              await markLoginRequired(config);
+            }
+            rethrow;
           }
-          rethrow;
         }
+      } finally {
+        client.close();
       }
-    } finally {
-      client.close();
+    } on ProviderOAuthException catch (error) {
+      if (!usageProbe || error.kind != ProviderOAuthFailure.loginRequired) {
+        rethrow;
+      }
+      throw ProviderOAuthException(
+        ProviderOAuthFailure.usageUnavailable,
+        providerId: original.id,
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+        stage: error.stage,
+        transportFailure: error.transportFailure,
+      );
     }
   }
 
@@ -493,6 +522,7 @@ class ProviderOAuthService extends ChangeNotifier {
       (wire, config) => ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
       ).usage(wire, config.oauthCredentials!),
+      usageProbe: true,
     );
     _usageRequests[key] = request;
     try {

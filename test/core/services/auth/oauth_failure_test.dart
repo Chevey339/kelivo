@@ -15,9 +15,9 @@ import 'package:http/testing.dart';
 const _secret = 'private-code-token-state-password';
 
 class _Adapter implements HttpClientAdapter {
-  _Adapter(this.error, {required this.afterHeaders});
+  _Adapter(this.error, {required this.statusCode});
   final Object error;
-  final bool afterHeaders;
+  final int? statusCode;
 
   @override
   Future<ResponseBody> fetch(
@@ -25,8 +25,15 @@ class _Adapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    if (!afterHeaders) throw error;
-    return ResponseBody(Stream<Uint8List>.error(error), 200);
+    if (statusCode == null) throw error;
+    return ResponseBody(
+      Stream<Uint8List>.error(error),
+      statusCode!,
+      headers: {
+        'x-should-retry': ['false'],
+        'set-cookie': [_secret],
+      },
+    );
   }
 
   @override
@@ -147,10 +154,10 @@ void main() {
     ),
   ];
   for (final (name, cause, kind, transport) in cases) {
-    for (final afterHeaders in [false, true]) {
-      test('$name is classified and sanitized (body: $afterHeaders)', () async {
+    for (final status in [null, 200, 503]) {
+      test('$name is classified and sanitized (status: $status)', () async {
         final client = DioHttpClient(
-          adapter: _Adapter(cause, afterHeaders: afterHeaders),
+          adapter: _Adapter(cause, statusCode: status),
           logRequests: false,
         );
         addTearDown(client.close);

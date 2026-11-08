@@ -198,11 +198,11 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         assistantBlocks.add({
           'type': 'thinking',
           'thinking': '',
-          'signature': '',
+          'signature': block['signature'] is String ? block['signature'] : '',
         });
         _thinkingBlockIndex[idx] = assistantBlocks.length - 1;
         _thinkingText[idx] = StringBuffer();
-        _thinkingSig[idx] = StringBuffer();
+        _thinkingSig.remove(idx);
         chunks.add(ReasoningStart(id: _ids.indexed('thinking', idx)));
       }
     } else if (kind == 'redacted_thinking') {
@@ -311,7 +311,11 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       }
     } else if (kind == 'signature_delta') {
       final sig = (d['signature'] ?? '').toString();
-      if (sig.isNotEmpty && idx != null) _thinkingSig[idx]?.write(sig);
+      if (idx != null && _thinkingBlockIndex.containsKey(idx)) {
+        // The first native delta replaces the block-start fallback, including
+        // an empty delta. Later fragments belong to that same signature.
+        _thinkingSig.putIfAbsent(idx, StringBuffer.new).write(sig);
+      }
     } else if (kind == 'redacted_thinking_delta') {
       final data = (d['data'] ?? '').toString();
       if (data.isNotEmpty && idx != null) _redactedData[idx]?.write(data);
@@ -365,7 +369,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       assistantBlocks[pos] = {
         'type': 'thinking',
         'thinking': _thinkingText.remove(idx)?.toString() ?? '',
-        'signature': _thinkingSig.remove(idx)?.toString() ?? '',
+        'signature':
+            _thinkingSig.remove(idx)?.toString() ??
+            assistantBlocks[pos]['signature'],
       };
       chunks.add(ReasoningEnd(id: _ids.indexed('thinking', idx)));
     }

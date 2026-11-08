@@ -437,7 +437,6 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     'originator': 'kelivo',
     'version': codexClientVersion,
     'User-Agent': 'Kelivo',
-    'OpenAI-Beta': 'responses=experimental',
   };
 
   @override

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:socks5_proxy/socks_client.dart' as socks;
 
 import '../logging/log_redactor.dart';
+import 'provider_http_exception.dart';
 import 'request_logger.dart';
 
 Future<InternetAddress?> _resolveProxyAddress(String host) async {
@@ -314,7 +315,18 @@ class DioHttpClient extends http.BaseClient {
                 '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(error.toString()))}',
               );
             }
-            controller.addError(error, stack);
+            final failure =
+                (statusCode < 200 || statusCode >= 300) &&
+                    !_cancelToken.isCancelled &&
+                    !(error is DioException &&
+                        error.type == DioExceptionType.cancel)
+                ? ProviderHttpException.bodyReadFailure(
+                    statusCode,
+                    headers,
+                    error,
+                  )
+                : error;
+            controller.addError(failure, stack);
             unawaited(controller.close());
           },
           onDone: () {
@@ -370,6 +382,10 @@ class DioHttpClient extends http.BaseClient {
         isRedirect: resp.isRedirect,
         reasonPhrase: resp.statusMessage,
       );
+    } on ProviderHttpException {
+      // Logging may read an error body before send returns. Keep its response
+      // metadata instead of wrapping it as an unclassified transport failure.
+      rethrow;
     } on DioException catch (e) {
       if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
