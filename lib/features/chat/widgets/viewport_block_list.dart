@@ -126,8 +126,10 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
     final scale = _textScale;
     _storedExtents?.removeWhere((key, _) {
       if (key is! (Object, double, double)) return true;
-      return key.$2 != width ||
-          key.$3 != scale ||
+      // A newly mounted folded list has no layout width yet. Keep its cached
+      // dimensions until LayoutBuilder can check the actual constraints.
+      return (width != null && key.$2 != width) ||
+          (scale != null && key.$3 != scale) ||
           (itemKeys != null && !itemKeys.contains(key.$1));
     });
   }
