@@ -36,13 +36,16 @@ namespace flutter_inappwebview_plugin
       auto lock = lockMessenger(messenger_.get());
       if (!*alive_ || !FlutterDesktopMessengerIsAvailable(messenger_.get())) return;
       if (handler) {
-        handler = [handler = std::move(handler), messenger = messenger_, alive = alive_](
+        auto sharedHandler = std::make_shared<flutter::BinaryMessageHandler>(std::move(handler));
+        handler = [sharedHandler, messenger = messenger_, alive = alive_](
           const uint8_t* data, size_t size, flutter::BinaryReply reply) {
           // Do not hold the messenger lock across a handler/reply: either can
           // re-enter the messenger. Platform callbacks run on the owning STA.
           if (available(messenger.get(), alive)) {
-            auto callback = handler;
-            callback(data, size, std::move(reply));
+            // Pin the same callable across dispatches and self-unregistration.
+            // Copying it would reset EventChannel's mutable listen/cancel state.
+            auto callback = sharedHandler;
+            (*callback)(data, size, std::move(reply));
           }
           else if (reply) reply(nullptr, 0);
         };

@@ -18,6 +18,7 @@ namespace flutter_inappwebview_plugin
     useOnLoadResource = get_fl_map_value(encodableMap, "useOnLoadResource", useOnLoadResource);
     useOnDownloadStart = get_fl_map_value(encodableMap, "useOnDownloadStart", useOnDownloadStart);
     useShouldInterceptRequest = get_fl_map_value(encodableMap, "useShouldInterceptRequest", useShouldInterceptRequest);
+    blockNetworkLoads = get_fl_map_value(encodableMap, "blockNetworkLoads", blockNetworkLoads);
     userAgent = get_fl_map_value(encodableMap, "userAgent", userAgent);
     javaScriptEnabled = get_fl_map_value(encodableMap, "javaScriptEnabled", javaScriptEnabled);
     transparentBackground = get_fl_map_value(encodableMap, "transparentBackground", transparentBackground);
@@ -34,6 +35,7 @@ namespace flutter_inappwebview_plugin
       {"useOnLoadResource", useOnLoadResource},
       {"useOnDownloadStart", useOnDownloadStart},
       {"useShouldInterceptRequest", useShouldInterceptRequest},
+      {"blockNetworkLoads", blockNetworkLoads},
       {"userAgent", userAgent},
       {"javaScriptEnabled", javaScriptEnabled},
       {"transparentBackground", transparentBackground},

@@ -275,8 +275,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   static bool _isPageUrl(String value) {
-    if (value == 'about:blank' ||
-        BrowserWorkspaceResources.isWorkspaceUrl(value)) {
+    if (value == 'about:blank' || BrowserWorkspaceResources.isLocalUrl(value)) {
       return true;
     }
     final uri = Uri.tryParse(value);
@@ -303,7 +302,10 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     ).hasMatch(value);
     if (explicit && !hostWithPort) {
       if (!_isPageUrl(value)) {
-        throw const FormatException('Use HTTP(S) or kelivo://workspace/ pages');
+        throw const FormatException('Use HTTP(S) or local Kelivo file pages');
+      }
+      if (BrowserWorkspaceResources.isLocalUrl(value)) {
+        return BrowserWorkspaceResources.normalizeLocalUrl(value);
       }
       return Uri.parse(value).toString();
     }
@@ -594,9 +596,12 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     final id = _target(tabId);
     _checkAction(id);
     final url = normalizeAddress(input, searchEngine: _settings.searchEngine);
-    if (BrowserWorkspaceResources.isWorkspaceUrl(url)) {
+    if (BrowserWorkspaceResources.isLocalUrl(url)) {
       final owner = requireTab(id).ownerSessionId;
-      final scope = await BrowserWorkspaceResources.instance.scope(owner);
+      final scope = await BrowserWorkspaceResources.instance.scope(
+        owner,
+        pageUrl: url,
+      );
       try {
         await scope.file(Uri.parse(url));
       } finally {
@@ -608,37 +613,36 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     final previous = requireTab(id);
-    _htmlDocuments.remove(id);
-    final index = _tabs.indexWhere((tab) => tab.id == id);
-    if (index >= 0) _tabs[index] = _tabs[index].copyWith(hasContent: false);
     final revision = (_navigationRevisions[id] ?? 0) + 1;
     _navigationRevisions[id] = revision;
     var created = false;
-    _updateTab(id, BrowserPageState(url: url, isLoading: true, progress: 0));
-    final engine = await _engine(id, onCreated: () => created = true);
-    _checkAction(id);
-    requireTab(id);
-    if (_navigationRevisions[id] != revision) return;
-    if (!created) {
-      try {
+    _updateTab(id, const BrowserPageState(isLoading: true, progress: 0));
+    try {
+      final engine = await _engine(
+        id,
+        initialUrl: url,
+        onCreated: () => created = true,
+      );
+      _checkAction(id);
+      requireTab(id);
+      if (_navigationRevisions[id] != revision) return;
+      if (!created) {
         await _runEngineOperation(id, () => engine.navigate(url));
-      } catch (error) {
-        if (error is StateError &&
-            error.message == 'browser_tab_owner_changed' &&
-            identical(_engines[id], engine) &&
-            _navigationRevisions[id] == revision) {
-          _updateTab(
-            id,
-            BrowserPageState(
-              url: previous.url,
-              title: previous.title,
-              isLoading: previous.isLoading,
-              progress: previous.progress,
-            ),
-          );
-        }
-        rethrow;
       }
+    } catch (error) {
+      if (_navigationRevisions[id] == revision) {
+        _updateTab(
+          id,
+          BrowserPageState(
+            url: previous.url,
+            title: previous.title,
+            isLoading: false,
+            progress: previous.progress,
+            error: BrowserFailure.from(error).message,
+          ),
+        );
+      }
+      rethrow;
     }
   }
 
@@ -1092,7 +1096,11 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<BrowserEngine> _engine(String id, {VoidCallback? onCreated}) {
+  Future<BrowserEngine> _engine(
+    String id, {
+    String? initialUrl,
+    VoidCallback? onCreated,
+  }) {
     _checkAction(id);
     requireTab(id);
     _idleTimer?.cancel();
@@ -1160,7 +1168,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
               tab.runtimeVersion;
       final creating = runZoned(
         () => _engineFactory(
-          tab: tab,
+          tab: initialUrl == null ? tab : tab.copyWith(url: initialUrl),
           settings: _settings,
           onChanged: (state) {
             if (isCurrent()) _updateTab(id, state);
@@ -1266,7 +1274,7 @@ class BrowserService extends ChangeNotifier with WidgetsBindingObserver {
       }
       onCreated?.call();
       final document = _htmlDocuments[id];
-      if (document != null) {
+      if (document != null && initialUrl == null) {
         await engine.loadHtml(document.html, baseUrl: document.baseUrl);
       }
       _scheduleIdleRelease();

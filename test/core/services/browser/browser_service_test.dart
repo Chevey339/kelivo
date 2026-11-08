@@ -43,6 +43,7 @@ class FakeBrowserEngine extends BrowserEngine {
   Future<void> navigate(String url) async {
     navigations.add(url);
     await navigating?.future;
+    onChanged(BrowserPageState(url: url));
   }
 
   @override

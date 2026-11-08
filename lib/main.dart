@@ -155,7 +155,7 @@ void _wireWorkspaceServices(BuildContext ctx) {
       // repeatedly resolving directory bookmarks for each auto-save.
       final paths = WorkspacePaths.sandboxed(
         workspaceHostRoot: root,
-        sessionHostDir: root,
+        sessionHostDir: (await AppDirectories.sessionDir(sessionId)).path,
         skillsHostDir: skills.path,
         externalMounts: mounts.activeMounts,
       );
@@ -186,6 +186,11 @@ void _wireWorkspaceServices(BuildContext ctx) {
       if (workspace == null) return null;
       return Directory(await workspaces.hostRootFor(workspace));
     };
+    BrowserWorkspaceResources.instance.sessionRootForSession =
+        (sessionId) async {
+          if (chat.getConversation(sessionId) == null) return null;
+          return AppDirectories.sessionDir(sessionId);
+        };
     chat.newConversationExtras = (assistantId) {
       if (assistantId == null) {
         return const <String, dynamic>{};

@@ -14,6 +14,7 @@ namespace flutter_inappwebview_plugin
     bool useOnLoadResource = false;
     bool useOnDownloadStart = false;
     bool useShouldInterceptRequest = false;
+    bool blockNetworkLoads = false;
     std::string userAgent;
     bool javaScriptEnabled = true;
     bool transparentBackground = false;

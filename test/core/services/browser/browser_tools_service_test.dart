@@ -122,6 +122,9 @@ void main() {
             required onNewWindow,
             required isAgentActive,
           }) async {
+            onChanged(
+              BrowserPageState(url: tab.url, title: 'Page', isLoading: false),
+            );
             return engines[tab.id] = _Engine(
               onChanged,
               loadError: loadError,
@@ -149,6 +152,43 @@ void main() {
       browser.updateSettings(browser.settings.copyWith(agentEnabled: true));
   Map<String, dynamic> payload(ClientToolResult result) =>
       jsonDecode(result.content.split('\n![](').first) as Map<String, dynamic>;
+
+  test('a missing local file releases only the new empty tab', () async {
+    final resources = BrowserWorkspaceResources.instance;
+    final previous = resources.rootForSession;
+    resources.rootForSession = (_) async => directory;
+    addTearDown(() => resources.rootForSession = previous);
+    final missing = payload(
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'kelivo://workspace/missing.html',
+      }),
+    );
+    expect(missing['error_code'], 'browser_workspace_file_error');
+    expect(missing['requested_url'], 'kelivo://workspace/missing.html');
+    expect(browser.tabsForSession('chat-a'), isEmpty);
+    resources.rootForSession = (_) async => null;
+    final unbound = payload(
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'kelivo://workspace/index.html',
+      }),
+    );
+    expect(unbound['error_code'], 'browser_workspace_not_bound');
+    expect(browser.tabsForSession('chat-a'), isEmpty);
+    resources.rootForSession = (_) async => directory;
+    final existing = await browser.createTab(
+      ownerSessionId: 'chat-a',
+      url: 'https://example.com',
+    );
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'kelivo://workspace/missing.html',
+      'tab_id': existing.id,
+    });
+    expect(browser.requireTab(existing.id).url, 'https://example.com');
+    expect(browser.tabsForSession('chat-a'), hasLength(1));
+  });
 
   test(
     'an explicit global opt-out prevents tools from creating tabs',

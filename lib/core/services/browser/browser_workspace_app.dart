@@ -108,6 +108,29 @@ String browserStorageScript(
   }
   if (window !== window.top ||
       decodeURIComponent(location.pathname) !== ${jsonEncode('/$entry')}) return;
+  // WebView2 can replace blocked network navigations with an error document.
+  // Keep this workaround off Android, whose local application origin is HTTPS.
+  if ($windows) {
+    addEventListener('click', event => {
+      const link = event.composedPath().find(node => node instanceof HTMLAnchorElement);
+      if (link && (link.protocol === 'http:' || link.protocol === 'https:')) {
+        event.preventDefault();
+      }
+    }, true);
+    // Detached download anchors do not dispatch through the window listener.
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function() {
+      if (this.protocol !== 'http:' && this.protocol !== 'https:') {
+        return Reflect.apply(click, this, []);
+      }
+    };
+    window.navigation?.addEventListener('navigate', event => {
+      const url = new URL(event.destination.url);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        event.preventDefault();
+      }
+    });
+  }
   const newDocumentId = () => Array.from(crypto.getRandomValues(new Uint32Array(4)),
       n => n.toString(16)).join('-');
   let documentId = newDocumentId();

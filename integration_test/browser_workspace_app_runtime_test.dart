@@ -190,6 +190,16 @@ const frame=document.createElement('iframe');frame.src='$address/frame';document
       ).write('backend.txt', 'native filesystem check', null);
       Future<Object?> evaluate(String script) =>
           browser.evaluateJavascript(script, tabId: tab.id, awaitPromise: true);
+      await expectLater(
+        evaluate('Promise.reject(new Error("storage-probe-failure"))'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message.toString(),
+            'JavaScript error description',
+            contains('storage-probe-failure'),
+          ),
+        ),
+      );
       if (Platform.isAndroid) {
         final ordinary = await resources.scope('storage-fixture');
         try {
@@ -278,6 +288,7 @@ const frame=document.createElement('iframe');frame.src='$address/frame';document
         try { navigator.sendBeacon(target+'/beacon','probe'); } catch (_) {}
         return true;
       })()''');
+      expect(await evaluate('location.protocol'), isNot('chrome-error:'));
       final saved = await evaluate('''(async () => {
         const initial = await kelivo.readJson('state.json', {count:0});
         await kelivo.saveJson('state.json', {count:initial.count+1});
@@ -413,6 +424,7 @@ const frame=document.createElement('iframe');frame.src='$address/frame';document
       );
       await Future<void>.delayed(const Duration(milliseconds: 250));
       expect(requests, 0);
+      expect(await evaluate('typeof kelivo'), 'object');
       expect(browser.tabs.single.url, 'kelivo://workspace/notes.app.html');
       if (const bool.fromEnvironment('KELIVO_STORAGE_PERF')) {
         await _measureStorage(evaluate);

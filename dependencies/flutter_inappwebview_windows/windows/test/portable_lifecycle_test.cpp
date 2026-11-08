@@ -108,6 +108,30 @@ void testMessengerTeardown() {
   check(!delegate.handler && delegate.registrations == 3, "live channel was not unregistered");
 }
 
+void testMutableMessageHandler() {
+  FlutterDesktopMessenger engine;
+  Messenger delegate;
+  auto alive = std::make_shared<std::atomic_bool>(true);
+  flutter_inappwebview_plugin::PluginMessenger messenger(&delegate, &engine, alive);
+  int observed = 0;
+  messenger.SetMessageHandler("events", [&, calls = 0](const uint8_t*, size_t, flutter::BinaryReply reply) mutable {
+    observed = ++calls;
+    if (calls == 2) {
+      // EventChannel keeps listen/cancel state in this callable. Unregistering
+      // during dispatch must preserve that state and keep the invocation alive.
+      messenger.SetMessageHandler("events", nullptr);
+      reply(nullptr, 0);
+      check(calls == 2, "unregistration destroyed the running handler");
+    }
+  });
+  delegate.handler(nullptr, 0, nullptr);
+  check(observed == 1, "first stateful event was not delivered");
+  bool replied = false;
+  delegate.handler(nullptr, 0, [&](const uint8_t*, size_t) { replied = true; });
+  check(observed == 2 && replied, "message handler lost state between listen and cancel");
+  check(!delegate.handler, "stateful handler did not unregister");
+}
+
 class Textures : public flutter::TextureRegistrar {
 public:
   std::promise<void> called;
@@ -149,6 +173,7 @@ void testTextureFence() {
 
 int main() {
   testMessengerTeardown();
+  testMutableMessageHandler();
   testTextureFence();
   std::cout << "Messenger teardown and async texture removal tests passed." << std::endl;
 }

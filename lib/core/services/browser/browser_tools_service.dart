@@ -68,6 +68,10 @@ class BrowserToolsService {
           'Use select_option for native select controls. Ref/selector targets are automatically scrolled into view and checked for obstruction before click/type/select_option. '
           'Workspace HTML is available at kelivo://workspace/path/index.html, '
           'with relative assets scoped to this conversation’s bound workspace. '
+          'Files in this conversation’s session directory use kelivo://session/path/index.html; '
+          'kelivo://chat/outputs/ and kelivo://chat/attachments/ links are also supported. '
+          'render creates a temporary about:blank document: use inline or absolute resources, '
+          'and do not rely on localStorage or the kelivo storage bridge there. '
           'For persistent single-file apps, create NAME.app.html with inline JS/CSS. '
           'These pages have no network, external assets, frames or popups. '
           'Use await kelivo.readJson("state.json", initialValue), then await '
@@ -118,7 +122,7 @@ class BrowserToolsService {
           'url': {
             'type': 'string',
             'description':
-                'HTTP(S) URL or kelivo://workspace/relative/path.html for open/new_tab.',
+                'HTTP(S) URL or kelivo://workspace/, kelivo://session/, kelivo://chat/outputs/ file URL for open/new_tab.',
           },
           'html': {
             'type': 'string',
@@ -312,12 +316,10 @@ class BrowserToolsService {
           uri.host.isEmpty ||
           !(uri.isScheme('http') ||
               uri.isScheme('https') ||
-              BrowserWorkspaceResources.isWorkspaceUrl(
-                args['url'] as String,
-              )) ||
+              BrowserWorkspaceResources.isLocalUrl(args['url'] as String)) ||
           uri.userInfo.isNotEmpty) {
         throw const FormatException(
-          'Use HTTP(S) or kelivo://workspace/ URLs, with no embedded credentials.',
+          'Use HTTP(S) or local Kelivo file URLs, with no embedded credentials.',
         );
       }
     }
@@ -437,6 +439,7 @@ class BrowserToolsService {
           'ok': false,
           'action': action,
           ...BrowserFailure.from(error).toJson(),
+          if (arguments['url'] is String) 'requested_url': arguments['url'],
           if (tab != null)
             'page': {
               'tab_id': tab.id,
@@ -474,18 +477,18 @@ class BrowserToolsService {
   ) async {
     ToolCallCancellation.current?.throwIfCancelled();
     String tabId;
+    var createdTab = false;
     if (action == 'new_tab' ||
         ((action == 'open' || action == 'render') &&
             args['tab_id'] == null &&
             browser.tabsForSession(sessionId).isEmpty)) {
       tabId = (await browser.createTab(ownerSessionId: sessionId)).id;
+      createdTab = true;
     } else {
       tabId = browser.requireAgentTab(sessionId, args['tab_id'] as String?).id;
     }
     onTab(tabId);
-    final outputScope = args['save_to'] == null
-        ? null
-        : await workspaces.scope(sessionId);
+    BrowserWorkspaceScope? outputScope;
     final previousTabs = browser
         .tabsForSession(sessionId)
         .map((t) => t.id)
@@ -495,71 +498,108 @@ class BrowserToolsService {
       args['wait_until'] as String? ?? 'domcontentloaded',
     );
     Map<String, dynamic> data = {};
-    switch (action) {
-      case 'new_tab':
-      case 'open':
-        if (args['url'] is String) {
-          await browser.navigate(args['url'] as String, tabId: tabId);
+    try {
+      if (args['save_to'] != null) {
+        outputScope = await workspaces.scope(sessionId);
+      }
+      switch (action) {
+        case 'new_tab':
+        case 'open':
+          if (args['url'] is String) {
+            await browser.navigate(args['url'] as String, tabId: tabId);
+            await browser.waitForLoad(
+              tabId: tabId,
+              timeout: timeout,
+              stage: stage,
+            );
+          }
+        case 'render':
+          await browser.loadHtml(
+            args['html'] as String,
+            tabId: tabId,
+            title: args['title'] as String?,
+          );
           await browser.waitForLoad(
             tabId: tabId,
             timeout: timeout,
             stage: stage,
           );
-        }
-      case 'render':
-        await browser.loadHtml(
-          args['html'] as String,
-          tabId: tabId,
-          title: args['title'] as String?,
-        );
-        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
-      case 'back':
-        await browser.back(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
-      case 'forward':
-        await browser.forward(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
-      case 'reload':
-        await browser.reload(tabId: tabId);
-        await browser.waitForLoad(tabId: tabId, timeout: timeout, stage: stage);
-      case 'switch_tab':
-        await browser.selectTab(tabId);
-      case 'close_tab':
+        case 'back':
+          await browser.back(tabId: tabId);
+          await browser.waitForLoad(
+            tabId: tabId,
+            timeout: timeout,
+            stage: stage,
+          );
+        case 'forward':
+          await browser.forward(tabId: tabId);
+          await browser.waitForLoad(
+            tabId: tabId,
+            timeout: timeout,
+            stage: stage,
+          );
+        case 'reload':
+          await browser.reload(tabId: tabId);
+          await browser.waitForLoad(
+            tabId: tabId,
+            timeout: timeout,
+            stage: stage,
+          );
+        case 'switch_tab':
+          await browser.selectTab(tabId);
+        case 'close_tab':
+          await browser.closeTab(tabId);
+          return _result(sessionId, action, {'closed_tab_id': tabId});
+        case 'evaluate':
+          data = _decode(
+            await browser.evaluateJavascript(
+              BrowserAutomationScript.evaluate(args['script'] as String),
+              tabId: tabId,
+              awaitPromise: true,
+            ),
+          );
+        case 'screenshot':
+          break;
+        case 'wait':
+          if (args.containsKey('wait_until')) {
+            await browser.waitForLoad(
+              tabId: tabId,
+              timeout: timeout,
+              stage: stage,
+            );
+          }
+          if (!args.containsKey('wait_until') ||
+              args.containsKey('wait_for') ||
+              args.containsKey('wait_for_url')) {
+            await _wait(tabId, args, timeout);
+          } else if (args['wait_ms'] is int) {
+            await Future<void>.delayed(
+              Duration(milliseconds: args['wait_ms'] as int),
+            );
+          }
+          data = {'ready': true};
+        default:
+          data = await _dom(tabId, action, {
+            ...args,
+            if (action == 'snapshot') 'snapshot_id': const Uuid().v4(),
+          });
+      }
+    } catch (error) {
+      final tab = browser.tabs.where((t) => t.id == tabId).firstOrNull;
+      final failure = BrowserFailure.from(error);
+      // A known initial-load failure has no document worth retaining. Timeouts,
+      // takeover and unknown mutation outcomes must leave the tab inspectable.
+      if (createdTab &&
+          tab?.url == 'about:blank' &&
+          tab?.hasContent == false &&
+          !failure.outcomeUnknown &&
+          (tab?.error != null ||
+              failure.code.startsWith('browser_workspace_')) &&
+          !failure.code.contains('timeout')) {
         await browser.closeTab(tabId);
-        return _result(sessionId, action, {'closed_tab_id': tabId});
-      case 'evaluate':
-        data = _decode(
-          await browser.evaluateJavascript(
-            BrowserAutomationScript.evaluate(args['script'] as String),
-            tabId: tabId,
-            awaitPromise: true,
-          ),
-        );
-      case 'screenshot':
-        break;
-      case 'wait':
-        if (args.containsKey('wait_until')) {
-          await browser.waitForLoad(
-            tabId: tabId,
-            timeout: timeout,
-            stage: stage,
-          );
-        }
-        if (!args.containsKey('wait_until') ||
-            args.containsKey('wait_for') ||
-            args.containsKey('wait_for_url')) {
-          await _wait(tabId, args, timeout);
-        } else if (args['wait_ms'] is int) {
-          await Future<void>.delayed(
-            Duration(milliseconds: args['wait_ms'] as int),
-          );
-        }
-        data = {'ready': true};
-      default:
-        data = await _dom(tabId, action, {
-          ...args,
-          if (action == 'snapshot') 'snapshot_id': const Uuid().v4(),
-        });
+      }
+      outputScope?.close();
+      rethrow;
     }
     if (action != 'wait' &&
         (args.containsKey('wait_for') ||
