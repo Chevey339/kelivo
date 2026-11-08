@@ -94,6 +94,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     return MarkdownLinkScope(
       source: _source,
       conversationId: widget.conversationId,
+      imageStorage: PageStorage.maybeOf(context),
       child: CitationScope(
         onTap: widget.onCitationTap,
         resolve: widget.citationIndexResolver,
