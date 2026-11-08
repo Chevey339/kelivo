@@ -33,13 +33,15 @@ class QuoteEditingValue extends TextEditingValue {
   @override
   bool operator ==(Object other) =>
       super == other &&
-      (other is QuoteEditingValue
-          ? listEquals(quotes, other.quotes)
-          : quotes.isEmpty);
+      // The platform only sends TextEditingValue's text/selection/composing.
+      // Missing quote metadata must not make an accepted IME edit look like
+      // a new app edit and echo it back, resetting Windows composition.
+      (other is! QuoteEditingValue || listEquals(quotes, other.quotes));
+
+  // Cross-type equality requires the same hash as the platform's plain value.
   @override
-  int get hashCode => quotes.isEmpty
-      ? super.hashCode
-      : Object.hash(super.hashCode, Object.hashAll(quotes));
+  // ignore: unnecessary_overrides
+  int get hashCode => super.hashCode;
 }
 
 QuoteEditingValue reconcileQuoteEdit(
