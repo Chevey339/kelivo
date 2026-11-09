@@ -15802,6 +15802,39 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get compressionNativeSourceUnavailable =>
       '此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => '生图模型';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => '自动';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => '生图复杂度';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => '默认';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => '低';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => '中';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => '高';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      '独立控制生图规划程度。默认使用服务端行为，可能沿用聊天思考档位。';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT 登录通道可能替换所选生图模型，模型和复杂度设置能否生效取决于服务端支持。';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      '请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31602,6 +31635,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get compressionNativeSourceUnavailable =>
       '此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => '生图模型';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => '自动';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => '生图复杂度';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => '默认';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => '低';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => '中';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => '高';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      '独立控制生图规划程度。默认使用服务端行为，可能沿用聊天思考档位。';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT 登录通道可能替换所选生图模型，模型和复杂度设置能否生效取决于服务端支持。';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      '请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47409,4 +47475,37 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get compressionNativeSourceUnavailable =>
       '此對話保留了完整的原生壓縮結果與保留的最近對話。來源對話已無法使用。未複製到此處的原文無法還原，且原生結果無法以文字形式檢視或編輯。';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => '生圖模型';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => '自動';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => '生圖複雜度';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => '預設';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => '低';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => '中';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => '高';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      '獨立控制生圖規劃程度。預設使用伺服器行為，可能沿用聊天思考檔位。';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT 登入通道可能替換所選生圖模型，模型和複雜度設定能否生效取決於伺服器支援。';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      '請將聊天思考檔位切換為「自動」，生圖複雜度設為「預設」，然後重試生圖。ChatGPT 登入通道可能替換所選生圖模型或不支援明確複雜度。';
 }

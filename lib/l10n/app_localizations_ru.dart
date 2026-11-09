@@ -16960,4 +16960,38 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get compressionNativeSourceUnavailable =>
       'Этот чат сохраняет полный результат нативного сжатия и сохранённые последние ходы. Исходный чат больше недоступен. Оригиналы, не скопированные сюда, восстановить невозможно, а нативный результат нельзя просмотреть или отредактировать как текст.';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => 'Модель изображений';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => 'Авто';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity =>
+      'Сложность изображения';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => 'По умолчанию';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => 'Низкая';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => 'Средняя';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => 'Высокая';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      'Управляет планированием изображения отдельно от рассуждений чата. «По умолчанию» использует поведение сервера и может наследовать уровень рассуждений чата.';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'Вход через ChatGPT может использовать другую модель изображений. Настройки модели и сложности зависят от поддержки сервера.';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      'Установите рассуждения чата в «Авто», а сложность изображения — в «По умолчанию», затем повторите генерацию изображения. Вход через ChatGPT может использовать другую модель изображений или отклонять явную сложность.';
 }

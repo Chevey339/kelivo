@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/models/image_generation_options.dart';
 import '../../../../core/models/request_budget.dart';
 import '../../../../core/models/avatar_config.dart';
 import '../../../../utils/avatar_files.dart';
@@ -33,6 +34,9 @@ class ModelSpecFormController extends ChangeNotifier {
     final override = isNew ? null : config.modelOverrides[modelKey];
     requestBudget = RequestBudgetOverrides.fromJson(
       override is Map ? override['requestBudget'] : null,
+    );
+    imageGeneration = ImageGenerationOptions.fromJson(
+      override is Map ? override['imageGeneration'] : null,
     );
     final displayModelId = _initialDisplayModelId(config, modelKey, isNew);
     final resolveKey = isNew
@@ -107,6 +111,28 @@ class ModelSpecFormController extends ChangeNotifier {
   void setRequestBudget(RequestBudgetOverrides value) {
     requestBudget = value;
     _requestBudgetTouched = true;
+    notifyListeners();
+  }
+
+  late ImageGenerationOptions imageGeneration;
+  bool _imageGenerationTouched = false;
+
+  void setImageGenerationModel(String? model) {
+    final next = ImageGenerationOptions(model: model);
+    imageGeneration = ImageGenerationOptions(
+      model: model,
+      complexity: next.supportsComplexity ? imageGeneration.complexity : null,
+    );
+    _imageGenerationTouched = true;
+    notifyListeners();
+  }
+
+  void setImageGenerationComplexity(String? complexity) {
+    imageGeneration = ImageGenerationOptions(
+      model: imageGeneration.model,
+      complexity: complexity,
+    );
+    _imageGenerationTouched = true;
     notifyListeners();
   }
 
@@ -600,6 +626,11 @@ class ModelSpecFormController extends ChangeNotifier {
         if (!requestBudget.isEmpty) {
           payload['requestBudget'] = requestBudget.toJson();
         }
+      }
+      if (_imageGenerationTouched) {
+        payload.remove('imageGeneration');
+        final options = imageGeneration.toJson();
+        if (options.isNotEmpty) payload['imageGeneration'] = options;
       }
       final overrides = Map<String, dynamic>.from(current.modelOverrides);
       overrides[key] = payload;

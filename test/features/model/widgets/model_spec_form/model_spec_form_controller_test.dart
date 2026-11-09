@@ -46,6 +46,61 @@ void main() {
   });
 
   test(
+    'image tool options persist independently and reset without stale complexity',
+    () async {
+      final cfg = _cfg();
+      final settings = await _settings(cfg);
+      addTearDown(settings.dispose);
+      final controller = ModelSpecFormController(
+        config: cfg,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(controller.dispose);
+      controller.setImageGenerationModel('gpt-image-2.6-sunburst');
+      controller.setImageGenerationComplexity('low');
+      expect(await controller.save(settings), isTrue);
+      final saved = settings.getProviderConfig(cfg.id);
+      expect(saved.modelOverrides['plain-model']['imageGeneration'], {
+        'model': 'gpt-image-2.6-sunburst',
+        'complexity': 'low',
+      });
+      final next = ModelSpecFormController(
+        config: saved,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(next.dispose);
+      expect(next.imageGeneration.model, 'gpt-image-2.6-sunburst');
+      expect(next.imageGeneration.complexity, 'low');
+      next.setDisplayName('Renamed');
+      next.setDefaultLevel(ReasoningLevel.xhigh);
+      expect(await next.save(settings), isTrue);
+      expect(
+        settings
+            .getProviderConfig(cfg.id)
+            .modelOverrides['plain-model']['imageGeneration'],
+        {'model': 'gpt-image-2.6-sunburst', 'complexity': 'low'},
+      );
+      next.setImageGenerationModel('gpt-image-2');
+      expect(next.imageGeneration.complexity, isNull);
+      expect(await next.save(settings), isTrue);
+      expect(
+        settings
+            .getProviderConfig(cfg.id)
+            .modelOverrides['plain-model']['imageGeneration'],
+        {'model': 'gpt-image-2'},
+      );
+      next.setImageGenerationModel(null);
+      expect(await next.save(settings), isTrue);
+      expect(
+        settings.getProviderConfig(cfg.id).modelOverrides['plain-model'],
+        isNot(contains('imageGeneration')),
+      );
+    },
+  );
+
+  test(
     'request budget overrides save, survive unrelated edits, and reset to provider',
     () async {
       final cfg = _cfg().copyWith(

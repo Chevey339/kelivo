@@ -29357,6 +29357,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.'**
   String get compressionNativeSourceUnavailable;
+
+  /// Label of the hosted image generation model picker in a chat model’s built-in tools settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Image model'**
+  String get modelDetailSheetImageGenerationModel;
+
+  /// Default image model option in built-in tools settings. Omits the tool model parameter so the server chooses the image model.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get modelDetailSheetImageGenerationAuto;
+
+  /// Label of the image planning effort picker in built-in tools settings, separate from chat reasoning effort and rendering quality.
+  ///
+  /// In en, this message translates to:
+  /// **'Image complexity'**
+  String get modelDetailSheetImageGenerationComplexity;
+
+  /// Default image complexity option. Omits complexity and uses server behavior, which may inherit the chat reasoning effort.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get modelDetailSheetImageGenerationComplexityDefault;
+
+  /// Low image planning complexity option in the built-in image generation tool settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get modelDetailSheetImageGenerationComplexityLow;
+
+  /// Medium image planning complexity option in the built-in image generation tool settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get modelDetailSheetImageGenerationComplexityMedium;
+
+  /// High image planning complexity option in the built-in image generation tool settings.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get modelDetailSheetImageGenerationComplexityHigh;
+
+  /// Help text below image complexity in built-in tools settings. Explain that an explicit level is independent, while omitting the field may inherit outer chat reasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'Controls image planning separately from chat reasoning. Default uses server behavior and may inherit chat reasoning.'**
+  String get modelDetailSheetImageGenerationComplexityDescription;
+
+  /// Hint in image generation settings for ChatGPT/Codex OAuth providers. The server may replace the requested image model or reject explicit complexity.
+  ///
+  /// In en, this message translates to:
+  /// **'ChatGPT sign-in may use a different image model. Model and complexity settings depend on server support.'**
+  String get modelDetailSheetImageGenerationOAuthHint;
+
+  /// Actionable hint appended after the original provider error when ChatGPT/Codex OAuth image generation rejects a complexity level. Preserve the original error; do not automatically retry or alter chat settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Set chat reasoning to Auto and image complexity to Default, then retry image generation. ChatGPT sign-in may use a different image model or reject explicit complexity.'**
+  String get imageGenerationComplexityErrorHint;
 }
 
 class _AppLocalizationsDelegate

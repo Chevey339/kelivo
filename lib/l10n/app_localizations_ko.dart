@@ -16153,4 +16153,37 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get compressionNativeSourceUnavailable =>
       '이 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화가 보관되어 있습니다. 원본 대화는 더 이상 사용할 수 없습니다. 여기로 복사되지 않은 원문은 복원할 수 없으며, 네이티브 결과는 텍스트로 읽거나 편집할 수 없습니다.';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => '이미지 모델';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => '자동';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => '이미지 복잡도';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => '기본';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => '낮음';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => '중간';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => '높음';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      '채팅 추론과 별도로 이미지 계획을 제어합니다. 기본은 서버 동작을 사용하며 채팅 추론을 따를 수 있습니다.';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT 로그인은 다른 이미지 모델을 사용할 수 있습니다. 모델 및 복잡도 설정은 서버 지원 여부에 따라 달라집니다.';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      '채팅 추론을 자동으로, 이미지 복잡도를 기본으로 설정한 후 이미지 생성을 다시 시도하세요. ChatGPT 로그인은 다른 이미지 모델을 사용하거나 명시적 복잡도를 거부할 수 있습니다.';
 }

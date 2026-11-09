@@ -4870,5 +4870,15 @@
   "compressionNativeOpenSource": "Kaynak sohbeti aç",
   "compressionNativeOriginalsUnavailable": "Bu sohbette içe aktarılan yerel bağlama ait özgün içerik yok. Yerel sıkıştırmayla devam edin veya özgün içeriği görüntülemek ya da özetlemek için kaynak sohbete dönün.",
   "compressionNativeTemporaryCopyHint": "Yeni geçici sohbet yalnızca tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak geçici sohbetten ayrılmak, onu ve aktarılmayan orijinalleri siler; bunlar burada geri yüklenemez.",
-  "compressionNativeSourceUnavailable": "Bu sohbet tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak sohbet artık kullanılamıyor. Buraya kopyalanmayan orijinaller geri yüklenemez ve yerel sonuç metin olarak okunamaz veya düzenlenemez."
+  "compressionNativeSourceUnavailable": "Bu sohbet tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak sohbet artık kullanılamıyor. Buraya kopyalanmayan orijinaller geri yüklenemez ve yerel sonuç metin olarak okunamaz veya düzenlenemez.",
+  "modelDetailSheetImageGenerationModel": "Görsel modeli",
+  "modelDetailSheetImageGenerationAuto": "Otomatik",
+  "modelDetailSheetImageGenerationComplexity": "Görsel karmaşıklığı",
+  "modelDetailSheetImageGenerationComplexityDefault": "Varsayılan",
+  "modelDetailSheetImageGenerationComplexityLow": "Düşük",
+  "modelDetailSheetImageGenerationComplexityMedium": "Orta",
+  "modelDetailSheetImageGenerationComplexityHigh": "Yüksek",
+  "modelDetailSheetImageGenerationComplexityDescription": "Görsel planlamayı sohbet akıl yürütmesinden bağımsız olarak kontrol eder. Varsayılan, sunucu davranışını kullanır ve sohbet akıl yürütmesini devralabilir.",
+  "modelDetailSheetImageGenerationOAuthHint": "ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir. Model ve karmaşıklık ayarları sunucu desteğine bağlıdır.",
+  "imageGenerationComplexityErrorHint": "Sohbet akıl yürütmesini Otomatik, görsel karmaşıklığını Varsayılan olarak ayarlayıp görsel oluşturmayı yeniden deneyin. ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir veya açık karmaşıklığı reddedebilir."
 }

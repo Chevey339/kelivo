@@ -1,5 +1,6 @@
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
+import '../../chat/utils/image_generation_error.dart';
 import 'dart:math' as math;
 import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/native_compaction_context.dart';
@@ -3248,6 +3249,14 @@ class ChatActions {
         e,
         AppLocalizations.of(contextProvider)!,
       );
+    } else if (!oauthFailure && contextProvider.mounted) {
+      if (AppLocalizations.of(contextProvider) case final l10n?) {
+        errorText = formatImageGenerationError(
+          e,
+          config: state.ctx.config,
+          l10n: l10n,
+        );
+      }
     }
     final tier = state.ctx.serviceTier;
     final speedL10n = tier != null && contextProvider.mounted

@@ -4870,5 +4870,15 @@
   "compressionNativeOpenSource": "9d38555f7e71d467aa92fdd640d89b1cce1e3ee4c593164d14984e6e0bc66b3e",
   "compressionNativeOriginalsUnavailable": "fd2f54e2cee6e6874bb61389743236f3a064a260f6783db55e37fdd1eb5a06ce",
   "compressionNativeTemporaryCopyHint": "b5d771848e5de3767aa82df73a8935a13c71667c293af012dcb59d4605e0c7cf",
-  "compressionNativeSourceUnavailable": "8575ed6ee050c106fdb03d389f7915b971202d33634ba6bdf65f487b4b9bf763"
+  "compressionNativeSourceUnavailable": "8575ed6ee050c106fdb03d389f7915b971202d33634ba6bdf65f487b4b9bf763",
+  "modelDetailSheetImageGenerationModel": "5e173bb89d7b506f45ff1146eb09e1e6e1262c7c53d68caa62beac3392e841f3",
+  "modelDetailSheetImageGenerationAuto": "631c1da441f1d1ea465deae8e1effbcdfb61fdbbf1e9c5a11208733c70299232",
+  "modelDetailSheetImageGenerationComplexity": "9d1cc1e77ff097351b0e775a3d8bfa7a528e528ef846616080e302f5d659f8ac",
+  "modelDetailSheetImageGenerationComplexityDefault": "fad57f516f2f8664b9ad338016d328e5f4acae6f4188e03e8fe0ff13060e91ed",
+  "modelDetailSheetImageGenerationComplexityLow": "9a13df862c891b5e8b2b20a9b84f956bf4b8dec7ef7273dea369c6b65e1d6a48",
+  "modelDetailSheetImageGenerationComplexityMedium": "e1d748d6610e13dcc119312165eae2b06241c59d430b460ea0e8f1cc78328f0d",
+  "modelDetailSheetImageGenerationComplexityHigh": "db6cc43dce20193cebc09ebdd196406f59c1994e7dc90129588cab5d8e549ad3",
+  "modelDetailSheetImageGenerationComplexityDescription": "d97a9330c1f28622eb7fb3138e343986654f9770164c9ce8d41690129b5fe15e",
+  "modelDetailSheetImageGenerationOAuthHint": "c8b7f74c9fca10e99f38fc56e3bfebc6c7e2f710ad28145e8082b605698175ec",
+  "imageGenerationComplexityErrorHint": "3edcba8a4c5a4a1711918d3e5a2bd5d946d1f350ce524c6b6055ec3af4f998f7"
 }

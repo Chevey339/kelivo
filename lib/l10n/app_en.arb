@@ -21701,5 +21701,45 @@
   "compressionNativeSourceUnavailable": "This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.",
   "@compressionNativeSourceUnavailable": {
     "description": "Description in imported native context details when the source conversation has been deleted or discarded. Explains that this chat still owns the complete opaque result and retained tail, but cannot restore absent originals. No placeholders."
+  },
+  "modelDetailSheetImageGenerationModel": "Image model",
+  "@modelDetailSheetImageGenerationModel": {
+    "description": "Label of the hosted image generation model picker in a chat model’s built-in tools settings."
+  },
+  "modelDetailSheetImageGenerationAuto": "Auto",
+  "@modelDetailSheetImageGenerationAuto": {
+    "description": "Default image model option in built-in tools settings. Omits the tool model parameter so the server chooses the image model."
+  },
+  "modelDetailSheetImageGenerationComplexity": "Image complexity",
+  "@modelDetailSheetImageGenerationComplexity": {
+    "description": "Label of the image planning effort picker in built-in tools settings, separate from chat reasoning effort and rendering quality."
+  },
+  "modelDetailSheetImageGenerationComplexityDefault": "Default",
+  "@modelDetailSheetImageGenerationComplexityDefault": {
+    "description": "Default image complexity option. Omits complexity and uses server behavior, which may inherit the chat reasoning effort."
+  },
+  "modelDetailSheetImageGenerationComplexityLow": "Low",
+  "@modelDetailSheetImageGenerationComplexityLow": {
+    "description": "Low image planning complexity option in the built-in image generation tool settings."
+  },
+  "modelDetailSheetImageGenerationComplexityMedium": "Medium",
+  "@modelDetailSheetImageGenerationComplexityMedium": {
+    "description": "Medium image planning complexity option in the built-in image generation tool settings."
+  },
+  "modelDetailSheetImageGenerationComplexityHigh": "High",
+  "@modelDetailSheetImageGenerationComplexityHigh": {
+    "description": "High image planning complexity option in the built-in image generation tool settings."
+  },
+  "modelDetailSheetImageGenerationComplexityDescription": "Controls image planning separately from chat reasoning. Default uses server behavior and may inherit chat reasoning.",
+  "@modelDetailSheetImageGenerationComplexityDescription": {
+    "description": "Help text below image complexity in built-in tools settings. Explain that an explicit level is independent, while omitting the field may inherit outer chat reasoning."
+  },
+  "modelDetailSheetImageGenerationOAuthHint": "ChatGPT sign-in may use a different image model. Model and complexity settings depend on server support.",
+  "@modelDetailSheetImageGenerationOAuthHint": {
+    "description": "Hint in image generation settings for ChatGPT/Codex OAuth providers. The server may replace the requested image model or reject explicit complexity."
+  },
+  "imageGenerationComplexityErrorHint": "Set chat reasoning to Auto and image complexity to Default, then retry image generation. ChatGPT sign-in may use a different image model or reject explicit complexity.",
+  "@imageGenerationComplexityErrorHint": {
+    "description": "Actionable hint appended after the original provider error when ChatGPT/Codex OAuth image generation rejects a complexity level. Preserve the original error; do not automatically retry or alter chat settings."
   }
 }

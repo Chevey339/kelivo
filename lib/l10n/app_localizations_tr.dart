@@ -16764,4 +16764,37 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get compressionNativeSourceUnavailable =>
       'Bu sohbet tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak sohbet artık kullanılamıyor. Buraya kopyalanmayan orijinaller geri yüklenemez ve yerel sonuç metin olarak okunamaz veya düzenlenemez.';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => 'Görsel modeli';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => 'Otomatik';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => 'Görsel karmaşıklığı';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => 'Varsayılan';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => 'Düşük';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => 'Orta';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => 'Yüksek';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      'Görsel planlamayı sohbet akıl yürütmesinden bağımsız olarak kontrol eder. Varsayılan, sunucu davranışını kullanır ve sohbet akıl yürütmesini devralabilir.';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir. Model ve karmaşıklık ayarları sunucu desteğine bağlıdır.';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      'Sohbet akıl yürütmesini Otomatik, görsel karmaşıklığını Varsayılan olarak ayarlayıp görsel oluşturmayı yeniden deneyin. ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir veya açık karmaşıklığı reddedebilir.';
 }

@@ -4870,5 +4870,15 @@
   "compressionNativeOpenSource": "檢視原會話",
   "compressionNativeOriginalsUnavailable": "此會話沒有已載入原生上下文對應的原文。可繼續使用原生壓縮，或返回原會話檢視原文、重新產生文字摘要。",
   "compressionNativeTemporaryCopyHint": "新的臨時對話僅保留完整的原生壓縮結果與保留的最近對話。離開來源臨時對話後，該對話及未保留的原文將被刪除，且無法在此處還原。",
-  "compressionNativeSourceUnavailable": "此對話保留了完整的原生壓縮結果與保留的最近對話。來源對話已無法使用。未複製到此處的原文無法還原，且原生結果無法以文字形式檢視或編輯。"
+  "compressionNativeSourceUnavailable": "此對話保留了完整的原生壓縮結果與保留的最近對話。來源對話已無法使用。未複製到此處的原文無法還原，且原生結果無法以文字形式檢視或編輯。",
+  "modelDetailSheetImageGenerationModel": "生圖模型",
+  "modelDetailSheetImageGenerationAuto": "自動",
+  "modelDetailSheetImageGenerationComplexity": "生圖複雜度",
+  "modelDetailSheetImageGenerationComplexityDefault": "預設",
+  "modelDetailSheetImageGenerationComplexityLow": "低",
+  "modelDetailSheetImageGenerationComplexityMedium": "中",
+  "modelDetailSheetImageGenerationComplexityHigh": "高",
+  "modelDetailSheetImageGenerationComplexityDescription": "獨立控制生圖規劃程度。預設使用伺服器行為，可能沿用聊天思考檔位。",
+  "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 登入通道可能替換所選生圖模型，模型和複雜度設定能否生效取決於伺服器支援。",
+  "imageGenerationComplexityErrorHint": "請將聊天思考檔位切換為「自動」，生圖複雜度設為「預設」，然後重試生圖。ChatGPT 登入通道可能替換所選生圖模型或不支援明確複雜度。"
 }
