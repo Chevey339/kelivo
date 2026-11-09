@@ -166,10 +166,12 @@ class MessageGenerationService {
 
   /// Packs system prompt, injections, history, and tool definitions without
   /// OCR, document extraction, or inline-image encoding.
+  /// Disable [applyMessageLimit] when compression already selected its range.
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     bool? fixedContextStart,
     DateTime? promptTime,
     bool forceResponses = false,
+    bool applyMessageLimit = true,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
@@ -263,7 +265,7 @@ class MessageGenerationService {
                   chatService.contextOperationsFor(currentConversation.id),
                 ) !=
                 null);
-    if (!hasFixedStart) {
+    if (applyMessageLimit && !hasFixedStart) {
       messageBuilderService.applyContextLimit(apiMessages, assistant);
     }
 
@@ -386,6 +388,7 @@ class MessageGenerationService {
     bool? fixedContextStart,
     DateTime? promptTime,
     bool forceResponses = false,
+    bool applyMessageLimit = true,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -395,6 +398,7 @@ class MessageGenerationService {
     fixedContextStart: fixedContextStart,
     promptTime: promptTime,
     forceResponses: forceResponses,
+    applyMessageLimit: applyMessageLimit,
     conversationId: conversationId,
     providerKey: providerKey,
     modelId: modelId,
@@ -424,6 +428,7 @@ class MessageGenerationService {
     bool? fixedContextStart,
     DateTime? promptTime,
     bool forceResponses = false,
+    bool applyMessageLimit = true,
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -442,7 +447,7 @@ class MessageGenerationService {
         messagesOverride ??
         await chatService.loadSelectedContextMessages(
           conversationId,
-          limit: assistant?.limitContextMessages == true
+          limit: applyMessageLimit && assistant?.limitContextMessages == true
               ? assistant!.contextMessageSize
               : 0x7fffffff,
         );
@@ -450,6 +455,7 @@ class MessageGenerationService {
       fixedContextStart: fixedContextStart,
       promptTime: promptTime,
       forceResponses: forceResponses,
+      applyMessageLimit: applyMessageLimit,
       messages: messages,
       versionSelections: chatService.getVersionSelections(conversationId),
       currentConversation: conversation?.copyWith(truncateIndex: -1),

@@ -3938,6 +3938,135 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  for (final keepRecent in [0, 1]) {
+    testWidgets(
+      'manual native compaction preserves selected history beyond the chat limit: keep=$keepRecent',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          await settings.disableSuggestionGeneration();
+          await assistantProvider.updateAssistant(
+            assistantProvider.currentAssistant!.copyWith(
+              limitContextMessages: true,
+              contextMessageSize: 10,
+            ),
+          );
+          final conversation = await service.createConversation(
+            title: 'Native compression range',
+            assistantId: assistantProvider.currentAssistant!.id,
+          );
+          await controller.chatController.setCurrentConversationAndLoad(
+            conversation,
+          );
+          final originals = <ChatMessage>[];
+          for (var i = 0; i < 30; i++) {
+            for (final role in ['user', 'assistant']) {
+              originals.add(
+                await service.addMessage(
+                  conversationId: conversation.id,
+                  role: role,
+                  content: '$role history $i',
+                ),
+              );
+            }
+          }
+          Map<String, dynamic>? compactBody;
+          apiOverride = (request, body) async {
+            expect(request.uri.path.endsWith('/responses/compact'), isTrue);
+            compactBody = body;
+            await _writeResponses(request, body, [
+              {
+                'type': 'compaction',
+                'id': 'selected-history',
+                'encrypted_content': 'selected-history-state',
+              },
+            ]);
+          };
+          expect(
+            await controller.compressContext(
+              options: CompressContextOptions(
+                mode: keepRecent == 0
+                    ? CompressContextLimitMode.unlimited
+                    : CompressContextLimitMode.keepRecent,
+                keepUserMessages: keepRecent,
+                native: true,
+              ),
+            ),
+            isNull,
+          );
+          await waitFor(
+            () =>
+                service.contextCompression.taskFor(conversation.id)?.phase ==
+                CompressionPhase.completed,
+            'selected history compaction installs',
+          );
+          final covered = originals.take(originals.length - keepRecent * 2);
+          final input = compactBody!['input'] as List;
+          expect(input.length, covered.length);
+          expect(input.map((item) => item['role']), covered.map((m) => m.role));
+          expect(
+            input.map((item) {
+              final content = item['content'];
+              return content is String
+                  ? content
+                  : (content as List).map((part) => part['text']).join();
+            }),
+            covered.map((m) => m.content),
+          );
+          final snapshot = await service.loadContextSnapshot(conversation.id);
+          final operation = snapshot.operations.single;
+          expect(operation.sourceGroups, covered.map(ContextHistory.group));
+          expect(
+            operation.compressionDetails['sourceRevisionIds'],
+            covered.map((m) => m.id),
+          );
+          final effective = ContextHistory.resolve(
+            snapshot.messages,
+            snapshot.operations,
+          );
+          expect(ContextOperation.isSummary(effective.first), isTrue);
+          expect(
+            effective.skip(1).map((m) => m.id),
+            originals.skip(covered.length).map((m) => m.id),
+          );
+
+          await service.changeContextOperation(
+            conversation.id,
+            operation.id,
+            includeDependents: true,
+            expectedState: ContextHistory.operationsFingerprint(
+              snapshot.operations,
+            ),
+          );
+          apiOverride = null;
+          await controller.sendMessage(
+            ChatInputData(text: 'ordinary continuation'),
+          );
+          await waitFor(
+            () =>
+                streamRequests.length == 1 &&
+                !controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+            'ordinary limited send finishes',
+          );
+          final ordinary = (streamRequests.single['messages'] as List).where(
+            (item) => item['role'] == 'user' || item['role'] == 'assistant',
+          );
+          // The limit keeps complete turns, plus the new user message.
+          expect(ordinary.map((item) => item['content']), [
+            ...originals.skip(50).map((m) => m.content),
+            'ordinary continuation',
+          ]);
+        });
+        AppSnackBarManager().dismissAll();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final newChat in [false, true]) {
     testWidgets(
       'manual native compaction sends its whole result before unchanged recent history: newChat=$newChat',
