@@ -130,6 +130,16 @@ Future<bool> changeContextOperationWithConfirmation(
   final operations = before.operations;
   if (!context.mounted) return false;
   final current = operations.where((op) => op.id == operation.id).firstOrNull;
+  if (current?.isImportedNative == true) {
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(
+        context,
+      )!.compressionNativeOriginalsUnavailable,
+      type: NotificationType.warning,
+    );
+    return false;
+  }
   if (current == null ||
       current.revoked ||
       current.summary != operation.summary) {
@@ -286,10 +296,12 @@ Future<void> showContextOperationDetails(
   );
   final budgets = await Future.wait([
     _estimate(chat, conversationId, snapshot, snapshot.operations),
-    _estimate(chat, conversationId, snapshot, [
-      for (final op in snapshot.operations)
-        affected.contains(op.id) ? op.copyWith(revoked: true) : op,
-    ]),
+    operation.canUndo
+        ? _estimate(chat, conversationId, snapshot, [
+            for (final op in snapshot.operations)
+              affected.contains(op.id) ? op.copyWith(revoked: true) : op,
+          ])
+        : Future<CompressionBudget?>.value(),
   ]);
   if (!context.mounted) return;
   final l10n = AppLocalizations.of(context)!;
@@ -321,12 +333,17 @@ Future<void> showContextOperationDetails(
         ? l10n.contextFixedStart
         : operation.isCompression
         ? operation.isNative
-              ? l10n.compressionNativeLabel
+              ? operation.isImportedNative
+                    ? l10n.compressionNativeImported
+                    : l10n.compressionNativeLabel
               : l10n.contextDetailTitle
         : l10n.contextDetailClearTitle,
     maxWidth: operation.isCompression ? 560 : 500,
     builder: (detailContext) => ContextOperationContent(
       operation: operation,
+      sourceConversationAvailable:
+          chat.getConversation(operation.nativeSourceConversationId ?? '') !=
+          null,
       rangeLabel: range,
       budget: budgets.first,
       undoBudget: budgets.last,
@@ -346,7 +363,7 @@ Future<void> showContextOperationDetails(
               operation: operation,
               summary: summary,
             ),
-      onUndo: operation.revoked
+      onUndo: !operation.canUndo
           ? null
           : () => changeContextOperationWithConfirmation(
               context,
@@ -363,19 +380,31 @@ Future<void> showContextOperationDetails(
           else
             op,
       ]),
-      onViewOriginal: source.isEmpty || onViewOriginal == null
+      onViewOriginal: operation.isImportedNative
+          ? onOpenConversation == null ||
+                    chat.getConversation(
+                          operation.nativeSourceConversationId ?? '',
+                        ) ==
+                        null
+                ? null
+                : () {
+                    Navigator.of(detailContext).pop();
+                    onOpenConversation(operation.nativeSourceConversationId!);
+                  }
+          : source.isEmpty || onViewOriginal == null
           ? null
           : () {
               Navigator.of(detailContext).pop();
               onViewOriginal(source.first.id);
             },
-      onViewBoundary: anchor == null || onViewOriginal == null
+      onViewBoundary:
+          operation.isImportedNative || anchor == null || onViewOriginal == null
           ? null
           : () {
               Navigator.of(detailContext).pop();
               onViewOriginal(anchor.id);
             },
-      onRecompress: onRecompress == null
+      onRecompress: operation.isImportedNative || onRecompress == null
           ? null
           : () {
               Navigator.of(detailContext).pop();

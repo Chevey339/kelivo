@@ -4845,9 +4845,9 @@
   "compressionNativeLabel": "f8e89156ec4118c5bc91bceabd2475e734b01502fdddc9d95a4358d37ba80715",
   "compressionNativeDescription": "b12d4b98fa9c4f81c4f084b2450b86afef066bf33c08a1cab1cd8ff288604971",
   "compressionNativeIncomplete": "16c94aed739914946e658e291e14ecec10ecf80613fc316aac4c4de9e4e7a1b4",
-  "compressionNativeScopeChanged": "ac5af3e3c86ec842411bd4f88dc3d6028ac440799a7732b4f172378934062f9e",
+  "compressionNativeScopeChanged": "3491ec235d2d2f60302378863712c396891f95c07f29579c929f72f63bc56fd6",
   "compressionNativeTokenHint": "e5a2c884f8f432c08708291395f273ebe313926e5ac058b41c61e727a82e6fcf",
-  "compressionNativeCopyHint": "35f8e921d9bff38f12dd3ee9f36fedcf788ad0a7dd1c92abde9d623337e9480d",
+  "compressionNativeCopyHint": "52ef6351d3d5b4cf9915c467aa061d8a1010004501ba848d937b8651a588cd31",
   "compressionNativeInputOverride": "e7b06f03ce31cededcdf14723df3de6b5344a0438578baf7a751a79979cb8c98",
   "compressionNativeAllHint": "347e16f759ee3360a8779f8d5e472f75b9000254e4fb7fcf147311fffa178e17",
   "compressionNativeAutoHint": "053907d2cdbe76e7eb3b2fe466855a89b0f53c7599abbdef58bf7fab2ab3eb72",
@@ -4864,5 +4864,11 @@
   "themePaletteTerracotta": "c487246a17c0b6fd0478f56f1a5f9bacb6e5e8508aa556deefb3ad3cdc7422dc",
   "themePaletteMonochrome": "80cf20928d911e24593cb031d6981df84c44ad27dbd02b4a41f02ee896c9700a",
   "themePaletteDocument": "976ca8b31bbfa8850f2d473a0da26763e3278c952038d08ac851a68197f45d3b",
-  "themePaletteCustom": "6df8ee047056570d85ecc55a0bfc6a855e38a698c86f6ba81004417025340afe"
+  "themePaletteCustom": "6df8ee047056570d85ecc55a0bfc6a855e38a698c86f6ba81004417025340afe",
+  "compressionNativeImported": "f68679a52eaa7f00c45030ff90184445d7344df09fee532ecb97c40d261e94d9",
+  "compressionNativeImportedDescription": "80d97252be92aa4a499e9867c58a296808be09a84f54f761094b56ad8b32b6b0",
+  "compressionNativeOpenSource": "f01e0b0a550e520cc5b50bd06137d1683fae25649335bb46545c4b432a2a78dc",
+  "compressionNativeOriginalsUnavailable": "1a0da4e6489243c0cf07dee6c861d99353519963c543ce2b94ec93cdf7f892a8",
+  "compressionNativeTemporaryCopyHint": "182687c82fc758a38efd93da25d2a750ad7164456f542a2c44396b6e72e34522",
+  "compressionNativeSourceUnavailable": "b3243dee78dbbd6ced14ac0863af7233b23162e2a5b124da15384852226bef2a"
 }

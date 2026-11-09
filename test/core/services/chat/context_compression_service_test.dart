@@ -2,8 +2,10 @@ import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -115,10 +117,11 @@ void main() {
     Future<NativeCompactionPayload> Function(CompressionSelection, String)
     compact, {
     bool newConversation = false,
+    int keep = 1,
   }) => CompressionRequest(
     options: CompressContextOptions(
       mode: CompressContextLimitMode.keepRecent,
-      keepUserMessages: 1,
+      keepUserMessages: keep,
       native: true,
       newConversation: newConversation,
     ),
@@ -307,48 +310,116 @@ void main() {
     },
   );
 
-  test(
-    'native new conversation keeps its own originals and source stays unchanged',
-    () async {
-      final source = await chat.loadContextSnapshot(id);
-      await compression.start(
-        id,
-        nativeRequest(
-          (_, _) async => nativePayload('fork'),
-          newConversation: true,
-        ),
-      );
-      await until(
-        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
-      );
-      final target = compression.taskFor(id)!.resultConversationId!;
-      final copy = await chat.loadContextSnapshot(target);
-      expect(
-        copy.messages.map((m) => m.content),
-        source.messages.map((m) => m.content),
-      );
-      expect(copy.operations.last.isNative, isTrue);
-      expect(
-        (await chat.loadSelectedContextMessages(target, limit: 100)),
-        hasLength(3),
-      );
-      expect(
-        (await chat.loadContextSnapshot(id)).fingerprint,
-        source.fingerprint,
-      );
-      await chat.changeContextOperation(
-        target,
-        copy.operations.last.id,
-        includeDependents: true,
-        expectedState: ContextHistory.operationsFingerprint(copy.operations),
-      );
-      final undone = await chat.loadSelectedContextMessages(target, limit: 100);
-      expect(
-        undone.map((m) => m.content),
-        source.messages.map((m) => m.content),
-      );
-    },
-  );
+  for (final keep in [0, 1, 3]) {
+    test(
+      'native new chat stores only the result and $keep complete turns',
+      () async {
+        final last = (await chat.loadContextSnapshot(id)).messages.last;
+        final events = [
+          {
+            'id': 'tool-last',
+            'name': 'lookup',
+            'arguments': {'query': 'retained'},
+            'content': 'TOOL_RESULT',
+          },
+        ];
+        await chat.updateMessage(
+          last.id,
+          parts: [
+            TextPart(last.content),
+            ToolCallPart(jsonEncode(events.single)),
+          ],
+        );
+        await chat.setToolEvents(last.id, events);
+        await chat.setProviderArtifact(
+          last.id,
+          responsesTurnArtifactKind,
+          'complete tool history',
+        );
+        final source = await chat.loadContextSnapshot(id);
+        await compression.start(
+          id,
+          nativeRequest(
+            (_, _) async => nativePayload('fork'),
+            newConversation: true,
+            keep: keep,
+          ),
+        );
+        await until(
+          () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+        );
+        final target = compression.taskFor(id)!.resultConversationId!;
+        final copy = await chat.loadContextSnapshot(target);
+        final retained = keep == 0
+            ? <ChatMessage>[]
+            : source.messages.sublist(source.messages.length - keep * 2);
+        expect(copy.messages, hasLength(1 + keep * 2));
+        expect(
+          copy.messages.skip(1).map((m) => m.content),
+          retained.map((m) => m.content),
+        );
+        final imported = copy.operations.single;
+        expect(imported.isImportedNative, isTrue);
+        expect(imported.canUndo, isFalse);
+        expect(imported.nativeSourceConversationId, id);
+        expect(imported.nativePayload!.output, nativePayload('fork').output);
+        expect(
+          (await chat.loadSelectedContextMessages(target, limit: 100)),
+          hasLength(1 + keep * 2),
+        );
+        if (keep > 0) {
+          expect(chat.getToolEventsForMessage(copy.messages.last), events);
+          expect(
+            chat.getProviderArtifactForMessage(
+              copy.messages.last,
+              responsesTurnArtifactKind,
+            ),
+            'complete tool history',
+          );
+          expect(
+            copy.messages.last.parts.map((p) => p.encodePayload()),
+            source.messages.last.parts.map((p) => p.encodePayload()),
+          );
+        }
+        await expectLater(
+          chat.changeContextOperation(
+            target,
+            imported.id,
+            includeDependents: true,
+            expectedState: ContextHistory.operationsFingerprint(
+              copy.operations,
+            ),
+          ),
+          throwsA(
+            predicate(
+              (Object e) => e.toString().contains(
+                'native_compaction_originals_unavailable',
+              ),
+            ),
+          ),
+        );
+        expect(
+          (await chat.loadContextSnapshot(target)).fingerprint,
+          copy.fingerprint,
+        );
+        expect(
+          (await chat.loadContextSnapshot(id)).fingerprint,
+          source.fingerprint,
+        );
+        await chat.deleteConversation(id);
+        expect(
+          (await chat.loadSelectedContextMessages(target, limit: 100)),
+          hasLength(1 + keep * 2),
+        );
+        expect(
+          (await chat.loadContextOperations(
+            target,
+          )).single.nativePayload!.output,
+          nativePayload('fork').output,
+        );
+      },
+    );
+  }
 
   test('native result cannot commit after its source was edited', () async {
     final hold = Completer<NativeCompactionPayload>();
@@ -370,6 +441,85 @@ void main() {
     expect(compression.taskFor(id)!.error, contains('context_changed'));
     expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
   });
+
+  test(
+    'imported native state rejects text rereads and supports undoing later native compression',
+    () async {
+      await compression.start(
+        id,
+        nativeRequest(
+          (_, _) async => nativePayload('seed'),
+          newConversation: true,
+        ),
+      );
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+      );
+      final target = compression.taskFor(id)!.resultConversationId!;
+      final initial = await chat.loadContextSnapshot(target);
+      for (final source in [
+        ContextHistorySource.effective,
+        ContextHistorySource.original,
+      ]) {
+        var generated = false;
+        await compression.start(
+          target,
+          request(
+            (_, _) async {
+              generated = true;
+              return 'must not lose opaque history';
+            },
+            options: CompressContextOptions(
+              mode: CompressContextLimitMode.unlimited,
+              historySource: source,
+            ),
+          ),
+        );
+        await until(
+          () => compression.taskFor(target)!.phase == CompressionPhase.failed,
+        );
+        expect(
+          compression.taskFor(target)!.error,
+          contains('native_compaction_originals_unavailable'),
+        );
+        expect(generated, isFalse);
+        expect(
+          (await chat.loadContextSnapshot(target)).fingerprint,
+          initial.fingerprint,
+        );
+      }
+      await compression.start(
+        target,
+        nativeRequest((selection, _) async {
+          expect(
+            NativeCompactionPayload.forMessage(selection.input.first)!.output,
+            nativePayload('seed').output,
+          );
+          return nativePayload('recompressed');
+        }, keep: 0),
+      );
+      await until(
+        () => compression.taskFor(target)!.phase == CompressionPhase.completed,
+      );
+      final after = await chat.loadContextSnapshot(target);
+      expect(after.operations.last.canUndo, isTrue);
+      await chat.changeContextOperation(
+        target,
+        after.operations.last.id,
+        includeDependents: true,
+        expectedState: ContextHistory.operationsFingerprint(after.operations),
+      );
+      final restored = await chat.loadSelectedContextMessages(
+        target,
+        limit: 100,
+      );
+      expect(restored, hasLength(3));
+      expect(
+        NativeCompactionPayload.forMessage(restored.first)!.output,
+        nativePayload('seed').output,
+      );
+    },
+  );
 
   for (final newConversation in [false, true]) {
     for (final changeAtCommit in [false, true]) {
@@ -429,7 +579,7 @@ void main() {
   }
 
   test(
-    'native state reloads and can continue in a separate undoable chat',
+    'native state reloads and copies only the retained tail without changing source undo',
     () async {
       final original = await chat.loadContextSnapshot(id);
       await compression.start(
@@ -466,29 +616,59 @@ void main() {
         await chat.loadSelectedContextMessages(continued.id, limit: 100),
         hasLength(3),
       );
-      await chat.changeContextOperation(
+      expect(copy.messages, hasLength(3));
+      expect(
+        copy.messages.skip(1).map((m) => m.content),
+        original.messages.skip(14).map((m) => m.content),
+      );
+      expect(copy.operations.single.isImportedNative, isTrue);
+      final again = await chat.continueFromContextSummary(
         continued.id,
         copy.operations.single.id,
+      );
+      final againSnapshot = await chat.loadContextSnapshot(again.id);
+      expect(againSnapshot.messages, hasLength(3));
+      expect(againSnapshot.operations.single.nativeSourceConversationId, id);
+      await chat.changeContextOperation(
+        id,
+        reloaded.operations.single.id,
         includeDependents: true,
-        expectedState: ContextHistory.operationsFingerprint(copy.operations),
+        expectedState: ContextHistory.operationsFingerprint(
+          reloaded.operations,
+        ),
       );
       expect(
         (await chat.loadSelectedContextMessages(
-          continued.id,
+          id,
           limit: 100,
         )).map((m) => m.content),
         original.messages.map((m) => m.content),
       );
+      await chat.close();
+      await repo.close();
+      database = AppDatabase.open(file: file);
+      repo = ChatDatabaseRepository(database, databaseFile: file);
+      chat = ChatService(existingRepository: repo);
+      await chat.init();
+      compression = chat.contextCompression;
+      final restored = await chat.loadContextSnapshot(continued.id);
+      expect(restored.operations.single.isImportedNative, isTrue);
+      expect(
+        restored.operations.single.nativePayload!.output,
+        nativePayload('persisted').output,
+      );
+      expect(restored.messages, hasLength(3));
     },
   );
 
   test(
-    'native temporary fork and undo never persist its history or state',
+    'native temporary fork keeps only its retained tail and rejects undo',
     () async {
       final temporary = await chat.createDraftConversation(
         title: 'private',
         temporary: true,
       );
+      chat.setCurrentConversation(temporary.id);
       for (var i = 0; i < 3; i++) {
         await chat.addMessage(
           conversationId: temporary.id,
@@ -521,19 +701,52 @@ void main() {
         await chat.loadSelectedContextMessages(target, limit: 100),
         hasLength(2),
       );
-      await chat.changeContextOperation(
-        target,
-        copy.operations.single.id,
-        includeDependents: true,
-        expectedState: ContextHistory.operationsFingerprint(copy.operations),
+      expect(copy.messages, hasLength(2));
+      expect(copy.messages.last.content, 'secret 2');
+      expect(copy.operations.single.isImportedNative, isTrue);
+      expect(
+        copy.operations.single.nativePayload!.output,
+        nativePayload('private').output,
+      );
+      await expectLater(
+        chat.changeContextOperation(
+          target,
+          copy.operations.single.id,
+          includeDependents: true,
+          expectedState: ContextHistory.operationsFingerprint(copy.operations),
+        ),
+        throwsA(
+          predicate(
+            (Object e) => e.toString().contains(
+              'native_compaction_originals_unavailable',
+            ),
+          ),
+        ),
       );
       expect(
-        (await chat.loadSelectedContextMessages(
-          target,
-          limit: 100,
-        )).map((m) => m.content),
+        (await chat.loadContextSnapshot(target)).fingerprint,
+        copy.fingerprint,
+      );
+      expect(
+        (await chat.loadContextSnapshot(
+          temporary.id,
+        )).messages.map((m) => m.content),
         ['secret 0', 'secret 1', 'secret 2'],
       );
+      chat.setCurrentConversation(target);
+      expect(chat.getConversation(temporary.id), isNull);
+      final continued = await chat.loadSelectedContextMessages(
+        target,
+        limit: 100,
+      );
+      expect(continued, hasLength(2));
+      expect(
+        NativeCompactionPayload.forMessage(continued.first)!.output,
+        nativePayload('private').output,
+      );
+      expect(continued.last.content, 'secret 2');
+      expect(await repo.getConversation(target), isNull);
+      expect(await repo.readContextOperations(target), isEmpty);
     },
   );
 

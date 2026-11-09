@@ -124,6 +124,90 @@ void main() {
 
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     check(
+      'imported native details have source navigation but no undo on $platform',
+      (tester) async {
+        await prepare(tester, platform);
+        final l10n = AppLocalizationsEn();
+        var opened = false;
+        final imported = op
+            .copyWith(
+              summary: '',
+              originalSummary: '',
+              compressionDetails: {
+                'nativeCompaction': NativeCompactionPayload(
+                  protocol: NativeCompactionProtocol.compact,
+                  scope: 'fixture',
+                  modelId: 'private',
+                  output: [
+                    {'type': 'compaction', 'encrypted_content': 'opaque'},
+                  ],
+                ).toJson(),
+              },
+            )
+            .copiedTo(
+              ChatMessage(
+                id: 'seed',
+                conversationId: 'target',
+                role: 'user',
+                content: '',
+              ),
+              keepUserMessages: 1,
+              sourceConversationId: 'source',
+            );
+        await tester.pumpWidget(
+          app(
+            ContextOperationContent(
+              operation: imported,
+              onClose: () {},
+              onUndo: () async => true,
+              onViewOriginal: () => opened = true,
+            ),
+          ),
+        );
+        expect(
+          find.text(l10n.compressionNativeImportedDescription),
+          findsOneWidget,
+        );
+        expect(find.text(l10n.contextUndoCompressTooltip), findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('context-summary-details-toggle')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.contextDetailAfterUndo), findsNothing);
+        expect(find.text(l10n.contextDetailReplaced), findsNothing);
+        await tester.tap(
+          platform == TargetPlatform.macOS
+              ? find.byIcon(LucideIcons.ellipsis)
+              : find.text(l10n.contextMore),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.compressionNativeOpenSource));
+        await tester.pumpAndSettle();
+        expect(opened, isTrue);
+        await tester.pumpWidget(
+          app(
+            ContextOperationContent(
+              operation: imported,
+              onClose: () {},
+              sourceConversationAvailable: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(l10n.compressionNativeSourceUnavailable),
+          findsOneWidget,
+        );
+        expect(
+          find.text(l10n.compressionNativeImportedDescription),
+          findsNothing,
+        );
+        expect(find.text(l10n.compressionNativeOpenSource), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    check(
       'native details expose undo and metadata but no text editor on $platform',
       (tester) async {
         await prepare(tester, platform);

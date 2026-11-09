@@ -2382,6 +2382,13 @@ class ChatActions {
           protectedMessageId: userId,
           effectiveMessageIds: allowedMessageIds,
         );
+        if (selection.missingOriginals) {
+          if (!notified) {
+            notified = true;
+            viewModel.onError?.call('native_compaction_originals_unavailable');
+          }
+          return null;
+        }
         if (selection.covered.isEmpty || selection.needsRegeneration) {
           return null;
         }

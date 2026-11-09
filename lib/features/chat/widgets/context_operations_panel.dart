@@ -411,7 +411,9 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                                 ? l10n.contextFixedStart
                                 : operation.isCompression
                                 ? operation.isNative
-                                      ? l10n.compressionNativeLabel
+                                      ? operation.isImportedNative
+                                            ? l10n.compressionNativeImported
+                                            : l10n.compressionNativeLabel
                                       : l10n.contextDividerCompressed
                                 : l10n.contextDetailClearTitle,
                             style: Theme.of(context).textTheme.titleSmall,

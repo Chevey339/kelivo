@@ -91,6 +91,33 @@ class ContextOperation {
   final int inputParts;
   final Map<String, dynamic> compressionDetails;
   bool get isNative => compressionDetails['nativeCompaction'] is Map;
+  bool get isImportedNative =>
+      isNative && compressionDetails['nativeContextImported'] == true;
+  bool get canUndo => !revoked && !isImportedNative;
+  String? get nativeSourceConversationId =>
+      compressionDetails['nativeSourceConversationId'] as String?;
+
+  /// A new conversation owns the result and retained tail, not the replaced
+  /// originals. Keep provenance separate from local undo dependencies.
+  ContextOperation copiedTo(
+    ChatMessage message, {
+    required int keepUserMessages,
+    required String sourceConversationId,
+  }) => ContextOperation.forCopiedSummary(
+    message,
+    keepUserMessages: keepUserMessages,
+    compressionDetails: {
+      ...compressionDetails,
+      'sourceRevisionIds': <String>[],
+      'imageSources': <String, dynamic>{},
+      'toolSources': <String, dynamic>{},
+      if (isNative) ...{
+        'nativeContextImported': true,
+        'nativeSourceConversationId':
+            nativeSourceConversationId ?? sourceConversationId,
+      },
+    },
+  );
   NativeCompactionPayload? get nativePayload => isNative
       ? NativeCompactionPayload.fromJson(
           Map<String, dynamic>.from(
@@ -510,6 +537,11 @@ class ContextHistory {
         }
       }
     }
+    // Imported opaque state has no local originals to expand. Preserve it so
+    // callers can reject a text-only reread instead of silently losing history.
+    expanded.removeWhere(
+      (id) => operations.any((op) => op.id == id && op.isImportedNative),
+    );
     final result = resolve(selected, operations, omitOperations: expanded);
     if (includeEditedSummaries) {
       for (final op in operations) {

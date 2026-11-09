@@ -4845,9 +4845,9 @@
   "compressionNativeLabel": "네이티브 압축",
   "compressionNativeDescription": "서비스에서 반환된 네이티브 컨텍스트가 이후 요청을 위해 로컬에 저장되었습니다. 텍스트로 보거나 편집할 수 없습니다. 원본 메시지는 유지되며 이 압축을 취소할 수 있습니다.",
   "compressionNativeIncomplete": "서비스에서 완전한 네이티브 압축 결과를 반환하지 않았습니다. 원본 컨텍스트는 변경되지 않았습니다.",
-  "compressionNativeScopeChanged": "이 네이티브 컨텍스트는 다른 연결 또는 계정에 속합니다. 해당 압축을 취소하거나 원본 기록으로 텍스트 요약을 생성한 후 계속하세요.",
+  "compressionNativeScopeChanged": "이 네이티브 컨텍스트는 다른 연결 또는 계정에 속합니다. 원래 연결로 계속하거나, 원본이 포함된 대화에서 압축을 취소하거나 텍스트 요약을 생성하세요.",
   "compressionNativeTokenHint": "네이티브 컨텍스트의 토큰 사용량은 서비스 통계를 기준으로 합니다.",
-  "compressionNativeCopyHint": "새 대화는 네이티브 압축을 취소할 수 있도록 원본 메시지를 유지합니다.",
+  "compressionNativeCopyHint": "새 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화만 저장됩니다. 원본은 원래 대화에 남아 있으며 여기서 취소하여 복원할 수 없습니다.",
   "compressionNativeInputOverride": "사용자 지정 input 필드가 네이티브 압축 데이터를 덮어씁니다. 계속하기 전에 공급자, 모델 또는 어시스턴트 설정에서 input 매개변수를 제거하세요.",
   "compressionNativeAllHint": "최근 꼬리를 따로 유지하지 않고 현재 컨텍스트의 전체 기록을 네이티브 압축에 제출합니다. 원본 메시지는 계속 확인할 수 있습니다.",
   "compressionNativeAutoHint": "임계값에 도달하면 현재 대화 모델로 네이티브 압축을 수행한 후 계속 전송합니다. 실패하면 원본 컨텍스트를 유지하며 텍스트 요약으로 전환하지 않습니다.",
@@ -4864,5 +4864,11 @@
   "themePaletteTerracotta": "테라코타 클레이",
   "themePaletteMonochrome": "프로스트 그레이",
   "themePaletteDocument": "버던트 민트",
-  "themePaletteCustom": "사용자 지정"
+  "themePaletteCustom": "사용자 지정",
+  "compressionNativeImported": "네이티브 컨텍스트 로드됨",
+  "compressionNativeImportedDescription": "이 대화는 완전한 네이티브 압축 결과와 유지된 최근 대화로 시작합니다. 이 결과는 텍스트로 읽거나 편집할 수 없습니다. 이전 원본은 원래 대화에 남아 있으므로 여기서 취소하여 복원할 수 없습니다.",
+  "compressionNativeOpenSource": "원래 대화 열기",
+  "compressionNativeOriginalsUnavailable": "이 대화에는 로드된 네이티브 컨텍스트에 해당하는 원본이 없습니다. 네이티브 압축으로 계속하거나, 원래 대화로 돌아가 원본을 확인하거나 텍스트 요약을 생성하세요.",
+  "compressionNativeTemporaryCopyHint": "새 임시 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화만 보관됩니다. 원본 임시 대화를 떠나면 해당 대화와 이전되지 않은 원문이 삭제되며, 여기서 복원할 수 없습니다.",
+  "compressionNativeSourceUnavailable": "이 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화가 보관되어 있습니다. 원본 대화는 더 이상 사용할 수 없습니다. 여기로 복사되지 않은 원문은 복원할 수 없으며, 네이티브 결과는 텍스트로 읽거나 편집할 수 없습니다."
 }

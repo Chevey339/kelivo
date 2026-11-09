@@ -3913,156 +3913,204 @@ void main() {
     await request.response.close();
   }
 
-  testWidgets(
-    'manual native compaction sends its whole result before unchanged recent history',
-    (tester) async {
-      final controller = await pumpHarness(tester);
-      await tester.runAsync(() async {
-        await settings.disableTitleGeneration();
-        await settings.disableSuggestionGeneration();
-        // Native mode ignores the independently configured text template/model.
-        await settings.setCompressionDefaults(
-          const CompressionConfig(
-            templateId: 'missing-template',
-            providerId: 'missing-summary-provider',
-            modelId: 'missing-summary-model',
-            keepRecentUserTurns: 4,
-          ),
-        );
-        final textSettings = settings.compressionDefaults.toJson();
-        final conversation = await openConversation(controller);
-        for (final content in ['old user', 'recent user']) {
-          await service.addMessage(
-            conversationId: conversation.id,
-            role: 'user',
-            content: content,
-          );
-          await service.addMessage(
-            conversationId: conversation.id,
-            role: 'assistant',
-            content: 'answer to $content',
-          );
-        }
-        final nativeOutput = <Map<String, dynamic>>[
-          {
-            'type': 'message',
-            'id': 'preserved',
-            'role': 'user',
-            'content': [
-              {'type': 'input_text', 'text': 'server retained'},
-            ],
-          },
-          {
-            'type': 'compaction',
-            'id': 'opaque-id',
-            'encrypted_content': 'opaque-state',
-          },
-          {
-            'type': 'future_native_item',
-            'custom': {'keep': true},
-          },
-        ];
-        var compactCalls = 0;
-        Map<String, dynamic>? following;
-        apiOverride = (request, body) async {
-          if (request.uri.path.endsWith('/responses/compact')) {
-            compactCalls++;
-            expect(body['model'], 'test-model');
-            expect(jsonEncode(body), contains('old user'));
-            expect(jsonEncode(body), isNot(contains('recent user')));
-            expect(body, isNot(contains('stream')));
-            request.response.headers.contentType = ContentType.json;
-            request.response.write(
-              jsonEncode({
-                'output': nativeOutput,
-                'usage': {'input_tokens': 200, 'output_tokens': 20},
-              }),
-            );
-            await request.response.close();
-          } else {
-            expect(request.uri.path.endsWith('/responses'), isTrue);
-            following = body;
-            request.response.headers.contentType = ContentType(
-              'text',
-              'event-stream',
-            );
-            for (final event in [
-              {
-                'type': 'response.output_text.delta',
-                'output_index': 0,
-                'content_index': 0,
-                'delta': 'continued',
-              },
-              {
-                'type': 'response.completed',
-                'response': {
-                  'status': 'completed',
-                  'output': [
-                    {
-                      'type': 'message',
-                      'id': 'answer-id',
-                      'role': 'assistant',
-                      'content': [
-                        {'type': 'output_text', 'text': 'continued'},
-                      ],
-                    },
-                  ],
-                  'usage': {'input_tokens': 40, 'output_tokens': 2},
-                },
-              },
-            ]) {
-              request.response.write('data: ${jsonEncode(event)}\n\n');
-            }
-            await request.response.close();
-          }
-        };
-        expect(
-          await controller.compressContext(
-            options: const CompressContextOptions(
-              mode: CompressContextLimitMode.keepRecent,
-              keepUserMessages: 1,
-              native: true,
+  testWidgets('automatic imported native warning is localized', (tester) async {
+    final controller = await pumpHarness(tester);
+    controller.debugViewModel.onError?.call(
+      'native_compaction_originals_unavailable',
+    );
+    await tester.pumpAndSettle();
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).first),
+    )!;
+    final notices = AppSnackBarManager().activeToasts.map(
+      (entry) => entry.notification.message,
+    );
+    expect(notices, contains(l10n.compressionNativeOriginalsUnavailable));
+    expect(
+      notices.any(
+        (message) =>
+            message.contains('native_compaction_originals_unavailable'),
+      ),
+      isFalse,
+    );
+    AppSnackBarManager().dismissAll();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+  });
+
+  for (final newChat in [false, true]) {
+    testWidgets(
+      'manual native compaction sends its whole result before unchanged recent history: newChat=$newChat',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          await settings.disableSuggestionGeneration();
+          // Native mode ignores the independently configured text template/model.
+          await settings.setCompressionDefaults(
+            const CompressionConfig(
+              templateId: 'missing-template',
+              providerId: 'missing-summary-provider',
+              modelId: 'missing-summary-model',
+              keepRecentUserTurns: 4,
             ),
-          ),
-          isNull,
-        );
-        await waitFor(
-          () =>
-              service.contextCompression.taskFor(conversation.id)?.phase ==
-              CompressionPhase.completed,
-          'native compaction installs',
-        );
-        expect(compactCalls, 1);
-        expect(settings.compressionDefaults.toJson(), textSettings);
-        expect(
-          settings.getProviderConfig('SiliconFlow').useResponseApi,
-          isNot(isTrue),
-        );
-        await controller.sendMessage(ChatInputData(text: 'next user'));
-        await waitFor(
-          () =>
-              following != null &&
-              !controller.chatController.isConversationLoading(conversation.id),
-          'native follow-up finishes',
-        );
-        final input = following!['input'] as List;
-        expect(input.take(nativeOutput.length).toList(), nativeOutput);
-        final tail = jsonEncode(input.skip(nativeOutput.length).toList());
-        expect(tail, contains('recent user'));
-        expect(tail, contains('answer to recent user'));
-        expect(tail, contains('next user'));
-        expect(tail, isNot(contains('old user')));
-        expect(jsonEncode(following), isNot(contains('_kelivo_native')));
-        expect(
-          (await service.loadMessages(conversation.id)).last.content,
-          'continued',
-        );
-      });
-      AppSnackBarManager().dismissAll();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
+          );
+          final textSettings = settings.compressionDefaults.toJson();
+          final conversation = await openConversation(controller);
+          for (final content in ['old user', 'recent user']) {
+            await service.addMessage(
+              conversationId: conversation.id,
+              role: 'user',
+              content: content,
+            );
+            await service.addMessage(
+              conversationId: conversation.id,
+              role: 'assistant',
+              content: 'answer to $content',
+            );
+          }
+          final nativeOutput = <Map<String, dynamic>>[
+            {
+              'type': 'message',
+              'id': 'preserved',
+              'role': 'user',
+              'content': [
+                {'type': 'input_text', 'text': 'server retained'},
+              ],
+            },
+            {
+              'type': 'compaction',
+              'id': 'opaque-id',
+              'encrypted_content': 'opaque-state',
+            },
+            {
+              'type': 'future_native_item',
+              'custom': {'keep': true},
+            },
+          ];
+          var compactCalls = 0;
+          Map<String, dynamic>? following;
+          apiOverride = (request, body) async {
+            if (request.uri.path.endsWith('/responses/compact')) {
+              compactCalls++;
+              expect(body['model'], 'test-model');
+              expect(jsonEncode(body), contains('old user'));
+              expect(jsonEncode(body), isNot(contains('recent user')));
+              expect(body, isNot(contains('stream')));
+              request.response.headers.contentType = ContentType.json;
+              request.response.write(
+                jsonEncode({
+                  'output': nativeOutput,
+                  'usage': {'input_tokens': 200, 'output_tokens': 20},
+                }),
+              );
+              await request.response.close();
+            } else {
+              expect(request.uri.path.endsWith('/responses'), isTrue);
+              following = body;
+              request.response.headers.contentType = ContentType(
+                'text',
+                'event-stream',
+              );
+              for (final event in [
+                {
+                  'type': 'response.output_text.delta',
+                  'output_index': 0,
+                  'content_index': 0,
+                  'delta': 'continued',
+                },
+                {
+                  'type': 'response.completed',
+                  'response': {
+                    'status': 'completed',
+                    'output': [
+                      {
+                        'type': 'message',
+                        'id': 'answer-id',
+                        'role': 'assistant',
+                        'content': [
+                          {'type': 'output_text', 'text': 'continued'},
+                        ],
+                      },
+                    ],
+                    'usage': {'input_tokens': 40, 'output_tokens': 2},
+                  },
+                },
+              ]) {
+                request.response.write('data: ${jsonEncode(event)}\n\n');
+              }
+              await request.response.close();
+            }
+          };
+          expect(
+            await controller.compressContext(
+              options: CompressContextOptions(
+                mode: CompressContextLimitMode.keepRecent,
+                keepUserMessages: 1,
+                native: true,
+                newConversation: newChat,
+              ),
+            ),
+            isNull,
+          );
+          await waitFor(
+            () =>
+                service.contextCompression.taskFor(conversation.id)?.phase ==
+                CompressionPhase.completed,
+            'native compaction installs',
+          );
+          final targetId = newChat
+              ? service.contextCompression
+                    .taskFor(conversation.id)!
+                    .resultConversationId!
+              : conversation.id;
+          if (newChat) {
+            final snapshot = await service.loadContextSnapshot(targetId);
+            expect(snapshot.messages, hasLength(3));
+            expect(snapshot.messages.skip(1).map((m) => m.content), [
+              'recent user',
+              'answer to recent user',
+            ]);
+            expect(
+              (await service.loadContextSnapshot(conversation.id)).messages,
+              hasLength(4),
+            );
+            await controller.chatController.setCurrentConversationAndLoad(
+              service.getConversation(targetId)!,
+            );
+          }
+          expect(compactCalls, 1);
+          expect(settings.compressionDefaults.toJson(), textSettings);
+          expect(
+            settings.getProviderConfig('SiliconFlow').useResponseApi,
+            isNot(isTrue),
+          );
+          await controller.sendMessage(ChatInputData(text: 'next user'));
+          await waitFor(
+            () =>
+                following != null &&
+                !controller.chatController.isConversationLoading(targetId),
+            'native follow-up finishes',
+          );
+          final input = following!['input'] as List;
+          expect(input.take(nativeOutput.length).toList(), nativeOutput);
+          final tail = jsonEncode(input.skip(nativeOutput.length).toList());
+          expect(tail, contains('recent user'));
+          expect(tail, contains('answer to recent user'));
+          expect(tail, contains('next user'));
+          expect(tail, isNot(contains('old user')));
+          expect(jsonEncode(following), isNot(contains('_kelivo_native')));
+          expect(
+            (await service.loadMessages(targetId)).last.content,
+            'continued',
+          );
+        });
+        AppSnackBarManager().dismissAll();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final scenario in ['threshold', 'overflow', 'failure', 'measured']) {
     testWidgets(

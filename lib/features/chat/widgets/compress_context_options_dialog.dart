@@ -504,6 +504,9 @@ class _CompressContextOptionsDialogState
         widget.operations,
         options,
       );
+      if (selection.missingOriginals) {
+        throw StateError('native_compaction_originals_unavailable');
+      }
       final input =
           await widget.prepareInput?.call(
             selection.input,
@@ -526,7 +529,14 @@ class _CompressContextOptionsDialogState
       if (!mounted) return;
       await showCompressionPromptPreview(context, prompt);
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        setState(
+          () => _error = compressionErrorLabel(
+            AppLocalizations.of(context)!,
+            error.toString(),
+          ),
+        );
+      }
     }
   }
 
@@ -919,7 +929,10 @@ class _CompressContextOptionsDialogState
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
-                        l10n.compressionNativeCopyHint,
+                        chat?.isTemporaryConversation(widget.conversationId) ==
+                                true
+                            ? l10n.compressionNativeTemporaryCopyHint
+                            : l10n.compressionNativeCopyHint,
                         style: hintStyle,
                       ),
                     ),
@@ -1255,6 +1268,14 @@ class _CompressContextOptionsDialogState
                     ),
                   ],
                 ],
+                if (selection.missingOriginals)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      l10n.compressionNativeOriginalsUnavailable,
+                      style: TextStyle(fontSize: 13, color: cs.error),
+                    ),
+                  ),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -1294,7 +1315,7 @@ class _CompressContextOptionsDialogState
                       }
                     }
                   }
-                : selection.covered.isEmpty
+                : selection.covered.isEmpty || selection.missingOriginals
                 ? null
                 : () => _submit(regenerate: selection.needsRegeneration),
           ),

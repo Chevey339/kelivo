@@ -365,6 +365,9 @@ extension ChatContextOperations on ChatService {
       if (ContextHistory.operationsFingerprint(operations) != expectedState) {
         throw StateError('context_changed');
       }
+      if (operations.any((op) => op.id == operationId && op.isImportedNative)) {
+        throw StateError('native_compaction_originals_unavailable');
+      }
       final affected = ContextHistory.affectedOperations(
         operations,
         operationIds: {operationId},
@@ -435,77 +438,11 @@ extension ChatContextOperations on ChatService {
     Future<void> Function()? validateBeforeCommit,
     void Function()? checkBeforeCommit,
   }) async {
-    if (operation.isNative) {
-      final snapshot = await loadContextSnapshot(id);
-      if (snapshot.fingerprint != expectedFingerprint) {
-        throw StateError('context_changed');
-      }
-      final source = getConversation(id)!;
-      final active =
-          (snapshot.operations.any((op) => op.id == operation.id)
-                  ? snapshot.operations
-                  : ContextHistory.appendOperation(
-                      snapshot.operations,
-                      operation,
-                    ))
-              .where((op) => !op.revoked)
-              .toList();
-      // A native fork keeps originals in its own storage so undo remains
-      // meaningful even if the source conversation is later deleted.
-      return _forkSelectedMessages(
-        title: source.title,
-        assistantId: source.assistantId,
-        activate: false,
-        temporary: _temporaryConversationIds.contains(id),
-        sourceMessages: snapshot.messages,
-        sourceExtras: Map<String, dynamic>.from(source.extras),
-        sourceMcpServerIds: ConversationMcpSettings.isOverridden(source)
-            ? List.of(source.mcpServerIds)
-            : null,
-        activationOwner: _currentConversationId,
-        beforePublish: (created) async {
-          await validateBeforeCommit?.call();
-          checkBeforeCommit?.call();
-          final target = await loadContextSnapshot(created.id);
-          final groups = <String, String>{};
-          final messages = <String, String>{};
-          for (var i = 0; i < snapshot.messages.length; i++) {
-            groups[ContextHistory.group(snapshot.messages[i])] =
-                ContextHistory.group(target.messages[i]);
-            messages[snapshot.messages[i].id] = target.messages[i].id;
-          }
-          final operations = {
-            for (final op in active) op.id: const Uuid().v4(),
-          };
-          await restoreContextOperations(created.id, [
-            for (final op in active)
-              op.remap(
-                groups: groups,
-                operations: operations,
-                messages: messages,
-              ),
-          ], expectedFingerprint: target.fingerprint);
-          await setCompressionOverrides(
-            created.id,
-            await compressionOverrides(id),
-          );
-          await setConversationModel(
-            created.id,
-            providerKey: source.chatModelProvider,
-            modelId: source.chatModelId,
-          );
-          if ((await loadContextSnapshot(id)).fingerprint !=
-              expectedFingerprint) {
-            throw StateError('context_changed');
-          }
-          checkBeforeCommit?.call();
-        },
-      );
-    }
     if (_temporaryConversationIds.contains(id)) {
       await validateBeforeCommit?.call();
       checkBeforeCommit?.call();
-      if ((await loadContextSnapshot(id)).fingerprint != expectedFingerprint) {
+      final snapshot = await loadContextSnapshot(id);
+      if (snapshot.fingerprint != expectedFingerprint) {
         throw StateError('context_changed');
       }
       final source = getConversation(id)!;
@@ -535,23 +472,31 @@ extension ChatContextOperations on ChatService {
           _temporaryCompressionSettings[created.id] =
               await compressionOverrides(id);
           final target = await loadContextSnapshot(created.id);
+          ContextOperation copySummary(int index) {
+            final original = index == 0
+                ? operation
+                : snapshot.operations.firstWhere(
+                    (op) => op.summaryMessageId == sourceMessages[index].id,
+                  );
+            final keep = countUserMessages(
+              sourceMessages.skip(index + 1).toList(),
+            );
+            return index == 0 || original.isNative
+                ? original.copiedTo(
+                    target.messages[index],
+                    sourceConversationId: id,
+                    keepUserMessages: keep,
+                  )
+                : ContextOperation.forCopiedSummary(
+                    target.messages[index],
+                    keepUserMessages: keep,
+                  );
+          }
+
           await restoreContextOperations(created.id, [
             for (var i = 0; i < sourceMessages.length; i++)
               if (i == 0 || ContextOperation.isSummary(sourceMessages[i]))
-                ContextOperation.forCopiedSummary(
-                  target.messages[i],
-                  compressionDetails: i == 0
-                      ? {
-                          ...operation.compressionDetails,
-                          'sourceRevisionIds': <String>[],
-                          'imageSources': <String, dynamic>{},
-                          'toolSources': <String, dynamic>{},
-                        }
-                      : const {},
-                  keepUserMessages: countUserMessages(
-                    sourceMessages.skip(i + 1).toList(),
-                  ),
-                ),
+                copySummary(i),
           ], expectedFingerprint: target.fingerprint);
           await setConversationModel(
             created.id,

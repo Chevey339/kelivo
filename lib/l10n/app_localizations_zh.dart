@@ -15715,13 +15715,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compressionNativeScopeChanged =>
-      '此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。';
+      '此原生上下文属于其他连接或账号。请切回原连接继续，或在保留原文的会话中撤销压缩、重新生成文字摘要。';
 
   @override
   String get compressionNativeTokenHint => '原生上下文的 token 用量以服务端统计为准。';
 
   @override
-  String get compressionNativeCopyHint => '新会话会保留原始消息，以便撤销原生压缩。';
+  String get compressionNativeCopyHint =>
+      '新会话仅保存完整的原生压缩结果和保留的最近对话。原文留在原会话，无法在新会话中撤销恢复。';
 
   @override
   String get compressionNativeInputOverride =>
@@ -15779,6 +15780,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get themePaletteCustom => '自定义';
+
+  @override
+  String get compressionNativeImported => '已载入原生压缩上下文';
+
+  @override
+  String get compressionNativeImportedDescription =>
+      '此会话以完整的原生压缩结果和保留的最近对话开始。压缩结果无法作为文本查看或编辑；较早的原文保留在原会话，不能在此撤销恢复。';
+
+  @override
+  String get compressionNativeOpenSource => '查看原会话';
+
+  @override
+  String get compressionNativeOriginalsUnavailable =>
+      '此会话没有已载入原生上下文对应的原文。可继续使用原生压缩，或返回原会话查看原文、重新生成文字摘要。';
+
+  @override
+  String get compressionNativeTemporaryCopyHint =>
+      '新的临时会话仅保留完整的原生压缩结果和最近对话。离开旧临时会话后，它及未保留的原文会被清除，无法在新会话中恢复。';
+
+  @override
+  String get compressionNativeSourceUnavailable =>
+      '此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31492,13 +31515,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressionNativeScopeChanged =>
-      '此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。';
+      '此原生上下文属于其他连接或账号。请切回原连接继续，或在保留原文的会话中撤销压缩、重新生成文字摘要。';
 
   @override
   String get compressionNativeTokenHint => '原生上下文的 token 用量以服务端统计为准。';
 
   @override
-  String get compressionNativeCopyHint => '新会话会保留原始消息，以便撤销原生压缩。';
+  String get compressionNativeCopyHint =>
+      '新会话仅保存完整的原生压缩结果和保留的最近对话。原文留在原会话，无法在新会话中撤销恢复。';
 
   @override
   String get compressionNativeInputOverride =>
@@ -31556,6 +31580,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get themePaletteCustom => '自定义';
+
+  @override
+  String get compressionNativeImported => '已载入原生压缩上下文';
+
+  @override
+  String get compressionNativeImportedDescription =>
+      '此会话以完整的原生压缩结果和保留的最近对话开始。压缩结果无法作为文本查看或编辑；较早的原文保留在原会话，不能在此撤销恢复。';
+
+  @override
+  String get compressionNativeOpenSource => '查看原会话';
+
+  @override
+  String get compressionNativeOriginalsUnavailable =>
+      '此会话没有已载入原生上下文对应的原文。可继续使用原生压缩，或返回原会话查看原文、重新生成文字摘要。';
+
+  @override
+  String get compressionNativeTemporaryCopyHint =>
+      '新的临时会话仅保留完整的原生压缩结果和最近对话。离开旧临时会话后，它及未保留的原文会被清除，无法在新会话中恢复。';
+
+  @override
+  String get compressionNativeSourceUnavailable =>
+      '此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47276,13 +47322,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressionNativeScopeChanged =>
-      '此原生上下文來自其他連線或帳號。請復原該次壓縮，或用原始歷史產生文字摘要後繼續。';
+      '此原生上下文屬於其他連線或帳號。請切回原連線繼續，或在保留原文的會話中復原壓縮、重新產生文字摘要。';
 
   @override
   String get compressionNativeTokenHint => '原生上下文的 token 用量以服務端統計為準。';
 
   @override
-  String get compressionNativeCopyHint => '新對話會保留原始訊息，以便復原原生壓縮。';
+  String get compressionNativeCopyHint =>
+      '新會話僅儲存完整的原生壓縮結果和保留的最近對話。原文留在原會話，無法在新會話中透過復原找回原文。';
 
   @override
   String get compressionNativeInputOverride =>
@@ -47340,4 +47387,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get themePaletteCustom => '自訂';
+
+  @override
+  String get compressionNativeImported => '已載入原生壓縮上下文';
+
+  @override
+  String get compressionNativeImportedDescription =>
+      '此會話以完整的原生壓縮結果和保留的最近對話開始。壓縮結果無法作為文字檢視或編輯；較早的原文保留在原會話，無法在此透過復原找回原文。';
+
+  @override
+  String get compressionNativeOpenSource => '檢視原會話';
+
+  @override
+  String get compressionNativeOriginalsUnavailable =>
+      '此會話沒有已載入原生上下文對應的原文。可繼續使用原生壓縮，或返回原會話檢視原文、重新產生文字摘要。';
+
+  @override
+  String get compressionNativeTemporaryCopyHint =>
+      '新的臨時對話僅保留完整的原生壓縮結果與保留的最近對話。離開來源臨時對話後，該對話及未保留的原文將被刪除，且無法在此處還原。';
+
+  @override
+  String get compressionNativeSourceUnavailable =>
+      '此對話保留了完整的原生壓縮結果與保留的最近對話。來源對話已無法使用。未複製到此處的原文無法還原，且原生結果無法以文字形式檢視或編輯。';
 }

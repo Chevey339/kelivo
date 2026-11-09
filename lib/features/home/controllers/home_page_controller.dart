@@ -1004,7 +1004,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
-    if (error.contains('compression_')) {
+    if (error.contains('compression_') ||
+        error.contains('native_compaction_')) {
       return compressionErrorLabel(l10n, error);
     }
     if (error.contains('context_changed')) return l10n.contextChanged;

@@ -16578,7 +16578,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionNativeScopeChanged =>
-      'This native context belongs to another connection or account. Undo its compaction, or create a text summary from the original history before continuing.';
+      'This native context belongs to another connection or account. Continue with the original connection, or undo the compaction or create a text summary in the chat that contains the originals.';
 
   @override
   String get compressionNativeTokenHint =>
@@ -16586,7 +16586,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionNativeCopyHint =>
-      'A new conversation keeps original messages so native compaction can be undone.';
+      'The new chat keeps only the complete native compaction result and retained recent turns. Originals stay in the source chat and cannot be restored by undoing here.';
 
   @override
   String get compressionNativeInputOverride =>
@@ -16644,4 +16644,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themePaletteCustom => 'Custom';
+
+  @override
+  String get compressionNativeImported => 'Native context loaded';
+
+  @override
+  String get compressionNativeImportedDescription =>
+      'This chat starts with the complete native compaction result and retained recent turns. The result cannot be read or edited as text. Earlier originals remain in the source chat, so they cannot be restored by undoing here.';
+
+  @override
+  String get compressionNativeOpenSource => 'Open source chat';
+
+  @override
+  String get compressionNativeOriginalsUnavailable =>
+      'This chat has no originals for the imported native context. Continue with native compaction, or return to the source chat to view or summarize the originals.';
+
+  @override
+  String get compressionNativeTemporaryCopyHint =>
+      'The new temporary chat keeps only the complete native compaction result and retained recent turns. Leaving the source temporary chat deletes it and the originals not carried over; they cannot be restored here.';
+
+  @override
+  String get compressionNativeSourceUnavailable =>
+      'This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.';
 }

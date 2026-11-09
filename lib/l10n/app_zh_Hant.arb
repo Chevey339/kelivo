@@ -4845,9 +4845,9 @@
   "compressionNativeLabel": "原生壓縮",
   "compressionNativeDescription": "已在本機儲存服務端傳回的原生上下文，用於後續請求，無法作為文字檢視或編輯。原始訊息仍保留，可以復原本次壓縮。",
   "compressionNativeIncomplete": "服務端未傳回完整的原生壓縮結果，原上下文未變更。",
-  "compressionNativeScopeChanged": "此原生上下文來自其他連線或帳號。請復原該次壓縮，或用原始歷史產生文字摘要後繼續。",
+  "compressionNativeScopeChanged": "此原生上下文屬於其他連線或帳號。請切回原連線繼續，或在保留原文的會話中復原壓縮、重新產生文字摘要。",
   "compressionNativeTokenHint": "原生上下文的 token 用量以服務端統計為準。",
-  "compressionNativeCopyHint": "新對話會保留原始訊息，以便復原原生壓縮。",
+  "compressionNativeCopyHint": "新會話僅儲存完整的原生壓縮結果和保留的最近對話。原文留在原會話，無法在新會話中透過復原找回原文。",
   "compressionNativeInputOverride": "自訂 input 欄位會覆蓋原生壓縮資料。請先移除供應商、模型或助手設定中的 input 參數，再繼續對話。",
   "compressionNativeAllHint": "將目前上下文的全部歷史提交給原生壓縮，不另外保留最近原文。原始訊息仍可檢視。",
   "compressionNativeAutoHint": "達到門檻時，用目前對話模型執行原生壓縮後繼續傳送。失敗時保留原上下文，不會改用文字摘要。",
@@ -4864,5 +4864,11 @@
   "themePaletteTerracotta": "陶砂紅",
   "themePaletteMonochrome": "紙墨灰",
   "themePaletteDocument": "櫻桃綠",
-  "themePaletteCustom": "自訂"
+  "themePaletteCustom": "自訂",
+  "compressionNativeImported": "已載入原生壓縮上下文",
+  "compressionNativeImportedDescription": "此會話以完整的原生壓縮結果和保留的最近對話開始。壓縮結果無法作為文字檢視或編輯；較早的原文保留在原會話，無法在此透過復原找回原文。",
+  "compressionNativeOpenSource": "檢視原會話",
+  "compressionNativeOriginalsUnavailable": "此會話沒有已載入原生上下文對應的原文。可繼續使用原生壓縮，或返回原會話檢視原文、重新產生文字摘要。",
+  "compressionNativeTemporaryCopyHint": "新的臨時對話僅保留完整的原生壓縮結果與保留的最近對話。離開來源臨時對話後，該對話及未保留的原文將被刪除，且無法在此處還原。",
+  "compressionNativeSourceUnavailable": "此對話保留了完整的原生壓縮結果與保留的最近對話。來源對話已無法使用。未複製到此處的原文無法還原，且原生結果無法以文字形式檢視或編輯。"
 }

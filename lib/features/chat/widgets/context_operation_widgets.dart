@@ -39,6 +39,7 @@ class ContextOperationContent extends StatefulWidget {
     this.estimateSummary,
     this.statusLabel = '',
     this.showHeader = true,
+    this.sourceConversationAvailable = true,
   });
   final ContextOperation operation;
   final VoidCallback onClose;
@@ -55,6 +56,7 @@ class ContextOperationContent extends StatefulWidget {
   final Future<CompressionBudget?> Function(String)? estimateSummary;
   final String statusLabel;
   final bool showHeader;
+  final bool sourceConversationAvailable;
 
   @override
   State<ContextOperationContent> createState() =>
@@ -166,7 +168,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (widget.onViewOriginal != null)
           ActionSheetItem(
             icon: LucideIcons.info,
-            label: l10n.contextDetailViewOriginals,
+            label: widget.operation.isImportedNative
+                ? l10n.compressionNativeOpenSource
+                : l10n.contextDetailViewOriginals,
             onTap: widget.onViewOriginal!,
           ),
         if (widget.onViewBoundary != null)
@@ -231,19 +235,20 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
             ),
           ),
         ],
-        ContextDetailRow(
-          label: operation.isFixedStart
-              ? l10n.contextFixedStart
-              : operation.isCompression
-              ? l10n.contextDetailReplaced
-              : l10n.contextDetailExcluded,
-          value: widget.rangeLabel.isEmpty
-              ? l10n.contextRangeInfo(
-                  operation.sourceGroups.length,
-                  operation.keepUserMessages,
-                )
-              : widget.rangeLabel,
-        ),
+        if (!operation.isImportedNative)
+          ContextDetailRow(
+            label: operation.isFixedStart
+                ? l10n.contextFixedStart
+                : operation.isCompression
+                ? l10n.contextDetailReplaced
+                : l10n.contextDetailExcluded,
+            value: widget.rangeLabel.isEmpty
+                ? l10n.contextRangeInfo(
+                    operation.sourceGroups.length,
+                    operation.keepUserMessages,
+                  )
+                : widget.rangeLabel,
+          ),
         if (operation.isCompression) ...[
           if (operation.compressionDetails['requestAttempts']
               case final int count)
@@ -318,14 +323,15 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                   contextTokenValue(widget.budget!.usedTokens),
                 ),
         ),
-        ContextDetailRow(
-          label: l10n.contextDetailAfterUndo,
-          value: widget.undoBudget == null
-              ? '—'
-              : l10n.compressApproxTokens(
-                  contextTokenValue(widget.undoBudget!.usedTokens),
-                ),
-        ),
+        if (operation.canUndo)
+          ContextDetailRow(
+            label: l10n.contextDetailAfterUndo,
+            value: widget.undoBudget == null
+                ? '—'
+                : l10n.compressApproxTokens(
+                    contextTokenValue(widget.undoBudget!.usedTokens),
+                  ),
+          ),
       ],
     );
     final body = Column(
@@ -334,7 +340,11 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (operation.isNative) ...[
           const SizedBox(height: 12),
           Text(
-            l10n.compressionNativeDescription,
+            operation.isImportedNative
+                ? widget.sourceConversationAvailable
+                      ? l10n.compressionNativeImportedDescription
+                      : l10n.compressionNativeSourceUnavailable
+                : l10n.compressionNativeDescription,
             style: TextStyle(fontSize: 14, height: 1.5, color: cs.onSurface),
           ),
           const SizedBox(height: 10),
@@ -541,7 +551,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                                   ? l10n.contextFixedStart
                                   : operation.isCompression
                                   ? operation.isNative
-                                        ? l10n.compressionNativeLabel
+                                        ? operation.isImportedNative
+                                              ? l10n.compressionNativeImported
+                                              : l10n.compressionNativeLabel
                                         : l10n.contextDetailTitle
                                   : l10n.contextDetailClearTitle,
                               style: TextStyle(
@@ -599,7 +611,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           const SizedBox(height: 14),
           Row(
             children: [
-              if (!_editing && widget.onUndo != null && !operation.revoked)
+              if (!_editing && widget.onUndo != null && operation.canUndo)
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,

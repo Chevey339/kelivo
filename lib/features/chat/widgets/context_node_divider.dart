@@ -94,7 +94,10 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
     final desktop = PlatformUtils.isDesktopTarget;
     final hovered = desktop && (_hovered || _focused);
     final showUndo =
-        operation != null && widget.onUndo != null && (!desktop || hovered);
+        operation != null &&
+        operation.canUndo &&
+        widget.onUndo != null &&
+        (!desktop || hovered);
     final symmetricIcons = showUndo && !desktop;
     final undoSize = desktop ? 18.0 : 28.0;
     final color = _highlight ? cs.primary : cs.onSurface.withValues(alpha: .6);
@@ -108,7 +111,9 @@ class _ContextOperationDividerState extends State<ContextOperationDivider> {
                   ? l10n.contextFixedStart
                   : operation.isCompression
                   ? operation.isNative
-                        ? l10n.compressionNativeLabel
+                        ? operation.isImportedNative
+                              ? l10n.compressionNativeImported
+                              : l10n.compressionNativeLabel
                         : l10n.contextDividerCompressed
                   : l10n.homePageClearContext}'
               '${operation.isCompression && operation.isEdited ? ' · ${l10n.contextDividerEdited}' : ''}';

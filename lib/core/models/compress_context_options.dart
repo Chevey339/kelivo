@@ -2,6 +2,7 @@ import '../utils/token_estimator.dart';
 import 'chat_message.dart';
 import 'context_operation.dart';
 import 'message_part.dart';
+import 'native_compaction.dart';
 
 enum CompressContextLimitMode { start, recent, unlimited, keepRecent }
 
@@ -83,6 +84,7 @@ typedef CompressionSelection = ({
   List<ChatMessage> input,
   List<String> dependencies,
   bool needsRegeneration,
+  bool missingOriginals,
 });
 
 /// The options preview and the actual task use the same range selection.
@@ -152,6 +154,17 @@ CompressionSelection selectCompressionHistory(
     includeEditedSummaries: options.includeEditedSummaries,
     includeNative: options.native,
   );
+  final input = expanded.where((message) {
+    if (groups.contains(ContextHistory.group(message))) return true;
+    final operation = operations
+        .where(
+          (op) =>
+              message.id == op.summaryMessageId ||
+              message.id == 'context-note:${op.id}',
+        )
+        .firstOrNull;
+    return operation != null && operation.sourceGroups.every(groups.contains);
+  }).toList();
   return (
     effective: effective,
     retained: effective.where((m) => !prefix.contains(m)).toList(),
@@ -165,17 +178,12 @@ CompressionSelection selectCompressionHistory(
         prefix.every(ContextOperation.isSummary) &&
         options.historySource == ContextHistorySource.effective &&
         !options.regenerateExisting,
-    input: expanded.where((message) {
-      if (groups.contains(ContextHistory.group(message))) return true;
-      final operation = operations
-          .where(
-            (op) =>
-                message.id == op.summaryMessageId ||
-                message.id == 'context-note:${op.id}',
-          )
-          .firstOrNull;
-      return operation != null && operation.sourceGroups.every(groups.contains);
-    }).toList(),
+    input: input,
+    missingOriginals:
+        !options.native &&
+        input.any(
+          (message) => NativeCompactionPayload.forMessage(message) != null,
+        ),
   );
 }
 

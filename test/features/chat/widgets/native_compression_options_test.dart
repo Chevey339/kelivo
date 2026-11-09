@@ -20,6 +20,10 @@ import '../../../support/business_test_harness.dart';
 
 class _NativeOptionsChat extends ChatService {
   _NativeOptionsChat({required super.existingRepository});
+  bool temporary = false;
+  @override
+  bool isTemporaryConversation(String? id) =>
+      temporary || super.isTemporaryConversation(id);
   final _conversations = {
     'c': Conversation(id: 'c', title: 'Current'),
     'other': Conversation(id: 'other', title: 'Other'),
@@ -258,8 +262,22 @@ void main() {
       await tester.tap(find.text(l10n.homePageCancel));
       await tester.pumpAndSettle();
       conversationId = 'other';
+      (chat as _NativeOptionsChat).temporary = true;
       await open();
       expect(tester.widget<IosSwitch>(toggle).value, isFalse);
+      await flip();
+      final newChat = find.byWidgetPredicate(
+        (w) =>
+            w is IosSwitch && w.semanticLabel == l10n.compressNewConversation,
+      );
+      await tester.ensureVisible(newChat);
+      await tester.tap(newChat);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(l10n.compressionNativeTemporaryCopyHint),
+        findsOneWidget,
+      );
+      expect(find.text(l10n.compressionNativeCopyHint), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
       debugDefaultTargetPlatformOverride = null;
     });

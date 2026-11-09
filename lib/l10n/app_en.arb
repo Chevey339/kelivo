@@ -8228,9 +8228,9 @@
   "compressionNativeLabel": "Native compaction",
   "compressionNativeDescription": "The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.",
   "compressionNativeIncomplete": "The service did not return a complete native compaction result. The original context is unchanged.",
-  "compressionNativeScopeChanged": "This native context belongs to another connection or account. Undo its compaction, or create a text summary from the original history before continuing.",
+  "compressionNativeScopeChanged": "This native context belongs to another connection or account. Continue with the original connection, or undo the compaction or create a text summary in the chat that contains the originals.",
   "compressionNativeTokenHint": "Token usage for opaque native context is determined by the service.",
-  "compressionNativeCopyHint": "A new conversation keeps original messages so native compaction can be undone.",
+  "compressionNativeCopyHint": "The new chat keeps only the complete native compaction result and retained recent turns. Originals stay in the source chat and cannot be restored by undoing here.",
   "compressionNativeInputOverride": "The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.",
   "compressionNativeAllHint": "Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.",
   "compressionNativeAutoHint": "At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.",
@@ -21661,13 +21661,13 @@
     "description": "Error message shown when the service returns an incomplete native compaction result and the original context is unchanged."
   },
   "@compressionNativeScopeChanged": {
-    "description": "Error shown when a native context belongs to a different connection or account, advising undo or a text summary."
+    "description": "Error when native context belongs to a different connection or account. Return to the original connection; undo or text-summary regeneration is only possible in a chat containing the originals, which may be the source chat of imported context. No placeholders."
   },
   "@compressionNativeTokenHint": {
     "description": "Hint stating that token usage for opaque native context is determined by the service; also used as the opaque usage state label."
   },
   "@compressionNativeCopyHint": {
-    "description": "Hint in the compression dialog noting that a new conversation keeps original messages so native compaction can be undone."
+    "description": "Hint in the compression dialog when native compaction and new chat are selected. Only the complete provider output and retained recent turns are copied; original history remains in the source chat and cannot be restored by undo in the new chat. No placeholders."
   },
   "@compressionNativeInputOverride": {
     "description": "Error shown when a custom input field would override native compression data, asking the user to remove the input override first."
@@ -21677,5 +21677,29 @@
   },
   "@compressionNativeAutoHint": {
     "description": "Hint for automatic compression with native mode: compact at the threshold with the current model; failures keep the original context without falling back to text summarization."
+  },
+  "compressionNativeImported": "Native context loaded",
+  "@compressionNativeImported": {
+    "description": "Title for an imported native compaction at the start of a new chat, shown in the timeline, context operation list and details. It is opaque context carried over from another chat, not a locally undoable compression. No placeholders."
+  },
+  "compressionNativeImportedDescription": "This chat starts with the complete native compaction result and retained recent turns. The result cannot be read or edited as text. Earlier originals remain in the source chat, so they cannot be restored by undoing here.",
+  "@compressionNativeImportedDescription": {
+    "description": "Description in imported native context details. Explains which data this chat owns, that the provider result is opaque, and that earlier originals must be viewed or restored in the source chat rather than through local undo. No placeholders."
+  },
+  "compressionNativeOpenSource": "Open source chat",
+  "@compressionNativeOpenSource": {
+    "description": "Action in imported native context details to open the source conversation containing the earlier originals. Source means the originating chat, not source code. No placeholders."
+  },
+  "compressionNativeOriginalsUnavailable": "This chat has no originals for the imported native context. Continue with native compaction, or return to the source chat to view or summarize the originals.",
+  "@compressionNativeOriginalsUnavailable": {
+    "description": "Message when undo or text-summary regeneration would require originals absent from an imported native context. Also shown in compression options when the selected range includes such context. Directs users to native compaction or the source chat. No placeholders."
+  },
+  "compressionNativeTemporaryCopyHint": "The new temporary chat keeps only the complete native compaction result and retained recent turns. Leaving the source temporary chat deletes it and the originals not carried over; they cannot be restored here.",
+  "@compressionNativeTemporaryCopyHint": {
+    "description": "Warning in the compression dialog when native compaction creates a new temporary chat. The app discards the source temporary chat when switching away, so originals outside the retained tail are deleted and cannot be restored from the new chat. No placeholders."
+  },
+  "compressionNativeSourceUnavailable": "This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.",
+  "@compressionNativeSourceUnavailable": {
+    "description": "Description in imported native context details when the source conversation has been deleted or discarded. Explains that this chat still owns the complete opaque result and retained tail, but cannot restore absent originals. No placeholders."
   }
 }

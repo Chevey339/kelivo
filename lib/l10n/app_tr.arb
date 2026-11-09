@@ -4845,9 +4845,9 @@
   "compressionNativeLabel": "Yerel sıkıştırma",
   "compressionNativeDescription": "Hizmet tarafından döndürülen yerel bağlam, sonraki istekler için yerel olarak kaydedildi. Metin olarak okunamaz veya düzenlenemez. Orijinal mesajlar kullanılabilir kalır ve bu sıkıştırma geri alınabilir.",
   "compressionNativeIncomplete": "Hizmet tam bir yerel sıkıştırma sonucu döndürmedi. Orijinal bağlam değişmedi.",
-  "compressionNativeScopeChanged": "Bu yerel bağlam başka bir bağlantıya veya hesaba ait. Sıkıştırmayı geri alın ya da devam etmeden önce orijinal geçmişten bir metin özeti oluşturun.",
+  "compressionNativeScopeChanged": "Bu yerel bağlam başka bir bağlantıya veya hesaba ait. Özgün bağlantıyla devam edin ya da sıkıştırmayı geri alın veya özgün içeriği barındıran sohbette metin özeti oluşturun.",
   "compressionNativeTokenHint": "Opak yerel bağlamın token kullanımı hizmet tarafından belirlenir.",
-  "compressionNativeCopyHint": "Yeni sohbet, yerel sıkıştırmanın geri alınabilmesi için orijinal mesajları korur.",
+  "compressionNativeCopyHint": "Yeni sohbet yalnızca tam yerel sıkıştırma sonucunu ve korunan son turları saklar. Özgün içerik kaynak sohbette kalır ve burada geri alınarak kurtarılamaz.",
   "compressionNativeInputOverride": "Özel input alanı yerel sıkıştırma verilerinin yerine geçer. Devam etmeden önce sağlayıcı, model veya asistan ayarlarındaki input geçersiz kılmasını kaldırın.",
   "compressionNativeAllHint": "Ayrı bir son kuyruk tutmadan geçerli geçmişin tamamını yerel sıkıştırmaya gönderin. Orijinal mesajlar kullanılabilir kalır.",
   "compressionNativeAutoHint": "Eşikte, geçerli sohbet modeliyle yerel olarak sıkıştırın, ardından göndermeye devam edin. Başarısız bir deneme orijinal bağlamı korur ve metin özetlemeye geçmez.",
@@ -4864,5 +4864,11 @@
   "themePaletteTerracotta": "Terrakota Kili",
   "themePaletteMonochrome": "Kırağı Grisi",
   "themePaletteDocument": "Yemyeşil Nane",
-  "themePaletteCustom": "Özel"
+  "themePaletteCustom": "Özel",
+  "compressionNativeImported": "Yerel bağlam yüklendi",
+  "compressionNativeImportedDescription": "Bu sohbet, tam yerel sıkıştırma sonucu ve korunan son turlarla başlar. Sonuç metin olarak görüntülenemez veya düzenlenemez. Önceki özgün içerik kaynak sohbette kalır, bu nedenle burada geri alınarak kurtarılamaz.",
+  "compressionNativeOpenSource": "Kaynak sohbeti aç",
+  "compressionNativeOriginalsUnavailable": "Bu sohbette içe aktarılan yerel bağlama ait özgün içerik yok. Yerel sıkıştırmayla devam edin veya özgün içeriği görüntülemek ya da özetlemek için kaynak sohbete dönün.",
+  "compressionNativeTemporaryCopyHint": "Yeni geçici sohbet yalnızca tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak geçici sohbetten ayrılmak, onu ve aktarılmayan orijinalleri siler; bunlar burada geri yüklenemez.",
+  "compressionNativeSourceUnavailable": "Bu sohbet tam yerel sıkıştırma sonucunu ve korunan son turları tutar. Kaynak sohbet artık kullanılamıyor. Buraya kopyalanmayan orijinaller geri yüklenemez ve yerel sonuç metin olarak okunamaz veya düzenlenemez."
 }

@@ -6070,9 +6070,9 @@
   "compressionNativeLabel": "原生压缩",
   "compressionNativeDescription": "已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。",
   "compressionNativeIncomplete": "服务端未返回完整的原生压缩结果，原上下文未改变。",
-  "compressionNativeScopeChanged": "此原生上下文来自其他连接或账号。请撤销该次压缩，或用原始历史生成文本摘要后继续。",
+  "compressionNativeScopeChanged": "此原生上下文属于其他连接或账号。请切回原连接继续，或在保留原文的会话中撤销压缩、重新生成文字摘要。",
   "compressionNativeTokenHint": "原生上下文的 token 用量以服务端统计为准。",
-  "compressionNativeCopyHint": "新会话会保留原始消息，以便撤销原生压缩。",
+  "compressionNativeCopyHint": "新会话仅保存完整的原生压缩结果和保留的最近对话。原文留在原会话，无法在新会话中撤销恢复。",
   "compressionNativeInputOverride": "自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。",
   "compressionNativeAllHint": "将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。",
   "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。",
@@ -6096,5 +6096,11 @@
         "type": "String"
       }
     }
-  }
+  },
+  "compressionNativeImported": "已载入原生压缩上下文",
+  "compressionNativeImportedDescription": "此会话以完整的原生压缩结果和保留的最近对话开始。压缩结果无法作为文本查看或编辑；较早的原文保留在原会话，不能在此撤销恢复。",
+  "compressionNativeOpenSource": "查看原会话",
+  "compressionNativeOriginalsUnavailable": "此会话没有已载入原生上下文对应的原文。可继续使用原生压缩，或返回原会话查看原文、重新生成文字摘要。",
+  "compressionNativeTemporaryCopyHint": "新的临时会话仅保留完整的原生压缩结果和最近对话。离开旧临时会话后，它及未保留的原文会被清除，无法在新会话中恢复。",
+  "compressionNativeSourceUnavailable": "此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。"
 }

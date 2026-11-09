@@ -1709,6 +1709,9 @@ class HomeViewModel extends ChangeNotifier {
       snapshot.operations,
       options,
     );
+    if (selection.missingOriginals) {
+      throw StateError('native_compaction_originals_unavailable');
+    }
     final messages = await _chatService.messagesForCompression(
       selection.input,
       includeAttachmentsAndTools: options.includeAttachmentsAndTools,

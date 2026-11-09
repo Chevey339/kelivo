@@ -326,6 +326,9 @@ class ContextCompressionService extends ChangeNotifier {
         protectedMessageId: request.beforeMessageId,
         effectiveMessageIds: task.effectiveMessageIds,
       );
+      if (selection.missingOriginals) {
+        throw StateError('native_compaction_originals_unavailable');
+      }
       if (selection.covered.isEmpty || selection.needsRegeneration) {
         throw StateError('no_messages');
       }

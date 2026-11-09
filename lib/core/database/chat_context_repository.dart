@@ -398,6 +398,9 @@ extension ChatContextRepository on ChatDatabaseRepository {
     }
     final target = operations.firstWhere((op) => op.id == operationId);
     if (target.revoked) throw StateError('context_changed');
+    if (target.isImportedNative) {
+      throw StateError('native_compaction_originals_unavailable');
+    }
     if (summary != null &&
         (!target.isCompression || target.isNative || summary.trim().isEmpty)) {
       throw ArgumentError('empty_summary');
@@ -462,14 +465,9 @@ extension ChatContextRepository on ChatDatabaseRepository {
         modelId: operation.model,
       );
       final targetOperations = [
-        ContextOperation.forCopiedSummary(
+        operation.copiedTo(
           summary,
-          compressionDetails: {
-            ...operation.compressionDetails,
-            'sourceRevisionIds': <String>[],
-            'imageSources': <String, dynamic>{},
-            'toolSources': <String, dynamic>{},
-          },
+          sourceConversationId: sourceId,
           keepUserMessages: countUserMessages(retained),
         ),
       ];
@@ -500,22 +498,31 @@ extension ChatContextRepository on ChatDatabaseRepository {
       ];
       for (var i = 0; i < retained.length; i++) {
         if (ContextOperation.isSummary(retained[i])) {
+          final retainedOperation = snapshot.operations.firstWhere(
+            (op) => op.summaryMessageId == retained[i].id,
+          );
           final background = ChatMessage(
             role: 'user',
             content: retained[i].content,
             conversationId: id,
+            modelId: retainedOperation.model,
           );
           await _db
               .into(_db.messageRows)
               .insert(_messageCompanion(background, i + 1));
           await _replaceMessageParts(background);
+          final keep = countUserMessages(retained.skip(i + 1).toList());
           targetOperations.add(
-            ContextOperation.forCopiedSummary(
-              background,
-              keepUserMessages: countUserMessages(
-                retained.skip(i + 1).toList(),
-              ),
-            ),
+            retainedOperation.isNative
+                ? retainedOperation.copiedTo(
+                    background,
+                    sourceConversationId: sourceId,
+                    keepUserMessages: keep,
+                  )
+                : ContextOperation.forCopiedSummary(
+                    background,
+                    keepUserMessages: keep,
+                  ),
           );
         }
       }
