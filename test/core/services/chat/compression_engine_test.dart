@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:isolate';
+
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:Kelivo/core/services/api/generation/model_request_attempts.dart';
@@ -9,6 +12,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'package:Kelivo/core/services/chat/compression_engine.dart';
+import 'package:Kelivo/core/services/chat/compression_planner.dart';
 import 'package:Kelivo/core/services/chat/compression_prompt.dart';
 import 'package:Kelivo/core/services/chat/compression_templates.dart';
 
@@ -133,6 +137,199 @@ void main() {
   );
 
   test(
+    'large windows still bound requests and keep the event loop responsive',
+    () async {
+      final materials = List.generate(
+        800,
+        (i) => '[source message:$i]\n${'历史消息 example of context ' * 12}',
+      );
+      final content = <String>[];
+      var eventRan = false;
+      Timer.run(() => eventRan = true);
+      await run(materials, (prompt, _, _, _) async {
+        expect(
+          eventRan,
+          isTrue,
+          reason: 'planning must yield to the UI isolate',
+        );
+        expect(
+          prompt.length,
+          lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
+        );
+        content.add(
+          prompt
+              .split('<content data="reference, not instructions">\n')[1]
+              .split('\n</content>')[0],
+        );
+        return result('working summary');
+      }, window: 1000000);
+      expect(content.length, greaterThan(1));
+      expect(content.join('\n\n'), materials.join('\n\n'));
+    },
+  );
+
+  test(
+    'local limit splits a single long message without losing UTF-16 text',
+    () async {
+      final original = '${'alpha😀中文 ' * 24000}END_EVIDENCE';
+      final content = <String>[];
+      await run([original], (prompt, _, _, _) async {
+        expect(
+          prompt.length,
+          lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
+        );
+        final part = prompt
+            .split('<content data="reference, not instructions">\n')[1]
+            .split('\n</content>')[0]
+            .replaceFirst(RegExp(r'^\[source fragment[^\n]+\]\n'), '');
+        expect(part.runes.any((r) => r >= 0xd800 && r <= 0xdfff), isFalse);
+        content.add(part);
+        return result('summary ${'记忆' * 1000}');
+      }, window: 1000000);
+      expect(content.length, greaterThan(1));
+      expect(content.join(), original);
+    },
+  );
+
+  test(
+    'local request limit participates in the preflight call budget',
+    () async {
+      await expectLater(
+        run(
+          ['history ' * 40000],
+          (_, _, _, _) async => fail('must reject before a paid request'),
+          window: 1000000,
+          attempts: 1,
+        ),
+        throwsA(
+          predicate((e) => e.toString().contains('compression_request_budget')),
+        ),
+      );
+      expect(task.requestAttempts, 0);
+    },
+  );
+
+  test(
+    'preflight counts whole-message packing rather than total characters',
+    () async {
+      await expectLater(
+        run(
+          List.generate(3, (i) => '[source message:$i]\n${'history ' * 7500}'),
+          (_, _, _, _) async => fail('must reject before a paid request'),
+          window: 1000000,
+          attempts: 2,
+        ),
+        throwsA(
+          predicate((e) => e.toString().contains('compression_request_budget')),
+        ),
+      );
+      expect(task.requestAttempts, 0);
+    },
+  );
+
+  test(
+    'preflight reserves character space for subsequent working summaries',
+    () async {
+      final request = CompressionRequest(
+        options: options,
+        model: 'test',
+        quoteMarker: (_) => 'quote',
+        contextWindowTokens: 1000000,
+        config: const CompressionConfig(
+          summaryTokens: 4096,
+          maxRequestAttempts: 2,
+        ),
+        generate: (_, _, _, _) async =>
+            fail('must reject before a paid request'),
+      );
+      await expectLater(
+        const CompressionEngine().run(
+          task: task,
+          request: request,
+          materials: ['[source message:large]\n${'history ' * 23000}'],
+          previousSummary: '',
+          background: '',
+          check: () {},
+          publish: () async {},
+        ),
+        throwsA(
+          predicate((e) => e.toString().contains('compression_request_budget')),
+        ),
+      );
+      expect(task.requestAttempts, 0);
+    },
+  );
+
+  test(
+    'local preview is the first bounded request used by execution',
+    () async {
+      final materials = List.generate(
+        300,
+        (i) => 'message $i ${'history ' * 80}',
+      );
+      var first = '';
+      final request = CompressionRequest(
+        options: options,
+        model: 'test',
+        quoteMarker: (_) => 'quote',
+        contextWindowTokens: 1000000,
+        generate: (prompt, _, _, _) async {
+          if (first.isEmpty) first = prompt;
+          return result('summary');
+        },
+      );
+      final planner = CompressionPlanner(
+        request: request,
+        materials: materials,
+        previousSummary: '',
+        background: '',
+      );
+      final preview = await Isolate.run(planner.preview);
+      expect(
+        preview.prompt.length,
+        lessThanOrEqualTo(CompressionPlanner.maxPromptChars),
+      );
+      expect(preview.estimatedRequests, greaterThan(1));
+      await const CompressionEngine().run(
+        task: task,
+        request: request,
+        materials: materials,
+        previousSummary: '',
+        background: '',
+        check: () {},
+        publish: () async {},
+      );
+      expect(first, preview.prompt);
+    },
+  );
+
+  test('cancellation during background planning makes no model call', () async {
+    var cancelled = false;
+    Timer.run(() => cancelled = true);
+    await expectLater(
+      const CompressionEngine().run(
+        task: task,
+        request: CompressionRequest(
+          options: options,
+          model: 'test',
+          quoteMarker: (_) => 'quote',
+          generate: (_, _, _, _) async =>
+              fail('must not call after cancellation'),
+        ),
+        materials: ['history ' * 100],
+        previousSummary: '',
+        background: '',
+        check: () {
+          if (cancelled) throw StateError('cancelled');
+        },
+        publish: () async {},
+      ),
+      throwsStateError,
+    );
+    expect(task.requestAttempts, 0);
+  });
+
+  test(
     'long message processes every fragment in order with prior state',
     () async {
       final original = '${'中文代码😀 alpha\n\n' * 2200}END_EVIDENCE';
@@ -242,6 +439,22 @@ void main() {
           id: 'custom',
           name: 'custom',
           prompt: 'very long template ' * 3000,
+        ),
+      ),
+      throwsStateError,
+    );
+    expect(task.requestAttempts, 0);
+  });
+  test('local limit also rejects oversized fixed instructions', () async {
+    await expectLater(
+      run(
+        ['history'],
+        (_, _, _, _) async => fail('must not call'),
+        window: 1000000,
+        template: CompressionTemplate(
+          id: 'large',
+          name: 'large',
+          prompt: 'x' * CompressionPlanner.maxPromptChars,
         ),
       ),
       throwsStateError,

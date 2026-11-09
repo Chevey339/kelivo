@@ -83,6 +83,13 @@ class ContextCompressionService extends ChangeNotifier {
   bool _disposed = false;
   Iterable<ContextCompressionTask> get tasks => _tasks.values;
   ContextCompressionTask? taskFor(String id) => _tasks[id];
+
+  void _releaseRequest(ContextCompressionTask task) {
+    task.request = null;
+    // The validator closes over the request and the full source selection.
+    task.validateReferences = null;
+  }
+
   bool blocksSending(String id) =>
       ((_tasks[id]?.active ?? false) && !(_tasks[id]?.automatic ?? false)) ||
       _contextChanges.containsKey(id);
@@ -194,6 +201,7 @@ class ContextCompressionService extends ChangeNotifier {
     } catch (error) {
       task.phase = CompressionPhase.failed;
       task.error = error.toString();
+      _releaseRequest(task);
       if (!_disposed) notifyListeners();
       rethrow;
     }
@@ -277,7 +285,7 @@ class ContextCompressionService extends ChangeNotifier {
     }
     task.phase = CompressionPhase.cancelled;
     task.error = reason;
-    task.request = null;
+    _releaseRequest(task);
     ChatApiService.cancelRequest(task.id);
     try {
       await _publish(task);
@@ -532,7 +540,9 @@ class ContextCompressionService extends ChangeNotifier {
         if (!_disposed) notifyListeners();
       }
     } finally {
-      if (task.phase != CompressionPhase.review) task.request = null;
+      // Review applies the saved candidate with a fresh source fingerprint;
+      // it does not need the generation callbacks or their source snapshot.
+      _releaseRequest(task);
     }
   }
 
@@ -636,8 +646,7 @@ class ContextCompressionService extends ChangeNotifier {
       return;
     }
     if (isConversationBusy?.call(id) ?? false) throw StateError('in_flight');
-    task.request = null;
-    task.validateReferences = null;
+    _releaseRequest(task);
     task.automatic = false;
     task.cancelRequested = false;
     // Claim the review before awaiting estimates; double saves cannot apply twice.
@@ -720,6 +729,7 @@ class ContextCompressionService extends ChangeNotifier {
     }
     task.phase = CompressionPhase.completed;
     task.completedAt = DateTime.now();
+    _releaseRequest(task);
     try {
       await _publish(task);
     } catch (error) {
@@ -771,6 +781,7 @@ class ContextCompressionService extends ChangeNotifier {
     final task = _tasks.remove(id);
     if (task != null) {
       task.phase = CompressionPhase.cancelled;
+      _releaseRequest(task);
       ChatApiService.cancelRequest(task.id);
       if (!_disposed) notifyListeners();
     }
@@ -810,6 +821,7 @@ class ContextCompressionService extends ChangeNotifier {
     }
     _idleWaiters.clear();
     for (final task in _tasks.values) {
+      _releaseRequest(task);
       ChatApiService.cancelRequest(task.id);
     }
     super.dispose();

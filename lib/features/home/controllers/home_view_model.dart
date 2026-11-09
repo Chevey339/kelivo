@@ -1,9 +1,8 @@
 import '../../../core/services/api/native_compaction_context.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import '../../../core/models/message_part.dart';
-import 'dart:math' as math;
-import '../../../core/services/chat/compression_engine.dart';
-import '../../../core/services/chat/compression_prompt.dart';
+import 'dart:isolate';
+import '../../../core/services/chat/compression_planner.dart';
 import '../../../core/models/compression_config.dart';
 import '../../../core/models/auto_retry_options.dart';
 import '../../../core/services/chat/compression_templates.dart';
@@ -1719,46 +1718,25 @@ class HomeViewModel extends ChangeNotifier {
       includeAttachmentsAndTools: options.includeAttachmentsAndTools,
       quoteMarker: request.quoteMarker,
     );
-    final content = buildCompressRequestContents(
+    final materials = buildCompressRequestContents(
       messages.where((m) => !ContextOperation.isSummary(m)).toList(),
       options,
       quoteMarker: request.quoteMarker,
-    ).join('\n\n');
+    );
     final previous = messages
         .where(ContextOperation.isSummary)
         .map((m) => m.content)
         .join('\n\n');
     final background = await request.loadReference?.call(selection) ?? '';
     final continuation = await request.loadContinuation?.call(selection) ?? '';
-    final output = math.min(
-      config.summaryTokens,
-      request.maxOutputTokens ?? config.summaryTokens,
-    );
-    final window =
-        request.contextWindowTokens ??
-        CompressContextOptions.defaultContextWindowTokens;
-    String render(String history) => renderCompressionPrompt(
-      template: request.resolvedTemplate,
-      content: history,
+    final planner = CompressionPlanner(
+      request: request,
+      materials: materials,
       previousSummary: previous,
       background: background,
       continuation: continuation,
-      focus: options.focus,
-      locale: request.locale,
-      targetTokens: output,
     );
-    final prompt = render(content);
-    return (
-      prompt: prompt,
-      maxRequestAttempts: config.maxRequestAttempts,
-      estimatedRequests: plannedCompressionRequests(
-        prompt: prompt,
-        promptWithoutHistory: render(''),
-        history: content,
-        inputLimit: window - output - (window * .05).ceil(),
-        outputLimit: output,
-      ),
-    );
+    return Isolate.run(planner.preview);
   }
 
   /// Update current conversation reference.
