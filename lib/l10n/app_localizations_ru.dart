@@ -3471,6 +3471,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contextUsageUnavailable => 'Использование недоступно';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return 'Оценка $tokens + неизвестное сжатие';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => 'Нативное сжатие';
+
+  @override
+  String get contextUsageUnknownTokens => 'Неизвестно';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return 'Вход последнего запроса (измерено): $tokens';
+  }
+
+  @override
   String get contextUsageStateNone => 'Пока нет данных';
 
   @override

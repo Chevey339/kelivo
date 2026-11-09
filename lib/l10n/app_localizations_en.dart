@@ -3424,6 +3424,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageUnavailable => 'Usage unavailable';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return 'Estimated $tokens + unknown compaction';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => 'Native compaction';
+
+  @override
+  String get contextUsageUnknownTokens => 'Unknown';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return 'Last request input (measured): $tokens';
+  }
+
+  @override
   String get contextUsageStateNone => 'No data yet';
 
   @override

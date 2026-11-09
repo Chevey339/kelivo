@@ -86,11 +86,14 @@ String contextUsageSummaryText(
 ) {
   if (snapshot?.hasUsage != true) return l10n.contextUsageUnavailable;
   final used = snapshot?.usedTokens ?? 0;
-  final window = snapshot?.contextWindow;
+  if (snapshot!.hasUnknownNativeTokens) {
+    return l10n.contextUsagePartialSummary(formatTokenCount(used));
+  }
+  final window = snapshot.contextWindow;
   if (window == null || window <= 0) {
     return formatTokenCount(used);
   }
-  final percent = ((snapshot?.ratio ?? 0) * 100).round();
+  final percent = ((snapshot.ratio ?? 0) * 100).round();
   return l10n.contextUsageUsedWindow(
     formatTokenCount(used),
     formatTokenCount(window),
@@ -131,11 +134,14 @@ List<ContextUsageSegment> buildContextUsageSegments(
   }
 
   final window = snapshot.contextWindow;
-  final hasWindow = window != null && window > 0;
+  final hasWindow =
+      window != null && window > 0 && !snapshot.hasUnknownNativeTokens;
   final used = snapshot.usedTokens;
   final buckets = snapshot.buckets;
   final useBuckets =
-      (snapshot.state != ContextUsageState.exact || snapshot.calibrated) &&
+      (snapshot.hasUnknownNativeTokens ||
+          snapshot.state != ContextUsageState.exact ||
+          snapshot.calibrated) &&
       buckets.total > 0;
   final denom = hasWindow
       ? window
@@ -225,19 +231,33 @@ class ContextUsageSummaryHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    contextUsageSummaryText(l10n, snapshot),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.medium,
-                      color: cs.onSurface.withValues(alpha: 0.78),
+                  if (snapshot?.hasUnknownNativeTokens != true) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      contextUsageSummaryText(l10n, snapshot),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.78),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
+              if (snapshot?.hasUnknownNativeTokens == true) ...[
+                const SizedBox(height: 4),
+                Text(
+                  contextUsageSummaryText(l10n, snapshot),
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.medium,
+                    color: cs.onSurface.withValues(alpha: 0.78),
+                  ),
+                ),
+              ],
               const SizedBox(height: 2),
               Text(
                 contextUsageStateLabel(l10n, snapshot),
@@ -359,8 +379,11 @@ class ContextUsageLegend extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final segments = buildContextUsageSegments(snapshot);
-    if (segments.isEmpty) return const SizedBox.shrink();
-    final showPercent = contextUsageHasWindow(snapshot);
+    if (segments.isEmpty && !snapshot.hasUnknownNativeTokens) {
+      return const SizedBox.shrink();
+    }
+    final showPercent =
+        contextUsageHasWindow(snapshot) && !snapshot.hasUnknownNativeTokens;
 
     return Column(
       children: [
@@ -376,6 +399,16 @@ class ContextUsageLegend extends StatelessWidget {
                       ? '<0.1%'
                       : '${(segments[i].fraction * 100).toStringAsFixed(1)}%')
                 : null,
+          ),
+        ],
+        if (snapshot.hasUnknownNativeTokens) ...[
+          if (segments.isNotEmpty) const SizedBox(height: 8),
+          _LegendRow(
+            key: const ValueKey('context-usage-bucket-native-compaction'),
+            color: cs.outline,
+            label: l10n.contextUsageBucketNativeCompaction,
+            tokens: null,
+            percent: null,
           ),
         ],
       ],
@@ -394,7 +427,7 @@ class _LegendRow extends StatelessWidget {
 
   final Color color;
   final String label;
-  final int tokens;
+  final int? tokens;
   final String? percent;
 
   @override
@@ -427,7 +460,12 @@ class _LegendRow extends StatelessWidget {
             ),
           ),
         ),
-        Text(formatTokenCount(tokens), style: valueStyle),
+        Text(
+          tokens == null
+              ? AppLocalizations.of(context)!.contextUsageUnknownTokens
+              : formatTokenCount(tokens!),
+          style: valueStyle,
+        ),
         if (percent != null) ...[
           const SizedBox(width: 8),
           SizedBox(
@@ -452,6 +490,8 @@ class ContextUsageBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final segments = snapshot == null
         ? const <ContextUsageSegment>[]
         : buildContextUsageSegments(snapshot!);
@@ -461,14 +501,31 @@ class ContextUsageBreakdown extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ContextUsageSummaryHeader(snapshot: snapshot, trailing: headerTrailing),
-        if (segments.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          ContextUsageStackedBar(
-            key: const ValueKey('context-usage-stacked-bar'),
-            snapshot: snapshot!,
-          ),
+        if (segments.isNotEmpty ||
+            (snapshot?.hasUsage == true &&
+                snapshot!.hasUnknownNativeTokens)) ...[
+          if (!snapshot!.hasUnknownNativeTokens) ...[
+            const SizedBox(height: 10),
+            ContextUsageStackedBar(
+              key: const ValueKey('context-usage-stacked-bar'),
+              snapshot: snapshot!,
+            ),
+          ],
           const SizedBox(height: 12),
           ContextUsageLegend(snapshot: snapshot!),
+          if (snapshot!.hasUnknownNativeTokens &&
+              snapshot!.lastRequestInputTokens != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              l10n.contextUsageLastRequestInput(
+                formatTokenCount(snapshot!.lastRequestInputTokens!),
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.58),
+              ),
+            ),
+          ],
         ],
       ],
     );

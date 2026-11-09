@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
+import '../../../core/models/native_compaction.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -65,7 +66,41 @@ class ContextAssemblyPreview {
     );
     final text = <ContextSource, StringBuffer>{};
     final references = <String>{};
+    final nativeImages = <ContextImageRef>[];
     for (final message in apiMessages) {
+      if (message[nativeCompactionMessageKey] case final Map native) {
+        // The returned window also contains retained readable items. Observe
+        // those without normalizing the canonical payload or counting cipher
+        // text, provider IDs, and the compaction pass's usage as input tokens.
+        for (final item
+            in (native['output'] as List? ?? const []).whereType<Map>()) {
+          final type = item['type'];
+          dynamic content;
+          if (type == 'message' || (type == null && item['role'] != null)) {
+            content = item['content'];
+          } else if (type == 'function_call_output') {
+            content = item['output'];
+          } else if (type == 'function_call') {
+            content = jsonEncode({
+              'name': item['name'],
+              'arguments': item['arguments'],
+            });
+          } else {
+            continue;
+          }
+          text
+              .putIfAbsent(ContextSource.chatHistory, StringBuffer.new)
+              .write(extractApiMessageText(content));
+          if (content is List) {
+            for (final part in content.whereType<Map>()) {
+              if (part['type'] == 'input_image') {
+                nativeImages.add(const ContextImageRef());
+              }
+            }
+          }
+        }
+        continue;
+      }
       for (final segment in segmentsFromTaggedMessage(
         imageContext?.previewMessage(message) ?? message,
         estimateTokenCounts: false,
@@ -115,7 +150,7 @@ class ContextAssemblyPreview {
       searchText: content([ContextSource.searchPrompt]),
       tools: tools.where((tool) => !isMcp(tool)).toList(),
       mcpTools: tools.where(isMcp).toList(),
-      images: images,
+      images: [...images, ...nativeImages],
       imageContext: imageContext,
     );
   }

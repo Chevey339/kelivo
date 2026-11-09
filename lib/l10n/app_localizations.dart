@@ -6304,6 +6304,30 @@ abstract class AppLocalizations {
   /// **'Usage unavailable'**
   String get contextUsageUnavailable;
 
+  /// Summary in the context usage panel and input-bar tooltip when OpenAI native compaction is present. Only readable content has been estimated; the encrypted compaction block's input token count is unknown. tokens is the already-formatted subtotal, such as 42k, not the full context total.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated {tokens} + unknown compaction'**
+  String contextUsagePartialSummary(String tokens);
+
+  /// Category row in the context usage breakdown for opaque OpenAI native compaction state. Its token value is shown as unknown, separately from estimated readable messages and other categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Native compaction'**
+  String get contextUsageBucketNativeCompaction;
+
+  /// Token value in the context usage panel for encrypted native compaction content that cannot be counted locally; unknown must not be interpreted as zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get contextUsageUnknownTokens;
+
+  /// Separate line below the native-compaction context usage breakdown showing input tokens reported by the last matching model request, not the current estimated window or the compaction operation's output usage. tokens is an already-formatted token count such as 42k.
+  ///
+  /// In en, this message translates to:
+  /// **'Last request input (measured): {tokens}'**
+  String contextUsageLastRequestInput(String tokens);
+
   /// Status text indicating no context usage data exists yet.
   ///
   /// In en, this message translates to:

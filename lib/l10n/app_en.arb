@@ -1604,6 +1604,28 @@
   "contextUsageStateFailed": "Calculation failed",
   "contextUsageStateFailedWithPrevious": "Update failed · previous result is stale",
   "contextUsageUnavailable": "Usage unavailable",
+  "contextUsagePartialSummary": "Estimated {tokens} + unknown compaction",
+  "@contextUsagePartialSummary": {
+    "description": "Summary in the context usage panel and input-bar tooltip when OpenAI native compaction is present. Only readable content has been estimated; the encrypted compaction block's input token count is unknown. tokens is the already-formatted subtotal, such as 42k, not the full context total.",
+    "placeholders": {
+      "tokens": { "type": "String" }
+    }
+  },
+  "contextUsageBucketNativeCompaction": "Native compaction",
+  "@contextUsageBucketNativeCompaction": {
+    "description": "Category row in the context usage breakdown for opaque OpenAI native compaction state. Its token value is shown as unknown, separately from estimated readable messages and other categories."
+  },
+  "contextUsageUnknownTokens": "Unknown",
+  "@contextUsageUnknownTokens": {
+    "description": "Token value in the context usage panel for encrypted native compaction content that cannot be counted locally; unknown must not be interpreted as zero."
+  },
+  "contextUsageLastRequestInput": "Last request input (measured): {tokens}",
+  "@contextUsageLastRequestInput": {
+    "description": "Separate line below the native-compaction context usage breakdown showing input tokens reported by the last matching model request, not the current estimated window or the compaction operation's output usage. tokens is an already-formatted token count such as 42k.",
+    "placeholders": {
+      "tokens": { "type": "String" }
+    }
+  },
   "contextUsageStateNone": "No data yet",
   "contextUsageBucketSystem": "System prompt",
   "contextUsageBucketInjections": "Instruction injections",

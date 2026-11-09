@@ -3445,6 +3445,22 @@ class AppLocalizationsTr extends AppLocalizations {
   String get contextUsageUnavailable => 'Kullanım bilgisi yok';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return 'Tahmini $tokens + bilinmeyen sıkıştırma';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => 'Yerel sıkıştırma';
+
+  @override
+  String get contextUsageUnknownTokens => 'Bilinmiyor';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return 'Son istek girdisi (ölçülen): $tokens';
+  }
+
+  @override
   String get contextUsageStateNone => 'Henüz veri yok';
 
   @override

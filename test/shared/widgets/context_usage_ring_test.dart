@@ -11,6 +11,7 @@ ContextUsageSnapshot usageSnap({
   int used = 400,
   int? window = 1000,
   bool hasUsage = true,
+  bool hasUnknownNativeTokens = false,
   ContextUsageBuckets buckets = const ContextUsageBuckets(),
 }) {
   return ContextUsageSnapshot(
@@ -24,6 +25,7 @@ ContextUsageSnapshot usageSnap({
     modelId: 'window-model',
     assistantId: null,
     computedAt: hasUsage ? DateTime.utc(2026, 1, 1) : null,
+    hasUnknownNativeTokens: hasUnknownNativeTokens,
   );
 }
 
@@ -53,6 +55,24 @@ ContextUsageRingPainter ringPainter(WidgetTester tester) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('partial native context has no misleading window percentage', (
+    tester,
+  ) async {
+    await pumpRing(
+      tester,
+      snapshot: usageSnap(
+        state: ContextUsageState.opaque,
+        hasUnknownNativeTokens: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(ringPainter(tester).ratio, isNull);
+    expect(
+      find.byTooltip('Estimated 400 + unknown compaction'),
+      findsOneWidget,
+    );
+  });
 
   final cs = ColorScheme.light();
   final warning = AppSemanticColors.light(cs).warning;

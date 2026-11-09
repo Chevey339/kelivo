@@ -11,6 +11,8 @@ ContextUsageSnapshot usageSnap({
   int? window = 1000,
   bool calibrated = false,
   bool hasUsage = true,
+  bool hasUnknownNativeTokens = false,
+  int? lastRequestInputTokens,
   ContextUsageBuckets buckets = const ContextUsageBuckets(
     system: 10,
     injections: 8,
@@ -32,6 +34,8 @@ ContextUsageSnapshot usageSnap({
     assistantId: null,
     computedAt: hasUsage ? DateTime.utc(2026, 1, 1) : null,
     calibrated: calibrated,
+    hasUnknownNativeTokens: hasUnknownNativeTokens,
+    lastRequestInputTokens: lastRequestInputTokens,
   );
 }
 
@@ -48,6 +52,101 @@ void expectSegment(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final width in [320.0, 720.0]) {
+    for (final language in ['en', 'zh']) {
+      for (final state in [
+        ContextUsageState.opaque,
+        ContextUsageState.failed,
+      ]) {
+        testWidgets('native partial breakdown fits $width $language $state', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final snapshot = usageSnap(
+            state: state,
+            hasUnknownNativeTokens: true,
+            lastRequestInputTokens: 900,
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              locale: Locale(language),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ContextUsageBreakdown(snapshot: snapshot),
+                ),
+              ),
+            ),
+          );
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(ContextUsageBreakdown)),
+          )!;
+          expect(
+            find.text(l10n.contextUsagePartialSummary('110')),
+            findsOneWidget,
+          );
+          expect(find.text(l10n.contextUsageUnknownTokens), findsOneWidget);
+          expect(
+            find.text(l10n.contextUsageLastRequestInput('900')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('context-usage-bucket-history')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(
+              const ValueKey('context-usage-bucket-native-compaction'),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('context-usage-stacked-bar')),
+            findsNothing,
+          );
+          expect(find.textContaining('%'), findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
+  testWidgets('native unknown row remains when readable subtotal is zero', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ContextUsageBreakdown(
+            snapshot: usageSnap(
+              state: ContextUsageState.opaque,
+              used: 0,
+              buckets: const ContextUsageBuckets(),
+              hasUnknownNativeTokens: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Estimated 0 + unknown compaction'), findsOneWidget);
+    expect(find.text('Native compaction'), findsOneWidget);
+    expect(find.text('Unknown'), findsOneWidget);
+    expect(find.text('Usage unavailable'), findsNothing);
+    expect(find.text('Free space'), findsNothing);
+  });
 
   for (final hasPrevious in [false, true]) {
     testWidgets(

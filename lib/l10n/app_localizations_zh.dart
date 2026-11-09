@@ -3292,6 +3292,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextUsageUnavailable => '用量不可用';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return '已估算 $tokens + 压缩块未知';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => '原生压缩块';
+
+  @override
+  String get contextUsageUnknownTokens => '未知';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return '上次请求输入（实测）：$tokens';
+  }
+
+  @override
   String get contextUsageStateNone => '暂无数据';
 
   @override
@@ -19144,6 +19160,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextUsageUnavailable => '用量不可用';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return '已估算 $tokens + 压缩块未知';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => '原生压缩块';
+
+  @override
+  String get contextUsageUnknownTokens => '未知';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return '上次请求输入（实测）：$tokens';
+  }
+
+  @override
   String get contextUsageStateNone => '暂无数据';
 
   @override
@@ -34994,6 +35026,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextUsageUnavailable => '用量不可用';
+
+  @override
+  String contextUsagePartialSummary(String tokens) {
+    return '已估算 $tokens + 壓縮塊未知';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => '原生壓縮塊';
+
+  @override
+  String get contextUsageUnknownTokens => '未知';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return '上次請求輸入（實測）：$tokens';
+  }
 
   @override
   String get contextUsageStateNone => '暫無資料';

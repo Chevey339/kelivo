@@ -172,6 +172,9 @@ class ContextUsageRing extends StatelessWidget {
     if (snapshot != null && !snapshot.hasUsage) {
       return contextUsageStateLabel(l10n, snapshot);
     }
+    if (snapshot?.hasUnknownNativeTokens == true) {
+      return contextUsageSummaryText(l10n, snapshot);
+    }
     final window = snapshot?.contextWindow;
     if (snapshot == null || window == null || window <= 0) {
       return l10n.contextUsageNoWindow;

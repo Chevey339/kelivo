@@ -3345,6 +3345,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextUsageUnavailable => '사용량을 사용할 수 없음';
 
   @override
+  String contextUsagePartialSummary(String tokens) {
+    return '추정 $tokens + 알 수 없는 압축';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => '네이티브 압축';
+
+  @override
+  String get contextUsageUnknownTokens => '알 수 없음';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return '마지막 요청 입력(측정됨): $tokens';
+  }
+
+  @override
   String get contextUsageStateNone => '아직 데이터 없음';
 
   @override
