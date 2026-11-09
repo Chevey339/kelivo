@@ -21741,5 +21741,29 @@
   "imageGenerationComplexityErrorHint": "Set chat reasoning to Auto and image complexity to Default, then retry image generation. ChatGPT sign-in may use a different image model or reject explicit complexity.",
   "@imageGenerationComplexityErrorHint": {
     "description": "Actionable hint appended after the original provider error when ChatGPT/Codex OAuth image generation rejects a complexity level. Preserve the original error; do not automatically retry or alter chat settings."
+  },
+  "workspaceEnvNativeShellTitle": "Default shell",
+  "@workspaceEnvNativeShellTitle": {
+    "description": "Title of the desktop Environment row and dialog for choosing the shell used by the AI shell tool."
+  },
+  "workspaceEnvNativeShellHint": "Leave empty for automatic detection. Otherwise, enter the absolute path to PowerShell, cmd, or a shell that supports -lc (such as bash, zsh, or fish). This setting applies only to this device.",
+  "@workspaceEnvNativeShellHint": {
+    "description": "Help below the shell executable path field in the desktop Environment dialog; explains automatic mode, supported shell command interfaces and device-local scope."
+  },
+  "workspaceEnvNativeShellInvalid": "Could not start this shell. Check its absolute path and supported command syntax.",
+  "@workspaceEnvNativeShellInvalid": {
+    "description": "Validation error in the desktop shell settings dialog when the path is invalid or the shell cannot execute a probe command."
+  },
+  "workspaceEnvNativeShellUnavailable": "Shell unavailable",
+  "@workspaceEnvNativeShellUnavailable": {
+    "description": "Value of the actual shell path in desktop Environment when no shell can be started."
+  },
+  "workspaceEnvNativeShellDetect": "Detect again",
+  "@workspaceEnvNativeShellDetect": {
+    "description": "Desktop Environment action that clears shell detection caches and checks the current shell setting again."
+  },
+  "workspaceEnvNativeShellSave": "Save",
+  "@workspaceEnvNativeShellSave": {
+    "description": "Button in the desktop default shell dialog; validates and saves the executable path or automatic detection setting."
   }
 }

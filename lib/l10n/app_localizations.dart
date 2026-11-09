@@ -29417,6 +29417,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set chat reasoning to Auto and image complexity to Default, then retry image generation. ChatGPT sign-in may use a different image model or reject explicit complexity.'**
   String get imageGenerationComplexityErrorHint;
+
+  /// Title of the desktop Environment row and dialog for choosing the shell used by the AI shell tool.
+  ///
+  /// In en, this message translates to:
+  /// **'Default shell'**
+  String get workspaceEnvNativeShellTitle;
+
+  /// Help below the shell executable path field in the desktop Environment dialog; explains automatic mode, supported shell command interfaces and device-local scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty for automatic detection. Otherwise, enter the absolute path to PowerShell, cmd, or a shell that supports -lc (such as bash, zsh, or fish). This setting applies only to this device.'**
+  String get workspaceEnvNativeShellHint;
+
+  /// Validation error in the desktop shell settings dialog when the path is invalid or the shell cannot execute a probe command.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start this shell. Check its absolute path and supported command syntax.'**
+  String get workspaceEnvNativeShellInvalid;
+
+  /// Value of the actual shell path in desktop Environment when no shell can be started.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell unavailable'**
+  String get workspaceEnvNativeShellUnavailable;
+
+  /// Desktop Environment action that clears shell detection caches and checks the current shell setting again.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect again'**
+  String get workspaceEnvNativeShellDetect;
+
+  /// Button in the desktop default shell dialog; validates and saves the executable path or automatic detection setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workspaceEnvNativeShellSave;
 }
 
 class _AppLocalizationsDelegate

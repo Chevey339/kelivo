@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -563,6 +565,38 @@ void main() {
       expect(find.text(l10n.workspaceEnvEngineLocalShell), findsOneWidget);
       expect(find.byKey(EnvironmentPane.installKey), findsNothing);
       expect(find.byKey(EnvironmentPane.mirrorsSectionKey), findsNothing);
+    });
+  });
+
+  testWidgets('desktop status displays the actual resolved shell', (
+    tester,
+  ) async {
+    await withPlatform(TargetPlatform.windows, () async {
+      final harness = await createHarness(tester);
+      const shell = DesktopShell(
+        r'C:\PS7\pwsh.exe',
+        DesktopShellKind.powerShell,
+        version: '7.6.9',
+      );
+      harness.runtime.lastStatus = const RuntimeStatus(
+        ready: true,
+        engine: 'process',
+        sandboxed: false,
+        shell: shell,
+      );
+      await pumpPane(
+        tester,
+        harness,
+        provideManager: false,
+        provideMirrors: false,
+        size: const Size(1280, 900),
+      );
+      expect(find.text('PowerShell 7.6.9'), findsOneWidget);
+      expect(find.text(shell.executable), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('native-shell-settings')),
+        findsOneWidget,
+      );
     });
   });
 

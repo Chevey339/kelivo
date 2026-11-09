@@ -16797,4 +16797,24 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get imageGenerationComplexityErrorHint =>
       'Sohbet akıl yürütmesini Otomatik, görsel karmaşıklığını Varsayılan olarak ayarlayıp görsel oluşturmayı yeniden deneyin. ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir veya açık karmaşıklığı reddedebilir.';
+
+  @override
+  String get workspaceEnvNativeShellTitle => 'Varsayılan kabuk';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      'Otomatik algılama için boş bırakın. Aksi takdirde PowerShell, cmd veya -lc destekleyen bir kabuğun (bash, zsh veya fish gibi) mutlak yolunu girin. Bu ayar yalnızca bu cihaz için geçerlidir.';
+
+  @override
+  String get workspaceEnvNativeShellInvalid =>
+      'Bu kabuk başlatılamadı. Mutlak yolunu ve desteklenen komut sözdizimini kontrol edin.';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Kabuk kullanılamıyor';
+
+  @override
+  String get workspaceEnvNativeShellDetect => 'Yeniden algıla';
+
+  @override
+  String get workspaceEnvNativeShellSave => 'Kaydet';
 }

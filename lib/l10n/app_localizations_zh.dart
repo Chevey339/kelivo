@@ -15835,6 +15835,25 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get imageGenerationComplexityErrorHint =>
       '请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。';
+
+  @override
+  String get workspaceEnvNativeShellTitle => '默认 Shell';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      '留空时自动检测，也可填写 PowerShell、cmd 或支持 -lc 的 Shell（如 bash、zsh、fish）的绝对路径。此设置仅用于本机。';
+
+  @override
+  String get workspaceEnvNativeShellInvalid => '无法启动此 Shell，请检查绝对路径及其支持的命令语法。';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Shell 不可用';
+
+  @override
+  String get workspaceEnvNativeShellDetect => '重新检测';
+
+  @override
+  String get workspaceEnvNativeShellSave => '保存';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31668,6 +31687,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get imageGenerationComplexityErrorHint =>
       '请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。';
+
+  @override
+  String get workspaceEnvNativeShellTitle => '默认 Shell';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      '留空时自动检测，也可填写 PowerShell、cmd 或支持 -lc 的 Shell（如 bash、zsh、fish）的绝对路径。此设置仅用于本机。';
+
+  @override
+  String get workspaceEnvNativeShellInvalid => '无法启动此 Shell，请检查绝对路径及其支持的命令语法。';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Shell 不可用';
+
+  @override
+  String get workspaceEnvNativeShellDetect => '重新检测';
+
+  @override
+  String get workspaceEnvNativeShellSave => '保存';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47508,4 +47546,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get imageGenerationComplexityErrorHint =>
       '請將聊天思考檔位切換為「自動」，生圖複雜度設為「預設」，然後重試生圖。ChatGPT 登入通道可能替換所選生圖模型或不支援明確複雜度。';
+
+  @override
+  String get workspaceEnvNativeShellTitle => '預設 Shell';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      '留空時自動偵測，也可填寫 PowerShell、cmd 或支援 -lc 的 Shell（如 bash、zsh、fish）的絕對路徑。此設定僅用於本機。';
+
+  @override
+  String get workspaceEnvNativeShellInvalid => '無法啟動此 Shell，請檢查絕對路徑及其支援的命令語法。';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Shell 無法使用';
+
+  @override
+  String get workspaceEnvNativeShellDetect => '重新偵測';
+
+  @override
+  String get workspaceEnvNativeShellSave => '儲存';
 }

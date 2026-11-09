@@ -4880,5 +4880,11 @@
   "modelDetailSheetImageGenerationComplexityHigh": "높음",
   "modelDetailSheetImageGenerationComplexityDescription": "채팅 추론과 별도로 이미지 계획을 제어합니다. 기본은 서버 동작을 사용하며 채팅 추론을 따를 수 있습니다.",
   "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 로그인은 다른 이미지 모델을 사용할 수 있습니다. 모델 및 복잡도 설정은 서버 지원 여부에 따라 달라집니다.",
-  "imageGenerationComplexityErrorHint": "채팅 추론을 자동으로, 이미지 복잡도를 기본으로 설정한 후 이미지 생성을 다시 시도하세요. ChatGPT 로그인은 다른 이미지 모델을 사용하거나 명시적 복잡도를 거부할 수 있습니다."
+  "imageGenerationComplexityErrorHint": "채팅 추론을 자동으로, 이미지 복잡도를 기본으로 설정한 후 이미지 생성을 다시 시도하세요. ChatGPT 로그인은 다른 이미지 모델을 사용하거나 명시적 복잡도를 거부할 수 있습니다.",
+  "workspaceEnvNativeShellTitle": "기본 셸",
+  "workspaceEnvNativeShellHint": "비워 두면 자동으로 감지합니다. 그렇지 않으면 PowerShell, cmd 또는 -lc를 지원하는 셸(bash, zsh, fish 등)의 절대 경로를 입력하세요. 이 설정은 이 기기에만 적용됩니다.",
+  "workspaceEnvNativeShellInvalid": "이 셸을 시작할 수 없습니다. 절대 경로와 지원되는 명령 구문을 확인하세요.",
+  "workspaceEnvNativeShellUnavailable": "셸을 사용할 수 없음",
+  "workspaceEnvNativeShellDetect": "다시 감지",
+  "workspaceEnvNativeShellSave": "저장"
 }

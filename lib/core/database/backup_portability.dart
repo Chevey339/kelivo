@@ -18,6 +18,7 @@ final class BackupPortability {
     'environment_disk_usage_v1',
     'environment_rootfs_selection_v1',
     'environment_proot_options_v1',
+    'environment_native_shell_path_v1',
   };
 
   static bool _isLinked(BusinessEntityValue row) =>

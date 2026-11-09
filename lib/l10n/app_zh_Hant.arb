@@ -4880,5 +4880,11 @@
   "modelDetailSheetImageGenerationComplexityHigh": "高",
   "modelDetailSheetImageGenerationComplexityDescription": "獨立控制生圖規劃程度。預設使用伺服器行為，可能沿用聊天思考檔位。",
   "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 登入通道可能替換所選生圖模型，模型和複雜度設定能否生效取決於伺服器支援。",
-  "imageGenerationComplexityErrorHint": "請將聊天思考檔位切換為「自動」，生圖複雜度設為「預設」，然後重試生圖。ChatGPT 登入通道可能替換所選生圖模型或不支援明確複雜度。"
+  "imageGenerationComplexityErrorHint": "請將聊天思考檔位切換為「自動」，生圖複雜度設為「預設」，然後重試生圖。ChatGPT 登入通道可能替換所選生圖模型或不支援明確複雜度。",
+  "workspaceEnvNativeShellTitle": "預設 Shell",
+  "workspaceEnvNativeShellHint": "留空時自動偵測，也可填寫 PowerShell、cmd 或支援 -lc 的 Shell（如 bash、zsh、fish）的絕對路徑。此設定僅用於本機。",
+  "workspaceEnvNativeShellInvalid": "無法啟動此 Shell，請檢查絕對路徑及其支援的命令語法。",
+  "workspaceEnvNativeShellUnavailable": "Shell 無法使用",
+  "workspaceEnvNativeShellDetect": "重新偵測",
+  "workspaceEnvNativeShellSave": "儲存"
 }

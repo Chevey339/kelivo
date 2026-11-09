@@ -19,6 +19,7 @@ import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -297,6 +298,79 @@ void main() {
       expect(metaOf(read).stdoutPreview, contains(secret));
     },
   );
+
+  for (final shell in [
+    const DesktopShell(
+      r'C:\Program Files\PowerShell\7\pwsh.exe',
+      DesktopShellKind.powerShell,
+      version: '7.6.9',
+    ),
+    const DesktopShell(
+      r'C:\Windows\powershell.exe',
+      DesktopShellKind.powerShell,
+      version: '5.1.19041.1',
+    ),
+    const DesktopShell(r'C:\Windows\cmd.exe', DesktopShellKind.cmd),
+    const DesktopShell('/bin/zsh', DesktopShellKind.posix),
+  ]) {
+    test('tool schema and prompt use resolved ${shell.name}', () {
+      final context = ctx(
+        status: RuntimeStatus(
+          ready: true,
+          engine: 'process',
+          sandboxed: false,
+          shell: shell,
+        ),
+      );
+      final definition = service()
+          .buildToolDefinitions(context)
+          .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
+      final schema = jsonEncode(definition);
+      final prompt = WorkspaceToolsService.buildPromptFragment(
+        context,
+        environmentVariableNames: ['API_KEY'],
+      );
+      expect(schema, contains(shell.name));
+      expect(prompt, contains(shell.invocation));
+      expect(prompt, contains('Use ${shell.environmentReference} references'));
+      expect(prompt, contains(shell.syntaxHint));
+      expect(schema, isNot(contains('sh -lc')));
+      if (shell.version?.startsWith('5.') == true) {
+        expect(prompt, isNot(contains('Chain with &&.')));
+      }
+    });
+  }
+
+  test('tool execution carries the shell used in the model prompt', () async {
+    const shell = DesktopShell('/bin/zsh', DesktopShellKind.posix);
+    final runtime = FakeWorkspaceRuntime();
+    final context = ctx(
+      fullAccess: true,
+      status: const RuntimeStatus(
+        ready: true,
+        engine: 'process',
+        sandboxed: false,
+        shell: shell,
+      ),
+    );
+    await service(runtime: runtime).handle(context, 'shell', {
+      'command': 'print ok',
+    }, toolCallId: 'shell-snapshot');
+    expect(runtime.requests.single.shell, same(shell));
+  });
+
+  test('unavailable native shell points to shell settings', () {
+    final context = ctx(
+      status: const RuntimeStatus(
+        ready: false,
+        engine: 'process',
+        sandboxed: false,
+      ),
+    );
+    final prompt = WorkspaceToolsService.buildPromptFragment(context);
+    expect(prompt, contains('Environment > Default shell'));
+    expect(prompt, isNot(contains('Sandbox environment not installed')));
+  });
 
   test('workspace prompt lists names without including values', () {
     final prompt = WorkspaceToolsService.buildPromptFragment(

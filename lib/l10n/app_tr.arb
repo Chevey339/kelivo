@@ -4880,5 +4880,11 @@
   "modelDetailSheetImageGenerationComplexityHigh": "Yüksek",
   "modelDetailSheetImageGenerationComplexityDescription": "Görsel planlamayı sohbet akıl yürütmesinden bağımsız olarak kontrol eder. Varsayılan, sunucu davranışını kullanır ve sohbet akıl yürütmesini devralabilir.",
   "modelDetailSheetImageGenerationOAuthHint": "ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir. Model ve karmaşıklık ayarları sunucu desteğine bağlıdır.",
-  "imageGenerationComplexityErrorHint": "Sohbet akıl yürütmesini Otomatik, görsel karmaşıklığını Varsayılan olarak ayarlayıp görsel oluşturmayı yeniden deneyin. ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir veya açık karmaşıklığı reddedebilir."
+  "imageGenerationComplexityErrorHint": "Sohbet akıl yürütmesini Otomatik, görsel karmaşıklığını Varsayılan olarak ayarlayıp görsel oluşturmayı yeniden deneyin. ChatGPT ile oturum açma farklı bir görsel modeli kullanabilir veya açık karmaşıklığı reddedebilir.",
+  "workspaceEnvNativeShellTitle": "Varsayılan kabuk",
+  "workspaceEnvNativeShellHint": "Otomatik algılama için boş bırakın. Aksi takdirde PowerShell, cmd veya -lc destekleyen bir kabuğun (bash, zsh veya fish gibi) mutlak yolunu girin. Bu ayar yalnızca bu cihaz için geçerlidir.",
+  "workspaceEnvNativeShellInvalid": "Bu kabuk başlatılamadı. Mutlak yolunu ve desteklenen komut sözdizimini kontrol edin.",
+  "workspaceEnvNativeShellUnavailable": "Kabuk kullanılamıyor",
+  "workspaceEnvNativeShellDetect": "Yeniden algıla",
+  "workspaceEnvNativeShellSave": "Kaydet"
 }

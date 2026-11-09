@@ -16994,4 +16994,24 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get imageGenerationComplexityErrorHint =>
       'Установите рассуждения чата в «Авто», а сложность изображения — в «По умолчанию», затем повторите генерацию изображения. Вход через ChatGPT может использовать другую модель изображений или отклонять явную сложность.';
+
+  @override
+  String get workspaceEnvNativeShellTitle => 'Оболочка по умолчанию';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      'Оставьте пустым для автоматического определения. Иначе укажите абсолютный путь к PowerShell, cmd или оболочке, поддерживающей -lc (например, bash, zsh или fish). Эта настройка применяется только к этому устройству.';
+
+  @override
+  String get workspaceEnvNativeShellInvalid =>
+      'Не удалось запустить эту оболочку. Проверьте абсолютный путь и поддерживаемый синтаксис команд.';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Оболочка недоступна';
+
+  @override
+  String get workspaceEnvNativeShellDetect => 'Определить снова';
+
+  @override
+  String get workspaceEnvNativeShellSave => 'Сохранить';
 }

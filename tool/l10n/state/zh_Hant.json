@@ -4880,5 +4880,11 @@
   "modelDetailSheetImageGenerationComplexityHigh": "86f1448ba6fba9334d6d4f395ffe6ef5fc4c794ee901c39fe6de22184e294312",
   "modelDetailSheetImageGenerationComplexityDescription": "b4b0e0a0be4680d8e5dbfb0106ba3845f5b3f6804b1a9263cf6ca9f178f69dc3",
   "modelDetailSheetImageGenerationOAuthHint": "dc21be18106eecc43dd6b65040d4fb805e5ed9f7cbbb294892de12e723e8cec4",
-  "imageGenerationComplexityErrorHint": "13bbeacf63f4967298baa2a3fd6b91c00d30a0239a2af8350ba2492b2fd3a140"
+  "imageGenerationComplexityErrorHint": "13bbeacf63f4967298baa2a3fd6b91c00d30a0239a2af8350ba2492b2fd3a140",
+  "workspaceEnvNativeShellTitle": "fea323580d814586d535d7a79fe711cae461b026fd28b7e401b9a3caf0132fa3",
+  "workspaceEnvNativeShellHint": "4b58dc8468ad873c5dea6ffaee31fc315f02780a200a50fe3b0f0740079f2ec7",
+  "workspaceEnvNativeShellInvalid": "5f525a4900728ccf61f5228f3517403d0c66f1443b99e0d2689ae6c98f5846cd",
+  "workspaceEnvNativeShellUnavailable": "71bf8290acb164372fc87ebc0ed1bf3f6aac075fbd4817f529f970de9a4b409e",
+  "workspaceEnvNativeShellDetect": "0f0445becc2c6c88c950f895adbaac518ae8b43439dbfeba3750bfd1bc4a9198",
+  "workspaceEnvNativeShellSave": "f4cfc72626a33217128c442fe0024d71d55cfc321410d6d53bc4561753cfaff7"
 }

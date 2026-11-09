@@ -29,6 +29,7 @@ import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
 import 'workspace_runtime.dart';
+import 'desktop_shell.dart';
 import 'workspace_tool_context.dart';
 import 'workspace_tool_metadata.dart';
 
@@ -76,10 +77,18 @@ class WorkspaceToolsService {
       'when unset, prefers /bin/bash if available, otherwise /bin/sh. '
       'This is not an interactive shell; do not assume ~/.bashrc is loaded.';
 
-  static String get _shellInvocation =>
-      defaultTargetPlatform == TargetPlatform.android
-      ? 'configured shell -lc'
-      : 'sh -lc';
+  static String _shellInvocation(DesktopShell? shell) {
+    if (shell != null) return shell.invocation;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'configured shell -lc',
+      TargetPlatform.iOS => 'sh -lc',
+      _ => 'native shell selected in Environment settings',
+    };
+  }
+
+  static String _shellInstructions(DesktopShell? shell) =>
+      'Fresh non-interactive ${_shellInvocation(shell)} per call; no cwd/env persists. '
+      '${shell?.syntaxHint ?? 'Use the syntax of the selected shell.'}';
 
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
@@ -195,6 +204,7 @@ class WorkspaceToolsService {
       ];
     }
     return definitions(
+          shell: ctx.runtimeStatus?.shell,
           vocab: _pathVocab(ctx.paths),
           outputHint: ctx.paths.sandboxed
               ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
@@ -211,12 +221,13 @@ class WorkspaceToolsService {
   static List<Map<String, dynamic>> definitions({
     List<String> vocab = const ['/workspace', '/chat', '/skills', '/tmp'],
     String outputHint = '/chat/outputs/<id>.txt',
+    DesktopShell? shell,
   }) {
     return [
       _fn(
         'shell',
         [
-          'Fresh non-interactive $_shellInvocation per call; no cwd/env persists. Chain with &&.',
+          _shellInstructions(shell),
           if (defaultTargetPlatform == TargetPlatform.android)
             _androidShellHint,
           'Use non-interactive flags (e.g. -y). Output is capped; long output is saved',
@@ -225,7 +236,8 @@ class WorkspaceToolsService {
         {
           'command': {
             'type': 'string',
-            'description': 'Shell command to run with $_shellInvocation.',
+            'description':
+                'Shell command to run with ${_shellInvocation(shell)}.',
           },
           'cwd': {
             'type': 'string',
@@ -380,6 +392,7 @@ class WorkspaceToolsService {
   }) {
     if (ctx.skillsOnly) return '';
     final paths = ctx.paths;
+    final shell = ctx.runtimeStatus?.shell;
     final workspace = paths.sandboxed
         ? WorkspacePaths.guestWorkspace
         : paths.workspaceHostRoot;
@@ -424,15 +437,16 @@ class WorkspaceToolsService {
       ..writeln();
     if (ctx.workspace.isToolEnabled('shell')) {
       buf.writeln(
-        'shell is one-shot: a fresh non-interactive $_shellInvocation each call. '
-        'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
+        'shell is one-shot: ${_shellInstructions(shell)} '
+        'Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );
       if (environmentVariableNames.isNotEmpty) {
         buf.writeln(
           'User-configured environment variables are already injected: '
           '${environmentVariableNames.join(', ')}. '
-          r'Use $NAME references; do not print or attempt to discover their values.',
+          'Use ${shell?.environmentReference ?? (defaultTargetPlatform == TargetPlatform.windows ? 'the selected shell’s environment variable syntax' : r'$NAME')} references; '
+          'do not print or attempt to discover their values.',
         );
       }
     }
@@ -726,8 +740,9 @@ class WorkspaceToolsService {
         tool: tool,
         error: 'environment_not_ready',
         message: status?.reason ?? 'Sandbox environment is not ready',
-        instruction:
-            'tell the user to install/enable the sandbox environment in Settings → Workspace',
+        instruction: status?.engine == 'process'
+            ? 'tell the user to check Environment → Default shell'
+            : 'tell the user to install/enable the sandbox environment in Settings → Workspace',
         meta: const WorkspaceToolMetadata(
           tool: tool,
           status: 'error',
@@ -789,6 +804,7 @@ class WorkspaceToolsService {
           runId: runtimeRunId,
           isCancelled: cancellation?.isCancelled,
           command: command,
+          shell: ctx.runtimeStatus?.shell,
           cwd: cwd,
           timeout: Duration(seconds: timeoutSeconds),
           env: env,
@@ -1538,6 +1554,9 @@ class WorkspaceToolsService {
   static String _engineLine(WorkspaceToolContext ctx) {
     final status = ctx.runtimeStatus;
     if (!ctx.runtimeRegistered || status == null || !status.ready) {
+      if (status?.engine == 'process') {
+        return 'Native shell unavailable — ask the user to check Environment > Default shell.';
+      }
       return 'Sandbox environment not installed — `shell` will fail until the user installs it';
     }
     switch (status.engine) {

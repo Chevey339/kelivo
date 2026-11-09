@@ -6112,5 +6112,11 @@
   "modelDetailSheetImageGenerationComplexityHigh": "高",
   "modelDetailSheetImageGenerationComplexityDescription": "独立控制生图规划程度。默认使用服务端行为，可能沿用聊天思考档位。",
   "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 登录通道可能替换所选生图模型，模型和复杂度设置能否生效取决于服务端支持。",
-  "imageGenerationComplexityErrorHint": "请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。"
+  "imageGenerationComplexityErrorHint": "请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。",
+  "workspaceEnvNativeShellTitle": "默认 Shell",
+  "workspaceEnvNativeShellHint": "留空时自动检测，也可填写 PowerShell、cmd 或支持 -lc 的 Shell（如 bash、zsh、fish）的绝对路径。此设置仅用于本机。",
+  "workspaceEnvNativeShellInvalid": "无法启动此 Shell，请检查绝对路径及其支持的命令语法。",
+  "workspaceEnvNativeShellUnavailable": "Shell 不可用",
+  "workspaceEnvNativeShellDetect": "重新检测",
+  "workspaceEnvNativeShellSave": "保存"
 }

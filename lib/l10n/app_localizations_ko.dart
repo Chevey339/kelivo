@@ -16186,4 +16186,24 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get imageGenerationComplexityErrorHint =>
       '채팅 추론을 자동으로, 이미지 복잡도를 기본으로 설정한 후 이미지 생성을 다시 시도하세요. ChatGPT 로그인은 다른 이미지 모델을 사용하거나 명시적 복잡도를 거부할 수 있습니다.';
+
+  @override
+  String get workspaceEnvNativeShellTitle => '기본 셸';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      '비워 두면 자동으로 감지합니다. 그렇지 않으면 PowerShell, cmd 또는 -lc를 지원하는 셸(bash, zsh, fish 등)의 절대 경로를 입력하세요. 이 설정은 이 기기에만 적용됩니다.';
+
+  @override
+  String get workspaceEnvNativeShellInvalid =>
+      '이 셸을 시작할 수 없습니다. 절대 경로와 지원되는 명령 구문을 확인하세요.';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => '셸을 사용할 수 없음';
+
+  @override
+  String get workspaceEnvNativeShellDetect => '다시 감지';
+
+  @override
+  String get workspaceEnvNativeShellSave => '저장';
 }
