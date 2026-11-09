@@ -191,7 +191,6 @@ class BrowserAddressBar extends StatelessWidget {
                             focusNode: focusNode,
                             autofocus: false,
                             autocorrect: false,
-                            enableSuggestions: false,
                             keyboardType: TextInputType.url,
                             textInputAction: TextInputAction.go,
                             placeholder: l.browserSearchHint,

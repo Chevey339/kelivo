@@ -18,7 +18,9 @@ class BrowserTextField extends StatelessWidget {
     this.prefix,
     this.autofocus = false,
     this.autocorrect = false,
-    this.enableSuggestions = false,
+    // Disabling suggestions adds Android's visible-password input variation,
+    // which can activate secure keyboards and prevent CJK composition.
+    this.enableSuggestions = true,
     this.keyboardType = TextInputType.text,
     this.textInputAction = TextInputAction.done,
     this.maxLines = 1,
