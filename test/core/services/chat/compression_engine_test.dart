@@ -136,6 +136,85 @@ void main() {
     },
   );
 
+  test('unknown model window uses 1M for preview and execution', () async {
+    final background = '背景设定 ' * 7000;
+    final materials = ['需要压缩的历史内容'];
+    var sent = '';
+    CompressionRequest request({int? window}) => CompressionRequest(
+      options: options,
+      model: '[次][抗截断]gemini-3.8-flash',
+      quoteMarker: (_) => 'quote',
+      contextWindowTokens: window,
+      locale: 'zh',
+      template: builtInCompressionTemplates.firstWhere(
+        (t) => t.id == 'roleplay',
+      ),
+      generate: (prompt, _, _, _) async {
+        sent = prompt;
+        return result('完整摘要');
+      },
+    );
+    CompressionPlanner planner({int? window}) => CompressionPlanner(
+      request: request(window: window),
+      materials: materials,
+      previousSummary: '',
+      background: background,
+    );
+    final unknown = planner();
+    expect(unknown.inputLimit, planner(window: 1048576).inputLimit);
+    expect(
+      planner(window: 2097152).inputLimit,
+      greaterThan(unknown.inputLimit),
+    );
+    final preview = await Isolate.run(unknown.preview);
+    expect(preview.estimatedRequests, 1);
+    expect(preview.prompt, contains(background));
+    expect(
+      await const CompressionEngine().run(
+        task: task,
+        request: request(),
+        materials: materials,
+        previousSummary: '',
+        background: background,
+        check: () {},
+        publish: () async {},
+      ),
+      '完整摘要',
+    );
+    expect(sent, preview.prompt);
+    expect(task.requestAttempts, 1);
+  });
+
+  test(
+    'known small model windows still reject an oversized reference',
+    () async {
+      await expectLater(
+        const CompressionEngine().run(
+          task: task,
+          request: CompressionRequest(
+            options: options,
+            model: 'explicit-32k-model',
+            quoteMarker: (_) => 'quote',
+            contextWindowTokens: 32000,
+            generate: (_, _, _, _) async =>
+                fail('must not exceed a known window'),
+          ),
+          materials: ['需要压缩的历史内容'],
+          previousSummary: '',
+          background: '背景设定 ' * 7000,
+          check: () {},
+          publish: () async {},
+        ),
+        throwsA(
+          predicate(
+            (e) => e.toString().contains('compression_reference_too_large'),
+          ),
+        ),
+      );
+      expect(task.requestAttempts, 0);
+    },
+  );
+
   test(
     'large windows still bound requests and keep the event loop responsive',
     () async {

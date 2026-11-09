@@ -24,7 +24,8 @@ class CompressContextOptions {
   static const int defaultMaxChars = 6000;
   static const int defaultKeepUserMessages = 6;
 
-  static const int defaultContextWindowTokens = 32000;
+  /// Planning window when the summary model has no catalog or explicit limit.
+  static const int defaultContextWindowTokens = 1048576;
 
   final CompressContextLimitMode mode;
   final int? maxChars;
