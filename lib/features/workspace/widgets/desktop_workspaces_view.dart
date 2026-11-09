@@ -120,6 +120,7 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                     ],
                   );
                   final actions = Wrap(
+                    alignment: wide ? WrapAlignment.end : WrapAlignment.start,
                     spacing: 8,
                     runSpacing: 8,
                     children: [
@@ -149,7 +150,15 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                     children: [
                       if (wide) Expanded(child: heading) else heading,
                       SizedBox(width: wide ? 12 : 0, height: wide ? 0 : 12),
-                      if (wide) Flexible(child: actions) else actions,
+                      if (wide)
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: actions,
+                          ),
+                        )
+                      else
+                        actions,
                     ],
                   );
                 },
