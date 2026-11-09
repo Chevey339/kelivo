@@ -173,6 +173,13 @@ dev_dependencies:
   url_launcher_platform_interface: ^2.3.2
   vm_service: ^15.3.0
 dependency_overrides:
+  # Detach native finalizers before freeing SQLite handles on isolate shutdown.
+  # https://github.com/simolus3/sqlite3.dart/pull/438
+  sqlite3:
+    git:
+      url: https://github.com/simolus3/sqlite3.dart.git
+      ref: 8db87537775047cdde00353f09afb1521befbeec
+      path: sqlite3
   # Bound SVG geometry expansion and native pattern bitmap allocations.
   vector_graphics_compiler:
     path: dependencies/vector_graphics_compiler

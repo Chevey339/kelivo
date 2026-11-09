@@ -36,6 +36,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/app_exit_flush.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/providers/google_gemini.dart';
@@ -374,6 +375,7 @@ void main() {
   });
 
   tearDown(() async {
+    AppExitFlush.debugReset();
     PathProviderPlatform.instance = previousPathProvider;
     try {
       await server.close(force: true);
@@ -2305,6 +2307,71 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scheduledRegeneration in [false, true]) {
+    testWidgets(
+      'exit waits for detached preparation: regeneration=$scheduledRegeneration',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          await settings.disableSuggestionGeneration();
+          final conversation = await openConversation(controller);
+          final actions = controller.debugViewModel.debugChatActions;
+          ChatMessage? user;
+          if (scheduledRegeneration) {
+            user = await service.addMessage(
+              conversationId: conversation.id,
+              role: 'user',
+              content: 'question',
+            );
+            await controller.chatController.setCurrentConversationAndLoad(
+              conversation,
+            );
+          }
+          final hold = Completer<void>();
+          repository.compression.readHold = hold;
+          final result = scheduledRegeneration
+              ? await actions.regenerateAtMessage(
+                  message: user!,
+                  conversation: conversation,
+                  scheduled: true,
+                )
+              : await actions.sendMessage(
+                  input: ChatInputData(text: 'question'),
+                  conversation: conversation,
+                );
+          expect(result.success, isTrue);
+          await repository.compression.readEntered.future;
+          var closed = false;
+          AppExitFlush.configureShutdown(
+            prepare: ChatActions.prepareForExit,
+            close: () async {
+              await service.close();
+              await repository.close();
+              closed = true;
+            },
+          );
+          final exit = AppExitFlush.shutdown();
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          expect(closed, isFalse);
+          final rejected = await actions.sendMessage(
+            input: ChatInputData(text: 'too late'),
+            conversation: conversation,
+          );
+          expect(rejected.success, isFalse);
+          expect(rejected.errorMessage, 'in_flight');
+          hold.complete();
+          await exit;
+          expect(closed, isTrue);
+          expect(streamRequestCount, 0);
+          expect(actions.activeStreamingMessageIds, isEmpty);
+          await expectLater(repository.ensureReady(), throwsStateError);
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('concurrent sends persist a single user/assistant pair', (
     tester,

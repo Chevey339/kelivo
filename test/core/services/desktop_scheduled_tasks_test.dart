@@ -94,6 +94,71 @@ void main() {
     );
   });
 
+  test('exit stops dispatch and waits for the active run to be persisted', () {
+    fakeAsync((async) {
+      final start = DateTime(2026, 9, 11, 7, 59, 58);
+      final desktop = DesktopScheduledTasks(
+        store: _MemoryTaskStore(prefs, disk),
+        now: () => start.add(async.elapsed),
+      );
+      final service = ScheduledTasksService(desktop: desktop);
+      final finish = Completer<void>();
+      var executions = 0;
+      var cancelled = false;
+      complete(
+        async,
+        service.attach((task, cancellation, onConversation) async {
+          executions++;
+          cancellation.onCancel = () async => cancelled = true;
+          await finish.future;
+          cancellation.check();
+          return {'status': 'completed'};
+        }),
+      );
+      complete(async, service.save(task));
+      async.elapse(const Duration(seconds: 2));
+      expect(executions, 1);
+
+      var stopped = false;
+      final stop = service.stopForExit().then((_) => stopped = true);
+      async.flushMicrotasks();
+      expect(cancelled, isTrue);
+      expect(stopped, isFalse);
+      finish.complete();
+      complete(async, stop);
+      expect(disk.tasks.single.runs.single.status, 'failed');
+      expect(disk.tasks.single.runs.single.error, contains('cancelled'));
+      async.elapse(const Duration(days: 2));
+      expect(executions, 1);
+      service.dispose();
+      async.flushMicrotasks();
+    });
+  });
+
+  test('exit drains a scheduler load that has not dispatched a run', () {
+    fakeAsync((async) {
+      final ready = Completer<void>();
+      final desktop = DesktopScheduledTasks(
+        store: _MemoryTaskStore(prefs, disk, ready: ready.future),
+      );
+      final service = ScheduledTasksService(desktop: desktop);
+      final attachment = service.attach(
+        (_, _, _) async => {'status': 'completed'},
+      );
+      async.flushMicrotasks();
+      var stopped = false;
+      final stop = service.stopForExit().then((_) => stopped = true);
+      async.flushMicrotasks();
+      expect(stopped, isFalse);
+      ready.complete();
+      complete(async, stop);
+      complete(async, attachment);
+      expect(desktop.loaded, isTrue);
+      service.dispose();
+      async.flushMicrotasks();
+    });
+  });
+
   test(
     'a live app runs at the deadline once and persists the result and chat',
     () {

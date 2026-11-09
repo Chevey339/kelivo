@@ -482,8 +482,11 @@ Future<void> main() async {
           stderr.writeln('[DataDirectoryConfirmation] $error');
         }
       }
-      // Desktop exit hook: drain queued preference writes before process exit.
-      _installExitFlush(businessPreferences);
+      // Desktop exit hook: stop producers, drain writes, then close SQLite.
+      final chatService = ChatService(
+        existingRepository: processDatabaseLease.chatRepository,
+      );
+      _installExitFlush(businessPreferences, chatService);
       ScheduledTasksService.configureDevice(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
@@ -494,6 +497,7 @@ Future<void> main() async {
       runApp(
         MyApp(
           databaseLease: processDatabaseLease,
+          chatService: chatService,
           businessPreferences: businessPreferences,
           appDataDirectory: appDataDirectory,
           restoreOutcome: restoreOutcome?.state,
@@ -684,9 +688,12 @@ Future<void> _initDesktopWindow() async {
 AppLifecycleListener? _exitFlushListener;
 
 /// Desktop-only: mobile process kills cannot be intercepted, and SQLite WAL
-/// already protects committed transactions, so only Dart-side write queues
-/// need draining before exit.
-void _installExitFlush(BusinessPreferences businessPreferences) {
+/// already protects committed transactions. On desktop, close the worker
+/// before engine shutdown so native finalizers do not race isolate teardown.
+void _installExitFlush(
+  BusinessPreferences businessPreferences,
+  ChatService chatService,
+) {
   if (kIsWeb) return;
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.windows ||
@@ -696,16 +703,28 @@ void _installExitFlush(BusinessPreferences businessPreferences) {
   AppExitFlush.register(DesktopSidePanelController.instance.flush);
   AppExitFlush.register(businessPreferences.flushPendingWrites);
   AppExitFlush.register(ChatActions.flushActiveGenerationProgress);
+  AppExitFlush.configureShutdown(
+    prepare: () async {
+      try {
+        await Future.wait([
+          ScheduledTasksService.instance.stopForExit(),
+          ChatActions.prepareForExit(),
+        ]);
+      } finally {
+        await chatService.close();
+      }
+    },
+    close: () async {
+      try {
+        await businessPreferences.close();
+      } finally {
+        await ChatDatabaseGateway.instance.shutdown();
+      }
+    },
+  );
   _exitFlushListener = AppLifecycleListener(
     onExitRequested: () async {
-      try {
-        // Bound the wait: a stuck write transaction must not leave the
-        // process unkillable after macOS answers NSTerminateLater.
-        await AppExitFlush.flushAll().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {},
-        );
-      } catch (_) {}
+      await AppExitFlush.shutdown();
       return AppExitResponse.exit;
     },
   );
@@ -768,12 +787,14 @@ class MyApp extends StatelessWidget {
   const MyApp({
     super.key,
     required this.databaseLease,
+    required this.chatService,
     required this.businessPreferences,
     required this.appDataDirectory,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
+  final ChatService chatService;
   final BusinessPreferences businessPreferences;
   final Directory appDataDirectory;
   final RestoreReceiptState? restoreOutcome;
@@ -789,10 +810,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              ChatService(existingRepository: databaseLease.chatRepository),
-        ),
+        ChangeNotifierProvider(create: (_) => chatService),
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -403,5 +404,29 @@ void main() {
     final snapshot = await repository.readSnapshot();
     expect(snapshot.preferences['theme_mode_v1'], 'dark');
     await expectLater(write, completion(isTrue));
+  });
+
+  test('close drains accepted mutations and rejects late writes', () async {
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+    final ready = Completer<void>();
+    final mutation = preferences.runExclusiveMutation(() async {
+      await ready.future;
+      await preferences.setString('theme_mode_v1', 'dark');
+    });
+    final close = preferences.close();
+    await expectLater(
+      preferences.runExclusiveMutation(() async {}),
+      throwsStateError,
+    );
+    ready.complete();
+    await mutation;
+    await close;
+    expect(await repository.getPreference('theme_mode_v1'), 'dark');
+    await expectLater(
+      preferences.setString('theme_mode_v1', 'light'),
+      throwsStateError,
+    );
+    expect(preferences.getString('theme_mode_v1'), 'dark');
   });
 }

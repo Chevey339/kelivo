@@ -30,6 +30,8 @@ final class BusinessPreferences {
   Future<void>? _mutationTail;
   bool _isLoaded = false;
   bool _writesBlockedForRestore = false;
+  bool _closed = false;
+  Future<void>? _closeFuture;
 
   bool get isLoaded => _isLoaded;
 
@@ -82,9 +84,18 @@ final class BusinessPreferences {
     await _writeTail;
   }
 
+  /// Drain accepted mutations before closing the shared database. Late timers
+  /// and callbacks may still run while the desktop engine is terminating.
+  Future<void> close() => _closeFuture ??= Future<void>.microtask(() async {
+    await _mutationTail;
+    _closed = true;
+    await _writeTail;
+  });
+
   /// Shared by assistant-related stores and assistant duplication. Lock the
   /// whole read-modify-write operation, not just its final SQLite write.
   Future<T> runExclusiveMutation<T>(Future<T> Function() operation) async {
+    if (_closeFuture != null) throw StateError('business_preferences_closed');
     final result = (_mutationTail ?? Future<void>.value()).then(
       (_) => operation(),
     );
@@ -202,6 +213,9 @@ final class BusinessPreferences {
   }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
+    if (_closed) {
+      return Future<T>.error(StateError('business_preferences_closed'));
+    }
     if (_writesBlockedForRestore) {
       return Future<T>.error(StateError('business_preferences_restore_fence'));
     }

@@ -1528,13 +1528,22 @@ class ChatDatabaseRepository {
     }
   }
 
-  Future<void> close() async {
-    await composerDrafts.flush();
-    await genUiStates.pauseAndDrain();
-    composerDrafts.dispose();
-    genUiStates.discardAfterCutover();
-    await _db.close();
-  }
+  Future<void>? _closeFuture;
+
+  Future<void> close() => _closeFuture ??= Future<void>.microtask(() async {
+    composerDrafts.suspended = true;
+    try {
+      await composerDrafts.flush();
+    } finally {
+      try {
+        await genUiStates.pauseAndDrain();
+      } finally {
+        composerDrafts.dispose();
+        genUiStates.discardAfterCutover();
+        await _db.close();
+      }
+    }
+  });
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();

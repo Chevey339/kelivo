@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/chat_database_gateway.dart';
@@ -111,6 +112,56 @@ void main() {
         await File('${directory.path}/.database_session_receipt.json').exists(),
         isFalse,
       );
+    });
+
+    test('shutdown closes outstanding leases and prevents reopening', () async {
+      final file = File('${directory.path}/chat.sqlite');
+      final first = await gateway.acquire(file);
+      final second = await gateway.acquire(file);
+      final shutdown = gateway.shutdown();
+      expect(gateway.shutdown(), same(shutdown));
+      await shutdown;
+      await first.release();
+      await second.release();
+      await expectLater(first.repository.ensureReady(), throwsStateError);
+      await expectLater(gateway.acquire(file), throwsStateError);
+    });
+
+    test('shutdown drains an accepted transaction before closing', () async {
+      final file = File('${directory.path}/chat.sqlite');
+      final lease = await gateway.acquire(file);
+      final entered = Completer<void>();
+      final finishWrite = Completer<void>();
+      final write = lease.repository.genUiStates.transaction(() async {
+        entered.complete();
+        await finishWrite.future;
+        await lease.businessRepository.setPreference('theme_mode_v1', 'dark');
+      });
+      await entered.future;
+      var closed = false;
+      final shutdown = gateway.shutdown().then((_) => closed = true);
+      await pumpEventQueue();
+      expect(closed, isFalse);
+      finishWrite.complete();
+      await write;
+      await shutdown;
+      await lease.release();
+
+      final reopened = await ChatDatabaseGateway().acquire(file);
+      expect(
+        await reopened.businessRepository.getPreference('theme_mode_v1'),
+        'dark',
+      );
+      await reopened.release();
+    });
+
+    test('shutdown during admission leaves no usable lease', () async {
+      final file = File('${directory.path}/chat.sqlite');
+      final acquisition = gateway.acquire(file);
+      final rejected = expectLater(acquisition, throwsStateError);
+      await gateway.shutdown();
+      await rejected;
+      await expectLater(gateway.acquire(file), throwsStateError);
     });
   });
 }
