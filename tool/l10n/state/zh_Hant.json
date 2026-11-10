@@ -5049,5 +5049,7 @@
   "backupEncryptionChangePassword": "7b64b792598b36dbff3514cb0450cd063e05426b9398b0e67ff12039d08a2e8d",
   "backupMacKeychainNeedsUnlock": "3d2ffb96bbc66a5048e53926d3009cfb1079e90cf585bdeee1b04faf4a5110b9",
   "backupMacOpenKeychainAccess": "c136cb097a7ae1611e49b4dd4dd6d9efcb67f81543a4bad73d484680c6d6e8b4",
-  "backupMacKeychainAccessDenied": "628d87aafd43e2c0e1a254cf527dd1c2cec911196d8358fdd1210d761f83f154"
+  "backupMacKeychainAccessDenied": "628d87aafd43e2c0e1a254cf527dd1c2cec911196d8358fdd1210d761f83f154",
+  "displaySettingsPageUiFontSizeTitle": "de3c304a7594104f23dfe90159feeb5c0cb8d1f35501e9ead7d75581fa477859",
+  "displaySettingsPageInputFontSizeTitle": "0e2c22835d30b61a7ae8198007da418c0a8e4ad90ad9e67d1f9d9a6725211214"
 }

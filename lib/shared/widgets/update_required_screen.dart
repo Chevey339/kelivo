@@ -114,7 +114,7 @@ class UpdateRequiredScreen extends StatelessWidget {
                         number: 3,
                         text: l10n.startupDatabaseUpdateRequiredDowngradeStep3,
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(height: scaledDim(context, 16)),
                       SizedBox(
                         width: double.infinity,
                         height: scaledDim(context, 44),

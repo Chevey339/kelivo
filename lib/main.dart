@@ -1375,9 +1375,10 @@ class MyApp extends StatelessWidget {
                     data: scaledMq,
                     child: FloatingIpadPadding(
                       child: LocalSnapshotScheduler(
-                      child: ExternalBackupAutoScheduler(
-                        child: AppOverlays(
-                          child: child ?? const SizedBox.shrink(),
+                        child: ExternalBackupAutoScheduler(
+                          child: AppOverlays(
+                            child: child ?? const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),

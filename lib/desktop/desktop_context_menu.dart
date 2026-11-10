@@ -6,7 +6,6 @@ import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'desktop_overlay_backdrop.dart';
-import '../utils/ui_scale.dart';
 
 /// Simple anchored context menu for desktop.
 /// Shows a Material menu near the cursor or an anchor widget with a subtle animation.

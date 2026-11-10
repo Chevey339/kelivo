@@ -23,6 +23,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 enum _FontTarget { app, code }
 
@@ -615,7 +616,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                             visualDensity: VisualDensity.compact,
                             icon: Icon(
                               Lucide.RotateCcw,
-                              size: 18,
+                              size: scaledDim(context, 18),
                               color: cs.onSurface.withValues(alpha: 0.7),
                             ),
                             // Reset to the default 100% scale.

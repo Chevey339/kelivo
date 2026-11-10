@@ -436,7 +436,7 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
                       color: cs.onSurface.withValues(alpha: .6),
                     ),
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: scaledDim(context, 8)),
                   ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: scaledDim(context, 480),

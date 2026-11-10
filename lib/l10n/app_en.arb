@@ -22557,5 +22557,11 @@
   "backupMacKeychainAccessDenied": "macOS denied access to the backup password. If a system prompt appears, allow Kelivo to access it. You can also check the default keychain and the password item’s permissions in Keychain Access.",
   "@backupMacKeychainAccessDenied": {
     "description": "Backup password error when macOS denied access even though the default keychain was reported unlocked. Covers access denied by item permissions or an unusable login keychain without assuming that the user cancelled."
+  },
+  "@displaySettingsPageUiFontSizeTitle": {
+    "description": "Title of the UI font size slider in display settings."
+  },
+  "@displaySettingsPageInputFontSizeTitle": {
+    "description": "Title of the input box font size slider in display settings."
   }
 }

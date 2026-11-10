@@ -39,6 +39,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/search_highlight.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/avatar_scale.dart';
+import '../../../utils/ui_scale.dart';
 import 'dart:ui' as ui;
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';

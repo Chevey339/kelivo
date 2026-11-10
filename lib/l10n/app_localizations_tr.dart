@@ -5756,6 +5756,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => 'Sohbet Yazı Boyutu';
 
   @override
+  String get displaySettingsPageUiFontSizeTitle => 'Arayüz Yazı Boyutu';
+
+  @override
+  String get displaySettingsPageInputFontSizeTitle =>
+      'Giriş Kutusu Yazı Boyutu';
+
+  @override
   String get displaySettingsPageAutoScrollEnableTitle =>
       'Otomatik olarak alta takip et';
 
