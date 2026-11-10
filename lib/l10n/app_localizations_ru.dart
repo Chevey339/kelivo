@@ -5715,6 +5715,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => 'Размер шрифта чата';
 
   @override
+  String get displaySettingsPageUiFontSizeTitle => 'Размер шрифта интерфейса';
+
+  @override
+  String get displaySettingsPageInputFontSizeTitle =>
+      'Размер шрифта поля ввода';
+
+  @override
   String get displaySettingsPageAutoScrollEnableTitle => 'Автопрокрутка вниз';
 
   @override

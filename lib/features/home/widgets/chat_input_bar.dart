@@ -64,6 +64,7 @@ import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../core/models/composer_draft.dart';
 import '../../../core/database/composer_draft_store.dart';
+import '../../../utils/ui_scale.dart';
 
 class ChatInputBarController {
   ChatInputBarController();
@@ -4341,10 +4342,23 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               //   );
                                               // }
 
-                                              final enterToSend = context
-                                                  .watch<SettingsProvider>()
-                                                  .enterToSendOnMobile;
-                                              return GestureDetector(
+                                              final settings = context
+                                                  .watch<SettingsProvider>();
+                                              final enterToSend =
+                                                  settings.enterToSendOnMobile;
+                                              // Composer font scaling: divide the
+                                              // app-wide UI scale out so the input
+                                              // font scale stays absolute.
+                                              final mqData = MediaQuery.of(
+                                                context,
+                                              );
+                                              final effectiveScale =
+                                                  MediaQuery.textScalerOf(
+                                                    context,
+                                                  ).scale(1) /
+                                                  settings.uiFontScale *
+                                                  settings.inputFontScale;
+                                              final inputField = GestureDetector(
                                                 behavior: HitTestBehavior
                                                     .deferToChild,
                                                 // onSecondaryTapDown: (details) {
@@ -4427,6 +4441,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   cursorColor:
                                                       theme.colorScheme.primary,
                                                 ),
+                                              );
+                                              return MediaQuery(
+                                                data: mqData.copyWith(
+                                                  textScaler: TextScaler.linear(
+                                                    effectiveScale,
+                                                  ),
+                                                ),
+                                                child: inputField,
                                               );
                                             },
                                           ),
@@ -4838,9 +4860,9 @@ class _ImageModePill extends StatelessWidget {
               border: Border.all(color: border),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 172),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 172)),
               child: SizedBox(
-                height: 24,
+                height: scaledDim(context, 24),
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 9, end: 3),
                   child: Row(

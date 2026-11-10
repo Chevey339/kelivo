@@ -13,6 +13,7 @@ import '../../../features/instruction_injection/pages/instruction_injection_page
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Bottom sheet for displaying instruction injection items on mobile/tablet.
 ///
@@ -231,7 +232,7 @@ class _SheetTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 52,
+      height: scaledDim(context, 52),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -363,7 +364,7 @@ class _InstructionInjectionRow extends StatelessWidget {
     final onColor = selected ? cs.primary : cs.onSurface;
     final radius = BorderRadius.circular(14);
     return SizedBox(
-      height: 48,
+      height: scaledDim(context, 48),
       child: IosCardPress(
         borderRadius: radius,
         baseColor: sheetTileColor(context),

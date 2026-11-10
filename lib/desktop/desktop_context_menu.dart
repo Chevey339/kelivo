@@ -55,8 +55,9 @@ Future<void> showDesktopContextMenuAt(
     barrierDismissible: true,
     barrierColor: cs.scrim.withValues(alpha: 0.06),
     pageBuilder: (ctx, _, __) {
-      const double minMenuWidth = 160;
-      const double maxMenuWidth = 360;
+      final double fontScale = MediaQuery.textScalerOf(ctx).scale(1.0);
+      final double minMenuWidth = 160 * fontScale;
+      final double maxMenuWidth = 360 * fontScale;
       final double estimatedWidth = _estimateMenuWidth(
         ctx,
         items,
@@ -210,7 +211,9 @@ double _estimateMenuWidth(
   double minW,
   double maxW,
 ) {
-  // Base paddings: 12 left/right; icon 18 + spacing 10 if present
+  // Base paddings: 12 left/right; icon 18 + spacing 10 if present. Width
+  // bounds scale with the user's text-scaler at the call sites so the menu
+  // grows with the type instead of clipping long labels at 150%+.
   double maxText = 0;
   final textStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
     fontSize: 14.5,
@@ -262,11 +265,12 @@ Future<void> showDesktopAnchoredMenu(
   const double minMenuWidth = 160;
   const double maxMenuWidth = 360;
   const double gap = 8; // should match showDesktopContextMenuAt gap
+  final double fontScale = MediaQuery.textScalerOf(context).scale(1.0);
   final double menuWidth = _estimateMenuWidth(
     context,
     items,
-    minMenuWidth,
-    maxMenuWidth,
+    minMenuWidth * fontScale,
+    maxMenuWidth * fontScale,
   );
   final anchorBottomCenter = topLeft + Offset(size.width / 2, size.height);
   final adjusted = anchorBottomCenter - Offset(menuWidth / 2 + gap, 0);

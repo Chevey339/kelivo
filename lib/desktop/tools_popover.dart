@@ -6,6 +6,7 @@ import '../features/mcp/utils/mcp_tool_groups.dart';
 import 'package:provider/provider.dart';
 
 import '../icons/lucide_adapter.dart';
+import '../utils/ui_scale.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/mcp_provider.dart';
 import '../core/providers/assistant_provider.dart';
@@ -388,7 +389,7 @@ class _ToolsContent extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
         child: ListView.builder(
           shrinkWrap: true,
           addRepaintBoundaries: false,

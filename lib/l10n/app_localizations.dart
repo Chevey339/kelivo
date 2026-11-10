@@ -10243,6 +10243,18 @@ abstract class AppLocalizations {
   /// **'Chat Font Size'**
   String get displaySettingsPageChatFontSizeTitle;
 
+  /// Title of the UI font size slider in display settings.
+  ///
+  /// In en, this message translates to:
+  /// **'UI Font Size'**
+  String get displaySettingsPageUiFontSizeTitle;
+
+  /// Title of the input box font size slider in display settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Box Font Size'**
+  String get displaySettingsPageInputFontSizeTitle;
+
   /// Label for the auto-follow-bottom setting controlling automatic scrolling to new messages.
   ///
   /// In en, this message translates to:

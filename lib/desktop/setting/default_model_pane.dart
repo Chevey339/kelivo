@@ -11,6 +11,7 @@ import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -38,12 +39,12 @@ class DesktopDefaultModelPane extends StatelessWidget {
         child: Center(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 36,
+                    height: scaledDim(context, 36),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -345,7 +346,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 vertical: 24,
               ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   child: Column(
@@ -436,7 +437,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -534,7 +535,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -622,7 +623,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -725,7 +726,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(

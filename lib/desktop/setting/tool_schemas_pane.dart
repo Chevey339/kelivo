@@ -14,6 +14,7 @@ import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopToolSchemasPane extends StatefulWidget {
   const DesktopToolSchemasPane({super.key});
@@ -79,7 +80,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 40,
+            height: scaledDim(context, 40),
             child: Row(
               children: [
                 Expanded(

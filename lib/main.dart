@@ -1290,10 +1290,25 @@ class MyApp extends StatelessWidget {
                     });
                   }
 
-                  final appWithOverlays = FloatingIpadPadding(
-                    child: LocalSnapshotScheduler(
-                      child: AppOverlays(
-                        child: child ?? const SizedBox.shrink(),
+                  final mq = MediaQuery.of(ctx);
+                  // App-wide base font scaling from the UI font size setting.
+                  // The chat and input font scales stack on top of this for
+                  // messages and the composer respectively.
+                  final fontScale = settings.uiFontScale;
+                  final scaledMq = fontScale == 1.0
+                      ? mq
+                      : mq.copyWith(
+                          textScaler: TextScaler.linear(
+                            mq.textScaler.scale(1) * fontScale,
+                          ),
+                        );
+                  final appWithOverlays = MediaQuery(
+                    data: scaledMq,
+                    child: FloatingIpadPadding(
+                      child: LocalSnapshotScheduler(
+                        child: AppOverlays(
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   );

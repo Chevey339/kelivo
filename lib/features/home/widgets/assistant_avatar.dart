@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/assistant.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/avatar_image.dart';
+import '../../../utils/avatar_scale.dart';
 import '../../../theme/app_font_weights.dart';
 
 class AssistantAvatar extends StatelessWidget {
@@ -20,6 +21,7 @@ class AssistantAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarValue = assistant?.avatar?.trim() ?? '';
@@ -44,8 +46,8 @@ class AssistantAvatar extends StatelessWidget {
     }
 
     return Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
@@ -71,21 +73,25 @@ class _AssistantInitialAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     final letter = name.isNotEmpty ? name.characters.first : '?';
     return Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: cs.primary,
-          fontSize: size * 0.42,
-          fontWeight: AppFontWeights.emphasis,
+      child: Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, size)),
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: cs.primary,
+            fontSize: size * 0.42,
+            fontWeight: AppFontWeights.emphasis,
+          ),
         ),
       ),
     );
@@ -105,9 +111,10 @@ class _AssistantEmojiAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     return Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,

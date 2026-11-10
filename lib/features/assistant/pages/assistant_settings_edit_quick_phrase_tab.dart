@@ -36,13 +36,13 @@ class _QuickPhraseTab extends StatelessWidget {
               vertical: 24,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 44,
+                    height: scaledDim(context, 44),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
@@ -253,7 +253,7 @@ class _QuickPhraseTab extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 200),
+                constraints: BoxConstraints(minWidth: scaledDim(context, 200)),
                 child: _IosButton(
                   label: l10n.assistantEditAddQuickPhraseButton,
                   icon: Lucide.Plus,

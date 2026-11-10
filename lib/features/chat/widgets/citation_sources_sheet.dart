@@ -7,6 +7,7 @@ import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class CitationSourceItem {
   const CitationSourceItem({
@@ -174,10 +175,10 @@ class _CitationSourcesDialogState extends State<CitationSourcesDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 420,
-          maxWidth: 640,
-          maxHeight: 680,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 420),
+          maxWidth: scaledDim(context, 640),
+          maxHeight: scaledDim(context, 680),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -549,7 +550,10 @@ class _IndexBadge extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       key: badgeKey(index),
-      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      constraints: BoxConstraints(
+        minWidth: scaledDim(context, 18),
+        minHeight: scaledDim(context, 18),
+      ),
       padding: EdgeInsets.symmetric(horizontal: index >= 10 ? 5 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -593,7 +597,7 @@ class _CitationTag extends StatelessWidget {
       ),
     );
     final content = Container(
-      constraints: const BoxConstraints(maxWidth: 120),
+      constraints: BoxConstraints(maxWidth: scaledDim(context, 120)),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: cs.onSurface.withValues(alpha: 0.06),

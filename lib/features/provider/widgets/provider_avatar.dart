@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../shared/widgets/configurable_avatar.dart';
+import '../../../utils/avatar_scale.dart';
 
 class ProviderAvatar extends StatelessWidget {
   const ProviderAvatar({
@@ -21,6 +22,7 @@ class ProviderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cfg = context.watch<SettingsProvider>().getProviderConfig(
@@ -35,8 +37,8 @@ class ProviderAvatar extends StatelessWidget {
     );
 
     final portrait = Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(

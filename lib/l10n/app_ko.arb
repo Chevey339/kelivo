@@ -4886,5 +4886,7 @@
   "workspaceEnvNativeShellInvalid": "이 셸을 시작할 수 없습니다. 절대 경로와 지원되는 명령 구문을 확인하세요.",
   "workspaceEnvNativeShellUnavailable": "셸을 사용할 수 없음",
   "workspaceEnvNativeShellDetect": "다시 감지",
-  "workspaceEnvNativeShellSave": "저장"
+  "workspaceEnvNativeShellSave": "저장",
+  "displaySettingsPageUiFontSizeTitle": "UI 글꼴 크기",
+  "displaySettingsPageInputFontSizeTitle": "입력창 글꼴 크기"
 }

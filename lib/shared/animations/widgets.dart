@@ -36,12 +36,14 @@ class AnimatedTextSwap extends StatelessWidget {
     this.duration = kAnim,
     this.maxLines,
     this.overflow,
+    this.textScaler,
   });
   final String text;
   final TextStyle? style;
   final Duration duration;
   final int? maxLines;
   final TextOverflow? overflow;
+  final TextScaler? textScaler;
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
@@ -71,6 +73,7 @@ class AnimatedTextSwap extends StatelessWidget {
         style: style,
         maxLines: maxLines,
         overflow: overflow,
+        textScaler: textScaler,
       ),
     );
   }

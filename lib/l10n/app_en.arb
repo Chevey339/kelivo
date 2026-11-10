@@ -2610,6 +2610,8 @@
   "desktopDisplaySettingsTopicPositionRight": "Right",
   "displaySettingsPageNewChatOnLaunchSubtitle": "Automatically create a new chat on launch",
   "displaySettingsPageChatFontSizeTitle": "Chat Font Size",
+  "displaySettingsPageUiFontSizeTitle": "UI Font Size",
+  "displaySettingsPageInputFontSizeTitle": "Input Box Font Size",
   "displaySettingsPageAutoScrollEnableTitle": "Auto-follow bottom",
   "displaySettingsPageAutoScrollDisabledLabel": "Off",
   "displaySettingsPageChatFontSampleText": "This is a sample chat text",
@@ -21765,5 +21767,11 @@
   "workspaceEnvNativeShellSave": "Save",
   "@workspaceEnvNativeShellSave": {
     "description": "Button in the desktop default shell dialog; validates and saves the executable path or automatic detection setting."
+  },
+  "@displaySettingsPageUiFontSizeTitle": {
+    "description": "Title of the UI font size slider in display settings."
+  },
+  "@displaySettingsPageInputFontSizeTitle": {
+    "description": "Title of the input box font size slider in display settings."
   }
 }
