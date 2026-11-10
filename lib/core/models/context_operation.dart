@@ -14,10 +14,10 @@ enum ContextHistorySource { effective, previous, original }
 
 typedef ContextMessageCounts = ({int stored, int messages, int summaries});
 
-/// A history transformation, stored independently from actual chat messages.
-/// Group ids locate ranges; revision ids and content fingerprints detect edits.
-class ContextOperation {
-  const ContextOperation({
+/// Dependencies and labels needed to approve a source mutation. This never
+/// contains summary text, tool manifests or a native compaction payload.
+class ContextOperationMetadata {
+  const ContextOperationMetadata({
     required this.id,
     required this.kind,
     required this.anchorGroupId,
@@ -25,9 +25,55 @@ class ContextOperation {
     required this.sourceGroups,
     required this.dependencies,
     required this.createdAt,
+    this.revoked = false,
+  });
+
+  final String id;
+  final ContextOperationKind kind;
+  final String anchorGroupId;
+  // A summary created after a retained tail must not leak into regeneration
+  // of a message that predates the operation, even if its UI anchor is earlier.
+  final String appliedAfterGroupId;
+  final List<String> sourceGroups;
+  final List<String> dependencies;
+  final DateTime createdAt;
+  final bool revoked;
+  bool get isCompression => kind == ContextOperationKind.compress;
+  bool get isClear => kind == ContextOperationKind.clear;
+  bool get isFixedStart => kind == ContextOperationKind.start;
+
+  factory ContextOperationMetadata.fromJson(Map<String, dynamic> json) =>
+      ContextOperationMetadata(
+        id: json['id'] as String,
+        kind: ContextOperationKind.values.byName(json['kind'] as String),
+        anchorGroupId: json['anchor'] as String,
+        appliedAfterGroupId: json['appliedAfter'] as String,
+        sourceGroups: List<String>.from(json['groups'] as List),
+        dependencies: List<String>.from(json['dependencies'] as List),
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        revoked: json['revoked'] as bool,
+      );
+}
+
+typedef ContextMutationState = ({
+  String revision,
+  List<ContextOperationMetadata> operations,
+});
+
+/// A history transformation, stored independently from actual chat messages.
+/// Group ids locate ranges; revision ids and content fingerprints detect edits.
+class ContextOperation extends ContextOperationMetadata {
+  const ContextOperation({
+    required super.id,
+    required super.kind,
+    required super.anchorGroupId,
+    required super.appliedAfterGroupId,
+    required super.sourceGroups,
+    required super.dependencies,
+    required super.createdAt,
     this.summary = '',
     this.originalSummary = '',
-    this.revoked = false,
+    super.revoked,
     this.keepUserMessages = 0,
     this.model = '',
     this.inputTokens = 0,
@@ -67,18 +113,8 @@ class ContextOperation {
 
   static const entityKind = 'conversationContext';
   static const summaryPrefix = 'context-summary:';
-  final String id;
-  final ContextOperationKind kind;
-  final String anchorGroupId;
-  // A summary created after a retained tail must not leak into regeneration
-  // of a message that predates the operation, even if its UI anchor is earlier.
-  final String appliedAfterGroupId;
-  final List<String> sourceGroups;
-  final List<String> dependencies;
-  final DateTime createdAt;
   final String summary;
   final String originalSummary;
-  final bool revoked;
   final int keepUserMessages;
   final String model;
   final int inputTokens;
@@ -130,9 +166,6 @@ class ContextOperation {
       : summary;
 
   bool get isEdited => summary != originalSummary;
-  bool get isCompression => kind == ContextOperationKind.compress;
-  bool get isClear => kind == ContextOperationKind.clear;
-  bool get isFixedStart => kind == ContextOperationKind.start;
   String get summaryMessageId => '$summaryPrefix$id';
   static bool isSummary(ChatMessage message) =>
       message.id.startsWith(summaryPrefix);
@@ -357,7 +390,7 @@ class ContextHistory {
   static String group(ChatMessage message) => message.groupId ?? message.id;
 
   static Set<String> affectedOperations(
-    List<ContextOperation> operations, {
+    List<ContextOperationMetadata> operations, {
     Set<String> operationIds = const {},
     Set<String> changedGroups = const {},
     Set<String> removedGroups = const {},

@@ -1,6 +1,30 @@
 part of 'chat_database_repository.dart';
 
 extension ChatContextRepository on ChatDatabaseRepository {
+  Future<ContextMutationState> readContextMutationState(String id) =>
+      _db.transaction(() async {
+        final row =
+            await (_db.selectOnly(_db.conversationRows)
+                  ..addColumns([_db.conversationRows.truncateIndex])
+                  ..where(_db.conversationRows.id.equals(id)))
+                .getSingleOrNull();
+        if (row == null) throw StateError('conversation_not_found');
+        // Preserve the existing atomic conversion before issuing approval.
+        if (row.read(_db.conversationRows.truncateIndex)! >= 0) {
+          await readContextOperations(id);
+        }
+        return _contextIndex.read(id);
+      });
+
+  Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
+  readContextMutationPreview(String id, {required String expectedState}) =>
+      _db.transaction(() async {
+        await _assertContextState(id, expectedState);
+        return (
+          messages: await getSelectedContextMessages(id, limit: 0x7fffffff),
+          operations: await readContextOperations(id),
+        );
+      });
   // Read only selection metadata for the excluded prefix. Large message parts
   // and provider artifacts are hydrated only for history actually being sent.
   Future<List<ChatMessage>> _contextMetadata(String id) async {
@@ -278,6 +302,13 @@ extension ChatContextRepository on ChatDatabaseRepository {
           _db.conversationRows,
         )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
         if (conversation == null) return [];
+        final state = await _contextIndex.read(conversationId);
+        final cached = _contextOperationCache;
+        if (conversation.truncateIndex < 0 &&
+            cached?.id == conversationId &&
+            cached?.revision == state.revision) {
+          return cached!.operations;
+        }
         final record =
             await (_db.select(_db.extensionEntityRows)..where(
                   (row) =>
@@ -287,13 +318,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
                 .getSingleOrNull();
         final operations = record == null
             ? <ContextOperation>[]
-            : (jsonDecode(record.payload) as List)
-                  .map(
-                    (value) => ContextOperation.fromJson(
-                      Map<String, dynamic>.from(value as Map),
-                    ),
-                  )
-                  .toList();
+            : await _decodeContextOperations(record.payload);
         // Explicitly approved one-time conversion. Clearing this column and
         // saving the node share a transaction, including on backup imports.
         if (conversation.truncateIndex >= 0) {
@@ -316,13 +341,20 @@ extension ChatContextRepository on ChatDatabaseRepository {
                 ..where((row) => row.id.equals(conversationId)))
               .write(const ConversationRowsCompanion(truncateIndex: Value(-1)));
         }
-        return operations;
+        final result = List<ContextOperation>.unmodifiable(operations);
+        _contextOperationCache = (
+          id: conversationId,
+          revision: state.revision,
+          operations: result,
+        );
+        return result;
       });
 
   Future<void> _writeContextOperations(
     String id,
     List<ContextOperation> operations,
   ) async {
+    final payload = await _encodeContextOperations(operations);
     await _db
         .into(_db.extensionEntityRows)
         .insertOnConflictUpdate(
@@ -331,7 +363,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
             id: id,
             ownerId: Value(id),
             sortOrder: 0,
-            payload: jsonEncode(operations.map((op) => op.toJson()).toList()),
+            payload: payload,
             updatedAt: DateTime.now(),
           ),
         );
@@ -579,8 +611,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
 
   Future<void> _assertContextState(String id, String? expected) async {
     if (expected == null) return;
-    final operations = await readContextOperations(id);
-    if (ContextHistory.operationsFingerprint(operations) != expected) {
+    if ((await readContextMutationState(id)).revision != expected) {
       throw StateError('context_changed');
     }
   }
@@ -591,14 +622,15 @@ extension ChatContextRepository on ChatDatabaseRepository {
     Set<String> groups, {
     Set<String> removedGroups = const {},
   }) async {
-    final operations = await readContextOperations(id);
-    if (operations.isEmpty) return;
+    final state = await readContextMutationState(id);
+    if (state.operations.isEmpty) return;
     final affected = ContextHistory.affectedOperations(
-      operations,
+      state.operations,
       changedGroups: groups,
       removedGroups: removedGroups,
     );
     if (affected.isEmpty) return;
+    final operations = await readContextOperations(id);
     await _writeContextOperations(id, [
       for (final op in operations)
         affected.contains(op.id) ? op.copyWith(revoked: true) : op,
@@ -662,3 +694,14 @@ extension ChatContextRepository on ChatDatabaseRepository {
     );
   }
 }
+
+Future<List<ContextOperation>> _decodeContextOperations(String payload) =>
+    Isolate.run(
+      () => [
+        for (final value in jsonDecode(payload) as List)
+          ContextOperation.fromJson(Map<String, dynamic>.from(value as Map)),
+      ],
+    );
+
+Future<String> _encodeContextOperations(List<ContextOperation> operations) =>
+    Isolate.run(() => jsonEncode(operations.map((op) => op.toJson()).toList()));

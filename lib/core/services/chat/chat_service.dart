@@ -1704,6 +1704,41 @@ class ChatService extends ChangeNotifier {
     return _repo.getMaxMessageVersionForGroup(conversationId, groupId);
   }
 
+  Future<ContextMutationState> loadContextMutationState(String id) async {
+    if (_initialized &&
+        !_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      return _repo.readContextMutationState(id);
+    }
+    final operations = await loadContextOperations(id);
+    return (
+      revision: ContextHistory.operationsFingerprint(operations),
+      operations: operations,
+    );
+  }
+
+  Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
+  loadContextMutationPreview(String id, {required String expectedState}) async {
+    if (_initialized &&
+        !_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      final snapshot = await _repo.readContextMutationPreview(
+        id,
+        expectedState: expectedState,
+      );
+      await _cacheMessageArtifacts(snapshot.messages);
+      return snapshot;
+    }
+    final operations = await loadContextOperations(id);
+    if (ContextHistory.operationsFingerprint(operations) != expectedState) {
+      throw StateError('context_changed');
+    }
+    return (
+      messages: await loadRawSelectedContextMessages(id, limit: 0x7fffffff),
+      operations: operations,
+    );
+  }
+
   Future<List<ChatMessage>> loadSelectedMessageProjections(
     String conversationId,
   ) async {
@@ -1715,6 +1750,43 @@ class ChatService extends ChangeNotifier {
       );
     }
     return _repo.getSelectedMessageProjections(conversationId);
+  }
+
+  Future<({String? targetGroupId, Set<String> removedGroups})>
+  loadRegenerationSourceGroups(
+    String conversationId,
+    String revisionId, {
+    required bool assistantAsNewReply,
+    required bool deleteTrailingMessages,
+  }) async {
+    if (!_temporaryConversationIds.contains(conversationId) &&
+        !_draftConversations.containsKey(conversationId)) {
+      return _repo.getRegenerationSourceGroups(
+        conversationId,
+        revisionId,
+        assistantAsNewReply: assistantAsNewReply,
+        deleteTrailingMessages: deleteTrailingMessages,
+      );
+    }
+    final selected = _collapseTitleVersions(
+      _messagesCache[conversationId] ?? [],
+      getVersionSelections(conversationId),
+    );
+    var keep = selected.indexWhere((m) => m.id == revisionId);
+    if (keep < 0) return (targetGroupId: null, removedGroups: <String>{});
+    String? target;
+    if (selected[keep].role == 'assistant') {
+      if (!assistantAsNewReply) target = ContextHistory.group(selected[keep]);
+    } else if (keep + 1 < selected.length &&
+        selected[keep + 1].role == 'assistant') {
+      target = ContextHistory.group(selected[++keep]);
+    }
+    return (
+      targetGroupId: target,
+      removedGroups: deleteTrailingMessages
+          ? selected.skip(keep + 1).map(ContextHistory.group).toSet()
+          : <String>{},
+    );
   }
 
   Future<List<MiniMapSearchHit>> searchMiniMapMatches(

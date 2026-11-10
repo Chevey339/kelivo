@@ -355,9 +355,7 @@ void main() {
     () async {
       await compact('S1', ['u1', 'a1']);
       await compact('S2', ['u1', 'a1', 'u2', 'a2'], depends: ['S1']);
-      final state = ContextHistory.operationsFingerprint(
-        await repo.readContextOperations('chat'),
-      );
+      final state = (await repo.readContextMutationState('chat')).revision;
       final edited = await repo.appendMessageVersion(
         messageId: 'u1',
         content: 'corrected',
@@ -377,9 +375,7 @@ void main() {
     'a new node after confirmation rejects the source edit without partial writes',
     () async {
       await compact('S1', ['u1', 'a1']);
-      final state = ContextHistory.operationsFingerprint(
-        await repo.readContextOperations('chat'),
-      );
+      final state = (await repo.readContextMutationState('chat')).revision;
       await compact('S2', ['u1', 'a1', 'u2', 'a2'], depends: ['S1']);
       await expectLater(
         repo.appendMessageVersion(

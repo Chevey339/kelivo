@@ -20,7 +20,7 @@ class ContextImpactDialog extends StatelessWidget {
     this.after,
     this.sourceLabel,
   });
-  final List<ContextOperation> operations;
+  final List<ContextOperationMetadata> operations;
   final Set<String> affectedIds;
   final ContextImpactKind kind;
   final String? targetId;

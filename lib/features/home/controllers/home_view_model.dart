@@ -250,15 +250,14 @@ class HomeViewModel extends ChangeNotifier {
       messagesOverride: messages,
       fixedContextStart: fixedContextStart,
     );
-    final estimate = estimateContextBuckets(
-      ContextEstimateJob(
-        preview: preview,
-        kind: ProviderConfig.classify(
-          model.providerKey!,
-          explicitType: config.providerType,
-        ),
+    final job = ContextEstimateJob(
+      preview: preview,
+      kind: ProviderConfig.classify(
+        model.providerKey!,
+        explicitType: config.providerType,
       ),
     );
+    final estimate = await Isolate.run(job.call);
     final window = ModelSpecResolver.instance
         .spec(config, model.modelId!)
         .contextWindow;

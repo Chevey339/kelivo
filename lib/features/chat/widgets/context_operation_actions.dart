@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/models/context_operation.dart';
+import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -26,13 +28,16 @@ import '../pages/context_summary_editor_page.dart';
 Future<CompressionBudget?> _estimate(
   ChatService chat,
   String id,
-  ConversationContextSnapshot snapshot,
+  List<ChatMessage> messages,
   List<ContextOperation> operations,
 ) async {
   try {
+    final resolved = await Isolate.run(
+      () => ContextHistory.resolve(messages, operations),
+    );
     return await chat.contextCompression.estimateCandidate?.call(
       id,
-      ContextHistory.resolve(snapshot.messages, operations),
+      resolved,
       fixedContextStart: ContextHistory.fixedStart(operations) != null,
     );
   } catch (_) {
@@ -42,13 +47,14 @@ Future<CompressionBudget?> _estimate(
 
 Future<bool> confirmContextImpact(
   BuildContext context,
-  List<ContextOperation> operations, {
+  List<ContextOperationMetadata> operations, {
   required Set<String> affectedIds,
   required ContextImpactKind kind,
   String? targetId,
   CompressionBudget? before,
   CompressionBudget? after,
   String? sourceLabel,
+  Future<List<CompressionBudget?>>? budgets,
 }) async {
   if (affectedIds.isEmpty) return true;
   if (!context.mounted) return false;
@@ -56,14 +62,17 @@ Future<bool> confirmContextImpact(
   final first = active.indexWhere((op) => affectedIds.contains(op.id));
   return await showDialog<bool>(
         context: context,
-        builder: (_) => ContextImpactDialog(
-          operations: active.skip(first < 0 ? 0 : first).toList(),
-          affectedIds: affectedIds,
-          targetId: targetId,
-          kind: kind,
-          before: before,
-          after: after,
-          sourceLabel: sourceLabel,
+        builder: (_) => FutureBuilder<List<CompressionBudget?>>(
+          future: budgets,
+          builder: (_, snapshot) => ContextImpactDialog(
+            operations: active.skip(first < 0 ? 0 : first).toList(),
+            affectedIds: affectedIds,
+            targetId: targetId,
+            kind: kind,
+            before: snapshot.data?.first ?? before,
+            after: snapshot.data?.last ?? after,
+            sourceLabel: sourceLabel,
+          ),
         ),
       ) ??
       false;
@@ -77,46 +86,56 @@ Future<String?> confirmContextSourceMutation(
   Set<String> removedGroups = const {},
   bool deleting = false,
 }) async {
-  final operations = await chat.loadContextOperations(conversationId);
-  if (ContextHistory.affectedOperations(
-    operations,
-    changedGroups: groups,
-    removedGroups: removedGroups,
-  ).isEmpty) {
-    return ContextHistory.operationsFingerprint(operations);
-  }
-  // Only hydrate original bodies when an impact preview needs their budget.
-  // Recompute against this snapshot in case nodes changed during the await.
-  final snapshot = await chat.loadContextSnapshot(conversationId);
+  final state = await chat.loadContextMutationState(conversationId);
   final affected = ContextHistory.affectedOperations(
-    snapshot.operations,
+    state.operations,
     changedGroups: groups,
     removedGroups: removedGroups,
   );
-  if (affected.isNotEmpty) {
-    final budgets = await Future.wait([
-      _estimate(chat, conversationId, snapshot, snapshot.operations),
-      _estimate(chat, conversationId, snapshot, [
-        for (final op in snapshot.operations)
-          affected.contains(op.id) ? op.copyWith(revoked: true) : op,
-      ]),
-    ]);
-    if (!context.mounted ||
-        !await confirmContextImpact(
-          context,
-          snapshot.operations,
-          affectedIds: affected,
-          kind: deleting
-              ? ContextImpactKind.deleteSource
-              : ContextImpactKind.source,
-          before: budgets.first,
-          after: budgets.last,
-          sourceLabel: AppLocalizations.of(context)!.contextOriginalMessages,
-        )) {
-      return null;
+  if (affected.isEmpty) {
+    return state.revision;
+  }
+  if (!context.mounted) return null;
+  var open = true;
+  Future<List<CompressionBudget?>> preview() async {
+    // Let the metadata-only confirmation paint before loading any bodies.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!open) return [null, null];
+    try {
+      final snapshot = await chat.loadContextMutationPreview(
+        conversationId,
+        expectedState: state.revision,
+      );
+      if (!open) return [null, null];
+      return await Future.wait([
+        _estimate(chat, conversationId, snapshot.messages, snapshot.operations),
+        _estimate(chat, conversationId, snapshot.messages, [
+          for (final op in snapshot.operations)
+            affected.contains(op.id) ? op.copyWith(revoked: true) : op,
+        ]),
+      ]);
+    } catch (_) {
+      return [null, null];
     }
   }
-  return ContextHistory.operationsFingerprint(snapshot.operations);
+
+  try {
+    if (!await confirmContextImpact(
+      context,
+      state.operations,
+      affectedIds: affected,
+      kind: deleting
+          ? ContextImpactKind.deleteSource
+          : ContextImpactKind.source,
+      budgets: preview(),
+      sourceLabel: AppLocalizations.of(context)!.contextOriginalMessages,
+    )) {
+      return null;
+    }
+    return state.revision;
+  } finally {
+    open = false;
+  }
 }
 
 Future<bool> changeContextOperationWithConfirmation(
@@ -164,8 +183,8 @@ Future<bool> changeContextOperationWithConfirmation(
         op,
   ];
   final budgets = await Future.wait([
-    _estimate(chat, conversationId, before, operations),
-    _estimate(chat, conversationId, before, projected),
+    _estimate(chat, conversationId, before.messages, operations),
+    _estimate(chat, conversationId, before.messages, projected),
   ]);
   if (!context.mounted) return false;
   final active = operations.where((op) => !op.revoked).toList();
@@ -214,7 +233,7 @@ Future<bool> changeContextOperationWithConfirmation(
         final budget = await _estimate(
           chat,
           conversationId,
-          after,
+          after.messages,
           after.operations,
         );
         if (context.mounted) {
@@ -295,9 +314,9 @@ Future<void> showContextOperationDetails(
     operationIds: {operation.id},
   );
   final budgets = await Future.wait([
-    _estimate(chat, conversationId, snapshot, snapshot.operations),
+    _estimate(chat, conversationId, snapshot.messages, snapshot.operations),
     operation.canUndo
-        ? _estimate(chat, conversationId, snapshot, [
+        ? _estimate(chat, conversationId, snapshot.messages, [
             for (final op in snapshot.operations)
               affected.contains(op.id) ? op.copyWith(revoked: true) : op,
           ])
@@ -371,15 +390,16 @@ Future<void> showContextOperationDetails(
               conversationId: conversationId,
               operation: operation,
             ),
-      estimateSummary: (summary) => _estimate(chat, conversationId, snapshot, [
-        for (final op in snapshot.operations)
-          if (op.id == operation.id)
-            op.copyWith(summary: summary)
-          else if (affected.contains(op.id))
-            op.copyWith(revoked: true)
-          else
-            op,
-      ]),
+      estimateSummary: (summary) =>
+          _estimate(chat, conversationId, snapshot.messages, [
+            for (final op in snapshot.operations)
+              if (op.id == operation.id)
+                op.copyWith(summary: summary)
+              else if (affected.contains(op.id))
+                op.copyWith(revoked: true)
+              else
+                op,
+          ]),
       onViewOriginal: operation.isImportedNative
           ? onOpenConversation == null ||
                     chat.getConversation(
@@ -617,7 +637,7 @@ Future<void> showCompressionReview(
 
   Future<CompressionBudget?> estimate(String summary) async {
     final snapshot = await chat.loadContextSnapshot(task.conversationId);
-    return _estimate(chat, task.conversationId, snapshot, [
+    return _estimate(chat, task.conversationId, snapshot.messages, [
       ...snapshot.operations,
       operation.copyWith(summary: summary),
     ]);
