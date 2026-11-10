@@ -11,7 +11,6 @@ import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../../utils/avatar_scale.dart';
 import '../../utils/ui_scale.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {

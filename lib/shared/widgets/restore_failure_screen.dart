@@ -837,7 +837,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                   onCopy: _copyReport,
                   onShare: _shareReport,
                 ),
-                SizedBox(height: 20),
+                SizedBox(height: scaledDim(context, 20)),
                 SizedBox(
                   height: scaledDim(context, 48),
                   child: FilledButton.icon(
@@ -1136,7 +1136,7 @@ class _DiagnosticsCard extends StatelessWidget {
             ],
           ),
           if (expanded) ...[
-            SizedBox(height: 4),
+            SizedBox(height: scaledDim(context, 4)),
             Container(
               width: double.infinity,
               constraints: BoxConstraints(maxHeight: scaledDim(context, 280)),
@@ -1465,7 +1465,7 @@ class _DangerZone extends StatelessWidget {
                     onPressed: busy ? null : onKeepCurrent,
                   ),
                 ],
-                SizedBox(height: 14),
+                SizedBox(height: scaledDim(context, 14)),
                 SizedBox(
                   width: double.infinity,
                   height: scaledDim(context, 44),

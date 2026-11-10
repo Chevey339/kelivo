@@ -5485,6 +5485,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get displaySettingsPageChatFontSizeTitle => '채팅 글꼴 크기';
 
   @override
+  String get displaySettingsPageUiFontSizeTitle => 'UI 글꼴 크기';
+
+  @override
+  String get displaySettingsPageInputFontSizeTitle => '입력창 글꼴 크기';
+
+  @override
   String get displaySettingsPageAutoScrollEnableTitle => '하단 자동 따라가기';
 
   @override

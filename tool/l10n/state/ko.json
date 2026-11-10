@@ -4886,5 +4886,7 @@
   "workspaceEnvNativeShellInvalid": "b60262884a8e6882312bee3a8960f7b388cb91df6d1cc26052ef3faccea27a29",
   "workspaceEnvNativeShellUnavailable": "27b2d084661c2cb09d5c588a1d5451bcdebe16b1a4011d3b8ac50f24de66cf74",
   "workspaceEnvNativeShellDetect": "5304a332350c49c6b9c1c3595efebdd375d8eadce9e056d4c80eb77595bb0be1",
-  "workspaceEnvNativeShellSave": "c63bda5d924d225c0fea8fae7edbcf2f609044d7318e7e55207dff936e4bbac1"
+  "workspaceEnvNativeShellSave": "c63bda5d924d225c0fea8fae7edbcf2f609044d7318e7e55207dff936e4bbac1",
+  "displaySettingsPageUiFontSizeTitle": "41b6660fe960393745b9ee183162fa78510cb710f1b1cafc98ada2f83b37ede4",
+  "displaySettingsPageInputFontSizeTitle": "6121c1f52e673d65867d914c9a3015f7cf0f17beb50199dad42b1d79de06cb4a"
 }

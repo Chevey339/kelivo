@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/models/avatar_config.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/avatar_cache.dart';
+import '../../utils/avatar_scale.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import 'emoji_text.dart';
@@ -35,6 +36,7 @@ class ConfigurableAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final dimension = scaledAvatarSize(context, size);
     final fallback = _fallback(context);
     final config = avatar;
     Widget content = fallback;
@@ -69,8 +71,8 @@ class ConfigurableAvatar extends StatelessWidget {
       }
     }
     return Container(
-      width: size,
-      height: size,
+      width: dimension,
+      height: dimension,
       decoration: BoxDecoration(
         color: withBackground
             ? (backgroundColor ?? cs.primary.withValues(alpha: dark ? .18 : .1))
@@ -101,17 +103,18 @@ class ConfigurableAvatar extends StatelessWidget {
         Theme.of(context).brightness == Brightness.dark &&
         BrandAssets.assetNeedsDarkInvert(asset);
     final color = Theme.of(context).colorScheme.onSurface;
+    final assetDimension = scaledAvatarSize(context, size) * iconScale;
     return asset.endsWith('.svg')
         ? SvgPicture.asset(
             asset,
-            width: size * iconScale,
-            height: size * iconScale,
+            width: assetDimension,
+            height: assetDimension,
             colorFilter: tint ? ColorFilter.mode(color, BlendMode.srcIn) : null,
           )
         : Image.asset(
             asset,
-            width: size * iconScale,
-            height: size * iconScale,
+            width: assetDimension,
+            height: assetDimension,
             fit: BoxFit.contain,
             color: tint ? color : null,
             colorBlendMode: tint ? BlendMode.srcIn : null,
@@ -125,7 +128,8 @@ class ConfigurableAvatar extends StatelessWidget {
     bool brand = false,
     bool monochrome = false,
   }) {
-    final dimension = brand ? size * iconScale : size;
+    final scaledSize = scaledAvatarSize(context, size);
+    final dimension = brand ? scaledSize * iconScale : scaledSize;
     if (path.toLowerCase().endsWith('.svg')) {
       final color = Theme.of(context).colorScheme.onSurface;
       return SvgPicture.file(

@@ -4886,5 +4886,7 @@
   "workspaceEnvNativeShellInvalid": "Не удалось запустить эту оболочку. Проверьте абсолютный путь и поддерживаемый синтаксис команд.",
   "workspaceEnvNativeShellUnavailable": "Оболочка недоступна",
   "workspaceEnvNativeShellDetect": "Определить снова",
-  "workspaceEnvNativeShellSave": "Сохранить"
+  "workspaceEnvNativeShellSave": "Сохранить",
+  "displaySettingsPageUiFontSizeTitle": "Размер шрифта интерфейса",
+  "displaySettingsPageInputFontSizeTitle": "Размер шрифта поля ввода"
 }

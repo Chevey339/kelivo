@@ -4886,5 +4886,7 @@
   "workspaceEnvNativeShellInvalid": "Bu kabuk başlatılamadı. Mutlak yolunu ve desteklenen komut sözdizimini kontrol edin.",
   "workspaceEnvNativeShellUnavailable": "Kabuk kullanılamıyor",
   "workspaceEnvNativeShellDetect": "Yeniden algıla",
-  "workspaceEnvNativeShellSave": "Kaydet"
+  "workspaceEnvNativeShellSave": "Kaydet",
+  "displaySettingsPageUiFontSizeTitle": "Arayüz Yazı Boyutu",
+  "displaySettingsPageInputFontSizeTitle": "Giriş Kutusu Yazı Boyutu"
 }
