@@ -136,7 +136,7 @@ void main() {
             ],
             tools: const [
               {
-                'function_declarations': [
+                'functionDeclarations': [
                   {
                     'name': 'get_current_time',
                     'description': 'Get current UTC time.',
@@ -412,7 +412,7 @@ void main() {
           ],
           tools: const [
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'fetch_markdown',
                   'description': 'Fetch markdown',
@@ -581,12 +581,12 @@ void main() {
       final firstUserParts = (contents.first['parts'] as List).cast<Map>();
 
       expect(firstUserParts.first['text'], 'inspect');
-      expect(firstUserParts.any((part) => part['inline_data'] is Map), isTrue);
+      expect(firstUserParts.any((part) => part['inlineData'] is Map), isTrue);
       final imagePart = firstUserParts.firstWhere(
-        (part) => part['inline_data'] is Map,
+        (part) => part['inlineData'] is Map,
       );
-      expect(imagePart['inline_data']['mime_type'], 'image/png');
-      expect(imagePart['inline_data']['data'], 'AQIDBA==');
+      expect(imagePart['inlineData']['mimeType'], 'image/png');
+      expect(imagePart['inlineData']['data'], 'AQIDBA==');
     });
   });
 }

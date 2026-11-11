@@ -63,7 +63,10 @@ void main() {
             },
           ],
           'toolConfig': {
-            'function_calling_config': {'mode': 'AUTO'},
+            if (key == 'functionDeclarations')
+              'functionCallingConfig': {'mode': 'AUTO'}
+            else
+              'function_calling_config': {'mode': 'AUTO'},
           },
         },
       ),
@@ -105,18 +108,18 @@ void main() {
         settings: const ImageContextSettings(allowRecall: false),
         images: [_image],
       );
-      const search = {'google_search': <String, dynamic>{}};
+      const search = {'googleSearch': <String, dynamic>{}};
       final body = {
         'tools': [
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'read_chat_image'},
             ],
           },
           search,
         ],
         'toolConfig': {
-          'function_calling_config': {'mode': 'VALIDATED'},
+          'functionCallingConfig': {'mode': 'VALIDATED'},
           'includeServerSideToolInvocations': true,
           'retrieval_config': {'lat_lng': <String, dynamic>{}},
         },
@@ -139,7 +142,7 @@ void main() {
           search,
         ],
         'toolConfig': {
-          'function_calling_config': {'mode': 'VALIDATED'},
+          'functionCallingConfig': {'mode': 'VALIDATED'},
           'includeServerSideToolInvocations': true,
         },
       };

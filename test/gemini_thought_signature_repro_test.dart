@@ -161,9 +161,9 @@ void main() {
             },
           ],
           tools: const [
-            {'google_search': {}},
+            {'googleSearch': {}},
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'fetch_markdown',
                   'description': 'Fetch a page as markdown',
@@ -246,9 +246,9 @@ void main() {
             },
           ],
           tools: const [
-            {'google_search': {}},
+            {'googleSearch': {}},
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'fetch_markdown',
                   'description': 'Fetch a page as markdown',
@@ -352,7 +352,7 @@ void main() {
           ],
           tools: const [
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'search_docs',
                   'description': 'Search for matching docs',
@@ -457,7 +457,7 @@ void main() {
         ],
         tools: const [
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {
                 'name': 'fetch_markdown',
                 'description': 'Fetch a page as markdown',
@@ -554,7 +554,7 @@ void main() {
         ],
         tools: const [
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {
                 'name': 'fetch_markdown',
                 'description': 'Fetch a page as markdown',
@@ -653,9 +653,9 @@ void main() {
           },
         ],
         tools: const [
-          {'google_search': {}},
+          {'googleSearch': {}},
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {
                 'name': 'fetch_markdown',
                 'description': 'Fetch a page as markdown',
@@ -755,7 +755,7 @@ void main() {
           ],
           tools: const [
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'fetch_markdown',
                   'description': 'Fetch a page as markdown',
@@ -859,7 +859,7 @@ void main() {
           ],
           tools: const [
             {
-              'function_declarations': [
+              'functionDeclarations': [
                 {
                   'name': 'fetch_markdown',
                   'description': 'Fetch a page as markdown',
