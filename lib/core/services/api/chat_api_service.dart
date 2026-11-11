@@ -381,12 +381,14 @@ class ChatApiService {
       );
       final useOpenAIImagesApi =
           !nativeTransport &&
+          imageContext?.omitImages != true &&
           !textOnly &&
           kind == ProviderKind.openai &&
           allowImagesApiRouting &&
           shouldUseOpenAIImagesApi(config, modelId);
       final useZhipuLayoutParsing =
           !nativeTransport &&
+          imageContext?.omitImages != true &&
           !textOnly &&
           shouldUseZhipuLayoutParsing(config, modelId);
       final unicodeSafeMessages = _sanitizeMessages(

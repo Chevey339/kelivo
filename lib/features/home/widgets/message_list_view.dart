@@ -138,6 +138,7 @@ class MessageListView extends StatefulWidget {
     this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
+    this.onRetryWithoutImages,
     this.onSetContextStart,
     this.onResendMessage,
     this.onTranslateMessage,
@@ -240,6 +241,7 @@ class MessageListView extends StatefulWidget {
   // Callbacks
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
+  final OnRegenerateMessage? onRetryWithoutImages;
   final ValueChanged<ChatMessage>? onSetContextStart;
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
@@ -2601,6 +2603,9 @@ class _MessageListViewState extends State<MessageListView> {
       onRegenerate: message.role == 'assistant'
           ? () => widget.onRegenerateMessage?.call(message)
           : null,
+      onRetryWithoutImages: widget.onRetryWithoutImages == null
+          ? null
+          : () => widget.onRetryWithoutImages!(message),
       onResend: message.role == 'user'
           ? () => widget.onResendMessage?.call(message)
           : null,

@@ -1282,6 +1282,8 @@ class _HomePageState extends State<HomePage>
       },
       onRegenerateMessage: (message) =>
           _controller.regenerateAtMessage(message),
+      onRetryWithoutImages: (message) =>
+          _controller.regenerateAtMessage(message, omitImages: true),
       onSetContextStart: (message) async {
         try {
           await chat.setConversationContextStart(

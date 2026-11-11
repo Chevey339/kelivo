@@ -4898,5 +4898,8 @@
   "desktopAutostartUnsupported": "Başlangıçta başlatma için macOS 13 veya üstü gerekir.",
   "desktopAutostartError": "Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin.",
   "compressionOutputBudget": "Toplam çıktı sınırı (token)",
-  "compressionOutputBudgetHint": "Akıl yürütme ve özet metnini içerir. Özet hedefini kullanmak için boş bırakın veya özeti uzatmadan düşünmek için daha yüksek bir sınır belirleyin. Model çıktı sınırı yine de geçerlidir."
+  "compressionOutputBudgetHint": "Akıl yürütme ve özet metnini içerir. Özet hedefini kullanmak için boş bırakın veya özeti uzatmadan düşünmek için daha yüksek bir sınır belirleyin. Model çıktı sınırı yine de geçerlidir.",
+  "responseOutputLimitReached": "Yanıt kesildi: çıktı sınırı akıl yürütmeyi de kapsar. Yeniden denemeden önce çıktı sınırını artırın veya akıl yürütmeyi azaltın.",
+  "responseContextLimitReached": "Yanıt kesildi: bu istek {inputTokens} giriş token'ı kullandı ve {contextWindow} token'lık bağlam sınırına yaklaştı. Yeniden denemeden önce bağlamı kısaltın.",
+  "responseRetryWithoutImages": "Görseller olmadan yeniden dene (orijinalleri koru)"
 }

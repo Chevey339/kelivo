@@ -5,6 +5,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 
 void main() {
+  test('truncation metadata roundtrips and uses only the request input', () {
+    const part = ResponseTruncationPart(
+      inputTokens: 1042909,
+      contextWindow: 1048576,
+      hadImages: true,
+    );
+    expect(MessagePart.fromRow(part.kind, part.encodePayload()), part);
+    expect(part.contextNearLimit, true);
+    expect(
+      const ResponseTruncationPart(
+        inputTokens: 34000,
+        contextWindow: 1048576,
+      ).contextNearLimit,
+      false,
+    );
+    expect(
+      const ResponseTruncationPart(hadImages: true).contextNearLimit,
+      false,
+    );
+    expect(
+      () => MessagePart.fromRow(
+        'response_truncation',
+        '{"inputTokens":"invalid"}',
+      ),
+      throwsFormatException,
+    );
+  });
+
   group('MessagePart.fromRow / encodePayload roundtrip', () {
     test('invalid response metadata is a recoverable payload format error', () {
       expect(

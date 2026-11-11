@@ -11,17 +11,19 @@ import 'stream_chunk_decoder.dart';
 /// flushes those ends. The two are idempotent.
 Stream<StreamChunk> decodeSseEvents(
   Stream<SseEvent> events,
-  StreamChunkDecoder decoder,
-) async* {
+  StreamChunkDecoder decoder, {
+  bool deferIncomplete = false,
+}) async* {
   await for (final event in events) {
     final data = event.data;
-    if (data.isNotEmpty && data != '[DONE]') {
-      throwIfInBandStreamError(data);
-    }
+    final incomplete = data.isNotEmpty && data != '[DONE]'
+        ? throwIfInBandStreamError(data, deferIncomplete: deferIncomplete)
+        : null;
     final decoded = decoder.accept(event);
     for (final chunk in decoded.chunks) {
       yield chunk;
     }
+    if (incomplete != null) throw incomplete;
     if (data == '[DONE]' || decoded.completed) break;
   }
   for (final chunk in decoder.onClosed()) {

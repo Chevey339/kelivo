@@ -10,6 +10,7 @@ import 'package:markstream/markstream_core.dart' show SourceSpan;
 import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
+import 'response_truncation_notice.dart';
 import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/material.dart';
@@ -1267,6 +1268,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool showUserAvatar;
   final bool showTokenStats;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onRetryWithoutImages;
   final VoidCallback? onResend;
   final VoidCallback? onCopy;
   final VoidCallback? onTranslate;
@@ -1334,6 +1336,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.showUserAvatar = true,
     this.showTokenStats = true,
     this.onRegenerate,
+    this.onRetryWithoutImages,
     this.onResend,
     this.onCopy,
     this.onTranslate,
@@ -3759,6 +3762,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             for (final error
                 in widget.message.parts.whereType<ProviderAuthErrorPart>())
               OAuthMessageRecovery(error: error),
+            for (final truncation
+                in widget.message.parts.whereType<ResponseTruncationPart>())
+              ResponseTruncationNotice(
+                truncation: truncation,
+                onRetryWithoutImages: widget.message.isStreaming
+                    ? null
+                    : widget.onRetryWithoutImages,
+              ),
             // Action buttons (hidden while generating)
             AnimatedSwitcher(
               // Completion previously remounted the row at its final height.

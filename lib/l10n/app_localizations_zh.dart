@@ -15897,6 +15897,18 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get compressionOutputBudgetHint =>
       '包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。';
+
+  @override
+  String get responseOutputLimitReached =>
+      '回复已截断：输出额度包含推理内容。请提高输出上限或降低推理强度后重试。';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return '回复已截断：本次请求输入为 $inputTokens token，接近 $contextWindow token 的上下文上限。请缩短上下文后重试。';
+  }
+
+  @override
+  String get responseRetryWithoutImages => '不发送图片重试（保留原图）';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31792,6 +31804,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get compressionOutputBudgetHint =>
       '包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。';
+
+  @override
+  String get responseOutputLimitReached =>
+      '回复已截断：输出额度包含推理内容。请提高输出上限或降低推理强度后重试。';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return '回复已截断：本次请求输入为 $inputTokens token，接近 $contextWindow token 的上下文上限。请缩短上下文后重试。';
+  }
+
+  @override
+  String get responseRetryWithoutImages => '不发送图片重试（保留原图）';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47695,4 +47719,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get compressionOutputBudgetHint =>
       '包含推理與摘要正文。留空時使用摘要目標長度；開啟思考時可單獨提高此上限，不會增加摘要目標長度。實際額度仍受模型輸出上限限制。';
+
+  @override
+  String get responseOutputLimitReached =>
+      '回覆已截斷：輸出額度包含推理內容。請提高輸出上限或降低推理強度後重試。';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return '回覆已截斷：本次請求輸入為 $inputTokens token，接近 $contextWindow token 的上下文上限。請縮短上下文後重試。';
+  }
+
+  @override
+  String get responseRetryWithoutImages => '不傳送圖片重試（保留原圖）';
 }

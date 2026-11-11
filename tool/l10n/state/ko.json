@@ -4898,5 +4898,8 @@
   "desktopAutostartUnsupported": "6482ad772385f95b1b15c0e4bb1ef5f4103d3cef9c95cca07d15618f1e7ba711",
   "desktopAutostartError": "68c6b270908202326276ac85f16e61e2f3e97d6a721ac4c676c7d2c21965684a",
   "compressionOutputBudget": "1de3da03a2c9360804591b9bda5ab44e180bfc40ee5b5b46decd61e72f9f4144",
-  "compressionOutputBudgetHint": "ecfa1814d0f6e8ee94929f25a621e49b1a432eea293be42d44f8582b65f84067"
+  "compressionOutputBudgetHint": "ecfa1814d0f6e8ee94929f25a621e49b1a432eea293be42d44f8582b65f84067",
+  "responseOutputLimitReached": "be7b80d7d6be06a0b447f6929f0ccd45fa208657c179e49028e61697cfd6113d",
+  "responseContextLimitReached": "b51c86fd58923b406669b2106bddf01275eb6655024f5353ff576fa264d63cbd",
+  "responseRetryWithoutImages": "f3f00e820b1b6bb8508b6f05a6532b2687f36503be775996dc372895f0c4baf9"
 }

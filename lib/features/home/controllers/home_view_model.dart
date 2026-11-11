@@ -742,6 +742,7 @@ class HomeViewModel extends ChangeNotifier {
     ChatMessage message, {
     bool assistantAsNewReply = false,
     bool allowImagesApiRouting = true,
+    bool omitImages = false,
     String? expectedContextState,
   }) async {
     final conversation = _chatService
@@ -762,6 +763,7 @@ class HomeViewModel extends ChangeNotifier {
 
     final result = await _chatActions.regenerateAtMessage(
       expectedContextState: expectedContextState,
+      omitImages: omitImages,
       message: message,
       conversation: conversation,
       assistantOverride: assistant,

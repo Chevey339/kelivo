@@ -17059,4 +17059,17 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get compressionOutputBudgetHint =>
       'Включает рассуждение и текст сводки. Оставьте пустым, чтобы использовать целевой размер сводки, или задайте более высокий лимит для рассуждения без удлинения сводки. Лимит вывода модели по-прежнему действует.';
+
+  @override
+  String get responseOutputLimitReached =>
+      'Ответ обрезан: лимит вывода включает рассуждение. Увеличьте лимит вывода или уменьшите рассуждение, затем повторите попытку.';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return 'Ответ обрезан: этот запрос использовал $inputTokens входных токенов, что близко к лимиту контекста в $contextWindow токенов. Сократите контекст, затем повторите попытку.';
+  }
+
+  @override
+  String get responseRetryWithoutImages =>
+      'Повторить без изображений (сохранить оригиналы)';
 }

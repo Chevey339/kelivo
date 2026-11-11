@@ -29525,6 +29525,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Includes reasoning and summary text. Leave blank to use the summary target, or set a higher limit for thinking without lengthening the summary. The model output limit still applies.'**
   String get compressionOutputBudgetHint;
+
+  /// Persistent notice below an assistant reply stopped by max_output_tokens when the latest request is not known to be near the context window limit. Explains that reasoning also consumes the output allowance.
+  ///
+  /// In en, this message translates to:
+  /// **'Response truncated: the output limit includes reasoning. Increase the output limit or reduce reasoning before retrying.'**
+  String get responseOutputLimitReached;
+
+  /// Persistent notice below a truncated assistant reply when the final HTTP response input usage is at least 95 percent of the configured context window. Does not attribute the limit to images. inputTokens is that single request input usage; contextWindow is the model context capacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Response truncated: this request used {inputTokens} input tokens, close to the {contextWindow}-token context limit. Shorten the context before retrying.'**
+  String responseContextLimitReached(int inputTokens, int contextWindow);
+
+  /// Action below a truncated assistant reply whose final request contained images. Regenerates once with all image inputs omitted for that generation, including tool follow-ups, without deleting attachments or changing saved settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry without images (keep originals)'**
+  String get responseRetryWithoutImages;
 }
 
 class _AppLocalizationsDelegate

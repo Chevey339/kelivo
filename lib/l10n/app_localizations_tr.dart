@@ -16862,4 +16862,17 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get compressionOutputBudgetHint =>
       'Akıl yürütme ve özet metnini içerir. Özet hedefini kullanmak için boş bırakın veya özeti uzatmadan düşünmek için daha yüksek bir sınır belirleyin. Model çıktı sınırı yine de geçerlidir.';
+
+  @override
+  String get responseOutputLimitReached =>
+      'Yanıt kesildi: çıktı sınırı akıl yürütmeyi de kapsar. Yeniden denemeden önce çıktı sınırını artırın veya akıl yürütmeyi azaltın.';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return 'Yanıt kesildi: bu istek $inputTokens giriş token\'ı kullandı ve $contextWindow token\'lık bağlam sınırına yaklaştı. Yeniden denemeden önce bağlamı kısaltın.';
+  }
+
+  @override
+  String get responseRetryWithoutImages =>
+      'Görseller olmadan yeniden dene (orijinalleri koru)';
 }

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../../models/auto_retry_options.dart';
 import '../../models/image_context.dart';
 import '../network/provider_http_exception.dart';
+import 'response_incomplete_exception.dart';
 
 /// Process-wide auto-retry config, synced from [SettingsProvider].
 ///
@@ -35,6 +36,7 @@ bool shouldRetryError(
   bool? retryOnNetworkError,
 }) {
   if (error is ImageContextBudgetException ||
+      error is ResponseIncompleteException ||
       isUserCancelError(error) ||
       (error is ProviderHttpException && error.prohibitsRetry)) {
     return false;

@@ -6130,5 +6130,8 @@
   "desktopAutostartUnsupported": "开机自启动需要 macOS 13 或更高版本。",
   "desktopAutostartError": "无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。",
   "compressionOutputBudget": "总输出上限（tokens）",
-  "compressionOutputBudgetHint": "包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。"
+  "compressionOutputBudgetHint": "包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。",
+  "responseOutputLimitReached": "回复已截断：输出额度包含推理内容。请提高输出上限或降低推理强度后重试。",
+  "responseContextLimitReached": "回复已截断：本次请求输入为 {inputTokens} token，接近 {contextWindow} token 的上下文上限。请缩短上下文后重试。",
+  "responseRetryWithoutImages": "不发送图片重试（保留原图）"
 }

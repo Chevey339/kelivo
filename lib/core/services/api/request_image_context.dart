@@ -109,8 +109,10 @@ class RequestImageContext {
     this.allowsRemoteUserImages = true,
     Map<String, String?> userTurns = const {},
     this.omitUserImages = false,
+    this.omitImages = false,
     this.viewImageUris = const {},
-  }) : canRecall = canRecall && canImageInput && settings.allowRecall,
+  }) : canRecall =
+           canRecall && canImageInput && settings.allowRecall && !omitImages,
        images = List.of(images),
        _userTurns = Map.of(userTurns) {
     String? user;
@@ -139,6 +141,11 @@ class RequestImageContext {
   final bool allowsRemoteUserImages;
   final Map<String, String?> _userTurns;
   final bool omitUserImages;
+
+  /// A user-requested image-free retry. Applies to every HTTP/tool round only
+  /// within this generation; original attachments and settings are untouched.
+  final bool omitImages;
+  int lastRequestImageCount = 0;
   final Set<String> viewImageUris;
   final activeHandles = <String>{};
   final compressedOwners = <String>{};
@@ -604,6 +611,7 @@ class RequestImageContext {
   );
 
   String omittedText(String handle, {String? reason}) {
+    if (omitImages) return '[Image omitted for this request by the user.]';
     if (reason == 'unavailable') {
       return '[Image $handle unavailable. Ask the user to attach it again.]';
     }
@@ -759,8 +767,8 @@ class RequestImageContext {
     if (part['type'] == 'image_url' && part['image_url'] is Map) {
       return image(part, (part['image_url']['url'] ?? '').toString());
     }
-    if (part['type'] == 'input_image' && part['image_url'] is String) {
-      return image(part, part['image_url'] as String);
+    if (part['type'] == 'input_image') {
+      return image(part, (part['image_url'] ?? '').toString());
     }
     if (part['type'] == 'image' &&
         source is Map &&
@@ -768,6 +776,19 @@ class RequestImageContext {
       return image(
         part,
         'data:${source['media_type']};base64,${source['data']}',
+      );
+    }
+    if (part['type'] == 'image' && source is Map) {
+      return image(part, (source['url'] ?? '').toString());
+    }
+    final file = part['fileData'] ?? part['file_data'];
+    if (file is Map &&
+        (file['mimeType'] ?? file['mime_type'] ?? '').toString().startsWith(
+          'image/',
+        )) {
+      return image(
+        part,
+        (file['fileUri'] ?? file['file_uri'] ?? '').toString(),
       );
     }
     if (inline is Map &&
@@ -789,6 +810,7 @@ class RequestImageContext {
     Map<String, dynamic> body,
     dynamic Function(Map<String, dynamic>, String) image, {
     void Function(String)? nativeImage,
+    bool mapNativeImages = false,
   }) {
     final result = Map<String, dynamic>.from(body);
     for (final key in ['messages', 'input', 'contents']) {
@@ -801,7 +823,8 @@ class RequestImageContext {
               final message = Map<String, dynamic>.from(value)
                 ..remove(imageContextOwnerKey)
                 ..remove(multimodalInternalImageReferencesKey);
-              if (message[nativeCompactionWireKey] == true) {
+              if (message[nativeCompactionWireKey] == true &&
+                  !mapNativeImages) {
                 if (nativeImage != null) {
                   dynamic observe(Map<String, dynamic> part, String url) {
                     nativeImage(url);
@@ -811,7 +834,8 @@ class RequestImageContext {
                   for (final field in ['content', 'parts']) {
                     _mapContent(message[field], observe);
                   }
-                  if (message['type'] == 'function_call_output') {
+                  if (message['type'] == 'function_call_output' ||
+                      message['type'] == 'custom_tool_call_output') {
                     _mapContent(message['output'], observe);
                   }
                 }
@@ -822,7 +846,8 @@ class RequestImageContext {
                   message[field] = _mapContent(message[field], image);
                 }
               }
-              if (message['type'] == 'function_call_output') {
+              if (message['type'] == 'function_call_output' ||
+                  message['type'] == 'custom_tool_call_output') {
                 message['output'] = _mapContent(message['output'], image);
               }
               return message;
@@ -837,7 +862,11 @@ class RequestImageContext {
   static Map<String, dynamic> _textPart(
     Map<String, dynamic> original,
     String text,
-  ) => original.containsKey('inlineData') || original.containsKey('inline_data')
+  ) =>
+      original.containsKey('inlineData') ||
+          original.containsKey('inline_data') ||
+          original.containsKey('fileData') ||
+          original.containsKey('file_data')
       ? {'text': text}
       : {
           'type': original['type'] == 'input_image' ? 'input_text' : 'text',
@@ -891,6 +920,22 @@ class RequestImageContext {
     Set<String> excludedOwners = const {},
     bool preserveSources = false,
   }) async {
+    if (omitImages) {
+      lastRequestImageCount = 0;
+      final projected = _projectTools(
+        _mapBody(
+          body,
+          (part, _) =>
+              _textPart(part, '[Image omitted for this request by the user.]'),
+          mapNativeImages: true,
+        ),
+        this,
+      );
+      return _validateProjectedBody(
+        projected,
+        preserveSources: preserveSources,
+      );
+    }
     final handles = <String>{};
     final occurrences = <String, int>{};
     final external = <String, String>{};
@@ -1049,12 +1094,17 @@ class RequestImageContext {
     // The deterministic history replay owns eviction. The final wire check is
     // a hard guard, so a changing text size cannot silently resurrect images.
     final toolNotes = <String, List<String>>{};
+    lastRequestImageCount = 0;
     final projected = _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
-      if (handle == null) return part;
+      if (handle == null) {
+        lastRequestImageCount++;
+        return part;
+      }
       final entry = _byHandle[handle];
       final resolved = urls[handle];
       if (entry != null && !omitted.contains(entry.key) && resolved != null) {
+        lastRequestImageCount++;
         return _replaceImage(part, resolved);
       }
       final text = omittedText(
@@ -1073,7 +1123,7 @@ class RequestImageContext {
         return <String, dynamic>{'_kelivo_omitted_tool_image': true};
       }
       return _textPart(part, text);
-    });
+    }, nativeImage: (_) => lastRequestImageCount++);
     if (toolNotes.isNotEmpty && projected['messages'] is List) {
       final messages = (projected['messages'] as List)
           .cast<Map<String, dynamic>>();
@@ -1136,6 +1186,16 @@ class RequestImageContext {
       projected['messages'] = messages;
     }
     final projectedTools = _projectTools(projected, this);
+    return _validateProjectedBody(
+      projectedTools,
+      preserveSources: preserveSources,
+    );
+  }
+
+  Map<String, dynamic> _validateProjectedBody(
+    Map<String, dynamic> projectedTools, {
+    required bool preserveSources,
+  }) {
     final request = RequestHistoryContext.stripSources(projectedTools);
     final byteCounter = _JsonByteCounter();
     final encoder = json.encoder

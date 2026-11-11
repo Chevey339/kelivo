@@ -16249,4 +16249,16 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get compressionOutputBudgetHint =>
       '추론과 요약 본문을 포함합니다. 비워 두면 요약 목표를 사용하며, 사고를 켤 때 이 한도만 높여도 요약 목표 길이는 늘어나지 않습니다. 실제 한도는 여전히 모델 출력 한도의 제약을 받습니다.';
+
+  @override
+  String get responseOutputLimitReached =>
+      '응답이 잘렸습니다: 출력 한도에 추론이 포함됩니다. 출력 한도를 늘리거나 추론을 줄인 후 다시 시도하세요.';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return '응답이 잘렸습니다: 이번 요청은 입력 토큰 $inputTokens개를 사용해 $contextWindow 토큰 컨텍스트 한도에 근접했습니다. 컨텍스트를 줄인 후 다시 시도하세요.';
+  }
+
+  @override
+  String get responseRetryWithoutImages => '이미지 없이 재시도(원본 유지)';
 }

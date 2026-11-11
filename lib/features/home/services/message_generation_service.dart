@@ -601,8 +601,9 @@ class MessageGenerationService {
     List<ChatMessage> messages,
     UnprocessedRequestContext packed,
     SettingsProvider settings,
-    String modelId,
-  ) async {
+    String modelId, {
+    bool omitImages = false,
+  }) async {
     final cfg = packed.cfg;
     final kind = ProviderConfig.classify(
       cfg.id,
@@ -637,6 +638,7 @@ class MessageGenerationService {
       inlineRemoteUsers: kind == ProviderKind.google,
       allowsRemoteUserImages: remoteImages,
       omitUserImages: settings.ocrActive,
+      omitImages: omitImages,
       latestUserId: history
           .where((m) => m.role == 'user' && !ContextOperation.isSummary(m))
           .lastOrNull
@@ -668,6 +670,7 @@ class MessageGenerationService {
     required String? assistantId,
     required String providerKey,
     required String modelId,
+    bool omitImages = false,
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
     String? processingMessageId,
@@ -794,14 +797,16 @@ class MessageGenerationService {
 
     RequestImageContext? imageContext;
     if (currentConversation != null &&
-        !ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
-        !shouldUseZhipuLayoutParsing(cfg, modelId)) {
+        (omitImages ||
+            (!ChatApiService.supportsOpenAIImagesApiRouting(cfg, modelId) &&
+                !shouldUseZhipuLayoutParsing(cfg, modelId)))) {
       imageContext = await _imageContext(
         currentConversation.id,
         messages,
         packed,
         settings,
         modelId,
+        omitImages: omitImages,
       );
       lastUserImagePaths = await imageContext.prepareMessages(
         apiMessages,
@@ -843,7 +848,7 @@ class MessageGenerationService {
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
-      contextUsageConfiguration: requestConfiguration,
+      contextUsageConfiguration: omitImages ? null : requestConfiguration,
       contextUsageRevision: requestRevision,
       imageContext: imageContext,
     );

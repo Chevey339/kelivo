@@ -5,6 +5,7 @@ import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/api/request_history_context.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
@@ -38,6 +39,66 @@ void main() {
       },
     ],
   };
+
+  test(
+    'image-free retry omits pinned, native and tool images without loading pixels',
+    () async {
+      final originalImage = image(0, source: ContextImageSource.user);
+      final context = RequestImageContext(
+        settings: ImageContextSettings(
+          automatic: false,
+          pinned: {originalImage.key},
+        ),
+        images: [originalImage],
+        latestUserId: originalImage.identity.messageId,
+        omitImages: true,
+        loader: (_) async => fail('An image-free retry must not load pixels'),
+      );
+      final body = bodyFor([
+        originalImage.reference,
+        pixels,
+        'https://example.com/image.png',
+      ]);
+      body['input'] = <Map<String, dynamic>>[
+        ...(body['input'] as List).cast<Map<String, dynamic>>(),
+        {
+          nativeCompactionWireKey: true,
+          'role': 'user',
+          'content': [
+            {'type': 'input_image', 'file_id': 'file-1'},
+          ],
+        },
+        {
+          'type': 'function_call_output',
+          'call_id': 'tool-1',
+          'output': [
+            {'type': 'input_image', 'image_url': originalImage.reference},
+          ],
+        },
+      ];
+      body['tools'] = [
+        {'type': 'function', 'name': 'read_chat_image'},
+      ];
+      final original = jsonEncode(body);
+      final projected = await context.project(body);
+      expect(jsonEncode(projected), isNot(contains('input_image')));
+      expect(jsonEncode(projected), isNot(contains('base64')));
+      expect(projected.containsKey('tools'), false);
+      expect(context.hasRecallableImages, false);
+      expect(context.lastRequestImageCount, 0);
+      expect(jsonEncode(body), original);
+      // A fresh image introduced by a subsequent tool is also omitted.
+      final followUp = await context.project(bodyFor([pixels]));
+      expect(jsonEncode(followUp), isNot(contains('input_image')));
+      // Ordinary retries retain the image; the option never changes saved data.
+      final normal = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+      );
+      expect(await normal.project(bodyFor([pixels])), bodyFor([pixels]));
+      expect(normal.lastRequestImageCount, 1);
+    },
+  );
 
   test(
     'all image limits report measured values and allow the exact boundary',

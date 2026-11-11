@@ -30,6 +30,8 @@ sealed class MessagePart {
         return FilePart.fromPayload(payload);
       case 'provider_auth_error':
         return ProviderAuthErrorPart.fromPayload(payload);
+      case 'response_truncation':
+        return ResponseTruncationPart.fromPayload(payload);
       default:
         return UnknownPart(rawKind: kind, payload: payload);
     }
@@ -38,6 +40,61 @@ sealed class MessagePart {
   String get kind;
 
   String encodePayload();
+}
+
+/// Durable output-limit notice, excluded from model input like auth errors.
+final class ResponseTruncationPart extends MessagePart {
+  const ResponseTruncationPart({
+    this.inputTokens,
+    this.contextWindow,
+    this.hadImages = false,
+  });
+
+  factory ResponseTruncationPart.fromPayload(String payload) {
+    final data = _decodeObjectPayload(payload);
+    int? tokens(String key) {
+      final value = data[key];
+      if (value == null) return null;
+      if (value is! int || value < 0) {
+        throw const _MessagePartFormatException('invalid_token_count');
+      }
+      return value;
+    }
+
+    return ResponseTruncationPart(
+      inputTokens: tokens('inputTokens'),
+      contextWindow: tokens('contextWindow'),
+      hadImages: _optionalBool(data, 'hadImages'),
+    );
+  }
+
+  final int? inputTokens;
+  final int? contextWindow;
+  final bool hadImages;
+
+  // This is a diagnostic threshold, not a claim that images caused the limit.
+  bool get contextNearLimit =>
+      contextWindow != null &&
+      contextWindow! > 0 &&
+      inputTokens != null &&
+      inputTokens! >= contextWindow! * 0.95;
+
+  @override
+  String get kind => 'response_truncation';
+  @override
+  String encodePayload() => jsonEncode({
+    if (inputTokens != null) 'inputTokens': inputTokens,
+    if (contextWindow != null) 'contextWindow': contextWindow,
+    'hadImages': hadImages,
+  });
+  @override
+  bool operator ==(Object other) =>
+      other is ResponseTruncationPart &&
+      other.inputTokens == inputTokens &&
+      other.contextWindow == contextWindow &&
+      other.hadImages == hadImages;
+  @override
+  int get hashCode => Object.hash(inputTokens, contextWindow, hadImages);
 }
 
 /// Durable recovery action for an OAuth failure, excluded from model input.

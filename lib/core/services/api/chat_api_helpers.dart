@@ -14,6 +14,7 @@ import '../model_spec/model_spec_resolver.dart';
 import '../custom_request_merger.dart';
 import 'builtin_tools.dart';
 import 'provider_request_headers.dart';
+import 'response_incomplete_exception.dart';
 
 typedef ToolCallHandler =
     Future<Object?> Function(
@@ -686,19 +687,25 @@ void logImageFallback({
 /// mask a non-empty error payload. Healthy chunks either lack the `error` key
 /// or carry a null/empty placeholder, which [_throwOnInBandStreamError]
 /// ignores.
-void throwIfInBandStreamError(String data) {
+/// [deferIncomplete] lets a Responses caller emit partial output and final
+/// usage before throwing the returned exception. Other failures still throw.
+ResponseIncompleteException? throwIfInBandStreamError(
+  String data, {
+  bool deferIncomplete = false,
+}) {
   final mayCarryError =
       data.contains('"error"') ||
       data.contains('response.failed') ||
-      data.contains('response.incomplete');
-  if (!mayCarryError) return;
+      data.contains('response.incomplete') ||
+      data.contains('"incomplete_details"');
+  if (!mayCarryError) return null;
   Object? decoded;
   try {
     decoded = jsonDecode(data);
   } catch (_) {
-    return;
+    return null;
   }
-  if (decoded is! Map) return;
+  if (decoded is! Map) return null;
   final type = (decoded['type'] ?? '').toString();
   if (type == 'error') {
     // `event: error` frames: Anthropic-style ones nest the payload under
@@ -710,26 +717,31 @@ void throwIfInBandStreamError(String data) {
     }
     _throwOnInBandStreamError(decoded);
   }
-  if (type == 'response.failed' || type == 'response.incomplete') {
+  final response = decoded['response'] is Map
+      ? decoded['response'] as Map
+      : decoded;
+  if (type == 'response.incomplete' || response['status'] == 'incomplete') {
+    _throwOnInBandStreamError(response['error']);
+    final details = response['incomplete_details'];
+    final reason = details is Map ? details['reason']?.toString().trim() : null;
+    final usage = response['usage'];
+    final input = usage is Map ? usage['input_tokens'] : null;
+    final error = ResponseIncompleteException(
+      reason: reason == null || reason.isEmpty ? 'incomplete' : reason,
+      inputTokens: input is num ? input.toInt() : int.tryParse('$input'),
+    );
+    if (deferIncomplete) return error;
+    throw error;
+  }
+  if (type == 'response.failed' || response['status'] == 'failed') {
     // Responses API terminal failure events nest the error under `response`.
-    final response = decoded['response'];
-    if (response is Map) {
-      _throwOnInBandStreamError(response['error']);
-      final details = response['incomplete_details'];
-      if (details is Map && details.isNotEmpty) {
-        final reason = (details['reason'] ?? '').toString().trim();
-        throw HttpException(
-          reason.isEmpty
-              ? 'Provider error: response incomplete'
-              : 'Provider error: response incomplete ($reason)',
-        );
-      }
-    }
+    _throwOnInBandStreamError(response['error']);
     // A failure event without a parseable payload still must not fall
     // through and be treated as a normal finish.
     throw HttpException('Provider error: $type');
   }
   _throwOnInBandStreamError(decoded['error']);
+  return null;
 }
 
 /// Throws when [error] carries a provider error payload; no-op for the null or
