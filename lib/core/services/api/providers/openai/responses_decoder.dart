@@ -98,8 +98,6 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Set<String> _openServerToolIds = <String>{};
   final Set<String> _endedServerToolIds = <String>{};
   final Set<String> _seenCitationUrls = <String>{};
-  final Set<String> _openReasoningIds = <String>{};
-  final Set<String> _endedReasoningIds = <String>{};
   bool _emittedCitationEvents = false;
   bool _closed = false;
 
@@ -728,18 +726,27 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     ];
   }
 
-  List<StreamChunk> _startReasoning(String id) {
+  List<StreamChunk> _startReasoning(
+    String id, [
+    ReasoningType reasoningType = ReasoningType.reasoningText,
+  ]) {
     if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
-      return const [];
+      return const <StreamChunk>[];
     }
-    return [ReasoningStart(id: id)];
+    return <StreamChunk>[
+      ReasoningStart(id: id, reasoningType: reasoningType),
+    ];
   }
 
+
   List<StreamChunk> _endReasoning(String id) {
-    if (!_openReasoningIds.remove(id)) return const [];
-    _endedReasoningIds.add(id);
-    return [ReasoningEnd(id: id)];
+    _openReasoningIds.remove(id);
+    if (!_endedReasoningIds.add(id)) {
+      return const <StreamChunk>[];
+    }
+    return <StreamChunk>[ReasoningEnd(id: id)];
   }
+
 
   List<StreamChunk> _closeOpenSeries({
     ServerToolStatus serverStatus = ServerToolStatus.completed,
@@ -759,23 +766,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         _finishServerTool(id, <String, dynamic>{'id': id}, serverStatus),
       );
     }
-    for (final id in _openReasoningIds.toList()) {
-      chunks.addAll(_endReasoning(id));
-    }
     return chunks;
-  }
-
-  List<StreamChunk> _startReasoning(String id, ReasoningType reasoningType) {
-    if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
-      return const <StreamChunk>[];
-    }
-    return <StreamChunk>[ReasoningStart(id: id, reasoningType: reasoningType)];
-  }
-
-  List<StreamChunk> _endReasoning(String id) {
-    _openReasoningIds.remove(id);
-    if (!_endedReasoningIds.add(id)) return const <StreamChunk>[];
-    return <StreamChunk>[ReasoningEnd(id: id)];
   }
 }
 
