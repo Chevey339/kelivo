@@ -199,6 +199,7 @@ class _HomePageState extends State<HomePage>
   late final QuoteInteractionController _quoteInteractions;
   bool _quoteSyncScheduled = false;
   (String?, int)? _quoteSourceVersion;
+  int _quoteJumpSerial = 0;
 
   void _syncQuoteHighlights() {
     if (_quoteSyncScheduled) return;
@@ -234,10 +235,16 @@ class _HomePageState extends State<HomePage>
 
   Future<bool> _jumpToQuote(QuoteRef quote) async {
     if (!quote.hasSourceRange) return false;
+    final serial = ++_quoteJumpSerial;
+    final previousConversation = _controller.currentConversation?.id;
     final source = (await context.read<ChatService>().loadMessagesByIds([
       quote.messageId,
     ])).firstOrNull;
-    if (!mounted) return false;
+    if (!mounted ||
+        serial != _quoteJumpSerial ||
+        _controller.currentConversation?.id != previousConversation) {
+      return false;
+    }
     final labels = AppLocalizations.of(context)!;
     if (source == null) {
       showAppSnackBar(context, message: labels.quoteSourceMissing);
@@ -246,13 +253,24 @@ class _HomePageState extends State<HomePage>
     if (_controller.currentConversation?.id != source.conversationId) {
       await _controller.switchConversationAnimated(source.conversationId);
     }
-    if (!mounted) return false;
+    bool isCurrent() =>
+        mounted &&
+        serial == _quoteJumpSerial &&
+        _controller.currentConversation?.id == source.conversationId;
+    if (!isCurrent()) return false;
     await _controller.setSelectedVersion(
       source.groupId ?? source.id,
       source.version,
     );
+    if (!isCurrent()) return false;
     await _controller.scrollToMessageId(source.id);
-    if (!mounted) return false;
+    if (!isCurrent()) return false;
+    await _quoteInteractions.scrollToSource(
+      quote,
+      scrollToRect: _controller.scrollToSourceRect,
+      isCurrent: isCurrent,
+    );
+    if (!mounted || !isCurrent()) return false;
     _quoteInteractions.reveal(quote);
     showAppSnackBar(context, message: labels.quoteLocated);
     return true;

@@ -953,6 +953,23 @@ class ChatScrollController {
     } catch (_) {}
   }
 
+  /// Center the quoted line inside the unobscured part of the chat viewport.
+  /// Its global geometry is re-read by the caller as lazy block heights settle.
+  void scrollToSourceRect(Rect rect, {required double bottomInset}) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final box = position.context.storageContext.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    _cancelProgrammaticNavigation(stopDrivenScroll: true);
+    _autoStickToBottom = false;
+    final top = box.localToGlobal(Offset.zero).dy + _currentTopRevealInset();
+    final bottom =
+        box.localToGlobal(Offset(0, box.size.height)).dy - bottomInset;
+    final target = (position.pixels + rect.center.dy - (top + bottom) / 2)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - position.pixels).abs() > .5) position.jumpTo(target);
+  }
+
   Future<void> _animateToMessageIndex({
     required int index,
     required double alignment,

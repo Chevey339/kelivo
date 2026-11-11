@@ -424,7 +424,7 @@ void main() {
       );
       final scrollable = find
           .descendant(
-            of: find.byType(ListView),
+            of: find.byKey(const ValueKey('markstream-virtualized-code')),
             matching: find.byType(Scrollable),
           )
           .first;
@@ -451,7 +451,7 @@ void main() {
     await tester.pumpAndSettle();
     final scrollable = find
         .descendant(
-          of: find.byType(ListView),
+          of: find.byKey(const ValueKey('markstream-virtualized-code')),
           matching: find.byType(Scrollable),
         )
         .first;
@@ -496,7 +496,7 @@ void main() {
       await tester.pumpAndSettle();
       final scrollable = find
           .descendant(
-            of: find.byType(ListView),
+            of: find.byKey(const ValueKey('markstream-virtualized-code')),
             matching: find.byType(Scrollable),
           )
           .first;

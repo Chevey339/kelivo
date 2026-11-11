@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/ast/nodes.dart';
 import '../../../core/ast/source_span.dart';
@@ -57,6 +58,8 @@ class MarkstreamCodeContent extends StatefulWidget {
 
 class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
   final _selection = SourceTextSelectionDelegate();
+  final _scroll = ScrollController();
+  final _list = ListController();
   final _chunks = <(int, String)>[];
   String _source = '';
   int _lastChunkStart = 0;
@@ -105,8 +108,23 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _list.dispose();
     _selection.dispose();
     super.dispose();
+  }
+
+  bool _prepareRange(TextRange range) {
+    if (_selection.rectForRange(range) != null) {
+      return _selection.prepareRange(range, boundary: context);
+    }
+    if (_list.isAttached && _scroll.hasClients) {
+      final index = _chunks.lastIndexWhere((chunk) => chunk.$1 <= range.start);
+      if (index >= 0) {
+        _list.jumpToItem(index: index, scrollController: _scroll, alignment: 0);
+      }
+    }
+    return false;
   }
 
   @override
@@ -172,11 +190,31 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     final Widget content;
     if (!widget.exporting &&
         codeLineCount(_source) > PerformanceLimits.virtualCodeLines) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: 'M',
+          style: DefaultTextStyle.of(
+            context,
+          ).style.merge(widget.theme.code.text),
+        ),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final lineHeight = painter.height;
+      painter.dispose();
       content = SizedBox(
         key: const ValueKey('markstream-virtualized-code'),
         height: widget.theme.code.virtualizedHeight,
-        child: ListView.builder(
+        child: SuperListView.builder(
           primary: false,
+          controller: _scroll,
+          listController: _list,
+          delayPopulatingCacheArea: false,
+          extentEstimation: (index, _) =>
+              lineHeight *
+              (index == null
+                  ? PerformanceLimits.codeChunkLines
+                  : codeLineCount(_chunks[index].$2)),
           itemCount: _chunks.length,
           itemBuilder: (context, index) {
             // Skip the list's per-row selection keep-alive proxy. The source
@@ -235,6 +273,8 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     return MarkstreamSelectionFragment(
       node: widget.node,
       segments: segments,
+      rangeRect: _selection.rectForRange,
+      prepareRange: _prepareRange,
       child: selected,
     );
   }

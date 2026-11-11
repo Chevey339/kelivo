@@ -3826,6 +3826,9 @@ class HomePageController extends ChangeNotifier {
   Future<void> jumpToPreviousQuestion() =>
       _jumpToAdjacentMessage(previous: true);
 
+  void scrollToSourceRect(Rect rect) =>
+      _scrollCtrl.scrollToSourceRect(rect, bottomInset: inputBarHeight);
+
   Future<void> jumpToNextQuestion() => _jumpToAdjacentMessage(previous: false);
 
   Future<void> _jumpToAdjacentMessage({required bool previous}) async {

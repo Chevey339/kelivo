@@ -63,6 +63,8 @@ import '../../../shared/markdown/quote_syntax.dart';
 import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
 import 'quote_chip.dart';
 import 'quote_source_highlight.dart';
+import 'quote_source_anchor.dart';
+import 'quote_interaction_scope.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
@@ -2418,12 +2420,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       content = CollapsibleUserText(
         key: ValueKey('user-collapse:${widget.message.id}'),
         collapsedHeight: lineHeight * _collapsedUserTextLines,
-        reveal: highlights.isNotEmpty,
+        reveal:
+            highlights.isNotEmpty ||
+            QuoteInteractionScope.maybeOf(
+                  context,
+                )?.navigationFor(widget.message.id) !=
+                null,
         child: content,
       );
     }
 
-    return content;
+    return QuoteSourceAnchor(
+      message: widget.message,
+      source: visualText,
+      sourceMap: sourceMap,
+      markdown: enableUserMarkdown,
+      child: content,
+    );
   }
 
   /// Attachment previews in [parts] ordinal order (not images-then-files).
@@ -2898,19 +2911,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: assistantContent,
     );
 
-    return RepaintBoundary(
-      child: AppSelectionArea(
-        message: widget.message,
-        sourceText: visualContent,
-        sourceMap: sourceMap,
-        key: ValueKey(
-          contentKey.isEmpty
-              ? 'assistant_${widget.message.id}'
-              : 'assistant_${widget.message.id}_$contentKey',
-        ),
-        child: DefaultTextStyle.merge(
-          style: TextStyle(fontSize: baseAssistant, height: 1.5),
-          child: assistantContent,
+    return QuoteSourceAnchor(
+      message: widget.message,
+      source: visualContent,
+      sourceMap: sourceMap,
+      markdown: enableAssistantMarkdown,
+      child: RepaintBoundary(
+        child: AppSelectionArea(
+          message: widget.message,
+          sourceText: visualContent,
+          sourceMap: sourceMap,
+          key: ValueKey(
+            contentKey.isEmpty
+                ? 'assistant_${widget.message.id}'
+                : 'assistant_${widget.message.id}_$contentKey',
+          ),
+          child: DefaultTextStyle.merge(
+            style: TextStyle(fontSize: baseAssistant, height: 1.5),
+            child: assistantContent,
+          ),
         ),
       ),
     );
@@ -3476,6 +3495,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ViewportBlockList(
                   storageId: 'body',
                   itemCount: visibleBlocks.length,
+                  revealIndex: () {
+                    final quote = QuoteInteractionScope.maybeOf(
+                      context,
+                    )?.navigationFor(widget.message.id);
+                    if (quote == null) return null;
+                    return visibleBlocks.indexWhere(
+                      (block) =>
+                          block.isText &&
+                          (block.sourceMap
+                                  ?.displayRanges(
+                                    SourceSpan(quote.start, quote.end),
+                                  )
+                                  .isNotEmpty ??
+                              false),
+                    );
+                  }(),
                   spacing: 8,
                   structureToken: (
                     widget.message.id,

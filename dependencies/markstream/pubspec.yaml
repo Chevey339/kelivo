@@ -9,6 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   lucide_icons_flutter: ^3.1.13
+  super_sliver_list: ^0.4.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
