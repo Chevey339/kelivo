@@ -4725,13 +4725,13 @@
   "compressionNearLimit": "aad2a6d53ba7ce4bf4babfa7914a5adb745817721da6e890a5af4fbd5154ce9d",
   "compressionKeepTurns": "471e254adbd628758c573ccffe4fc7e0d49264e12f5bdb3b2438dd628ae61510",
   "compressionKeepHint": "bf2e9db4bca513deebd34139b82e0df27a746f9266f195b307e7d2064d7a9226",
-  "compressionLength": "da8a138fbdf9a6f302b83f3e462af668dd8bd04d8850cc53b03f27e41c8c863e",
+  "compressionLength": "04cd7d14b4b594480e32e15e345960c19e774818807db0da35c1be8d5464b59c",
   "compressionTrigger": "5aeda8e5b01c6f0ff1ff1e3d98e5df725d25c743a88308300d6c077039c2eb71",
   "compressionTarget": "77eda2dfd775bff4ab8bbb487410fb7c9c518815b5173c55bb695d9014de6c0a",
   "compressionWindow": "fd716eb2518fc5861bf73241b75d994ca05477e7fe7ea197349838b1f9d8af52",
   "compressionRequests": "9cc5927b9c87c56f8747112560363465d00e263b9b50769fded828274247d201",
-  "compressionReference": "4488cb6c81d59b5cca83a9b9dc81b026388f6d7f1ee098f04c647abaad5607da",
-  "compressionReferenceHint": "a136e9b35853bcec7eeea3859f560d019595e5d920b31bd68e35f99af4ea7b67",
+  "compressionReference": "f38804e716ff51a18118924265b6370f9b39850473534676a0718081116de736",
+  "compressionReferenceHint": "bf0e5ae447dab3c1ab45199b25a66ec1ce37b01210c2bff68570592b0804f8fe",
   "compressionToolReferences": "1f6ef75a7d0c36d5053e2001210056f3fb391f33cea10082cc528490c6a76895",
   "compressionToolReferencesHint": "5b9b91aae3a5824aea4f6e7425e1ff67948292cc34e40c7a18288ba586b9558a",
   "compressionSummaryScan": "25418c81101252b700212e8fe42fefae5e11cad93a41801032f19e7c47bd5cee",
@@ -4896,5 +4896,7 @@
   "desktopAutostartHiddenTitle": "6d1c7a3708d106c9843c7750de919dcd2148fc5e8332df51ab6b3fc6a24bb24e",
   "desktopAutostartHiddenDescription": "4309290f4cf7fb402938d097341fa54865ce84926d9314cb03b38b0d3dd74659",
   "desktopAutostartUnsupported": "f8780b5e2989c259184c5fc798a25d1797aa19386ede16f88a17b8d01a0bf8f1",
-  "desktopAutostartError": "2e4291d4438a2ccbc222a6f512d12e5a497f8016f728b6c5ebc670f9f9e33f6a"
+  "desktopAutostartError": "2e4291d4438a2ccbc222a6f512d12e5a497f8016f728b6c5ebc670f9f9e33f6a",
+  "compressionOutputBudget": "3eaca91e2d0bb655a45e0f6e467973f5f8b99641713891f1ec3708632d30f803",
+  "compressionOutputBudgetHint": "109e65109dcaa7a40d71290ad8c807c87a1207f37316f4b1b27baf8ce967fcfa"
 }

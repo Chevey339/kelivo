@@ -396,9 +396,6 @@ class ContextCompressionService extends ChangeNotifier {
         materials: chunks,
         previousSummary: previousSummary,
         background: background,
-        continuation:
-            await request.loadContinuation?.call(selection) ??
-            request.continuation,
         check: () => _check(task),
         publish: () => _publish(task),
       );

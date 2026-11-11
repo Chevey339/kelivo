@@ -7983,13 +7983,13 @@
   "compressionNearLimit": "Context is near its estimated capacity. You can keep chatting or compress manually.",
   "compressionKeepTurns": "Keep recent",
   "compressionKeepHint": "A turn includes a user message, its replies and tools.",
-  "compressionLength": "Summary limit (tokens)",
+  "compressionLength": "Summary target (tokens)",
   "compressionTrigger": "Start at",
   "compressionTarget": "Compress to",
   "compressionWindow": "Planning window",
   "compressionRequests": "Maximum calls",
-  "compressionReference": "Reference active world books and memory",
-  "compressionReferenceHint": "Reference explains names and rules; it is not evidence that events happened or characters know them.",
+  "compressionReference": "Reference world books and historical memory",
+  "compressionReferenceHint": "Scan only the selected history for world books and use its saved memory snapshots. References explain names and rules; they do not establish events or character knowledge.",
   "compressionToolReferences": "Reference consumed tool results",
   "compressionToolReferencesHint": "Only with tool access. Keeps the latest unread results and allows exact, read-only recall.",
   "compressionSummaryScan": "Include summaries in world book keyword matching",
@@ -21360,7 +21360,7 @@
     "description": "Hint text explaining that a turn includes a user message plus its replies and tool content."
   },
   "@compressionLength": {
-    "description": "Number-field label for the summary output token limit."
+    "description": "Compression summary settings: target maximum length of visible summary text in tokens, separate from the total generation limit including reasoning."
   },
   "@compressionTrigger": {
     "description": "Number-field label for the context-usage percentage that starts automatic compression."
@@ -21375,10 +21375,10 @@
     "description": "Number-field label for the maximum number of model calls allowed."
   },
   "@compressionReference": {
-    "description": "Switch label for including active world books and memory as reference during summarization."
+    "description": "Compression option to include world books evaluated on the selected history and memory snapshots frozen in that history, rather than current live memory or retained messages."
   },
   "@compressionReferenceHint": {
-    "description": "Hint clarifying that reference material explains names/rules but is not evidence events occurred or characters know them."
+    "description": "Compression reference help: restrict dynamic reference sources to the selected historical range, and distinguish explanatory background from events or character knowledge. No placeholders."
   },
   "@compressionToolReferences": {
     "description": "Switch label for replacing already-consumed tool results with references."
@@ -21815,5 +21815,13 @@
   "desktopAutostartError": "Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.",
   "@desktopAutostartError": {
     "description": "Desktop startup setting failure tooltip and error notification, including when system approval is required. No placeholders."
+  },
+  "compressionOutputBudget": "Total output limit (tokens)",
+  "compressionOutputBudgetHint": "Includes reasoning and summary text. Leave blank to use the summary target, or set a higher limit for thinking without lengthening the summary. The model output limit still applies.",
+  "@compressionOutputBudget": {
+    "description": "Optional number field in compression summary settings for total generated tokens, including reasoning and visible summary. Blank uses the summary target. No placeholders."
+  },
+  "@compressionOutputBudgetHint": {
+    "description": "Help below the compression total output limit field: reasoning consumes the same budget, an independent higher limit does not increase the desired summary length, blank follows the summary target, and model output limits still apply. No placeholders."
   }
 }

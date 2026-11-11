@@ -4725,13 +4725,13 @@
   "compressionNearLimit": "컨텍스트가 예상 용량에 근접했습니다. 계속 대화하거나 수동으로 압축할 수 있습니다.",
   "compressionKeepTurns": "최근 유지",
   "compressionKeepHint": "한 턴에는 사용자 메시지와 그에 대한 답변 및 도구 내용이 포함됩니다.",
-  "compressionLength": "요약 상한 (토큰)",
+  "compressionLength": "요약 목표 (토큰)",
   "compressionTrigger": "시작 기준",
   "compressionTarget": "압축 후 목표",
   "compressionWindow": "계획 창",
   "compressionRequests": "최대 호출",
-  "compressionReference": "현재 적용 중인 세계관과 기억 참조",
-  "compressionReferenceHint": "참조는 인물 이름과 규칙을 이해하기 위한 것이며, 사건이 발생했거나 캐릭터가 알고 있음을 의미하지 않습니다.",
+  "compressionReference": "세계관 책과 과거 기억 참조",
+  "compressionReferenceHint": "선택한 기록에 대해서만 세계관 책을 트리거하고, 그 안에 저장된 기억 스냅샷을 사용합니다. 참조는 인물 이름과 규칙을 이해하기 위한 것이며, 사건이 이미 발생했거나 캐릭터가 알고 있음을 의미하지 않습니다.",
   "compressionToolReferences": "이미 읽은 도구 결과를 참조로 대체",
   "compressionToolReferencesHint": "도구 사용이 가능할 때만 적용됩니다. 최신 미확인 결과는 유지하며, 원본 기록을 읽기 전용으로 다시 조회할 수 있습니다.",
   "compressionSummaryScan": "요약을 세계관 키워드 매칭에 포함",
@@ -4896,5 +4896,7 @@
   "desktopAutostartHiddenTitle": "자동 시작 시 트레이로 숨기기",
   "desktopAutostartHiddenDescription": "시작 시 실행과 트레이 아이콘이 필요합니다. Kelivo를 직접 열면 창이 계속 표시됩니다.",
   "desktopAutostartUnsupported": "시작 시 실행은 macOS 13 이상이 필요합니다.",
-  "desktopAutostartError": "시작 설정을 적용할 수 없습니다. 시스템 시작 항목 또는 로그인 항목 설정에서 이 앱을 확인한 후 다시 시도하세요."
+  "desktopAutostartError": "시작 설정을 적용할 수 없습니다. 시스템 시작 항목 또는 로그인 항목 설정에서 이 앱을 확인한 후 다시 시도하세요.",
+  "compressionOutputBudget": "총 출력 한도 (토큰)",
+  "compressionOutputBudgetHint": "추론과 요약 본문을 포함합니다. 비워 두면 요약 목표를 사용하며, 사고를 켤 때 이 한도만 높여도 요약 목표 길이는 늘어나지 않습니다. 실제 한도는 여전히 모델 출력 한도의 제약을 받습니다."
 }

@@ -2318,6 +2318,9 @@ class MessageBuilderService {
     Conversation? conversation,
     bool conversationScoped = false,
     List<ChatMessage>? sourceMessages,
+    // Historical summaries evaluate only their supplied range, without live
+    // activation timers or an expansion back into the current conversation.
+    bool restrictToSourceMessages = false,
     bool persistActivation = true,
     void Function(int before, int after)? onActivationPersisted,
   }) async {
@@ -2342,7 +2345,7 @@ class MessageBuilderService {
           ? null
           : chatService.getConversation(conversation.id) ?? conversation;
       final rawState = latest?.extras[WorldBookActivation.extrasKey];
-      final previous = rawState is Map
+      final previous = !restrictToSourceMessages && rawState is Map
           ? Map<String, dynamic>.from(rawState)
           : <String, dynamic>{};
       bool isChatMessage(ChatMessage message) =>
@@ -2362,6 +2365,7 @@ class MessageBuilderService {
       // selected conversation through this request's last message, including on
       // regeneration; future messages and the empty reply placeholder do not count.
       if (usesTiming &&
+          !restrictToSourceMessages &&
           conversation != null &&
           historyMessages != null &&
           chatService.initialized) {

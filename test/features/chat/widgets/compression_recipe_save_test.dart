@@ -18,6 +18,7 @@ import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
+import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -188,6 +189,20 @@ void main() {
 
     check('recipe saves once and can be reopened on $platform', (tester) async {
       await prepare(tester, platform);
+      Finder numberField(String label) => find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is IosFormTextField && widget.label == label,
+        ),
+        matching: find.byType(TextField),
+      );
+      final target = numberField(l10n.compressionLength);
+      final output = numberField(l10n.compressionOutputBudget);
+      await tester.ensureVisible(target);
+      await tester.enterText(target, '512');
+      await tester.ensureVisible(output);
+      await tester.enterText(output, '8192');
+      await tester.pump();
+      expect(tester.widget<TextField>(target).controller!.text, '512');
       for (final bindModel in [false, true]) {
         await openRecipe(tester);
         final actions = find.descendant(
@@ -220,6 +235,8 @@ void main() {
         );
         expect(recipe.settings.providerId, bindModel ? 'provider' : isNull);
         expect(recipe.settings.modelId, bindModel ? 'model' : isNull);
+        expect(recipe.settings.summaryTokens, 512);
+        expect(recipe.settings.maxOutputTokens, 8192);
         expect(recipe.template.id, 'general');
         expect(recipes, hasLength(bindModel ? 2 : 1));
       }

@@ -3,6 +3,12 @@ import 'package:Kelivo/features/home/controllers/home_view_model.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/world_book.dart';
+import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
@@ -40,7 +46,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import '../../../support/business_test_harness.dart';
 
 class _Chat extends ChatService {
-  _Chat(this.repository);
+  _Chat(this.repository) : super(existingRepository: repository);
   final ChatDatabaseRepository repository;
   final conversations = <String, Conversation>{};
   final revisions = <String, int>{};
@@ -91,6 +97,19 @@ class _Chat extends ChatService {
       includeFollowingAssistant: includeFollowingAssistant,
     );
   }
+}
+
+class _CompressionPaths extends PathProviderPlatform {
+  _CompressionPaths(this.path);
+  final String path;
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
 class _Routes extends Fake implements McpToolRouteSnapshot {}
@@ -184,6 +203,8 @@ void main() {
   late BusinessTestHarness harness;
   late ChatDatabaseRepository repository;
   late _Chat chat;
+  late Directory directory;
+  late PathProviderPlatform paths;
   late WorldBookProvider books;
   late InstructionInjectionProvider injections;
   late UserProvider user;
@@ -206,7 +227,11 @@ void main() {
     harness = await createBusinessTestHarness();
     repository = ChatDatabaseRepository(harness.database);
     await repository.ensureReady();
+    directory = await Directory.systemTemp.createTemp('context_memory_');
+    paths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _CompressionPaths(directory.path);
     chat = _Chat(repository);
+    await chat.init();
     memories = MemoryProviderV2(
       repository: MemoryRepository(harness.preferences),
       chatRepository: repository,
@@ -258,13 +283,16 @@ void main() {
     chat.conversations[conversation.id] = conversation;
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await chat.close();
     memories.dispose();
     books.dispose();
     injections.dispose();
     user.dispose();
     settings.dispose();
     assistants.dispose();
+    PathProviderPlatform.instance = paths;
+    await directory.delete(recursive: true);
   });
 
   Future<void> mount(WidgetTester tester) async {
@@ -370,6 +398,158 @@ void main() {
     assemble: g.previewContextAssembly,
     runEstimate: <T>(T Function() computation) async => computation(),
   );
+
+  testWidgets('compression preview excludes retained text and dynamic references', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      final g = generation();
+      final controller = ChatController(chatService: chat);
+      final vm = HomeViewModel(
+        chatService: chat,
+        messageBuilderService: builder,
+        messageGenerationService: g,
+        generationController: g.generationController,
+        streamController: g.streamController,
+        chatController: controller,
+        contextProvider: context,
+        getTitleForLocale: (_) => 'title',
+      );
+      try {
+        for (final (id, content) in [
+          ('old', 'Earlier history'),
+          ('covered', 'Decision A; PAST_TRIGGER; result still unknown'),
+          ('covered-last', 'We are still waiting for the result'),
+          ('retained', 'Decision B; FUTURE_MARKER; FUTURE_TRIGGER'),
+        ]) {
+          final message = ChatMessage(
+            id: id,
+            conversationId: 'one',
+            role: 'user',
+            content: content,
+          );
+          await repository.putMessage(message);
+          chat.storedMessages.add(message);
+        }
+        final operation = ContextOperation(
+          id: 'prior',
+          kind: ContextOperationKind.compress,
+          anchorGroupId: 'old',
+          appliedAfterGroupId: 'old',
+          sourceGroups: const ['old'],
+          dependencies: const [],
+          createdAt: DateTime(2026),
+          summary: 'PAST_SUMMARY',
+        );
+        String memory(String marker) =>
+            '${MemoryPrompts.introFullEn}\n'
+            '<user_profile><occupation>$marker</occupation></user_profile>\n'
+            '<user_memory type="identity"/>\n<user_memory type="workflow"/>\n'
+            '<user_memory type="voice"/>\n<user_memory type="instruction"/>\n\n';
+        for (final (id, marker) in [
+          ('covered', 'SUPERSEDED_MEMORY'),
+          ('covered-last', 'PAST_MEMORY'),
+          ('retained', 'FUTURE_MEMORY'),
+        ]) {
+          await repository.putMessagePrompt(
+            revisionId: id,
+            conversationId: 'one',
+            payload: '${memory(marker)}original message',
+            carriesMemorySnapshot: true,
+          );
+        }
+        await putMemory('future', 'FUTURE_LIVE_MEMORY');
+        await assistants.updateAssistant(
+          assistants
+              .getById('assistant')!
+              .copyWith(limitContextMessages: true, contextMessageSize: 1),
+        );
+        await books.addBook(
+          const WorldBook(
+            id: 'range',
+            entries: [
+              WorldBookEntry(
+                id: 'past',
+                keywords: ['PAST_TRIGGER'],
+                content: 'PAST_REFERENCE',
+                scanDepth: 100,
+                sticky: 5,
+              ),
+              WorldBookEntry(
+                id: 'future',
+                keywords: ['FUTURE_TRIGGER'],
+                content: 'FUTURE_REFERENCE',
+                scanDepth: 100,
+                sticky: 5,
+              ),
+            ],
+          ),
+        );
+        await books.setActiveBookIds(['range'], assistantId: 'assistant');
+        const options = CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 1,
+        );
+        final history = (
+          messages: chat.storedMessages,
+          operations: [operation],
+        );
+        final selection = selectCompressionHistory(
+          history.messages,
+          history.operations,
+          options,
+        );
+        expect(selection.retained.single.id, 'retained');
+        for (final includeReference in [false, true]) {
+          final config = CompressionConfig(
+            summaryTokens: 512,
+            maxOutputTokens: 4096,
+            includeReference: includeReference,
+          );
+          final preview = await vm.previewCompressionRequest(
+            'one',
+            options,
+            config,
+            history: Future.value(history),
+          );
+          expect(preview.prompt, contains('PAST_SUMMARY'));
+          expect(preview.prompt, contains('Decision A'));
+          expect(preview.prompt, isNot(contains('FUTURE_')));
+          expect(preview.prompt, isNot(contains('<continuation')));
+          if (includeReference) {
+            expect(preview.prompt, contains('PAST_REFERENCE'));
+            expect(preview.prompt, contains('PAST_MEMORY'));
+            final request = await vm.buildCompressionRequest(
+              'one',
+              options: options,
+              configOverride: config,
+            );
+            final reference = await request.loadReference!(selection);
+            expect(reference, contains('PAST_REFERENCE'));
+            expect(reference, contains('PAST_MEMORY'));
+            expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
+            expect(reference, isNot(contains('FUTURE_')));
+            // A summary-only range must not read the latest real turn for timers.
+            final summaries = selection.input
+                .where(ContextOperation.isSummary)
+                .toList();
+            final summaryReference = await g.compressionReferenceText(
+              conversationId: 'one',
+              modelId: 'opaque',
+              assistantId: 'assistant',
+              messages: summaries,
+              promptTime: DateTime(2026),
+            );
+            expect(summaryReference, isNot(contains('FUTURE_')));
+          }
+        }
+      } finally {
+        vm.dispose();
+        controller.dispose();
+      }
+    });
+  });
 
   testWidgets(
     'compression references freeze clock but still detect real prompt edits',

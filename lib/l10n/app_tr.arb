@@ -4725,13 +4725,13 @@
   "compressionNearLimit": "Bağlam tahmini kapasitesine yaklaşıyor. Sohbete devam edebilir veya elle sıkıştırabilirsiniz.",
   "compressionKeepTurns": "Son turları koru",
   "compressionKeepHint": "Bir tur, bir kullanıcı mesajını ve onun yanıtlarını ve araçlarını içerir.",
-  "compressionLength": "Özet sınırı (token)",
+  "compressionLength": "Özet hedefi (token)",
   "compressionTrigger": "Başlangıç",
   "compressionTarget": "Hedefe sıkıştır",
   "compressionWindow": "Planlama penceresi",
   "compressionRequests": "En fazla çağrı",
-  "compressionReference": "Etkin dünya kitaplarını ve belleği referans al",
-  "compressionReferenceHint": "Referans, adları ve kuralları açıklar; olayların gerçekleştiğine veya karakterlerin bunları bildiğine dair kanıt değildir.",
+  "compressionReference": "Dünya kitaplarına ve geçmiş belleğe başvur",
+  "compressionReferenceHint": "Dünya kitapları için yalnızca seçili geçmişi tarayın ve kaydedilmiş bellek anlık görüntülerini kullanın. Başvurular adları ve kuralları açıklar; olayların gerçekleştiğini veya karakterlerin bildiğini göstermez.",
   "compressionToolReferences": "Tüketilen araç sonuçlarını referans olarak kullan",
   "compressionToolReferencesHint": "Yalnızca araç erişimi varken geçerlidir. En son okunmamış sonuçları korur ve tam, salt okunur geri çağırmaya izin verir.",
   "compressionSummaryScan": "Özetleri dünya kitabı anahtar kelime eşleştirmesine dahil et",
@@ -4896,5 +4896,7 @@
   "desktopAutostartHiddenTitle": "Otomatik başlatmada tepsiye gizle",
   "desktopAutostartHiddenDescription": "Başlangıçta başlatma ve tepsi simgesi gerektirir. Kelivo'yu elle açtığınızda pencere yine görünür.",
   "desktopAutostartUnsupported": "Başlangıçta başlatma için macOS 13 veya üstü gerekir.",
-  "desktopAutostartError": "Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin."
+  "desktopAutostartError": "Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin.",
+  "compressionOutputBudget": "Toplam çıktı sınırı (token)",
+  "compressionOutputBudgetHint": "Akıl yürütme ve özet metnini içerir. Özet hedefini kullanmak için boş bırakın veya özeti uzatmadan düşünmek için daha yüksek bir sınır belirleyin. Model çıktı sınırı yine de geçerlidir."
 }

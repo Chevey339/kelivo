@@ -87,6 +87,7 @@ class _CompressContextOptionsDialogState
   final _focus = TextEditingController();
   final _keep = TextEditingController();
   final _length = TextEditingController();
+  final _outputBudget = TextEditingController();
   final _trigger = TextEditingController();
   final _nativeTrigger = TextEditingController();
   final _target = TextEditingController();
@@ -285,6 +286,7 @@ class _CompressContextOptionsDialogState
   void _fillFields() {
     _keep.text = '${_config.keepRecentUserTurns}';
     _length.text = '${_config.summaryTokens}';
+    _outputBudget.text = _config.maxOutputTokens?.toString() ?? '';
     _trigger.text = '${(_config.triggerInputRatio * 100).round()}';
     _nativeTrigger.text = '${(_config.nativeTriggerInputRatio * 100).round()}';
     _target.text = '${(_config.targetInputRatio * 100).round()}';
@@ -356,6 +358,7 @@ class _CompressContextOptionsDialogState
       _focus,
       _keep,
       _length,
+      _outputBudget,
       _trigger,
       _nativeTrigger,
       _target,
@@ -371,6 +374,9 @@ class _CompressContextOptionsDialogState
   CompressionConfig _values() => _config.withOverrides({
     'keepRecentUserTurns': int.parse(_keep.text),
     'summaryTokens': int.parse(_length.text),
+    'maxOutputTokens': _outputBudget.text.trim().isEmpty
+        ? null
+        : int.parse(_outputBudget.text),
     'triggerInputRatio': double.parse(_trigger.text) / 100,
     'targetInputRatio': double.parse(_target.text) / 100,
     'planningWindow': _window.text.trim().isEmpty
@@ -1143,6 +1149,18 @@ class _CompressContextOptionsDialogState
                   if (!_native)
                     _section(l10n.compressionOutputSettings, [
                       _number(l10n.compressionLength, _length),
+                      _number(
+                        l10n.compressionOutputBudget,
+                        _outputBudget,
+                        hint: _length.text,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                        child: Text(
+                          l10n.compressionOutputBudgetHint,
+                          style: hintStyle,
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: Container(

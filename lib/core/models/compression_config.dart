@@ -19,6 +19,7 @@ class CompressionConfig {
     this.triggerInputRatio = .8,
     this.targetInputRatio = .6,
     this.summaryTokens = 4096,
+    this.maxOutputTokens,
     this.maxRequestAttempts = 8,
     this.planningWindow,
     this.includeReference = true,
@@ -38,6 +39,9 @@ class CompressionConfig {
   final double triggerInputRatio;
   final double targetInputRatio;
   final int summaryTokens;
+
+  /// Total generation budget, including reasoning. Null uses the summary target.
+  final int? maxOutputTokens;
   final int maxRequestAttempts;
   final int? planningWindow;
   final bool includeReference;
@@ -59,6 +63,7 @@ class CompressionConfig {
     'triggerInputRatio': triggerInputRatio,
     'targetInputRatio': targetInputRatio,
     'summaryTokens': summaryTokens,
+    'maxOutputTokens': maxOutputTokens,
     'maxRequestAttempts': maxRequestAttempts,
     'planningWindow': planningWindow,
     'includeReference': includeReference,
@@ -80,6 +85,7 @@ class CompressionConfig {
       triggerInputRatio: (json['triggerInputRatio'] as num? ?? .8).toDouble(),
       targetInputRatio: (json['targetInputRatio'] as num? ?? .6).toDouble(),
       summaryTokens: json['summaryTokens'] as int? ?? 4096,
+      maxOutputTokens: json['maxOutputTokens'] as int?,
       maxRequestAttempts: json['maxRequestAttempts'] as int? ?? 8,
       planningWindow: json['planningWindow'] as int?,
       includeReference: json['includeReference'] as bool? ?? true,
@@ -103,6 +109,9 @@ class CompressionConfig {
         config.targetInputRatio >= config.triggerInputRatio ||
         config.summaryTokens < 128 ||
         config.summaryTokens > 65536 ||
+        (config.maxOutputTokens != null &&
+            (config.maxOutputTokens! < config.summaryTokens ||
+                config.maxOutputTokens! > 1048576)) ||
         config.maxRequestAttempts < 1 ||
         config.maxRequestAttempts > 128 ||
         (config.planningWindow != null && config.planningWindow! < 1024) ||

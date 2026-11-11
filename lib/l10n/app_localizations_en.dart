@@ -16146,7 +16146,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'A turn includes a user message, its replies and tools.';
 
   @override
-  String get compressionLength => 'Summary limit (tokens)';
+  String get compressionLength => 'Summary target (tokens)';
 
   @override
   String get compressionTrigger => 'Start at';
@@ -16161,11 +16161,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionRequests => 'Maximum calls';
 
   @override
-  String get compressionReference => 'Reference active world books and memory';
+  String get compressionReference =>
+      'Reference world books and historical memory';
 
   @override
   String get compressionReferenceHint =>
-      'Reference explains names and rules; it is not evidence that events happened or characters know them.';
+      'Scan only the selected history for world books and use its saved memory snapshots. References explain names and rules; they do not establish events or character knowledge.';
 
   @override
   String get compressionToolReferences => 'Reference consumed tool results';
@@ -16757,4 +16758,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get desktopAutostartError =>
       'Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.';
+
+  @override
+  String get compressionOutputBudget => 'Total output limit (tokens)';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      'Includes reasoning and summary text. Leave blank to use the summary target, or set a higher limit for thinking without lengthening the summary. The model output limit still applies.';
 }

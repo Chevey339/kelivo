@@ -28482,10 +28482,10 @@ abstract class AppLocalizations {
   /// **'A turn includes a user message, its replies and tools.'**
   String get compressionKeepHint;
 
-  /// Number-field label for the summary output token limit.
+  /// Compression summary settings: target maximum length of visible summary text in tokens, separate from the total generation limit including reasoning.
   ///
   /// In en, this message translates to:
-  /// **'Summary limit (tokens)'**
+  /// **'Summary target (tokens)'**
   String get compressionLength;
 
   /// Number-field label for the context-usage percentage that starts automatic compression.
@@ -28512,16 +28512,16 @@ abstract class AppLocalizations {
   /// **'Maximum calls'**
   String get compressionRequests;
 
-  /// Switch label for including active world books and memory as reference during summarization.
+  /// Compression option to include world books evaluated on the selected history and memory snapshots frozen in that history, rather than current live memory or retained messages.
   ///
   /// In en, this message translates to:
-  /// **'Reference active world books and memory'**
+  /// **'Reference world books and historical memory'**
   String get compressionReference;
 
-  /// Hint clarifying that reference material explains names/rules but is not evidence events occurred or characters know them.
+  /// Compression reference help: restrict dynamic reference sources to the selected historical range, and distinguish explanatory background from events or character knowledge. No placeholders.
   ///
   /// In en, this message translates to:
-  /// **'Reference explains names and rules; it is not evidence that events happened or characters know them.'**
+  /// **'Scan only the selected history for world books and use its saved memory snapshots. References explain names and rules; they do not establish events or character knowledge.'**
   String get compressionReferenceHint;
 
   /// Switch label for replacing already-consumed tool results with references.
@@ -29513,6 +29513,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.'**
   String get desktopAutostartError;
+
+  /// Optional number field in compression summary settings for total generated tokens, including reasoning and visible summary. Blank uses the summary target. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Total output limit (tokens)'**
+  String get compressionOutputBudget;
+
+  /// Help below the compression total output limit field: reasoning consumes the same budget, an independent higher limit does not increase the desired summary length, blank follows the summary target, and model output limits still apply. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes reasoning and summary text. Leave blank to use the summary target, or set a higher limit for thinking without lengthening the summary. The model output limit still applies.'**
+  String get compressionOutputBudgetHint;
 }
 
 class _AppLocalizationsDelegate

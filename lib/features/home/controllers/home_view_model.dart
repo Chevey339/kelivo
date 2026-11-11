@@ -1585,29 +1585,13 @@ class HomeViewModel extends ChangeNotifier {
               chatModel.modelId == null
           ? null
           : (selection) async =>
-                (await _messageGenerationService.previewContextAssembly(
+                _messageGenerationService.compressionReferenceText(
                   promptTime: referenceTime,
                   conversationId: conversationId,
-                  providerKey: chatModel.providerKey!,
                   modelId: chatModel.modelId!,
                   assistantId: conversation.assistantId,
-                  messagesOverride: selection.effective,
-                )).referenceText,
-      loadContinuation: (selection) async {
-        final recent = selection.retained.reversed
-            .take(2)
-            .toList()
-            .reversed
-            .toList();
-        final text = await _chatService.messagesForCompression(
-          recent,
-          quoteMarker: quoteMarker,
-        );
-        return buildConversationTextForCompression(
-          text,
-          quoteMarker: quoteMarker,
-        );
-      },
+                  messages: selection.input,
+                ),
       generate: (prompt, requestId, maxTokens, onUsage) =>
           ChatApiService.generateMessage(
             conversationId: conversationId,
@@ -1713,13 +1697,11 @@ class HomeViewModel extends ChangeNotifier {
       quoteMarker: request.quoteMarker,
     );
     final background = await request.loadReference?.call(selection) ?? '';
-    final continuation = await request.loadContinuation?.call(selection) ?? '';
     final planner = CompressionPlanner(
       request: request,
       materials: [],
       previousSummary: '',
       background: background,
-      continuation: continuation,
     );
     return _previewCompressionMaterials(
       planner,

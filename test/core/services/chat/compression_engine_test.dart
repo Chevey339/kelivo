@@ -136,6 +136,136 @@ void main() {
     },
   );
 
+  test(
+    'total output budget is independent of the visible summary target',
+    () async {
+      const config = CompressionConfig(
+        summaryTokens: 512,
+        maxOutputTokens: 4096,
+      );
+      final request = CompressionRequest(
+        options: options,
+        model: 'reasoning-model',
+        quoteMarker: (_) => 'quote',
+        config: config,
+        contextWindowTokens: 32000,
+        generate: (prompt, _, maxTokens, _) async {
+          expect(maxTokens, 4096);
+          expect(prompt, contains('Target length: at most 512 tokens.'));
+          return TextGenerationResult(
+            parts: const [
+              ReasoningPart('internal reasoning'),
+              TextPart('summary'),
+            ],
+            usage: const TokenUsage(
+              completionTokens: 3072,
+              reasoningTokens: 3000,
+            ),
+            finishReason: 'stop',
+          );
+        },
+      );
+      final planner = CompressionPlanner(
+        request: request,
+        materials: ['history'],
+        previousSummary: '',
+        background: '',
+      );
+      expect(planner.inputLimit, 32000 - 4096 - 1600);
+      expect(
+        await const CompressionEngine().run(
+          task: task,
+          request: request,
+          materials: ['history'],
+          previousSummary: '',
+          background: '',
+          check: () {},
+          publish: () async {},
+        ),
+        'summary',
+      );
+      expect(task.usage!.completionTokens, 3072);
+      expect(task.usage!.reasoningTokens, 3000);
+    },
+  );
+
+  test(
+    'model output cap constrains generation and achievable summary target',
+    () {
+      for (final cap in [256, 2048]) {
+        final planner = CompressionPlanner(
+          request: CompressionRequest(
+            options: options,
+            model: 'limited',
+            quoteMarker: (_) => 'quote',
+            config: const CompressionConfig(
+              summaryTokens: 512,
+              maxOutputTokens: 4096,
+            ),
+            maxOutputTokens: cap,
+            contextWindowTokens: 32000,
+            generate: (_, _, _, _) async => result('summary'),
+          ),
+          materials: ['history'],
+          previousSummary: '',
+          background: '',
+        );
+        expect(planner.outputTokens, cap);
+        expect(planner.targetTokens, cap < 512 ? cap : 512);
+        expect(planner.inputLimit, 32000 - cap - 1600);
+      }
+    },
+  );
+
+  test(
+    'reasoning-only exhaustion fails while preserving provider usage',
+    () async {
+      await expectLater(
+        run(
+          ['history'],
+          (_, _, _, _) async => TextGenerationResult(
+            parts: const [ReasoningPart('thinking')],
+            usage: const TokenUsage(
+              completionTokens: 16384,
+              reasoningTokens: 16384,
+            ),
+            finishReason: 'max_output_tokens',
+          ),
+        ),
+        throwsA(
+          predicate(
+            (e) => e.toString().contains(
+              'compression_incomplete:max_output_tokens',
+            ),
+          ),
+        ),
+      );
+      expect(task.summary, isEmpty);
+      expect(task.usage!.completionTokens, 16384);
+      expect(task.usage!.reasoningTokens, 16384);
+    },
+  );
+
+  test('preflight reserves summary text without the reasoning allowance', () {
+    final planner = CompressionPlanner(
+      request: CompressionRequest(
+        options: options,
+        model: 'large-output',
+        quoteMarker: (_) => 'quote',
+        config: const CompressionConfig(
+          summaryTokens: 512,
+          maxOutputTokens: 32768,
+        ),
+        contextWindowTokens: 1000000,
+        generate: (_, _, _, _) async => result('summary'),
+      ),
+      materials: ['past ' * 12000, 'next ' * 12000],
+      previousSummary: '',
+      background: '',
+    );
+    expect(planner.estimateRequests(), 2);
+  });
+
   test('unknown model window uses 1M for preview and execution', () async {
     final background = '背景设定 ' * 7000;
     final materials = ['需要压缩的历史内容'];

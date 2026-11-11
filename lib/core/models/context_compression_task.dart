@@ -49,8 +49,6 @@ class CompressionRequest {
     this.template,
     this.locale = 'en',
     this.loadReference,
-    this.loadContinuation,
-    this.continuation = '',
     this.beforeMessageId,
     this.effectiveMessageIds,
     this.isCancelled,
@@ -75,8 +73,6 @@ class CompressionRequest {
       template ?? builtInCompressionTemplatesForLocale(locale).first;
   final String locale;
   final Future<String> Function(CompressionSelection)? loadReference;
-  final String continuation;
-  final Future<String> Function(CompressionSelection)? loadContinuation;
 
   /// An in-turn caller protects this message and everything after it.
   final String? beforeMessageId;

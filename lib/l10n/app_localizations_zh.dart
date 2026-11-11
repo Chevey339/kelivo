@@ -15319,7 +15319,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionKeepHint => '一轮包含一条用户消息及其后续回复、工具内容。';
 
   @override
-  String get compressionLength => '摘要上限（tokens）';
+  String get compressionLength => '摘要目标长度（tokens）';
 
   @override
   String get compressionTrigger => '触发阈值';
@@ -15334,10 +15334,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionRequests => '最多调用';
 
   @override
-  String get compressionReference => '参考当前生效的世界书与记忆';
+  String get compressionReference => '参考世界书与历史记忆';
 
   @override
-  String get compressionReferenceHint => '参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
+  String get compressionReferenceHint =>
+      '仅按所选历史触发世界书，并使用其中已保存的记忆快照。参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
 
   @override
   String get compressionToolReferences => '以引用替代已读工具结果';
@@ -15889,6 +15890,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get desktopAutostartError => '无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。';
+
+  @override
+  String get compressionOutputBudget => '总输出上限（tokens）';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      '包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31206,7 +31214,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionKeepHint => '一轮包含一条用户消息及其后续回复、工具内容。';
 
   @override
-  String get compressionLength => '摘要上限（tokens）';
+  String get compressionLength => '摘要目标长度（tokens）';
 
   @override
   String get compressionTrigger => '触发阈值';
@@ -31221,10 +31229,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionRequests => '最多调用';
 
   @override
-  String get compressionReference => '参考当前生效的世界书与记忆';
+  String get compressionReference => '参考世界书与历史记忆';
 
   @override
-  String get compressionReferenceHint => '参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
+  String get compressionReferenceHint =>
+      '仅按所选历史触发世界书，并使用其中已保存的记忆快照。参考用于理解人名与规则，不代表事件已经发生或角色已经知情。';
 
   @override
   String get compressionToolReferences => '以引用替代已读工具结果';
@@ -31776,6 +31785,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get desktopAutostartError => '无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。';
+
+  @override
+  String get compressionOutputBudget => '总输出上限（tokens）';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      '包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47100,7 +47116,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionKeepHint => '一輪包含一則使用者訊息及其後續回覆、工具內容。';
 
   @override
-  String get compressionLength => '摘要上限（tokens）';
+  String get compressionLength => '摘要目標長度（tokens）';
 
   @override
   String get compressionTrigger => '觸發門檻';
@@ -47115,10 +47131,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionRequests => '最多呼叫';
 
   @override
-  String get compressionReference => '參考目前生效的世界書與記憶';
+  String get compressionReference => '參考世界書與歷史記憶';
 
   @override
-  String get compressionReferenceHint => '參考用於理解人名與規則，不代表事件已發生或角色已知情。';
+  String get compressionReferenceHint =>
+      '僅按所選歷史觸發世界書，並使用其中已儲存的記憶快照。參考用於理解人名與規則，不代表事件已經發生或角色已經知情。';
 
   @override
   String get compressionToolReferences => '以引用替代已讀工具結果';
@@ -47671,4 +47688,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get desktopAutostartError =>
       '無法套用啟動設定。請檢查系統啟動項目或登入項目中的 Kelivo 設定後再試一次。';
+
+  @override
+  String get compressionOutputBudget => '總輸出上限（tokens）';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      '包含推理與摘要正文。留空時使用摘要目標長度；開啟思考時可單獨提高此上限，不會增加摘要目標長度。實際額度仍受模型輸出上限限制。';
 }

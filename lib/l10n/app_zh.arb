@@ -5885,13 +5885,13 @@
   "compressionNearLimit": "上下文接近估算容量，可以继续发送或手动压缩。",
   "compressionKeepTurns": "保留最近",
   "compressionKeepHint": "一轮包含一条用户消息及其后续回复、工具内容。",
-  "compressionLength": "摘要上限（tokens）",
+  "compressionLength": "摘要目标长度（tokens）",
   "compressionTrigger": "触发阈值",
   "compressionTarget": "压缩后目标",
   "compressionWindow": "规划窗口",
   "compressionRequests": "最多调用",
-  "compressionReference": "参考当前生效的世界书与记忆",
-  "compressionReferenceHint": "参考用于理解人名与规则，不代表事件已经发生或角色已经知情。",
+  "compressionReference": "参考世界书与历史记忆",
+  "compressionReferenceHint": "仅按所选历史触发世界书，并使用其中已保存的记忆快照。参考用于理解人名与规则，不代表事件已经发生或角色已经知情。",
   "compressionToolReferences": "以引用替代已读工具结果",
   "compressionToolReferencesHint": "仅工具可用时生效。保留最新未读结果，可只读回查原记录。",
   "compressionSummaryScan": "摘要参与世界书关键词匹配",
@@ -6128,5 +6128,7 @@
   "desktopAutostartHiddenTitle": "自启动后隐藏到托盘",
   "desktopAutostartHiddenDescription": "需要开启自启动和托盘图标。手动打开 Kelivo 时仍会显示窗口。",
   "desktopAutostartUnsupported": "开机自启动需要 macOS 13 或更高版本。",
-  "desktopAutostartError": "无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。"
+  "desktopAutostartError": "无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。",
+  "compressionOutputBudget": "总输出上限（tokens）",
+  "compressionOutputBudgetHint": "包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。"
 }

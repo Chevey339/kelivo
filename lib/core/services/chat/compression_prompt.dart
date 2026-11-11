@@ -9,7 +9,6 @@ String renderCompressionPrompt({
   required String content,
   String previousSummary = '',
   String background = '',
-  String continuation = '',
   String focus = '',
   String locale = 'en',
   required int targetTokens,
@@ -54,8 +53,6 @@ String renderCompressionPrompt({
       if (!inserted.contains(key) &&
           (key == 'content' || data[key]!.isNotEmpty))
         section(key),
-    if (continuation.isNotEmpty)
-      '<continuation read-only="true" covered="false">\n$continuation\n</continuation>',
     'Return one complete summary of the covered history. Do not continue the conversation.',
   ].join('\n\n');
 }

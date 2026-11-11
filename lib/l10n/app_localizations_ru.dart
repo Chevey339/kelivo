@@ -16437,7 +16437,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Раунд включает сообщение пользователя, ответы на него и инструменты.';
 
   @override
-  String get compressionLength => 'Лимит сводки (токены)';
+  String get compressionLength => 'Целевой размер сводки (токены)';
 
   @override
   String get compressionTrigger => 'Начинать при';
@@ -16453,11 +16453,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionReference =>
-      'Учитывать активные мировые книги и память';
+      'Учитывать книги мира и историческую память';
 
   @override
   String get compressionReferenceHint =>
-      'Справочные данные поясняют имена и правила; они не доказывают, что события произошли или известны персонажам.';
+      'Искать книги мира только в выбранной истории и использовать сохранённые в ней снимки памяти. Справочные данные поясняют имена и правила; они не означают, что события произошли или что персонаж о них знает.';
 
   @override
   String get compressionToolReferences =>
@@ -17052,4 +17052,11 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get desktopAutostartError =>
       'Не удалось применить настройку автозапуска. Проверьте Kelivo в настройках автозагрузки или элементов входа системы и повторите попытку.';
+
+  @override
+  String get compressionOutputBudget => 'Общий лимит вывода (токены)';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      'Включает рассуждение и текст сводки. Оставьте пустым, чтобы использовать целевой размер сводки, или задайте более высокий лимит для рассуждения без удлинения сводки. Лимит вывода модели по-прежнему действует.';
 }

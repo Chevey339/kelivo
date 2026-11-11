@@ -16241,7 +16241,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bir tur, bir kullanıcı mesajını ve onun yanıtlarını ve araçlarını içerir.';
 
   @override
-  String get compressionLength => 'Özet sınırı (token)';
+  String get compressionLength => 'Özet hedefi (token)';
 
   @override
   String get compressionTrigger => 'Başlangıç';
@@ -16257,11 +16257,11 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionReference =>
-      'Etkin dünya kitaplarını ve belleği referans al';
+      'Dünya kitaplarına ve geçmiş belleğe başvur';
 
   @override
   String get compressionReferenceHint =>
-      'Referans, adları ve kuralları açıklar; olayların gerçekleştiğine veya karakterlerin bunları bildiğine dair kanıt değildir.';
+      'Dünya kitapları için yalnızca seçili geçmişi tarayın ve kaydedilmiş bellek anlık görüntülerini kullanın. Başvurular adları ve kuralları açıklar; olayların gerçekleştiğini veya karakterlerin bildiğini göstermez.';
 
   @override
   String get compressionToolReferences =>
@@ -16855,4 +16855,11 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get desktopAutostartError =>
       'Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin.';
+
+  @override
+  String get compressionOutputBudget => 'Toplam çıktı sınırı (token)';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      'Akıl yürütme ve özet metnini içerir. Özet hedefini kullanmak için boş bırakın veya özeti uzatmadan düşünmek için daha yüksek bir sınır belirleyin. Model çıktı sınırı yine de geçerlidir.';
 }
