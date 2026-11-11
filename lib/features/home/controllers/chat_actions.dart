@@ -2307,11 +2307,13 @@ class ChatActions {
         !_activeAssistantMessages.isActive(ctx.assistantMessage)) {
       return null;
     }
-    if (preferences.mode == AutoCompressionMode.off &&
+    final skipAutomatic = chatService.contextCompression.consumeAutomaticSkip(
+      id,
+    );
+    if ((skipAutomatic || preferences.mode == AutoCompressionMode.off) &&
         !preferences.replaceConsumedTools) {
       return null;
     }
-    if (chatService.contextCompression.consumeAutomaticSkip(id)) return null;
     final user = ctx.apiMessages
         .where(
           (m) =>
@@ -2335,7 +2337,8 @@ class ChatActions {
       explicitType: ctx.config.providerType,
     );
     var disposed = false;
-    var allowed = preferences.mode == AutoCompressionMode.auto;
+    var allowed =
+        !skipAutomatic && preferences.mode == AutoCompressionMode.auto;
     final useNative = preferences.nativeEnabled && allowed;
     final nativeScope =
         '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
@@ -2366,6 +2369,7 @@ class ChatActions {
       );
       if (cancelled()) return;
       allowed =
+          !skipAutomatic &&
           current.mode == AutoCompressionMode.auto &&
           current.nativeEnabled == preferences.nativeEnabled;
       if (!allowed &&
@@ -2388,7 +2392,7 @@ class ChatActions {
         if (anchor != null) _nativeUsage[id] = anchor;
       },
       beforeRequest: (body, project, overflow) async {
-        if (cancelled()) return null;
+        if (skipAutomatic || cancelled()) return null;
         // A custom Responses input replaces the transcript. It has no message
         // ownership to compact or safely project back into this request.
         final input = body['input'];

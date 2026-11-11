@@ -7,6 +7,7 @@ import '../../../shared/text_input/message_editing_controller.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../widgets/context_compression_status.dart';
 import '../widgets/context_dialog.dart';
 
 class ContextSummaryEditorPage extends StatefulWidget {
@@ -71,7 +72,14 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
       final saved = await widget.onSave(_editor.text);
       if (mounted && saved) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        setState(
+          () => _error = compressionErrorLabel(
+            AppLocalizations.of(context)!,
+            error.toString(),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -276,6 +276,8 @@ class HomeViewModel extends ChangeNotifier {
       _compressionStates[task.conversationId] = state;
       if (task.phase == CompressionPhase.completed &&
           task.resultConversationId == null) {
+        queueChanged =
+            _pausedQueuedInputs.remove(task.conversationId) || queueChanged;
         unawaited(_drainQueuedInputIfReady(task.conversationId));
       } else if ((task.phase == CompressionPhase.review || !task.active) &&
           _queuedInputs.containsKey(task.conversationId)) {

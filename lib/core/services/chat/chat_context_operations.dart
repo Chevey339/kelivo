@@ -530,6 +530,7 @@ extension ChatContextOperations on ChatService {
       );
     }
     await loadContextOperations(id, refresh: true);
+    contextCompression.clearAutomaticSkip(id);
     _notifyContextChanged(id);
   });
 

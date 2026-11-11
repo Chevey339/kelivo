@@ -304,7 +304,11 @@ void main() {
     (widget) => widget is IosIconButton && widget.semanticLabel == 'Close',
   );
 
-  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.macOS,
+  ]) {
     for (final openResult in [false, true]) {
       check(
         'viewed completion clears its notice and preserves the result on $platform (open result: $openResult)',
@@ -328,6 +332,11 @@ void main() {
           final result = chat.contextCompression
               .taskFor(id)!
               .resultConversationId!;
+          final phases = <CompressionPhase?>[];
+          void observe() =>
+              phases.add(chat.contextCompression.taskFor(id)?.phase);
+          chat.contextCompression.addListener(observe);
+          addTearDown(() => chat.contextCompression.removeListener(observe));
           String? opened;
           await pumpTaskEntry(tester, onOpenConversation: (id) => opened = id);
           expect(find.text('Dismiss status'), findsNothing);
@@ -342,6 +351,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(opened, openResult ? result : isNull);
           expect(find.byKey(const ValueKey('context-task-bar')), findsNothing);
+          expect(phases, isNot(contains(CompressionPhase.cancelled)));
           await tester.runAsync(() async {
             expect(chat.getConversation(result), isNotNull);
             expect(

@@ -532,6 +532,55 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
+    check(
+      'summary budget errors preserve edits and are localized on $platform',
+      (tester) async {
+        await prepare(tester, platform);
+        var closed = 0;
+        final saved = <String>[];
+        await tester.pumpWidget(
+          app(
+            ContextDialog(
+              maxWidth: 560,
+              child: ContextOperationContent(
+                operation: op,
+                onClose: () => closed++,
+                onSave: (summary) async {
+                  saved.add(summary);
+                  if (saved.length == 1) {
+                    throw StateError('context_budget_exceeded');
+                  }
+                  return true;
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Edit'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'over budget draft');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(AppLocalizationsEn().compressOverSnack),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          'over budget draft',
+        );
+        expect(closed, 0);
+        await tester.enterText(find.byType(TextField), 'shorter draft');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(saved, ['over budget draft', 'shorter draft']);
+        expect(closed, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   check('desktop edits are explicit and empty summaries disable save', (
     tester,
   ) async {

@@ -17,6 +17,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/platform_utils.dart';
 import '../pages/context_summary_editor_page.dart';
+import 'context_compression_status.dart';
 import 'context_dialog.dart';
 export 'context_node_divider.dart';
 
@@ -132,7 +133,14 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
       final saved = await widget.onSave?.call(_editor.text) ?? false;
       if (mounted && saved) widget.onClose();
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        setState(
+          () => _error = compressionErrorLabel(
+            AppLocalizations.of(context)!,
+            error.toString(),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
