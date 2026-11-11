@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -78,7 +81,93 @@ void main() {
   }
   for (final dark in [false, true]) {
     testWidgets(
-      'original code appearance is the default with opaque exports: dark=$dark',
+      'legacy code header retains the body wallpaper transparency: dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        final boundaryKey = GlobalKey();
+        final samples = <(Color, Color)>[];
+        for (final underlay in [Colors.black, Colors.white]) {
+          await tester.pumpWidget(
+            host(
+              RepaintBoundary(
+                key: boundaryKey,
+                child: ColoredBox(
+                  color: underlay,
+                  child: const MarkdownWithCodeHighlight(
+                    text: '> ```python\n> print("code")\n> ```',
+                  ),
+                ),
+              ),
+              settings: settings,
+              dark: dark,
+              wallpaper: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final header = tester.getRect(
+            find.byKey(const ValueKey('markstream-code-header')),
+          );
+          final body = tester.getRect(find.byType(MarkstreamCodeContent));
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = boundary.toImageSync();
+          try {
+            final pixels = (await tester.runAsync(
+              () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+            ))!;
+            Color pixel(Offset global) {
+              final point = boundary.globalToLocal(global);
+              final offset =
+                  (point.dy.floor() * image.width + point.dx.floor()) * 4;
+              return Color.fromARGB(
+                pixels.getUint8(offset + 3),
+                pixels.getUint8(offset),
+                pixels.getUint8(offset + 1),
+                pixels.getUint8(offset + 2),
+              );
+            }
+
+            final headerFill = pixel(header.center);
+            samples.add((
+              headerFill,
+              pixel(Offset(header.center.dx, body.center.dy)),
+            ));
+            final chrome = tester
+                .widget<MarkstreamCodeBlock>(find.byType(MarkstreamCodeBlock))
+                .theme
+                .code
+                .chrome;
+            double contrast(Color ink) {
+              final a = Color.alphaBlend(ink, headerFill).computeLuminance();
+              final b = headerFill.computeLuminance();
+              return a >= b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
+            }
+
+            expect(contrast(chrome.label.color!), greaterThanOrEqualTo(4.5));
+            expect(contrast(chrome.actionColor), greaterThanOrEqualTo(3));
+          } finally {
+            image.dispose();
+          }
+          expect(tester.takeException(), isNull);
+        }
+        double change(Color a, Color b) =>
+            ((a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs()) / 3;
+        final headerChange = change(samples[0].$1, samples[1].$1);
+        final bodyChange = change(samples[0].$2, samples[1].$2);
+        expect(bodyChange, greaterThan(.15));
+        expect(
+          headerChange,
+          greaterThanOrEqualTo(bodyChange * .9),
+          reason:
+              'The header must not paint a second heavy fill over the code surface.',
+        );
+      },
+    );
+    testWidgets(
+      'original code geometry and body fill remain with opaque exports: dark=$dark',
       (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
         addTearDown(settings.dispose);
@@ -100,7 +189,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           final block = find.byType(MarkstreamCodeBlock);
-          final code = tester.widget<MarkstreamCodeBlock>(block).theme.code;
+          final theme = tester.widget<MarkstreamCodeBlock>(block).theme;
+          final code = theme.code;
           final scheme = Theme.of(tester.element(block)).colorScheme;
           final alpha = exporting ? 1.0 : .8;
           expect(code.text.fontSize, 13);
@@ -122,7 +212,7 @@ void main() {
           );
           expect(
             code.chrome.background,
-            scheme.surfaceContainerHighest.withValues(alpha: alpha),
+            exporting ? scheme.surfaceContainerHighest : theme.colors.fillHead,
           );
           expect(tester.takeException(), isNull);
         }

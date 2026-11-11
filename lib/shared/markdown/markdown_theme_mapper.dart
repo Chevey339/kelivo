@@ -126,6 +126,7 @@ CodeBlockTheme _legacyCodeBlockTheme(
   // Custom chat colors still need the paired block surface/ink resolved above.
   // Other surfaces retain the original theme-container colors and 80% fill.
   final fillAlpha = exporting ? 1.0 : .8;
+  final backdropTint = !exporting && theme.backdrop != MarkstreamBackdrop.plain;
   return theme.code.copyWith(
     text: theme.code.text.copyWith(fontSize: 13, height: 1.5),
     margin: const EdgeInsets.symmetric(vertical: 6),
@@ -140,21 +141,28 @@ CodeBlockTheme _legacyCodeBlockTheme(
     chrome: theme.code.chrome.copyWith(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      background:
-          (customSurface ? scheme.surface : scheme.surfaceContainerHighest)
-              .withValues(alpha: fillAlpha),
+      // The code surface already paints the backdrop fill. Use only a light
+      // tint here instead of stacking another 80% layer over the wallpaper.
+      background: backdropTint
+          ? theme.colors.fillHead
+          : (customSurface ? scheme.surface : scheme.surfaceContainerHighest)
+                .withValues(alpha: fillAlpha),
       divider: Colors.transparent,
       label: theme.code.chrome.label.copyWith(
         fontSize: 12,
         letterSpacing: theme.body.letterSpacing,
-        color: customSurface
+        color: backdropTint
+            ? theme.colors.ink.withValues(alpha: .9)
+            : customSurface
             ? theme.colors.ink2
             : scheme.onSurfaceVariant.withValues(alpha: .72),
       ),
       actionSize: 24,
       actionIconSize: 16,
       actionRadius: 4,
-      actionColor: customSurface
+      actionColor: backdropTint
+          ? theme.colors.ink2
+          : customSurface
           ? theme.colors.ink3
           : scheme.onSurfaceVariant.withValues(alpha: .5),
     ),
