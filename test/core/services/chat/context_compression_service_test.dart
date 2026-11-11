@@ -685,6 +685,7 @@ void main() {
         reloaded.operations.single.id,
       );
       final copy = await chat.loadContextSnapshot(continued.id);
+      expect(continued.title, 'Original (1)');
       expect(copy.operations, hasLength(1));
       expect(
         copy.operations.single.nativePayload!.output,
@@ -705,6 +706,7 @@ void main() {
         copy.operations.single.id,
       );
       final againSnapshot = await chat.loadContextSnapshot(again.id);
+      expect(again.title, 'Original (2)');
       expect(againSnapshot.messages, hasLength(3));
       expect(againSnapshot.operations.single.nativeSourceConversationId, id);
       await chat.changeContextOperation(
@@ -746,6 +748,7 @@ void main() {
         title: 'private',
         temporary: true,
       );
+      await chat.createConversation(title: 'private (1)', activate: false);
       chat.setCurrentConversation(temporary.id);
       for (var i = 0; i < 3; i++) {
         await chat.addMessage(
@@ -768,6 +771,7 @@ void main() {
       );
       final target = compression.taskFor(temporary.id)!.resultConversationId!;
       expect(chat.isTemporaryConversation(target), isTrue);
+      expect(chat.getConversation(target)!.title, 'private (2)');
       final copy = await chat.loadContextSnapshot(target);
       expect(await repo.getConversation(target), isNull);
       expect(await repo.readContextOperations(target), isEmpty);
@@ -1499,6 +1503,7 @@ void main() {
         title: 'temporary',
         temporary: true,
       );
+      await chat.createConversation(title: 'temporary (1)', activate: false);
       for (var i = 0; i < 3; i++) {
         await chat.addMessage(
           conversationId: temporary.id,
@@ -1528,6 +1533,7 @@ void main() {
       );
       final target = compression.taskFor(temporary.id)!.resultConversationId!;
       expect(chat.isTemporaryConversation(target), isTrue);
+      expect(chat.getConversation(target)!.title, 'temporary (2)');
       expect(await repo.getConversation(target), isNull);
       expect(await repo.compression.overrides(temporary.id), isEmpty);
       expect(await repo.compression.overrides(target), isEmpty);

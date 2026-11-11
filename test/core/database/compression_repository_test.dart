@@ -332,7 +332,6 @@ void main() {
       final fork = await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'u',
-        title: 'fork',
         assistantId: null,
         preserveVersions: false,
       );

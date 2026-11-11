@@ -111,7 +111,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a2',
-        title: 'Before pin',
       ))!;
       expect(
         ContextHistory.fixedStart(await repo.readContextOperations(fork.id)),
@@ -266,7 +265,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a1',
-        title: 'fork',
       ))!;
       final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
       final forkSettings = await repo.readImageContextSettings(fork.id);
@@ -806,13 +804,11 @@ void main() {
       final old = await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'u2',
-        title: 'old',
       );
       expect(await repo.readContextOperations(old!.id), isEmpty);
       final current = await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a3',
-        title: 'current',
         preserveVersions: false,
       );
       expect((await repo.readContextOperations(current!.id)).length, 1);
@@ -834,7 +830,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a3',
-        title: 'Fork',
         preserveVersions: false,
       ))!;
       expect(

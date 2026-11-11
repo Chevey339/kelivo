@@ -155,7 +155,6 @@ void main() {
       final fork = await service.forkConversationAtRevision(
         sourceConversationId: conversation.id,
         sourceRevisionId: message.id,
-        title: 'Copy',
         preserveVersions: preserveVersions,
       );
       await service.deleteConversation(conversation.id);

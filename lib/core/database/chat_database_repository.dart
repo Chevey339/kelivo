@@ -3,6 +3,7 @@ import 'extension_entity_store.dart';
 import '../models/compression_config.dart';
 import '../models/image_context.dart';
 import '../utils/chat_image_result.dart';
+import '../utils/conversation_fork_title.dart';
 import '../models/quote_ref.dart';
 import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
@@ -4731,6 +4732,26 @@ class ChatDatabaseRepository {
     await _replaceMcpServers(conversationId, serverIds ?? const []);
   });
 
+  // Call inside the transaction that inserts the fork so concurrent copies
+  // cannot claim the same suffix. Read titles only, including other assistants.
+  Future<String> _nextForkTitle(String sourceTitle) async {
+    final title = _db.conversationRows.title;
+    final rows = await (_db.selectOnly(
+      _db.conversationRows,
+    )..addColumns([title])).get();
+    return nextConversationForkTitle(
+      sourceTitle,
+      rows.map((row) => row.read(title)!),
+    );
+  }
+
+  /// Saves a newly constructed message-selection fork with an available title.
+  Future<void> putForkConversation(Conversation conversation) =>
+      _writeTransaction(() async {
+        conversation.title = await _nextForkTitle(conversation.title);
+        await putConversation(conversation);
+      });
+
   Future<Conversation?> duplicateConversation(String sourceId) async {
     await genUiStates.flush();
     return _writeTransaction(() async {
@@ -4765,6 +4786,7 @@ class ChatDatabaseRepository {
       );
       final duplicatedAt = DateTime.now();
       final duplicate = source.copyWith(
+        title: await _nextForkTitle(source.title),
         extras: ToolPermissionMode.withoutGrant(source.extras),
         id: targetId,
         createdAt: duplicatedAt,
@@ -4924,7 +4946,6 @@ class ChatDatabaseRepository {
   Future<Conversation?> forkConversationWithVersions({
     required String sourceId,
     required String targetRevisionId,
-    required String title,
     String? assistantId,
     bool preserveVersions = true,
   }) async {
@@ -5042,7 +5063,7 @@ class ChatDatabaseRepository {
             _conversationCompanion(
               Conversation(
                 id: targetId,
-                title: title,
+                title: await _nextForkTitle(source.title),
                 createdAt: now,
                 updatedAt: now,
                 assistantId: assistantId,

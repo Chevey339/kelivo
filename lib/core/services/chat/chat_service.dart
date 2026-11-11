@@ -4,6 +4,7 @@ import '../../../features/intelligent_ui/host/ui_source_map.dart';
 import '../../models/compression_config.dart';
 import '../../models/image_context.dart';
 import '../../utils/chat_image_result.dart';
+import '../../utils/conversation_fork_title.dart';
 import '../../models/quote_ref.dart';
 import '../../../features/intelligent_ui/host/ui_context_submission.dart';
 import '../../../features/intelligent_ui/models/ui_context_attachment.dart';
@@ -4120,7 +4121,6 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> forkConversationAtRevision({
     required String sourceConversationId,
     required String sourceRevisionId,
-    required String title,
     bool preserveVersions = false,
   }) async {
     if (!_initialized) await init();
@@ -4132,7 +4132,6 @@ class ChatService extends ChangeNotifier {
       sourceId: sourceConversationId,
       preserveVersions: preserveVersions,
       targetRevisionId: sourceRevisionId,
-      title: source.title,
       assistantId: source.assistantId,
     );
     if (forked == null) throw StateError('linear_fork_target_missing');
@@ -4203,14 +4202,26 @@ class ChatService extends ChangeNotifier {
     };
     final uiCopies = await _captureGenUiCopies(sourceMessages);
     final persisted = Conversation(
-      title: title,
+      title: temporary
+          ? nextConversationForkTitle(title, [
+              for (final conversation in _conversationsCache.values)
+                conversation.title,
+              for (final conversation in _draftConversations.values)
+                conversation.title,
+            ])
+          : title,
       assistantId: assistantId,
       extras: _extrasForNewConversation(assistantId),
     );
     if (temporary) _temporaryConversationIds.add(persisted.id);
     _unpublishedForks.add(persisted.id);
     try {
-      await _saveConversation(persisted);
+      if (temporary) {
+        await _saveConversation(persisted);
+      } else {
+        await _repo.putForkConversation(persisted);
+        _conversationsCache[persisted.id] = persisted;
+      }
       await _copyConversationSettingsFrom(persisted.id, sourceExtras);
       if (sourceMcpServerIds != null) {
         await setConversationMcpServers(persisted.id, sourceMcpServerIds);

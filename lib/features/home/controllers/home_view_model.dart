@@ -1361,13 +1361,11 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    final title = getTitleForLocale(_contextProvider);
     final sourceConversation = currentConversation;
     if (sourceConversation == null) return;
     final newConvo = await _chatService.forkConversationAtRevision(
       sourceConversationId: sourceConversation.id,
       sourceRevisionId: message.id,
-      title: title,
       preserveVersions: _contextProvider
           .read<SettingsProvider>()
           .forkKeepMessageVersions,

@@ -481,7 +481,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
       final now = DateTime.now();
       final target = Conversation(
         id: id,
-        title: source.title,
+        title: await _nextForkTitle(source.title),
         assistantId: source.assistantId,
         createdAt: now,
         updatedAt: now,

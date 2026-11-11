@@ -124,7 +124,6 @@ void main() {
       final fork = await repository.forkConversationWithVersions(
         sourceId: 'source',
         targetRevisionId: 'a1v1',
-        title: 'Fork title',
         assistantId: 'assistant',
       );
 
@@ -138,7 +137,7 @@ void main() {
         ))!.extras['tools.permission_mode'],
         'fullAccess',
       );
-      expect(fork.title, 'Fork title');
+      expect(fork.title, 'Topic (1)');
       expect(fork.assistantId, 'assistant');
       expect(fork.isPinned, isFalse);
       expect(fork.mcpServerIds, const ['mcp-server']);
@@ -288,7 +287,6 @@ void main() {
         final fork = await repository.forkConversationWithVersions(
           sourceId: 'source',
           targetRevisionId: 'a1v0',
-          title: 'Rolled fork',
           assistantId: 'assistant',
         );
 
@@ -319,7 +317,6 @@ void main() {
         await repository.forkConversationWithVersions(
           sourceId: 'missing',
           targetRevisionId: 'rev',
-          title: 'Fork',
         ),
         isNull,
       );
@@ -358,7 +355,6 @@ void main() {
         await repository.forkConversationWithVersions(
           sourceId: 'source',
           targetRevisionId: 'missing-rev',
-          title: 'Fork',
         ),
         isNull,
       );
@@ -417,7 +413,6 @@ void main() {
           await repository.forkConversationWithVersions(
             sourceId: 'source',
             targetRevisionId: 'other-msg',
-            title: 'Fork',
           ),
           isNull,
         );

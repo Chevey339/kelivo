@@ -171,7 +171,6 @@ void main() {
         final fork = await service.forkConversationAtRevision(
           sourceConversationId: compressed.id,
           sourceRevisionId: copied.id,
-          title: 'Retained image',
           preserveVersions: preserveVersions,
         );
         await service.deleteConversation(compressed.id);

@@ -126,7 +126,6 @@ void main() {
           final fork = await reopened.forkConversationAtRevision(
             sourceConversationId: conversation.id,
             sourceRevisionId: message.id,
-            title: 'Fork',
             preserveVersions: preserve,
           );
           expect(ConversationMcpSettings.isOverridden(fork), isTrue);
