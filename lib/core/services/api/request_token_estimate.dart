@@ -6,6 +6,7 @@ import 'request_history_context.dart';
 /// Counts the actual wire projection, including tools, but never tokenizes
 /// base64 image bytes as text. Call after the existing image planner.
 int estimateRequestInput(Map<String, dynamic> body, ProviderKind kind) {
+  final wire = RequestHistoryContext.stripSources(body);
   var images = 0;
   dynamic countable(dynamic value) {
     if (value is List) return value.map(countable).toList();
@@ -27,8 +28,7 @@ int estimateRequestInput(Map<String, dynamic> body, ProviderKind kind) {
     }
     return {
       for (final entry in value.entries)
-        if (entry.key != historySourceKey)
-          entry.key.toString(): countable(entry.value),
+        entry.key.toString(): countable(entry.value),
     };
   }
 
@@ -44,7 +44,7 @@ int estimateRequestInput(Map<String, dynamic> body, ProviderKind kind) {
       'tools',
       'functions',
     ])
-      if (body[key] != null) key: countable(body[key]),
+      if (wire[key] != null) key: countable(wire[key]),
   };
   return estimateTokens(jsonEncode(input)) + images * estimateImageTokens(kind);
 }
