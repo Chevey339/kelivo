@@ -3,7 +3,6 @@
   "modelAvatarTitle": "模型图标",
   "avatarColor": "彩色",
   "avatarMonochrome": "单色",
-
   "settingsSearchHint": "搜索设置",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清空搜索",
@@ -522,7 +521,10 @@
   "backupPagePassword": "密码",
   "backupPagePath": "路径",
   "backupPageChatsLabel": "聊天记录",
-  "backupPageFilesLabel": "文件",
+  "backupPageFilesDescription": "聊天附件、头像、背景图和自定义字体。恢复头像或背景图时，还需选中对应的助手、服务商或设置。",
+  "backupPageChooseBackupFolder": "选择备份保存文件夹",
+  "backupPageChooseExternalFolder": "请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。",
+  "backupPageFilesLabel": "文件与图片",
   "backupPageScopeTitle": "备份与导入内容",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "@backupPageScopeSelectedCount": {
@@ -723,8 +725,8 @@
       }
     }
   },
-  "backupPageExportToFile": "导出为文件",
-  "backupPageExportToFileSubtitle": "导出APP数据为文件",
+  "backupPageExportToFile": "立即备份",
+  "backupPageExportToFileSubtitle": "将所选内容保存为备份文件",
   "backupPageImportBackupFile": "备份文件导入",
   "backupPageImportBackupFileSubtitle": "导入本地备份文件",
   "backupPageImportFromOtherApps": "从其他APP导入",
@@ -753,7 +755,7 @@
   "backupPageSave": "保存",
   "backupPageBackupNow": "立即备份",
   "backupPageLocalBackup": "本地备份",
-  "backupPageIosSystemBackupNote": "Kelivo 的本地数据已设置为不参与 iCloud 系统备份。换机或卸载 App 前，请先导出备份文件。",
+  "backupPageIosSystemBackupNote": "Kelivo 的本地数据不参与 iCloud 系统备份。换机或卸载 App 前，请将备份保存到 iCloud 云盘或 Kelivo 之外的文件夹。“我的 iPhone > Kelivo”中的文件会随 App 卸载而删除。",
   "backupPageImportFromCherryStudio": "从 Cherry Studio 导入",
   "backupPageCherryStudioUnsupportedBackupVersion": "此备份使用 Cherry Studio 格式版本 {version}，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。",
   "backupPageImportFromChatbox": "从 Chatbox 导入",
@@ -851,15 +853,15 @@
   "compressContextEmptySummary": "压缩返回了空摘要",
   "compressContextOptionsTitle": "压缩上下文",
   "compressContextOptionsDesc": "在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。",
-  "compressContextKeepStart": "开头取样",
-  "compressContextKeepRecent": "末尾取样",
-  "compressContextUnlimited": "全部内容",
+  "compressContextKeepStart": "较早历史",
+  "compressContextKeepRecent": "较近历史",
+  "compressContextUnlimited": "全部历史",
   "compressContextMaxCharsLabel": "字符数",
   "compressContextInvalidLimit": "请输入大于 0 的字符数",
   "compressContextStartButton": "开始压缩",
   "compressContextModelLabel": "压缩模型",
   "compressContextModelUnset": "选择模型",
-  "compressContextKeepRecentMessages": "保留 N 条",
+  "compressContextKeepRecentMessages": "保留最近原文",
   "compressContextKeepCountLabel": "保留用户消息数",
   "compressContextKeepAllMessages": "保留条数覆盖全部消息，无内容可压缩",
   "compressContextEstimatePreview": "总结 {summarized} 字符，原样保留 {kept} 字符 → 压缩后约 {minTokens}–{maxTokens} tokens（原文约 {totalTokens} tokens）",
@@ -906,6 +908,8 @@
   "reasoningLevelAuto": "自动",
   "reasoningLevelAutoSubtitle": "使用模型或供应商的默认设置",
   "reasoningLevelOff": "关闭",
+  "reasoningLevelOn": "开启",
+  "reasoningLevelOnSubtitle": "启用推理",
   "reasoningLevelOffSubtitle": "关闭推理，直接回答",
   "reasoningLevelMinimal": "最低",
   "reasoningLevelMinimalSubtitle": "使用极少推理来回答问题",
@@ -1186,6 +1190,10 @@
   "contextUsageStateFailed": "计算失败",
   "contextUsageStateFailedWithPrevious": "更新失败，上次结果已过时",
   "contextUsageUnavailable": "用量不可用",
+  "contextUsagePartialSummary": "已估算 {tokens} + 压缩块未知",
+  "contextUsageBucketNativeCompaction": "原生压缩块",
+  "contextUsageUnknownTokens": "未知",
+  "contextUsageLastRequestInput": "上次请求输入（实测）：{tokens}",
   "contextUsageStateNone": "暂无数据",
   "contextUsageBucketSystem": "系统提示词",
   "contextUsageBucketInjections": "指令注入",
@@ -1968,7 +1976,7 @@
   "displaySettingsPageNewChatOnLaunchSubtitle": "应用启动时自动创建新对话",
   "displaySettingsPageChatFontSizeTitle": "聊天字体大小",
   "displaySettingsPageAutoScrollEnableTitle": "自动跟随底部",
-  "displaySettingsPageAutoScrollDisabledLabel": "已关闭",
+  "displaySettingsPageAutoScrollDisabledLabel": "关闭",
   "displaySettingsPageChatFontSampleText": "这是一个示例的聊天文本",
   "displaySettingsPageChatBackgroundMaskTitle": "背景图片遮罩透明度",
   "displaySettingsPageChatInputBackgroundOpacityTitle": "输入框背景透明度",
@@ -2734,7 +2742,7 @@
   "memoryAboutScopeTitle": "全局与助手范围",
   "memoryAboutScopeBody": "全局记忆会对所有助手注入。助手范围的记忆只对该助手可见。跨助手都该知道的事实用全局；只属于某一个助手的规则或上下文用助手范围。",
   "memoryAboutInjectionTitle": "记忆如何注入",
-  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。",
+  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。 可在各助手的记忆设置中选择需要全量注入的类型。",
   "memoryAboutPipelineTitle": "后台整理",
   "memoryAboutPipelineBody": "开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。",
   "memoryAboutCacheTitle": "保持缓存良好",
@@ -2746,9 +2754,11 @@
   "memorySettingsThinkingSubtitle": "在模型支持时允许记忆模型使用推理",
   "memorySettingsInjectionSection": "记忆注入",
   "memorySettingsInjectionMaxItemsTitle": "每类注入条数",
-  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
-  "memorySettingsFullInjectionTypesTitle": "全量注入类型",
-  "memorySettingsFullInjectionTypesSubtitle": "可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
+  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未在助手记忆设置中选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "assistantEditMemoryFullInjectionTypesTitle": "全量注入类型",
+  "assistantEditMemoryFullInjectionTypesNone": "未选择",
+  "assistantEditMemoryFullInjectionTypesSelected": "已选 {count} 类",
+  "assistantEditMemoryFullInjectionTypesSubtitle": "仅对当前助手生效，可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
@@ -5582,7 +5592,7 @@
   "compressCopyResult": "复制结果",
   "contextDetailInUse": "当前直接使用",
   "contextImpactDescription": "相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。",
-  "compressIncludeAttachmentsDesc": "纳入已有附件文字、工具参数与结果；过长内容会截断并标明，不会重新识图。",
+  "compressIncludeAttachmentsDesc": "按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。",
   "worldBookEntriesMoved": "已移动 {count} 个条目",
   "contextImpactSourceDescription": "确认后变更原文，并撤销概括过它的摘要及依赖后继。其他消息与独立节点保留，不会自动调用模型。",
   "contextEditTitle": "编辑摘要",
@@ -5842,5 +5852,275 @@
   "contextCancelFixedStart": "取消固定上下文起点",
   "contextFixedStartDescription": "从这条消息开始发送历史，不再按消息数量滚动截取。",
   "contextBeforeFixedStart": "这条消息位于固定上下文起点之前，请先移动或取消起点再重新生成。",
-  "contextRegenerateFixedStart": "这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。"
+  "contextRegenerateFixedStart": "这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。",
+  "responseSpeedLabel": "响应速度",
+  "responseSpeedStandard": "标准",
+  "responseSpeedUsageHint": "加速模式会消耗更多额度或余额。",
+  "responseSpeedLoading": "正在检查可用档位…",
+  "responseSpeedUnavailable": "当前模型没有可请求的加速档位。",
+  "responseSpeedSaveFailed": "响应速度保存失败，请重试。",
+  "responseSpeedRequestFailed": "{mode} 请求失败。请检查模型及账号是否支持，或切换为标准模式重试。",
+  "responseSpeedSelectionUnavailable": "之前选择的加速档位已不可用，此会话将使用标准模式。",
+  "responseSpeedProviderDependent": "是否支持加速取决于当前供应商。",
+  "responseSpeedTapTo": "点击切换为{mode}",
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要启用 Responses API。",
+  "compressionTemplate": "摘要模板",
+  "compressionGeneral": "通用",
+  "compressionCode": "代码",
+  "compressionWriting": "写作",
+  "compressionResearch": "研究",
+  "compressionRoleplay": "角色扮演",
+  "compressionOriginalPrompt": "我的原提示词",
+  "compressionMore": "更多设置",
+  "compressionFocus": "本次重点保留",
+  "compressionFocusHint": "可选：关键决定、任务进展、人物状态",
+  "compressionForConversation": "用于此会话",
+  "compressionFollowGlobal": "跟随全局默认",
+  "compressionSetGlobal": "设为全局默认",
+  "compressionGlobalDescription": "影响跟随全局默认的会话；已有会话覆盖保持不变。",
+  "compressionAutoTitle": "自动压缩",
+  "compressionAutoOff": "关闭",
+  "compressionAutoNotify": "仅提醒",
+  "compressionAutoOn": "自动",
+  "compressionNearLimit": "上下文接近估算容量，可以继续发送或手动压缩。",
+  "compressionKeepTurns": "保留最近",
+  "compressionKeepHint": "一轮包含一条用户消息及其后续回复、工具内容。",
+  "compressionLength": "摘要上限（tokens）",
+  "compressionTrigger": "触发阈值",
+  "compressionTarget": "压缩后目标",
+  "compressionWindow": "规划窗口",
+  "compressionRequests": "最多调用",
+  "compressionReference": "参考当前生效的世界书与记忆",
+  "compressionReferenceHint": "参考用于理解人名与规则，不代表事件已经发生或角色已经知情。",
+  "compressionToolReferences": "以引用替代已读工具结果",
+  "compressionToolReferencesHint": "仅工具可用时生效。保留最新未读结果，可只读回查原记录。",
+  "compressionSummaryScan": "摘要参与世界书关键词匹配",
+  "compressionChatModel": "跟随当前对话模型",
+  "compressionManageTemplates": "管理模板与方案",
+  "compressionLocalPreview": "预览发送内容 · 不调用模型",
+  "compressionTry": "试生成摘要 · 会产生模型用量",
+  "compressionPreviewOnly": "仅生成候选，审阅后可应用。",
+  "compressionTemplateChanged": "新模板用于后续摘要。已有摘要保持原样；可从原文重新生成以补回细节。",
+  "compressionRange": "压缩 {count} 条历史 · 保留 {turns} 轮原文",
+  "compressionCalls": "模型调用 {count} 次",
+  "compressionActualUsage": "摘要模型实际用量",
+  "compressionUsageValues": "输入 {input} · 输出 {output} tokens",
+  "compressionUsageUnknown": "有 {count} 次调用未返回用量，不能视为免费。",
+  "compressionBudgetError": "预计调用数超过上限。请调高上限或选择更大窗口的摘要模型；未应用部分摘要。",
+  "compressionIncomplete": "摘要被截断或拒绝，未应用。请调整输出上限或模型。",
+  "compressionReferenceTooLarge": "模板、参考或工作摘要占满了摘要模型预算。请减少参考或选择更大窗口模型。",
+  "compressionReferenceChanged": "引用背景已改变，请审阅候选或重新生成。",
+  "compressionTargetNotReached": "候选未使完整请求降到自动触发线以下，已保留原上下文。",
+  "compressionTemplateMissing": "所选模板不可用，请选择其他模板。",
+  "compressionTemplates": "模板",
+  "compressionRecipes": "方案",
+  "compressionNewTemplate": "新建模板",
+  "compressionEditTemplate": "编辑模板",
+  "compressionRestoreDefault": "恢复默认",
+  "compressionCopyEdit": "复制并修改",
+  "compressionTemplateName": "名称",
+  "compressionPrompt": "摘要提示词",
+  "compressionLanguage": "输出语言",
+  "compressionLanguageConversation": "跟随对话",
+  "compressionLanguageLegacy": "沿用原模板语言行为",
+  "compressionLanguageHint": "语言名称或代码，或 conversation / legacy",
+  "compressionVariables": "支持以下变量；缺少历史变量时会自动附加历史：",
+  "compressionDeleteTemplate": "选择替代模板并删除？已接受的摘要和方案快照仍保留。",
+  "compressionTemplateReferences": "被 {count} 个会话单独引用。",
+  "compressionSaveRecipe": "保存当前设置为方案",
+  "compressionBindModel": "绑定所选摘要模型",
+  "compressionRecipeHint": "方案不会开启自动压缩；导入只加入库，不立即应用。",
+  "compressionImport": "导入 JSON",
+  "compressionExport": "导出 JSON",
+  "compressionCopyJson": "复制 JSON",
+  "compressionApplyRecipe": "应用方案",
+  "compressionInvalidSettings": "请检查参数：压后目标需低于触发阈值，调用数与 token 上限需有效。",
+  "compressionOverflowAction": "压缩一次后重试失败的回复",
+  "@compressionRange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "turns": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionUsageValues": {
+    "placeholders": {
+      "input": {
+        "type": "String"
+      },
+      "output": {
+        "type": "String"
+      }
+    }
+  },
+  "@compressionUsageUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionTemplateReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionPlannedCalls": "预计 {count} 次请求 · 本次上限 {limit} 次（含重试）",
+  "@compressionPlannedCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGlobalTemplateReference": "同时用作全局默认模板。",
+  "compressionRecipeReferences": "{count} 个方案将保留各自独立的模板快照。",
+  "compressionReplacementTemplate": "替代模板",
+  "@compressionRecipeReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGeneralDescription": "保留当前话题、决定与未解决问题。",
+  "compressionCodeDescription": "区分代码改动、实际验证与下一步工作。",
+  "compressionWritingDescription": "保存已采纳文本、结构、文风与编辑要求。",
+  "compressionResearchDescription": "保留证据、来源、数值与不确定性。",
+  "compressionRoleplayDescription": "保持场景、人物状态与各角色的知识边界。",
+  "compressionLastUsed": "最近使用：{date}",
+  "@compressionLastUsed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionManage": "管理",
+  "compressionOutputSettings": "摘要设置",
+  "compressionSourceSettings": "参考与原文",
+  "compressionSavedSettings": "预览与方案",
+  "compressionNoRecipes": "暂无保存的方案",
+  "compressionNoTemplatesFound": "没有匹配的模板",
+  "compressionBuiltIn": "内置",
+  "compressionGlobalDefault": "全局默认",
+  "compressionCustomLanguage": "其他语言",
+  "compressionCustomLanguageHint": "语言名称或代码，例如日语 / ja",
+  "compressionLibraryTitle": "模板与方案",
+  "compressionBuiltInTemplates": "内置模板",
+  "compressionMyTemplates": "我的模板",
+  "compressionSearchTemplates": "搜索模板",
+  "compressionSearchRecipes": "搜索方案",
+  "compressionRecipeCreateHint": "在「更多设置」中将当前配置保存为方案。",
+  "compressionTurnUnit": "轮",
+  "compressionCallUnit": "次",
+  "compressionAdvancedOptions": "压缩细节",
+  "compressionAdvancedHint": "参考内容、原文回读与调用限制",
+  "compressionAutomaticWindow": "自动",
+  "compressionAutoOffHint": "需要时可在压缩页手动开始。",
+  "compressionAutoNotifyHint": "接近阈值时提醒，由你决定何时压缩。",
+  "compressionAutoOnHint": "达到阈值后自动整理较早历史，会产生额外模型用量。",
+  "compressionBudgetHint": "百分比以当前可用的输入预算为基准。",
+  "compressionPreviewAction": "本地预览",
+  "compressionSaveRecipeAction": "保存方案",
+  "compressionManualRange": "本次压缩范围",
+  "compressionScopeKeepHint": "保留最近原文，压缩更早历史；此轮数也用于自动压缩。",
+  "compressionScopeAllHint": "当前上下文的历史全部纳入摘要，不保留最近原文；原消息仍可查看。",
+  "compressionScopeStartHint": "按字符预算选取较早的完整消息，未选中的历史保留原文。",
+  "compressionScopeRecentHint": "按字符预算选取较近的完整消息，未选中的历史保留原文。",
+  "compressionAutoKeepHint": "自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。",
+  "requestBudgetTitle": "图片与请求预算",
+  "requestBudgetInherited": "继承默认",
+  "requestBudgetCustom": "自定义",
+  "requestBudgetReset": "恢复默认",
+  "requestBudgetSingleImage": "单张图片（MiB）",
+  "requestBudgetTotalImages": "图片合计（MiB）",
+  "requestBudgetImageCount": "图片数量",
+  "requestBudgetBody": "请求体（MiB）",
+  "requestBudgetProviderHelp": "这些是发送前的本地检查，不代表供应商上限。留空使用提示中的默认值。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。",
+  "requestBudgetModelHelp": "为此模型覆盖本地发送限制。留空继承提示中的供应商设置。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。",
+  "requestBudgetRetentionHelp": "调大限制不会增加自动保留的历史图片，可固定需要保留的图片。较大的预算会增加设备内存占用。",
+  "requestBudgetInvalid": "请输入正数大小和正整数图片数量，或留空继承默认值。",
+  "requestBudgetBytes": "{mib} MiB（{bytes} 字节）",
+  "requestBudgetSingleError": "Kelivo 本地预检：本次请求第 {index} 张图片编码后为 {actual}，超过单张预算 {limit}。",
+  "requestBudgetTotalError": "Kelivo 本地预检：图片编码后合计 {actual}，超过图片总预算 {limit}。",
+  "requestBudgetCountError": "Kelivo 本地预检：本次请求包含 {actual} 张图片，超过数量上限 {limit} 张。",
+  "requestBudgetBodyError": "Kelivo 本地预检：完整请求体为 {actual}，超过请求体预算 {limit}。",
+  "requestBudgetPinnedError": "这张图片已固定。",
+  "requestBudgetImageHint": "打开“图片上下文”查看本轮图片及固定状态。可缩小或减少图片、取消固定旧图片，或在供应商／模型设置中调整预算。",
+  "requestBudgetBodyHint": "请缩短或压缩会话上下文（包括工具记录），或在供应商／模型设置中调整请求体预算。",
+  "imageContextEncodedSize": "编码后 {size} MiB",
+  "imageContextPinned": "已固定",
+  "imageContextSizeUnknown": "大小待发送时确认",
+  "requestBudgetAtLeast": "至少 {value}",
+  "compressionNativeTitle": "使用 OpenAI 原生压缩",
+  "compressionNativeHint": "使用当前对话模型和 Responses 协议；本会话开启自动压缩时也使用原生方式，支持情况由服务端决定。",
+  "compressionNativeScopeHint": "保留最近原文，压缩较早历史；此轮数也用于原生自动压缩，不修改文本摘要的保留轮数。",
+  "compressionNativeLabel": "原生压缩",
+  "compressionNativeDescription": "已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。",
+  "compressionNativeIncomplete": "服务端未返回完整的原生压缩结果，原上下文未改变。",
+  "compressionNativeScopeChanged": "此原生上下文属于其他连接或账号。请切回原连接继续，或在保留原文的会话中撤销压缩、重新生成文字摘要。",
+  "compressionNativeTokenHint": "原生上下文的 token 用量以服务端统计为准。",
+  "compressionNativeCopyHint": "新会话仅保存完整的原生压缩结果和保留的最近对话。原文留在原会话，无法在新会话中撤销恢复。",
+  "compressionNativeInputOverride": "自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。",
+  "compressionNativeAllHint": "将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。",
+  "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。",
+  "languageDisplayRussian": "俄语",
+  "languageDisplayTurkish": "土耳其语",
+  "sideDrawerDeleteConfirmContent": "删除“{title}”？",
+  "backupPageCherryImportWarning": "此功能目前仍处于实验阶段，可导入助手、对话、供应商和文件。部分供应商需要在基础 URL 后添加 /v1 或 /v1beta。为确保数据安全，请在导入前备份。是否继续选择文件？",
+  "themePaletteDefault": "默认",
+  "themePaletteBlue": "海霄蓝",
+  "themePaletteGreen": "竹影绿",
+  "themePalettePurple": "暮紫韵",
+  "themePaletteYellow": "琥珀金",
+  "themePaletteSmokyRose": "暮霭玫",
+  "themePaletteTerracotta": "陶砂红",
+  "themePaletteMonochrome": "纸墨灰",
+  "themePaletteDocument": "樱桃绿",
+  "themePaletteCustom": "自定义",
+  "@sideDrawerDeleteConfirmContent": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionNativeImported": "已载入原生压缩上下文",
+  "compressionNativeImportedDescription": "此会话以完整的原生压缩结果和保留的最近对话开始。压缩结果无法作为文本查看或编辑；较早的原文保留在原会话，不能在此撤销恢复。",
+  "compressionNativeOpenSource": "查看原会话",
+  "compressionNativeOriginalsUnavailable": "此会话没有已载入原生上下文对应的原文。可继续使用原生压缩，或返回原会话查看原文、重新生成文字摘要。",
+  "compressionNativeTemporaryCopyHint": "新的临时会话仅保留完整的原生压缩结果和最近对话。离开旧临时会话后，它及未保留的原文会被清除，无法在新会话中恢复。",
+  "compressionNativeSourceUnavailable": "此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。",
+  "modelDetailSheetImageGenerationModel": "生图模型",
+  "modelDetailSheetImageGenerationAuto": "自动",
+  "modelDetailSheetImageGenerationComplexity": "生图复杂度",
+  "modelDetailSheetImageGenerationComplexityDefault": "默认",
+  "modelDetailSheetImageGenerationComplexityLow": "低",
+  "modelDetailSheetImageGenerationComplexityMedium": "中",
+  "modelDetailSheetImageGenerationComplexityHigh": "高",
+  "modelDetailSheetImageGenerationComplexityDescription": "独立控制生图规划程度。默认使用服务端行为，可能沿用聊天思考档位。",
+  "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 登录通道可能替换所选生图模型，模型和复杂度设置能否生效取决于服务端支持。",
+  "imageGenerationComplexityErrorHint": "请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。",
+  "workspaceEnvNativeShellTitle": "默认 Shell",
+  "workspaceEnvNativeShellHint": "留空时自动检测，也可填写 PowerShell、cmd 或支持 -lc 的 Shell（如 bash、zsh、fish）的绝对路径。此设置仅用于本机。",
+  "workspaceEnvNativeShellInvalid": "无法启动此 Shell，请检查绝对路径及其支持的命令语法。",
+  "workspaceEnvNativeShellUnavailable": "Shell 不可用",
+  "workspaceEnvNativeShellDetect": "重新检测",
+  "workspaceEnvNativeShellSave": "保存"
 }

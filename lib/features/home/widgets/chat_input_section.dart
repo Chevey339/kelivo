@@ -67,6 +67,7 @@ class ChatInputSection extends StatelessWidget {
     this.onOpenSkills,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.reasoningButtonKey,
     this.onOpenContextUsage,
     this.onSend,
     this.onStop,
@@ -118,6 +119,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onOpenSkills;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final GlobalKey? reasoningButtonKey;
   final VoidCallback? onOpenContextUsage;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
   final VoidCallback? onStop;
@@ -230,6 +232,7 @@ class ChatInputSection extends StatelessWidget {
       mediaController: mediaController,
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
+      reasoningButtonKey: reasoningButtonKey,
       onOpenContextUsage: onOpenContextUsage,
       reasoningActive: isReasoningEnabled(effectiveReasoning),
       reasoning: effectiveReasoning,

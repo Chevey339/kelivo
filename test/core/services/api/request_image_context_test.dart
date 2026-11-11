@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/api/request_history_context.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
 import 'package:Kelivo/core/services/api/native_input_attachments.dart';
@@ -26,6 +28,263 @@ ChatContextImage image(
 );
 
 void main() {
+  Map<String, dynamic> bodyFor(List<String> urls) => {
+    'input': [
+      {
+        'role': 'user',
+        'content': [
+          for (final url in urls) {'type': 'input_image', 'image_url': url},
+        ],
+      },
+    ],
+  };
+
+  test(
+    'all image limits report measured values and allow the exact boundary',
+    () async {
+      for (final (budget, urls, kind, actual, limit) in [
+        (
+          const RequestBudget(singleImageBytes: 3),
+          [pixels],
+          ImageContextBudgetKind.singleImage,
+          4,
+          3,
+        ),
+        (
+          const RequestBudget(totalImageBytes: 7),
+          [pixels, pixels],
+          ImageContextBudgetKind.totalImages,
+          8,
+          7,
+        ),
+        (
+          const RequestBudget(imageCount: 1),
+          [pixels, pixels],
+          ImageContextBudgetKind.imageCount,
+          2,
+          1,
+        ),
+      ]) {
+        final request = RequestImageContext(
+          settings: const ImageContextSettings(automatic: false),
+          images: [],
+          budget: budget,
+        );
+        await expectLater(
+          request.project(bodyFor(urls)),
+          throwsA(
+            isA<ImageContextBudgetException>()
+                .having((e) => e.kind, 'kind', kind)
+                .having((e) => e.actual, 'actual', actual)
+                .having((e) => e.limit, 'limit', limit),
+          ),
+        );
+      }
+      final exact = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+        budget: const RequestBudget(
+          singleImageBytes: 4,
+          totalImageBytes: 8,
+          imageCount: 2,
+        ),
+      );
+      expect(
+        await exact.project(bodyFor([pixels, pixels])),
+        bodyFor([pixels, pixels]),
+      );
+    },
+  );
+
+  test(
+    'body diagnostics count final UTF-8 JSON including text and tools, without local metadata',
+    () async {
+      final body = <String, dynamic>{
+        'input': [
+          {
+            'role': 'user',
+            historySourceKey: 'local-source',
+            'content': [
+              {'type': 'input_text', 'text': '中文🙂\\\n' * 5000},
+            ],
+          },
+        ],
+        'tools': [
+          {'type': 'function', 'name': 'test', 'description': '字' * 100},
+        ],
+      };
+      final expectedBytes = utf8
+          .encode(jsonEncode(RequestHistoryContext.stripSources(body)))
+          .length;
+      final request = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+        budget: RequestBudget(bodyBytes: expectedBytes - 1),
+      );
+      await expectLater(
+        request.project(body),
+        throwsA(
+          isA<ImageContextBudgetException>()
+              .having((e) => e.kind, 'kind', ImageContextBudgetKind.requestBody)
+              .having((e) => e.actual, 'actual', expectedBytes)
+              .having((e) => e.limit, 'limit', expectedBytes - 1),
+        ),
+      );
+      final exact = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+        budget: RequestBudget(bodyBytes: expectedBytes),
+      );
+      expect(
+        utf8.encode(jsonEncode(await exact.project(body))).length,
+        expectedBytes,
+      );
+    },
+  );
+
+  test(
+    'larger sending limits permit pins without expanding automatic retention',
+    () async {
+      final images = [
+        for (var i = 0; i < 4; i++) image(i, source: ContextImageSource.user),
+      ];
+      const history = RequestBudget(totalImageBytes: 8);
+      const sending = RequestBudget(totalImageBytes: 16);
+      RequestImageContext request(ImageContextSettings settings) =>
+          RequestImageContext(
+            settings: settings,
+            images: images,
+            latestUserId: 'new-text',
+            historyBudget: history,
+            budget: sending,
+          );
+      final automatic = request(const ImageContextSettings());
+      expect(await automatic.historyOmissions(), {
+        'm0|tool:call0|0',
+        'm1|tool:call1|0',
+      });
+      final pinned = request(
+        ImageContextSettings(pinned: images.map((im) => im.key).toSet()),
+      );
+      expect(await pinned.historyOmissions(), isEmpty);
+      final output = await pinned.project(
+        bodyFor(images.map((im) => im.reference).toList()),
+      );
+      expect(jsonEncode(output), isNot(contains('omitted')));
+      expect('YWJj'.allMatches(jsonEncode(output)).length, 4);
+    },
+  );
+
+  test(
+    'single-image errors identify the transmitted image and pin before reading',
+    () async {
+      final old = image(0);
+      final large = image(1);
+      var loads = 0;
+      final request = RequestImageContext(
+        settings: ImageContextSettings(pinned: {large.key}),
+        images: [old, large],
+        budget: const RequestBudget(singleImageBytes: 3),
+        loader: (_) async {
+          loads++;
+          return pixels;
+        },
+      );
+      request.compressedOwners.add(old.identity.messageId);
+      await expectLater(
+        request.project(bodyFor([old.reference, large.reference])),
+        throwsA(
+          isA<ImageContextBudgetException>()
+              .having((e) => e.imageIndex, 'request image position', 1)
+              .having((e) => e.imageKey, 'image identity', large.key)
+              .having((e) => e.pinned, 'pinned', isTrue)
+              .having((e) => e.actual, 'encoded size', 4),
+        ),
+      );
+      expect(loads, 0);
+    },
+  );
+
+  test(
+    'old oversized user images retire after their turn unless pinned',
+    () async {
+      final old = image(0, source: ContextImageSource.user);
+      final request = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [old],
+        latestUserId: 'new-text',
+        budget: const RequestBudget(singleImageBytes: 3),
+      );
+      expect(await request.historyOmissions(), {old.key});
+      expect(
+        jsonEncode(await request.project(bodyFor([old.reference]))),
+        contains('omitted'),
+      );
+    },
+  );
+
+  test('remote preview size is a reservation and never loads pixels', () async {
+    var loads = 0;
+    final remote = ChatContextImage(
+      identity: const ContextImageIdentity('m', 'tool:c'),
+      uri: 'https://example.test/image',
+      source: ContextImageSource.tool,
+      label: 'remote',
+    );
+    final request = RequestImageContext(
+      settings: const ImageContextSettings(),
+      images: [remote],
+      loader: (_) async {
+        loads++;
+        return pixels;
+      },
+    );
+    final preview = await request.preview();
+    expect(preview.single.sizeIsEstimate, isTrue);
+    expect(loads, 0);
+  });
+
+  test(
+    'missing pixels do not consume image count, and loading stops at the limit',
+    () async {
+      final images = [for (var i = 0; i < 5; i++) image(i)];
+      var loads = 0;
+      final request = RequestImageContext(
+        settings: const ImageContextSettings(automatic: false),
+        images: images,
+        budget: const RequestBudget(imageCount: 1),
+        loader: (image) async {
+          loads++;
+          return image == images.first ? null : pixels;
+        },
+      );
+      await expectLater(
+        request.project(bodyFor(images.map((im) => im.reference).toList())),
+        throwsA(
+          isA<ImageContextBudgetException>()
+              .having((e) => e.kind, 'kind', ImageContextBudgetKind.imageCount)
+              .having((e) => e.actual, 'resolved image count', 2)
+              .having(
+                (e) => e.minimum,
+                'stopped before remaining images',
+                isTrue,
+              ),
+        ),
+      );
+      expect(loads, 3);
+      final allowed = RequestImageContext(
+        settings: const ImageContextSettings(automatic: false),
+        images: images.take(2).toList(),
+        budget: const RequestBudget(imageCount: 1),
+        loader: (image) async => image == images.first ? null : pixels,
+      );
+      final projected = await allowed.project(
+        bodyFor(images.take(2).map((im) => im.reference).toList()),
+      );
+      expect('YWJj'.allMatches(jsonEncode(projected)).length, 1);
+    },
+  );
+
   test('a text-only append cannot restore a byte-evicted tool image', () async {
     const large = 'data:image/png;base64,AAAAAAAA';
     const small = 'data:image/png;base64,AAAA';
@@ -69,8 +328,10 @@ void main() {
           settings: settings,
           images: catalog,
           latestUserId: user,
-          maxImageBytes: 40,
-          maxSingleImageBytes: 10,
+          budget: const RequestBudget(
+            totalImageBytes: 40,
+            singleImageBytes: 10,
+          ),
           loader: (im) async => im.uri,
         ).project({
           'input': [
@@ -229,7 +490,7 @@ void main() {
         settings: const ImageContextSettings(),
         images: [current],
         latestUserId: 'm0',
-        maxSingleImageBytes: 2,
+        budget: RequestBudget(singleImageBytes: 2),
         loader: (_) async {
           loads++;
           return pixels;
@@ -256,7 +517,7 @@ void main() {
           pinned: pinned.map((im) => im.key).toSet(),
         ),
         images: pinned,
-        maxImageBytes: 16,
+        budget: RequestBudget(totalImageBytes: 16),
         loader: (_) async {
           loads++;
           return pixels;

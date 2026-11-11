@@ -17,6 +17,7 @@ class DesktopContextMenuItem {
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
+  final bool startsGroup;
 
   const DesktopContextMenuItem({
     this.icon,
@@ -26,6 +27,7 @@ class DesktopContextMenuItem {
     this.onTap,
     this.danger = false,
     this.checked = false,
+    this.startsGroup = false,
   });
 }
 
@@ -35,6 +37,7 @@ Future<void> showDesktopContextMenuAt(
   required Offset globalPosition,
   required List<DesktopContextMenuItem> items,
   Color? backgroundColor,
+  bool compact = false,
 }) async {
   // Match the navigator used by showGeneralDialog, including nested panes.
   final overlay = Navigator.of(context, rootNavigator: true).overlay;
@@ -70,7 +73,14 @@ Future<void> showDesktopContextMenuAt(
       final double estMenuHeight = items
           .fold<double>(
             0,
-            (sum, item) => sum + (item.subtitle == null ? 44 : 60),
+            (sum, item) =>
+                sum +
+                _menuItemHeight(
+                  ctx,
+                  subtitle: item.subtitle,
+                  compact: compact,
+                ) +
+                (item.startsGroup ? 9 : 0),
           )
           .clamp(44.0, menuMaxHeight);
       const double gap = 8; // offset from cursor
@@ -135,8 +145,22 @@ Future<void> showDesktopContextMenuAt(
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    for (final it in items)
+                                    for (final it in items) ...[
+                                      if (it.startsGroup)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          child: Divider(
+                                            height: 9,
+                                            thickness: 0.5,
+                                            color: cs.outlineVariant.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                          ),
+                                        ),
                                       _GlassMenuItem(
+                                        compact: compact,
                                         icon: it.icon,
                                         svgAsset: it.svgAsset,
                                         label: it.label,
@@ -150,6 +174,7 @@ Future<void> showDesktopContextMenuAt(
                                                 it.onTap!();
                                               },
                                       ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -167,6 +192,16 @@ Future<void> showDesktopContextMenuAt(
       );
     },
   );
+}
+
+double _menuItemHeight(
+  BuildContext context, {
+  String? subtitle,
+  required bool compact,
+}) {
+  if (subtitle != null) return 60;
+  if (!compact) return 44;
+  return math.max(36, MediaQuery.textScalerOf(context).scale(20) + 12);
 }
 
 double _estimateMenuWidth(
@@ -280,6 +315,7 @@ class _GlassMenuItem extends StatefulWidget {
     this.onTap,
     this.danger = false,
     this.checked = false,
+    this.compact = false,
   });
   final IconData? icon;
   final String? svgAsset;
@@ -288,6 +324,7 @@ class _GlassMenuItem extends StatefulWidget {
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
+  final bool compact;
 
   @override
   State<_GlassMenuItem> createState() => _GlassMenuItemState();
@@ -327,7 +364,11 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
                 widget.onTap?.call();
               },
         child: Container(
-          height: widget.subtitle == null ? 44 : 60,
+          height: _menuItemHeight(
+            context,
+            subtitle: widget.subtitle,
+            compact: widget.compact,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(color: bg),

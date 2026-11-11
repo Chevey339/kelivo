@@ -85,6 +85,11 @@ class DesktopScheduledTasks extends ChangeNotifier {
     _lastTimeZoneOffset = null;
   }
 
+  Future<void> stopForExit() {
+    stop();
+    return _store.runExclusive(() async {});
+  }
+
   void _updateTimer() {
     if (_onRun == null ||
         !tasks.any((task) => task.enabled && task.nextRunAt != null)) {

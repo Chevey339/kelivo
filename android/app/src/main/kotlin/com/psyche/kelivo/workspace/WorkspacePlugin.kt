@@ -42,10 +42,14 @@ class WorkspacePlugin(private val context: Context) {
     }
 
     private val executor = Executors.newCachedThreadPool()
+    // Recovery may wait for old tracers. Keep it off the platform thread and
+    // preserve start/cancel/close order while that first recovery is running.
+    private val processExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val events = WorkspaceEvents()
-    private val execRunner = ExecRunner(events)
-    private val ptySessions = PtySessions(events)
+    private val processOwner = WorkspaceProcessOwner(context.packageName)
+    private val execRunner = ExecRunner(events, processOwner = processOwner)
+    private val ptySessions = PtySessions(events, processOwner)
     private val directories = WorkspaceDirectoryAccess(context)
     private var externalMounts = emptyList<BindMount>()
     private var environmentBusy = false
@@ -58,14 +62,13 @@ class WorkspacePlugin(private val context: Context) {
                     "probe" -> result.success(probe())
                     "setEnvironmentBusy" -> {
                         environmentBusy = asMap(call.arguments)["busy"] == true
-                        if (environmentBusy) {
-                            runAsync(result) {
+                        val busy = environmentBusy
+                        runProcessAsync(result) {
+                            if (busy) {
                                 execRunner.cancelAll(waitForExit = true)
                                 ptySessions.closeAll(waitForExit = true)
-                                null
                             }
-                        } else {
-                            result.success(null)
+                            null
                         }
                     }
                     "inspectRootfs" -> runAsync(result, "invalid_rootfs") {
@@ -75,12 +78,14 @@ class WorkspacePlugin(private val context: Context) {
                     "setExternalMounts" -> {
                         val next = parseBinds(asMap(call.arguments)["mounts"])
                         validateExternalMounts(next)
-                        if (next != externalMounts) {
-                            execRunner.cancelAll()
-                            ptySessions.closeAll()
-                            externalMounts = next
+                        runProcessAsync(result) {
+                            if (next != externalMounts) {
+                                execRunner.cancelAll()
+                                ptySessions.closeAll()
+                                externalMounts = next
+                            }
+                            null
                         }
-                        result.success(null)
                     }
                     "hasDirectoryStorageAccess" -> result.success(directories.hasStorageAccess())
                     "requestDirectoryStorageAccess" -> directories.requestStorageAccess(result)
@@ -94,8 +99,11 @@ class WorkspacePlugin(private val context: Context) {
                     }
                     "exec" -> {
                         require(!environmentBusy) { "environment is being replaced" }
-                        exec(asMap(call.arguments))
-                        result.success(mapOf("started" to true))
+                        val args = asMap(call.arguments)
+                        runProcessAsync(result) {
+                            exec(args)
+                            mapOf("started" to true)
+                        }
                     }
                     "stdinWrite" -> runAsync(result) {
                         val args = asMap(call.arguments)
@@ -104,11 +112,12 @@ class WorkspacePlugin(private val context: Context) {
                     }
                     "cancel" -> {
                         val runId = asMap(call.arguments)["runId"]?.toString().orEmpty()
-                        result.success(runId.isNotEmpty() && execRunner.cancel(runId))
+                        runProcessAsync(result) { runId.isNotEmpty() && execRunner.cancel(runId) }
                     }
                     "ptyOpen" -> {
                         require(!environmentBusy) { "environment is being replaced" }
-                        result.success(mapOf("pid" to ptyOpen(asMap(call.arguments))))
+                        val args = asMap(call.arguments)
+                        runProcessAsync(result) { mapOf("pid" to ptyOpen(args)) }
                     }
                     "ptyWrite" -> {
                         ptyWrite(asMap(call.arguments))
@@ -120,8 +129,10 @@ class WorkspacePlugin(private val context: Context) {
                     }
                     "ptyClose" -> {
                         val sessionId = asMap(call.arguments)["sessionId"]?.toString().orEmpty()
-                        if (sessionId.isNotEmpty()) ptySessions.close(sessionId)
-                        result.success(null)
+                        runProcessAsync(result) {
+                            if (sessionId.isNotEmpty()) ptySessions.close(sessionId)
+                            null
+                        }
                     }
                     "extractRootfs" -> runAsync(result) { extractRootfs(asMap(call.arguments)) }
                     "deleteEnvironmentDirectory" -> {
@@ -152,8 +163,11 @@ class WorkspacePlugin(private val context: Context) {
 
     fun dispose() {
         directories.dispose()
-        execRunner.cancelAll()
-        ptySessions.closeAll()
+        processExecutor.execute {
+            execRunner.cancelAll()
+            ptySessions.closeAll()
+        }
+        processExecutor.shutdown()
         executor.shutdownNow()
     }
 
@@ -308,6 +322,18 @@ class WorkspacePlugin(private val context: Context) {
                 mainHandler.post { result.success(value) }
             } catch (error: Exception) {
                 mainHandler.post { result.error(errorCode, error.message, null) }
+            }
+        }
+    }
+
+    private fun runProcessAsync(result: MethodChannel.Result, block: () -> Any?) {
+        processExecutor.execute {
+            try {
+                processOwner.recoverOrphans()
+                val value = block()
+                mainHandler.post { result.success(value) }
+            } catch (error: Exception) {
+                mainHandler.post { result.error("workspace", error.message, null) }
             }
         }
     }

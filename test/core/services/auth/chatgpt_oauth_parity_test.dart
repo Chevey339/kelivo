@@ -212,6 +212,7 @@ void main() {
             expect(request.url.path, '/backend-api/codex/models');
             expect(request.url.queryParameters['client_version'], '0.159.0');
             expect(request.headers['version'], '0.159.0');
+            expect(request.headers, isNot(contains('openai-beta')));
             return json({
               'models': [
                 {

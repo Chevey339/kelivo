@@ -382,9 +382,12 @@ void _writeOpenAi(
   ReasoningResolution resolution,
   ReasoningTransport transport,
 ) {
-  final effort = resolution.effective == ReasoningLevel.off
-      ? 'none'
-      : resolution.effective.name;
+  final effort = switch (resolution.effective) {
+    ReasoningLevel.off => 'none',
+    // Ollama maps recognized compatibility efforts to true for boolean models.
+    ReasoningLevel.on => 'high',
+    final level => level.name,
+  };
   if (_usesResponsesEnvelope(dialect, transport)) {
     body['reasoning'] = <String, dynamic>{'effort': effort, 'summary': 'auto'};
   } else {

@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
@@ -211,6 +212,33 @@ class _CandidateCleanupChatService extends ChatService {
 
 Future<String> _fileSha256(File file) async {
   return (await sha256.bind(file.openRead()).first).toString();
+}
+
+Future<File> _repackBackupFixture(
+  File source, {
+  Map<String, List<int>> replacements = const {},
+  Set<String> removed = const {},
+}) async {
+  final original = ZipDecoder().decodeBytes(await source.readAsBytes());
+  final repacked = Archive();
+  try {
+    for (final entry in original) {
+      if (entry.isFile &&
+          !removed.contains(entry.name) &&
+          !replacements.containsKey(entry.name)) {
+        repacked.add(ArchiveFile.bytes(entry.name, entry.readBytes()!));
+      }
+    }
+    for (final entry in replacements.entries) {
+      repacked.add(ArchiveFile.bytes(entry.key, entry.value));
+    }
+    return await File(
+      '${source.path}.edited.zip',
+    ).writeAsBytes(ZipEncoder().encode(repacked));
+  } finally {
+    original.clearSync();
+    repacked.clearSync();
+  }
 }
 
 Future<Map<String, ({int bytes, String sha256})>>
@@ -3864,14 +3892,190 @@ void main() {
       expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
     });
 
+    for (final mode in RestoreMode.values) {
+      test(
+        'imports a manually edited backup with stale metadata in ${mode.name} mode',
+        () async {
+          final fixture = await _createSqliteBackupFixture(
+            root: root,
+            prefix: 'manually_edited',
+            settings: const {},
+            includeFiles: true,
+            assetContent: 'original attachment',
+            extraEntries: const {'upload/removed.txt': 'removed attachment'},
+          );
+          final databaseFile = File(
+            '${root.path}/manually_edited_database.sqlite',
+          );
+          final database = sqlite.sqlite3.open(databaseFile.path);
+          try {
+            database.execute('PRAGMA foreign_keys = ON;');
+            database.execute("UPDATE conversation_rows SET title = 'Cleaned';");
+            database.execute('DELETE FROM message_rows;');
+          } finally {
+            database.close();
+          }
+          final edited = await _repackBackupFixture(
+            fixture,
+            replacements: {
+              'database/kelivo.db': await databaseFile.readAsBytes(),
+              'settings.json': utf8.encode(
+                jsonEncode({'edited_setting': 'edited'}),
+              ),
+              'upload/fixture.txt': utf8.encode('edited'),
+              'upload/added.txt': utf8.encode('added attachment'),
+              '.DS_Store': [1, 2],
+              '__MACOSX/._manifest.json': [3, 4],
+            },
+            removed: const {'upload/removed.txt'},
+          );
+          final chatService = ChatService();
+          await chatService.init();
+          addTearDown(chatService.close);
+          final existing = await chatService.createConversation(title: 'Local');
+
+          await DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(edited, const WebDavConfig(), mode: mode);
+
+          if (mode == RestoreMode.overwrite) {
+            final run = await _singleRestoreRunDirectory(root);
+            final candidate = Directory('${run.path}/candidate');
+            final manifest =
+                jsonDecode(
+                      await File(
+                        '${candidate.path}/manifest.json',
+                      ).readAsString(),
+                    )
+                    as Map;
+            expect((manifest['database'] as Map)['messageCount'], 0);
+            final entries = manifest['entries'] as Map;
+            expect(
+              entries.keys,
+              unorderedEquals([
+                'database/kelivo.db',
+                'upload/fixture.txt',
+                'upload/added.txt',
+              ]),
+            );
+            for (final name in entries.keys.cast<String>()) {
+              final file = File('${candidate.path}/$name');
+              expect((entries[name] as Map)['bytes'], await file.length());
+              expect((entries[name] as Map)['sha256'], await _fileSha256(file));
+            }
+            await chatService.close();
+            final terminal = await _recoverAcrossColdRestart(
+              appDataDirectory: root,
+            );
+            expect(terminal?.state, RestoreReceiptState.committed);
+            await chatService.init();
+            expect(chatService.getConversation(existing.id), isNull);
+          } else {
+            expect(chatService.getConversation(existing.id), isNotNull);
+            expect(
+              (await BusinessRestoreService(
+                businessRepository,
+              ).exportSettings())['edited_setting'],
+              'edited',
+            );
+          }
+          expect(
+            chatService.getConversation('fixture-conversation')?.title,
+            'Cleaned',
+          );
+          expect(
+            await chatService.loadMessages('fixture-conversation'),
+            isEmpty,
+          );
+          expect(
+            await File('${root.path}/upload/fixture.txt').readAsString(),
+            'edited',
+          );
+          expect(
+            await File('${root.path}/upload/added.txt').readAsString(),
+            'added attachment',
+          );
+          expect(
+            await File('${root.path}/upload/removed.txt').exists(),
+            isFalse,
+          );
+          expect(await File('${root.path}/.DS_Store').exists(), isFalse);
+        },
+      );
+    }
+
+    test('rebuilds missing manifest entries and record counts', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'missing_inventory',
+        settings: const {},
+      );
+      final manifest =
+          jsonDecode(
+                await File(
+                  '${root.path}/missing_inventory_manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      manifest.remove('entries');
+      (manifest['database'] as Map).remove('conversationCount');
+      (manifest['database'] as Map).remove('messageCount');
+      final edited = await _repackBackupFixture(
+        fixture,
+        replacements: {'manifest.json': utf8.encode(jsonEncode(manifest))},
+      );
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(edited, _withoutAssets);
+
+      final run = await _singleRestoreRunDirectory(root);
+      final candidate =
+          jsonDecode(
+                await File(
+                  '${run.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map;
+      expect((candidate['database'] as Map)['conversationCount'], 1);
+      expect((candidate['database'] as Map)['messageCount'], 1);
+      expect((candidate['entries'] as Map).keys, ['database/kelivo.db']);
+    });
+
+    test('accepts a stale SQLite manifest hash', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'stale_hash',
+        settings: const {},
+        databaseSha256: List.filled(64, '0').join(),
+      );
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(fixture, _withoutAssets);
+      expect(
+        (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))?.receipt.state,
+        RestoreReceiptState.prepared,
+      );
+    });
+
     test(
-      'rejects a SQLite manifest hash mismatch before changing live data',
+      'rejects a corrupt SQLite payload before changing live data',
       () async {
         final fixture = await _createSqliteBackupFixture(
           root: root,
           prefix: 'bad_hash',
           settings: const {'preserved_setting': 'imported'},
-          databaseSha256: List.filled(64, '0').join(),
+        );
+        final corrupt = await _repackBackupFixture(
+          fixture,
+          replacements: {
+            'database/kelivo.db': [1, 2, 3],
+          },
         );
         await BusinessRestoreService(
           businessRepository,
@@ -3888,8 +4092,8 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: chatService,
-          ).restoreFromLocalFile(fixture, _withoutAssets),
-          throwsA(isA<FormatException>()),
+          ).restoreFromLocalFile(corrupt, _withoutAssets),
+          throwsA(anything),
         );
 
         expect(
@@ -3898,6 +4102,10 @@ void main() {
         );
         expect(chatService.getConversation(existing.id), isNotNull);
         expect(chatService.getConversation('fixture-conversation'), isNull);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
       },
     );
 
@@ -4017,6 +4225,85 @@ void main() {
         expect(chatService.getConversation('legacy-fallback'), isNull);
       },
     );
+
+    for (final entryName in ['manifest.json', 'settings.json']) {
+      test(
+        'rejects corrupt ZIP bytes in $entryName before restoring',
+        () async {
+          final manifest = {
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'settings-only',
+            'createdAtUtc': '2026-07-09T00:00:00.000Z',
+            'appVersion': entryName == 'manifest.json' ? 'original' : 'test',
+            'includeChats': false,
+            'includeFiles': false,
+            'secretsIncluded': true,
+          };
+          final archive = Archive()
+            ..add(
+              ArchiveFile.string('manifest.json', jsonEncode(manifest))
+                ..compression = CompressionType.none,
+            )
+            ..add(
+              ArchiveFile.string(
+                'settings.json',
+                jsonEncode({
+                  'crc_setting': entryName == 'settings.json'
+                      ? 'original'
+                      : 'test',
+                }),
+              )..compression = CompressionType.none,
+            );
+          final bytes = ZipEncoder().encode(archive);
+          final marker = utf8.encode('original');
+          var changed = false;
+          for (
+            var offset = 0;
+            offset <= bytes.length - marker.length;
+            offset++
+          ) {
+            if (_containsContiguousBytes(
+              bytes.sublist(offset, offset + marker.length),
+              marker,
+            )) {
+              bytes[offset] = 'O'.codeUnitAt(0);
+              changed = true;
+              break;
+            }
+          }
+          expect(changed, isTrue);
+          final corrupt = await File(
+            '${root.path}/crc_corrupt.zip',
+          ).writeAsBytes(bytes);
+          final before = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+
+          await expectLater(
+            DataSync(
+              businessRepository: businessRepository,
+              chatService: ChatService(),
+            ).restoreFromLocalFile(corrupt, _withoutChatsOrAssets),
+            throwsA(
+              isA<FormatException>().having(
+                (error) => error.message,
+                'message',
+                'zip_entry_crc',
+              ),
+            ),
+          );
+          expect(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+            before,
+          );
+          expect(
+            await RestoreStartupGate.inspect(appDataDirectory: root),
+            isNull,
+          );
+        },
+      );
+    }
 
     test('rejects case-folded duplicate ZIP paths before restoring', () async {
       final firstSettings = File('${root.path}/duplicate_settings_one.json');

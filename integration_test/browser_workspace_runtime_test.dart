@@ -39,9 +39,23 @@ void main() {
     await File(
       '${workspace.path}/data.json',
     ).writeAsString('{"label":"相对资源正常"}');
+    await File('${workspace.path}/empty.html').writeAsString('');
+    await File('${workspace.path}/probe.txt').writeAsString('text-ok');
+    await File('${workspace.path}/preview.png').writeAsBytes(
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+      ),
+    );
+    final session = await Directory('${directory.path}/session').create();
+    await File(
+      '${session.path}/index.html',
+    ).writeAsString('<title>Session fixture</title><p>session-ok</p>');
     final resources = BrowserWorkspaceResources.instance;
     final previousResolver = resources.rootForSession;
+    final previousSessionResolver = resources.sessionRootForSession;
     resources.rootForSession = (id) async => id == 'fixture' ? workspace : null;
+    resources.sessionRootForSession = (id) async =>
+        id == 'fixture' ? session : null;
     final browser = BrowserService(
       store: BrowserStore(directory: Directory('${directory.path}/browser')),
     );
@@ -72,10 +86,24 @@ void main() {
       await browser.updateSettings(
         browser.settings.copyWith(agentEnabled: true),
       );
+      final missing = decode(
+        (await tools.handle('fixture', {
+          'action': 'open',
+          'url': 'kelivo://workspace/missing.html',
+        }, capturePreview: false)).content,
+      );
+      expect(missing['error_code'], 'browser_workspace_file_error');
+      expect(browser.tabs, isEmpty);
       final opened = await run('open', {
         'url': 'kelivo://workspace/index.html',
       });
       expect(opened['url'], 'kelivo://workspace/index.html');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: browser.buildView(opened['tab_id'] as String)),
+        ),
+      );
+      await tester.pumpAndSettle();
       // Module loading is asynchronous; wait on a concrete resulting element.
       await run('wait', {
         'wait_for': '#data',
@@ -130,6 +158,44 @@ void main() {
         false,
         null,
       ]);
+      final image = await run('evaluate', {
+        'script': '''new Promise(resolve => {
+        const img = new Image(); img.onload = () => resolve(img.naturalWidth);
+        img.onerror = () => resolve(-1); img.src = './preview.png';
+      })''',
+      });
+      expect(image['value'], 1);
+      for (final path in [
+        'empty.html',
+        'probe.txt',
+        'preview.png',
+        '%69ndex.html',
+      ]) {
+        final page = await run('open', {
+          'url': 'kelivo://workspace/$path',
+          'wait_until': 'load',
+        });
+        expect(page['navigation_state'], 'ready');
+      }
+      for (final url in ['kelivo://workspace', 'kelivo://workspace/']) {
+        expect(
+          (await run('open', {'url': url, 'wait_until': 'load'}))['title'],
+          'Workspace fixture',
+        );
+      }
+      final sessionPage = await run('open', {
+        'url': 'kelivo://session/index.html',
+        'wait_until': 'load',
+      });
+      expect(sessionPage['title'], 'Session fixture');
+      await run('render', {
+        'html': '<title>Render fixture</title><p>render-ok</p>',
+        'wait_until': 'load',
+      });
+      expect(
+        (await run('evaluate', {'script': 'document.title'}))['value'],
+        'Render fixture',
+      );
       resources.rootForSession = (_) async => null;
       final denied = decode(
         (await tools.handle('fixture', {
@@ -139,9 +205,11 @@ void main() {
       );
       expect(denied['ok'], false);
     } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
       browser.dispose();
       resources.rootForSession = previousResolver;
-      await tester.pumpWidget(const SizedBox.shrink());
+      resources.sessionRootForSession = previousSessionResolver;
       // Native disposal is async; the temporary data is independent of the app.
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await directory.delete(recursive: true);

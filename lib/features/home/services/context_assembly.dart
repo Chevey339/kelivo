@@ -1,6 +1,8 @@
+import 'dart:convert';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
+import '../../../core/models/native_compaction.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -28,6 +30,8 @@ class ContextAssemblyPreview {
     this.skillsText = '',
     this.workspaceText = '',
     this.searchText = '',
+    this.referenceText = '',
+    this.apiMessages = const [],
     this.mcpTools = const [],
     this.imageContext,
   });
@@ -43,6 +47,8 @@ class ContextAssemblyPreview {
   final String skillsText;
   final String workspaceText;
   final String searchText;
+  final String referenceText;
+  final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> mcpTools;
 
   /// Attribute the assembled, trimmed payload by origin, not by message role.
@@ -59,13 +65,59 @@ class ContextAssemblyPreview {
       imageContext: imageContext,
     );
     final text = <ContextSource, StringBuffer>{};
+    final references = <String>{};
+    final nativeImages = <ContextImageRef>[];
     for (final message in apiMessages) {
+      if (message[nativeCompactionMessageKey] case final Map native) {
+        // The returned window also contains retained readable items. Observe
+        // those without normalizing the canonical payload or counting cipher
+        // text, provider IDs, and the compaction pass's usage as input tokens.
+        for (final item
+            in (native['output'] as List? ?? const []).whereType<Map>()) {
+          final type = item['type'];
+          dynamic content;
+          if (type == 'message' || (type == null && item['role'] != null)) {
+            content = item['content'];
+          } else if (type == 'function_call_output') {
+            content = item['output'];
+          } else if (type == 'function_call') {
+            content = jsonEncode({
+              'name': item['name'],
+              'arguments': item['arguments'],
+            });
+          } else {
+            continue;
+          }
+          text
+              .putIfAbsent(ContextSource.chatHistory, StringBuffer.new)
+              .write(extractApiMessageText(content));
+          if (content is List) {
+            for (final part in content.whereType<Map>()) {
+              if (part['type'] == 'input_image') {
+                nativeImages.add(const ContextImageRef());
+              }
+            }
+          }
+        }
+        continue;
+      }
       for (final segment in segmentsFromTaggedMessage(
         imageContext?.previewMessage(message) ?? message,
         estimateTokenCounts: false,
         elideDataUris: false,
       )) {
         text.putIfAbsent(segment.source, StringBuffer.new).write(segment.text);
+        if (const {
+              ContextSource.systemPrompt,
+              ContextSource.instructionInjection,
+              ContextSource.memorySnapshot,
+              ContextSource.worldBook,
+            }.contains(segment.source) &&
+            segment.text.trim().isNotEmpty) {
+          references.add(
+            '[reference ${segment.source.name}; ${jsonEncode(segment.meta ?? const {})}]\n${segment.text}',
+          );
+        }
       }
       final reasoning = message['reasoning_content'];
       if (reasoning is String) {
@@ -79,6 +131,8 @@ class ContextAssemblyPreview {
     bool isMcp(Map<String, dynamic> tool) =>
         mcpToolNames.contains((tool['function'] as Map?)?['name']);
     return ContextAssemblyPreview(
+      apiMessages: apiMessages,
+      referenceText: references.join('\n\n'),
       systemText: content([ContextSource.systemPrompt]),
       injectionsText: content([ContextSource.instructionInjection]),
       historyText: content([
@@ -96,7 +150,7 @@ class ContextAssemblyPreview {
       searchText: content([ContextSource.searchPrompt]),
       tools: tools.where((tool) => !isMcp(tool)).toList(),
       mcpTools: tools.where(isMcp).toList(),
-      images: images,
+      images: [...images, ...nativeImages],
       imageContext: imageContext,
     );
   }

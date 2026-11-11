@@ -19,8 +19,8 @@ Map<String, String>? providerSessionHeaders(
     final session = id.isEmpty ? const Uuid().v4() : id;
     return {
       if (config.oauthProvider == OAuthProvider.chatgpt) ...{
-        'session_id': session,
-        'conversation_id': session,
+        'session-id': session,
+        'thread-id': session,
         'x-client-request-id': session,
       },
       if (config.oauthProvider == OAuthProvider.grok) 'x-grok-conv-id': session,

@@ -3465,6 +3465,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
               final widgets = <Widget>[
                 ViewportBlockList(
+                  storageId: 'body',
                   itemCount: visibleBlocks.length,
                   spacing: 8,
                   structureToken: (
@@ -5205,6 +5206,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     ),
                   ),
                 ViewportBlockList(
+                  storageId: ('steps', widget.key),
                   itemCount: visibleSteps.length,
                   structureToken: (visibleSteps.length, hiddenCount),
                   itemKey: (i) {
@@ -5294,6 +5296,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                           widget.conversationId,
                         ),
                         builder: () => _ChainOfThoughtBrowserGroup(
+                          sourceOrdinal: step.sourceOrdinal,
                           tools: tools,
                           lite: step.browserLite,
                           conversationId: widget.conversationId,
@@ -5868,6 +5871,7 @@ class _ChainOfThoughtReasoningStepState
 
 class _ChainOfThoughtBrowserGroup extends StatefulWidget {
   const _ChainOfThoughtBrowserGroup({
+    required this.sourceOrdinal,
     required this.tools,
     required this.lite,
     required this.conversationId,
@@ -5877,6 +5881,7 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
     required this.showPageCard,
     required this.streaming,
   });
+  final int sourceOrdinal;
   final List<ToolUIPart> tools;
   final bool lite, isFirst, isLast, hideImages, showPageCard, streaming;
   final String conversationId;
@@ -6189,6 +6194,7 @@ class _ChainOfThoughtBrowserGroupState
       }
       steps.add(
         ViewportBlockList(
+          storageId: ('browser-steps', tools.first.id, widget.sourceOrdinal),
           itemCount: _actions.length - firstVisible,
           structureToken: (_structureRevision, firstVisible),
           itemKey: (i) => timelineToolStepKey(

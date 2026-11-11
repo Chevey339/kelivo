@@ -12,6 +12,8 @@ class ActiveStreamingMessageStore {
   /// Whether any conversation currently has an in-flight assistant message.
   bool get isNotEmpty => _messagesByConversation.isNotEmpty;
 
+  Set<String> get conversationIds => _messagesByConversation.keys.toSet();
+
   Set<String> get messageIds => {
     for (final message in _messagesByConversation.values) message.id,
   };

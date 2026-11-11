@@ -447,9 +447,7 @@ Widget _paletteRow(
   required VoidCallback onTap,
 }) {
   final cs = Theme.of(context).colorScheme;
-  final title = Localizations.localeOf(context).languageCode == 'zh'
-      ? palette.displayNameZh
-      : palette.displayNameEn;
+  final title = palette.displayName(AppLocalizations.of(context)!);
   final color = palette.light.primary;
   return _TactileRow(
     onTap: onTap,

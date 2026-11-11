@@ -1570,6 +1570,7 @@ class GenerationContext {
     this.onToolCall,
     this.extraHeaders,
     this.extraBody,
+    this.serviceTier,
     required this.supportsReasoning,
     required this.enableReasoning,
     required this.streamOutput,
@@ -1597,6 +1598,7 @@ class GenerationContext {
   final ToolCallHandler? onToolCall;
   final Map<String, String>? extraHeaders;
   final Map<String, dynamic>? extraBody;
+  final String? serviceTier;
   final bool supportsReasoning;
   final bool enableReasoning;
   final bool streamOutput;

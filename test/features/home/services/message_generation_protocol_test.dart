@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/compression_config.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
@@ -31,6 +32,9 @@ class _Context implements BuildContext {
 class _Settings extends Fake implements SettingsProvider {
   _Settings(this.config);
   final ProviderConfig config;
+
+  @override
+  CompressionConfig get compressionDefaults => const CompressionConfig();
 
   @override
   ProviderConfig getProviderConfig(String key, {String? defaultName}) => config;

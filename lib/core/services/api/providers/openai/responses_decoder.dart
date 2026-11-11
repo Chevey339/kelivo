@@ -68,6 +68,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
+  String? finishReason;
   bool completed = false;
   int approxCompletionChars = 0;
 
@@ -426,6 +427,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     required bool failed,
   }) {
     final response = obj['response'];
+    finishReason =
+        responsesFinishReason(obj) ?? (failed ? 'incomplete' : 'completed');
     if (response is Map) {
       final u = response['usage'];
       if (u != null) {
@@ -805,4 +808,27 @@ int _readInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// Preserve terminal status even when a Responses payload contains partial text.
+String? responsesFinishReason(Map response) {
+  final value = response['response'] is Map
+      ? response['response'] as Map
+      : response;
+  final status = value['status']?.toString();
+  if (status == 'incomplete') {
+    final details = value['incomplete_details'];
+    final reason = details is Map ? details['reason']?.toString() : null;
+    return reason == 'max_output_tokens' || reason == 'content_filter'
+        ? reason
+        : 'incomplete';
+  }
+  if (status == 'completed' &&
+      value['output'] is List &&
+      (value['output'] as List).whereType<Map>().any(
+        (item) => item['type'] == 'function_call',
+      )) {
+    return 'tool_calls';
+  }
+  return status;
 }

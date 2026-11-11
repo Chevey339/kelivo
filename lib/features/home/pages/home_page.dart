@@ -180,6 +180,7 @@ class _HomePageState extends State<HomePage>
       scroll_ctrl.ChatAutoFollowScrollController();
   String? _scrollConversationId;
   final GlobalKey _inputBarKey = GlobalKey();
+  final GlobalKey _reasoningButtonKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
@@ -385,6 +386,8 @@ class _HomePageState extends State<HomePage>
         void retry() => _controller.compressContext(
           options: task.options,
           targetConversationId: task.conversationId,
+          beforeMessageId: task.protectedMessageId,
+          effectiveMessageIds: task.effectiveMessageIds,
         );
         void options() => _showCompressContextOptions(
           targetConversationId: task.conversationId,
@@ -434,9 +437,9 @@ class _HomePageState extends State<HomePage>
           case CompressionPhase.review:
             showAppSnackBar(
               context,
-              message: task.error == 'context_budget_exceeded'
-                  ? l10n.compressOverSnack
-                  : l10n.contextSummaryNotSmaller,
+              message: task.error == null
+                  ? l10n.compressionPreviewOnly
+                  : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
               actionLabel: l10n.compressAdjust,
               onAction: () => showCompressionReview(
@@ -1197,6 +1200,8 @@ class _HomePageState extends State<HomePage>
         onRetry: () => _controller.compressContext(
           options: task.options,
           targetConversationId: task.conversationId,
+          beforeMessageId: task.protectedMessageId,
+          effectiveMessageIds: task.effectiveMessageIds,
         ),
         onAdjust: () => _showCompressContextOptions(
           targetConversationId: task.conversationId,
@@ -1425,6 +1430,7 @@ class _HomePageState extends State<HomePage>
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));
       },
       onOpenSearch: _openSearchSettings,
+      reasoningButtonKey: _reasoningButtonKey,
       onConfigureReasoning: () async {
         await _openReasoningSettings();
       },
@@ -1727,13 +1733,20 @@ class _HomePageState extends State<HomePage>
       return;
     }
     final assistant = context.read<AssistantProvider>().currentAssistant;
+    final conversationId = await ensureConversationId(
+      context,
+      conversationId: _controller.currentConversation?.id,
+      assistantId: assistant?.id,
+    );
+    if (!mounted) return;
     if (PlatformUtils.isDesktop) {
       await showDesktopReasoningLevelPopover(
         context,
-        anchorKey: _inputBarKey,
+        anchorKey: _reasoningButtonKey,
         config: config,
         modelId: modelId,
         assistant: assistant,
+        conversationId: conversationId,
       );
     } else {
       await showReasoningLevelSheet(
@@ -1741,6 +1754,7 @@ class _HomePageState extends State<HomePage>
         config: config,
         modelId: modelId,
         assistant: assistant,
+        conversationId: conversationId,
       );
     }
   }
@@ -1916,7 +1930,6 @@ class _HomePageState extends State<HomePage>
               _inputController.quotes,
               quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
             ),
-            messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;
@@ -1969,6 +1982,8 @@ class _HomePageState extends State<HomePage>
       onRetry: (task) => _controller.compressContext(
         options: task.options,
         targetConversationId: id,
+        beforeMessageId: task.protectedMessageId,
+        effectiveMessageIds: task.effectiveMessageIds,
       ),
       onAdjust: (task) => _showCompressContextOptions(
         targetConversationId: id,
@@ -2012,9 +2027,13 @@ class _HomePageState extends State<HomePage>
     final snapshot = await chat.loadContextSnapshot(conversation.id);
     if (!mounted) return;
     final estimator = chat.contextCompression.estimateCandidate;
-    final options = await showDialog<CompressContextOptions>(
+    final options = await showCompressContextOptions(
       context: context,
-      builder: (_) => CompressContextOptionsDialog(
+      builder: (sheet) => CompressContextOptionsDialog(
+        sheet: sheet,
+        conversationId: conversation.id,
+        previewRequest: (options, config) => _controller
+            .previewCompressionRequest(conversation.id, options, config),
         messages: snapshot.messages,
         operations: snapshot.operations,
         messageWindow: messageWindow,

@@ -646,7 +646,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         return AlertDialog(
           title: Text(l10n.sideDrawerMenuDelete),
           content: Text(
-            '${l10n.sideDrawerMenuDelete} "${chat.title}"?\n\n${l10n.composerDraftDeleteNotice}',
+            '${l10n.sideDrawerDeleteConfirmContent(chat.title)}\n\n${l10n.composerDraftDeleteNotice}',
           ),
           actions: [
             TextButton(

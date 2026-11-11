@@ -1,8 +1,11 @@
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 // ignore: depend_on_referenced_packages
@@ -20,10 +23,12 @@ import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/chat/context_compression_service.dart';
 import 'package:Kelivo/features/chat/widgets/context_operations_panel.dart';
+import 'package:Kelivo/features/chat/widgets/context_operation_actions.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_section.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import '../../../support/business_test_harness.dart';
 
@@ -61,6 +66,11 @@ void main() {
   late SettingsProvider settings;
 
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('haptic_feedback'),
+          (_) async => null,
+        );
     directory = await Directory.systemTemp.createTemp('context_operations_');
     PathProviderPlatform.instance = _Paths(directory.path);
     repo = ChatDatabaseRepository.open(
@@ -89,6 +99,8 @@ void main() {
     await repo.close();
     settings.dispose();
     await directory.delete(recursive: true);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('haptic_feedback'), null);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -100,19 +112,22 @@ void main() {
     fail('Compression did not finish');
   }
 
-  Future<void> start(Future<String> Function(String, String) generate) =>
-      chat.contextCompression.start(
-        id,
-        CompressionRequest(
-          options: const CompressContextOptions(
-            mode: CompressContextLimitMode.keepRecent,
-            keepUserMessages: 25,
-          ),
-          model: 'test',
-          generate: generate,
-          quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
-        ),
-      );
+  Future<void> start(
+    Future<String> Function(String, String) generate, {
+    CompressContextOptions options = const CompressContextOptions(
+      mode: CompressContextLimitMode.keepRecent,
+      keepUserMessages: 25,
+    ),
+  }) => chat.contextCompression.start(
+    id,
+    CompressionRequest(
+      options: options,
+      model: 'test',
+      generate: (prompt, id, _, _) async =>
+          TextGenerationResult(parts: [TextPart(await generate(prompt, id))]),
+      quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+    ),
+  );
 
   Future<void> pumpUntil(WidgetTester tester, bool Function() done) async {
     for (var i = 0; i < 300; i++) {
@@ -171,6 +186,175 @@ void main() {
       () => find.text('Saved history: 60 messages').evaluate().isNotEmpty,
     );
   }
+
+  Future<void> pumpTaskEntry(
+    WidgetTester tester, {
+    ValueChanged<String>? onOpenConversation,
+  }) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: chat),
+          ChangeNotifierProvider.value(value: settings),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildLightTheme(null),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ContextTaskBar(
+                conversationId: id,
+                onOpen: () => showContextOperations(
+                  context,
+                  chat: chat,
+                  conversationId: id,
+                  messageLimit: 100,
+                  onOpenOperation: (_) {},
+                  onRetry: (_) {},
+                  onAdjust: (_) {},
+                  onOpenConversation: onOpenConversation ?? (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('context-task-bar')));
+    await pumpUntil(
+      tester,
+      () => find.text('Saved history: 60 messages').evaluate().isNotEmpty,
+    );
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  final closePanel = find.byWidgetPredicate(
+    (widget) => widget is IosIconButton && widget.semanticLabel == 'Close',
+  );
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
+    for (final openResult in [false, true]) {
+      check(
+        'viewed completion clears its notice and preserves the result on $platform (open result: $openResult)',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = platform;
+          await tester.runAsync(() async {
+            await start(
+              (_, _) async => 'saved summary',
+              options: const CompressContextOptions(
+                mode: CompressContextLimitMode.keepRecent,
+                keepUserMessages: 1,
+                newConversation: true,
+              ),
+            );
+            await until(
+              () =>
+                  chat.contextCompression.taskFor(id)!.phase ==
+                  CompressionPhase.completed,
+            );
+          });
+          final result = chat.contextCompression
+              .taskFor(id)!
+              .resultConversationId!;
+          String? opened;
+          await pumpTaskEntry(tester, onOpenConversation: (id) => opened = id);
+          expect(find.text('Dismiss status'), findsNothing);
+          expect(chat.contextCompression.taskFor(id), isNotNull);
+          await tester.tap(
+            openResult ? find.text('Open new chat') : closePanel,
+          );
+          await pumpUntil(
+            tester,
+            () => chat.contextCompression.taskFor(id) == null,
+          );
+          await tester.pumpAndSettle();
+          expect(opened, openResult ? result : isNull);
+          expect(find.byKey(const ValueKey('context-task-bar')), findsNothing);
+          await tester.runAsync(() async {
+            expect(chat.getConversation(result), isNotNull);
+            expect(
+              (await chat.loadContextOperations(
+                result,
+                refresh: true,
+              )).single.summary,
+              'saved summary',
+            );
+            expect(await chat.loadMessages(id), hasLength(60));
+            await chat.close();
+            await chat.init();
+            expect(chat.contextCompression.taskFor(id), isNull);
+            expect(chat.getConversation(result), isNotNull);
+          });
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final phase in [
+    CompressionPhase.waiting,
+    CompressionPhase.review,
+    CompressionPhase.failed,
+  ]) {
+    check('closing task details preserves $phase for further action', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        if (phase == CompressionPhase.waiting) {
+          chat.contextCompression.isConversationBusy = (_) => true;
+        } else if (phase == CompressionPhase.review) {
+          chat.contextCompression.estimateCandidate =
+              (_, _, {bool? fixedContextStart}) async =>
+                  (usedTokens: 5000, contextWindow: 4000);
+        }
+        await start((_, _) async {
+          if (phase == CompressionPhase.failed) {
+            throw StateError('test failure');
+          }
+          return 'summary';
+        });
+        await until(() => chat.contextCompression.taskFor(id)!.phase == phase);
+      });
+      final task = chat.contextCompression.taskFor(id);
+      await pumpTaskEntry(tester);
+      await tester.tap(closePanel);
+      await tester.pump(const Duration(seconds: 1));
+      expect(chat.contextCompression.taskFor(id), same(task));
+      expect(task!.phase, phase);
+      expect(find.byKey(const ValueKey('context-task-bar')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  check('closing old task details does not dismiss a replacement completion', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      chat.contextCompression.isConversationBusy = (_) => true;
+      await start((_, _) async => 'old summary');
+    });
+    await pumpTaskEntry(tester);
+    await tester.runAsync(() async {
+      await chat.contextCompression.cancel(id);
+      chat.contextCompression.isConversationBusy = (_) => false;
+      await start((_, _) async => 'new summary');
+      await until(
+        () =>
+            chat.contextCompression.taskFor(id)!.phase ==
+            CompressionPhase.completed,
+      );
+    });
+    final replacement = chat.contextCompression.taskFor(id);
+    await tester.pump();
+    await tester.tap(closePanel);
+    await tester.pumpAndSettle();
+    expect(chat.contextCompression.taskFor(id), same(replacement));
+    expect(replacement!.phase, CompressionPhase.completed);
+    await tester.runAsync(() => chat.contextCompression.dismiss(id));
+    expect(tester.takeException(), isNull);
+  });
 
   check(
     'measured composer includes the task bar without recreating its input',

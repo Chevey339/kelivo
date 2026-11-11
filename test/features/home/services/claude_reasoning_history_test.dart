@@ -77,14 +77,24 @@ String _round() => sseRound('m1', [
 ]);
 
 void main() {
-  for (final deepseek in [false, true]) {
+  for (final backend in ['claude', 'deepseek', 'vertex']) {
+    final deepseek = backend == 'deepseek';
+    final vertex = backend == 'vertex';
     for (final stream in [false, true]) {
       for (final toolsAvailable in [false, true]) {
         test(
-          'no-tool thinking survives SQLite reload: deepseek=$deepseek, stream=$stream, tools=$toolsAvailable',
+          'no-tool thinking survives SQLite reload: backend=$backend, stream=$stream, tools=$toolsAvailable',
           () async {
-            final config = deepseek ? deepSeekClaudeConfig() : claudeConfig();
-            final modelId = deepseek ? 'deepseek-flash' : 'claude-sonnet-4-6';
+            final config = vertex
+                ? vertexClaudeConfig()
+                : deepseek
+                ? deepSeekClaudeConfig()
+                : claudeConfig();
+            final modelId = vertex
+                ? 'claude-sonnet-4-6@20260217'
+                : deepseek
+                ? 'deepseek-flash'
+                : 'claude-sonnet-4-6';
             final exchange = await captureClaudeExchange(
               config: config,
               modelId: modelId,

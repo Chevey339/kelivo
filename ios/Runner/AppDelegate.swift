@@ -5,6 +5,7 @@
  import UserNotifications
  import SwiftUI
  import Translation
+ import UniformTypeIdentifiers
 
 
 @main
@@ -400,6 +401,10 @@ private final class IosOAuthHandler: NSObject, ASWebAuthenticationPresentationCo
 private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
   weak var presentingViewController: UIViewController?
   private var pendingResult: FlutterResult?
+  private var externalBackupSource: URL?
+  private var initialDirectory: URL?
+  private let backupQueue = DispatchQueue(label: "psyche.kelivo.backup-export", qos: .userInitiated)
+  private static let backupDirectoryKey = "backup_export_directory_bookmark"
 
   func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
     if pendingResult != nil {
@@ -430,26 +435,47 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
     }
 
     pendingResult = result
+    externalBackupSource = args["requireOutsideAppContainer"] as? Bool == true ? sourceURL : nil
 
-    DispatchQueue.main.async { [weak self] in
+    backupQueue.async { [weak self] in
       guard let self else { return }
-
-      let picker: UIDocumentPickerViewController
-      if #available(iOS 14.0, *) {
-        picker = UIDocumentPickerViewController(forExporting: [sourceURL], asCopy: true)
-      } else {
-        picker = UIDocumentPickerViewController(url: sourceURL, in: .exportToService)
+      var preferredDirectory: URL?
+      if self.externalBackupSource != nil,
+         let data = UserDefaults.standard.data(forKey: Self.backupDirectoryKey) {
+        var stale = false
+        if let directory = try? URL(resolvingBookmarkData: data, options: [.withoutUI],
+                                    relativeTo: nil, bookmarkDataIsStale: &stale),
+           !BackupExportDestination.isInsideAppContainer(directory),
+           directory.startAccessingSecurityScopedResource() {
+          preferredDirectory = directory
+        }
       }
 
-      picker.delegate = self
-      picker.modalPresentationStyle = .formSheet
-      if let popover = picker.popoverPresentationController {
-        popover.sourceView = presenter.view
-        popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
-        popover.permittedArrowDirections = []
-      }
+      let directory = preferredDirectory
+      DispatchQueue.main.async {
+        self.initialDirectory = directory
+        let picker: UIDocumentPickerViewController
+        if self.externalBackupSource != nil {
+          picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+          picker.allowsMultipleSelection = false
+          picker.directoryURL = directory
+          picker.title = args["dialogTitle"] as? String
+        } else if #available(iOS 14.0, *) {
+          picker = UIDocumentPickerViewController(forExporting: [sourceURL], asCopy: true)
+        } else {
+          picker = UIDocumentPickerViewController(url: sourceURL, in: .exportToService)
+        }
 
-      presenter.present(picker, animated: true)
+        picker.delegate = self
+        picker.modalPresentationStyle = .formSheet
+        if let popover = picker.popoverPresentationController {
+          popover.sourceView = presenter.view
+          popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+          popover.permittedArrowDirections = []
+        }
+
+        presenter.present(picker, animated: true)
+      }
     }
   }
 
@@ -458,16 +484,40 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    if let source = externalBackupSource, let directory = urls.first {
+      backupQueue.async {
+        let accessed = directory.startAccessingSecurityScopedResource()
+        defer { if accessed { directory.stopAccessingSecurityScopedResource() } }
+        do {
+          try BackupExportDestination.copy(source: source, to: directory)
+          if let bookmark = try? directory.bookmarkData(options: [.minimalBookmark],
+                                                        includingResourceValuesForKeys: nil, relativeTo: nil) {
+            UserDefaults.standard.set(bookmark, forKey: Self.backupDirectoryKey)
+          }
+          DispatchQueue.main.async { self.finish(with: true) }
+        } catch {
+          let code = error is BackupExportDestination.ExportError
+            ? "backup_destination_inside_app" : "save_failed"
+          DispatchQueue.main.async {
+            self.finish(with: FlutterError(code: code, message: error.localizedDescription, details: nil))
+          }
+        }
+      }
+      return
+    }
     finish(with: !urls.isEmpty)
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
-    finish(with: true)
+    documentPicker(controller, didPickDocumentsAt: [url])
   }
 
-  private func finish(with value: Bool) {
+  private func finish(with value: Any) {
     let result = pendingResult
     pendingResult = nil
+    externalBackupSource = nil
+    initialDirectory?.stopAccessingSecurityScopedResource()
+    initialDirectory = nil
     result?(value)
   }
 

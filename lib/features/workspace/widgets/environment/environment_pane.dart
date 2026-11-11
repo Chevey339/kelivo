@@ -8,6 +8,9 @@ import 'package:Kelivo/features/workspace/pages/proot_options_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
 import 'package:Kelivo/features/workspace/pages/environment_variables_page.dart';
 import 'environment_dependencies_section.dart';
+import 'native_shell_dialog.dart';
+import 'package:Kelivo/core/services/workspace/desktop_process_runtime.dart';
+import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -407,19 +410,71 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   List<Widget> _nativeChildren() {
     final l10n = AppLocalizations.of(context)!;
-    final shell = workspaceEnvNativeShellPath();
+    final provider = context.watch<WorkspaceRuntimeProvider>();
+    final env = context.watch<EnvironmentProvider>();
+    final runtime = provider.runtime;
+    final shell = provider.lastStatus?.shell;
+    final path = shell?.executable ?? l10n.workspaceEnvNativeShellUnavailable;
     return [
       _StatusCard(
         diskUsageBytes: null,
-        rootfsPath: shell,
+        rootfsPath: path,
         desktopNative: true,
-        onCopyPath: () => unawaited(_copyPath(shell)),
+        onCopyPath: shell == null
+            ? null
+            : () => unawaited(_copyPath(shell.executable)),
       ),
       KeyedSubtree(
         key: EnvironmentPane.nativeExplanationKey,
         child: IosSectionFooter(text: l10n.workspaceEnvNativeExplanation),
       ),
       IosSectionFooter(text: l10n.workspaceEnvNativeUnsandboxed),
+      SectionCard(
+        children: [
+          IosNavRow(
+            key: const ValueKey('native-shell-settings'),
+            icon: Lucide.Terminal,
+            label: l10n.workspaceEnvNativeShellTitle,
+            subtitle: env.nativeShellPath.isEmpty
+                ? l10n.workspaceEnvShellAutomatic
+                : env.nativeShellPath,
+            subtitleMaxLines: 2,
+            onTap: runtime is! DesktopProcessRuntime
+                ? null
+                : () async {
+                    await env.loaded;
+                    if (!mounted) return;
+                    await showAppDialog<void>(
+                      context,
+                      maxWidth: 520,
+                      child: NativeShellDialog(
+                        environment: env,
+                        runtime: runtime,
+                        runtimeProvider: provider,
+                      ),
+                    );
+                  },
+          ),
+          const IosRowDivider(),
+          IosNavRow(
+            key: const ValueKey('native-shell-detect'),
+            icon: Lucide.RefreshCw,
+            label: l10n.workspaceEnvNativeShellDetect,
+            trailing: _busy ? const EnvironmentInlineSpinner() : null,
+            onTap: _busy || runtime is! DesktopProcessRuntime
+                ? null
+                : () async {
+                    setState(() => _busy = true);
+                    try {
+                      runtime.refreshShell();
+                      await provider.refresh();
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
+                  },
+          ),
+        ],
+      ),
       ..._variablesSection(),
     ];
   }
@@ -665,7 +720,7 @@ class _StatusCard extends StatelessWidget {
           children: [
             IosNavRow(
               icon: icon,
-              label: engine,
+              label: desktopNative ? (status?.shell?.name ?? engine) : engine,
               subtitle: desktopNative
                   ? null
                   : workspaceEnvPhaseLabel(l10n, state.phase),

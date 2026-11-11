@@ -1,3 +1,4 @@
+import '../../../core/models/request_budget.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -485,6 +486,25 @@ class _ImageContextPanelState extends State<ImageContextPanel> {
                               fontWeight: AppFontWeights.medium,
                             ),
                           ),
+                          if ((item.bytes ?? 0) > 0 || item.pinned) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              [
+                                if (item.sizeIsEstimate)
+                                  l10n.imageContextSizeUnknown
+                                else if ((item.bytes ?? 0) > 0)
+                                  l10n.imageContextEncodedSize(
+                                    (item.bytes! / RequestBudget.mib)
+                                        .toStringAsFixed(2),
+                                  ),
+                                if (item.pinned) l10n.imageContextPinned,
+                              ].join(' · '),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurface.withValues(alpha: .55),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 6),
                           Row(
                             children: [

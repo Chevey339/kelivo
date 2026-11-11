@@ -1,3 +1,4 @@
+import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../intelligent_ui/host/ui_user_context_parts.dart';
@@ -406,12 +407,31 @@ class MessageBuilderService {
 
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      final native = NativeCompactionPayload.forMessage(m);
+      if (native != null) {
+        out.add({
+          'role': 'user',
+          'content': '',
+          '_contextSummary': true,
+          imageContextOwnerKey: m.id,
+          nativeCompactionMessageKey: native.toJson(),
+        });
+        continue;
+      }
       final messageStart = out.length;
+      final matchesClaudeSource =
+          claudeSource != null &&
+          m.providerId == claudeSource.providerId &&
+          m.modelId == claudeSource.modelId;
+      final omitClaudeSignatures = claudeSource != null && !matchesClaudeSource;
       final omitGoogleSignatures =
           m.role == 'assistant' &&
           googleProviderId != null &&
           m.providerId != googleProviderId;
-      if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
+      if (includeToolMessages &&
+          !preserveToolTurns &&
+          m.role == 'assistant' &&
+          !omitClaudeSignatures) {
         thinkingRecovery.readArtifact(
           _providerArtifact(m, claudeThinkingRecoveryArtifactKind),
         );
@@ -450,9 +470,7 @@ class MessageBuilderService {
           includeToolMessages &&
               !preserveToolTurns &&
               m.role == 'assistant' &&
-              claudeSource != null &&
-              m.providerId == claudeSource.providerId &&
-              m.modelId == claudeSource.modelId &&
+              matchesClaudeSource &&
               chatService.getToolEventsForMessage(m).isEmpty
           ? _providerArtifact(m, claudeTurnArtifactKind)
           : null;
@@ -497,6 +515,10 @@ class MessageBuilderService {
 
             for (int i = 0; i < events.length; i++) {
               final e = events[i];
+              final metadata = e['metadata'] is Map
+                  ? Map<String, dynamic>.from(e['metadata'] as Map)
+                  : null;
+              if (omitClaudeSignatures) metadata?.remove('anthropic');
               final name = (e['name'] ?? '').toString().trim();
               if (name.isEmpty) continue;
               final rawId = (e['id'] ?? '').toString().trim();
@@ -518,10 +540,9 @@ class MessageBuilderService {
                 'id': id,
                 'type': 'function',
                 'function': {'name': name, 'arguments': argumentsJson},
-                if (e['metadata'] is Map || e['server'] == true)
+                if (metadata != null || e['server'] == true)
                   'metadata': {
-                    if (e['metadata'] is Map)
-                      ...(e['metadata'] as Map).cast<String, dynamic>(),
+                    ...?metadata,
                     if (e['server'] == true) 'server': true,
                   },
               });
@@ -532,8 +553,7 @@ class MessageBuilderService {
                 'name': name,
                 'tool_call_id': id,
                 'content': toolResultContentForModel(c?.toString()),
-                if (e['metadata'] is Map)
-                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+                if (metadata != null) 'metadata': metadata,
               });
             }
 
@@ -543,17 +563,18 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
-              final turn = _providerArtifact(m, claudeTurnArtifactKind);
+              final turn = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeTurnArtifactKind);
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
                 hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
-              final container = _providerArtifact(
-                m,
-                claudeContainerArtifactKind,
-              );
+              final container = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeContainerArtifactKind);
               if (container != null && container.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeContainerKey] =
                     container;
@@ -581,6 +602,7 @@ class MessageBuilderService {
                   length: (toolMessage['content'] ?? '').toString().length,
                 );
               }
+              identify(assistantToolMessage, m.id);
               out.add(assistantToolMessage);
               for (final toolMessage in toolMessages) {
                 identify(toolMessage, m.id);
@@ -628,7 +650,9 @@ class MessageBuilderService {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
         }
-        final container = _providerArtifact(m, claudeContainerArtifactKind);
+        final container = omitClaudeSignatures
+            ? null
+            : _providerArtifact(m, claudeContainerArtifactKind);
         if (container != null && container.isNotEmpty) {
           message[multimodalInternalClaudeContainerKey] = container;
         }
@@ -1906,8 +1930,7 @@ class MessageBuilderService {
       assistantId: assistant.id,
       lang: lang,
       maxItems: maxItems,
-      fullInjectionTypes:
-          resolvedSettings?.memoryFullInjectionTypes ?? const {},
+      fullInjectionTypes: assistant.memoryFullInjectionTypes,
     );
   }
 
@@ -2028,6 +2051,7 @@ class MessageBuilderService {
     Assistant? assistant,
     String modelId, {
     Conversation? conversation,
+    DateTime? promptTime,
   }) {
     final prompt = ConversationPromptSettings.fromExtras(
       conversation?.extras ?? const {},
@@ -2039,6 +2063,7 @@ class MessageBuilderService {
         modelId: modelId,
         modelName: modelId,
         userNickname: contextProvider.read<UserProvider>().name,
+        now: promptTime,
       );
       final sys = PromptTransformer.replacePlaceholders(prompt, vars);
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
@@ -2296,6 +2321,9 @@ class MessageBuilderService {
     bool persistActivation = true,
     void Function(int before, int after)? onActivationPersisted,
   }) async {
+    final compressionDefaults = contextProvider
+        .read<SettingsProvider>()
+        .compressionDefaults;
     try {
       List<WorldBook> books = const <WorldBook>[];
       try {
@@ -2370,9 +2398,25 @@ class MessageBuilderService {
           ...requestHistory.skip(lastRecorded + 1),
         ];
       }
+      final scanSummary = conversation == null
+          ? true
+          : (await chatService.compressionConfig(
+              conversation.id,
+              compressionDefaults,
+            )).summaryInWorldBookScan;
       final result = WorldBookActivation.evaluate(
         books: books,
-        scanMessages: apiMessages,
+        scanMessages: scanSummary
+            ? apiMessages
+            : apiMessages
+                  .where(
+                    (message) =>
+                        !(message[imageContextOwnerKey]?.toString().startsWith(
+                              ContextOperation.summaryPrefix,
+                            ) ??
+                            false),
+                  )
+                  .toList(),
         history: historyMessages == null
             ? [
                 for (final message in apiMessages)

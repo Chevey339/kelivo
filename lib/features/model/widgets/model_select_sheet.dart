@@ -2312,41 +2312,52 @@ class _DesktopModelSelectDialogBodyState
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      text: m.info.displayName,
-                      style: TextStyle(fontSize: 12.5),
-                      children: [
-                        if (showProviderLabel)
-                          TextSpan(
-                            text: ' | ${m.providerName}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                      ],
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          text: m.info.displayName,
+                          style: TextStyle(fontSize: 12.5),
+                          children: [
+                            if (showProviderLabel)
+                              TextSpan(
+                                text: ' | ${m.providerName}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  ModelCapsulesRow(
-                    model: m.info,
-                    pillPadding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      // Keep room for the full name; extra capabilities wrap
+                      // within the trailing half instead of squeezing it out.
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth / 2,
+                      ),
+                      child: ModelCapsulesRow(
+                        model: m.info,
+                        alignment: WrapAlignment.end,
+                        pillPadding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        bgOpacityDark: 0.18,
+                        bgOpacityLight: 0.14,
+                        borderOpacity: 0.22,
+                        itemSpacing: 4,
+                      ),
                     ),
-                    bgOpacityDark: 0.18,
-                    bgOpacityLight: 0.14,
-                    borderOpacity: 0.22,
-                    itemSpacing: 4,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             Builder(
               builder: (context) {
                 final pinnedNow = context.select<SettingsProvider, bool>(

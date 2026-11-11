@@ -11,6 +11,57 @@ SseEvent _event(String type, Map<String, dynamic> data) {
 }
 
 void main() {
+  test(
+    'thinking signatures stay scoped to blocks and native deltas replace fallback',
+    () {
+      final decoder = ClaudeStreamDecoder();
+      final scenarios = [
+        (start: 'start-only', deltas: <String>[], expected: 'start-only'),
+        (start: '', deltas: ['delta-', 'only'], expected: 'delta-only'),
+        (
+          start: 'delta-only',
+          deltas: ['delta-', 'only'],
+          expected: 'delta-only',
+        ),
+        (start: 'fallback', deltas: [''], expected: ''),
+        (start: 'another-start', deltas: <String>[], expected: 'another-start'),
+      ];
+      for (var index = 0; index < scenarios.length; index++) {
+        decoder.accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': index,
+            'content_block': {
+              'type': 'thinking',
+              'signature': scenarios[index].start,
+            },
+          }),
+        );
+      }
+      for (var index = scenarios.length - 1; index >= 0; index--) {
+        for (final signature in scenarios[index].deltas) {
+          decoder.accept(
+            _event('content_block_delta', {
+              'type': 'content_block_delta',
+              'index': index,
+              'delta': {'type': 'signature_delta', 'signature': signature},
+            }),
+          );
+        }
+        decoder.accept(
+          _event('content_block_stop', {
+            'type': 'content_block_stop',
+            'index': index,
+          }),
+        );
+      }
+      expect(
+        decoder.assistantBlocks.map((block) => block['signature']),
+        scenarios.map((scenario) => scenario.expected),
+      );
+    },
+  );
+
   test('a result for a call from an earlier response reports no input', () {
     // A turn cut in two by a client tool opens the next response with the
     // hosted result. This decoder never saw the call, so it has no input to

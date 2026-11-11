@@ -4,6 +4,8 @@ import 'dart:ui';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
+import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/core/models/context_compression_task.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -30,6 +32,165 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets(
+    'imported native context is a single entry without an empty message or undo',
+    (tester) async {
+      final key = GlobalKey<_PrependingMessageListHarnessState>();
+      await tester.pumpWidget(_PrependingMessageListHarness(key: key));
+      await tester.pumpAndSettle();
+      final state = key.currentState!;
+      final seed = ChatMessage(
+        id: 'native-seed',
+        role: 'user',
+        content: '',
+        conversationId: 'conversation-1',
+      );
+      final tail = ChatMessage(
+        id: 'retained',
+        role: 'user',
+        content: 'Retained original',
+        conversationId: 'conversation-1',
+      );
+      final imported = ContextOperation.forCopiedSummary(
+        seed,
+        keepUserMessages: 1,
+        compressionDetails: {
+          'nativeCompaction': NativeCompactionPayload(
+            protocol: NativeCompactionProtocol.compact,
+            scope: 'fixture',
+            modelId: 'private',
+            output: [
+              {'type': 'compaction', 'encrypted_content': 'opaque-history'},
+            ],
+          ).toJson(),
+          'nativeContextImported': true,
+          'nativeSourceConversationId': 'source',
+        },
+      );
+      state.replaceMessages([seed, tail]);
+      state.updateContext(null, [imported]);
+      await tester.pumpAndSettle();
+      final node = find.byKey(ValueKey('context-node-${imported.id}'));
+      expect(node, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('timeline-slot:${seed.id}')),
+          matching: find.byType(ChatMessageWidget),
+        ),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('undo-context-summary')), findsNothing);
+      expect(find.text('opaque-history'), findsNothing);
+      await tester.tap(node);
+      expect(state.openedOperations, 1);
+      // With no retained turns, later tasks and operations share the seed's
+      // anchor. Replacing its empty bubble must not hide those controls.
+      state.replaceMessages([seed]);
+      final task = ContextCompressionTask(
+        id: 'recompact',
+        conversationId: seed.conversationId,
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.unlimited,
+          native: true,
+        ),
+        phase: CompressionPhase.summarizing,
+      )..anchorGroupId = seed.id;
+      state.updateContext(task, [imported]);
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('context-task-recompact')),
+        findsOneWidget,
+      );
+      final later = ContextOperation(
+        id: 'recompact',
+        kind: ContextOperationKind.compress,
+        anchorGroupId: seed.id,
+        appliedAfterGroupId: seed.id,
+        sourceGroups: [seed.id],
+        dependencies: [imported.id],
+        createdAt: DateTime(2026),
+        compressionDetails: {
+          'nativeCompaction': imported.nativePayload!.toJson(),
+        },
+      );
+      state.updateContext(null, [imported, later]);
+      await tester.pumpAndSettle();
+      final laterNode = find.byKey(const ValueKey('context-node-recompact'));
+      expect(laterNode, findsOneWidget);
+      expect(later.canUndo, isTrue);
+      await tester.tap(laterNode);
+      expect(state.openedOperations, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('copied summaries do not repeat a compression divider', (
+    tester,
+  ) async {
+    final key = GlobalKey<_PrependingMessageListHarnessState>();
+    await tester.pumpWidget(_PrependingMessageListHarness(key: key));
+    await tester.pumpAndSettle();
+    final state = key.currentState!;
+    final summary = ChatMessage(
+      id: 'copied-summary',
+      role: 'user',
+      content: 'Summary carried into a new conversation.',
+      conversationId: 'conversation-1',
+      timestamp: DateTime(2026),
+    );
+    final tail = ChatMessage(
+      id: 'retained-turn',
+      role: 'user',
+      content: 'Continue from here.',
+      conversationId: 'conversation-1',
+    );
+    final copied = ContextOperation.fromJson(
+      ContextOperation.forCopiedSummary(summary, keepUserMessages: 1).toJson(),
+    );
+    state.replaceMessages([summary, tail]);
+    state.updateContext(null, [copied]);
+    await tester.pumpAndSettle();
+    final divider = find.byKey(ValueKey('context-node-${copied.id}'));
+    expect(find.byKey(ValueKey(summary.id)), findsOneWidget);
+    expect(find.byKey(ValueKey(tail.id)), findsOneWidget);
+    expect(divider, findsNothing);
+    expect(
+      ContextHistory.resolve(
+        [summary, tail],
+        [copied],
+        limit: 1,
+      ).map((m) => m.content),
+      [summary.content, tail.content],
+    );
+
+    // A different, edited summary still needs its own operation entry.
+    state.updateContext(null, [copied.copyWith(summary: 'Edited summary')]);
+    await tester.pumpAndSettle();
+    expect(divider, findsOneWidget);
+    await tester.tap(divider);
+    expect(state.openedOperations, 1);
+
+    // Branches remap operation and message IDs independently.
+    final forkedSummary = summary.copyWith(
+      id: 'fork-summary',
+      groupId: 'fork-summary',
+    );
+    final forked = copied.remap(
+      groups: {summary.id: forkedSummary.id},
+      operations: {copied.id: 'fork-operation'},
+      messages: {summary.id: forkedSummary.id},
+    );
+    state.replaceMessages([forkedSummary, tail]);
+    state.updateContext(null, [forked]);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('context-node-fork-operation')),
+      findsNothing,
+    );
+    expect(find.byKey(ValueKey(forkedSummary.id)), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -1375,7 +1536,7 @@ class _PrependingMessageListHarnessState
   int openedOperations = 0;
 
   void updateContext(
-    ContextCompressionTask task,
+    ContextCompressionTask? task,
     List<ContextOperation> operations,
   ) {
     setState(() {

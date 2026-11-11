@@ -161,7 +161,14 @@ void main() {
     () async {
       final loginRequired = account(id: 'login-required');
       final loaded = await loadAccounts([
-        account(id: 'current', version: codexClientVersion),
+        account(id: 'current', version: codexClientVersion).copyWith(
+          modelOverrides: const {
+            'gpt-6-sol': {
+              'temperature': .7,
+              'oauthServiceTierSessionId': 'session',
+            },
+          },
+        ),
         account(id: 'disabled').copyWith(enabled: false),
         account(id: 'logged-out').copyWith(oauthCredentials: null),
         loginRequired.copyWith(

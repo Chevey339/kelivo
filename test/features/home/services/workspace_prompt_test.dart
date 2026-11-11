@@ -65,6 +65,9 @@ class _PackedGenerationService extends MessageGenerationService {
   @override
   Future<UnprocessedRequestContext> assembleUnprocessedRequestContext({
     bool? fixedContextStart,
+    DateTime? promptTime,
+    bool forceResponses = false,
+    bool applyMessageLimit = true,
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,

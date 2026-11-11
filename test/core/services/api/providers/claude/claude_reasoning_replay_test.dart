@@ -15,46 +15,119 @@ const _thinking = {
 };
 const _text = {'type': 'text', 'text': 'First answer.'};
 
-String _thinkingRound() => sseRound('m1', [
-  {
-    'type': 'content_block_start',
-    'index': 0,
-    'content_block': {'type': 'thinking', 'thinking': '', 'signature': ''},
-  },
-  {
-    'type': 'content_block_delta',
-    'index': 0,
-    'delta': {'type': 'thinking_delta', 'thinking': _thinking['thinking']},
-  },
-  for (final signature in ['opaque-', 'signature'])
-    {
-      'type': 'content_block_delta',
-      'index': 0,
-      'delta': {'type': 'signature_delta', 'signature': signature},
-    },
-  {'type': 'content_block_stop', 'index': 0},
-  {
-    'type': 'content_block_start',
-    'index': 1,
-    'content_block': {'type': 'text', 'text': ''},
-  },
-  {
-    'type': 'content_block_delta',
-    'index': 1,
-    'delta': {'type': 'text_delta', 'text': _text['text']},
-  },
-  {'type': 'content_block_stop', 'index': 1},
-  {
-    'type': 'message_delta',
-    'delta': {'stop_reason': 'end_turn'},
-  },
-  {'type': 'message_stop'},
-]);
+String _thinkingRound({bool signatureAtStart = false, bool toolCall = false}) =>
+    sseRound('m1', [
+      {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {
+          'type': 'thinking',
+          'thinking': '',
+          'signature': signatureAtStart ? _thinking['signature'] : '',
+        },
+      },
+      {
+        'type': 'content_block_delta',
+        'index': 0,
+        'delta': {'type': 'thinking_delta', 'thinking': _thinking['thinking']},
+      },
+      for (final signature
+          in signatureAtStart ? <String>[] : ['opaque-', 'signature'])
+        {
+          'type': 'content_block_delta',
+          'index': 0,
+          'delta': {'type': 'signature_delta', 'signature': signature},
+        },
+      {'type': 'content_block_stop', 'index': 0},
+      {
+        'type': 'content_block_start',
+        'index': 1,
+        'content_block': {'type': 'text', 'text': ''},
+      },
+      {
+        'type': 'content_block_delta',
+        'index': 1,
+        'delta': {'type': 'text_delta', 'text': _text['text']},
+      },
+      {'type': 'content_block_stop', 'index': 1},
+      if (toolCall) ...[
+        {
+          'type': 'content_block_start',
+          'index': 2,
+          'content_block': {
+            'type': 'tool_use',
+            'id': 'call1',
+            'name': 'create_memory',
+            'input': {},
+          },
+        },
+        {
+          'type': 'content_block_delta',
+          'index': 2,
+          'delta': {
+            'type': 'input_json_delta',
+            'partial_json': '{"content":"remember"}',
+          },
+        },
+        {'type': 'content_block_stop', 'index': 2},
+      ],
+      {
+        'type': 'message_delta',
+        'delta': {'stop_reason': toolCall ? 'tool_use' : 'end_turn'},
+      },
+      {'type': 'message_stop'},
+    ]);
 
 void main() {
-  for (final deepseek in [false, true]) {
-    final modelId = deepseek ? 'deepseek-flash' : 'claude-sonnet-4-6';
-    final config = deepseek ? deepSeekClaudeConfig() : claudeConfig();
+  test('block-start signature survives a streamed tool continuation', () async {
+    var toolsExecuted = 0;
+    final exchange = await captureClaudeExchange(
+      modelId: 'claude-sonnet-4-6',
+      stream: true,
+      tools: const [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'create_memory',
+            'parameters': {'type': 'object', 'properties': {}},
+          },
+        },
+      ],
+      onToolCall: (name, args, {toolCallId}) async {
+        toolsExecuted++;
+        return 'saved';
+      },
+      sseRounds: [
+        _thinkingRound(signatureAtStart: true, toolCall: true),
+        plainRound,
+      ],
+    );
+    expect(toolsExecuted, 1);
+    expect(exchange.bodies, hasLength(2));
+    expect((exchange.bodies.last['messages'] as List)[1]['content'], [
+      _thinking,
+      _text,
+      clientCall('call1', 'remember'),
+    ]);
+    final artifact = exchange.chunks.whereType<ProviderArtifact>().firstWhere(
+      (chunk) => chunk.kind == claudeTurnArtifactKind,
+    );
+    expect(decodeClaudeTurn(artifact.payload)!.first.first, _thinking);
+  });
+
+  for (final backend in ['claude', 'deepseek', 'vertex']) {
+    final deepseek = backend == 'deepseek';
+    final vertex = backend == 'vertex';
+    final modelId = vertex
+        ? 'claude-sonnet-4-6@20260217'
+        : deepseek
+        ? 'deepseek-flash'
+        : 'claude-sonnet-4-6';
+    final config = vertex
+        ? vertexClaudeConfig()
+        : deepseek
+        ? deepSeekClaudeConfig()
+        : claudeConfig();
     for (final stream in [false, true]) {
       test('records a no-tool response: $modelId, stream=$stream', () async {
         final exchange = await captureClaudeExchange(

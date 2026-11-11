@@ -2,3 +2,5 @@
 enum BrowserAgentActivity { idle, running, paused }
 
 enum BrowserAgentPauseReason { user, timeout }
+
+typedef BrowserAgentPause = ({BrowserAgentPauseReason reason, String? tabId});

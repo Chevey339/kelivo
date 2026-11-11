@@ -44,6 +44,40 @@ void main() {
     createdAt: DateTime(2026),
   );
 
+  for (final includeSummary in [false, true]) {
+    test(
+      'bounded compression expands only selected summary dependencies: $includeSummary',
+      () {
+        final history = ['HIDDEN', 'A', 'B', 'C', 'D'].map(message).toList();
+        final previous = compact('previous', ['A', 'B']);
+        final selection = selectCompressionHistory(
+          history,
+          [previous],
+          const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 1,
+          ),
+          protectedMessageId: 'D',
+          effectiveMessageIds: {
+            'C',
+            'D',
+            if (includeSummary) previous.summaryMessageId,
+          },
+        );
+        expect(
+          text(selection.input),
+          includeSummary ? ['previous', 'C'] : ['C'],
+        );
+        expect(
+          text(selection.covered),
+          includeSummary ? ['A', 'B', 'C'] : ['C'],
+        );
+        expect(selection.dependencies, includeSummary ? ['previous'] : isEmpty);
+        expect(text(selection.retained), ['D']);
+      },
+    );
+  }
+
   test(
     'fixed start is inclusive, overrides the window and follows the selected group',
     () {

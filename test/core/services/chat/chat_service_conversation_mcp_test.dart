@@ -232,11 +232,14 @@ void main() {
         );
         expect(ConversationMcpSettings.isOverridden(compressed), isTrue);
         expect(compressed.mcpServerIds, ids);
-        for (final id in [fork.id, compressed.id]) {
-          final saved = await chat.chatRepositoryOrNull!.getConversation(id);
-          expect(ConversationMcpSettings.isOverridden(saved), isTrue);
-          expect(saved!.mcpServerIds, ids);
-        }
+        final saved = await chat.chatRepositoryOrNull!.getConversation(fork.id);
+        expect(ConversationMcpSettings.isOverridden(saved), isTrue);
+        expect(saved!.mcpServerIds, ids);
+        expect(chat.isTemporaryConversation(compressed.id), isTrue);
+        expect(
+          await chat.chatRepositoryOrNull!.getConversation(compressed.id),
+          isNull,
+        );
       },
     );
   }

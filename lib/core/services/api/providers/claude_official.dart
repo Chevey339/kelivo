@@ -1,3 +1,5 @@
+import '../../network/provider_http_exception.dart';
+import '../request_history_context.dart';
 import '../request_image_context.dart';
 import '../../../utils/provider_url.dart';
 import '../../custom_request_merger.dart';
@@ -5,7 +7,6 @@ import '../../../models/provider_oauth.dart';
 import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -53,6 +54,7 @@ Stream<StreamChunk> sendClaudeStream(
   bool skipImageParsing = false,
   StreamRoundRunner? retryRound,
 }) async* {
+  RequestHistoryContext.current?.format = HistoryWireFormat.claude;
   final upstreamModelId = apiModelId(config, modelId);
   // Endpoint and headers (constant across rounds)
   final base = config.baseUrl.endsWith('/')
@@ -256,6 +258,7 @@ Stream<StreamChunk> sendClaudeStream(
     initialMessages,
   );
   TokenUsage? totalUsage;
+  String? finishReason;
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
   var lastAssistantBlocks = <Map<String, dynamic>>[];
@@ -345,6 +348,7 @@ Stream<StreamChunk> sendClaudeStream(
     retryRound: retryRound,
     sendRound: () async* {
       totalUsage = null;
+      finishReason = null;
       final spec = ModelSpecResolver.instance.spec(config, modelId);
       var retriedContainer = false;
       Map<String, dynamic> buildBody() {
@@ -424,7 +428,7 @@ Stream<StreamChunk> sendClaudeStream(
             body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
-          throw HttpException('HTTP ${response.statusCode}: $errorBody');
+          throw ProviderHttpException(response, errorBody);
         }
         retriedContainer = true;
         container = null;
@@ -440,6 +444,7 @@ Stream<StreamChunk> sendClaudeStream(
       if (!stream) {
         final txt = await decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
+        finishReason = obj['stop_reason']?.toString();
         // Usage
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
@@ -539,7 +544,9 @@ Stream<StreamChunk> sendClaudeStream(
         if (toolUses.isEmpty) {
           // A hosted tool that ran past the turn limit asks to be resumed,
           // with no client tool to answer first.
-          pauseTurn = (obj['stop_reason'] ?? '').toString() == 'pause_turn';
+          pauseTurn =
+              allTools.isNotEmpty &&
+              (obj['stop_reason'] ?? '').toString() == 'pause_turn';
         }
         if (toolUses.isNotEmpty && onToolCall != null) {
           pendingCalls = [
@@ -647,7 +654,7 @@ Stream<StreamChunk> sendClaudeStream(
 
       final usage = decoder.usage;
       final assistantBlocks = decoder.assistantBlocks;
-      final lastStopReason = decoder.lastStopReason;
+      finishReason = decoder.lastStopReason;
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
@@ -658,7 +665,7 @@ Stream<StreamChunk> sendClaudeStream(
       lastAssistantBlocks = history.sanitize(assistantBlocks);
       yield* recordTurn(assistantBlocks);
       if (decoder.clientTools.isEmpty) {
-        pauseTurn = (lastStopReason ?? '') == 'pause_turn';
+        pauseTurn = allTools.isNotEmpty && (finishReason ?? '') == 'pause_turn';
         return;
       }
 
@@ -732,6 +739,7 @@ Stream<StreamChunk> sendClaudeStream(
     finish: () async* {
       yield* emitDone(
         ids: StreamChunkIds('finish'),
+        finishReason: finishReason,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       );

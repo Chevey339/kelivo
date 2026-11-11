@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:io';
 
@@ -106,7 +108,8 @@ void main() {
             keepUserMessages: 6,
           ),
           model: 'fixture',
-          generate: (_, _) async => 'summary',
+          generate: (_, _, _, _) async =>
+              const TextGenerationResult(parts: [TextPart('summary')]),
           quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
         ),
       );

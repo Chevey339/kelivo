@@ -24,6 +24,7 @@ import '../widgets/provider_avatar.dart';
 import '../widgets/oauth_connection_info.dart';
 import '../widgets/provider_prompt_cache_settings.dart';
 import 'provider_network_page.dart';
+import '../widgets/request_budget_settings.dart';
 import 'provider_custom_request_page.dart';
 
 Future<void> showOAuthProviderDetails(
@@ -515,6 +516,7 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
                             ),
                           ),
                           if (_connection) OAuthConnectionInfo(config: config),
+                          ProviderRequestBudgetRow(providerId: config.id),
                           IosNavRow(
                             label: l.providerDetailPageNetworkTab,
                             onTap: () => _openPage(

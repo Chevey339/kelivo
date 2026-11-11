@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/logging/context_log_models.dart';
 import 'package:Kelivo/core/utils/token_estimator.dart';
@@ -24,6 +25,77 @@ Map<String, dynamic> tagged(
 };
 
 void main() {
+  test(
+    'native window counts retained content without counting opaque state',
+    () {
+      final native = {
+        'output': [
+          {
+            'type': 'message',
+            'role': 'user',
+            'content': [
+              {'type': 'input_text', 'text': 'retained question'},
+              {
+                'type': 'input_image',
+                'image_url': 'data:image/png;base64,YWJj',
+              },
+            ],
+          },
+          {
+            'type': 'function_call',
+            'name': 'search',
+            'arguments': '{"query":"retained"}',
+          },
+          {
+            'type': 'function_call_output',
+            'output': [
+              {'type': 'input_text', 'text': 'retained result'},
+              {
+                'type': 'input_image',
+                'image_url': 'https://example.com/image.png',
+              },
+            ],
+          },
+          {'type': 'reasoning', 'encrypted_content': 'encrypted reasoning'},
+          {
+            'type': 'compaction',
+            'encrypted_content': List.filled(10000, 'x').join(),
+          },
+        ],
+        'usage': {'completionTokens': 999999},
+      };
+      final before = jsonEncode(native);
+      final preview = ContextAssemblyPreview.fromApiMessages(
+        apiMessages: [
+          {'role': 'system', 'content': 'system'},
+          {'role': 'user', 'content': '', nativeCompactionMessageKey: native},
+          {'role': 'user', 'content': 'latest question'},
+        ],
+        tools: [],
+        mcpToolNames: {},
+        images: const [ContextImageRef()],
+      );
+      expect(
+        preview.historyText,
+        'retained question'
+        '{"name":"search","arguments":"{\\"query\\":\\"retained\\"}"}'
+        'retained resultlatest question',
+      );
+      expect(preview.systemText, 'system');
+      expect(preview.images, hasLength(3));
+      final estimate = estimateContextBuckets(
+        ContextEstimateJob(preview: preview, kind: ProviderKind.openai),
+      );
+      expect(estimate.history, estimateTokens(preview.historyText));
+      expect(estimate.history, lessThan(100));
+      expect(
+        estimate.attachments,
+        3 * estimateImageTokens(ProviderKind.openai),
+      );
+      expect(jsonEncode(native), before);
+    },
+  );
+
   for (final kind in ProviderKind.values) {
     test(
       'real isolate counts every bucket with cached image Futures: $kind',

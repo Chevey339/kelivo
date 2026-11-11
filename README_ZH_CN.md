@@ -42,9 +42,17 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 <table>
 <tr>
 <td width="180" align="center" valign="middle">
-  <b><a href="https://siliconflow.cn">siliconflow.cn</a></b>
+  <a href="https://sta1n.ai/"><img src="docs/sponsors/sta1n.png" alt="STA1N API" width="150"></a><br />
+  <b><a href="https://sta1n.ai/">STA1N API🍪</a></b>
 </td>
-<td valign="middle">感谢 siliconflow.cn 与我们合作提供可免费使用的模型。</td>
+<td valign="middle">感谢<a href="https://sta1n.ai/">STA1N API🍪</a>对 Kelivo 的赞助与支持！专注角色扮演（RP）的 API 服务，为角色聊天提供更多选择。</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <a href="https://api.10dianai.com"><img src="docs/sponsors/10dian.png" alt="10dian-API" width="150"></a><br />
+  <b><a href="https://api.10dianai.com">10dian-API</a></b>
+</td>
+<td valign="middle">感谢<a href="https://api.10dianai.com">10dian-API</a>对本项目的赞助！10dian-API 为广大开发者和玩家提供安全·快速·稳定的 API 服务，资费透明·价格低廉·体验至上，承诺 100% 不掺水。用一把钥匙，召唤全世界的 AI～</td>
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">
@@ -58,6 +66,12 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
   <a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo"><img src="docs/sponsors/marucode.jpg" alt="MaruCode" width="150"></a>
 </td>
 <td valign="middle"><b><a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">MaruCode</a></b> 是一家偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型，支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)，<a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">新用户注册送 2 刀</a>。<a href="https://images-2.muteki.site">生图工作台🖼️</a></td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b><a href="https://ai.ota1245.top/">砂糖酒馆</a></b>
+</td>
+<td valign="middle">感谢<a href="https://ai.ota1245.top/">砂糖酒馆</a>对本项目的赞助！砂糖酒馆主营角色聊天，按次收费，价格透明。提供 Gemini、Claude、DeepSeek、GLM 等主流文本模型，以及 NAI 生图、TTS 和视频模型。注重隐私，无数据倒卖，无模型掺水，充值额度 1:1。<a href="https://www.16688.com.cn/shop/S929990">购买链接</a>。</td>
 </tr>
 </table>
 

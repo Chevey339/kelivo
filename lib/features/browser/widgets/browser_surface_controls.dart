@@ -446,7 +446,6 @@ class BrowserSurfaceField extends StatelessWidget {
             placeholder: hintText,
             autofocus: autofocus,
             autocorrect: autocorrect,
-            enableSuggestions: keyboardType != TextInputType.url,
             keyboardType: keyboardType,
             textInputAction: onSubmitted == null
                 ? TextInputAction.done

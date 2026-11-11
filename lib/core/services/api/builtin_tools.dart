@@ -1,3 +1,4 @@
+import '../../models/image_generation_options.dart';
 import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
@@ -372,7 +373,11 @@ abstract class BuiltInToolsHelper {
     }
 
     if (configured.contains(BuiltInToolNames.imageGeneration)) {
-      add({'type': 'image_generation'});
+      final override = cfg.modelOverrides[modelId];
+      final options = ImageGenerationOptions.fromJson(
+        override is Map ? override['imageGeneration'] : null,
+      );
+      add({'type': 'image_generation', ...options.toJson()});
     }
     if (!configured.contains(BuiltInToolNames.search)) {
       return BuiltInToolsRequestPayload(tools: tools);

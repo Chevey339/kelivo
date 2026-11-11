@@ -1,3 +1,7 @@
+import '../api/request_image_context.dart';
+import '../../../features/chat/utils/thinking_tag_parser.dart';
+import '../../../features/intelligent_ui/host/ui_source_map.dart';
+import '../../models/compression_config.dart';
 import '../../models/image_context.dart';
 import '../../utils/chat_image_result.dart';
 import '../../models/quote_ref.dart';
@@ -35,7 +39,6 @@ import 'context_compression_service.dart';
 import '../memory/memory_block_builder.dart';
 import '../logging/log_payload_elider.dart';
 import '../../../utils/mcp_structured_image.dart';
-import '../../../utils/utf16_safe_cut.dart';
 import '../api/providers/claude/claude_container.dart';
 import '../api/providers/claude/claude_history.dart';
 import '../api/providers/claude/claude_thinking_recovery.dart';
@@ -53,6 +56,7 @@ import '../storage/attachment_file_lock.dart';
 
 part 'chat_context_operations.dart';
 part 'chat_image_context.dart';
+part 'chat_compression_settings.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -368,6 +372,7 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  final _temporaryCompressionSettings = <String, Map<String, dynamic>>{};
   final _temporaryImageSettings = <String, ImageContextSettings>{};
 
   void _bumpContextRevision(String conversationId) {
@@ -1699,6 +1704,41 @@ class ChatService extends ChangeNotifier {
     return _repo.getMaxMessageVersionForGroup(conversationId, groupId);
   }
 
+  Future<ContextMutationState> loadContextMutationState(String id) async {
+    if (_initialized &&
+        !_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      return _repo.readContextMutationState(id);
+    }
+    final operations = await loadContextOperations(id);
+    return (
+      revision: ContextHistory.operationsFingerprint(operations),
+      operations: operations,
+    );
+  }
+
+  Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
+  loadContextMutationPreview(String id, {required String expectedState}) async {
+    if (_initialized &&
+        !_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      final snapshot = await _repo.readContextMutationPreview(
+        id,
+        expectedState: expectedState,
+      );
+      await _cacheMessageArtifacts(snapshot.messages);
+      return snapshot;
+    }
+    final operations = await loadContextOperations(id);
+    if (ContextHistory.operationsFingerprint(operations) != expectedState) {
+      throw StateError('context_changed');
+    }
+    return (
+      messages: await loadRawSelectedContextMessages(id, limit: 0x7fffffff),
+      operations: operations,
+    );
+  }
+
   Future<List<ChatMessage>> loadSelectedMessageProjections(
     String conversationId,
   ) async {
@@ -1710,6 +1750,43 @@ class ChatService extends ChangeNotifier {
       );
     }
     return _repo.getSelectedMessageProjections(conversationId);
+  }
+
+  Future<({String? targetGroupId, Set<String> removedGroups})>
+  loadRegenerationSourceGroups(
+    String conversationId,
+    String revisionId, {
+    required bool assistantAsNewReply,
+    required bool deleteTrailingMessages,
+  }) async {
+    if (!_temporaryConversationIds.contains(conversationId) &&
+        !_draftConversations.containsKey(conversationId)) {
+      return _repo.getRegenerationSourceGroups(
+        conversationId,
+        revisionId,
+        assistantAsNewReply: assistantAsNewReply,
+        deleteTrailingMessages: deleteTrailingMessages,
+      );
+    }
+    final selected = _collapseTitleVersions(
+      _messagesCache[conversationId] ?? [],
+      getVersionSelections(conversationId),
+    );
+    var keep = selected.indexWhere((m) => m.id == revisionId);
+    if (keep < 0) return (targetGroupId: null, removedGroups: <String>{});
+    String? target;
+    if (selected[keep].role == 'assistant') {
+      if (!assistantAsNewReply) target = ContextHistory.group(selected[keep]);
+    } else if (keep + 1 < selected.length &&
+        selected[keep + 1].role == 'assistant') {
+      target = ContextHistory.group(selected[++keep]);
+    }
+    return (
+      targetGroupId: target,
+      removedGroups: deleteTrailingMessages
+          ? selected.skip(keep + 1).map(ContextHistory.group).toSet()
+          : <String>{},
+    );
   }
 
   Future<List<MiniMapSearchHit>> searchMiniMapMatches(
@@ -2067,6 +2144,7 @@ class ChatService extends ChangeNotifier {
   void _discardTemporaryConversation(String? id) {
     if (id == null || !_temporaryConversationIds.remove(id)) return;
     _temporaryImageSettings.remove(id);
+    _temporaryCompressionSettings.remove(id);
     _contextCompression?.forget(id);
     _forgetContextRevision(id);
     _rememberDiscardedTemporaryConversation(id);
@@ -2087,6 +2165,7 @@ class ChatService extends ChangeNotifier {
 
   Future<void> deleteConversation(String id) async {
     _temporaryImageSettings.remove(id);
+    _temporaryCompressionSettings.remove(id);
     if (!_initialized) return;
     _contextCompression?.forget(id);
 
@@ -2811,6 +2890,7 @@ class ChatService extends ChangeNotifier {
     _draftConversations.clear();
     _temporaryConversationIds.clear();
     _temporaryImageSettings.clear();
+    _temporaryCompressionSettings.clear();
     _temporaryToolEvents.clear();
     _temporaryProviderArtifacts.clear();
     _toolEventsCache.clear();
@@ -2854,6 +2934,16 @@ class ChatService extends ChangeNotifier {
   ) async {
     if (!_initialized) await init();
 
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final messages = _messagesCache.putIfAbsent(conversationId, () => []);
+      if (messages.any((m) => m.id == message.id)) return;
+      messages.add(message);
+      _messageOrderIds[conversationId] = messages.map((m) => m.id).toList();
+      _messageCounts[conversationId] = messages.length;
+      _bumpContextRevision(conversationId);
+      notifyListeners();
+      return;
+    }
     final conversation = _conversationsCache[conversationId];
     if (conversation == null) return;
     final order = await _loadMessageOrder(conversationId);
@@ -4094,6 +4184,7 @@ class ChatService extends ChangeNotifier {
     required List<String>? sourceMcpServerIds,
     required String? activationOwner,
     bool activate = true,
+    bool temporary = false,
     Future<void> Function(Conversation)? beforePublish,
   }) async {
     // Cache-only metadata belongs to temporary sources too. Capture it before
@@ -4116,6 +4207,7 @@ class ChatService extends ChangeNotifier {
       assistantId: assistantId,
       extras: _extrasForNewConversation(assistantId),
     );
+    if (temporary) _temporaryConversationIds.add(persisted.id);
     _unpublishedForks.add(persisted.id);
     try {
       await _saveConversation(persisted);
@@ -4137,7 +4229,11 @@ class ChatService extends ChangeNotifier {
     } catch (_) {
       // This target belongs solely to the failed copy. Remove its committed
       // partial rows and caches; keep the current owner and temporary assets.
-      await _deletePersistedConversation(persisted.id);
+      if (temporary) {
+        _discardTemporaryConversation(persisted.id);
+      } else {
+        await _deletePersistedConversation(persisted.id);
+      }
       notifyListeners();
       rethrow;
     } finally {
@@ -4221,7 +4317,8 @@ class ChatService extends ChangeNotifier {
       await addMessageDirectly(targetConversationId, forked);
       cloned.add(forked);
       messageIdMap[message.id] = forked.id;
-      if (message.role == 'user') {
+      if (message.role == 'user' &&
+          !isTemporaryConversation(targetConversationId)) {
         await _inheritImageOcrArtifactsBestEffort(
           fromRevisionId: message.id,
           toRevisionId: forked.id,
@@ -4247,6 +4344,10 @@ class ChatService extends ChangeNotifier {
           await setProviderArtifact(forked.id, kind, payload);
         }
       }
+    }
+    if (isTemporaryConversation(targetConversationId)) {
+      _messagesCache[targetConversationId] = cloned;
+      return;
     }
     await _repo.copyGenUiTransfer(
       sources: uiCopies,
@@ -4821,6 +4922,7 @@ class ChatService extends ChangeNotifier {
     _draftConversations.clear();
     _temporaryConversationIds.clear();
     _temporaryImageSettings.clear();
+    _temporaryCompressionSettings.clear();
     _temporaryToolEvents.clear();
     _temporaryProviderArtifacts.clear();
     _toolEventsCache.clear();

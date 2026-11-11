@@ -19,6 +19,100 @@ QuoteRef quote(int index) => QuoteRef(
 );
 
 void main() {
+  test('quote values match platform values in both comparison directions', () {
+    const remote = TextEditingValue(
+      text: '${quotePlaceholder}dou',
+      selection: TextSelection.collapsed(offset: 4),
+      composing: TextRange(start: 1, end: 4),
+    );
+    final local = QuoteEditingValue(
+      text: remote.text,
+      selection: remote.selection,
+      composing: remote.composing,
+      quotes: [quote(1)],
+    );
+    expect(local == remote, true);
+    expect(remote == local, true);
+    expect(local.hashCode, remote.hashCode);
+    expect(local == remote.copyWith(composing: TextRange.empty), false);
+    expect(
+      local ==
+          remote.copyWith(selection: const TextSelection.collapsed(offset: 1)),
+      false,
+    );
+  });
+
+  test('same-placeholder restoration still updates the quote snapshot', () {
+    final c = QuoteEditingController(nativeInputEnabled: false);
+    addTearDown(c.dispose);
+    c.insertQuote(quote(1));
+    final previous = c.value;
+    var notifications = 0;
+    c.addListener(() => notifications++);
+    c.restore(previous, [quote(2)]);
+    expect(c.text, previous.text);
+    expect(c.quotes, [quote(2)]);
+    expect(c.value == previous, false);
+    expect(notifications, 1);
+    expect(previous.quotes, [quote(1)]);
+  });
+
+  testWidgets(
+    'quoted IME composition is not echoed back to the platform',
+    (tester) async {
+      final c = QuoteEditingController(nativeInputEnabled: false);
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: TextField(maxLines: null, controller: c, autofocus: true),
+          ),
+        ),
+      );
+      await tester.pump();
+      c.insertQuote(quote(1));
+      await tester.pump();
+      tester.testTextInput.log.clear();
+      for (final (text, composing) in [
+        ('d', const TextRange(start: 1, end: 2)),
+        ('do', const TextRange(start: 1, end: 3)),
+        ('dou', const TextRange(start: 1, end: 4)),
+        ('都', TextRange.empty),
+        ('都n', const TextRange(start: 2, end: 3)),
+        ('都no', const TextRange(start: 2, end: 4)),
+        ('都nong', const TextRange(start: 2, end: 6)),
+        ("都nong'nong", const TextRange(start: 2, end: 11)),
+        ('都弄弄', TextRange.empty),
+      ]) {
+        final value = TextEditingValue(
+          text: '$quotePlaceholder$text',
+          selection: TextSelection.collapsed(offset: text.length + 1),
+          composing: composing,
+        );
+        tester.testTextInput.updateEditingValue(value);
+        await tester.pump();
+        expect(c.text, value.text);
+        expect(c.value.composing, composing);
+        expect(c.quotes, [quote(1)]);
+        expect(
+          tester.testTextInput.log.where(
+            (call) => call.method == 'TextInput.setEditingState',
+          ),
+          isEmpty,
+          reason: 'An accepted IME update must not reset native state: $text',
+        );
+      }
+      expect(c.text, '$quotePlaceholder都弄弄');
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.windows,
+      TargetPlatform.macOS,
+      TargetPlatform.linux,
+    }),
+  );
+
   test(
     'reasoning snapshots deduplicate by selected text and survive serialization',
     () {
@@ -223,5 +317,18 @@ void main() {
     expect(c.text, '\uFFFC');
     expect(c.quotes, [quote(1)]);
     expect(find.byType(QuoteChip), findsOneWidget);
+
+    // Both edits fit into one undo interval and finish with the same U+FFFC.
+    // Their quote snapshots must remain distinguishable from one another.
+    c.removeQuote('q1');
+    c.insertQuote(quote(2));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(c.quotes, [quote(2)]);
+    undo.undo();
+    await tester.pump();
+    expect(c.quotes, [quote(1)]);
+    undo.redo();
+    await tester.pump();
+    expect(c.quotes, [quote(2)]);
   });
 }

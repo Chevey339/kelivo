@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/compression_config.dart';
+import 'package:Kelivo/features/home/controllers/home_view_model.dart';
+import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:Kelivo/core/models/memory_entry.dart';
@@ -117,6 +120,39 @@ class _Generation extends Fake implements GenerationController {
   }) => [];
 }
 
+class _ClockGeneration extends MessageGenerationService {
+  _ClockGeneration({
+    required super.chatService,
+    required super.messageBuilderService,
+    required super.generationController,
+    required super.streamController,
+    required super.contextProvider,
+  });
+  DateTime wallClock = DateTime(2020, 1, 1, 12);
+  @override
+  Future<ContextAssemblyPreview> previewContextAssembly({
+    bool? fixedContextStart,
+    DateTime? promptTime,
+    bool forceResponses = false,
+    bool applyMessageLimit = true,
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+    List<ChatMessage>? messagesOverride,
+  }) => super.previewContextAssembly(
+    fixedContextStart: fixedContextStart,
+    promptTime: promptTime ?? wallClock,
+    forceResponses: forceResponses,
+    applyMessageLimit: applyMessageLimit,
+    conversationId: conversationId,
+    providerKey: providerKey,
+    modelId: modelId,
+    assistantId: assistantId,
+    messagesOverride: messagesOverride,
+  );
+}
+
 class _Usage extends ContextUsageService {
   _Usage({
     required super.chatService,
@@ -153,6 +189,15 @@ void main() {
   late UserProvider user;
   late SettingsProvider settings;
   late AssistantProvider assistants;
+
+  Future<void> setFullInjectionTypes(Set<MemoryType> types) async {
+    await assistants.updateAssistant(
+      assistants
+          .getById('assistant')!
+          .copyWith(memoryFullInjectionTypes: types),
+    );
+  }
+
   late MemoryProviderV2 memories;
   late BuildContext context;
   late MessageBuilderService builder;
@@ -326,6 +371,73 @@ void main() {
     runEstimate: <T>(T Function() computation) async => computation(),
   );
 
+  testWidgets(
+    'compression references freeze clock but still detect real prompt edits',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        await seedUser('hello');
+        await assistants.updateAssistant(
+          assistants
+              .getById('assistant')!
+              .copyWith(
+                systemPrompt: 'RULES {cur_date} {cur_time} {cur_datetime}',
+              ),
+        );
+        final g = _ClockGeneration(
+          chatService: chat,
+          messageBuilderService: builder,
+          generationController: _Generation(),
+          streamController: _Stream(),
+          contextProvider: context,
+        );
+        final controller = ChatController(chatService: chat);
+        final vm = HomeViewModel(
+          chatService: chat,
+          messageBuilderService: builder,
+          messageGenerationService: g,
+          generationController: g.generationController,
+          streamController: g.streamController,
+          chatController: controller,
+          contextProvider: context,
+          getTitleForLocale: (_) => 'title',
+        );
+        try {
+          const options = CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          );
+          final request = await vm.buildCompressionRequest(
+            'one',
+            options: options,
+            configOverride: const CompressionConfig(),
+          );
+          final selection = selectCompressionHistory(
+            chat.storedMessages,
+            [],
+            options,
+          );
+          final first = await request.loadReference!(selection);
+          expect(first, contains('RULES'));
+          expect(first, isNot(contains('{cur_')));
+          g.wallClock = g.wallClock.add(const Duration(days: 1, minutes: 2));
+          final later = await request.loadReference!(selection);
+          expect(later, first);
+          await assistants.updateAssistant(
+            assistants
+                .getById('assistant')!
+                .copyWith(systemPrompt: 'CHANGED {cur_datetime}'),
+          );
+          final edited = await request.loadReference!(selection);
+          expect(edited, contains('CHANGED'));
+          expect(edited, isNot(first));
+        } finally {
+          vm.dispose();
+          controller.dispose();
+        }
+      });
+    },
+  );
+
   testWidgets('profile edit invalidates the cached memory bucket', (
     tester,
   ) async {
@@ -388,14 +500,14 @@ void main() {
       try {
         await usage.refresh('one', force: true);
         final limited = usage.current!.buckets.memory;
-        await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+        await setFullInjectionTypes({MemoryType.identity});
         await usage.refresh('one');
         expect(usage.current!.buckets.memory, greaterThan(limited + 400));
         expect(
           usage.current!.buckets.memory,
           estimateTokens((await preview(g)).memoryText),
         );
-        await settings.setMemoryFullInjectionTypes({});
+        await setFullInjectionTypes({});
         await usage.refresh('one');
         expect(usage.current!.buckets.memory, limited);
       } finally {
@@ -527,7 +639,7 @@ void main() {
             await putMemory('m2', 'second fact');
             await settings.setMemoryInjectionMaxItems(1);
             if (change == 'limitedInjection') {
-              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+              await setFullInjectionTypes({MemoryType.identity});
             }
             final g = generation();
             final usage = usageService(g);
@@ -555,11 +667,9 @@ void main() {
                 case 'limit':
                   await settings.setMemoryInjectionMaxItems(2);
                 case 'fullInjection':
-                  await settings.setMemoryFullInjectionTypes({
-                    MemoryType.identity,
-                  });
+                  await setFullInjectionTypes({MemoryType.identity});
                 case 'limitedInjection':
-                  await settings.setMemoryFullInjectionTypes({});
+                  await setFullInjectionTypes({});
               }
               final rebuilt = await preview(g);
               await usage.refresh('one', force: force);
@@ -605,6 +715,42 @@ void main() {
       }
     });
   });
+
+  testWidgets(
+    'another assistant full injection selection preserves exact usage',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        final otherId = await assistants.addAssistant(name: 'Other');
+        await seedUser('hello');
+        await putMemory('first', 'first fact');
+        await putMemory('second', 'second fact');
+        await settings.setMemoryInjectionMaxItems(1);
+        final g = generation();
+        final usage = usageService(g)..setActiveConversation('one');
+        try {
+          final request = await prepare(g);
+          await record(usage, request);
+          await usage.refresh('one', force: true);
+          final before = await preview(g);
+          await assistants.updateAssistant(
+            assistants
+                .getById(otherId)!
+                .copyWith(
+                  enableMemory: true,
+                  memoryFullInjectionTypes: {MemoryType.identity},
+                ),
+          );
+          await usage.refresh('one');
+          expect(usage.snapshot('one')!.state, ContextUsageState.exact);
+          expect(usage.snapshot('one')!.usedTokens, 10);
+          expect((await preview(g)).memoryText, before.memoryText);
+        } finally {
+          usage.dispose();
+        }
+      });
+    },
+  );
 
   testWidgets('memory edits during estimation discard the old estimate', (
     tester,

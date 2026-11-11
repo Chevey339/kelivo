@@ -41,7 +41,8 @@ Color contextUsageColor(
     ContextUsageState.failed => cs.error,
     ContextUsageState.exact ||
     ContextUsageState.estimated ||
-    ContextUsageState.none => base,
+    ContextUsageState.none ||
+    ContextUsageState.opaque => base,
   };
 }
 
@@ -170,6 +171,9 @@ class ContextUsageRing extends StatelessWidget {
     }
     if (snapshot != null && !snapshot.hasUsage) {
       return contextUsageStateLabel(l10n, snapshot);
+    }
+    if (snapshot?.hasUnknownNativeTokens == true) {
+      return contextUsageSummaryText(l10n, snapshot);
     }
     final window = snapshot?.contextWindow;
     if (snapshot == null || window == null || window <= 0) {

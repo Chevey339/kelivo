@@ -28,6 +28,8 @@ data class ExecRequest(
 class ExecRunner(
     private val events: WorkspaceEvents,
     private val stopProcess: (Process) -> Unit = ::stopProotProcess,
+    private val processOwner: WorkspaceProcessOwner? = null,
+    private val hostShell: String = "/system/bin/sh",
 ) {
     private val runs = ConcurrentHashMap<String, Running>()
     private val liveRuns = ConcurrentHashMap.newKeySet<Running>()
@@ -48,10 +50,11 @@ class ExecRunner(
             extraArgs = request.prootArguments,
             shell = request.shell,
         )
-        val builder = ProcessBuilder(launch.argv)
+        val builder = ProcessBuilder(workspaceExecArgv(launch.argv, hostShell))
             .directory(launch.workingDirectory)
             .redirectErrorStream(false)
         builder.environment().putAll(launch.processEnv)
+        processOwner?.let { builder.environment().putAll(it.environment(request.runId)) }
         val process = builder.start()
         if (!request.keepStdinOpen) try {
             process.outputStream.close()
@@ -190,6 +193,14 @@ class ExecRunner(
     }
 }
 
+internal fun workspaceExecArgv(argv: List<String>, shell: String): List<String> {
+    // Android's mksh clears the inherited signal mask in j_init(). A direct
+    // ProcessBuilder exec inherits ART's blocked SIGQUIT, making PRoot immune
+    // to our shutdown request. exec keeps the same PID and the original pipes;
+    // positional arguments preserve every byte without evaluating user input.
+    return listOf(shell, "-c", "exec \"\$@\"", "kelivo-workspace") + argv
+}
+
 internal fun processPid(process: Process): Long? {
     try {
         val method = process.javaClass.methods.firstOrNull { it.name == "pid" && it.parameterCount == 0 }
@@ -214,10 +225,10 @@ internal fun stopProotProcess(process: Process) {
     requestProotExit(pid)
 }
 
-internal fun requestProotExit(pid: Long) {
+internal fun requestProotExit(pid: Long, stillOwned: () -> Boolean = { true }) {
     // SIGKILL on the tracer can orphan tracees (including daemonized guests).
     // SIGQUIT asks PRoot to kill and reap the complete traced process set.
-    if (!awaitProotSignalHandler(File("/proc/$pid"))) return
+    if (!awaitProotSignalHandler(File("/proc/$pid"), stillOwned = stillOwned) || !stillOwned()) return
     try {
         Os.kill(pid.toInt(), OsConstants.SIGQUIT)
     } catch (error: ErrnoException) {

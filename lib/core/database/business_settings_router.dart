@@ -35,6 +35,7 @@ final class BusinessKeyRegistry {
   };
 
   static const discardedKeys = <String>{
+    'memory_full_injection_types_v1',
     'pinned_chat_ids',
     'chat_titles_map',
     'instruction_injections_active_id_v1',
@@ -114,6 +115,8 @@ final class BusinessKeyRegistry {
     'suggestion_insert_on_tap_only_v1',
     'compress_model_v1',
     'compress_prompt_v1',
+    'native_compression_v1',
+    'compression_defaults_v1',
     'reasoning_choice_by_model_v1',
     'image_cropper_enabled_v1',
     'image_upload_quality_v1',
@@ -184,7 +187,6 @@ final class BusinessKeyRegistry {
     'memory_migrate_prompt_zh_v1',
     'memory_migrate_prompt_en_v1',
     'memory_migration_batch_size_v1',
-    'memory_full_injection_types_v1',
     'chat_bubble_style_overrides_v1',
     'chat_bubble_style_overrides_user_v1',
     'tool_schema_overrides_v1',
@@ -613,7 +615,12 @@ final class BusinessSettingsRouter {
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
           objectLists: const {'balanceHeaders'},
-          maps: const {'modelOverrides', 'keyManagement', 'oauthCredentials'},
+          maps: const {
+            'modelOverrides',
+            'keyManagement',
+            'oauthCredentials',
+            'requestBudget',
+          },
         );
         _validateProviderChildren(kind, payload);
         return;

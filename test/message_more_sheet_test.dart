@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'support/business_test_harness.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -23,12 +25,21 @@ Future<void> _openMoreSheet(
   bool canCreateBranch = true,
   bool canSetContextStart = false,
   bool isContextStart = false,
+  double textScale = 1,
+  Locale? locale,
   ValueChanged<MessageMoreAction?>? onSelected,
 }) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) => SettingsProvider(createBusinessTestPreferences()),
       child: MaterialApp(
+        locale: locale,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         localizationsDelegates: const [
           AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
@@ -64,6 +75,84 @@ Future<void> _openMoreSheet(
 }
 
 void main() {
+  final platforms = TargetPlatformVariant({
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  });
+  testWidgets(
+    'compact message menu keeps every action with accessible click targets',
+    (tester) async {
+      final desktop = {
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      }.contains(defaultTargetPlatform);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = desktop
+          ? const Size(1000, 800)
+          : const Size(390, 844);
+      addTearDown(tester.view.reset);
+      MessageMoreAction? selected;
+      await _openMoreSheet(
+        tester,
+        canDeleteAllVersions: false,
+        canSetContextStart: true,
+        locale: const Locale('zh'),
+        onSelected: (action) => selected = action,
+      );
+      final l10n = AppLocalizations.of(tester.element(find.text('open')))!;
+      expect(find.text(l10n.contextFixedStartDescription), findsNothing);
+      expect(find.text(l10n.branchInheritNote), findsNothing);
+      expect(find.byType(Divider), findsNWidgets(3));
+      final rows = find.byType(IosCardPress);
+      expect(rows, findsNWidgets(8));
+      final bounds = [
+        for (final element in rows.evaluate())
+          tester.getRect(find.byWidget(element.widget)),
+      ];
+      expect(
+        bounds.last.bottom - bounds.first.top,
+        lessThanOrEqualTo(desktop ? 330 : 400),
+      );
+      for (final rect in bounds) {
+        expect(rect.height, greaterThanOrEqualTo(desktop ? 36 : 44));
+      }
+      if (desktop) expect(bounds.first.width, lessThan(320));
+      await tester.tap(find.text(l10n.messageMoreSheetDelete));
+      await tester.pumpAndSettle();
+      expect(selected, MessageMoreAction.deleteCurrentVersion);
+      expect(tester.takeException(), isNull);
+    },
+    variant: platforms,
+  );
+
+  testWidgets(
+    'compact menu keeps destructive actions reachable with large text',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 640);
+      addTearDown(tester.view.reset);
+      MessageMoreAction? selected;
+      await _openMoreSheet(
+        tester,
+        canDeleteAllVersions: true,
+        canSetContextStart: true,
+        textScale: 2,
+        onSelected: (action) => selected = action,
+      );
+      await tester.ensureVisible(find.text('Delete All Versions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete All Versions'));
+      await tester.pumpAndSettle();
+      expect(selected, MessageMoreAction.deleteAllVersions);
+      expect(tester.takeException(), isNull);
+    },
+    variant: platforms,
+  );
+
   for (final pinned in [false, true]) {
     testWidgets(
       'context start menu action: pinned=$pinned',

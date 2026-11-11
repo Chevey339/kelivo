@@ -1,10 +1,15 @@
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
+import 'package:Kelivo/core/services/api/providers/openai/native_compaction.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_service.dart';
@@ -56,6 +61,122 @@ void main() {
     await settings.loaded;
   });
   tearDown(() => settings.dispose());
+
+  for (final provider in [
+    OAuthProvider.chatgpt,
+    OAuthProvider.claude,
+    OAuthProvider.grok,
+  ]) {
+    test('final OAuth body respects local budget: $provider', () async {
+      final original = config(provider: provider, expired: false);
+      await settings.setProviderConfig(original.id, original);
+      final service = ProviderOAuthService()..bind(settings);
+      addTearDown(service.dispose);
+      var sends = 0;
+      var wireBytes = 0;
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          sends++;
+          wireBytes = request.bodyBytes.length;
+          return http.Response('{}', 200);
+        }),
+        original,
+      );
+      addTearDown(client.close);
+      final payload = provider == OAuthProvider.claude
+          ? {
+              'model': 'claude-sonnet-4-6',
+              'messages': [
+                {'role': 'user', 'content': 'hi'},
+              ],
+              'max_tokens': 100,
+            }
+          : {
+              'model': 'plain-model',
+              'input': [
+                {'role': 'user', 'content': 'hi'},
+              ],
+            };
+      final path = provider == OAuthProvider.claude
+          ? '/messages'
+          : '/responses';
+      Future<void> send() async {
+        final request =
+            http.Request('POST', Uri.parse('${provider.baseUrl}$path'))
+              ..headers['content-type'] = 'application/json'
+              ..body = await RequestImageContext.encodeBody(payload);
+        await (await client.send(request)).stream.drain<void>();
+      }
+
+      await send();
+      final expected = wireBytes;
+      final rawSize = utf8.encode(jsonEncode(payload)).length;
+      expect(expected, greaterThan(rawSize));
+      final blocked = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+        budget: RequestBudget(bodyBytes: rawSize),
+      );
+      await expectLater(
+        blocked.run(() async* {
+          await send();
+          yield 0;
+        }).drain<void>(),
+        throwsA(
+          isA<ImageContextBudgetException>()
+              .having((e) => e.actual, 'final wire bytes', expected)
+              .having((e) => e.limit, 'body budget', rawSize),
+        ),
+      );
+      expect(sends, 1);
+      final exact = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+        budget: RequestBudget(bodyBytes: expected),
+      );
+      await exact.run(() async* {
+        await send();
+        yield 0;
+      }).drain<void>();
+      expect(sends, 2);
+    });
+  }
+
+  test(
+    'Codex sync stores service tiers scoped to the authenticated session',
+    () async {
+      var tiers = <Map<String, String>>[
+        {'id': 'fast', 'name': 'Fast', 'description': 'Faster'},
+        {'id': 'ultrafast', 'name': 'Ultrafast', 'description': 'Fastest'},
+      ];
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient(
+          (_) async => jsonResponse({
+            'models': [
+              {'slug': 'gpt-6-astra', 'service_tiers': tiers},
+            ],
+          }),
+        ),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      await settings.setProviderConfig(
+        'account',
+        config(provider: OAuthProvider.chatgpt, expired: false),
+      );
+      await service.syncModels('account');
+      var saved =
+          settings.providerConfigs['account']!.modelOverrides['gpt-6-astra']
+              as Map;
+      expect(saved['oauthServiceTiers'], ['fast', 'ultrafast']);
+      expect(saved['oauthServiceTierSessionId'], 'session');
+      tiers = [];
+      await service.syncModels('account');
+      saved =
+          settings.providerConfigs['account']!.modelOverrides['gpt-6-astra']
+              as Map;
+      expect(saved['oauthServiceTiers'], isEmpty);
+    },
+  );
 
   test(
     'refresh errors retain sanitized diagnostics through the service',
@@ -369,92 +490,113 @@ void main() {
     },
   );
 
-  test(
-    'Codex streaming applies subscription contract after user overrides',
-    () async {
-      final service = ProviderOAuthService()..bind(settings);
-      final original = config(provider: OAuthProvider.chatgpt, expired: false)
-          .copyWith(
-            customHeaders: [
-              {'name': 'Authorization', 'value': 'Bearer wrong'},
-            ],
-            customBody: [
-              {'key': 'store', 'value': 'true'},
-              {'key': 'max_output_tokens', 'value': '10'},
-              {'key': 'top_k', 'value': '50'},
-              {'key': 'min_p', 'value': '0.1'},
-              {'key': 'presence_penalty', 'value': '0.1'},
-              {'key': 'repetition_penalty', 'value': '1.1'},
-              {'key': 'frequency_penalty', 'value': '0.1'},
-              {'key': 'stop', 'value': '["END"]'},
-              {'key': 'service_tier', 'value': 'priority'},
-            ],
-          );
-      await settings.setProviderConfig(original.id, original);
-      final resolved = await service.resolve(original);
-      final requests = <http.Request>[];
-      final client = service.authenticatedClient(
-        MockClient((request) async {
-          requests.add(request);
-          return http.Response(
-            'data: {"type":"response.output_text.delta","delta":"Hello"}\n\ndata: {"type":"response.completed","response":{"id":"resp","output":[]}}\n\n',
-            200,
-            headers: {'content-type': 'text/event-stream'},
-          );
-        }),
-        resolved,
-      );
-      final chunks = await sendOpenAIStream(
-        client,
-        resolved,
-        'gpt-5.4',
-        [
-          {'role': 'user', 'content': 'Hi'},
-        ],
-        temperature: .7,
-        maxTokens: 32,
-        reasoning: legacyBudget(0),
-      ).toList();
-      expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'Hello');
-      final sent = requests.single;
-      expect(sent.headers['Authorization'], 'Bearer access');
-      expect(sent.headers['chatgpt-account-id'], 'workspace');
-      expect(sent.headers['version'], '0.159.0');
-      expect(sent.url.toString(), '${OAuthProvider.chatgpt.baseUrl}/responses');
-      final body = jsonDecode(sent.body) as Map;
-      expect(body['stream'], true);
-      expect(body['store'], false);
-      expect(body['instructions'], '');
-      expect(body.containsKey('temperature'), false);
-      expect(body.containsKey('max_output_tokens'), false);
-      for (final key in [
-        'top_k',
-        'min_p',
-        'presence_penalty',
-        'repetition_penalty',
-        'frequency_penalty',
-        'stop',
-      ]) {
-        expect(
-          body.containsKey(key),
-          false,
-          reason: '$key is unsupported by Codex',
+  for (final serviceTier in [null, 'default', 'fast', 'ultrafast']) {
+    test(
+      'Codex applies subscription contract and selected tier $serviceTier after user overrides',
+      () async {
+        final service = ProviderOAuthService()..bind(settings);
+        final original = config(provider: OAuthProvider.chatgpt, expired: false)
+            .copyWith(
+              customHeaders: [
+                {'name': 'Authorization', 'value': 'Bearer wrong'},
+              ],
+              customBody: [
+                {'key': 'store', 'value': 'true'},
+                {'key': 'max_output_tokens', 'value': '10'},
+                {'key': 'top_k', 'value': '50'},
+                {'key': 'min_p', 'value': '0.1'},
+                {'key': 'presence_penalty', 'value': '0.1'},
+                {'key': 'repetition_penalty', 'value': '1.1'},
+                {'key': 'frequency_penalty', 'value': '0.1'},
+                {'key': 'stop', 'value': '["END"]'},
+                {'key': 'service_tier', 'value': 'priority'},
+              ],
+            );
+        await settings.setProviderConfig(original.id, original);
+        final resolved = await service.resolve(original);
+        final requests = <http.Request>[];
+        final client = service.authenticatedClient(
+          MockClient((request) async {
+            requests.add(request);
+            return http.Response(
+              'data: {"type":"response.output_text.delta","delta":"Hello"}\n\ndata: {"type":"response.completed","response":{"id":"resp","output":[]}}\n\n',
+              200,
+              headers: {'content-type': 'text/event-stream'},
+            );
+          }),
+          resolved,
         );
-      }
-      expect(body['reasoning'], {'effort': 'none', 'summary': 'auto'});
-      expect(
-        sent.headers['x-codex-routing-hint'],
-        'model=gpt-5.4;tier=priority',
-      );
-      expect(body['include'], contains('reasoning.encrypted_content'));
-    },
-  );
+        final chunks = await sendOpenAIStream(
+          client,
+          resolved,
+          'gpt-5.4',
+          [
+            {'role': 'user', 'content': 'Hi'},
+          ],
+          serviceTier: serviceTier,
+          temperature: .7,
+          maxTokens: 32,
+          reasoning: legacyBudget(0),
+        ).toList();
+        expect(
+          chunks.whereType<TextDelta>().map((e) => e.text).join(),
+          'Hello',
+        );
+        final sent = requests.single;
+        expect(sent.headers['Authorization'], 'Bearer access');
+        expect(sent.headers['chatgpt-account-id'], 'workspace');
+        expect(sent.headers['version'], '0.159.0');
+        expect(sent.headers, isNot(contains('openai-beta')));
+        expect(
+          sent.url.toString(),
+          '${OAuthProvider.chatgpt.baseUrl}/responses',
+        );
+        final body = jsonDecode(sent.body) as Map;
+        expect(body['stream'], true);
+        expect(body['store'], false);
+        expect(body['instructions'], '');
+        expect(body.containsKey('temperature'), false);
+        expect(body.containsKey('max_output_tokens'), false);
+        for (final key in [
+          'top_k',
+          'min_p',
+          'presence_penalty',
+          'repetition_penalty',
+          'frequency_penalty',
+          'stop',
+        ]) {
+          expect(
+            body.containsKey(key),
+            false,
+            reason: '$key is unsupported by Codex',
+          );
+        }
+        expect(body['reasoning'], {'effort': 'none', 'summary': 'auto'});
+        expect(
+          sent.headers['x-codex-routing-hint'],
+          serviceTier == 'default'
+              ? 'model=gpt-5.4'
+              : 'model=gpt-5.4;tier=${serviceTier ?? 'priority'}',
+        );
+        expect(
+          body['service_tier'],
+          serviceTier == 'default' ? isNull : (serviceTier ?? 'priority'),
+        );
+        expect(body['include'], contains('reasoning.encrypted_content'));
+      },
+    );
+  }
 
   test(
     'Codex tool continuation preserves encrypted reasoning without server item references',
     () async {
       final service = ProviderOAuthService()..bind(settings);
-      final original = config(provider: OAuthProvider.chatgpt, expired: false);
+      final original = config(provider: OAuthProvider.chatgpt, expired: false)
+          .copyWith(
+            customBody: const [
+              {'key': 'service_tier', 'value': 'priority'},
+            ],
+          );
       await settings.setProviderConfig(original.id, original);
       final requests = <http.Request>[];
       final toolCalls = <String>[];
@@ -465,6 +607,9 @@ void main() {
         'name': 'weather',
         'arguments': '{}',
         'status': 'completed',
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 7,
+        },
       };
       final client = service.authenticatedClient(
         MockClient((request) async {
@@ -485,6 +630,9 @@ void main() {
                           'id': 'rs_temporary',
                           'summary': [],
                           'encrypted_content': 'opaque',
+                          'internal_chat_message_metadata_passthrough': {
+                            'content_token_count': 3,
+                          },
                         },
                         call,
                       ],
@@ -513,6 +661,7 @@ void main() {
         [
           {'role': 'user', 'content': 'Weather?'},
         ],
+        serviceTier: 'ultrafast',
         tools: [
           {
             'type': 'function',
@@ -530,9 +679,24 @@ void main() {
       expect(toolCalls, ['weather']);
       expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'Sunny');
       expect(requests.length, 2);
+      for (final request in requests) {
+        expect((jsonDecode(request.body) as Map)['service_tier'], 'ultrafast');
+        expect(
+          request.headers['x-codex-routing-hint'],
+          'model=gpt-5.4;tier=ultrafast',
+        );
+      }
       final body = jsonDecode(requests.last.body) as Map;
       final input = (body['input'] as List).cast<Map>();
       expect(input.any((item) => item.containsKey('id')), false);
+      expect(
+        input.any(
+          (item) =>
+              item.containsKey('internal_chat_message_metadata_passthrough'),
+        ),
+        false,
+      );
+      expect(call, contains('internal_chat_message_metadata_passthrough'));
       expect(
         input
             .where((item) => item['type'] == 'reasoning')
@@ -548,6 +712,128 @@ void main() {
       expect(body['store'], false);
       expect(body['instructions'], '');
       expect(body['include'], contains('reasoning.encrypted_content'));
+    },
+  );
+
+  test(
+    'Codex sanitizes saved history, compaction input and compacted continuation at the wire',
+    () async {
+      const model = 'gpt-5.4';
+      final original = config(provider: OAuthProvider.chatgpt, expired: false);
+      await settings.setProviderConfig(original.id, original);
+      final service = ProviderOAuthService()..bind(settings);
+      addTearDown(service.dispose);
+      final resolved = await service.resolve(original);
+      final savedItem = <String, dynamic>{
+        'type': 'message',
+        'id': 'message-id',
+        'role': 'assistant',
+        'content': [
+          {'type': 'output_text', 'text': 'answer'},
+        ],
+        'metadata': {'keep': true},
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 7,
+        },
+      };
+      final scope = responsesReplayScope(resolved, model);
+      final stored = ResponsesTurnRecorder(
+        scope,
+      ).record([savedItem], []).payload;
+      final history = buildResponsesHistory(
+        payload: stored,
+        scope: scope,
+        toolEvents: [],
+        content: 'answer',
+      )!;
+      final historyBefore = jsonEncode(history);
+      final compactItem = <String, dynamic>{
+        'type': 'compaction',
+        'id': 'compaction-id',
+        'encrypted_content': 'opaque-compaction',
+        'internal_chat_message_metadata_passthrough': {
+          'content_token_count': 2,
+        },
+      };
+      final requests = <http.Request>[];
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          requests.add(request);
+          return http.Response(
+            'data: ${jsonEncode({
+              'type': 'response.completed',
+              'response': {
+                'status': 'completed',
+                'output': requests.length == 1 ? [compactItem] : [],
+              },
+            })}\n\n',
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }),
+        resolved,
+      );
+      addTearDown(client.close);
+      final prepared = <String, dynamic>{
+        'model': model,
+        'input': [
+          {'role': 'user', 'content': 'earlier'},
+          savedItem,
+        ],
+      };
+      final preparedBefore = jsonEncode(prepared);
+      final compacted = await requestNativeCompaction(
+        client,
+        resolved,
+        model,
+        prepared,
+      );
+      final compactedBefore = jsonEncode(compacted.toJson());
+      await sendOpenAIStream(client, resolved, model, [
+        {
+          'role': 'user',
+          'content': '',
+          nativeCompactionMessageKey: compacted.toJson(),
+        },
+        {'role': 'user', 'content': 'next'},
+      ]).toList();
+      await sendOpenAIStream(client, resolved, model, [
+        {'role': 'user', 'content': 'earlier'},
+        ...history,
+        {'role': 'user', 'content': 'next'},
+      ]).toList();
+      expect(requests, hasLength(3));
+      for (final request in requests) {
+        expect(request.headers, isNot(contains('openai-beta')));
+        final input = (jsonDecode(request.body)['input'] as List).cast<Map>();
+        expect(
+          input.any(
+            (item) =>
+                item.containsKey('internal_chat_message_metadata_passthrough'),
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        requests.first.headers['x-codex-beta-features'],
+        'remote_compaction_v2',
+      );
+      final continued = (jsonDecode(requests[1].body)['input'] as List)
+          .cast<Map>();
+      expect(continued.singleWhere((item) => item['type'] == 'compaction'), {
+        'type': 'compaction',
+        'id': 'compaction-id',
+        'encrypted_content': 'opaque-compaction',
+      });
+      final replayed = (jsonDecode(requests.last.body)['input'] as List)
+          .cast<Map>();
+      expect(
+        replayed.singleWhere((item) => item['role'] == 'assistant')['metadata'],
+        {'keep': true},
+      );
+      expect(jsonEncode(prepared), preparedBefore);
+      expect(jsonEncode(history), historyBefore);
+      expect(jsonEncode(compacted.toJson()), compactedBefore);
     },
   );
 
@@ -1442,10 +1728,6 @@ void main() {
         'grok-4.7-build-fast',
       );
       expect(fastSpec.contextWindow, 500000);
-      expect(
-        compressRequestCharBudget(contextWindowTokens: fastSpec.contextWindow),
-        100000,
-      );
       expect(
         synced.modelOverrides['grok-4.7-build-fast']['abilities'],
         contains('reasoning'),

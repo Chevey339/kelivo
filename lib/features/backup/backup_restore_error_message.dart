@@ -1,8 +1,14 @@
+import 'package:flutter/services.dart';
+
 import '../../l10n/app_localizations.dart';
 import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/services/backup/backup_encryption.dart';
 
 String backupRestoreErrorMessage(AppLocalizations localizations, Object error) {
+  if (error is PlatformException &&
+      error.code == 'backup_destination_inside_app') {
+    return localizations.backupPageChooseExternalFolder;
+  }
   if (error is BackupCancelledException) {
     return localizations.backupProgressCancelled;
   }

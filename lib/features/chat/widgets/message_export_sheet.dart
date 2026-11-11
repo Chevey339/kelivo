@@ -980,6 +980,22 @@ Future<void> exportChatMessagesMarkdown(
       buf.writeln('\n---\n');
     }
 
+    final compressionMetadata = await chat.compressionMetadataForExport(
+      conversation.id,
+      captures.messages.map(ContextHistory.group).toSet(),
+      settings.compressionDefaults,
+      locale: l10n.localeName,
+    );
+    if (compressionMetadata != null) {
+      buf.writeln(
+        '<details><summary>${l10n.contextOperationsTitle}</summary>\n\n```json',
+      );
+      buf.writeln(
+        const JsonEncoder.withIndent('  ').convert(compressionMetadata),
+      );
+      buf.writeln('```\n\n</details>');
+    }
+
     final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
     if (!context.mounted) return;
     await saveExportTextWithPicker(
@@ -1079,6 +1095,19 @@ Future<void> exportChatMessagesTxt(
         }
       }
       buf.writeln('\n---\n');
+    }
+
+    final compressionMetadata = await chat.compressionMetadataForExport(
+      conversation.id,
+      captures.messages.map(ContextHistory.group).toSet(),
+      settings.compressionDefaults,
+      locale: l10n.localeName,
+    );
+    if (compressionMetadata != null) {
+      buf.writeln('\n${l10n.contextOperationsTitle}');
+      buf.writeln(
+        const JsonEncoder.withIndent('  ').convert(compressionMetadata),
+      );
     }
 
     final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';

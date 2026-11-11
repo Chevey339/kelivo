@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.4+84
+version: 1.3.5+85
 
 environment:
   sdk: ^3.12.1
@@ -173,6 +173,13 @@ dev_dependencies:
   url_launcher_platform_interface: ^2.3.2
   vm_service: ^15.3.0
 dependency_overrides:
+  # Detach native finalizers before freeing SQLite handles on isolate shutdown.
+  # https://github.com/simolus3/sqlite3.dart/pull/438
+  sqlite3:
+    git:
+      url: https://github.com/simolus3/sqlite3.dart.git
+      ref: 8db87537775047cdde00353f09afb1521befbeec
+      path: sqlite3
   # Bound SVG geometry expansion and native pattern bitmap allocations.
   vector_graphics_compiler:
     path: dependencies/vector_graphics_compiler

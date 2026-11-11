@@ -292,7 +292,7 @@ class _UsageBar extends StatelessWidget {
                 ),
               ),
             ),
-            Flexible(
+            Expanded(
               child: Text(
                 usedText,
                 textAlign: TextAlign.end,

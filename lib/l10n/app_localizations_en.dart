@@ -1682,7 +1682,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageChatsLabel => 'Chats';
 
   @override
-  String get backupPageFilesLabel => 'Files';
+  String get backupPageFilesDescription =>
+      'Chat attachments, avatars, backgrounds and custom fonts. To restore avatars or backgrounds, also select the corresponding assistants, providers or settings.';
+
+  @override
+  String get backupPageChooseBackupFolder => 'Choose a backup folder';
+
+  @override
+  String get backupPageChooseExternalFolder =>
+      'Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.';
+
+  @override
+  String get backupPageFilesLabel => 'Files and Images';
 
   @override
   String get backupPageScopeTitle => 'Backup and import content';
@@ -2164,10 +2175,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get backupPageExportToFile => 'Export to File';
+  String get backupPageExportToFile => 'Back Up Now';
 
   @override
-  String get backupPageExportToFileSubtitle => 'Export app data to a file';
+  String get backupPageExportToFileSubtitle =>
+      'Save the selected content as a backup file';
 
   @override
   String get backupPageImportBackupFile => 'Import Backup File';
@@ -2257,7 +2269,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageIosSystemBackupNote =>
-      'Kelivo\'s local data is set to be excluded from iCloud device backups. Export a backup file before changing devices or deleting the app.';
+      'Kelivo\'s local data is excluded from iCloud device backups. Before changing devices or deleting the app, back up to iCloud Drive or another folder outside Kelivo. Files in On My iPhone > Kelivo are deleted with the app.';
 
   @override
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
@@ -2477,13 +2489,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create an editable, reversible summary in this chat. Original messages are kept.';
 
   @override
-  String get compressContextKeepStart => 'Start sample';
+  String get compressContextKeepStart => 'Earlier history';
 
   @override
-  String get compressContextKeepRecent => 'End sample';
+  String get compressContextKeepRecent => 'Recent history';
 
   @override
-  String get compressContextUnlimited => 'All content';
+  String get compressContextUnlimited => 'All active history';
 
   @override
   String get compressContextMaxCharsLabel => 'Characters';
@@ -2501,7 +2513,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextModelUnset => 'Select a model';
 
   @override
-  String get compressContextKeepRecentMessages => 'Keep N';
+  String get compressContextKeepRecentMessages => 'Keep recent turns';
 
   @override
   String get compressContextKeepCountLabel => 'Recent user messages';
@@ -2590,6 +2602,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reasoningLevelOff => 'Off';
+
+  @override
+  String get reasoningLevelOn => 'On';
+
+  @override
+  String get reasoningLevelOnSubtitle => 'Enable reasoning';
 
   @override
   String get reasoningLevelOffSubtitle =>
@@ -3404,6 +3422,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextUsageUnavailable => 'Usage unavailable';
+
+  @override
+  String contextUsagePartialSummary(String tokens) {
+    return 'Estimated $tokens + unknown compaction';
+  }
+
+  @override
+  String get contextUsageBucketNativeCompaction => 'Native compaction';
+
+  @override
+  String get contextUsageUnknownTokens => 'Unknown';
+
+  @override
+  String contextUsageLastRequestInput(String tokens) {
+    return 'Last request input (measured): $tokens';
+  }
 
   @override
   String get contextUsageStateNone => 'No data yet';
@@ -7699,7 +7733,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memoryAboutInjectionBody =>
-      'At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost.';
+      'At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost. In each assistant’s memory settings, select types to always inject in full.';
 
   @override
   String get memoryAboutPipelineTitle => 'Background pipeline';
@@ -7741,15 +7775,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+      'This limit applies to types not selected for full injection in the assistant’s memory settings. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
 
   @override
-  String get memorySettingsFullInjectionTypesTitle =>
-      'Always inject these types';
+  String get assistantEditMemoryFullInjectionTypesTitle =>
+      'Full injection types';
 
   @override
-  String get memorySettingsFullInjectionTypesSubtitle =>
-      'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.';
+  String get assistantEditMemoryFullInjectionTypesNone => 'None';
+
+  @override
+  String assistantEditMemoryFullInjectionTypesSelected(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get assistantEditMemoryFullInjectionTypesSubtitle =>
+      'Applies only to this assistant. Select types to inject all their active global and assistant memories, ignoring the item limit. Uses more context and tokens.';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -15346,7 +15388,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressIncludeAttachmentsDesc =>
-      'Include available attachment text and bounded tool records. Truncation is marked; images are not reinterpreted.';
+      'Include available attachment text and complete tool records in their original order. Images are not reinterpreted.';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -15992,4 +16034,705 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get contextRegenerateFixedStart =>
       'This reply is the fixed context start, so its question is excluded. Move the start to an earlier message or cancel it before regenerating.';
+
+  @override
+  String get responseSpeedLabel => 'Response speed';
+
+  @override
+  String get responseSpeedStandard => 'Standard';
+
+  @override
+  String get responseSpeedUsageHint =>
+      'Faster modes use more quota or credits.';
+
+  @override
+  String get responseSpeedLoading => 'Checking availability…';
+
+  @override
+  String get responseSpeedUnavailable =>
+      'No acceleration tier is available for this model.';
+
+  @override
+  String get responseSpeedSaveFailed =>
+      'Could not save the response speed. Try again.';
+
+  @override
+  String responseSpeedRequestFailed(String mode) {
+    return '$mode request failed. Check model and account availability, or switch to Standard and retry.';
+  }
+
+  @override
+  String get responseSpeedSelectionUnavailable =>
+      'The saved speed is no longer available. This chat will use Standard.';
+
+  @override
+  String get responseSpeedProviderDependent =>
+      'Availability depends on your provider.';
+
+  @override
+  String responseSpeedTapTo(String mode) {
+    return 'Tap to switch to $mode';
+  }
+
+  @override
+  String get responseSpeedUltrafastNeedsResponses =>
+      'UltraFast requires the Responses API.';
+
+  @override
+  String get compressionTemplate => 'Summary template';
+
+  @override
+  String get compressionGeneral => 'General';
+
+  @override
+  String get compressionCode => 'Code';
+
+  @override
+  String get compressionWriting => 'Writing';
+
+  @override
+  String get compressionResearch => 'Research';
+
+  @override
+  String get compressionRoleplay => 'Roleplay';
+
+  @override
+  String get compressionOriginalPrompt => 'My original prompt';
+
+  @override
+  String get compressionMore => 'More settings';
+
+  @override
+  String get compressionFocus => 'Focus for this run';
+
+  @override
+  String get compressionFocusHint =>
+      'Optional: key decisions, progress or character details';
+
+  @override
+  String get compressionForConversation => 'For this conversation';
+
+  @override
+  String get compressionFollowGlobal => 'Follow global defaults';
+
+  @override
+  String get compressionSetGlobal => 'Set as global defaults';
+
+  @override
+  String get compressionGlobalDescription =>
+      'Affects conversations that follow global defaults. Conversation overrides stay unchanged.';
+
+  @override
+  String get compressionAutoTitle => 'Automatic compression';
+
+  @override
+  String get compressionAutoOff => 'Off';
+
+  @override
+  String get compressionAutoNotify => 'Notify only';
+
+  @override
+  String get compressionAutoOn => 'Automatic';
+
+  @override
+  String get compressionNearLimit =>
+      'Context is near its estimated capacity. You can keep chatting or compress manually.';
+
+  @override
+  String get compressionKeepTurns => 'Keep recent';
+
+  @override
+  String get compressionKeepHint =>
+      'A turn includes a user message, its replies and tools.';
+
+  @override
+  String get compressionLength => 'Summary limit (tokens)';
+
+  @override
+  String get compressionTrigger => 'Start at';
+
+  @override
+  String get compressionTarget => 'Compress to';
+
+  @override
+  String get compressionWindow => 'Planning window';
+
+  @override
+  String get compressionRequests => 'Maximum calls';
+
+  @override
+  String get compressionReference => 'Reference active world books and memory';
+
+  @override
+  String get compressionReferenceHint =>
+      'Reference explains names and rules; it is not evidence that events happened or characters know them.';
+
+  @override
+  String get compressionToolReferences => 'Reference consumed tool results';
+
+  @override
+  String get compressionToolReferencesHint =>
+      'Only with tool access. Keeps the latest unread results and allows exact, read-only recall.';
+
+  @override
+  String get compressionSummaryScan =>
+      'Include summaries in world book keyword matching';
+
+  @override
+  String get compressionChatModel => 'Follow the current chat model';
+
+  @override
+  String get compressionManageTemplates => 'Manage templates & recipes';
+
+  @override
+  String get compressionLocalPreview => 'Preview request · no model call';
+
+  @override
+  String get compressionTry => 'Try summary · uses model tokens';
+
+  @override
+  String get compressionPreviewOnly =>
+      'Candidate only. Review and apply when ready.';
+
+  @override
+  String get compressionTemplateChanged =>
+      'This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.';
+
+  @override
+  String compressionRange(int count, int turns) {
+    return 'Summarize $count messages · keep $turns user turns verbatim';
+  }
+
+  @override
+  String compressionCalls(int count) {
+    return '$count model calls';
+  }
+
+  @override
+  String get compressionActualUsage => 'Summary model usage';
+
+  @override
+  String compressionUsageValues(String input, String output) {
+    return 'Input $input · output $output tokens';
+  }
+
+  @override
+  String compressionUsageUnknown(int count) {
+    return 'Usage not returned for $count attempts; these calls are not counted as free.';
+  }
+
+  @override
+  String get compressionBudgetError =>
+      'The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.';
+
+  @override
+  String get compressionIncomplete =>
+      'The summary was truncated or refused and was not applied. Adjust the output limit or model.';
+
+  @override
+  String get compressionReferenceTooLarge =>
+      'The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.';
+
+  @override
+  String get compressionReferenceChanged =>
+      'Referenced background changed. Review the candidate or regenerate.';
+
+  @override
+  String get compressionTargetNotReached =>
+      'The candidate did not reduce the full request below the automatic trigger. Original context was kept.';
+
+  @override
+  String get compressionTemplateMissing =>
+      'The selected template is unavailable. Select another template.';
+
+  @override
+  String get compressionTemplates => 'Templates';
+
+  @override
+  String get compressionRecipes => 'Recipes';
+
+  @override
+  String get compressionNewTemplate => 'New template';
+
+  @override
+  String get compressionEditTemplate => 'Edit template';
+
+  @override
+  String get compressionRestoreDefault => 'Restore defaults';
+
+  @override
+  String get compressionCopyEdit => 'Copy & edit';
+
+  @override
+  String get compressionTemplateName => 'Name';
+
+  @override
+  String get compressionPrompt => 'Summary instructions';
+
+  @override
+  String get compressionLanguage => 'Output language';
+
+  @override
+  String get compressionLanguageConversation => 'Follow the conversation';
+
+  @override
+  String get compressionLanguageLegacy =>
+      'Keep original template language behavior';
+
+  @override
+  String get compressionLanguageHint =>
+      'Language code, or conversation / legacy';
+
+  @override
+  String get compressionVariables =>
+      'Supported variables; history is appended automatically if omitted:';
+
+  @override
+  String get compressionDeleteTemplate =>
+      'Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.';
+
+  @override
+  String compressionTemplateReferences(int count) {
+    return 'Used by $count conversation overrides.';
+  }
+
+  @override
+  String get compressionSaveRecipe => 'Save these settings as a recipe';
+
+  @override
+  String get compressionBindModel => 'Include the selected summary model';
+
+  @override
+  String get compressionRecipeHint =>
+      'Recipes do not enable automatic compression. Import adds to the library without applying.';
+
+  @override
+  String get compressionImport => 'Import JSON';
+
+  @override
+  String get compressionExport => 'Export JSON';
+
+  @override
+  String get compressionCopyJson => 'Copy JSON';
+
+  @override
+  String get compressionApplyRecipe => 'Apply recipe';
+
+  @override
+  String get compressionInvalidSettings =>
+      'Check the values: target must be below trigger, and call and token limits must be positive.';
+
+  @override
+  String get compressionOverflowAction =>
+      'Compress once, then retry the failed response';
+
+  @override
+  String compressionPlannedCalls(int count, int limit) {
+    return 'Estimated $count request(s) · limit $limit, including retries';
+  }
+
+  @override
+  String get compressionGlobalTemplateReference =>
+      'Also used as the global default.';
+
+  @override
+  String compressionRecipeReferences(int count) {
+    return '$count recipes keep independent template snapshots.';
+  }
+
+  @override
+  String get compressionReplacementTemplate => 'Replacement template';
+
+  @override
+  String get compressionGeneralDescription =>
+      'Current topic, decisions and unresolved questions.';
+
+  @override
+  String get compressionCodeDescription =>
+      'Code changes, actual checks and the next engineering step.';
+
+  @override
+  String get compressionWritingDescription =>
+      'Accepted text, structure, voice and editing constraints.';
+
+  @override
+  String get compressionResearchDescription =>
+      'Evidence, sources, measurements and uncertainty.';
+
+  @override
+  String get compressionRoleplayDescription =>
+      'Scene continuity, character state and who knows what.';
+
+  @override
+  String compressionLastUsed(String date) {
+    return 'Last used: $date';
+  }
+
+  @override
+  String get compressionManage => 'Manage';
+
+  @override
+  String get compressionOutputSettings => 'Summary settings';
+
+  @override
+  String get compressionSourceSettings => 'References & original text';
+
+  @override
+  String get compressionSavedSettings => 'Preview & saved settings';
+
+  @override
+  String get compressionNoRecipes => 'No saved recipes yet';
+
+  @override
+  String get compressionNoTemplatesFound => 'No matching templates';
+
+  @override
+  String get compressionBuiltIn => 'Built-in';
+
+  @override
+  String get compressionGlobalDefault => 'Global default';
+
+  @override
+  String get compressionCustomLanguage => 'Other language';
+
+  @override
+  String get compressionCustomLanguageHint =>
+      'Language name or code, e.g. Japanese / ja';
+
+  @override
+  String get compressionLibraryTitle => 'Templates & recipes';
+
+  @override
+  String get compressionBuiltInTemplates => 'Built-in templates';
+
+  @override
+  String get compressionMyTemplates => 'My templates';
+
+  @override
+  String get compressionSearchTemplates => 'Search templates';
+
+  @override
+  String get compressionSearchRecipes => 'Search recipes';
+
+  @override
+  String get compressionRecipeCreateHint =>
+      'Save a recipe from More settings to reuse a configuration.';
+
+  @override
+  String get compressionTurnUnit => 'turns';
+
+  @override
+  String get compressionCallUnit => 'calls';
+
+  @override
+  String get compressionAdvancedOptions => 'Compression details';
+
+  @override
+  String get compressionAdvancedHint =>
+      'References, original-history rereading and request limits';
+
+  @override
+  String get compressionAutomaticWindow => 'Auto';
+
+  @override
+  String get compressionAutoOffHint => 'Compress manually whenever you need.';
+
+  @override
+  String get compressionAutoNotifyHint =>
+      'Notify near the threshold; you decide when to compress.';
+
+  @override
+  String get compressionAutoOnHint =>
+      'Summarize older history at the threshold. Extra model usage applies.';
+
+  @override
+  String get compressionBudgetHint =>
+      'Percentages use the available input budget.';
+
+  @override
+  String get compressionPreviewAction => 'Local preview';
+
+  @override
+  String get compressionSaveRecipeAction => 'Save recipe';
+
+  @override
+  String get compressionManualRange => 'Scope for this compression';
+
+  @override
+  String get compressionScopeKeepHint =>
+      'Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.';
+
+  @override
+  String get compressionScopeAllHint =>
+      'Summarize all history in the current context, including recent turns. Original messages stay available.';
+
+  @override
+  String get compressionScopeStartHint =>
+      'Select earlier whole messages within the character budget. Other messages keep their original text.';
+
+  @override
+  String get compressionScopeRecentHint =>
+      'Select recent whole messages within the character budget. Other messages keep their original text.';
+
+  @override
+  String get compressionAutoKeepHint =>
+      'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.';
+
+  @override
+  String get requestBudgetTitle => 'Image & request budgets';
+
+  @override
+  String get requestBudgetInherited => 'Inherited';
+
+  @override
+  String get requestBudgetCustom => 'Custom';
+
+  @override
+  String get requestBudgetReset => 'Reset';
+
+  @override
+  String get requestBudgetSingleImage => 'Single image (MiB)';
+
+  @override
+  String get requestBudgetTotalImages => 'All images (MiB)';
+
+  @override
+  String get requestBudgetImageCount => 'Image count';
+
+  @override
+  String get requestBudgetBody => 'Request body (MiB)';
+
+  @override
+  String get requestBudgetProviderHelp =>
+      'Local checks before sending, not provider limits. Leave a field empty to use the default shown. Image sizes include Base64 encoding; request size includes the complete JSON body.';
+
+  @override
+  String get requestBudgetModelHelp =>
+      'Override local sending limits for this model. Empty fields inherit the provider settings shown. Image sizes include Base64 encoding; request size includes the complete JSON body.';
+
+  @override
+  String get requestBudgetRetentionHelp =>
+      'Raising these limits does not increase automatic history image retention. Pin images to keep them. Larger budgets can increase device memory use.';
+
+  @override
+  String get requestBudgetInvalid =>
+      'Enter positive sizes and a positive whole image count, or leave fields empty to inherit.';
+
+  @override
+  String requestBudgetBytes(String mib, int bytes) {
+    return '$mib MiB ($bytes bytes)';
+  }
+
+  @override
+  String requestBudgetSingleError(int index, String actual, String limit) {
+    return 'Kelivo local preflight: image $index has an encoded size of $actual, exceeding the single-image limit of $limit.';
+  }
+
+  @override
+  String requestBudgetTotalError(String actual, String limit) {
+    return 'Kelivo local preflight: encoded images total $actual, exceeding the image budget of $limit.';
+  }
+
+  @override
+  String requestBudgetCountError(String actual, int limit) {
+    return 'Kelivo local preflight: the request contains $actual images, exceeding the limit of $limit.';
+  }
+
+  @override
+  String requestBudgetBodyError(String actual, String limit) {
+    return 'Kelivo local preflight: the complete request body is $actual, exceeding the request budget of $limit.';
+  }
+
+  @override
+  String get requestBudgetPinnedError => 'This image is pinned.';
+
+  @override
+  String get requestBudgetImageHint =>
+      'Open Image context to review included images and pins. Reduce image size or count, unpin older images, or adjust the budget in provider/model settings.';
+
+  @override
+  String get requestBudgetBodyHint =>
+      'Shorten or compress the conversation, including tool results, or adjust the request body budget in provider/model settings.';
+
+  @override
+  String imageContextEncodedSize(String size) {
+    return '$size MiB encoded';
+  }
+
+  @override
+  String get imageContextPinned => 'Pinned';
+
+  @override
+  String get imageContextSizeUnknown => 'Size checked when sending';
+
+  @override
+  String requestBudgetAtLeast(String value) {
+    return 'at least $value';
+  }
+
+  @override
+  String get compressionNativeTitle => 'Use OpenAI native compaction';
+
+  @override
+  String get compressionNativeHint =>
+      'Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.';
+
+  @override
+  String get compressionNativeScopeHint =>
+      'Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.';
+
+  @override
+  String get compressionNativeLabel => 'Native compaction';
+
+  @override
+  String get compressionNativeDescription =>
+      'The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.';
+
+  @override
+  String get compressionNativeIncomplete =>
+      'The service did not return a complete native compaction result. The original context is unchanged.';
+
+  @override
+  String get compressionNativeScopeChanged =>
+      'This native context belongs to another connection or account. Continue with the original connection, or undo the compaction or create a text summary in the chat that contains the originals.';
+
+  @override
+  String get compressionNativeTokenHint =>
+      'Token usage for opaque native context is determined by the service.';
+
+  @override
+  String get compressionNativeCopyHint =>
+      'The new chat keeps only the complete native compaction result and retained recent turns. Originals stay in the source chat and cannot be restored by undoing here.';
+
+  @override
+  String get compressionNativeInputOverride =>
+      'The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.';
+
+  @override
+  String get compressionNativeAllHint =>
+      'Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.';
+
+  @override
+  String get compressionNativeAutoHint =>
+      'At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.';
+
+  @override
+  String get languageDisplayRussian => 'Russian';
+
+  @override
+  String get languageDisplayTurkish => 'Turkish';
+
+  @override
+  String sideDrawerDeleteConfirmContent(String title) {
+    return 'Delete \"$title\"?';
+  }
+
+  @override
+  String get backupPageCherryImportWarning =>
+      'This feature is experimental. It imports assistants, conversations, providers, and files. Some providers require /v1 or /v1beta at the end of the base URL. Back up your data before importing. Continue to choose a file?';
+
+  @override
+  String get themePaletteDefault => 'Default';
+
+  @override
+  String get themePaletteBlue => 'Aether Blue';
+
+  @override
+  String get themePaletteGreen => 'Bamboo Green';
+
+  @override
+  String get themePalettePurple => 'Twilight Purple';
+
+  @override
+  String get themePaletteYellow => 'Amber Gold';
+
+  @override
+  String get themePaletteSmokyRose => 'Smoky Rose';
+
+  @override
+  String get themePaletteTerracotta => 'Terracotta Clay';
+
+  @override
+  String get themePaletteMonochrome => 'Frost Gray';
+
+  @override
+  String get themePaletteDocument => 'Verdant Mint';
+
+  @override
+  String get themePaletteCustom => 'Custom';
+
+  @override
+  String get compressionNativeImported => 'Native context loaded';
+
+  @override
+  String get compressionNativeImportedDescription =>
+      'This chat starts with the complete native compaction result and retained recent turns. The result cannot be read or edited as text. Earlier originals remain in the source chat, so they cannot be restored by undoing here.';
+
+  @override
+  String get compressionNativeOpenSource => 'Open source chat';
+
+  @override
+  String get compressionNativeOriginalsUnavailable =>
+      'This chat has no originals for the imported native context. Continue with native compaction, or return to the source chat to view or summarize the originals.';
+
+  @override
+  String get compressionNativeTemporaryCopyHint =>
+      'The new temporary chat keeps only the complete native compaction result and retained recent turns. Leaving the source temporary chat deletes it and the originals not carried over; they cannot be restored here.';
+
+  @override
+  String get compressionNativeSourceUnavailable =>
+      'This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.';
+
+  @override
+  String get modelDetailSheetImageGenerationModel => 'Image model';
+
+  @override
+  String get modelDetailSheetImageGenerationAuto => 'Auto';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexity => 'Image complexity';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDefault => 'Default';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityLow => 'Low';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityMedium => 'Medium';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityHigh => 'High';
+
+  @override
+  String get modelDetailSheetImageGenerationComplexityDescription =>
+      'Controls image planning separately from chat reasoning. Default uses server behavior and may inherit chat reasoning.';
+
+  @override
+  String get modelDetailSheetImageGenerationOAuthHint =>
+      'ChatGPT sign-in may use a different image model. Model and complexity settings depend on server support.';
+
+  @override
+  String get imageGenerationComplexityErrorHint =>
+      'Set chat reasoning to Auto and image complexity to Default, then retry image generation. ChatGPT sign-in may use a different image model or reject explicit complexity.';
+
+  @override
+  String get workspaceEnvNativeShellTitle => 'Default shell';
+
+  @override
+  String get workspaceEnvNativeShellHint =>
+      'Leave empty for automatic detection. Otherwise, enter the absolute path to PowerShell, cmd, or a shell that supports -lc (such as bash, zsh, or fish). This setting applies only to this device.';
+
+  @override
+  String get workspaceEnvNativeShellInvalid =>
+      'Could not start this shell. Check its absolute path and supported command syntax.';
+
+  @override
+  String get workspaceEnvNativeShellUnavailable => 'Shell unavailable';
+
+  @override
+  String get workspaceEnvNativeShellDetect => 'Detect again';
+
+  @override
+  String get workspaceEnvNativeShellSave => 'Save';
 }

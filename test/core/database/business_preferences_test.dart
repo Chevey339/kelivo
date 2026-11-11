@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -61,6 +62,54 @@ void main() {
       );
     },
   );
+
+  test('reads stored integer and fractional preferences as doubles', () async {
+    const values = <String, num>{
+      'display_chat_input_background_opacity_dark_v1': 0,
+      'display_chat_input_background_opacity_light_v1': 0.9500000000000002,
+      'display_chat_background_mask_strength_v1': 1,
+      'desktop_sidebar_width_v1': 300,
+      'tts_speech_rate_v1': 0.75,
+      'tts_pitch_v1': 1,
+    };
+    await repository.replaceSnapshot(
+      BusinessSettingsRouter.normalizeAndRoute(values),
+    );
+
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+
+    for (final entry in values.entries) {
+      final value = preferences.getDouble(entry.key);
+      expect(value, isA<double>(), reason: entry.key);
+      expect(value, entry.value.toDouble(), reason: entry.key);
+      if (entry.value is int) {
+        expect(preferences.getInt(entry.key), entry.value);
+        expect(await repository.getPreference(entry.key), isA<int>());
+      }
+    }
+    expect(preferences.getDouble('missing_preference'), isNull);
+  });
+
+  test('getDouble rejects non-numeric preferences', () async {
+    await repository.replaceSnapshot(
+      BusinessSettingsRouter.normalizeAndRoute({
+        'theme_mode_v1': '0',
+        'use_dynamic_color_v1': false,
+        'pinned_models_v1': <String>[],
+      }),
+    );
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+
+    for (final key in [
+      'theme_mode_v1',
+      'use_dynamic_color_v1',
+      'pinned_models_v1',
+    ]) {
+      expect(() => preferences.getDouble(key), throwsA(isA<TypeError>()));
+    }
+  });
 
   test(
     'persists preference writes and removals across a cold reload',
@@ -355,5 +404,29 @@ void main() {
     final snapshot = await repository.readSnapshot();
     expect(snapshot.preferences['theme_mode_v1'], 'dark');
     await expectLater(write, completion(isTrue));
+  });
+
+  test('close drains accepted mutations and rejects late writes', () async {
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+    final ready = Completer<void>();
+    final mutation = preferences.runExclusiveMutation(() async {
+      await ready.future;
+      await preferences.setString('theme_mode_v1', 'dark');
+    });
+    final close = preferences.close();
+    await expectLater(
+      preferences.runExclusiveMutation(() async {}),
+      throwsStateError,
+    );
+    ready.complete();
+    await mutation;
+    await close;
+    expect(await repository.getPreference('theme_mode_v1'), 'dark');
+    await expectLater(
+      preferences.setString('theme_mode_v1', 'light'),
+      throwsStateError,
+    );
+    expect(preferences.getString('theme_mode_v1'), 'dark');
   });
 }

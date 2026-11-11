@@ -33,6 +33,89 @@ void main() {
   });
 
   test(
+    'session links resolve in their own directory and retain isolation',
+    () async {
+      final session = await Directory('${root.path}/session').create();
+      await File('${session.path}/index.html').writeAsString('session page');
+      await Directory('${session.path}/outputs').create();
+      await File('${session.path}/outputs/report.html').writeAsString('report');
+      resources.sessionRootForSession = (id) async =>
+          id == 'chat-a' ? session : null;
+      final local = await resources.scope(
+        'chat-a',
+        pageUrl: 'kelivo://session/index.html',
+      );
+      addTearDown(local.close);
+      expect(local.host, isNot(scope.host));
+      for (final useHttps in [false, true]) {
+        final uri = local.internalUrl(
+          'kelivo://session/index.html',
+          android: useHttps,
+        );
+        expect(
+          String.fromCharCodes((await local.read(uri))!.bytes),
+          'session page',
+        );
+        expect(local.publicUrl(uri.toString()), 'kelivo://session/index.html');
+        expect(await scope.read(uri), isNull);
+        final report = local.internalUrl(
+          'kelivo://chat/outputs/report.html',
+          android: useHttps,
+        );
+        expect(
+          String.fromCharCodes((await local.read(report))!.bytes),
+          'report',
+        );
+      }
+      expect(
+        local.dataAccessPath('notes.app.html.data/state.json'),
+        '/chat/notes.app.html.data/state.json',
+      );
+      for (final url in [
+        'kelivo://session/index.html',
+        'kelivo://chat/outputs/report.html',
+      ]) {
+        expect(
+          BrowserToolsService.validateArguments({
+            'action': 'open',
+            'url': url,
+          })['url'],
+          url,
+        );
+      }
+      for (final url in [
+        'kelivo://session/../secret',
+        'kelivo://session/%2e%2e/secret',
+        'kelivo://chat/another-session/index.html',
+      ]) {
+        expect(BrowserWorkspaceResources.isLocalUrl(url), false);
+      }
+      resources.sessionRootForSession = (_) async => bindings['chat-a'];
+      expect(
+        await local.read(Uri.parse('kelivo://session/index.html')),
+        isNull,
+      );
+    },
+  );
+
+  test('bare local authority and trailing slash use the same index', () async {
+    expect(
+      BrowserService.normalizeAddress('kelivo://workspace'),
+      'kelivo://workspace/',
+    );
+    for (final url in ['kelivo://workspace', 'kelivo://workspace/']) {
+      expect((await scope.file(Uri.parse(url))).path, endsWith('/index.html'));
+    }
+    await File('${bindings['chat-a']!.path}/index.html').delete();
+    for (final url in ['kelivo://workspace', 'kelivo://workspace/']) {
+      await expectLater(
+        scope.file(Uri.parse(url)),
+        throwsA(isA<FileSystemException>()),
+      );
+    }
+  });
+
+  test(
     'replaced screenshot leaf never truncates the replacement or its symlink target',
     () async {
       for (final symlink in [false, if (!Platform.isWindows) true]) {

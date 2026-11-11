@@ -20,6 +20,7 @@ class ViewportBlockList extends StatefulWidget {
     this.keepAlive,
     this.spacing = 0,
     this.threshold = 24,
+    this.storageId,
   });
 
   final int itemCount;
@@ -31,6 +32,10 @@ class ViewportBlockList extends StatefulWidget {
   final double spacing;
   final int threshold;
 
+  /// Identifies the measured extents kept in the enclosing [PageStorage].
+  /// Without it extents live only as long as this widget's state.
+  final Object? storageId;
+
   @override
   State<ViewportBlockList> createState() => _ViewportBlockListState();
 }
@@ -40,6 +45,8 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   final _extents = _ExtentIndex();
   final _measurements = <int, double>{};
   final _mountedIndices = <int>{};
+  Map<Object, double>? _storedExtents;
+  PageStorageBucket? _storage;
   ScrollPosition? _position;
   double? _width;
   double? _textScale;
@@ -71,12 +78,69 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       _textScale = scale;
       _width = null;
     }
+    _syncStorage();
     _scheduleRefresh();
+  }
+
+  void _syncStorage({bool storageIdChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (!storageIdChanged && identical(storage, _storage)) return;
+    _storage = storage;
+    _storedExtents = _readStoredExtents();
+    _extents.clear();
+    _measurements.clear();
+  }
+
+  /// Extents outlive this state in the enclosing [PageStorage], so a rebuilt
+  /// list starts from real heights instead of falling back to estimates.
+  Map<Object, double>? _readStoredExtents() {
+    final storageId = widget.storageId;
+    final storage = _storage;
+    if (storageId == null || storage == null) return null;
+    final stored = storage.readState(context, identifier: storageId);
+    if (stored is Map<Object, double>) return stored;
+    final created = <Object, double>{};
+    storage.writeState(context, created, identifier: storageId);
+    return created;
+  }
+
+  /// Heights are only valid for the width and text scale they were measured
+  /// at, so both are part of the key.
+  double? _storedExtent(int index, double width) {
+    final stored = _storedExtents;
+    final scale = _textScale;
+    if (stored == null || scale == null) return null;
+    return stored[(widget.itemKey(index), width, scale)];
+  }
+
+  void _storeExtent(int index, double extent) {
+    final stored = _storedExtents;
+    final width = _width;
+    final scale = _textScale;
+    if (stored == null || width == null || scale == null) return;
+    stored[(widget.itemKey(index), width, scale)] = extent;
+  }
+
+  void _pruneStoredExtents({Set<Object>? itemKeys}) {
+    final width = _width;
+    final scale = _textScale;
+    _storedExtents?.removeWhere((key, _) {
+      if (key is! (Object, double, double)) return true;
+      // A newly mounted folded list has no layout width yet. Keep its cached
+      // dimensions until LayoutBuilder can check the actual constraints.
+      return (width != null && key.$2 != width) ||
+          (scale != null && key.$3 != scale) ||
+          (itemKeys != null && !itemKeys.contains(key.$1));
+    });
   }
 
   @override
   void didUpdateWidget(ViewportBlockList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // PageStorage is not inherited: replacing its bucket does not trigger
+    // didChangeDependencies. Switch caches before pruning or measuring a new
+    // message version, even when it keeps the same storageId.
+    _syncStorage(storageIdChanged: oldWidget.storageId != widget.storageId);
     if (oldWidget.structureToken != widget.structureToken) {
       _preserveReadingAnchor(oldWidget);
       // A changed shape may insert/reorder blocks. Transfer only measured
@@ -91,13 +155,20 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       };
       _extents.clear();
       _mountedIndices.clear();
+      final width = _width;
       for (var i = 0; i < widget.itemCount; i++) {
         if (retainedKeys.contains(widget.itemKey(i))) _mountedIndices.add(i);
         _extents.add(
           previous[widget.itemKey(i)] ??
-              widget.estimateExtent(i, _width ?? 400) + widget.spacing,
+              (width == null ? null : _storedExtent(i, width)) ??
+              widget.estimateExtent(i, width ?? 400) + widget.spacing,
         );
       }
+      _pruneStoredExtents(
+        itemKeys: {
+          for (var i = 0; i < widget.itemCount; i++) widget.itemKey(i),
+        },
+      );
       _measurements.clear();
     }
     _scheduleRefresh();
@@ -204,6 +275,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       var sizeChanged = false;
       for (final entry in _measurements.entries) {
         if (entry.key >= _extents.length) continue;
+        _storeExtent(entry.key, entry.value);
         if ((_extents.value(entry.key) - entry.value).abs() < .5) continue;
         _extents.set(entry.key, entry.value);
         sizeChanged = true;
@@ -270,6 +342,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
         if (_width != constraints.maxWidth) {
           _preserveReadingAnchor(widget);
           _width = constraints.maxWidth;
+          _pruneStoredExtents();
           _extents.clear();
           _measurements.clear();
         }
@@ -279,7 +352,8 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
         while (_extents.length < widget.itemCount) {
           final i = _extents.length;
           _extents.add(
-            widget.estimateExtent(i, constraints.maxWidth) + widget.spacing,
+            _storedExtent(i, constraints.maxWidth) ??
+                widget.estimateExtent(i, constraints.maxWidth) + widget.spacing,
           );
         }
         if (_last == 0) {

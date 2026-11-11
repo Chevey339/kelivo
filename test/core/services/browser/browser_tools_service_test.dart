@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/browser/browser_engine.dart';
 import 'package:Kelivo/core/services/browser/browser_service.dart';
 import 'package:Kelivo/core/services/browser/browser_store.dart';
@@ -121,6 +122,9 @@ void main() {
             required onNewWindow,
             required isAgentActive,
           }) async {
+            onChanged(
+              BrowserPageState(url: tab.url, title: 'Page', isLoading: false),
+            );
             return engines[tab.id] = _Engine(
               onChanged,
               loadError: loadError,
@@ -149,6 +153,43 @@ void main() {
   Map<String, dynamic> payload(ClientToolResult result) =>
       jsonDecode(result.content.split('\n![](').first) as Map<String, dynamic>;
 
+  test('a missing local file releases only the new empty tab', () async {
+    final resources = BrowserWorkspaceResources.instance;
+    final previous = resources.rootForSession;
+    resources.rootForSession = (_) async => directory;
+    addTearDown(() => resources.rootForSession = previous);
+    final missing = payload(
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'kelivo://workspace/missing.html',
+      }),
+    );
+    expect(missing['error_code'], 'browser_workspace_file_error');
+    expect(missing['requested_url'], 'kelivo://workspace/missing.html');
+    expect(browser.tabsForSession('chat-a'), isEmpty);
+    resources.rootForSession = (_) async => null;
+    final unbound = payload(
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'kelivo://workspace/index.html',
+      }),
+    );
+    expect(unbound['error_code'], 'browser_workspace_not_bound');
+    expect(browser.tabsForSession('chat-a'), isEmpty);
+    resources.rootForSession = (_) async => directory;
+    final existing = await browser.createTab(
+      ownerSessionId: 'chat-a',
+      url: 'https://example.com',
+    );
+    await tools.handle('chat-a', {
+      'action': 'open',
+      'url': 'kelivo://workspace/missing.html',
+      'tab_id': existing.id,
+    });
+    expect(browser.requireTab(existing.id).url, 'https://example.com');
+    expect(browser.tabsForSession('chat-a'), hasLength(1));
+  });
+
   test(
     'an explicit global opt-out prevents tools from creating tabs',
     () async {
@@ -161,6 +202,12 @@ void main() {
       });
       expect(payload(result)['ok'], false);
       expect(result.content, contains('browser_agent_disabled'));
+      expect(
+        payload(
+          await tools.handle('chat-a', {'action': 'list_tabs'}),
+        )['error_code'],
+        'browser_agent_disabled',
+      );
       expect(browser.tabs, isEmpty);
       expect(engines, isEmpty);
     },
@@ -400,7 +447,7 @@ void main() {
         expect(result['page']['navigation_state'], isNotNull);
         expect(result['error'], isNot(contains('browser_human_control')));
         expect(browser.agentPaused, isFalse);
-        expect(browser.agentPauseReason, isNull);
+        expect(browser.agentPauseFor('chat-a')?.reason, isNull);
         expect(browser.controlEpoch, epoch);
         expect(engines.values.every((engine) => engine.stopCalls == 0), isTrue);
         expect(
@@ -589,9 +636,12 @@ void main() {
         result['error_code'],
         contains('browser_action_timeout_outcome_unknown'),
       );
-      expect(browser.agentPauseReason, BrowserAgentPauseReason.timeout);
+      expect(
+        browser.agentPauseFor('chat-a')?.reason,
+        BrowserAgentPauseReason.timeout,
+      );
       expect(browser.agentPaused, isTrue);
-      expect(browser.pausedAgentSessionId, 'chat-a');
+      expect(browser.agentPauseFor('chat-a'), isNotNull);
       expect(engine.stopCalls, 1);
       final blocked = payload(
         await tools.handle('chat-a', {'action': 'snapshot'}),
@@ -612,19 +662,299 @@ void main() {
     },
   );
 
+  for (final siblingOwner in ['chat-a', null]) {
+    test(
+      'timeout isolates sessions and only stops the affected tab ($siblingOwner)',
+      () async {
+        await enable();
+        final a = await browser.createTab(ownerSessionId: 'chat-a');
+        final sibling = await browser.createTab(ownerSessionId: siblingOwner);
+        final b = await browser.createTab(ownerSessionId: 'chat-b');
+        for (final tab in [a, sibling, b]) {
+          await browser.evaluateJavascript('prepare', tabId: tab.id);
+        }
+        engines[a.id]!.evaluationError = TimeoutException('Native timeout');
+        final failure = payload(
+          await tools.handle('chat-a', {
+            'action': 'click',
+            'tab_id': a.id,
+            'selector': '#submit',
+          }, capturePreview: false),
+        );
+        expect(failure['error_code'], 'browser_action_timeout_outcome_unknown');
+        expect(engines[a.id]!.stopCalls, 1);
+        for (final tab in [sibling, b]) {
+          expect(engines[tab.id]!.stopCalls, 0);
+        }
+        for (final session in ['chat-a', 'chat-b']) {
+          final listed = payload(
+            await tools.handle(session, {'action': 'list_tabs'}),
+          );
+          expect(listed['ok'], isTrue);
+          expect(listed['page']['agent_paused'], session == 'chat-a');
+          expect(
+            (listed['page']['tabs'] as List).map((tab) => tab['tab_id']),
+            session == 'chat-a'
+                ? [a.id, if (siblingOwner == 'chat-a') sibling.id]
+                : [b.id],
+          );
+          if (session == 'chat-a') {
+            expect(listed['page']['pause_reason'], 'timeout');
+            expect(listed['page']['paused_tab_id'], a.id);
+          }
+        }
+        for (final action in ['new_tab', 'snapshot']) {
+          expect(
+            payload(
+              await tools.handle('chat-a', {'action': action}),
+            )['error_code'],
+            'browser_action_timeout_outcome_unknown',
+          );
+        }
+        browser.allowAgentControl(sessionId: 'chat-b');
+        expect(browser.agentPauseFor('chat-a'), isNotNull);
+        expect(
+          payload(
+            await tools.handle('chat-b', {
+              'action': 'snapshot',
+            }, capturePreview: false),
+          )['ok'],
+          isTrue,
+        );
+      },
+    );
+  }
+
+  test(
+    'timeout permits owned-tab cleanup without resuming page actions',
+    () async {
+      await enable();
+      final a = await browser.createTab(ownerSessionId: 'chat-a');
+      final b = await browser.createTab(ownerSessionId: 'chat-b');
+      await browser.evaluateJavascript('prepare', tabId: a.id);
+      engines[a.id]!.evaluationError = TimeoutException('Native timeout');
+      await tools.handle('chat-a', {
+        'action': 'snapshot',
+      }, capturePreview: false);
+      expect(
+        payload(
+          await tools.handle('chat-a', {'action': 'close_tab', 'tab_id': b.id}),
+        )['error_code'],
+        'browser_tab_not_owned',
+      );
+      expect(
+        payload(
+          await tools.handle('chat-a', {'action': 'close_tab', 'tab_id': a.id}),
+        )['ok'],
+        isTrue,
+      );
+      expect(browser.tabsForSession('chat-a'), isEmpty);
+      expect(browser.hasLiveEngine(a.id), isFalse);
+      expect(browser.tabsForSession('chat-b').single.id, b.id);
+      expect(
+        browser.agentPauseFor('chat-a')?.reason,
+        BrowserAgentPauseReason.timeout,
+      );
+      expect(
+        payload(
+          await tools.handle('chat-a', {'action': 'new_tab'}),
+        )['error_code'],
+        'browser_action_timeout_outcome_unknown',
+      );
+      browser.allowAgentControl(sessionId: 'chat-a');
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'new_tab'}))['ok'],
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'list_tabs stays available while cancelled native work drains',
+    () async {
+      await enable();
+      final tab = await browser.createTab(ownerSessionId: 'chat-a');
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final running = browser.runAgentAction<void>(
+        sessionId: 'chat-a',
+        label: 'evaluate',
+        tabId: tab.id,
+        action: () {
+          started.complete();
+          return finish.future;
+        },
+      );
+      final cancelled = expectLater(running, throwsStateError);
+      await started.future;
+      try {
+        browser.takeOver(sessionId: 'chat-a', tabId: tab.id);
+        await cancelled;
+        Map<String, dynamic>? listed;
+        final reading = tools.handle('chat-a', {'action': 'list_tabs'}).then((
+          result,
+        ) {
+          listed = payload(result);
+        });
+        await Future<void>.delayed(Duration.zero);
+        expect(listed?['ok'], isTrue);
+        expect(listed?['page']['pause_reason'], 'user');
+        expect(finish.isCompleted, isFalse);
+        await reading;
+      } finally {
+        finish.complete();
+        await Future<void>.delayed(Duration.zero);
+      }
+    },
+  );
+
+  test(
+    'multiple pauses retain independent reasons and resume independently',
+    () async {
+      await enable();
+      final a = await browser.createTab(ownerSessionId: 'chat-a');
+      final b = await browser.createTab(ownerSessionId: 'chat-b');
+      await browser.evaluateJavascript('prepare', tabId: a.id);
+      engines[a.id]!.evaluationError = TimeoutException('Native timeout');
+      await tools.handle('chat-a', {
+        'action': 'snapshot',
+      }, capturePreview: false);
+      browser.takeOver(sessionId: 'chat-b', tabId: b.id);
+      expect(
+        browser.agentPauseFor('chat-a')?.reason,
+        BrowserAgentPauseReason.timeout,
+      );
+      expect(
+        browser.agentPauseFor('chat-b')?.reason,
+        BrowserAgentPauseReason.user,
+      );
+      browser.allowAgentControl(sessionId: 'chat-a');
+      expect(browser.agentPauseFor('chat-a'), isNull);
+      expect(browser.agentPauseFor('chat-b'), isNotNull);
+      engines[a.id]!.evaluationError = null;
+      expect(
+        payload(
+          await tools.handle('chat-a', {
+            'action': 'snapshot',
+          }, capturePreview: false),
+        )['ok'],
+        isTrue,
+      );
+      expect(
+        payload(
+          await tools.handle('chat-b', {'action': 'new_tab'}),
+        )['error_code'],
+        'browser_human_control',
+      );
+      await browser.updateSettings(
+        browser.settings.copyWith(agentEnabled: false),
+      );
+      expect(browser.agentPaused, isFalse);
+      await enable();
+      expect(
+        payload(
+          await tools.handle('chat-b', {
+            'action': 'snapshot',
+          }, capturePreview: false),
+        )['ok'],
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'a queued timeout close remains subject to a later human takeover',
+    () async {
+      await enable();
+      final a = await browser.createTab(ownerSessionId: 'chat-a');
+      await browser.evaluateJavascript('prepare', tabId: a.id);
+      engines[a.id]!.evaluationError = TimeoutException('Native timeout');
+      await tools.handle('chat-a', {
+        'action': 'snapshot',
+      }, capturePreview: false);
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final running = browser.runAgentAction<void>(
+        sessionId: 'chat-b',
+        label: 'wait',
+        action: () {
+          started.complete();
+          return finish.future;
+        },
+      );
+      await started.future;
+      final close = tools.handle('chat-a', {
+        'action': 'close_tab',
+        'tab_id': a.id,
+      });
+      await Future<void>.delayed(Duration.zero);
+      browser.takeOver(sessionId: 'chat-a', tabId: a.id);
+      finish.complete();
+      await running;
+      expect(payload(await close)['ok'], isFalse);
+      expect(browser.tabsForSession('chat-a').single.id, a.id);
+      expect(browser.hasLiveEngine(a.id), isTrue);
+      expect(
+        browser.agentPauseFor('chat-a')?.reason,
+        BrowserAgentPauseReason.user,
+      );
+    },
+  );
+
+  test(
+    'list_tabs still checks tool cancellation and service disposal',
+    () async {
+      await enable();
+      final cancelled = Completer<void>();
+      var isCancelled = false;
+      final token = ToolCallCancellation(
+        isCancelled: () => isCancelled,
+        cancelled: cancelled.future,
+      );
+      final result = token.run(() async {
+        isCancelled = true;
+        cancelled.complete();
+        return tools.handle('chat-a', {'action': 'list_tabs'});
+      });
+      expect(payload(await result)['ok'], isFalse);
+      browser.dispose();
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'list_tabs'}))['ok'],
+        isFalse,
+      );
+    },
+  );
+
   test(
     'human takeover stays paused until the user allows continuation',
     () async {
       await enable();
+      final tab = await browser.createTab(ownerSessionId: 'chat-a');
       browser.takeOver(sessionId: 'chat-a');
       for (var attempt = 0; attempt < 2; attempt++) {
         final result = payload(
-          await tools.handle('chat-a', {'action': 'list_tabs'}),
+          await tools.handle('chat-a', {'action': 'new_tab'}),
         );
         expect(result['error_code'], contains('browser_human_control'));
-        expect(browser.agentPauseReason, BrowserAgentPauseReason.user);
+        expect(
+          browser.agentPauseFor('chat-a')?.reason,
+          BrowserAgentPauseReason.user,
+        );
         expect(browser.agentPaused, isTrue);
       }
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'list_tabs'}))['ok'],
+        isTrue,
+      );
+      expect(
+        payload(
+          await tools.handle('chat-a', {
+            'action': 'close_tab',
+            'tab_id': tab.id,
+          }),
+        )['error_code'],
+        'browser_human_control',
+      );
       browser.allowAgentControl(sessionId: 'chat-a');
       expect(
         payload(await tools.handle('chat-a', {'action': 'list_tabs'}))['ok'],
@@ -639,8 +969,11 @@ void main() {
       await enable();
       final tab = await browser.createTab(ownerSessionId: 'chat-a');
       browser.takeOver(sessionId: 'chat-a', tabId: tab.id);
-      expect(browser.agentPauseReason, BrowserAgentPauseReason.user);
-      expect(browser.pausedAgentSessionId, 'chat-a');
+      expect(
+        browser.agentPauseFor('chat-a')?.reason,
+        BrowserAgentPauseReason.user,
+      );
+      expect(browser.agentPauseFor('chat-a'), isNotNull);
       expect(
         browser.agentActivityFor(sessionId: 'chat-a'),
         BrowserAgentActivity.paused,
@@ -657,7 +990,7 @@ void main() {
       );
       expect(browser.controlEpoch, greaterThan(epoch));
       expect(browser.agentPaused, isFalse);
-      expect(browser.agentPauseReason, isNull);
+      expect(browser.agentPauseFor('chat-a')?.reason, isNull);
       expect(
         browser.agentActivityFor(sessionId: 'chat-a'),
         BrowserAgentActivity.idle,

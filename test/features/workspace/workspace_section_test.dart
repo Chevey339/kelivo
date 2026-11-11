@@ -287,6 +287,19 @@ void main() {
     return created;
   }
 
+  testWidgets('desktop workspace menu exposes environment without a sandbox', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      await pumpSection(tester, chat: _FakeChatService(null));
+      expect(find.byKey(WorkspaceSection.environmentKey), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('desktop workspace launcher can create and bind a workspace', (
     tester,
   ) async {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:Kelivo/utils/platform_utils.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace.dart';
@@ -345,12 +346,17 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final workspace = binding.isBound
         ? workspaces.byId(binding.workspaceId!)
         : null;
-    final runtime = context.watch<WorkspaceRuntimeProvider>().runtime;
+    final runtimeProvider = context.watch<WorkspaceRuntimeProvider>();
+    final runtime = runtimeProvider.runtime;
     final env = context.watch<EnvironmentProvider>();
     final envManager = _resolvedEnvManager();
     final desktop = useDesktopWorkspaceLayout(context);
-    final showEnvironment = envManager != null;
-    final envStatus = workspaceEnvPhaseLabel(l10n, env.state.phase);
+    final native = PlatformUtils.isDesktopTarget;
+    final showEnvironment = native || envManager != null;
+    final envStatus = native
+        ? (runtimeProvider.lastStatus?.shell?.name ??
+              l10n.workspaceEnvEngineLocalShell)
+        : workspaceEnvPhaseLabel(l10n, env.state.phase);
     final chevron = ToolsSheetRow.chevron(context);
 
     if (desktop) {
@@ -448,6 +454,10 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
             ),
           ),
           const SizedBox(height: 8),
+          if (PlatformUtils.isDesktopTarget && environmentRow != null) ...[
+            environmentRow,
+            const SizedBox(height: 8),
+          ],
           _permissionRow(),
         ],
       );

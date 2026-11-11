@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../desktop/widgets/desktop_form_dialog.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 
@@ -11,17 +14,16 @@ class ContextDialog extends StatelessWidget {
   final double maxWidth;
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-    backgroundColor: Colors.transparent,
-    child: ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
+  Widget build(BuildContext context) => AnimatedPadding(
+    padding: MediaQuery.viewInsetsOf(context),
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 160),
+    child: SafeArea(
+      child: DesktopFormDialog(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: child,
         ),
       ),
@@ -47,10 +49,14 @@ class ContextDialogActionButton extends StatelessWidget {
     return Opacity(
       opacity: onTap == null ? .45 : 1,
       child: IosCardPress(
-        baseColor: primary ? cs.primary : context.appColors.surfaceFill,
-        borderRadius: BorderRadius.circular(11),
+        baseColor: primary ? cs.primary : Colors.transparent,
+        border: primary
+            ? null
+            : Border.all(color: context.appColors.hairlineStrong),
+        borderRadius: BorderRadius.circular(12),
         pressedScale: .98,
         haptics: false,
+        focusable: true,
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Center(
@@ -64,6 +70,65 @@ class ContextDialogActionButton extends StatelessWidget {
               color: primary ? cs.onPrimary : cs.onSurface,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One consistent row for every action in the context-management sheet.
+class ContextActionRow extends StatelessWidget {
+  const ContextActionRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.trailing,
+    this.showChevron = false,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IosCardPress(
+      baseColor: sheetTileColor(context),
+      borderRadius: BorderRadius.circular(14),
+      pressedScale: .98,
+      duration: const Duration(milliseconds: 260),
+      focusable: true,
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: cs.onSurface),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: AppFontWeights.medium,
+                  color: cs.onSurface,
+                ),
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+            if (showChevron) ...[
+              const SizedBox(width: 10),
+              Icon(
+                Lucide.ChevronRight,
+                size: 17,
+                color: cs.onSurface.withValues(alpha: .35),
+              ),
+            ],
+          ],
         ),
       ),
     );

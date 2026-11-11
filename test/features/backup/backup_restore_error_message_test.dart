@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
@@ -33,6 +34,13 @@ void main() {
         const BackupCancelledException(),
       ),
       'Cancelled',
+    );
+    expect(
+      backupRestoreErrorMessage(
+        AppLocalizations.of(context)!,
+        PlatformException(code: 'backup_destination_inside_app'),
+      ),
+      AppLocalizations.of(context)!.backupPageChooseExternalFolder,
     );
   });
 }

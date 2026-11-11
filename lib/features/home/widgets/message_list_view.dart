@@ -647,6 +647,20 @@ class _MessageListViewState extends State<MessageListView> {
     });
   }
 
+  bool _showsOperationDivider(ContextOperation operation, ChatMessage message) {
+    final group = ContextHistory.group(message);
+    if (operation.revoked || operation.anchorGroupId != group) return false;
+    if (operation.isImportedNative) return false;
+    // A new conversation already displays its copied summary as a message.
+    // Keep the operation for context assembly without repeating it in the UI.
+    return !(operation.isCompression &&
+        !operation.isNative &&
+        !operation.isEdited &&
+        operation.sourceGroups.length == 1 &&
+        operation.sourceGroups.single == group &&
+        operation.summary == message.content);
+  }
+
   /// Rough height of a message bubble, used for items that never got laid out.
   ///
   /// SuperSliverList's default estimate is a flat 100px. In a long chat a real
@@ -667,9 +681,10 @@ class _MessageListViewState extends State<MessageListView> {
         ? 0
         : widget.contextOperations
               .where(
-                (op) =>
-                    !op.revoked &&
-                    op.anchorGroupId == _effectiveRenderModels[index].slotId,
+                (op) => _showsOperationDivider(
+                  op,
+                  _effectiveRenderModels[index].message,
+                ),
               )
               .length;
     return _estimateMessageExtent(index, crossAxisExtent) +
@@ -1327,10 +1342,26 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.contextTaskRevision != widget.contextTaskRevision ||
         !listEquals(
           oldWidget.contextOperations
-              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .map(
+                (op) => (
+                  op.id,
+                  op.revoked,
+                  op.anchorGroupId,
+                  op.summary,
+                  op.isEdited,
+                ),
+              )
               .toList(),
           widget.contextOperations
-              .map((op) => (op.id, op.revoked, op.anchorGroupId))
+              .map(
+                (op) => (
+                  op.id,
+                  op.revoked,
+                  op.anchorGroupId,
+                  op.summary,
+                  op.isEdited,
+                ),
+              )
               .toList(),
         ) ||
         oldWidget.chatFontScale != widget.chatFontScale ||
@@ -2095,6 +2126,33 @@ class _MessageListViewState extends State<MessageListView> {
   }) {
     final model = _effectiveRenderModels[index];
     final message = model.message;
+    final imported = widget.contextOperations
+        .where(
+          (op) =>
+              op.isImportedNative &&
+              op.anchorGroupId == ContextHistory.group(message),
+        )
+        .firstOrNull;
+    final importedEntry = imported == null
+        ? null
+        : Padding(
+            padding: widget.dividerPadding,
+            child: ContextOperationDivider(
+              key: ValueKey('context-node-${imported.id}'),
+              operation: imported,
+              onOpen: () => widget.onOpenContextOperation?.call(imported),
+              hiddenByClear: widget.contextOperations.any(
+                (op) =>
+                    !op.revoked &&
+                    (op.isFixedStart ||
+                        (op.isClear &&
+                            op.sourceGroups.contains(imported.anchorGroupId))),
+              ),
+              superseded: widget.contextOperations.any(
+                (op) => !op.revoked && op.dependencies.contains(imported.id),
+              ),
+            ),
+          );
     final r = widget.reasoning[message.id];
     final t = widget.translations[message.id];
     final assistant = presentation.assistant;
@@ -2124,9 +2182,8 @@ class _MessageListViewState extends State<MessageListView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final operation in widget.contextOperations)
-          if (!operation.revoked &&
-              operation.isFixedStart &&
-              operation.anchorGroupId == (message.groupId ?? message.id))
+          if (operation.isFixedStart &&
+              _showsOperationDivider(operation, message))
             Padding(
               padding: widget.dividerPadding,
               child: ContextOperationDivider(
@@ -2138,111 +2195,117 @@ class _MessageListViewState extends State<MessageListView> {
                     : () => widget.onUndoContextOperation!(operation),
               ),
             ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (widget.selecting &&
-                (message.role == 'user' || message.role == 'assistant'))
-              Padding(
-                padding: const EdgeInsets.only(left: 10, right: 6),
-                child: IosCheckbox(
-                  value: widget.selectedItems.contains(message.id),
-                  size: 20,
-                  hitTestSize: 28,
-                  onChanged: (v) {
-                    widget.onToggleSelection?.call(message.id, v);
-                  },
+        if (importedEntry != null)
+          importedEntry
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.selecting &&
+                  (message.role == 'user' || message.role == 'assistant'))
+                Padding(
+                  padding: const EdgeInsets.only(left: 10, right: 6),
+                  child: IosCheckbox(
+                    value: widget.selectedItems.contains(message.id),
+                    size: 20,
+                    hitTestSize: 28,
+                    onChanged: (v) {
+                      widget.onToggleSelection?.call(message.id, v);
+                    },
+                  ),
                 ),
-              ),
-            Expanded(
-              child: (() {
-                Widget buildContent(bool isProcessingFiles) => Builder(
-                  builder: (context) {
-                    final baseMediaQuery = context
-                        .getInheritedWidgetOfExactType<MediaQuery>();
-                    final baseData = baseMediaQuery?.data;
-                    final data = baseData ?? MediaQuery.of(context);
-                    final textScale = data.textScaler.scale(1);
-                    return MediaQuery(
-                      // Keep chat font scaling without rebuilding on keyboard insets.
-                      data: data.copyWith(
-                        textScaler: TextScaler.linear(
-                          textScale * presentation.chatFontScale,
+              Expanded(
+                child: (() {
+                  Widget buildContent(bool isProcessingFiles) => Builder(
+                    builder: (context) {
+                      final baseMediaQuery = context
+                          .getInheritedWidgetOfExactType<MediaQuery>();
+                      final baseData = baseMediaQuery?.data;
+                      final data = baseData ?? MediaQuery.of(context);
+                      final textScale = data.textScaler.scale(1);
+                      return MediaQuery(
+                        // Keep chat font scaling without rebuilding on keyboard insets.
+                        data: data.copyWith(
+                          textScaler: TextScaler.linear(
+                            textScale * presentation.chatFontScale,
+                          ),
                         ),
-                      ),
-                      child: message.role == 'assistant'
-                          ? _buildStreamingMessageWidget(
-                              context,
-                              isStreaming: isStreaming,
-                              message: message,
-                              index: index,
-                              r: r,
-                              t: t,
-                              useAssistAvatar: useAssistAvatar,
-                              useAssistName: useAssistName,
-                              assistant: assistant,
-                              gid: gid,
-                              availableVersions: availableVersions,
-                              selectedVersion: selectedVersion,
-                              selectedIdx: selectedIdx,
-                              total: total,
-                              isProcessingFiles: isProcessingFiles,
-                              suggestions: messageSuggestions,
-                              presentation: presentation,
-                            )
-                          : _buildChatMessageWidget(
-                              context,
-                              message: message,
-                              index: index,
-                              r: r,
-                              t: t,
-                              useAssistAvatar: useAssistAvatar,
-                              useAssistName: useAssistName,
-                              assistant: assistant,
-                              gid: gid,
-                              availableVersions: availableVersions,
-                              selectedVersion: selectedVersion,
-                              selectedIdx: selectedIdx,
-                              total: total,
-                              isProcessingFiles: isProcessingFiles,
-                              suggestions: messageSuggestions,
-                              presentation: presentation,
-                            ),
-                    );
-                  },
-                );
-
-                // Only the assistant message that owns the indicator listens,
-                // so parsing never rebuilds the rest of the timeline.
-                Widget content = message.role == 'assistant'
-                    ? ValueListenableBuilder<String?>(
-                        valueListenable: widget.processingFilesMessageId,
-                        builder: (context, processingId, _) =>
-                            buildContent(processingId == message.id),
-                      )
-                    : buildContent(false);
-
-                final canSelect =
-                    (message.role == 'user' || message.role == 'assistant');
-                if (widget.selecting && canSelect) {
-                  final isSelected = widget.selectedItems.contains(message.id);
-                  content = GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () =>
-                        widget.onToggleSelection?.call(message.id, !isSelected),
-                    child: IgnorePointer(ignoring: true, child: content),
+                        child: message.role == 'assistant'
+                            ? _buildStreamingMessageWidget(
+                                context,
+                                isStreaming: isStreaming,
+                                message: message,
+                                index: index,
+                                r: r,
+                                t: t,
+                                useAssistAvatar: useAssistAvatar,
+                                useAssistName: useAssistName,
+                                assistant: assistant,
+                                gid: gid,
+                                availableVersions: availableVersions,
+                                selectedVersion: selectedVersion,
+                                selectedIdx: selectedIdx,
+                                total: total,
+                                isProcessingFiles: isProcessingFiles,
+                                suggestions: messageSuggestions,
+                                presentation: presentation,
+                              )
+                            : _buildChatMessageWidget(
+                                context,
+                                message: message,
+                                index: index,
+                                r: r,
+                                t: t,
+                                useAssistAvatar: useAssistAvatar,
+                                useAssistName: useAssistName,
+                                assistant: assistant,
+                                gid: gid,
+                                availableVersions: availableVersions,
+                                selectedVersion: selectedVersion,
+                                selectedIdx: selectedIdx,
+                                total: total,
+                                isProcessingFiles: isProcessingFiles,
+                                suggestions: messageSuggestions,
+                                presentation: presentation,
+                              ),
+                      );
+                    },
                   );
-                }
 
-                return content;
-              })(),
-            ),
-          ],
-        ),
+                  // Only the assistant message that owns the indicator listens,
+                  // so parsing never rebuilds the rest of the timeline.
+                  Widget content = message.role == 'assistant'
+                      ? ValueListenableBuilder<String?>(
+                          valueListenable: widget.processingFilesMessageId,
+                          builder: (context, processingId, _) =>
+                              buildContent(processingId == message.id),
+                        )
+                      : buildContent(false);
+
+                  final canSelect =
+                      (message.role == 'user' || message.role == 'assistant');
+                  if (widget.selecting && canSelect) {
+                    final isSelected = widget.selectedItems.contains(
+                      message.id,
+                    );
+                    content = GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => widget.onToggleSelection?.call(
+                        message.id,
+                        !isSelected,
+                      ),
+                      child: IgnorePointer(ignoring: true, child: content),
+                    );
+                  }
+
+                  return content;
+                })(),
+              ),
+            ],
+          ),
         for (final operation in widget.contextOperations)
-          if (!operation.revoked &&
-              !operation.isFixedStart &&
-              operation.anchorGroupId == (message.groupId ?? message.id))
+          if (!operation.isFixedStart &&
+              _showsOperationDivider(operation, message))
             Padding(
               padding: widget.dividerPadding,
               child: ContextOperationDivider(

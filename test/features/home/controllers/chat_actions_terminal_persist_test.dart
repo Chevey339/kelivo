@@ -10,6 +10,7 @@ import 'package:Kelivo/core/models/mobile_background_settings.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/app_exit_flush.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/generation_controller.dart';
@@ -112,6 +113,66 @@ class _ThrowingFinalizeChatService extends ChatService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
+
+  testWidgets('exit persists generations from every conversation', (
+    tester,
+  ) async {
+    final service = _ThrowingFinalizeChatService(failCompletion: false);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final background = MobileBackgroundCoordinator(
+      platform: TargetPlatform.linux,
+    );
+    addTearDown(settings.dispose);
+    addTearDown(background.dispose);
+    addTearDown(AppExitFlush.debugReset);
+    late ChatActions actions;
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SettingsProvider>.value(
+        value: settings,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) {
+              actions = _actionsFor(
+                context,
+                service,
+                settings,
+                background,
+              ).actions;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    addTearDown(actions.streamController.dispose);
+    for (final id in ['visible', 'background']) {
+      actions.debugTrackActiveMessage(
+        ChatMessage(
+          id: '$id-reply',
+          role: 'assistant',
+          content: '$id partial response',
+          conversationId: id,
+          isStreaming: true,
+        ),
+      );
+    }
+    var closed = false;
+    AppExitFlush.configureShutdown(
+      prepare: ChatActions.prepareForExit,
+      close: () async {
+        expect(service.terminalStates, [
+          GenerationRunState.cancelled,
+          GenerationRunState.cancelled,
+        ]);
+        expect(actions.activeStreamingMessageIds, isEmpty);
+        closed = true;
+      },
+    );
+    final exit = AppExitFlush.shutdown();
+    expect(actions.isSendInFlight('another-conversation'), isTrue);
+    await exit;
+    expect(closed, isTrue);
+  });
 
   for (final terminal in ['complete', 'error', 'cancel']) {
     testWidgets('empty reasoning stops on $terminal without an end event', (

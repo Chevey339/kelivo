@@ -315,16 +315,19 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     // Base providers (same as mobile list)
     List<({String name, String key})> base() => [
       (name: 'OpenAI', key: 'OpenAI'),
-      (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'Gemini', key: 'Gemini'),
+      (name: 'STA1N API', key: 'STA1N API'),
       (name: 'OpenRouter', key: 'OpenRouter'),
-      (name: 'Vercel AI Gateway', key: 'Vercel'),
       (name: 'KelivoIN', key: 'KelivoIN'),
-      (name: 'Tensdaq', key: 'Tensdaq'),
+      (name: '10dian-API', key: '10dian-API'),
       (name: 'DeepSeek', key: 'DeepSeek'),
+      (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'AIhubmix', key: 'AIhubmix'),
       (name: '随想AI中转站', key: '随想AI中转站'),
       (name: 'MaruCode', key: 'MaruCode'),
+      (name: '砂糖酒馆', key: '砂糖酒馆'),
+      (name: 'Vercel AI Gateway', key: 'Vercel'),
+      (name: 'Tensdaq', key: 'Tensdaq'),
       (name: l10n.providersPageAliyunName, key: 'Aliyun'),
       (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
       (name: 'Claude', key: 'Claude'),
@@ -1565,6 +1568,8 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                 ),
                 const SizedBox(height: 12),
               ],
+
+              ProviderSponsorCard(providerKey: widget.providerKey),
 
               // API Key (hidden when Google Vertex)
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
@@ -3564,6 +3569,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               ],
                             ],
                             const SizedBox(height: 4),
+                            ProviderRequestBudgetRow(
+                              providerId: widget.providerKey,
+                            ),
+                            const SizedBox(height: 16),
                             // 5) Network proxy inline
                             row(
                               l10n.providerDetailPageNetworkTab,
@@ -7025,15 +7034,31 @@ class _ModelRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(displayName, style: TextStyle(fontSize: 13.5)),
-                  if (!isSelectionMode) ...[
-                    const SizedBox(height: 4),
-                    ModelCapsulesRow(model: info),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        style: TextStyle(fontSize: 13.5),
+                      ),
+                    ),
+                    if (!isSelectionMode) ...[
+                      const SizedBox(width: 8),
+                      ConstrainedBox(
+                        // Leave room for the full name while capabilities wrap
+                        // within the trailing half on narrower panes.
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth / 2,
+                        ),
+                        child: ModelCapsulesRow(
+                          model: info,
+                          alignment: WrapAlignment.end,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             const SizedBox(width: 8),

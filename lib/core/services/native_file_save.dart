@@ -53,6 +53,8 @@ class NativeFileSave {
   static Future<bool> saveFileFromPath({
     required String sourcePath,
     String? fileName,
+    bool requireOutsideAppContainer = false,
+    String? dialogTitle,
   }) async {
     if (kIsWeb ||
         (defaultTargetPlatform != TargetPlatform.android &&
@@ -65,6 +67,10 @@ class NativeFileSave {
     final result = await _channel.invokeMethod<dynamic>('saveFileFromPath', {
       'sourcePath': sourcePath,
       if (fileName != null && fileName.isNotEmpty) 'fileName': fileName,
+      if (requireOutsideAppContainer &&
+          defaultTargetPlatform == TargetPlatform.iOS)
+        'requireOutsideAppContainer': true,
+      if (dialogTitle != null) 'dialogTitle': dialogTitle,
     });
     if (result is bool) return result;
     return result == true;

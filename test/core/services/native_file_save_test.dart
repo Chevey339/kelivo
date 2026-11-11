@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/services/native_file_save.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,10 +15,38 @@ void main() {
   });
 
   tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
     NativeFileSave.debugForceAndroidForTest = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    test('$platform requests external folders only for iOS backups', () async {
+      debugDefaultTargetPlatformOverride = platform;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'saveFileFromPath');
+            expect(call.arguments, {
+              'sourcePath': '/tmp/backup.zip',
+              'fileName': 'backup.zip',
+              if (platform == TargetPlatform.iOS)
+                'requireOutsideAppContainer': true,
+              'dialogTitle': 'Choose a backup folder',
+            });
+            return false;
+          });
+      expect(
+        await NativeFileSave.saveFileFromPath(
+          sourcePath: '/tmp/backup.zip',
+          fileName: 'backup.zip',
+          requireOutsideAppContainer: true,
+          dialogTitle: 'Choose a backup folder',
+        ),
+        isFalse,
+      );
+    });
+  }
 
   test('direct writer streams chunks and completes the destination', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

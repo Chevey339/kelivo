@@ -184,7 +184,6 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
         keyboardType: url ? TextInputType.url : TextInputType.text,
         textInputAction: url ? TextInputAction.done : TextInputAction.next,
         autocorrect: !url,
-        enableSuggestions: !url,
         onChanged: url && _invalid
             ? (_) => setState(() => _invalid = false)
             : null,

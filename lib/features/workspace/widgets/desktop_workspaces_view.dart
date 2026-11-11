@@ -11,6 +11,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'desktop_workspace_button.dart';
+import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 
 class DesktopWorkspacesView extends StatefulWidget {
   const DesktopWorkspacesView({
@@ -93,42 +94,74 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.showHeader)
-                          Text(
-                            l10n.workspacesTitle,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: AppFontWeights.semibold,
-                            ),
-                          ),
-                        if (widget.showHeader) const SizedBox(height: 4),
+              child: Builder(
+                builder: (context) {
+                  final heading = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.showHeader)
                         Text(
-                          PlatformUtils.isDesktopTarget
-                              ? l10n.workspaceDesktopHostHint
-                              : l10n.workspaceMgmtKindManagedSubtitle,
+                          l10n.workspacesTitle,
                           style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurfaceVariant,
+                            fontSize: 20,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
+                      if (widget.showHeader) const SizedBox(height: 4),
+                      Text(
+                        PlatformUtils.isDesktopTarget
+                            ? l10n.workspaceDesktopHostHint
+                            : l10n.workspaceMgmtKindManagedSubtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  );
+                  final actions = Wrap(
+                    alignment: wide ? WrapAlignment.end : WrapAlignment.start,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (PlatformUtils.isDesktopTarget) ...[
+                        DesktopWorkspaceButton(
+                          key: const ValueKey('workspaces-environment'),
+                          label: l10n.workspaceEntryEnvironment,
+                          icon: Lucide.Terminal,
+                          onPressed: () =>
+                              WorkspaceNavigation.openEnvironmentPage(context),
+                        ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  DesktopWorkspaceButton(
-                    key: WorkspacesPane.createKey,
-                    label: l10n.workspaceMgmtNewWorkspace,
-                    icon: Lucide.Plus,
-                    primary: true,
-                    onPressed: _creating ? null : _create,
-                  ),
-                ],
+                      DesktopWorkspaceButton(
+                        key: WorkspacesPane.createKey,
+                        label: l10n.workspaceMgmtNewWorkspace,
+                        icon: Lucide.Plus,
+                        primary: true,
+                        onPressed: _creating ? null : _create,
+                      ),
+                    ],
+                  );
+                  return Flex(
+                    direction: wide ? Axis.horizontal : Axis.vertical,
+                    crossAxisAlignment: wide
+                        ? CrossAxisAlignment.center
+                        : CrossAxisAlignment.start,
+                    children: [
+                      if (wide) Expanded(child: heading) else heading,
+                      SizedBox(width: wide ? 12 : 0, height: wide ? 0 : 12),
+                      if (wide)
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: actions,
+                          ),
+                        )
+                      else
+                        actions,
+                    ],
+                  );
+                },
               ),
             ),
             Divider(

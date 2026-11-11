@@ -116,7 +116,7 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<void> _dialogBridgeReady = Future<void>.value();
   Future<void> _storageBridgeReady = Future<void>.value();
   bool _storageBridgeInstalled = false;
-  final _applicationEntries = <String, String>{};
+  final _localAuthorities = <String, String>{};
   int _storageCalls = 0;
   int _storageReplies = 0;
   String? _storageDocument;
@@ -437,8 +437,11 @@ class NativeBrowserEngine implements BrowserEngine {
   String publicUrl(String url) => _workspace?.publicUrl(url) ?? url;
 
   Future<void> _installStorageBridge() async {
-    if (_storageBridgeInstalled) return;
-    if (Platform.isAndroid || Platform.isWindows) {
+    // A Windows headless -> visible transfer creates a new Dart handler map.
+    // Rebind its handler even though the native document/bridge survived.
+    if (_storageBridgeInstalled && !Platform.isWindows) return;
+    if (!_storageBridgeInstalled &&
+        (Platform.isAndroid || Platform.isWindows)) {
       final String? version;
       if (Platform.isAndroid) {
         version = (await InAppWebViewController.getCurrentWebViewPackage())
@@ -683,7 +686,11 @@ class NativeBrowserEngine implements BrowserEngine {
             await scope.checkCurrent();
             final authorize = scope.resources.authorizeData;
             if (authorize == null) throw StateError('storage_access_denied');
-            await authorize(scope.sessionId, relative, write);
+            await authorize(
+              scope.sessionId,
+              scope.dataAccessPath(relative),
+              write,
+            );
             await scope.checkCurrent();
             checkDocument();
           },
@@ -791,14 +798,7 @@ class NativeBrowserEngine implements BrowserEngine {
     _renderedDocumentLoaded = false;
     _replacingRenderedDocument = false;
     _awaitingRenderedLoadStart = false;
-    _emit(
-      BrowserPageState(
-        url: _pageUrl(url),
-        isLoading: true,
-        progress: 0,
-        replacesRenderedDocument: replaced,
-      ),
-    );
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
   }
 
   String? _pageUrl(WebUri? url) {
@@ -832,15 +832,15 @@ class NativeBrowserEngine implements BrowserEngine {
     return url.scheme == 'data' || url.toString() == documentUrl;
   }
 
-  Future<void> _onLoadStop(
-    InAppWebViewController controller,
-    WebUri? url,
-  ) async {
+  Future<void> _onLoadStop(InAppWebViewController _, WebUri? url) async {
     if (_disposed) return;
     final generation = _navigationGeneration;
     final historyRevision = ++_historyRevision;
     final navigation = _navigation;
-    final current = await controller.getUrl();
+    // A headless -> visible transfer disposes the callback's Dart controller.
+    // Read through the retained controller, reacquiring it after each await.
+    final current = await _webView.getUrl();
+    if (_disposed || generation != _navigationGeneration) return;
     if (url != null &&
         current != null &&
         current.toString() != url.toString()) {
@@ -848,7 +848,7 @@ class NativeBrowserEngine implements BrowserEngine {
       // representation of the same loadData document. Reject unrelated stale
       // callbacks, but allow this explicit render alias once its DOM is ready.
       if (!_isRenderedUrl(url) || !_isRenderedUrl(current)) return;
-      final readiness = await controller.evaluateJavascript(
+      final readiness = await _webView.evaluateJavascript(
         source: 'document.readyState',
       );
       if (readiness != 'complete') return;
@@ -860,8 +860,8 @@ class NativeBrowserEngine implements BrowserEngine {
       _latestHistoryRevision = historyRevision;
     }
     final values = await Future.wait<Object?>([
-      controller.getTitle(),
-      _readHistory(controller),
+      _webView.getTitle(),
+      _readHistory(_webView),
     ]);
     if (_disposed || generation != _navigationGeneration) return;
     _awaitingRenderedLoadStart = false;
@@ -882,6 +882,8 @@ class NativeBrowserEngine implements BrowserEngine {
             ? null
             : history.index + 1 < history.length,
         completedNavigation: _loadFailure == null,
+        replacesRenderedDocument:
+            _loadFailure == null && _renderedDocumentUrl == null,
         error: _loadFailure?.message,
       ),
     );
@@ -969,15 +971,33 @@ class NativeBrowserEngine implements BrowserEngine {
     WebUri? url,
     bool? reload,
   ) async {
-    // URL callbacks arrive in native order. Publish the URL before querying
-    // availability so a slower query cannot replay an older SPA location.
+    // WebView2 can announce the requested URL even when an offline app's
+    // departure was cancelled and its original document is still displayed.
+    final scope = _workspace;
+    if (scope?.app != null &&
+        url != null &&
+        (url.scheme != (Platform.isAndroid ? 'https' : 'kelivo') ||
+            !scope!.owns(url))) {
+      await _refreshHistory(controller);
+      return;
+    }
+    // Publish committed/same-document URLs before querying availability so a
+    // slower query cannot replay an older SPA location. Failed provisional
+    // navigation can also emit a URL event without replacing the document.
     // A newly created WebView can report its previous about:blank document
     // after load-start. URL notifications alone must not change the ownership
     // of an unfinished navigation; commit/redirect events establish that.
-    if (_navigation?.isCompleted == true || _navigationUrl == null) {
+    if (_loadFailure == null &&
+        (_navigation?.isCompleted == true || _navigationUrl == null)) {
       _navigationUrl = _pageUrl(url) ?? _navigationUrl;
     }
-    _emit(BrowserPageState(url: _pageUrl(url)));
+    if (_loadFailure == null &&
+        (_navigation?.isCompleted == true ||
+            _commit?.isCompleted == true ||
+            _historyTraversal != null ||
+            _historyDocument != null)) {
+      _emit(BrowserPageState(url: _pageUrl(url)));
+    }
     await _refreshHistory(controller);
     if (_navigation?.isCompleted == true) unawaited(_loadFavicon());
   }
@@ -1018,6 +1038,13 @@ class NativeBrowserEngine implements BrowserEngine {
       // The current native document, rather than an earlier history event,
       // owns this commit. Windows additionally filters by NavigationId.
       _navigationUrl = _pageUrl(url);
+      _emit(
+        BrowserPageState(
+          url: _navigationUrl,
+          title: '',
+          replacesRenderedDocument: _renderedDocumentUrl == null,
+        ),
+      );
       if (!(_commit?.isCompleted ?? true)) _commit!.complete();
       unawaited(_refreshHistory(controller));
     } catch (_) {
@@ -1195,6 +1222,12 @@ class NativeBrowserEngine implements BrowserEngine {
         code,
         'The page could not be loaded ($code).',
         'Check the connection or address, then open another page in this tab. Do not repeat form submissions automatically.',
+        details: {
+          'native_type': error.type.toString(),
+          'native_description': error.description.length > 512
+              ? error.description.substring(0, 512)
+              : error.description,
+        },
       ),
     );
     if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
@@ -1440,7 +1473,7 @@ class NativeBrowserEngine implements BrowserEngine {
   InAppWebViewController get _webView =>
       _controller ?? (throw StateError('browser_engine_not_ready'));
   Future<String> _prepareWorkspaceUrl(String url) async {
-    if (!BrowserWorkspaceResources.isWorkspaceUrl(url)) {
+    if (!BrowserWorkspaceResources.isLocalUrl(url)) {
       if (_workspace?.app != null) {
         _workspace!.close();
         _workspace = null;
@@ -1505,7 +1538,7 @@ class NativeBrowserEngine implements BrowserEngine {
         }
         checkOwner();
       }
-      if (next.app != null) _applicationEntries[next.host] = url;
+      _localAuthorities[next.host] = next.authority;
       return _workspace!
           .internalUrl(url, android: Platform.isAndroid)
           .toString();
@@ -1577,6 +1610,7 @@ class NativeBrowserEngine implements BrowserEngine {
     _renderedDocumentLoaded = false;
     _beginNavigation();
     _navigationUrl = publicUrl(url);
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
     await _webView.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
   }
 
@@ -1593,6 +1627,7 @@ class NativeBrowserEngine implements BrowserEngine {
     _replacingRenderedDocument = false;
     _renderedDocumentLoaded = false;
     _beginNavigation();
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
     try {
       await _webView.loadData(
         data: html,
@@ -1623,7 +1658,7 @@ class NativeBrowserEngine implements BrowserEngine {
       }
       final target = before.index + direction;
       if (target < 0 || target >= before.length) return;
-      if (_applicationEntries.isNotEmpty) {
+      if (_localAuthorities.isNotEmpty) {
         final history = await controller.getCopyBackForwardList();
         final items = history?.list;
         final targetUrl = items != null && target < items.length
@@ -1633,13 +1668,13 @@ class NativeBrowserEngine implements BrowserEngine {
           final local = BrowserWorkspaceResources.isInternalHost(
             targetUrl.host,
           );
-          final publicTarget =
-              _applicationEntries[targetUrl.host] ??
-              (local
-                  ? targetUrl
-                        .replace(scheme: 'kelivo', host: 'workspace')
-                        .toString()
-                  : targetUrl.toString());
+          final authority = _localAuthorities[targetUrl.host];
+          if (local && authority == null) {
+            throw StateError('browser_workspace_binding_changed');
+          }
+          final publicTarget = local
+              ? targetUrl.replace(scheme: 'kelivo', host: authority).toString()
+              : targetUrl.toString();
           final prepared = await _prepareWorkspaceUrl(publicTarget);
           if (local && Uri.parse(prepared).host != targetUrl.host) {
             throw StateError('browser_workspace_binding_changed');

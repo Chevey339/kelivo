@@ -1,6 +1,6 @@
-/// Keep a reached document footer visible when iOS browser chrome changes the
-/// layout viewport. DOM resize events run with the new viewport-relative CSS
-/// geometry, after the native inset/frame setter has returned.
+/// Keep a reached document footer visible and clamp positions beyond its end
+/// when iOS browser chrome changes the layout viewport. DOM resize events use
+/// the new viewport-relative CSS geometry after the native setter has returned.
 const browserViewportAnchorScript = r'''
 (() => {
   if (window !== window.top || window.__kelivoViewportAnchor) return;
@@ -16,9 +16,11 @@ const browserViewportAnchorScript = r'''
     const editing = focused?.isContentEditable || focused?.tagName === 'TEXTAREA' ||
       (focused?.tagName === 'INPUT' &&
        !/^(button|submit|reset|checkbox|radio|range|color|file|hidden)$/.test(focused.type));
-    if (allowAnchor && previous && (previous.height !== height || previous.width !== width) &&
-        previous.end > 0 && previous.offset >= previous.end - 1 && !editing) {
-      window.scrollTo({left: window.scrollX, top: end, behavior: 'instant'});
+    if (allowAnchor && previous && (previous.height !== height || previous.width !== width) && !editing) {
+      const atEnd = previous.end > 0 && previous.offset >= previous.end - 1;
+      if (atEnd || window.scrollY > end) {
+        window.scrollTo({left: window.scrollX, top: end, behavior: 'instant'});
+      }
     }
     previous = {height, width, end, offset: window.scrollY};
   };

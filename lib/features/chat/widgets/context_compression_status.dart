@@ -46,6 +46,37 @@ String compressionStatusLabel(
 };
 
 String compressionErrorLabel(AppLocalizations l10n, String error) {
+  if (error.contains('native_compaction_originals_unavailable')) {
+    return l10n.compressionNativeOriginalsUnavailable;
+  }
+  if (error.contains('native_compaction_scope_changed')) {
+    return l10n.compressionNativeScopeChanged;
+  }
+  if (error.contains('native_compaction_missing') ||
+      error.contains('native_compaction_incomplete')) {
+    return l10n.compressionNativeIncomplete;
+  }
+  if (error.contains('compression_near_limit')) {
+    return l10n.compressionNearLimit;
+  }
+  if (error.contains('compression_request_budget')) {
+    return l10n.compressionBudgetError;
+  }
+  if (error.contains('compression_incomplete')) {
+    return l10n.compressionIncomplete;
+  }
+  if (error.contains('compression_reference_too_large')) {
+    return l10n.compressionReferenceTooLarge;
+  }
+  if (error.contains('compression_reference_changed')) {
+    return l10n.compressionReferenceChanged;
+  }
+  if (error.contains('compression_target_not_reached')) {
+    return l10n.compressionTargetNotReached;
+  }
+  if (error.contains('compression_template_missing')) {
+    return l10n.compressionTemplateMissing;
+  }
   if (error.contains('context_budget_exceeded')) return l10n.compressOverSnack;
   if (error.contains('summary_not_smaller')) {
     return l10n.contextSummaryNotSmaller;

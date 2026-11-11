@@ -1,3 +1,4 @@
+import '../../../core/models/token_usage.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import '../../../shared/markdown/markdown_with_code_highlight.dart';
 import '../../../shared/text_input/message_editing_controller.dart';
 import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/ios_text_button.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -37,6 +39,7 @@ class ContextOperationContent extends StatefulWidget {
     this.estimateSummary,
     this.statusLabel = '',
     this.showHeader = true,
+    this.sourceConversationAvailable = true,
   });
   final ContextOperation operation;
   final VoidCallback onClose;
@@ -53,6 +56,7 @@ class ContextOperationContent extends StatefulWidget {
   final Future<CompressionBudget?> Function(String)? estimateSummary;
   final String statusLabel;
   final bool showHeader;
+  final bool sourceConversationAvailable;
 
   @override
   State<ContextOperationContent> createState() =>
@@ -63,7 +67,8 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
   late final MessageEditingController _editor = MessageEditingController(
     text: widget.operation.summary,
   );
-  late bool _editing = widget.initiallyEditing;
+  late bool _editing = widget.initiallyEditing && !widget.operation.isNative;
+  bool _detailsExpanded = false;
   bool _saving = false;
   String? _error;
   CompressionBudget? _editBudget;
@@ -163,7 +168,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (widget.onViewOriginal != null)
           ActionSheetItem(
             icon: LucideIcons.info,
-            label: l10n.contextDetailViewOriginals,
+            label: widget.operation.isImportedNative
+                ? l10n.compressionNativeOpenSource
+                : l10n.contextDetailViewOriginals,
             onTap: widget.onViewOriginal!,
           ),
         if (widget.onViewBoundary != null)
@@ -202,7 +209,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
     final mode = switch (operation.inputMode) {
       'start' => l10n.compressContextKeepStart,
       'recent' => l10n.compressContextKeepRecent,
-      'keepRecent' => l10n.compressContextUnlimited,
+      'keepRecent' => l10n.compressContextKeepRecentMessages,
       _ => l10n.compressContextUnlimited,
     };
     final time = operation.createdAt.toLocal();
@@ -212,7 +219,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
     final over =
         widget.undoBudget?.contextWindow != null &&
         widget.undoBudget!.usedTokens > widget.undoBudget!.contextWindow!;
-    final body = Column(
+    final details = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!operation.isCompression) ...[
@@ -228,20 +235,51 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
             ),
           ),
         ],
-        ContextDetailRow(
-          label: operation.isFixedStart
-              ? l10n.contextFixedStart
-              : operation.isCompression
-              ? l10n.contextDetailReplaced
-              : l10n.contextDetailExcluded,
-          value: widget.rangeLabel.isEmpty
-              ? l10n.contextRangeInfo(
-                  operation.sourceGroups.length,
-                  operation.keepUserMessages,
-                )
-              : widget.rangeLabel,
-        ),
+        if (!operation.isImportedNative)
+          ContextDetailRow(
+            label: operation.isFixedStart
+                ? l10n.contextFixedStart
+                : operation.isCompression
+                ? l10n.contextDetailReplaced
+                : l10n.contextDetailExcluded,
+            value: widget.rangeLabel.isEmpty
+                ? l10n.contextRangeInfo(
+                    operation.sourceGroups.length,
+                    operation.keepUserMessages,
+                  )
+                : widget.rangeLabel,
+          ),
         if (operation.isCompression) ...[
+          if (operation.compressionDetails['requestAttempts']
+              case final int count)
+            ContextDetailRow(
+              label: l10n.compressionActualUsage,
+              value: l10n.compressionCalls(count),
+            ),
+          if (operation.compressionDetails['usage'] case final Map usage)
+            ContextDetailRow(
+              label: l10n.compressionActualUsage,
+              value: l10n.compressionUsageValues(
+                contextTokenValue(
+                  TokenUsage.fromJson(
+                    usage.cast<String, dynamic>(),
+                  ).promptTokens,
+                ),
+                contextTokenValue(
+                  TokenUsage.fromJson(
+                    usage.cast<String, dynamic>(),
+                  ).completionTokens,
+                ),
+              ),
+            ),
+          if ((operation.compressionDetails['unknownUsageAttempts'] as int? ??
+                  0) >
+              0)
+            Text(
+              l10n.compressionUsageUnknown(
+                operation.compressionDetails['unknownUsageAttempts'] as int,
+              ),
+            ),
           ContextDetailRow(
             label: l10n.contextDetailRead,
             value: [
@@ -252,7 +290,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                 l10n.compressIncludeAttachments,
             ].join(' · '),
           ),
-          if (operation.inputMode == 'start' || operation.inputMode == 'recent')
+          if (operation.compressionDetails.isEmpty &&
+              (operation.inputMode == 'start' ||
+                  operation.inputMode == 'recent'))
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
@@ -277,20 +317,77 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           label: operation.isCompression
               ? l10n.contextDetailNext
               : l10n.contextDetailCurrent,
-          value: widget.budget == null
+          value: operation.isNative || widget.budget == null
               ? '—'
               : l10n.compressApproxTokens(
                   contextTokenValue(widget.budget!.usedTokens),
                 ),
         ),
-        ContextDetailRow(
-          label: l10n.contextDetailAfterUndo,
-          value: widget.undoBudget == null
-              ? '—'
-              : l10n.compressApproxTokens(
-                  contextTokenValue(widget.undoBudget!.usedTokens),
-                ),
-        ),
+        if (operation.canUndo)
+          ContextDetailRow(
+            label: l10n.contextDetailAfterUndo,
+            value: widget.undoBudget == null
+                ? '—'
+                : l10n.compressApproxTokens(
+                    contextTokenValue(widget.undoBudget!.usedTokens),
+                  ),
+          ),
+      ],
+    );
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (operation.isNative) ...[
+          const SizedBox(height: 12),
+          Text(
+            operation.isImportedNative
+                ? widget.sourceConversationAvailable
+                      ? l10n.compressionNativeImportedDescription
+                      : l10n.compressionNativeSourceUnavailable
+                : l10n.compressionNativeDescription,
+            style: TextStyle(fontSize: 14, height: 1.5, color: cs.onSurface),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.compressionNativeTokenHint,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (operation.isCompression)
+          Semantics(
+            button: true,
+            expanded: _detailsExpanded,
+            child: IosCardPress(
+              key: const ValueKey('context-summary-details-toggle'),
+              focusable: true,
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              onTap: () => setState(() => _detailsExpanded = !_detailsExpanded),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.compressionAdvancedOptions,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: AppFontWeights.medium,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _detailsExpanded
+                        ? LucideIcons.chevronUp
+                        : LucideIcons.chevronDown,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (!operation.isCompression || _detailsExpanded) details,
         if (over)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -303,7 +400,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
               ),
             ),
           ),
-        if (operation.isCompression) ...[
+        if (operation.isCompression && !operation.isNative) ...[
           const SizedBox(height: 12),
           Row(
             children: [
@@ -345,7 +442,8 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           ),
           const SizedBox(height: 4),
           Container(
-            height: desktop ? (_editing ? 210 : 180) : 235,
+            key: const ValueKey('context-summary-content'),
+            height: _editing ? (desktop ? 210 : 235) : null,
             decoration: BoxDecoration(
               color: context.appColors.surfaceFill,
               borderRadius: BorderRadius.circular(14),
@@ -367,7 +465,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                       contentPadding: const EdgeInsets.all(14),
                     ),
                   )
-                : SingleChildScrollView(
+                : Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 12,
@@ -452,7 +550,11 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                               operation.isFixedStart
                                   ? l10n.contextFixedStart
                                   : operation.isCompression
-                                  ? l10n.contextDetailTitle
+                                  ? operation.isNative
+                                        ? operation.isImportedNative
+                                              ? l10n.compressionNativeImported
+                                              : l10n.compressionNativeLabel
+                                        : l10n.contextDetailTitle
                                   : l10n.contextDetailClearTitle,
                               style: TextStyle(
                                 fontSize: 17,
@@ -484,25 +586,23 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
                 ),
               ),
               if (hasMore && desktop)
-                IconButton(
+                IosIconButton(
                   key: _moreKey,
                   tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
-                  onPressed: _saving ? null : _more,
-                  icon: Icon(
-                    LucideIcons.ellipsis,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
-                  ),
+                  onTap: _saving ? null : _more,
+                  icon: LucideIcons.ellipsis,
+                  minSize: 40,
+                  size: 18,
+                  color: cs.onSurfaceVariant,
                 ),
               if (widget.showHeader)
-                IconButton(
+                IosIconButton(
                   tooltip: l10n.statsPageClose,
-                  onPressed: _saving ? null : widget.onClose,
-                  icon: Icon(
-                    LucideIcons.x,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
-                  ),
+                  onTap: _saving ? null : widget.onClose,
+                  icon: LucideIcons.x,
+                  minSize: 40,
+                  size: 18,
+                  color: cs.onSurfaceVariant,
                 ),
             ],
           ),
@@ -511,7 +611,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
           const SizedBox(height: 14),
           Row(
             children: [
-              if (!_editing && widget.onUndo != null && !operation.revoked)
+              if (!_editing && widget.onUndo != null && operation.canUndo)
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,

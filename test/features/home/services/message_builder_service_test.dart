@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
@@ -1263,6 +1264,56 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('native context survives the assistant message limit', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final payload = NativeCompactionPayload(
+        protocol: NativeCompactionProtocol.compact,
+        scope: 'fixture',
+        modelId: 'model',
+        output: [
+          {'type': 'compaction', 'encrypted_content': 'opaque-history'},
+        ],
+      );
+      final messages = service.buildApiMessages(
+        messages: [
+          ChatMessage(
+            id: 'context-summary:native',
+            conversationId: 'chat',
+            role: 'user',
+            content: '',
+          )..hydrateProviderArtifacts({
+            nativeCompactionArtifactKind: jsonEncode(payload.toJson()),
+          }),
+          for (var i = 0; i < 6; i++)
+            _message(
+              id: 'm$i',
+              role: i.isEven ? 'user' : 'assistant',
+              content: 'recent $i',
+            ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(id: 'chat', title: 'test'),
+      );
+      service.applyContextLimit(
+        messages,
+        const Assistant(
+          id: 'assistant',
+          name: 'test',
+          limitContextMessages: true,
+          contextMessageSize: 2,
+        ),
+      );
+      expect(messages, hasLength(3));
+      expect(messages.first[nativeCompactionMessageKey], payload.toJson());
+      expect(messages.skip(1).map((m) => m['content']), [
+        'recent 4',
+        'recent 5',
+      ]);
     });
 
     test('WorldBook 注入后的最终裁剪会限制发送消息数', () {

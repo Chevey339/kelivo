@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/workspace/desktop_process_runtime.dart';
+import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
 void main() {
@@ -27,6 +28,102 @@ void main() {
   });
 
   group('DesktopProcessRuntime', () {
+    test('shell cache follows settings and explicit refresh', () async {
+      var path = '/bin/bash';
+      var probes = 0;
+      final configured = DesktopProcessRuntime(
+        loadShellPath: () async => path,
+        shellResolver: DesktopShellResolver(
+          windows: false,
+          runProcess: (exe, args) async {
+            probes++;
+            return ProcessResult(1, 0, 'kelivo-shell-ready', '');
+          },
+        ),
+      );
+      expect((await configured.status()).shell?.executable, '/bin/bash');
+      await configured.status();
+      expect(probes, 1);
+      path = '/bin/zsh';
+      expect((await configured.status()).shell?.executable, '/bin/zsh');
+      expect(probes, 2);
+      configured.refreshShell();
+      await configured.status();
+      expect(probes, 3);
+    });
+
+    test('configured shell runs quoted text without nesting', () async {
+      final configured = DesktopProcessRuntime(
+        loadShellPath: () async => '/bin/sh',
+      );
+      final status = await configured.status();
+      expect(status.shell?.executable, '/bin/sh');
+      final events = await _collect(
+        configured,
+        _req(
+          runId: 'custom',
+          command: r'''value='hello $world'; printf '%s' "$value"''',
+          cwd: tmp.path,
+        ),
+      );
+      expect(utf8.decode(_stdout(events)), r'hello $world');
+      expect(_singleExit(events).exitCode, 0);
+    }, skip: !isUnix);
+
+    test('stale status refresh cannot overwrite a newer shell', () async {
+      var path = '/bin/bash';
+      final started = Completer<void>();
+      final old = Completer<ProcessResult>();
+      final configured = DesktopProcessRuntime(
+        loadShellPath: () async => path,
+        shellResolver: DesktopShellResolver(
+          windows: false,
+          runProcess: (exe, args) async {
+            if (exe == '/bin/bash') {
+              started.complete();
+              return old.future;
+            }
+            return ProcessResult(1, 0, 'kelivo-shell-ready', '');
+          },
+        ),
+      );
+      final provider = WorkspaceRuntimeProvider()..register(configured);
+      final first = provider.refresh();
+      await started.future;
+      path = '/bin/zsh';
+      configured.refreshShell();
+      await provider.refresh();
+      old.complete(ProcessResult(1, 0, 'kelivo-shell-ready', ''));
+      await first;
+      expect(provider.lastStatus?.shell?.executable, '/bin/zsh');
+      provider.dispose();
+    });
+
+    test(
+      'a generated command retains its shell across a settings change',
+      () async {
+        var path = '/bin/bash';
+        final configured = DesktopProcessRuntime(
+          loadShellPath: () async => path,
+        );
+        final snapshot = (await configured.status()).shell!;
+        path = '/bin/sh';
+        final events = await _collect(
+          configured,
+          CommandRequest(
+            runId: 'snapshot',
+            command: r'printf "%s" "$0"',
+            cwd: tmp.path,
+            shell: snapshot,
+          ),
+        );
+        expect(_singleExit(events).exitCode, 0);
+        expect(utf8.decode(_stdout(events)), '/bin/bash');
+        expect((await configured.status()).shell?.executable, '/bin/sh');
+      },
+      skip: !isUnix,
+    );
+
     test('status reports a ready unsandboxed process engine', () async {
       final status = await runtime.status();
       expect(status.ready, isTrue);
