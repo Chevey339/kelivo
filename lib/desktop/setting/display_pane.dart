@@ -60,6 +60,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _DesktopTrayShowRow(),
                   _RowDivider(),
                   _DesktopTrayMinimizeOnCloseRow(),
+                  _RowDivider(),
+                  _DesktopStartupRows(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -940,6 +942,95 @@ class _LinuxHideTitleBarRow extends StatelessWidget {
           );
         }
       },
+    );
+  }
+}
+
+class _DesktopStartupRows extends StatefulWidget {
+  const _DesktopStartupRows();
+
+  @override
+  State<_DesktopStartupRows> createState() => _DesktopStartupRowsState();
+}
+
+class _DesktopStartupRowsState extends State<_DesktopStartupRows>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    await settings.loaded;
+    if (mounted) await settings.refreshDesktopStartup();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _change(Future<void> Function() update) async {
+    try {
+      await update();
+    } catch (_) {
+      if (!mounted) return;
+      await context.read<SettingsProvider>().refreshDesktopStartup();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.desktopAutostartError,
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    final available =
+        settings.desktopAutostartSupported && !settings.desktopAutostartBusy;
+    final canHide =
+        available &&
+        settings.desktopAutostartEnabled &&
+        settings.desktopShowTray;
+    return Column(
+      children: [
+        _ToggleRow(
+          label: l10n.desktopAutostartTitle,
+          tip: !settings.desktopAutostartSupported
+              ? l10n.desktopAutostartUnsupported
+              : settings.desktopAutostartFailed
+              ? l10n.desktopAutostartError
+              : l10n.desktopAutostartDescription,
+          value: settings.desktopAutostartEnabled,
+          onChanged: available
+              ? (value) =>
+                    _change(() => settings.setDesktopAutostartEnabled(value))
+              : null,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.desktopAutostartHiddenTitle,
+          tip: l10n.desktopAutostartHiddenDescription,
+          value: canHide && settings.desktopAutostartHidden,
+          onChanged: canHide
+              ? (value) =>
+                    _change(() => settings.setDesktopAutostartHidden(value))
+              : null,
+        ),
+      ],
     );
   }
 }

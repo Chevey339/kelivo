@@ -15870,6 +15870,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => '保存';
+
+  @override
+  String get desktopAutostartTitle => '开机自启动';
+
+  @override
+  String get desktopAutostartDescription => '登录这台电脑后自动启动 Kelivo。';
+
+  @override
+  String get desktopAutostartHiddenTitle => '自启动后隐藏到托盘';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      '需要开启自启动和托盘图标。手动打开 Kelivo 时仍会显示窗口。';
+
+  @override
+  String get desktopAutostartUnsupported => '开机自启动需要 macOS 13 或更高版本。';
+
+  @override
+  String get desktopAutostartError => '无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -31738,6 +31757,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeShellSave => '保存';
+
+  @override
+  String get desktopAutostartTitle => '开机自启动';
+
+  @override
+  String get desktopAutostartDescription => '登录这台电脑后自动启动 Kelivo。';
+
+  @override
+  String get desktopAutostartHiddenTitle => '自启动后隐藏到托盘';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      '需要开启自启动和托盘图标。手动打开 Kelivo 时仍会显示窗口。';
+
+  @override
+  String get desktopAutostartUnsupported => '开机自启动需要 macOS 13 或更高版本。';
+
+  @override
+  String get desktopAutostartError => '无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -47613,4 +47651,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvNativeShellSave => '儲存';
+
+  @override
+  String get desktopAutostartTitle => '開機時啟動';
+
+  @override
+  String get desktopAutostartDescription => '登入這台電腦後自動啟動 Kelivo。';
+
+  @override
+  String get desktopAutostartHiddenTitle => '自動啟動後隱藏至系統匣';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      '需要開啟開機時啟動及系統匣圖示。手動開啟 Kelivo 時仍會顯示視窗。';
+
+  @override
+  String get desktopAutostartUnsupported => '開機時啟動需要 macOS 13 或以上版本。';
+
+  @override
+  String get desktopAutostartError =>
+      '無法套用啟動設定。請檢查系統啟動項目或登入項目中的 Kelivo 設定後再試一次。';
 }

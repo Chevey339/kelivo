@@ -16222,4 +16222,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => '저장';
+
+  @override
+  String get desktopAutostartTitle => '시작 시 실행';
+
+  @override
+  String get desktopAutostartDescription => '이 컴퓨터에 로그인하면 Kelivo를 시작합니다.';
+
+  @override
+  String get desktopAutostartHiddenTitle => '자동 시작 시 트레이로 숨기기';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      '시작 시 실행과 트레이 아이콘이 필요합니다. Kelivo를 직접 열면 창이 계속 표시됩니다.';
+
+  @override
+  String get desktopAutostartUnsupported => '시작 시 실행은 macOS 13 이상이 필요합니다.';
+
+  @override
+  String get desktopAutostartError =>
+      '시작 설정을 적용할 수 없습니다. 시스템 시작 항목 또는 로그인 항목 설정에서 이 앱을 확인한 후 다시 시도하세요.';
 }

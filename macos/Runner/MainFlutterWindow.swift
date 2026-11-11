@@ -1,3 +1,4 @@
+import ServiceManagement
 import Cocoa
 import FlutterMacOS
 import WebKit
@@ -408,6 +409,50 @@ class MainFlutterWindow: NSWindow {
     // Place system traffic light buttons
     self.layoutTrafficLights()
 
+    FlutterMethodChannel(
+      name: "app.desktop_startup", binaryMessenger: flutterViewController.engine.binaryMessenger
+    ).setMethodCallHandler { call, result in
+      if call.method == "wasLaunchedAtLogin" {
+        guard let delegate = NSApp.delegate as? AppDelegate else {
+          result(false)
+          return
+        }
+        delegate.readLoginLaunch { result($0) }
+        return
+      }
+      guard #available(macOS 13.0, *) else {
+        if call.method == "getState" {
+          result(["supported": false, "enabled": false])
+        } else {
+          result(FlutterError(code: "startup_unsupported", message: "Requires macOS 13", details: nil))
+        }
+        return
+      }
+      switch call.method {
+      case "getState":
+        result(["supported": true, "enabled": SMAppService.mainApp.status == .enabled])
+      case "setEnabled":
+        guard let enabled = call.arguments as? Bool else {
+          result(FlutterError(code: "invalid_arguments", message: "Expected a boolean", details: nil))
+          return
+        }
+        do {
+          if enabled {
+            try SMAppService.mainApp.register()
+          } else {
+            try SMAppService.mainApp.unregister()
+          }
+          if enabled && SMAppService.mainApp.status == .requiresApproval {
+            SMAppService.openSystemSettingsLoginItems()
+          }
+          result(nil)
+        } catch {
+          result(FlutterError(code: "startup_write_failed", message: error.localizedDescription, details: nil))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     RegisterGeneratedPlugins(registry: flutterViewController)
     let glassRegistrar = flutterViewController.registrar(forPlugin: "BrowserGlass")
     glassRegistrar.register(

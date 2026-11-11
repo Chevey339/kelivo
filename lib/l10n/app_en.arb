@@ -1608,7 +1608,9 @@
   "@contextUsagePartialSummary": {
     "description": "Summary in the context usage panel and input-bar tooltip when OpenAI native compaction is present. Only readable content has been estimated; the encrypted compaction block's input token count is unknown. tokens is the already-formatted subtotal, such as 42k, not the full context total.",
     "placeholders": {
-      "tokens": { "type": "String" }
+      "tokens": {
+        "type": "String"
+      }
     }
   },
   "contextUsageBucketNativeCompaction": "Native compaction",
@@ -1623,7 +1625,9 @@
   "@contextUsageLastRequestInput": {
     "description": "Separate line below the native-compaction context usage breakdown showing input tokens reported by the last matching model request, not the current estimated window or the compaction operation's output usage. tokens is an already-formatted token count such as 42k.",
     "placeholders": {
-      "tokens": { "type": "String" }
+      "tokens": {
+        "type": "String"
+      }
     }
   },
   "contextUsageStateNone": "No data yet",
@@ -21787,5 +21791,29 @@
   "workspaceEnvNativeShellSave": "Save",
   "@workspaceEnvNativeShellSave": {
     "description": "Button in the desktop default shell dialog; validates and saves the executable path or automatic detection setting."
+  },
+  "desktopAutostartTitle": "Launch at startup",
+  "@desktopAutostartTitle": {
+    "description": "Desktop display settings, tray section: switch to register Kelivo to start when the user logs in to this device. Disabled by default."
+  },
+  "desktopAutostartDescription": "Start Kelivo when you sign in to this computer.",
+  "@desktopAutostartDescription": {
+    "description": "Tooltip for the desktop launch-at-startup switch. This is a device-local operating system setting."
+  },
+  "desktopAutostartHiddenTitle": "Hide to tray on automatic startup",
+  "@desktopAutostartHiddenTitle": {
+    "description": "Desktop display settings, tray section: switch to keep the main window hidden only when the system starts Kelivo at login."
+  },
+  "desktopAutostartHiddenDescription": "Requires launch at startup and the tray icon. Opening Kelivo manually still shows the window.",
+  "@desktopAutostartHiddenDescription": {
+    "description": "Tooltip for hiding the desktop window on automatic startup. Explains prerequisites and that manual launches remain visible."
+  },
+  "desktopAutostartUnsupported": "Launch at startup requires macOS 13 or later.",
+  "@desktopAutostartUnsupported": {
+    "description": "Desktop startup switch tooltip when the current macOS version does not support the system login-item API."
+  },
+  "desktopAutostartError": "Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.",
+  "@desktopAutostartError": {
+    "description": "Desktop startup setting failure tooltip and error notification, including when system approval is required. No placeholders."
   }
 }

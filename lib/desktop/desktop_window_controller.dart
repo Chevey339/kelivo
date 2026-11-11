@@ -37,6 +37,8 @@ class DesktopWindowController with WindowListener {
   final void Function(AsyncCallback) _whenWindowReady;
   final WindowSizeManager _sizeMgr = const WindowSizeManager();
   bool _attached = false;
+  bool _maximizeOnFocus = false;
+  bool _focusedWhileRestoring = false;
   bool _restoring = false;
   int _geometryRevision = 0;
   bool get _isWindows => defaultTargetPlatform == TargetPlatform.windows;
@@ -48,6 +50,7 @@ class DesktopWindowController with WindowListener {
   Future<void> initializeAndShow({
     String? title,
     bool linuxHideTitleBar = false,
+    bool show = true,
   }) async {
     if (kIsWeb) return;
     if (!(defaultTargetPlatform == TargetPlatform.windows ||
@@ -89,8 +92,11 @@ class DesktopWindowController with WindowListener {
     if (_isWindows) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
       final placement = await _windowsPlacement(initialSize, savedPos);
+      _restoring = true;
+      _maximizeOnFocus = wasMax && !show;
+      _focusedWhileRestoring = false;
+      _attachListeners();
       _whenWindowReady(() async {
-        _restoring = true;
         try {
           if (placement == null) {
             // If display discovery fails, retain the runner's initial position.
@@ -98,19 +104,24 @@ class DesktopWindowController with WindowListener {
           } else {
             await restoreWindowsWindowBounds(placement);
           }
-          if (wasMax) await windowManager.maximize();
+          if (wasMax && show) await windowManager.maximize();
         } catch (_) {
           // A window-manager failure must not prevent the app from opening.
         } finally {
           _restoring = false;
-          _attachListeners();
+          if (_focusedWhileRestoring) {
+            _focusedWhileRestoring = false;
+            await _applyDeferredMaximize();
+          }
         }
       });
     } else {
       await windowManager.waitUntilReadyToShow(options, () async {
         // Show first, then restore position to avoid macOS jump/flicker.
-        await windowManager.show();
-        await windowManager.focus();
+        if (show) {
+          await windowManager.show();
+          await windowManager.focus();
+        }
         // On macOS rely on native autosave. Do not set position from Dart.
         final shouldRestorePos = savedPos != null && !isMac;
         if (shouldRestorePos) {
@@ -167,6 +178,23 @@ class DesktopWindowController with WindowListener {
     if (_attached) return;
     windowManager.addListener(this);
     _attached = true;
+  }
+
+  @override
+  void onWindowFocus() {
+    if (_restoring) {
+      _focusedWhileRestoring = true;
+    } else if (_maximizeOnFocus) {
+      unawaited(_applyDeferredMaximize());
+    }
+  }
+
+  Future<void> _applyDeferredMaximize() async {
+    if (!_maximizeOnFocus) return;
+    _maximizeOnFocus = false;
+    try {
+      await windowManager.maximize();
+    } catch (_) {}
   }
 
   @override

@@ -16833,4 +16833,26 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => 'Kaydet';
+
+  @override
+  String get desktopAutostartTitle => 'Başlangıçta başlat';
+
+  @override
+  String get desktopAutostartDescription =>
+      'Bu bilgisayarda oturum açtığınızda Kelivo\'yu başlat.';
+
+  @override
+  String get desktopAutostartHiddenTitle => 'Otomatik başlatmada tepsiye gizle';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      'Başlangıçta başlatma ve tepsi simgesi gerektirir. Kelivo\'yu elle açtığınızda pencere yine görünür.';
+
+  @override
+  String get desktopAutostartUnsupported =>
+      'Başlangıçta başlatma için macOS 13 veya üstü gerekir.';
+
+  @override
+  String get desktopAutostartError =>
+      'Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin.';
 }

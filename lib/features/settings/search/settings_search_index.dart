@@ -913,6 +913,16 @@ class SettingsSearchIndex {
     }
     if (desktop) {
       add(
+        'desktopAutostartTitle',
+        SettingsSearchDestination.display,
+        (l) => l.desktopAutostartTitle,
+      );
+      add(
+        'desktopAutostartHiddenTitle',
+        SettingsSearchDestination.display,
+        (l) => l.desktopAutostartHiddenTitle,
+      );
+      add(
         'displaySettingsPageTrayShowTrayTitle',
         SettingsSearchDestination.display,
         (l) => l.displaySettingsPageTrayShowTrayTitle,

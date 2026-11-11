@@ -29477,6 +29477,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get workspaceEnvNativeShellSave;
+
+  /// Desktop display settings, tray section: switch to register Kelivo to start when the user logs in to this device. Disabled by default.
+  ///
+  /// In en, this message translates to:
+  /// **'Launch at startup'**
+  String get desktopAutostartTitle;
+
+  /// Tooltip for the desktop launch-at-startup switch. This is a device-local operating system setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Kelivo when you sign in to this computer.'**
+  String get desktopAutostartDescription;
+
+  /// Desktop display settings, tray section: switch to keep the main window hidden only when the system starts Kelivo at login.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide to tray on automatic startup'**
+  String get desktopAutostartHiddenTitle;
+
+  /// Tooltip for hiding the desktop window on automatic startup. Explains prerequisites and that manual launches remain visible.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires launch at startup and the tray icon. Opening Kelivo manually still shows the window.'**
+  String get desktopAutostartHiddenDescription;
+
+  /// Desktop startup switch tooltip when the current macOS version does not support the system login-item API.
+  ///
+  /// In en, this message translates to:
+  /// **'Launch at startup requires macOS 13 or later.'**
+  String get desktopAutostartUnsupported;
+
+  /// Desktop startup setting failure tooltip and error notification, including when system approval is required. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.'**
+  String get desktopAutostartError;
 }
 
 class _AppLocalizationsDelegate

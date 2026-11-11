@@ -55,6 +55,7 @@ import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
 import '../services/linux_window_service.dart';
+import '../../desktop/desktop_startup_service.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -1222,6 +1223,9 @@ class SettingsProvider extends ChangeNotifier {
     _linuxHideTitleBar =
         LinuxWindowService.isSupported &&
         (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
+
+    _desktopAutostartHidden = await DesktopStartupService.readHidden();
+    await refreshDesktopStartup(notify: false);
 
     // Desktop: tray settings (default enabled on desktop platforms)
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
@@ -5479,11 +5483,70 @@ Requirements:
     notifyListeners();
   }
 
+  int _desktopStartupRevision = 0;
+  bool _desktopAutostartEnabled = false;
+  bool get desktopAutostartEnabled => _desktopAutostartEnabled;
+  bool _desktopAutostartSupported = true;
+  bool get desktopAutostartSupported => _desktopAutostartSupported;
+  bool _desktopAutostartBusy = false;
+  bool get desktopAutostartBusy => _desktopAutostartBusy;
+  bool _desktopAutostartFailed = false;
+  bool get desktopAutostartFailed => _desktopAutostartFailed;
+  bool _desktopAutostartHidden = false;
+  bool get desktopAutostartHidden => _desktopAutostartHidden;
+
+  Future<void> refreshDesktopStartup({bool notify = true}) async {
+    if (!DesktopStartupService.isDesktop || _desktopAutostartBusy) return;
+    final revision = ++_desktopStartupRevision;
+    try {
+      final state = await DesktopStartupService.readState();
+      if (revision != _desktopStartupRevision) return;
+      _desktopAutostartEnabled = state.enabled;
+      _desktopAutostartSupported = state.supported;
+      _desktopAutostartFailed = false;
+    } catch (_) {
+      if (revision != _desktopStartupRevision) return;
+      _desktopAutostartFailed = true;
+    }
+    if (notify) notifyListeners();
+  }
+
+  Future<void> setDesktopAutostartEnabled(bool enabled) async {
+    if (_desktopAutostartBusy || !_desktopAutostartSupported) return;
+    _desktopStartupRevision++;
+    _desktopAutostartBusy = true;
+    notifyListeners();
+    try {
+      await DesktopStartupService.setEnabled(enabled);
+      final state = await DesktopStartupService.readState();
+      _desktopAutostartEnabled = state.enabled;
+      _desktopAutostartFailed = false;
+      if (state.enabled != enabled) {
+        throw StateError('Startup registration requires system approval');
+      }
+    } finally {
+      _desktopAutostartBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setDesktopAutostartHidden(bool hidden) async {
+    if (_desktopAutostartBusy) return;
+    final next = hidden && _desktopShowTray && _desktopAutostartEnabled;
+    await DesktopStartupService.setHidden(next);
+    _desktopAutostartHidden = next;
+    notifyListeners();
+  }
+
   // Desktop-only: show system tray icon
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
   Future<void> setDesktopShowTray(bool v) async {
     if (_desktopShowTray == v) return;
+    if (!v && _desktopAutostartHidden) {
+      await DesktopStartupService.setHidden(false);
+      _desktopAutostartHidden = false;
+    }
     _desktopShowTray = v;
     if (!_desktopShowTray && _desktopMinimizeToTrayOnClose) {
       _desktopMinimizeToTrayOnClose = false;
@@ -5999,6 +6062,10 @@ Requirements:
     copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
     copy._linuxHideTitleBar = _linuxHideTitleBar;
+    copy._desktopAutostartEnabled = _desktopAutostartEnabled;
+    copy._desktopAutostartSupported = _desktopAutostartSupported;
+    copy._desktopAutostartHidden = _desktopAutostartHidden;
+    copy._desktopAutostartFailed = _desktopAutostartFailed;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;

@@ -16735,4 +16735,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => 'Save';
+
+  @override
+  String get desktopAutostartTitle => 'Launch at startup';
+
+  @override
+  String get desktopAutostartDescription =>
+      'Start Kelivo when you sign in to this computer.';
+
+  @override
+  String get desktopAutostartHiddenTitle => 'Hide to tray on automatic startup';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      'Requires launch at startup and the tray icon. Opening Kelivo manually still shows the window.';
+
+  @override
+  String get desktopAutostartUnsupported =>
+      'Launch at startup requires macOS 13 or later.';
+
+  @override
+  String get desktopAutostartError =>
+      'Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.';
 }

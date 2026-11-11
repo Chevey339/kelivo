@@ -17,6 +17,7 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'desktop/desktop_startup_service.dart';
 import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
@@ -221,235 +222,175 @@ void _wireWorkspaceServices(BuildContext ctx) {
   } catch (_) {}
 }
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
   await runZoned(
     () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      WindowsPasteFix.instance.install();
-      AndroidImeSelection.instance.install();
-      // Register notification tap handling for every Android launch. This is
-      // independent of the current background-chat mode: an older completion
-      // notification can still launch the app after the mode has changed.
-      // Initialization does not request notification permission.
-      if (Platform.isAndroid || Platform.isIOS) {
-        try {
-          await NotificationService.ensureInitialized();
-        } catch (_) {}
-      }
-      FlutterLogger.installGlobalHandlers();
-      // The Linux runner starts hidden so decorations can be restored first.
-      // Show before the restore gate so progress and failure screens stay visible.
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
-        await _initDesktopWindow();
-      }
-      if (defaultTargetPlatform == TargetPlatform.windows) {
-        await initializeWindowsDataDirectory(
-          showWindow: _initRestoreFailureWindow,
+      try {
+        WidgetsFlutterBinding.ensureInitialized();
+        await DesktopStartupService.prepareLaunch(arguments);
+        WindowsPasteFix.instance.install();
+        AndroidImeSelection.instance.install();
+        // Register notification tap handling for every Android launch. This is
+        // independent of the current background-chat mode: an older completion
+        // notification can still launch the app after the mode has changed.
+        // Initialization does not request notification permission.
+        if (Platform.isAndroid || Platform.isIOS) {
+          try {
+            await NotificationService.ensureInitialized();
+          } catch (_) {}
+        }
+        FlutterLogger.installGlobalHandlers();
+        // The Linux runner starts hidden so decorations can be restored first.
+        // Show before the restore gate so progress and failure screens stay visible.
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+          await _initDesktopWindow();
+        }
+        if (defaultTargetPlatform == TargetPlatform.windows) {
+          await initializeWindowsDataDirectory(
+            showWindow: _initRestoreFailureWindow,
+          );
+        }
+        final appDataDirectory = await AppDirectories.getAppDataDirectory();
+        final retained = await AppDirectories.documentsDirectoryFor(
+          appDataDirectory,
         );
-      }
-      final appDataDirectory = await AppDirectories.getAppDataDirectory();
-      final retained = await AppDirectories.documentsDirectoryFor(
-        appDataDirectory,
-      );
-      if (retained != null) {
-        try {
-          await PrivateDataStorage.prepare(
-            source: retained,
-            target: appDataDirectory,
-            onCopying: () => runApp(
-              _RestoreProgressApp(
-                stage: ValueNotifier(RestoreStartupStage.protectingData),
-              ),
-            ),
-          );
-        } catch (error, stackTrace) {
-          runApp(
-            _RestoreFailureApp(
-              report: StartupFailureReport.capture(
-                stage: StartupFailureStage.databaseAdmission,
-                error: error,
-                step: 'private_storage_activation',
-                stackTrace: stackTrace,
-              ),
-              appDataDirectory: appDataDirectory,
-              privateStorageSource: retained,
-            ),
-          );
-          return;
-        }
-      }
-      late final RestoreReceipt? restoreOutcome;
-      final restoreDiagnostics = RestoreStartupDiagnostics();
-      RestoreBusinessLease? businessLease;
-      // A restore large enough to take seconds would otherwise spend all of
-      // them before the first frame, which is indistinguishable from a hang.
-      // Only paint when there is actually work waiting: an ordinary launch
-      // must not pay for a frame it immediately replaces.
-      final restoreStage =
-          await RestoreStartupGate.hasPendingWork(
-            appDataDirectory: appDataDirectory,
-          )
-          ? ValueNotifier(RestoreStartupStage.checkingBackup)
-          : null;
-      if (restoreStage != null) {
-        runApp(_RestoreProgressApp(stage: restoreStage));
-      }
-      while (true) {
-        try {
-          // The lease remains process-owned through its internal registry until
-          // process exit, preventing another instance from racing business I/O.
-          businessLease ??= await RestoreBusinessLease.acquire(
-            appDataDirectory: appDataDirectory,
-          );
-          restoreOutcome =
-              await RestoreStartupGate.recoverAndRequireBusinessReady(
-                appDataDirectory: appDataDirectory,
-                businessLease: businessLease,
-                diagnostics: restoreDiagnostics,
-                onStage: restoreStage == null
-                    ? null
-                    : (stage) => restoreStage.value = stage,
-              );
-          break;
-        } catch (error, stackTrace) {
-          stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
-          await _initRestoreFailureWindow();
-          final report = StartupFailureReport.capture(
-            stage: StartupFailureStage.restoreGate,
-            error: error,
-            step: 'recover_and_require_business_ready',
-            stackTrace: stackTrace,
-            restoreDetails: restoreDiagnostics.details,
-          );
-          final retry = report.blockedRestoreDirectory == null
-              ? null
-              : Completer<void>();
-          runApp(
-            _RestoreFailureApp(
-              key: ObjectKey(report),
-              report: report,
-              appDataDirectory: appDataDirectory,
-              businessLease: businessLease,
-              retryRestore: retry == null
-                  ? null
-                  : () async {
-                      if (!retry.isCompleted) retry.complete();
-                    },
-            ),
-          );
-          if (retry == null) return;
-          await retry.future;
-          if (restoreStage != null) {
-            restoreStage.value = RestoreStartupStage.checkingBackup;
-            runApp(_RestoreProgressApp(stage: restoreStage));
-          }
-        }
-      }
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
-        await FlutterLogger.setEnabled(enabled);
-      } catch (_) {}
-      // Trim Flutter global image cache to reduce memory pressure from large images
-      try {
-        PaintingBinding.instance.imageCache.maximumSize = 200;
-        PaintingBinding.instance.imageCache.maximumSizeBytes =
-            48 << 20; // ~48MB
-      } catch (_) {}
-      // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
-      if (defaultTargetPlatform != TargetPlatform.linux) {
-        await _initDesktopWindow();
-      }
-      // Avoid preloading all system fonts at launch (huge memory on desktop)
-      // Debug logging and global error handlers were enabled previously for diagnosis.
-      // They are commented out now per request to reduce log noise.
-      // FlutterError.onError = (FlutterErrorDetails details) { ... };
-      // WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) { ... };
-      // logging.Logger.root.level = logging.Level.ALL;
-      // logging.Logger.root.onRecord.listen((rec) { ... });
-      // Cache current Documents directory to fix sandboxed absolute paths on iOS
-      await SandboxPathResolver.init();
-      ChatDatabaseLease? processDatabaseLease;
-      BusinessPreferences? businessPreferences;
-      var recoveryAttempted = false;
-      // Every call below can fail through drift's worker isolate, which erases
-      // the distinction between them. Naming the current one is what lets the
-      // failure screen say where startup actually stopped.
-      var admissionStep = 'legacy_migration_check';
-      while (true) {
-        try {
-          admissionStep = 'legacy_migration_check';
-          final migrationDecision = await HiveToSqliteMigrationService.check();
-          if (migrationDecision.needsMigration) {
-            runApp(
-              MigrationApp(
-                service: HiveToSqliteMigrationService(
-                  migrationDecision,
-                  businessLease: businessLease,
+        if (retained != null) {
+          try {
+            await PrivateDataStorage.prepare(
+              source: retained,
+              target: appDataDirectory,
+              onCopying: () => runApp(
+                _RestoreProgressApp(
+                  stage: ValueNotifier(RestoreStartupStage.protectingData),
                 ),
-                restoreOutcome: restoreOutcome?.state,
+              ),
+            );
+          } catch (error, stackTrace) {
+            runApp(
+              _RestoreFailureApp(
+                report: StartupFailureReport.capture(
+                  stage: StartupFailureStage.databaseAdmission,
+                  error: error,
+                  step: 'private_storage_activation',
+                  stackTrace: stackTrace,
+                ),
+                appDataDirectory: appDataDirectory,
+                privateStorageSource: retained,
               ),
             );
             return;
           }
-          admissionStep = 'installation_gate';
-          final installationReceipt =
-              await DatabaseInstallationGate.ensureReady(
-                appDataDirectory: appDataDirectory,
-                allowDatabaseIdentityChange:
-                    restoreOutcome?.selectedComponents.contains(
-                      RestoreComponent.database,
-                    ) ??
-                    false,
-              );
-          admissionStep = 'empty_database_recovery_check';
-          if (restoreOutcome?.state == RestoreReceiptState.committed &&
-              restoreOutcome!.selectedComponents.contains(
-                RestoreComponent.database,
-              )) {
-            await EmptyDatabaseRecoveryGuard.acknowledge(appDataDirectory);
-          } else {
-            await EmptyDatabaseRecoveryGuard.check(
+        }
+        late final RestoreReceipt? restoreOutcome;
+        final restoreDiagnostics = RestoreStartupDiagnostics();
+        RestoreBusinessLease? businessLease;
+        // A restore large enough to take seconds would otherwise spend all of
+        // them before the first frame, which is indistinguishable from a hang.
+        // Only paint when there is actually work waiting: an ordinary launch
+        // must not pay for a frame it immediately replaces.
+        final restoreStage =
+            await RestoreStartupGate.hasPendingWork(
               appDataDirectory: appDataDirectory,
-              databaseId: installationReceipt.databaseId,
-            );
-          }
-          final databaseFile = File(
-            '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
-          );
-          admissionStep = 'gateway_open';
-          final databaseLease = await ChatDatabaseGateway.instance.acquire(
-            databaseFile,
-          );
+            )
+            ? ValueNotifier(RestoreStartupStage.checkingBackup)
+            : null;
+        if (restoreStage != null) {
+          await _initRestoreFailureWindow();
+          runApp(_RestoreProgressApp(stage: restoreStage));
+        }
+        while (true) {
           try {
-            admissionStep = 'business_migration';
-            final legacyPreferences =
-                await SharedPreferencesLegacyBusinessPreferences.open();
-            final loadedBusinessPreferences =
-                await BusinessStartupGate.migrateAndLoad(
-                  repository: databaseLease.businessRepository,
-                  legacyPreferences: legacyPreferences,
-                );
-            processDatabaseLease = databaseLease;
-            businessPreferences = loadedBusinessPreferences;
-          } catch (_) {
-            await databaseLease.release();
-            rethrow;
-          }
-          break;
-        } catch (error, stackTrace) {
-          stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
-          if (!recoveryAttempted) {
-            recoveryAttempted = true;
-            final recovery = await _recoverFailedAdmission(
-              appDataDirectory,
-              error,
+            // The lease remains process-owned through its internal registry until
+            // process exit, preventing another instance from racing business I/O.
+            businessLease ??= await RestoreBusinessLease.acquire(
+              appDataDirectory: appDataDirectory,
             );
-            if (recovery == _AdmissionRecovery.remigrate) {
+            restoreOutcome =
+                await RestoreStartupGate.recoverAndRequireBusinessReady(
+                  appDataDirectory: appDataDirectory,
+                  businessLease: businessLease,
+                  diagnostics: restoreDiagnostics,
+                  onStage: restoreStage == null
+                      ? null
+                      : (stage) => restoreStage.value = stage,
+                );
+            break;
+          } catch (error, stackTrace) {
+            stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
+            await _initRestoreFailureWindow();
+            final report = StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+              step: 'recover_and_require_business_ready',
+              stackTrace: stackTrace,
+              restoreDetails: restoreDiagnostics.details,
+            );
+            final retry = report.blockedRestoreDirectory == null
+                ? null
+                : Completer<void>();
+            runApp(
+              _RestoreFailureApp(
+                key: ObjectKey(report),
+                report: report,
+                appDataDirectory: appDataDirectory,
+                businessLease: businessLease,
+                retryRestore: retry == null
+                    ? null
+                    : () async {
+                        if (!retry.isCompleted) retry.complete();
+                      },
+              ),
+            );
+            if (retry == null) return;
+            await retry.future;
+            if (restoreStage != null) {
+              restoreStage.value = RestoreStartupStage.checkingBackup;
+              runApp(_RestoreProgressApp(stage: restoreStage));
+            }
+          }
+        }
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
+          await FlutterLogger.setEnabled(enabled);
+        } catch (_) {}
+        // Trim Flutter global image cache to reduce memory pressure from large images
+        try {
+          PaintingBinding.instance.imageCache.maximumSize = 200;
+          PaintingBinding.instance.imageCache.maximumSizeBytes =
+              48 << 20; // ~48MB
+        } catch (_) {}
+        // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
+        if (defaultTargetPlatform != TargetPlatform.linux) {
+          await _initDesktopWindow();
+        }
+        // Avoid preloading all system fonts at launch (huge memory on desktop)
+        // Debug logging and global error handlers were enabled previously for diagnosis.
+        // They are commented out now per request to reduce log noise.
+        // FlutterError.onError = (FlutterErrorDetails details) { ... };
+        // WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) { ... };
+        // logging.Logger.root.level = logging.Level.ALL;
+        // logging.Logger.root.onRecord.listen((rec) { ... });
+        // Cache current Documents directory to fix sandboxed absolute paths on iOS
+        await SandboxPathResolver.init();
+        ChatDatabaseLease? processDatabaseLease;
+        BusinessPreferences? businessPreferences;
+        var recoveryAttempted = false;
+        // Every call below can fail through drift's worker isolate, which erases
+        // the distinction between them. Naming the current one is what lets the
+        // failure screen say where startup actually stopped.
+        var admissionStep = 'legacy_migration_check';
+        while (true) {
+          try {
+            admissionStep = 'legacy_migration_check';
+            final migrationDecision =
+                await HiveToSqliteMigrationService.check();
+            if (migrationDecision.needsMigration) {
+              await _initRestoreFailureWindow();
               runApp(
                 MigrationApp(
                   service: HiveToSqliteMigrationService(
-                    _legacyMigrationDecision(appDataDirectory),
+                    migrationDecision,
                     businessLease: businessLease,
                   ),
                   restoreOutcome: restoreOutcome?.state,
@@ -457,52 +398,135 @@ Future<void> main() async {
               );
               return;
             }
-          }
-          await _initRestoreFailureWindow();
-          runApp(
-            _RestoreFailureApp(
-              report: StartupFailureReport.capture(
-                stage: StartupFailureStage.databaseAdmission,
-                error: error,
-                step: admissionStep,
-                stackTrace: stackTrace,
+            admissionStep = 'installation_gate';
+            final installationReceipt =
+                await DatabaseInstallationGate.ensureReady(
+                  appDataDirectory: appDataDirectory,
+                  allowDatabaseIdentityChange:
+                      restoreOutcome?.selectedComponents.contains(
+                        RestoreComponent.database,
+                      ) ??
+                      false,
+                );
+            admissionStep = 'empty_database_recovery_check';
+            if (restoreOutcome?.state == RestoreReceiptState.committed &&
+                restoreOutcome!.selectedComponents.contains(
+                  RestoreComponent.database,
+                )) {
+              await EmptyDatabaseRecoveryGuard.acknowledge(appDataDirectory);
+            } else {
+              await EmptyDatabaseRecoveryGuard.check(
+                appDataDirectory: appDataDirectory,
+                databaseId: installationReceipt.databaseId,
+              );
+            }
+            final databaseFile = File(
+              '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
+            );
+            admissionStep = 'gateway_open';
+            final databaseLease = await ChatDatabaseGateway.instance.acquire(
+              databaseFile,
+            );
+            try {
+              admissionStep = 'business_migration';
+              final legacyPreferences =
+                  await SharedPreferencesLegacyBusinessPreferences.open();
+              final loadedBusinessPreferences =
+                  await BusinessStartupGate.migrateAndLoad(
+                    repository: databaseLease.businessRepository,
+                    legacyPreferences: legacyPreferences,
+                  );
+              processDatabaseLease = databaseLease;
+              businessPreferences = loadedBusinessPreferences;
+            } catch (_) {
+              await databaseLease.release();
+              rethrow;
+            }
+            break;
+          } catch (error, stackTrace) {
+            stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
+            if (!recoveryAttempted) {
+              recoveryAttempted = true;
+              final recovery = await _recoverFailedAdmission(
+                appDataDirectory,
+                error,
+              );
+              if (recovery == _AdmissionRecovery.remigrate) {
+                await _initRestoreFailureWindow();
+                runApp(
+                  MigrationApp(
+                    service: HiveToSqliteMigrationService(
+                      _legacyMigrationDecision(appDataDirectory),
+                      businessLease: businessLease,
+                    ),
+                    restoreOutcome: restoreOutcome?.state,
+                  ),
+                );
+                return;
+              }
+            }
+            await _initRestoreFailureWindow();
+            runApp(
+              _RestoreFailureApp(
+                report: StartupFailureReport.capture(
+                  stage: StartupFailureStage.databaseAdmission,
+                  error: error,
+                  step: admissionStep,
+                  stackTrace: stackTrace,
+                ),
+                appDataDirectory: appDataDirectory,
+                businessLease: businessLease,
               ),
-              appDataDirectory: appDataDirectory,
-              businessLease: businessLease,
+            );
+            return;
+          }
+        }
+        if (defaultTargetPlatform == TargetPlatform.windows) {
+          try {
+            await (await WindowsDataDirectory.instance).confirmStartup();
+          } catch (error) {
+            // Keep the retained source when confirmation cannot be persisted.
+            stderr.writeln('[DataDirectoryConfirmation] $error');
+          }
+        }
+        // Desktop exit hook: stop producers, drain writes, then close SQLite.
+        final chatService = ChatService(
+          existingRepository: processDatabaseLease.chatRepository,
+        );
+        _installExitFlush(businessPreferences, chatService);
+        ScheduledTasksService.configureDevice(businessPreferences);
+        // Best-effort trim of archived restore runs after a few cold starts.
+        unawaited(_pruneRestoreArchive(appDataDirectory));
+        unawaited(ModelCatalogService.instance.maybeAutoRefresh());
+        // Enable edge-to-edge to allow content under system bars (Android)
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        // Start app (Flutter log capture is toggleable and off by default)
+        runApp(
+          MyApp(
+            databaseLease: processDatabaseLease,
+            chatService: chatService,
+            businessPreferences: businessPreferences,
+            appDataDirectory: appDataDirectory,
+            restoreOutcome: restoreOutcome?.state,
+          ),
+        );
+      } catch (error, stackTrace) {
+        if (!DesktopStartupService.isDesktop) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        stderr.writeln('[DesktopStartup] $error\n$stackTrace');
+        await _initRestoreFailureWindow();
+        runApp(
+          _RestoreFailureApp(
+            report: StartupFailureReport.capture(
+              stage: StartupFailureStage.databaseAdmission,
+              step: 'desktop_initialization',
+              error: error,
+              stackTrace: stackTrace,
             ),
-          );
-          return;
-        }
+          ),
+        );
       }
-      if (defaultTargetPlatform == TargetPlatform.windows) {
-        try {
-          await (await WindowsDataDirectory.instance).confirmStartup();
-        } catch (error) {
-          // Keep the retained source when confirmation cannot be persisted.
-          stderr.writeln('[DataDirectoryConfirmation] $error');
-        }
-      }
-      // Desktop exit hook: stop producers, drain writes, then close SQLite.
-      final chatService = ChatService(
-        existingRepository: processDatabaseLease.chatRepository,
-      );
-      _installExitFlush(businessPreferences, chatService);
-      ScheduledTasksService.configureDevice(businessPreferences);
-      // Best-effort trim of archived restore runs after a few cold starts.
-      unawaited(_pruneRestoreArchive(appDataDirectory));
-      unawaited(ModelCatalogService.instance.maybeAutoRefresh());
-      // Enable edge-to-edge to allow content under system bars (Android)
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      // Start app (Flutter log capture is toggleable and off by default)
-      runApp(
-        MyApp(
-          databaseLease: processDatabaseLease,
-          chatService: chatService,
-          businessPreferences: businessPreferences,
-          appDataDirectory: appDataDirectory,
-          restoreOutcome: restoreOutcome?.state,
-        ),
-      );
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -563,6 +587,7 @@ HiveToSqliteMigrationDecision _legacyMigrationDecision(
 }
 
 Future<void> _initRestoreFailureWindow() async {
+  DesktopStartupService.cancelDeferredLaunch();
   if (kIsWeb) return;
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.windows ||
@@ -670,16 +695,12 @@ Future<void> _initDesktopWindow() async {
     await DesktopWindowController.instance.initializeAndShow(
       title: 'Kelivo',
       linuxHideTitleBar: linuxHideTitleBar,
+      show: !DesktopStartupService.deferWindow,
     );
   } catch (_) {
-    // A failed preference/geometry restore must not leave Linux invisible.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
-      try {
-        await windowManager.show();
-        await windowManager.focus();
-      } catch (_) {}
-    }
-    // Ignore on unsupported platforms.
+    // Native runners can start hidden; a failed geometry restore must still
+    // leave a visible window on every desktop platform.
+    await _initRestoreFailureWindow();
   }
 }
 
@@ -1282,13 +1303,30 @@ class MyApp extends StatelessWidget {
                                 defaultTargetPlatform == TargetPlatform.linux);
                         if (!isDesktop) return;
                         final sp = ctx.read<SettingsProvider>();
-                        await DesktopTrayController.instance.syncFromSettings(
+                        await sp.loaded;
+                        final tray = DesktopTrayController.instance;
+                        await tray.syncFromSettings(
                           l10n,
                           showTray: sp.desktopShowTray,
                           minimizeToTrayOnClose:
                               sp.desktopMinimizeToTrayOnClose,
                         );
-                      } catch (_) {}
+                        if (DesktopStartupService.finishLaunch(
+                          hideToTray: sp.desktopAutostartHidden,
+                          trayReady:
+                              sp.desktopShowTray &&
+                              tray.isReady &&
+                              (!DesktopStartupService.deferWindow ||
+                                  await DesktopStartupService.hasTrayHost()),
+                        )) {
+                          await windowManager.show();
+                          await windowManager.focus();
+                        }
+                      } catch (_) {
+                        if (DesktopStartupService.deferWindow) {
+                          await _initRestoreFailureWindow();
+                        }
+                      }
                     });
                   }
 

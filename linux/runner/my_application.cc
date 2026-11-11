@@ -49,6 +49,11 @@ static GdkPixbuf* load_window_icon() {
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+  GList* windows = gtk_application_get_windows(GTK_APPLICATION(application));
+  if (windows != nullptr) {
+    gtk_window_present(GTK_WINDOW(windows->data));
+    return;
+  }
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   gtk_window_set_icon_name(window, "kelivo");
@@ -102,6 +107,41 @@ static void my_application_activate(GApplication* application) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  g_autoptr(FlStandardMethodCodec) startup_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) startup_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "app.desktop_startup", FL_METHOD_CODEC(startup_codec));
+  fl_method_channel_set_method_call_handler(startup_channel,
+      [](FlMethodChannel*, FlMethodCall* call, gpointer) {
+        if (g_strcmp0(fl_method_call_get_name(call), "hasTrayHost") != 0) {
+          fl_method_call_respond_not_implemented(call, nullptr);
+          return;
+        }
+        // Creating an AppIndicator succeeds even when GNOME has no tray host.
+        // Never silently hide the only window in that environment.
+        g_autoptr(GError) error = nullptr;
+        g_autoptr(GDBusConnection) bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+        gboolean available = FALSE;
+        if (bus != nullptr) {
+          g_autoptr(GVariant) reply = g_dbus_connection_call_sync(
+              bus, "org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher",
+              "org.freedesktop.DBus.Properties", "Get",
+              g_variant_new("(ss)", "org.kde.StatusNotifierWatcher", "IsStatusNotifierHostRegistered"),
+              G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, 1000, nullptr, &error);
+          if (reply != nullptr) {
+            GVariant* value = nullptr;
+            g_variant_get(reply, "(v)", &value);
+            if (g_variant_is_of_type(value, G_VARIANT_TYPE_BOOLEAN)) {
+              available = g_variant_get_boolean(value);
+            }
+            g_variant_unref(value);
+          }
+        }
+        g_autoptr(FlValue) value = fl_value_new_bool(available);
+        fl_method_call_respond_success(call, value, nullptr);
+      }, nullptr, nullptr);
+
 
   // logind reports system suspend/hibernate, independently of Flutter focus.
   if (self->power_proxy == nullptr) {
@@ -244,23 +284,23 @@ static void my_application_activate(GApplication* application) {
   }, nullptr, nullptr);
 }
 
-// Implements GApplication::local_command_line.
-static gboolean my_application_local_command_line(GApplication* application, gchar*** arguments, int* exit_status) {
+// Forward later launches to the primary process instead of opening another DB.
+static int my_application_command_line(GApplication* application,
+                                       GApplicationCommandLine* command_line) {
   MyApplication* self = MY_APPLICATION(application);
-  // Strip out the first argument as it is the binary name.
-  self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
-
-  g_autoptr(GError) error = nullptr;
-  if (!g_application_register(application, nullptr, &error)) {
-     g_warning("Failed to register: %s", error->message);
-     *exit_status = 1;
-     return TRUE;
+  int argc = 0;
+  g_auto(GStrv) arguments = g_application_command_line_get_arguments(command_line, &argc);
+  bool autostart = false;
+  for (int i = 1; i < argc; ++i) {
+    if (g_strcmp0(arguments[i], "--autostart") == 0) autostart = true;
   }
-
+  if (gtk_application_get_windows(GTK_APPLICATION(application)) != nullptr) {
+    if (!autostart) g_application_activate(application);
+    return 0;
+  }
+  self->dart_entrypoint_arguments = g_strdupv(arguments + 1);
   g_application_activate(application);
-  *exit_status = 0;
-
-  return TRUE;
+  return 0;
 }
 
 // Implements GApplication::startup.
@@ -294,7 +334,7 @@ static void my_application_dispose(GObject* object) {
 
 static void my_application_class_init(MyApplicationClass* klass) {
   G_APPLICATION_CLASS(klass)->activate = my_application_activate;
-  G_APPLICATION_CLASS(klass)->local_command_line = my_application_local_command_line;
+  G_APPLICATION_CLASS(klass)->command_line = my_application_command_line;
   G_APPLICATION_CLASS(klass)->startup = my_application_startup;
   G_APPLICATION_CLASS(klass)->shutdown = my_application_shutdown;
   G_OBJECT_CLASS(klass)->dispose = my_application_dispose;
@@ -311,6 +351,6 @@ MyApplication* my_application_new() {
 
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID,
-                                     "flags", G_APPLICATION_NON_UNIQUE,
+                                     "flags", G_APPLICATION_HANDLES_COMMAND_LINE,
                                      nullptr));
 }

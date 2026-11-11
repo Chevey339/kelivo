@@ -73,6 +73,46 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
   }
 
+  windowsTest('hidden startup defers maximizing until the window is focused', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'window_maximized_v1': true});
+    await controller.initializeAndShow(show: false);
+    await ready!();
+    expect(window.calls, isNot(contains('maximize')));
+    expect(window.calls, isNot(contains('show')));
+    expect(window.calls, isNot(contains('focus')));
+    controller.onWindowFocus();
+    await tester.pump();
+    expect(window.maximized, isTrue);
+    final maximizations = window.calls
+        .where((call) => call == 'maximize')
+        .length;
+    controller.onWindowFocus();
+    await tester.pump();
+    expect(
+      window.calls.where((call) => call == 'maximize').length,
+      maximizations,
+    );
+  });
+
+  windowsTest(
+    'focus before the first rasterized frame still restores maximization',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'window_maximized_v1': true});
+      await controller.initializeAndShow(show: false);
+      controller.onWindowFocus();
+      await tester.pump();
+      expect(window.calls, isNot(contains('maximize')));
+      await ready!();
+      expect(window.maximized, isTrue);
+      expect(
+        window.calls.indexOf('restoreBounds'),
+        lessThan(window.calls.indexOf('maximize')),
+      );
+    },
+  );
+
   windowsTest('obsolete right-screen position is safely restored', (
     tester,
   ) async {

@@ -17030,4 +17030,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => 'Сохранить';
+
+  @override
+  String get desktopAutostartTitle => 'Запускать при входе';
+
+  @override
+  String get desktopAutostartDescription =>
+      'Запускать Kelivo при входе в систему на этом компьютере.';
+
+  @override
+  String get desktopAutostartHiddenTitle => 'Скрывать в трей при автозапуске';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      'Требуется автозапуск и значок в трее. При ручном запуске Kelivo окно всё равно отображается.';
+
+  @override
+  String get desktopAutostartUnsupported =>
+      'Автозапуск требует macOS 13 или новее.';
+
+  @override
+  String get desktopAutostartError =>
+      'Не удалось применить настройку автозапуска. Проверьте Kelivo в настройках автозагрузки или элементов входа системы и повторите попытку.';
 }

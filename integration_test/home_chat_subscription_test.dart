@@ -63,7 +63,7 @@ void main() {
     );
     await repo.close();
     try {
-      await app.main();
+      await app.main(const []);
       final finder = find.byType(MessageListView);
       for (var i = 0; i < 200 && finder.evaluate().isEmpty; i++) {
         await tester.pump(const Duration(milliseconds: 100));

@@ -4890,5 +4890,11 @@
   "workspaceEnvNativeShellInvalid": "無法啟動此 Shell，請檢查絕對路徑及其支援的命令語法。",
   "workspaceEnvNativeShellUnavailable": "Shell 無法使用",
   "workspaceEnvNativeShellDetect": "重新偵測",
-  "workspaceEnvNativeShellSave": "儲存"
+  "workspaceEnvNativeShellSave": "儲存",
+  "desktopAutostartTitle": "開機時啟動",
+  "desktopAutostartDescription": "登入這台電腦後自動啟動 Kelivo。",
+  "desktopAutostartHiddenTitle": "自動啟動後隱藏至系統匣",
+  "desktopAutostartHiddenDescription": "需要開啟開機時啟動及系統匣圖示。手動開啟 Kelivo 時仍會顯示視窗。",
+  "desktopAutostartUnsupported": "開機時啟動需要 macOS 13 或以上版本。",
+  "desktopAutostartError": "無法套用啟動設定。請檢查系統啟動項目或登入項目中的 Kelivo 設定後再試一次。"
 }

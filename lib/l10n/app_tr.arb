@@ -4890,5 +4890,11 @@
   "workspaceEnvNativeShellInvalid": "Bu kabuk başlatılamadı. Mutlak yolunu ve desteklenen komut sözdizimini kontrol edin.",
   "workspaceEnvNativeShellUnavailable": "Kabuk kullanılamıyor",
   "workspaceEnvNativeShellDetect": "Yeniden algıla",
-  "workspaceEnvNativeShellSave": "Kaydet"
+  "workspaceEnvNativeShellSave": "Kaydet",
+  "desktopAutostartTitle": "Başlangıçta başlat",
+  "desktopAutostartDescription": "Bu bilgisayarda oturum açtığınızda Kelivo'yu başlat.",
+  "desktopAutostartHiddenTitle": "Otomatik başlatmada tepsiye gizle",
+  "desktopAutostartHiddenDescription": "Başlangıçta başlatma ve tepsi simgesi gerektirir. Kelivo'yu elle açtığınızda pencere yine görünür.",
+  "desktopAutostartUnsupported": "Başlangıçta başlatma için macOS 13 veya üstü gerekir.",
+  "desktopAutostartError": "Başlangıç ayarı uygulanamadı. Sistem başlangıç veya oturum açma öğeleri ayarlarında bu uygulamayı kontrol edip tekrar deneyin."
 }

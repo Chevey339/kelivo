@@ -4890,5 +4890,11 @@
   "workspaceEnvNativeShellInvalid": "9088b8002f0d1c1495373035ef8f35b4c5cadc2578a36c8cd6fc2f7155f22920",
   "workspaceEnvNativeShellUnavailable": "b55a490f465b29ebbf46a510599d1f59da94e4e98fe09cdd8d79321fbbc105f7",
   "workspaceEnvNativeShellDetect": "c4b77f8f1d163d0a629ec38eaf938ccd4c005c69f147616eacdb0f206de0dd7c",
-  "workspaceEnvNativeShellSave": "e7e9a6d39f6d43e2ece3d5311fe2c1d3509469f9cdb5489c9b5dd659a517e98c"
+  "workspaceEnvNativeShellSave": "e7e9a6d39f6d43e2ece3d5311fe2c1d3509469f9cdb5489c9b5dd659a517e98c",
+  "desktopAutostartTitle": "6d37effdbfd54c6a31e00a39ea8e697e54cc15edfe83236aeb8e670d3319f166",
+  "desktopAutostartDescription": "5e71d91d42baa7621e3c83988b6437dec5ec18cac2d44d466a34fb87eb2cc3a5",
+  "desktopAutostartHiddenTitle": "75df26d9c9e0932b906a36d4f33de8848351eb813b8f53ea4bba06a83aa53f89",
+  "desktopAutostartHiddenDescription": "6d945ef26b9df5005fe65b2b9c1f7f744cd7082511167954661700524f65963e",
+  "desktopAutostartUnsupported": "d14cfe214cd9e45727169b9595d22a0d10cb3aa617b0efde8edafce28f215d97",
+  "desktopAutostartError": "f916f30147f302acd6da4952ebb02236fc8bab158a2c367fe0496a9950e11589"
 }
