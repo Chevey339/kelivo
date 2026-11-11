@@ -1026,11 +1026,11 @@ Inline ***strong emphasis*** text.
       );
       expect(
         (container.foregroundDecoration as BoxDecoration).borderRadius,
-        BorderRadius.circular(MarkstreamTheme.radiusMd),
+        BorderRadius.circular(16),
       );
       expect(
         tester.getRect(_action(MarkstreamActionKind.copyCode)).right,
-        closeTo(tester.getRect(surface).right - 4, .1),
+        closeTo(tester.getRect(surface).right - 12, .1),
       );
       expect(
         tester.getRect(find.byTooltip('Save as file')).right,
@@ -4800,13 +4800,15 @@ press5
       );
     });
 
-    testWidgets('code block fill is composited with surface', (tester) async {
+    testWidgets('default code block retains its original translucent fill', (
+      tester,
+    ) async {
       await tester.pumpWidget(_markdownHarness('```dart\nvoid main() {}\n```'));
       await tester.pump();
 
       final block = find.byKey(const ValueKey('markstream-code-surface'));
       expect(block, findsOneWidget);
-      expect(fillAlpha(tester, block), 1);
+      expect(fillAlpha(tester, block), .8);
     });
 
     testWidgets('inline code fill is translucent in light mode', (

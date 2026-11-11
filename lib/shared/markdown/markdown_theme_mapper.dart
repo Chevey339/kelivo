@@ -38,22 +38,22 @@ MarkstreamTheme mapMarkdownTheme(
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows;
   final backdrop = resolveMarkdownBackdrop(context, settings);
-  final customBackground = backdrop == MarkstreamBackdrop.plain
+  final customBackground = ExportCaptureScope.of(context)
       ? null
       : MarkdownSurfaceScope.maybeOf(context)?.customBackground;
   if (backdrop != MarkstreamBackdrop.plain) {
     if (customBackground != null) {
       // Fixed syntax colors need a near-dark or near-light block surface, even
-      // over arbitrary wallpaper. Retain the bubble's hue, not its midtones.
+      // over arbitrary wallpaper. Retain the bubble's hue, but always follow
+      // the app's brightness rather than inferring it from the bubble color.
       final tone = surfaceTone(customBackground);
-      final dark = tone < 50;
+      final dark = scheme.brightness == Brightness.dark;
       final blockTone = dark ? tone.clamp(0.0, 5.0) : tone.clamp(98.0, 100.0);
       scheme = scheme.copyWith(
         surface: blockTone == tone
             ? customBackground
             : atTone(customBackground, blockTone),
         onSurface: dark ? Colors.white : Colors.black,
-        brightness: dark ? Brightness.dark : Brightness.light,
       );
     }
   }
@@ -63,6 +63,12 @@ MarkstreamTheme mapMarkdownTheme(
     maskStrength: backdrop == MarkstreamBackdrop.plain
         ? 1
         : settings.chatBackgroundMaskStrength,
+    // Fixed syntax colors need an opaque surface over arbitrary custom
+    // bubbles, including diagram source tabs that use the shared palette.
+    blockBackgroundColor:
+        customBackground == null || backdrop == MarkstreamBackdrop.plain
+        ? null
+        : scheme.surface,
     bodyStyle: body,
     desktop: desktop,
     codeFontFamily: (settings.codeFontFamily?.isNotEmpty ?? false)
@@ -76,6 +82,7 @@ MarkstreamTheme mapMarkdownTheme(
         theme,
         scheme,
         customSurface: customBackground != null,
+        exporting: ExportCaptureScope.of(context),
       ),
     );
   }
@@ -106,6 +113,7 @@ CodeBlockTheme _legacyCodeBlockTheme(
   MarkstreamTheme theme,
   ColorScheme scheme, {
   required bool customSurface,
+  required bool exporting,
 }) {
   final dark = theme.brightness == Brightness.dark;
   final outline = scheme.outlineVariant;
@@ -117,6 +125,7 @@ CodeBlockTheme _legacyCodeBlockTheme(
       : outline;
   // Custom chat colors still need the paired block surface/ink resolved above.
   // Other surfaces retain the original theme-container colors and 80% fill.
+  final fillAlpha = exporting ? 1.0 : .8;
   return theme.code.copyWith(
     text: theme.code.text.copyWith(fontSize: 13, height: 1.5),
     margin: const EdgeInsets.symmetric(vertical: 6),
@@ -125,15 +134,15 @@ CodeBlockTheme _legacyCodeBlockTheme(
     actionSpacing: 16,
     radius: 16,
     backgroundColor: customSurface
-        ? theme.colors.fillBlock
-        : scheme.surfaceContainer.withValues(alpha: .8),
+        ? theme.code.backgroundColor
+        : scheme.surfaceContainer.withValues(alpha: fillAlpha),
     borderColor: customSurface ? theme.colors.border : border,
     chrome: theme.code.chrome.copyWith(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       background:
           (customSurface ? scheme.surface : scheme.surfaceContainerHighest)
-              .withValues(alpha: .8),
+              .withValues(alpha: fillAlpha),
       divider: Colors.transparent,
       label: theme.code.chrome.label.copyWith(
         fontSize: 12,

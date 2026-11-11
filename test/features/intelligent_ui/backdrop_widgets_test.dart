@@ -293,7 +293,19 @@ planField = Select(label="Plan",bind=$plan,options=[{"value":"a","label":"Plan A
         await tester.pumpAndSettle();
         expect(
           tester.widget<Text>(find.text('Plan A')).style!.color,
-          ink.withValues(alpha: .88),
+          (dark ? Colors.white : Colors.black).withValues(alpha: .88),
+        );
+        final native = palette(tester);
+        expect(
+          native.markdown.brightness,
+          dark ? Brightness.dark : Brightness.light,
+        );
+        expect(
+          _contrast(
+            tester.widget<Text>(find.text('Plan A')).style!.color!,
+            Color.alphaBlend(native.fill, native.surface),
+          ),
+          greaterThanOrEqualTo(4.5),
         );
         final menu = tester.widget<DesktopSelectDropdown<Object?>>(
           find.byType(DesktopSelectDropdown<Object?>),
@@ -389,22 +401,41 @@ planField = Select(label="Plan",bind=$plan,options=[{"value":"a","label":"Plan A
     });
 
     testWidgets(
-      'custom bubble ink survives inline; export uses app colors, dark=$dark',
+      'custom bubble prose retains its ink; blocks and exports follow app brightness, dark=$dark',
       (tester) async {
         final background = dark ? Colors.white : Colors.black;
         final ink = dark ? Colors.black : Colors.white;
+        late MarkstreamTheme markdown;
         await tester.pumpWidget(
           app(
-            (theme) =>
-                GenUiSurface(controller: controller, markdownTheme: theme),
+            (theme) {
+              markdown = theme;
+              return GenUiSurface(controller: controller, markdownTheme: theme);
+            },
             dark: dark,
             customBackground: background,
             customInk: ink,
           ),
         );
         await tester.pumpAndSettle();
-        expect(palette(tester).ink, ink);
-        expect(palette(tester).surface.withValues(alpha: 1), background);
+        expect(markdown.body.color, ink);
+        final native = palette(tester);
+        expect(native.ink, dark ? Colors.white : Colors.black);
+        expect(native.surface.a, 1);
+        expect(
+          ThemeData.estimateBrightnessForColor(native.surface),
+          dark ? Brightness.dark : Brightness.light,
+        );
+        expect(
+          _contrast(
+            tester
+                .widget<EditableText>(find.text('Native content'))
+                .style
+                .color!,
+            native.surface,
+          ),
+          greaterThanOrEqualTo(7),
+        );
         await tester.pumpWidget(
           app(
             (theme) => GenUiSurface(

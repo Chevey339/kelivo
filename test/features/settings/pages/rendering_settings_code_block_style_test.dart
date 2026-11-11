@@ -4,25 +4,49 @@ import 'package:Kelivo/features/settings/pages/display_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const startupChannel = MethodChannel('app.desktop_startup');
+  const hapticsChannel = MethodChannel('haptic_feedback');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          startupChannel,
+          (_) async => {'supported': false, 'enabled': false},
+        );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(hapticsChannel, (_) async => null);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(startupChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(hapticsChannel, null);
+  });
   for (final desktop in [false, true]) {
     testWidgets(
-      'rendering settings opt in to legacy code block: desktop=$desktop',
+      'rendering settings retain legacy code blocks by default: desktop=$desktop',
       (tester) async {
         tester.view.physicalSize = desktop
             ? const Size(1400, 900)
             : const Size(390, 844);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final preferences = createBusinessTestPreferences();
-        final settings = SettingsProvider(preferences);
+        final harness = (await tester.runAsync(() async {
+          final preferences = createBusinessTestPreferences();
+          final settings = SettingsProvider(preferences);
+          await settings.loaded;
+          return (preferences: preferences, settings: settings);
+        }))!;
+        final preferences = harness.preferences;
+        final settings = harness.settings;
         addTearDown(settings.dispose);
-        await settings.loaded;
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: settings,
@@ -61,9 +85,12 @@ void main() {
           ),
           matching: find.byType(IosSwitch),
         );
-        expect(tester.widget<IosSwitch>(toggle).value, isFalse);
-        for (final enabled in [true, false]) {
-          await tester.tap(toggle);
+        expect(tester.widget<IosSwitch>(toggle).value, isTrue);
+        for (final enabled in [false, true]) {
+          await tester.runAsync(() async {
+            await tester.tap(toggle);
+            await preferences.flushPendingWrites();
+          });
           await tester.pumpAndSettle();
           expect(settings.useLegacyCodeBlockStyle, enabled);
           expect(settings.useLegacyInlineCodeStyle, isFalse);

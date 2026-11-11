@@ -8,6 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_surface.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
+import 'package:Kelivo/shared/markdown/diagram_code_blocks.dart';
 import 'package:Kelivo/shared/markdown/kelivo_markdown_extensions.dart';
 import 'package:Kelivo/shared/markdown/markdown_surface_scope.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
@@ -104,6 +105,162 @@ void main() {
     final scheme = dark
         ? ThemePalettes.defaultPalette.dark
         : ThemePalettes.defaultPalette.light;
+    testWidgets(
+      'custom bubbles keep code readable in the app brightness, dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(settings.dispose);
+        for (final style in [
+          ChatMessageBackgroundStyle.frosted,
+          ChatMessageBackgroundStyle.solid,
+        ]) {
+          await settings.setChatMessageBackgroundStyle(style);
+          for (final legacy in [false, true]) {
+            await settings.setUseLegacyCodeBlockStyle(legacy);
+            for (final background in [0xff80a6ad, 0xffffffff, 0xff000000]) {
+              await settings.setChatBubbleStyleOverrides(
+                ChatBubbleStyleOverrides(
+                  backgroundArgbLight: background,
+                  backgroundArgbDark: background,
+                  frostedOpacity: .66,
+                  solidOpacity: 1,
+                ),
+              );
+              for (final wallpaper in [false, true]) {
+                final code = await _mount(
+                  tester,
+                  settings,
+                  scheme,
+                  wallpaper: wallpaper,
+                  source:
+                      "```dart\n// comment\nfinal count = 1;\nfinal text = 'value';\n```",
+                );
+                final reason =
+                    '$style legacy=$legacy background=$background wallpaper=$wallpaper';
+                expect(
+                  code.theme.brightness,
+                  scheme.brightness,
+                  reason: reason,
+                );
+                final surface = tester.widget<Container>(
+                  find.byKey(const ValueKey('markstream-code-surface')),
+                );
+                final fill = (surface.decoration! as BoxDecoration).color!;
+                expect(
+                  ThemeData.estimateBrightnessForColor(fill),
+                  scheme.brightness,
+                  reason: reason,
+                );
+                final highlighted =
+                    renderParagraphs(
+                          find.byType(MarkstreamCodeContent),
+                        ).single.text
+                        as TextSpan;
+                final bubble = resolveBubbleStyle(
+                  scheme,
+                  scheme.brightness,
+                  style,
+                  settings.chatBubbleStyleOverrides,
+                ).background;
+                for (final underlay in [Colors.black, Colors.white]) {
+                  final visibleFill = Color.alphaBlend(
+                    fill,
+                    Color.alphaBlend(bubble, underlay),
+                  );
+                  expect(
+                    _contrast(code.theme.code.text.color!, visibleFill),
+                    greaterThanOrEqualTo(7),
+                    reason: reason,
+                  );
+                  for (final (text, ink) in _textInks(highlighted)) {
+                    if (text.trim().isEmpty) continue;
+                    expect(
+                      _contrast(ink, visibleFill),
+                      greaterThanOrEqualTo(4.5),
+                      reason: '$reason text=$text',
+                    );
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+    );
+    testWidgets(
+      'SVG source keeps syntax readable on custom bubbles, dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(settings.dispose);
+        debugMermaidBitmapRenderOverride = (_, __, ___) async =>
+            MermaidBitmapRenderResult.unsupported();
+        addTearDown(() => debugMermaidBitmapRenderOverride = null);
+        await settings.setChatMessageBackgroundStyle(
+          ChatMessageBackgroundStyle.solid,
+        );
+        final background = dark ? Colors.white : Colors.black;
+        await settings.setChatBubbleStyleOverrides(
+          ChatBubbleStyleOverrides(
+            backgroundArgbLight: background.toARGB32(),
+            backgroundArgbDark: background.toARGB32(),
+            solidOpacity: 1,
+          ),
+        );
+        for (final legacy in [false, true]) {
+          await settings.setUseLegacyCodeBlockStyle(legacy);
+          for (final wallpaper in [false, true]) {
+            await _mount(
+              tester,
+              settings,
+              scheme,
+              wallpaper: wallpaper,
+              source:
+                  '```dart\nfinal value = 1;\n```\n\n```svg\n<svg viewBox="0 0 20 20"><circle r="5" /></svg>\n```',
+            );
+            await tester.pump(const Duration(milliseconds: 240));
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.text('Code'));
+            await tester.tap(find.text('Code'));
+            await tester.pumpAndSettle();
+            final diagramFinder = find.byType(KelivoDiagramBlock);
+            final diagram = tester.widget<KelivoDiagramBlock>(diagramFinder);
+            final surface = tester.widget<Container>(
+              find
+                  .descendant(
+                    of: diagramFinder,
+                    matching: find.byWidgetPredicate(
+                      (widget) =>
+                          widget is Container &&
+                          widget.decoration is BoxDecoration &&
+                          (widget.decoration! as BoxDecoration).color ==
+                              diagram.theme.colors.fillBlock,
+                    ),
+                  )
+                  .first,
+            );
+            final fill = (surface.decoration! as BoxDecoration).color!;
+            final content = find.descendant(
+              of: diagramFinder,
+              matching: find.byType(MarkstreamCodeContent),
+            );
+            final highlighted =
+                renderParagraphs(content).single.text as TextSpan;
+            expect(highlighted.toPlainText(), contains('<svg'));
+            final visibleFill = Color.alphaBlend(fill, background);
+            for (final (text, ink) in _textInks(highlighted)) {
+              if (text.trim().isEmpty) continue;
+              expect(
+                _contrast(ink, visibleFill),
+                greaterThanOrEqualTo(4.5),
+                reason: 'legacy=$legacy wallpaper=$wallpaper text=$text',
+              );
+            }
+          }
+        }
+      },
+    );
     testWidgets('real bubble contexts retain contrast, dark=$dark', (
       tester,
     ) async {
@@ -193,11 +350,12 @@ void main() {
       ('blue', 0xff1e40af, 0xffffffff),
       ('amber', 0xffc57d22, 0xff000000),
     ]) {
-      testWidgets('bubble overrides keep code readable, '
+      testWidgets('bubble overrides keep modern code readable, '
           'dark=$dark colors=$name', (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
         await settings.loaded;
         addTearDown(settings.dispose);
+        await settings.setUseLegacyCodeBlockStyle(false);
         for (final style in [
           ChatMessageBackgroundStyle.frosted,
           ChatMessageBackgroundStyle.solid,
@@ -273,7 +431,7 @@ void main() {
                   reason: reason,
                 );
                 final header = Color.alphaBlend(
-                  code.theme.chrome.background,
+                  code.theme.code.chrome.background,
                   background,
                 );
                 expect(
@@ -282,7 +440,7 @@ void main() {
                   reason: reason,
                 );
                 expect(
-                  _contrast(code.theme.chrome.actionColor, header),
+                  _contrast(code.theme.code.chrome.actionColor, header),
                   greaterThanOrEqualTo(3),
                   reason: reason,
                 );
@@ -325,7 +483,7 @@ void main() {
                 as TextSpan;
         expect(rendered.toPlainText(), '分镜脚本\n镜头 01-1');
         expect(_textInks(rendered).map((s) => s.$2).toSet(), {
-          dark ? Colors.black : Colors.white,
+          dark ? Colors.white : Colors.black,
         });
         final image = tester.widget<Image>(find.byType(Image).first);
         final provider =
@@ -445,11 +603,12 @@ Code
     );
 
     testWidgets(
-      'custom bubble colors pair ink, syntax and opaque capture, dark=$dark',
+      'custom bubble colors pair modern ink, syntax and opaque capture, dark=$dark',
       (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
         await settings.loaded;
         addTearDown(settings.dispose);
+        await settings.setUseLegacyCodeBlockStyle(false);
         const overrides = ChatBubbleStyleOverrides(
           backgroundArgbLight: 0xff000000,
           textArgbLight: 0xffffffff,
@@ -474,14 +633,11 @@ Code
             expect(code.theme.body.color, customInk);
             expect(
               code.theme.code.text.color,
-              wallpaper ? customInk : scheme.onSurface,
-            );
-            expect(
-              code.theme.brightness,
               wallpaper
-                  ? (dark ? Brightness.light : Brightness.dark)
-                  : scheme.brightness,
+                  ? (dark ? Colors.white : Colors.black)
+                  : scheme.onSurface,
             );
+            expect(code.theme.brightness, scheme.brightness);
             expect(code.theme.colors.fillBlockOpaque.a, 1);
             final bubble = resolveBubbleStyle(
               scheme,
@@ -500,11 +656,18 @@ Code
                 code.theme.colors.fillBlock,
                 Color.alphaBlend(bubble, underlay),
               );
+              final codeBackground = Color.alphaBlend(
+                code.theme.code.backgroundColor,
+                Color.alphaBlend(bubble, underlay),
+              );
               expect(
                 _contrast(code.theme.colors.ink, background),
                 greaterThanOrEqualTo(7),
               );
-              expect(_contrast(keyword, background), greaterThanOrEqualTo(4.5));
+              expect(
+                _contrast(keyword, codeBackground),
+                greaterThanOrEqualTo(4.5),
+              );
               expect(
                 _contrast(code.theme.table.body.color!, background),
                 greaterThanOrEqualTo(4.5),

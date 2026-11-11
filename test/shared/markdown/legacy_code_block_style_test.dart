@@ -10,11 +10,25 @@ import 'package:Kelivo/shared/markdown/markdown_theme_mapper.dart';
 import 'package:Kelivo/shared/markdown/kelivo_markdown_extensions.dart'
     show markdownCodeOptions;
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 
 import '../../support/business_test_harness.dart';
 import 'markstream_adapters_test.dart' show host;
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const startupChannel = MethodChannel('app.desktop_startup');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          startupChannel,
+          (_) async => {'supported': false, 'enabled': false},
+        );
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(startupChannel, null);
+  });
   for (final wallpaper in [false, true]) {
     testWidgets(
       'code block preference leaves generated mono text unchanged: wallpaper=$wallpaper',
@@ -22,6 +36,7 @@ void main() {
         final settings = SettingsProvider(createBusinessTestPreferences());
         addTearDown(settings.dispose);
         await settings.loaded;
+        await settings.setUseLegacyCodeBlockStyle(false);
         await tester.pumpWidget(
           host(
             Builder(
@@ -63,11 +78,67 @@ void main() {
   }
   for (final dark in [false, true]) {
     testWidgets(
+      'original code appearance is the default with opaque exports: dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        expect(settings.useLegacyCodeBlockStyle, isTrue);
+        for (final exporting in [false, true]) {
+          await tester.pumpWidget(
+            host(
+              ExportCaptureScope(
+                enabled: exporting,
+                child: const MarkdownWithCodeHighlight(
+                  text: '```text\nOriginal code block\n```',
+                ),
+              ),
+              settings: settings,
+              dark: dark,
+              wallpaper: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final block = find.byType(MarkstreamCodeBlock);
+          final code = tester.widget<MarkstreamCodeBlock>(block).theme.code;
+          final scheme = Theme.of(tester.element(block)).colorScheme;
+          final alpha = exporting ? 1.0 : .8;
+          expect(code.text.fontSize, 13);
+          expect(code.text.height, 1.5);
+          expect(code.radius, 16);
+          expect(
+            code.bodyPadding,
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          );
+          expect(
+            tester
+                .getSize(find.byKey(const ValueKey('markstream-code-header')))
+                .height,
+            40,
+          );
+          expect(
+            code.backgroundColor,
+            scheme.surfaceContainer.withValues(alpha: alpha),
+          );
+          expect(
+            code.chrome.background,
+            scheme.surfaceContainerHighest.withValues(alpha: alpha),
+          );
+          expect(tester.takeException(), isNull);
+        }
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+      }),
+    );
+    testWidgets(
       'code block preference updates live without resetting content or other styles: dark=$dark',
       (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
         addTearDown(settings.dispose);
         await settings.loaded;
+        await settings.setUseLegacyCodeBlockStyle(false);
         await settings.setAutoCollapseCodeBlock(false);
         await settings.setAutoCollapseCodeBlockLines(2);
         final code = List.generate(8, (i) => 'final value$i = $i;').join('\n');

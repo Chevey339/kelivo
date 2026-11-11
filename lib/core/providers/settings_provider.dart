@@ -1178,7 +1178,7 @@ class SettingsProvider extends ChangeNotifier {
     _useLegacyInlineCodeStyle =
         prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
     _useLegacyCodeBlockStyle =
-        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? false;
+        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? true;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -5248,8 +5248,8 @@ Requirements:
     await _preferences.setBool(_displayUseLegacyInlineCodeStyleKey, value);
   }
 
-  // Display: opt in to the previous fenced code block appearance.
-  bool _useLegacyCodeBlockStyle = false;
+  // Display: retain the original fenced code block appearance by default.
+  bool _useLegacyCodeBlockStyle = true;
   bool get useLegacyCodeBlockStyle => _useLegacyCodeBlockStyle;
   Future<void> setUseLegacyCodeBlockStyle(bool value) async {
     if (_useLegacyCodeBlockStyle == value) return;
