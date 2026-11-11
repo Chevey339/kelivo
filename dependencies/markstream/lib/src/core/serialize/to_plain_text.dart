@@ -2,7 +2,7 @@ import '../ast/nodes.dart';
 import '../ast/source_span.dart';
 import '../text_index/text_index.dart';
 import 'common.dart';
-import '../html/html_fragment.dart' show htmlBlockTags;
+import '../html/html_fragment.dart' show htmlBlockTags, isNativeHtmlTableRow;
 
 /// Structural clipboard text. Generated separators do not define selection offsets.
 String toPlainText(MarkdownNode root) => _plainText(root, false).text;
@@ -129,6 +129,7 @@ _PlainText _plainText(MarkdownNode root, bool track) {
       if (node.tag == 'img') return literal(node.attributes['alt'] ?? '');
       if (node.tag == 'hr') return literal('---');
       if (node.tag == 'tr') {
+        if (!isNativeHtmlTableRow(node)) return writer.htmlFlow(node, output);
         return row(
           node.children
               .whereType<HtmlElementNode>()
@@ -137,33 +138,22 @@ _PlainText _plainText(MarkdownNode root, bool track) {
         );
       }
       if (const {'table', 'thead', 'tbody', 'tfoot'}.contains(node.tag)) {
-        return writer.join(
-          node.children.whereType<HtmlElementNode>().map(
-            (child) => output[child]!,
-          ),
-          '\n',
-          node,
-        );
+        return writer.htmlFlow(node, output, separator: '\n');
       }
       if (node.tag == 'ul' || node.tag == 'ol') {
-        final items = node.children
-            .whereType<HtmlElementNode>()
-            .where((child) => child.tag == 'li')
-            .toList();
-        final start = int.tryParse(node.attributes['start'] ?? '') ?? 1;
-        return writer.join(
-          [
-            for (var i = 0; i < items.length; i++)
-              writer.indent(
-                output[items[i]]!,
-                node.tag == 'ol' ? '${start + i}. ' : '- ',
-                '  ',
-                items[i],
-              ),
-          ],
-          '\n',
-          node,
-        );
+        var index = int.tryParse(node.attributes['start'] ?? '') ?? 1;
+        final contents = <MarkdownNode, _PlainText>{};
+        for (final child in node.children) {
+          contents[child] = child is HtmlElementNode && child.tag == 'li'
+              ? writer.indent(
+                  output[child]!,
+                  node.tag == 'ol' ? '${index++}. ' : '- ',
+                  '  ',
+                  child,
+                )
+              : output[child]!;
+        }
+        return writer.htmlFlow(node, contents, separator: '\n');
       }
       if (node.tag != 'pre' && htmlBlockTags.contains(node.tag))
         return writer.htmlFlow(node, output);
@@ -284,8 +274,9 @@ class _PlainWriter {
       : value;
   _PlainText htmlFlow(
     MarkdownNode parent,
-    Map<MarkdownNode, _PlainText> output,
-  ) {
+    Map<MarkdownNode, _PlainText> output, {
+    String separator = '\n\n',
+  }) {
     final values = <_PlainText>[];
     var previousBlock = false, hasText = false;
     final hasBlocks = parent.children.any(
@@ -294,11 +285,11 @@ class _PlainWriter {
     for (final node in parent.children) {
       final block = node is HtmlElementNode && htmlBlockTags.contains(node.tag);
       final text = output[node]!;
-      if (text.text.trim().isEmpty && hasBlocks) continue;
+      if (node is TextNode && text.text.trim().isEmpty && hasBlocks) continue;
       if (hasText && (block || previousBlock))
-        values.add(generated('\n\n', node));
+        values.add(generated(separator, node));
       values.add(text);
-      hasText = hasText || text.text.isNotEmpty;
+      hasText = hasText || block || text.text.isNotEmpty;
       previousBlock = block;
     }
     return join(values, '', parent);

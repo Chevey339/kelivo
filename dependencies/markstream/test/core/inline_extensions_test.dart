@@ -12,8 +12,9 @@ final class _CitationSyntax extends InlineSyntax {
   Set<int> get startCharacters => const {91};
   @override
   InlineSyntaxMatch? match(InlineSyntaxContext context, int offset) {
-    final match = RegExp(r'\[cite:([a-z0-9]+)\]')
-        .matchAsPrefix(context.text, offset);
+    final match = RegExp(
+      r'\[cite:([a-z0-9]+)\]',
+    ).matchAsPrefix(context.text, offset);
     if (match == null) return null;
     return InlineSyntaxMatch(
       end: match.end,
@@ -66,9 +67,9 @@ void main() {
     );
     expect(parser.parse(r'$x').map(textOf).join(), r'$x');
     expect(
-      const InlineParser(options: ParserOptions.commonMark())
-          .parse(r'$x$')
-          .single,
+      const InlineParser(
+        options: ParserOptions.commonMark(),
+      ).parse(r'$x$').single,
       isA<TextNode>(),
     );
   });
@@ -101,24 +102,30 @@ void main() {
     expect(parser.parse(':smile:').map(textOf).join(), ':smile:');
     expect(parser.parse(':bad-[]').whereType<NamedInlineNode>(), isEmpty);
   });
-  test('native inline HTML keeps supported tags and strips unknown shells', () {
-    const source =
-        'Before <b>bold <u>under</u></b> <custom>plain</custom> <br> after';
-    final nodes = parser.parse(source);
-    expect(nodes.whereType<HtmlElementNode>().map((n) => n.tag), ['b', 'br']);
-    expect(
-      (nodes.whereType<HtmlElementNode>().first.children.last
-              as HtmlElementNode)
-          .tag,
-      'u',
-    );
-    expect(nodes.map(textOf).join(), 'Before bold under plain  after');
-    expect(
-      parser.parse('<script>hidden</script>visible').map(textOf).join(),
-      'visible',
-    );
-    expect(parser.parse('x <iframe>secret').map(textOf).join(), 'x ');
-  });
+  test(
+    'native inline HTML renders supported tags and retains unknown tags',
+    () {
+      const source =
+          'Before <b>bold <u>under</u></b> <custom>plain</custom> <br> after';
+      final nodes = parser.parse(source);
+      expect(nodes.whereType<HtmlElementNode>().map((n) => n.tag), ['b', 'br']);
+      expect(
+        (nodes.whereType<HtmlElementNode>().first.children.last
+                as HtmlElementNode)
+            .tag,
+        'u',
+      );
+      expect(
+        nodes.map(textOf).join(),
+        'Before bold under <custom>plain</custom>  after',
+      );
+      expect(
+        parser.parse('<script>hidden</script>visible').map(textOf).join(),
+        'visible',
+      );
+      expect(parser.parse('x <iframe>secret').map(textOf).join(), 'x ');
+    },
+  );
   test('HTML attributes and entity spans stay source mapped', () {
     const source = 'x <span style="color:red" onclick="bad()">&amp;</span> y';
     final node = parser.parse(source).whereType<HtmlElementNode>().single;
@@ -130,8 +137,9 @@ void main() {
     'registered syntax is source mapped and opaque inside code and math',
     () {
       const source = '> [cite:a1] `[cite:b2]` \$[cite:c3]\$ [1]';
-      final doc = const MarkdownParser(inlineSyntaxes: [_CitationSyntax()])
-          .parse(source);
+      final doc = const MarkdownParser(
+        inlineSyntaxes: [_CitationSyntax()],
+      ).parse(source);
       final children = doc.children.single.children.single.children;
       final citation = children.whereType<NamedInlineNode>().single;
       expect(citation.attributes['id'], 'a1');
@@ -145,21 +153,26 @@ void main() {
       );
     },
   );
-  test('math pipes remain in a table cell and LaTeX pipe escapes stay intact', () {
-    const source =
-        '| Formula | Text |\n| --- | --- |\n| \$|x|\$ | one |\n| \$\\|x\\|=1\$ | two |';
-    final table =
-        const MarkdownParser().parse(source).children.single as TableNode;
-    expect(table.children[1].children, hasLength(2));
-    expect(
-      (table.children[1].children.first.children.single as MathInlineNode).tex,
-      '|x|',
-    );
-    expect(
-      (table.children[2].children.first.children.single as MathInlineNode).tex,
-      r'\|x\|=1',
-    );
-  });
+  test(
+    'math pipes remain in a table cell and LaTeX pipe escapes stay intact',
+    () {
+      const source =
+          '| Formula | Text |\n| --- | --- |\n| \$|x|\$ | one |\n| \$\\|x\\|=1\$ | two |';
+      final table =
+          const MarkdownParser().parse(source).children.single as TableNode;
+      expect(table.children[1].children, hasLength(2));
+      expect(
+        (table.children[1].children.first.children.single as MathInlineNode)
+            .tex,
+        '|x|',
+      );
+      expect(
+        (table.children[2].children.first.children.single as MathInlineNode)
+            .tex,
+        r'\|x\|=1',
+      );
+    },
+  );
   test('directive code labels shield brackets from the label scanner', () {
     final directive =
         parser.parse(':note[`[` and `]`]').single as NamedInlineNode;

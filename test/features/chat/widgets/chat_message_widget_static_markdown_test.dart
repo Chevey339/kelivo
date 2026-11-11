@@ -20,10 +20,15 @@ void main() {
       testWidgets(
         'static ${translation ? "translation" : "user"} uses markstream on $platform',
         (tester) async {
-          final settings = SettingsProvider(createBusinessTestPreferences());
-          await settings.loaded;
+          late SettingsProvider settings;
+          await tester.runAsync(() async {
+            settings = SettingsProvider(createBusinessTestPreferences());
+            await settings.loaded;
+          });
           addTearDown(settings.dispose);
-          final source = ValueNotifier('# Heading\n\n**body** with `code`');
+          final source = ValueNotifier(
+            '# Heading\n\n**body** with `code`\n\n<hello> **After**',
+          );
           addTearDown(source.dispose);
           await tester.pumpWidget(
             MultiProvider(
@@ -78,6 +83,10 @@ void main() {
             'Heading',
           );
           expect(find.byType(InlineCodeCapsule), findsOneWidget);
+          expect(
+            markdownParagraph(tester, '<hello>').text.toPlainText(),
+            '<hello> After',
+          );
           source.value += '\n\nUpdated body';
           await tester.pumpAndSettle();
           expect(tester.state(view), same(state));
@@ -93,11 +102,13 @@ void main() {
                 .conversationId,
             'static-conversation',
           );
-          if (translation) {
-            await settings.setEnableAssistantMarkdown(false);
-          } else {
-            await settings.setEnableUserMarkdown(false);
-          }
+          await tester.runAsync(() async {
+            if (translation) {
+              await settings.setEnableAssistantMarkdown(false);
+            } else {
+              await settings.setEnableUserMarkdown(false);
+            }
+          });
           await tester.pumpAndSettle();
           expect(view, findsNothing);
           expect(find.text(source.value), findsOneWidget);
@@ -105,11 +116,13 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('bad�value�😀'), findsOneWidget);
           expect(tester.takeException(), isNull);
-          if (translation) {
-            await settings.setEnableAssistantMarkdown(true);
-          } else {
-            await settings.setEnableUserMarkdown(true);
-          }
+          await tester.runAsync(() async {
+            if (translation) {
+              await settings.setEnableAssistantMarkdown(true);
+            } else {
+              await settings.setEnableUserMarkdown(true);
+            }
+          });
           await tester.pumpAndSettle();
           expect(tester.widget<MarkstreamView>(view).source, 'bad�value�😀');
           expect(tester.takeException(), isNull);

@@ -4137,8 +4137,14 @@ press5
       );
       await tester.pump();
 
-      expect(_paragraphsWith(RegExp(r'</?theater>'), contains: true), isEmpty);
-      expect(_paragraphsWith('返回 List 给 ', contains: true), hasLength(1));
+      expect(
+        _paragraphsWith(RegExp(r'</?theater>'), contains: true),
+        hasLength(2),
+      );
+      expect(
+        _paragraphsWith('返回 List<String> 给 <username>', contains: true),
+        hasLength(1),
+      );
       expect(_paragraphsWith('更多信息', contains: false), hasLength(1));
       expect(_paragraphsWith('隐藏内容', contains: false), isEmpty);
 

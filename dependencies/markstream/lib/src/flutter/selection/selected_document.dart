@@ -1,6 +1,7 @@
 import '../../core/ast/nodes.dart';
 import '../../core/ast/source_span.dart';
 import '../../core/ast/transform.dart';
+import '../../core/html/html_fragment.dart' show isNativeHtmlTableRow;
 import '../../core/text_index/text_index.dart';
 import '../../core/serialize/to_plain_text.dart';
 
@@ -101,7 +102,7 @@ DocumentNode selectedDocument(
       continue;
     }
     if (node is HtmlElementNode &&
-        node.tag == 'tr' &&
+        isNativeHtmlTableRow(node) &&
         (kept.isNotEmpty ||
             node.children.any(visible.contains) &&
                 completeHtmlTables.any(

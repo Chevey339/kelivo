@@ -12,7 +12,7 @@ GFM 0.29 extension examples: 19/27 (70.4%).
 Intentional policy differences
 -----------------------------
 - Raw HTML is parsed into a safe native subset instead of copied verbatim.
-  Unknown tag shells are removed; script/style/iframe bodies are discarded;
+  Unknown tags remain literal text; script/style/iframe bodies are discarded;
   comments are removed; attributes are filtered; unclosed tags are balanced.
   Complete HTML documents export as escaped code. This also affects examples
   outside the HTML sections (links, emphasis, lists and line breaks).
