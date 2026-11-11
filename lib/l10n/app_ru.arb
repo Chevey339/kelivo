@@ -4679,6 +4679,7 @@
   "imageContextLoadFailed": "Не удалось загрузить изображения. Попробуйте ещё раз.",
   "imageContextUpdateFailed": "Не удалось сохранить изменения. Попробуйте ещё раз.",
   "contextOperationsTitle": "Операции с контекстом",
+  "contextOperationsLoadMore": "Показать ещё",
   "contextOperationsDescription": "Управление задачами сжатия, сводками и границами контекста",
   "contextOperationsEmpty": "Операций с контекстом пока нет.",
   "contextOperationsStored": "Сохранённая история: сообщений — {count}",

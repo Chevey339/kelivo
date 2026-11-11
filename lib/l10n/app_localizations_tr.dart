@@ -16080,6 +16080,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get contextOperationsTitle => 'Bağlam işlemleri';
 
   @override
+  String get contextOperationsLoadMore => 'Daha fazla göster';
+
+  @override
   String get contextOperationsDescription =>
       'Sıkıştırma görevlerini, özetleri ve bağlam sınırlarını yönetin';
 

@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/context_operation.dart';
+import '../../../core/models/context_operation_summary.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/context_compression_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -13,7 +14,6 @@ import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
-import '../../../utils/utf16_safe_cut.dart';
 import 'context_compression_status.dart';
 
 /// Stays outside the locked composer and the loaded history window.
@@ -143,8 +143,15 @@ class ContextOperationsPanel extends StatefulWidget {
 class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
   late Future<ContextMessageCounts> _counts;
   late int _revision;
-  List<ContextOperation> _operations = const [];
-  Map<String, ({bool hidden, bool superseded})> _statuses = const {};
+  List<ContextOperationSummary> _operations = const [];
+  int _visibleLimit = 3;
+  int _loadGeneration = 0;
+  String? _operationsRevision;
+  bool _loadingOperations = false;
+  bool _operationsFailed = false;
+  bool _retryAppend = false;
+  bool _hasMore = false;
+  bool _openingOperation = false;
   Object? _taskState;
 
   Object _currentTaskState() {
@@ -163,11 +170,6 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
     );
   }
 
-  void _readOperations() {
-    _operations = widget.chat.contextOperationsFor(widget.conversationId);
-    _statuses = ContextHistory.operationStatuses(_operations);
-  }
-
   bool _busy = false;
   String? _error;
 
@@ -181,19 +183,92 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
   void _load() {
     _revision = widget.chat.contextRevision(widget.conversationId);
     _taskState = _currentTaskState();
-    final revision = _revision;
     Future<ContextMessageCounts> load() async {
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return (stored: 0, messages: 0, summaries: 0);
-      await widget.chat.loadContextOperations(widget.conversationId);
-      if (mounted && revision == _revision) setState(_readOperations);
       return widget.chat.loadContextMessageCounts(
         widget.conversationId,
         limit: widget.messageLimit,
       );
     }
 
+    // Queue the small first page before the independent conversation counts.
+    _loadOperations();
     _counts = load();
+  }
+
+  Future<void> _loadOperations({bool append = false}) async {
+    final generation = ++_loadGeneration;
+    _loadingOperations = true;
+    _operationsFailed = false;
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || generation != _loadGeneration) return;
+      var page = await widget.chat.loadContextOperationPage(
+        widget.conversationId,
+        offset: append ? _operations.length : 0,
+        limit: append ? 10 : _visibleLimit,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      var replace = !append;
+      if (append && page.revision != _operationsRevision) {
+        // A database write can commit before ChatService notifies listeners.
+        // Re-read the expanded window instead of mixing two offset snapshots.
+        page = await widget.chat.loadContextOperationPage(
+          widget.conversationId,
+          offset: 0,
+          limit: _operations.length + 10,
+        );
+        if (!mounted || generation != _loadGeneration) return;
+        replace = true;
+      }
+      setState(() {
+        _operations = replace ? page.items : [..._operations, ...page.items];
+        if (append && _operations.length > _visibleLimit) {
+          _visibleLimit = _operations.length;
+        }
+        _operationsRevision = page.revision;
+        _hasMore = page.hasMore;
+        _loadingOperations = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _loadingOperations = false;
+        _operationsFailed = true;
+        _retryAppend = append;
+      });
+    }
+  }
+
+  Future<void> _openOperation(String id) async {
+    if (_openingOperation) return;
+    final chat = widget.chat;
+    final conversationId = widget.conversationId;
+    bool current() =>
+        mounted &&
+        chat == widget.chat &&
+        conversationId == widget.conversationId;
+    setState(() {
+      _openingOperation = true;
+      _error = null;
+    });
+    try {
+      final operation = await chat.loadContextOperation(conversationId, id);
+      if (!current()) return;
+      if (operation == null) throw StateError('context_operation_missing');
+      widget.onOpenOperation(operation);
+    } catch (_) {
+      if (current()) {
+        setState(
+          () => _error = AppLocalizations.of(
+            context,
+          )!.contextOperationsLoadFailed,
+        );
+      }
+    } finally {
+      if (current()) setState(() => _openingOperation = false);
+    }
   }
 
   void _changed() {
@@ -204,6 +279,25 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
       _taskState = taskState;
       if (_revision != revision) _load();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant ContextOperationsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat != widget.chat ||
+        oldWidget.conversationId != widget.conversationId) {
+      oldWidget.chat.removeListener(_changed);
+      widget.chat.addListener(_changed);
+      _operations = const [];
+      _operationsRevision = null;
+      _visibleLimit = 3;
+      _hasMore = false;
+      _openingOperation = false;
+      _error = null;
+      _load();
+    } else if (oldWidget.messageLimit != widget.messageLimit) {
+      _load();
+    }
   }
 
   @override
@@ -347,7 +441,7 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
               child: ListView.builder(
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(12),
-                itemCount: operations.length + 2,
+                itemCount: operations.length + 3,
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return showTask ? _task(task) : const SizedBox.shrink();
@@ -390,9 +484,8 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                               onPressed: () => setState(_load),
                             ),
                           ],
-                          if (snapshot.connectionState ==
-                                  ConnectionState.done &&
-                              !snapshot.hasError &&
+                          if (!_loadingOperations &&
+                              !_operationsFailed &&
                               operations.isEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 12),
@@ -402,23 +495,53 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                       ),
                     );
                   }
-                  final operation =
-                      operations[operations.length - (index - 2) - 1];
-                  final hidden = _statuses[operation.id]?.hidden ?? false;
-                  final superseded =
-                      _statuses[operation.id]?.superseded ?? false;
+                  if (index == operations.length + 2) {
+                    return Column(
+                      children: [
+                        if (_error != null && !showTask)
+                          Text(_error!, style: TextStyle(color: cs.error)),
+                        if (_loadingOperations)
+                          Text(l10n.contextLogLoading)
+                        else if (_operationsFailed) ...[
+                          Text(
+                            l10n.contextOperationsLoadFailed,
+                            style: TextStyle(color: cs.error),
+                          ),
+                          IosTextButton(
+                            label: l10n.compressTaskRetry,
+                            onPressed: () => setState(() {
+                              _loadOperations(append: _retryAppend);
+                            }),
+                          ),
+                        ] else if (_hasMore)
+                          IosTextButton(
+                            key: const ValueKey('context-operations-load-more'),
+                            label: l10n.contextOperationsLoadMore,
+                            onPressed: () {
+                              if (_loadingOperations) return;
+                              setState(() {
+                                _loadOperations(append: true);
+                              });
+                            },
+                          ),
+                      ],
+                    );
+                  }
+                  final operation = operations[index - 2];
                   final status = operation.revoked
                       ? l10n.contextOperationUndone
-                      : hidden
+                      : operation.hidden
                       ? l10n.contextOperationHidden
-                      : superseded
+                      : operation.superseded
                       ? l10n.contextOperationSuperseded
                       : l10n.contextOperationActive;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: IosCardPress(
                       key: ValueKey('context-operation-${operation.id}'),
-                      onTap: () => widget.onOpenOperation(operation),
+                      onTap: _openingOperation
+                          ? null
+                          : () => _openOperation(operation.id),
                       baseColor: cs.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(12),
                       padding: const EdgeInsets.all(12),
@@ -448,7 +571,7 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                               !operation.isNative) ...[
                             const SizedBox(height: 6),
                             Text(
-                              truncateHeadUtf16Safe(operation.summary, 240),
+                              operation.summaryPreview,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),

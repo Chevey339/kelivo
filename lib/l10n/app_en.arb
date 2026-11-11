@@ -7910,6 +7910,10 @@
     "description": "Status line showing how many images are included in this turn; {included} of {total}."
   },
   "contextOperationsTitle": "Context operations",
+  "contextOperationsLoadMore": "Show more",
+  "@contextOperationsLoadMore": {
+    "description": "Button below the context operation history list. Loads and appends the next ten older records; initially only the three most recent records are shown. Hidden when all records are loaded. No placeholders."
+  },
   "contextOperationsDescription": "Manage compression tasks, summaries and context boundaries",
   "contextOperationsEmpty": "No context operations yet.",
   "contextOperationsStored": "Saved history: {count} messages",

@@ -35,6 +35,7 @@ import '../backup/backup_task_progress.dart';
 import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../../models/context_operation.dart';
+import '../../models/context_operation_summary.dart';
 import '../../models/compress_context_options.dart';
 import 'context_compression_service.dart';
 import '../memory/memory_block_builder.dart';

@@ -4679,6 +4679,7 @@
   "imageContextLoadFailed": "暫時無法載入圖片，請重試。",
   "imageContextUpdateFailed": "未能儲存修改，請重試。",
   "contextOperationsTitle": "上下文操作記錄",
+  "contextOperationsLoadMore": "顯示更多",
   "contextOperationsDescription": "管理壓縮任務、摘要和上下文分界",
   "contextOperationsEmpty": "尚無上下文操作記錄。",
   "contextOperationsStored": "已儲存歷史：{count} 則訊息",

@@ -4679,6 +4679,7 @@
   "imageContextLoadFailed": "Görseller yüklenemedi. Tekrar deneyin.",
   "imageContextUpdateFailed": "Değişiklikleriniz kaydedilemedi. Tekrar deneyin.",
   "contextOperationsTitle": "Bağlam işlemleri",
+  "contextOperationsLoadMore": "Daha fazla göster",
   "contextOperationsDescription": "Sıkıştırma görevlerini, özetleri ve bağlam sınırlarını yönetin",
   "contextOperationsEmpty": "Henüz bağlam işlemi yok.",
   "contextOperationsStored": "Kaydedilen geçmiş: {count} mesaj",

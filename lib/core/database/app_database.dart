@@ -910,6 +910,14 @@ class AppDatabase extends _$AppDatabase {
           function: (args) => (args.single as String).length,
         );
         database.createFunction(
+          functionName: 'kelivo_timestamp_micros',
+          argumentCount: const AllowedArgumentCount(1),
+          deterministic: true,
+          directOnly: true,
+          function: (args) =>
+              DateTime.parse(args.single as String).microsecondsSinceEpoch,
+        );
+        database.createFunction(
           functionName: 'kelivo_has_context_content',
           argumentCount: const AllowedArgumentCount(2),
           deterministic: true,

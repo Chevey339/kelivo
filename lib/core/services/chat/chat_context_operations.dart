@@ -61,6 +61,58 @@ extension ChatContextOperations on ChatService {
   List<ContextOperation> contextOperationsFor(String conversationId) =>
       List.unmodifiable(_contextOperations[conversationId] ?? const []);
 
+  Future<ContextOperationPage> loadContextOperationPage(
+    String id, {
+    required int offset,
+    required int limit,
+  }) async {
+    RangeError.checkNotNegative(offset, 'offset');
+    RangeError.checkValueInInterval(limit, 1, 0x7fffffff, 'limit');
+    if (!_initialized || getConversation(id) == null) {
+      throw StateError('conversation_not_found');
+    }
+    if (!_temporaryConversationIds.contains(id) &&
+        !_draftConversations.containsKey(id)) {
+      return _repo.readContextOperationPage(id, offset: offset, limit: limit);
+    }
+    final operations = contextOperationsFor(id);
+    final statuses = ContextHistory.operationStatuses(operations);
+    final ordered = operations.indexed.toList()
+      ..sort((a, b) {
+        final time = b.$2.createdAt.compareTo(a.$2.createdAt);
+        return time != 0 ? time : b.$1.compareTo(a.$1);
+      });
+    final selected = ordered.skip(offset).take(limit).toList();
+    return (
+      items: [
+        for (final (_, operation) in selected)
+          ContextOperationSummary.fromOperation(
+            operation,
+            hidden: statuses[operation.id]!.hidden,
+            superseded: statuses[operation.id]!.superseded,
+          ),
+      ],
+      hasMore: offset + selected.length < ordered.length,
+      revision: 'memory:${contextRevision(id)}',
+    );
+  }
+
+  Future<ContextOperation?> loadContextOperation(
+    String id,
+    String operationId,
+  ) async {
+    if (!_initialized || getConversation(id) == null) {
+      throw StateError('conversation_not_found');
+    }
+    if (_temporaryConversationIds.contains(id) ||
+        _draftConversations.containsKey(id)) {
+      return contextOperationsFor(
+        id,
+      ).where((operation) => operation.id == operationId).firstOrNull;
+    }
+    return _repo.readContextOperation(id, operationId);
+  }
+
   Future<List<ContextOperation>> loadContextOperations(
     String id, {
     bool refresh = false,

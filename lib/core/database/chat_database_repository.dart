@@ -35,6 +35,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
 import '../models/context_operation.dart';
+import '../models/context_operation_summary.dart';
 import '../models/compress_context_options.dart';
 import '../models/token_usage.dart';
 import '../models/conversation.dart';

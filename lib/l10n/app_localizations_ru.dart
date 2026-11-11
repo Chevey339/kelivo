@@ -16273,6 +16273,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contextOperationsTitle => 'Операции с контекстом';
 
   @override
+  String get contextOperationsLoadMore => 'Показать ещё';
+
+  @override
   String get contextOperationsDescription =>
       'Управление задачами сжатия, сводками и границами контекста';
 

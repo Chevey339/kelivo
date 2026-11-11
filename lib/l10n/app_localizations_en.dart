@@ -15985,6 +15985,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextOperationsTitle => 'Context operations';
 
   @override
+  String get contextOperationsLoadMore => 'Show more';
+
+  @override
   String get contextOperationsDescription =>
       'Manage compression tasks, summaries and context boundaries';
 

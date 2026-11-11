@@ -3,18 +3,122 @@ part of 'chat_database_repository.dart';
 extension ChatContextRepository on ChatDatabaseRepository {
   Future<ContextMutationState> readContextMutationState(String id) =>
       _db.transaction(() async {
-        final row =
-            await (_db.selectOnly(_db.conversationRows)
-                  ..addColumns([_db.conversationRows.truncateIndex])
-                  ..where(_db.conversationRows.id.equals(id)))
-                .getSingleOrNull();
-        if (row == null) throw StateError('conversation_not_found');
-        // Preserve the existing atomic conversion before issuing approval.
-        if (row.read(_db.conversationRows.truncateIndex)! >= 0) {
-          await readContextOperations(id);
-        }
+        await _convertContextBoundary(id);
         return _contextIndex.read(id);
       });
+
+  Future<void> _convertContextBoundary(String id) async {
+    final row =
+        await (_db.selectOnly(_db.conversationRows)
+              ..addColumns([_db.conversationRows.truncateIndex])
+              ..where(_db.conversationRows.id.equals(id)))
+            .getSingleOrNull();
+    if (row == null) throw StateError('conversation_not_found');
+    // Preserve the existing atomic conversion before reading context records.
+    if (row.read(_db.conversationRows.truncateIndex)! >= 0) {
+      await readContextOperations(id);
+    }
+  }
+
+  /// Select and bound list data on SQLite's worker before crossing to the UI.
+  Future<ContextOperationPage> readContextOperationPage(
+    String id, {
+    required int offset,
+    required int limit,
+  }) => _db.transaction(() async {
+    RangeError.checkNotNegative(offset, 'offset');
+    RangeError.checkValueInInterval(limit, 1, 0x7fffffff, 'limit');
+    await _convertContextBoundary(id);
+    await _contextIndex.ensure(id);
+    final rows = await _db
+        .customSelect(
+          r'''
+WITH state AS MATERIALIZED (
+  SELECT revision,metadata FROM context_operation_state WHERE conversation_id=?
+), metadata AS MATERIALIZED (
+  SELECT CAST(j.key AS INTEGER) AS ordinal, j.value
+  FROM state, json_each(state.metadata) j
+), page AS MATERIALIZED (
+  SELECT ordinal, value,
+    kelivo_timestamp_micros(json_extract(value,'$.createdAt')) AS timestamp
+  FROM metadata ORDER BY timestamp DESC, ordinal DESC LIMIT ? OFFSET ?
+)
+SELECT s.revision, json_extract(p.value,'$.id') AS id,
+  json_extract(p.value,'$.kind') AS kind,
+  json_extract(p.value,'$.createdAt') AS created_at,
+  json_extract(p.value,'$.revoked') AS revoked,
+  COALESCE(json_type(e.payload,'$['||p.ordinal||'].compressionDetails.nativeCompaction')='object',0) AS native,
+  COALESCE(json_extract(e.payload,'$['||p.ordinal||'].compressionDetails.nativeContextImported'),0) AS imported,
+  substr(COALESCE(json_extract(e.payload,'$['||p.ordinal||'].summary'),''),1,240) AS preview,
+  (SELECT json_array_length(metadata) FROM state) AS total,
+  EXISTS(SELECT 1 FROM metadata n
+    WHERE n.ordinal>p.ordinal AND NOT json_extract(n.value,'$.revoked')
+    AND (json_extract(n.value,'$.kind')='start'
+      OR (json_extract(n.value,'$.kind')='clear' AND EXISTS(
+        SELECT 1 FROM json_each(n.value,'$.groups') g
+        WHERE g.value=json_extract(p.value,'$.anchor'))))) AS hidden,
+  EXISTS(SELECT 1 FROM metadata n, json_each(n.value,'$.dependencies') d
+    WHERE NOT json_extract(n.value,'$.revoked')
+    AND json_extract(p.value,'$.kind')='compress'
+    AND d.value=json_extract(p.value,'$.id')) AS superseded
+FROM state s LEFT JOIN page p ON 1
+LEFT JOIN extension_entity_rows e ON e.kind=? AND e.id=?
+ORDER BY p.timestamp DESC, p.ordinal DESC
+''',
+          variables: [
+            Variable<String>(id),
+            Variable<int>(limit),
+            Variable<int>(offset),
+            Variable<String>(ContextOperation.entityKind),
+            Variable<String>(id),
+          ],
+        )
+        .get();
+    final items = rows
+        .where((row) => row.readNullable<String>('id') != null)
+        .toList();
+    return (
+      items: [
+        for (final row in items)
+          ContextOperationSummary(
+            id: row.read<String>('id'),
+            kind: ContextOperationKind.values.byName(row.read<String>('kind')),
+            createdAt: DateTime.parse(row.read<String>('created_at')),
+            revoked: row.read<int>('revoked') != 0,
+            hidden: row.read<int>('hidden') != 0,
+            superseded: row.read<int>('superseded') != 0,
+            isNative: row.read<int>('native') != 0,
+            isImportedNative:
+                row.read<int>('native') != 0 && row.read<int>('imported') != 0,
+            summaryPreview: row.read<int>('native') != 0
+                ? ''
+                : truncateHeadUtf16Safe(row.read<String>('preview'), 240),
+          ),
+      ],
+      hasMore: offset + items.length < rows.first.read<int>('total'),
+      revision: rows.first.read<String>('revision'),
+    );
+  });
+
+  Future<ContextOperation?> readContextOperation(
+    String id,
+    String operationId,
+  ) => _db.transaction(() async {
+    await _convertContextBoundary(id);
+    final row = await _db
+        .customSelect(
+          r'''SELECT j.value AS payload FROM extension_entity_rows e, json_each(e.payload) j
+WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
+          variables: [
+            Variable<String>(ContextOperation.entityKind),
+            Variable<String>(id),
+            Variable<String>(operationId),
+          ],
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return _decodeContextOperation(row.read<String>('payload'));
+  });
 
   Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
   readContextMutationPreview(String id, {required String expectedState}) =>
@@ -709,6 +813,10 @@ extension ChatContextRepository on ChatDatabaseRepository {
     );
   }
 }
+
+Future<ContextOperation> _decodeContextOperation(String payload) => Isolate.run(
+  () => ContextOperation.fromJson(jsonDecode(payload) as Map<String, dynamic>),
+);
 
 Future<List<ContextOperation>> _decodeContextOperations(String payload) =>
     Isolate.run(

@@ -5822,6 +5822,7 @@
   "imageContextLoadFailed": "暂时无法加载图片，请重试。",
   "imageContextUpdateFailed": "未能保存修改，请重试。",
   "contextOperationsTitle": "上下文操作记录",
+  "contextOperationsLoadMore": "展开更多",
   "contextOperationsDescription": "管理压缩任务、摘要和上下文分界",
   "contextOperationsEmpty": "暂无上下文操作记录。",
   "contextOperationsStored": "已保存历史：{count} 条消息",

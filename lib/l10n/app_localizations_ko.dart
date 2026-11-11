@@ -15495,6 +15495,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextOperationsTitle => '컨텍스트 작업';
 
   @override
+  String get contextOperationsLoadMore => '더 보기';
+
+  @override
   String get contextOperationsDescription => '압축 작업, 요약 및 컨텍스트 경계 관리';
 
   @override

@@ -28206,6 +28206,12 @@ abstract class AppLocalizations {
   /// **'Context operations'**
   String get contextOperationsTitle;
 
+  /// Button below the context operation history list. Loads and appends the next ten older records; initially only the three most recent records are shown. Hidden when all records are loaded. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get contextOperationsLoadMore;
+
   /// Subtitle under the context operations entry describing what it manages: compression tasks, summaries and context boundaries.
   ///
   /// In en, this message translates to:

@@ -71,7 +71,7 @@ END
     });
   }
 
-  Future<ContextMutationState> read(String id) async {
+  Future<void> ensure(String id) async {
     // A caller may roll back the transaction that first creates this index.
     // Check its presence instead of caching an installation Future in Dart.
     if (await database
@@ -93,6 +93,10 @@ AND NOT EXISTS(SELECT 1 FROM context_operation_state s WHERE s.conversation_id=c
 ''',
       [id],
     );
+  }
+
+  Future<ContextMutationState> read(String id) async {
+    await ensure(id);
     final row = await database
         .customSelect(
           'SELECT revision,metadata FROM context_operation_state WHERE conversation_id=?',

@@ -15171,6 +15171,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextOperationsTitle => '上下文操作记录';
 
   @override
+  String get contextOperationsLoadMore => '展开更多';
+
+  @override
   String get contextOperationsDescription => '管理压缩任务、摘要和上下文分界';
 
   @override
@@ -31081,6 +31084,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get contextOperationsTitle => '上下文操作记录';
+
+  @override
+  String get contextOperationsLoadMore => '展开更多';
 
   @override
   String get contextOperationsDescription => '管理压缩任务、摘要和上下文分界';
@@ -47000,6 +47006,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextOperationsTitle => '上下文操作記錄';
+
+  @override
+  String get contextOperationsLoadMore => '顯示更多';
 
   @override
   String get contextOperationsDescription => '管理壓縮任務、摘要和上下文分界';
