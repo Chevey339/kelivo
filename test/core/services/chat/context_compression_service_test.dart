@@ -1,8 +1,11 @@
 import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
+import 'package:Kelivo/core/services/api/native_compaction_context.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_request.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -328,6 +331,125 @@ void main() {
       expect(compression.taskFor(id)!.id, replacement.id);
     },
   );
+
+  for (final temporary in [false, true]) {
+    test(
+      'native regeneration after a retained edit replays only compacted history and the target: temporary=$temporary',
+      () async {
+        final conversation = temporary
+            ? await chat.createDraftConversation(
+                title: 'Five turns',
+                temporary: true,
+              )
+            : await chat.createConversation(title: 'Five turns');
+        id = conversation.id;
+        chat.setCurrentConversation(id);
+        for (final turn in ['A', 'B', 'C', 'D', 'E']) {
+          for (final role in ['user', 'assistant']) {
+            await chat.addMessage(
+              conversationId: id,
+              role: role,
+              content: '$turn-1-$role',
+            );
+          }
+        }
+        final original = (await chat.loadContextSnapshot(id)).messages;
+        final config = nativeResponsesConfig(
+          ProviderConfig(
+            id: 'fixture',
+            name: 'Fixture',
+            enabled: true,
+            baseUrl: 'https://fixture.example/v1',
+            apiKey: 'test',
+          ),
+        );
+        final payload = NativeCompactionPayload(
+          protocol: NativeCompactionProtocol.compact,
+          scope: nativeCompactionScope(config),
+          modelId: 'private-model',
+          output: [
+            {
+              'type': 'compaction',
+              'id': 'AB',
+              'encrypted_content': 'opaque-AB',
+            },
+          ],
+        );
+        await compression.start(
+          id,
+          nativeRequest((selection, _) async {
+            expect(selection.input.map((m) => m.content), [
+              'A-1-user',
+              'A-1-assistant',
+              'B-1-user',
+              'B-1-assistant',
+            ]);
+            expect(
+              selection.retained.map((m) => m.id),
+              original.skip(4).map((m) => m.id),
+            );
+            return payload;
+          }, keep: 3),
+        );
+        await until(
+          () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+        );
+        final edited = await chat.appendMessageVersion(
+          messageId: original[4].id,
+          content: 'C-2-user',
+        );
+        final operation = (await chat.loadContextOperations(
+          id,
+          refresh: true,
+        )).single;
+        expect(operation.revoked, isFalse);
+        expect(operation.anchorGroupId, ContextHistory.group(original[3]));
+        expect(
+          operation.appliedAfterGroupId,
+          ContextHistory.group(original.last),
+        );
+        final history = await chat.loadEffectiveContextMessages(
+          id,
+          limit: 100,
+          throughRevisionId: edited!.id,
+        );
+        expect(history.map((m) => m.id), [
+          operation.summaryMessageId,
+          edited.id,
+        ]);
+        expect(
+          NativeCompactionPayload.forMessage(history.first)!.output,
+          payload.output,
+        );
+        final body = await buildOpenAIResponsesBody(config, 'private-model', [
+          for (final message in history)
+            {
+              'role': message.role,
+              'content': message.content,
+              if (NativeCompactionPayload.forMessage(message)
+                  case final native?)
+                nativeCompactionMessageKey: native.toJson(),
+            },
+        ]);
+        final input = (body['input'] as List).cast<Map>();
+        expect(
+          input.where((item) => item['type'] == 'compaction'),
+          hasLength(1),
+        );
+        final serialized = jsonEncode(input);
+        expect(serialized, contains('C-2-user'));
+        for (final excluded in [
+          'A-1-assistant',
+          'B-1-assistant',
+          'C-1-',
+          'D-1-',
+          'E-1-',
+        ]) {
+          expect(serialized, isNot(contains(excluded)));
+        }
+      },
+    );
+  }
 
   test(
     'native history stays opaque while subsequent text compression reads originals',

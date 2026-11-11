@@ -511,9 +511,9 @@ void main() {
   });
 
   test(
-    'historical regeneration uses original history and keeps following assistant',
+    'historical regeneration reuses earlier summaries and keeps following assistant',
     () async {
-      await compact('S1', ['u1', 'a1']);
+      final summary = await compact('S1', ['u1', 'a1']);
       final selected = await repo.appendMessageVersion(
         messageId: 'u3',
         content: 'selected version',
@@ -526,8 +526,7 @@ void main() {
         includeFollowingAssistant: true,
       );
       expect(result.map((m) => m.id), [
-        'u1',
-        'a1',
+        summary.summaryMessageId,
         'u2',
         'a2',
         selected!.message.id,

@@ -71,8 +71,8 @@ class ContextOperationMetadata {
   final String id;
   final ContextOperationKind kind;
   final String anchorGroupId;
-  // A summary created after a retained tail must not leak into regeneration
-  // of a message that predates the operation, even if its UI anchor is earlier.
+  // The selected tail when the operation was created. Compression replay is
+  // bounded by sourceGroups and dependencies, not this retained-tail position.
   final String appliedAfterGroupId;
   final List<String> sourceGroups;
   final List<String> dependencies;
@@ -570,6 +570,9 @@ class ContextHistory {
     final applicable = startOperation == null
         ? operations
         : operations.skipWhile((op) => op.id != startOperation.id);
+    final appliedOperations = <String>{
+      if (startOperation != null) startOperation.id,
+    };
     for (final operation in applicable) {
       if (operation.revoked || omitOperations.contains(operation.id)) continue;
       if (operation.isFixedStart) continue;
@@ -589,7 +592,25 @@ class ContextHistory {
               ))) {
         continue;
       }
-      if (throughGroupId != null && appliedAfter >= through) continue;
+      if (throughGroupId != null) {
+        // A retained-tail regeneration can reuse an earlier compressed range,
+        // even when compression was requested after the target. Never replay a
+        // summary that covers the target or depends on an unavailable node.
+        if (operation.isCompression) {
+          if (anchor >= through ||
+              operation.sourceGroups.any(
+                (group) => (positions[group] ?? through) >= through,
+              ) ||
+              operation.dependencies.any(
+                (id) => !appliedOperations.contains(id),
+              )) {
+            continue;
+          }
+        } else if (appliedAfter >= through) {
+          continue;
+        }
+      }
+      appliedOperations.add(operation.id);
       if (operation.isClear) {
         result.removeWhere(
           (message) =>
