@@ -12,13 +12,23 @@ class McpGroup {
 enum McpIconType { emoji, file, url, asset, lobehub }
 
 class McpServerIcon {
-  const McpServerIcon({required this.type, required this.value});
+  const McpServerIcon({
+    required this.type,
+    required this.value,
+    this.monochrome = false,
+  });
   final McpIconType type;
   final String value;
-  Map<String, dynamic> toJson() => {'type': type.name, 'value': value};
+  final bool monochrome;
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'value': value,
+    if (monochrome) 'monochrome': true,
+  };
   factory McpServerIcon.fromJson(Map<String, dynamic> json) => McpServerIcon(
     type: McpIconType.values.byName(json['type'] as String),
     value: json['value'] as String,
+    monochrome: json['monochrome'] == true,
   );
 }
 
